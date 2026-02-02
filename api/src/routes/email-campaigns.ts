@@ -53,7 +53,7 @@ router.get('/debug-leads', requireAuth, async (req, res) => {
         );
 
         res.json({
-            columns: columnsResult.rows.map(r => r.column_name),
+            columns: columnsResult.rows.map((r: { column_name: string }) => r.column_name),
             totalLeads: leadsCount.rows[0].count,
             leadsWithEmail: leadsWithEmail.rows[0].count,
             userId

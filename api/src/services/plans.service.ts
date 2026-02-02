@@ -105,7 +105,7 @@ export const plansService = {
     const result = await query(
       `INSERT INTO plans (id, name, description, price_monthly, price_annual, features, limits)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, name, description, price_monthly, price_annual, features, limits`,
+       RETURNING id, name, description, price_monthly, price_annual, payment_link_monthly, payment_link_annual, features, limits`,
       [id, name, description, priceMonthly, priceAnnual, JSON.stringify(features), JSON.stringify(limits)]
     );
 
@@ -117,6 +117,10 @@ export const plansService = {
       price: {
         monthly: parseFloat(row.price_monthly),
         annual: parseFloat(row.price_annual),
+      },
+      paymentLinks: {
+        monthly: row.payment_link_monthly || null,
+        annual: row.payment_link_annual || null,
       },
       features: row.features,
       limits: row.limits,
@@ -174,7 +178,7 @@ export const plansService = {
       `UPDATE plans
        SET ${fields.join(', ')}
        WHERE id = $${paramCount}
-       RETURNING id, name, description, price_monthly, price_annual, features, limits`,
+       RETURNING id, name, description, price_monthly, price_annual, payment_link_monthly, payment_link_annual, features, limits`,
       values
     );
 
@@ -190,6 +194,10 @@ export const plansService = {
       price: {
         monthly: parseFloat(row.price_monthly),
         annual: parseFloat(row.price_annual),
+      },
+      paymentLinks: {
+        monthly: row.payment_link_monthly || null,
+        annual: row.payment_link_annual || null,
       },
       features: row.features,
       limits: row.limits,

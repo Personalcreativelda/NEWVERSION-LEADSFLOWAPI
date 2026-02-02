@@ -24,7 +24,7 @@ export const notificationsService = {
       [userId, limit, offset]
     );
 
-    return result.rows.map(row => ({
+    return result.rows.map((row: any) => ({
       id: row.id,
       userId: row.user_id,
       type: row.type,

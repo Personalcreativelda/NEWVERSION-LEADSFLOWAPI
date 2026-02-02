@@ -121,7 +121,7 @@ router.post('/send', async (req, res, next) => {
           content: message.trim(),
           status: 'sent',
           sent_at: new Date().toISOString(),
-          external_id: result?.key?.id || null,
+          external_id: (result as any)?.key?.id || null,
           metadata: {
             whatsapp_result: result,
             remote_jid: remoteJid,
