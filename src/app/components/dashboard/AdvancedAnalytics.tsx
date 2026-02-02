@@ -400,38 +400,38 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
   const topOrigins = leadsByOrigin.slice(0, 5);
 
   return (
-    <div className="space-y-4 sm:space-y-6 px-3 sm:px-0 overflow-x-hidden">
+    <div className="space-y-6">
       {/* KPIs Principais */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Taxa de Conversão */}
-        <Card className="p-3 sm:p-5 bg-card border-border">
+        <Card className="p-5 bg-card border-border">
           <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-                <Target className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 flex-shrink-0" />
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">Taxa de Conversão</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Target className="w-4 h-4 text-green-600" />
+                <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
               </div>
-              <p className={`text-xl sm:text-3xl mb-1 text-green-600`}>{metrics.conversionRate}%</p>
+              <p className={`text-3xl mb-1 text-green-600`}>{metrics.conversionRate}%</p>
               <div className="flex items-center gap-1">
-                <ArrowUpRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-green-600 flex-shrink-0" />
-                <span className="text-[10px] sm:text-xs text-green-600 truncate">+2.3% vs mês anterior</span>
+                <ArrowUpRight className="w-3 h-3 text-green-600" />
+                <span className="text-xs text-green-600">+2.3% vs mês anterior</span>
               </div>
             </div>
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0 ml-2">
-              <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
+            <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-green-600" />
             </div>
           </div>
         </Card>
 
         {/* Valor Médio */}
-        <Card className="p-3 sm:p-5 bg-card border-border">
+        <Card className="p-5 bg-card border-border">
           <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-                <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 flex-shrink-0" />
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">Valor Médio</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="w-4 h-4 text-blue-600" />
+                <p className="text-sm text-muted-foreground">Valor Médio</p>
               </div>
-              <p className={`text-lg sm:text-3xl mb-1 text-blue-600 truncate`}>
+              <p className={`text-3xl mb-1 text-blue-600`}>
                 {metrics.avgValue > 0
                   ? `R$ ${metrics.avgValue.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                   : '-'}
@@ -440,34 +440,34 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                 {metrics.avgValue > 0 ? (
                   <>
                     {parseFloat(metrics.avgValueChange) >= 0 ? (
-                      <ArrowUpRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-green-600 flex-shrink-0" />
+                      <ArrowUpRight className="w-3 h-3 text-green-600" />
                     ) : (
-                      <ArrowDownRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-red-600 flex-shrink-0" />
+                      <ArrowDownRight className="w-3 h-3 text-red-600" />
                     )}
-                    <span className={`text-[10px] sm:text-xs truncate ${parseFloat(metrics.avgValueChange) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {parseFloat(metrics.avgValueChange) >= 0 ? '+' : ''}{metrics.avgValueChange}%
+                    <span className={`text-xs ${parseFloat(metrics.avgValueChange) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {parseFloat(metrics.avgValueChange) >= 0 ? '+' : ''}{metrics.avgValueChange}% vs mês anterior
                     </span>
                   </>
                 ) : (
-                  <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 truncate">Aguardando</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">Aguardando conversões</span>
                 )}
               </div>
             </div>
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 ml-2">
-              <DollarSign className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
+            <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <DollarSign className="w-6 h-6 text-blue-600" />
             </div>
           </div>
         </Card>
 
         {/* Tempo Médio no Funil */}
-        <Card className="p-3 sm:p-5 bg-card border-border">
+        <Card className="p-5 bg-card border-border">
           <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-                <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-purple-600 flex-shrink-0" />
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">Tempo Médio</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="w-4 h-4 text-purple-600" />
+                <p className="text-sm text-muted-foreground">Tempo Médio</p>
               </div>
-              <p className={`text-xl sm:text-3xl mb-1 text-purple-600`}>
+              <p className={`text-3xl mb-1 text-purple-600`}>
                 {metrics.avgTimeInFunnel > 0
                   ? metrics.avgTimeInFunnel < 1
                     ? `${Math.round(metrics.avgTimeInFunnel * 24)}h`
@@ -480,68 +480,68 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                 {metrics.avgTimeInFunnel > 0 && parseFloat(metrics.avgTimeChange) !== 0 ? (
                   <>
                     {parseFloat(metrics.avgTimeChange) < 0 ? (
-                      <ArrowDownRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-green-600 flex-shrink-0" />
+                      <ArrowDownRight className="w-3 h-3 text-green-600" />
                     ) : (
-                      <ArrowUpRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-red-600 flex-shrink-0" />
+                      <ArrowUpRight className="w-3 h-3 text-red-600" />
                     )}
-                    <span className={`text-[10px] sm:text-xs truncate ${parseFloat(metrics.avgTimeChange) < 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`text-xs ${parseFloat(metrics.avgTimeChange) < 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {parseFloat(metrics.avgTimeChange) < 0 ? '↓ ' : '↑ '}
-                      {Math.abs(parseFloat(metrics.avgTimeChange))}%
+                      {Math.abs(parseFloat(metrics.avgTimeChange))}% vs mês anterior
                     </span>
                   </>
                 ) : (
-                  <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 truncate">Aguardando</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">Aguardando conversões</span>
                 )}
               </div>
             </div>
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0 ml-2">
-              <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600" />
+            <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+              <Clock className="w-6 h-6 text-purple-600" />
             </div>
           </div>
         </Card>
 
         {/* Taxa de Crescimento */}
-        <Card className="p-3 sm:p-5 bg-card border-border">
+        <Card className="p-5 bg-card border-border">
           <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-                <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-orange-600 flex-shrink-0" />
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">Crescimento</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Zap className="w-4 h-4 text-orange-600" />
+                <p className="text-sm text-muted-foreground">Crescimento</p>
               </div>
-              <p className={`text-xl sm:text-3xl mb-1 ${metrics.absoluteGrowth >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
+              <p className={`text-3xl mb-1 ${metrics.absoluteGrowth >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
                 {metrics.absoluteGrowth >= 0 ? '+' : ''}{metrics.absoluteGrowth}
               </p>
               <div className="flex items-center gap-1">
                 {metrics.absoluteGrowth >= 0 ? (
-                  <ArrowUpRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-green-600 flex-shrink-0" />
+                  <ArrowUpRight className="w-3 h-3 text-green-600" />
                 ) : (
-                  <ArrowDownRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-red-600 flex-shrink-0" />
+                  <ArrowDownRight className="w-3 h-3 text-red-600" />
                 )}
-                <span className={`text-[10px] sm:text-xs truncate ${metrics.absoluteGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {parseFloat(metrics.growthRate) >= 0 ? '+' : ''}{metrics.growthRate}% 7 dias
+                <span className={`text-xs ${metrics.absoluteGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {parseFloat(metrics.growthRate) >= 0 ? '+' : ''}{metrics.growthRate}% últimos 7 dias
                 </span>
               </div>
             </div>
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 ml-2">
-              <Zap className="w-4 h-4 sm:w-6 sm:h-6 text-orange-600" />
+            <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+              <Zap className="w-6 h-6 text-orange-600" />
             </div>
           </div>
         </Card>
       </div>
 
       {/* Gráficos de Análise */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gráfico de Tendência (Últimos 7 dias) */}
-        <Card className="p-4 sm:p-6 bg-card border-border">
-          <div className="mb-3 sm:mb-4">
-            <h3 className="text-base sm:text-lg text-foreground">
+        <Card className="p-6 bg-card border-border">
+          <div className="mb-4">
+            <h3 className="text-lg text-foreground">
               Tendência de Leads
             </h3>
-            <p className="text-xs sm:text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Últimos 7 dias
             </p>
           </div>
-          <ResponsiveContainer width="100%" height={280}>
+          <ResponsiveContainer width="100%" height={380}>
             <AreaChart data={temporalAnalysis}>
               <defs>
                 <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
@@ -550,14 +550,13 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#E5E7EB'} />
-              <XAxis dataKey="date" stroke={isDark ? '#9CA3AF' : '#6B7280'} tick={{ fontSize: 10 }} />
-              <YAxis stroke={isDark ? '#9CA3AF' : '#6B7280'} tick={{ fontSize: 10 }} width={30} />
+              <XAxis dataKey="date" stroke={isDark ? '#9CA3AF' : '#6B7280'} />
+              <YAxis stroke={isDark ? '#9CA3AF' : '#6B7280'} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
                   border: `1px solid ${isDark ? '#374151' : '#E5E7EB'}`,
                   borderRadius: '8px',
-                  fontSize: '12px',
                 }}
                 labelStyle={{ color: isDark ? '#F3F4F6' : '#111827' }}
               />
@@ -567,26 +566,26 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
         </Card>
 
         {/* Distribuição por Status */}
-        <Card className="p-4 sm:p-6 bg-card border-border">
-          <div className="mb-3 sm:mb-4">
-            <h3 className="text-base sm:text-lg text-foreground">
+        <Card className="p-6 bg-card border-border">
+          <div className="mb-4">
+            <h3 className="text-lg text-foreground">
               Distribuição por Status
             </h3>
-            <p className="text-xs sm:text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Leads por estágio do funil
             </p>
           </div>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
                 data={conversionByStatus}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                outerRadius={70}
+                outerRadius={100}
                 fill="#8884d8"
                 dataKey="value"
-                label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
               >
                 {conversionByStatus.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || PIE_COLORS[index % PIE_COLORS.length]} />
@@ -597,7 +596,6 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                   backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
                   border: `1px solid ${isDark ? '#374151' : '#E5E7EB'}`,
                   borderRadius: '8px',
-                  fontSize: '12px',
                 }}
                 labelStyle={{ color: isDark ? '#F3F4F6' : '#111827' }}
               />
@@ -605,15 +603,15 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
           </ResponsiveContainer>
 
           {/* Legenda Customizada - LIMPA E ORGANIZADA */}
-          <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 sm:gap-x-4 gap-y-2 sm:gap-y-3">
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-3 gap-x-4 gap-y-3">
               {conversionByStatus.map((entry, index) => (
-                <div key={`legend-${index}`} className="flex items-center gap-1.5 sm:gap-2">
+                <div key={`legend-${index}`} className="flex items-center gap-2">
                   <div
-                    className="w-2 h-2 sm:w-3 sm:h-3 rounded-full flex-shrink-0"
+                    className="w-3 h-3 rounded-full flex-shrink-0"
                     style={{ backgroundColor: STATUS_COLORS[entry.name] || PIE_COLORS[index % PIE_COLORS.length] }}
                   />
-                  <span className="text-xs sm:text-sm text-muted-foreground truncate">
+                  <span className="text-sm text-muted-foreground">
                     {entry.name} <span className="text-muted-foreground/70">({entry.value})</span>
                   </span>
                 </div>
@@ -623,26 +621,25 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
         </Card>
 
         {/* Top 5 Origens */}
-        <Card className="p-4 sm:p-6 bg-card border-border">
-          <div className="mb-3 sm:mb-4">
-            <h3 className="text-base sm:text-lg text-foreground">
+        <Card className="p-6 bg-card border-border">
+          <div className="mb-4">
+            <h3 className="text-lg text-foreground">
               Top 5 Origens de Leads
             </h3>
-            <p className="text-xs sm:text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Fontes mais produtivas
             </p>
           </div>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={topOrigins} layout="vertical" margin={{ top: 10, right: 40, left: 0, bottom: 10 }}>
+          <ResponsiveContainer width="100%" height={380}>
+            <BarChart data={topOrigins} layout="vertical" margin={{ top: 10, right: 60, left: 10, bottom: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#E5E7EB'} />
-              <XAxis type="number" stroke={isDark ? '#9CA3AF' : '#6B7280'} tick={{ fontSize: 10 }} />
-              <YAxis dataKey="name" type="category" width={70} stroke={isDark ? '#9CA3AF' : '#6B7280'} tick={{ fontSize: 10 }} />
+              <XAxis type="number" stroke={isDark ? '#9CA3AF' : '#6B7280'} />
+              <YAxis dataKey="name" type="category" width={100} stroke={isDark ? '#9CA3AF' : '#6B7280'} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
                   border: `1px solid ${isDark ? '#374151' : '#E5E7EB'}`,
                   borderRadius: '8px',
-                  fontSize: '12px',
                 }}
                 labelStyle={{ color: isDark ? '#F3F4F6' : '#111827' }}
               />
@@ -650,7 +647,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                 dataKey="value"
                 radius={[0, 8, 8, 0]}
                 minPointSize={15}
-                label={{ position: 'right', fill: isDark ? '#9CA3AF' : '#6B7280', fontSize: 10 }}
+                label={{ position: 'right', fill: isDark ? '#9CA3AF' : '#6B7280', fontSize: 12 }}
               >
                 {topOrigins.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -661,35 +658,35 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
         </Card>
 
         {/* Performance Metrics */}
-        <Card className="p-4 sm:p-6 bg-card border-border">
-          <div className="mb-3 sm:mb-4">
-            <h3 className="text-base sm:text-lg text-foreground">
+        <Card className="p-6 bg-card border-border">
+          <div className="mb-4">
+            <h3 className="text-lg text-foreground">
               Métricas de Performance
             </h3>
-            <p className="text-xs sm:text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Indicadores por status do funil
             </p>
           </div>
-          <div className="space-y-2 sm:space-y-3 max-h-[280px] sm:max-h-[320px] overflow-y-auto pr-2">
+          <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2">
             {/* ✅ Renderização dinâmica de TODOS os status */}
             {metrics.dynamicStatuses.map((statusItem, index) => (
               <div key={statusItem.status} className="flex items-center justify-between">
-                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="flex items-center gap-3">
                   <div 
-                    className="w-2 h-2 rounded-full flex-shrink-0" 
+                    className="w-2 h-2 rounded-full" 
                     style={{ backgroundColor: statusItem.color }}
                   ></div>
-                  <span className="text-xs sm:text-sm text-muted-foreground truncate">
+                  <span className="text-sm text-muted-foreground">
                     {statusItem.status}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                  <span className={`text-sm sm:text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>
                     {statusItem.count}
                   </span>
                   <Badge 
                     variant="secondary" 
-                    className="border-0 min-w-[40px] sm:min-w-[50px] justify-center text-xs"
+                    className="border-0 min-w-[50px] justify-center"
                     style={{ 
                       backgroundColor: `${statusItem.color}20`, 
                       color: statusItem.color 
@@ -701,15 +698,15 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
               </div>
             ))}
 
-            <div className={`pt-3 sm:pt-4 mt-3 sm:mt-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className={`pt-4 mt-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Users className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600" />
-                  <span className="text-xs sm:text-sm text-muted-foreground">
+                <div className="flex items-center gap-3">
+                  <Users className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm text-muted-foreground">
                     Total de Leads
                   </span>
                 </div>
-                <span className={`text-lg sm:text-xl ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <span className={`text-xl ${isDark ? 'text-white' : 'text-gray-900'}`}>
                   {metrics.total}
                 </span>
               </div>
@@ -719,31 +716,31 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
       </div>
 
       {/* Insights e Recomendações */}
-      <Card className="p-4 sm:p-6 bg-card border-border">
-        <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-white/20 backdrop-blur flex items-center justify-center flex-shrink-0">
-            <span className="text-xl sm:text-2xl">💡</span>
+      <Card className="p-6 bg-card border-border">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center flex-shrink-0">
+            <span className="text-2xl">💡</span>
           </div>
           <div className="flex-1">
-            <h3 className={`text-base sm:text-lg mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h3 className={`text-lg mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
               Insights e Recomendações
             </h3>
-            <ul className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+            <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
               <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400 flex-shrink-0">✓</span>
+                <span className="text-green-600 dark:text-green-400">✓</span>
                 <span>Sua taxa de conversão de {metrics.conversionRate}% está {parseFloat(metrics.conversionRate) > 20 ? 'acima' : 'abaixo'} da média do mercado (20%)</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-blue-600 dark:text-blue-400 flex-shrink-0">→</span>
+                <span className="text-blue-600 dark:text-blue-400">→</span>
                 <span>A origem "{topOrigins[0]?.name || 'N/A'}" é sua melhor fonte com {topOrigins[0]?.value || 0} leads - considere investir mais nesse canal</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-orange-600 dark:text-orange-400 flex-shrink-0">⚠</span>
+                <span className="text-orange-600 dark:text-orange-400">⚠</span>
                 <span>Você tem {metrics.inNegotiation} leads em negociação - priorize o follow-up para fechar mais vendas</span>
               </li>
               {parseFloat(metrics.lostRate) > 30 && (
                 <li className="flex items-start gap-2">
-                  <span className="text-red-600 dark:text-red-400 flex-shrink-0">!</span>
+                  <span className="text-red-600 dark:text-red-400">!</span>
                   <span>Alta taxa de perda ({metrics.lostRate}%) - revise seu processo de qualificação</span>
                 </li>
               )}

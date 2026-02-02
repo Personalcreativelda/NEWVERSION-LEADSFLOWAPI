@@ -532,7 +532,7 @@ router.post('/configure-webhook/:instanceId', async (req, res, next) => {
     }
 
     const { instanceId } = req.params;
-    
+
     // Validate instance belongs to user
     if (!instanceBelongsToUser(instanceId, user.id)) {
       return res.status(403).json({ error: 'Access denied: Instance does not belong to you' });
@@ -541,7 +541,7 @@ router.post('/configure-webhook/:instanceId', async (req, res, next) => {
     // Determine webhook URL
     const webhookUrl = process.env.WEBHOOK_URL || process.env.API_URL || process.env.SERVICE_URL_API;
     if (!webhookUrl || webhookUrl.includes('localhost')) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'WEBHOOK_URL not configured properly',
         message: 'A public WEBHOOK_URL is required for Evolution API webhooks. Configure WEBHOOK_URL in .env with your public API URL.',
         current: webhookUrl || 'NOT SET'
@@ -549,11 +549,11 @@ router.post('/configure-webhook/:instanceId', async (req, res, next) => {
     }
 
     const fullWebhookUrl = `${webhookUrl.replace(/\/$/, '')}/api/webhooks/evolution/messages`;
-    
+
     console.log('[WhatsApp Routes] Configuring webhook for:', instanceId, 'URL:', fullWebhookUrl);
-    
+
     const result = await whatsappService.configureWebhook(instanceId, fullWebhookUrl);
-    
+
     res.json({
       success: true,
       message: 'Webhook configured successfully',
@@ -562,6 +562,185 @@ router.post('/configure-webhook/:instanceId', async (req, res, next) => {
     });
   } catch (error: any) {
     console.error('[WhatsApp Routes] Error configuring webhook:', error);
+    next(error);
+  }
+});
+
+// ✅ Verificar webhook configurado na Evolution API
+router.get('/webhook-status/:instanceId', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { instanceId } = req.params;
+
+    // Validate instance belongs to user
+    if (!instanceBelongsToUser(instanceId, user.id)) {
+      return res.status(403).json({ error: 'Access denied: Instance does not belong to you' });
+    }
+
+    console.log('[WhatsApp Routes] Checking webhook status for:', instanceId);
+
+    // Buscar configuração atual do webhook na Evolution API
+    const webhookUrl = process.env.WEBHOOK_URL || process.env.API_URL || process.env.SERVICE_URL_API;
+    const expectedUrl = webhookUrl ? `${webhookUrl.replace(/\/$/, '')}/api/webhooks/evolution/messages` : null;
+
+    // Tentar buscar o webhook atual da Evolution API
+    let currentWebhook = null;
+    let webhookConfigured = false;
+
+    try {
+      // Evolution API endpoint para buscar webhook
+      const evolutionUrl = process.env.EVOLUTION_API_URL;
+      const apiKey = process.env.EVOLUTION_API_KEY;
+
+      if (evolutionUrl && apiKey) {
+        const response = await fetch(`${evolutionUrl}/webhook/find/${instanceId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': apiKey,
+          },
+        });
+
+        if (response.ok) {
+          currentWebhook = await response.json();
+          console.log('[WhatsApp Routes] Current webhook config:', JSON.stringify(currentWebhook));
+
+          // Verificar se o webhook está configurado corretamente
+          const webhookUrlFromApi = currentWebhook?.url || currentWebhook?.webhook?.url;
+          webhookConfigured = webhookUrlFromApi && webhookUrlFromApi === expectedUrl;
+        }
+      }
+    } catch (e: any) {
+      console.warn('[WhatsApp Routes] Could not fetch current webhook:', e.message);
+    }
+
+    res.json({
+      instanceId,
+      expectedWebhookUrl: expectedUrl,
+      currentWebhook: currentWebhook,
+      webhookConfigured,
+      diagnosis: {
+        hasWebhookUrl: !!webhookUrl,
+        webhookUrlValue: webhookUrl || 'NOT SET',
+        isLocalhost: webhookUrl?.includes('localhost') || false,
+        recommendation: !webhookUrl
+          ? 'Configure WEBHOOK_URL no .env com a URL pública da sua API'
+          : webhookUrl.includes('localhost')
+          ? 'WEBHOOK_URL não pode ser localhost - use uma URL pública'
+          : !webhookConfigured
+          ? 'Webhook não está configurado na Evolution API - use POST /api/whatsapp/fix-webhook/:instanceId para corrigir'
+          : 'Webhook configurado corretamente!'
+      }
+    });
+  } catch (error: any) {
+    console.error('[WhatsApp Routes] Error checking webhook status:', error);
+    next(error);
+  }
+});
+
+// ✅ Forçar reconfiguração do webhook na Evolution API
+router.post('/fix-webhook/:instanceId', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { instanceId } = req.params;
+
+    // Validate instance belongs to user
+    if (!instanceBelongsToUser(instanceId, user.id)) {
+      return res.status(403).json({ error: 'Access denied: Instance does not belong to you' });
+    }
+
+    console.log('[WhatsApp Routes] 🔧 Fixing webhook for:', instanceId);
+
+    // Determine webhook URL
+    const webhookUrl = process.env.WEBHOOK_URL || process.env.API_URL || process.env.SERVICE_URL_API;
+    if (!webhookUrl) {
+      return res.status(400).json({
+        error: 'WEBHOOK_URL not configured',
+        message: 'Configure WEBHOOK_URL no .env com a URL pública da sua API (ex: https://api.seudominio.com)',
+      });
+    }
+
+    if (webhookUrl.includes('localhost')) {
+      return res.status(400).json({
+        error: 'WEBHOOK_URL cannot be localhost',
+        message: 'A Evolution API precisa de uma URL pública para enviar webhooks. Configure uma URL acessível pela internet.',
+        current: webhookUrl
+      });
+    }
+
+    const fullWebhookUrl = `${webhookUrl.replace(/\/$/, '')}/api/webhooks/evolution/messages`;
+
+    console.log('[WhatsApp Routes] Setting webhook URL:', fullWebhookUrl);
+
+    // Configurar webhook na Evolution API com todos os eventos necessários
+    const evolutionUrl = process.env.EVOLUTION_API_URL;
+    const apiKey = process.env.EVOLUTION_API_KEY;
+
+    if (!evolutionUrl || !apiKey) {
+      return res.status(400).json({
+        error: 'Evolution API not configured',
+        message: 'Configure EVOLUTION_API_URL e EVOLUTION_API_KEY no .env',
+      });
+    }
+
+    // Configurar webhook com TODOS os eventos de mensagem
+    const webhookConfig = {
+      url: fullWebhookUrl,
+      webhook_by_events: false,
+      webhook_base64: true,
+      events: [
+        'MESSAGES_UPSERT',
+        'MESSAGES_UPDATE',
+        'MESSAGES_DELETE',
+        'SEND_MESSAGE',
+        'CONNECTION_UPDATE',
+        'QRCODE_UPDATED',
+      ],
+    };
+
+    console.log('[WhatsApp Routes] Webhook config:', JSON.stringify(webhookConfig));
+
+    const response = await fetch(`${evolutionUrl}/webhook/set/${instanceId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': apiKey,
+      },
+      body: JSON.stringify(webhookConfig),
+    });
+
+    const result = await response.json();
+
+    console.log('[WhatsApp Routes] Evolution API response:', JSON.stringify(result));
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: 'Failed to configure webhook',
+        details: result,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: '✅ Webhook configurado com sucesso!',
+      webhookUrl: fullWebhookUrl,
+      evolutionResponse: result,
+      nextSteps: [
+        '1. Envie uma mensagem de teste para o WhatsApp conectado',
+        '2. Verifique os logs do servidor para ver se o webhook é chamado',
+        '3. Procure por: [Evolution Webhook] ===== WEBHOOK RECEBIDO =====',
+      ]
+    });
+  } catch (error: any) {
+    console.error('[WhatsApp Routes] Error fixing webhook:', error);
     next(error);
   }
 });

@@ -1042,31 +1042,31 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   };
 
   return (
-    <div className="min-h-screen bg-background dark:bg-background overflow-x-hidden">
+    <div className="min-h-screen bg-background dark:bg-background">
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+      <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Search & Filters */}
-        <div className="mb-4 sm:mb-8">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
-              <div className="relative flex-1 sm:flex-none">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-600 dark:text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-600 dark:text-gray-400 w-5 h-5" />
                 <Input
                   type="text"
                   placeholder="Buscar campanhas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 sm:pl-10 pr-4 py-2 w-full sm:w-80 focus:ring-2 focus:ring-[#10B981] !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200 text-sm"
+                  className="pl-10 pr-4 py-2 w-80 focus:ring-2 focus:ring-[#10B981] !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
                 />
               </div>
-              <Button variant="outline" className="hidden sm:flex items-center space-x-2 border-gray-300 dark:border-border text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800">
+              <Button variant="outline" className="flex items-center space-x-2 border-gray-300 dark:border-border text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800">
                 <Filter className="w-4 h-4" />
                 <span>Filtros</span>
               </Button>
             </div>
             <Button
               onClick={() => setChannelSelectorOpen(true)}
-              className="bg-[#10B981] hover:bg-green-600 text-white font-medium shadow-sm flex items-center justify-center space-x-2 w-full sm:w-auto"
+              className="bg-[#10B981] hover:bg-green-600 text-white font-medium shadow-sm flex items-center space-x-2"
             >
               <Plus className="w-4 h-4" />
               <span>Nova Campanha</span>
@@ -1075,45 +1075,45 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
         </div>
 
         {/* Channel Tabs */}
-        <div className="mb-4 sm:mb-8">
-          <div className="border-b border-gray-200 dark:border-border overflow-x-auto">
-            <nav className="flex space-x-4 sm:space-x-8 min-w-max">
+        <div className="mb-8">
+          <div className="border-b border-gray-200 dark:border-border">
+            <nav className="flex space-x-8">
               <button
                 onClick={() => setActiveTab('whatsapp')}
-                className={`py-2 sm:py-3 px-1 font-semibold flex items-center space-x-1 sm:space-x-2 border-b-2 transition-all whitespace-nowrap text-sm sm:text-base ${activeTab === 'whatsapp'
+                className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'whatsapp'
                   ? 'border-[#10B981] text-[#10B981]'
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-[#10B981]'
                   }`}
               >
                 <i className="fab fa-whatsapp"></i>
                 <span>WhatsApp</span>
-                <span className={`${activeTab === 'whatsapp' ? 'bg-[#10B981]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} text-white text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-semibold`}>
+                <span className={`${activeTab === 'whatsapp' ? 'bg-[#10B981]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
                   {campaigns.filter(c => c.type === 'whatsapp').length}
                 </span>
               </button>
               <button
                 onClick={() => setActiveTab('email')}
-                className={`py-2 sm:py-3 px-1 font-semibold flex items-center space-x-1 sm:space-x-2 border-b-2 transition-all whitespace-nowrap text-sm sm:text-base ${activeTab === 'email'
+                className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'email'
                   ? 'border-[#3B82F6] text-[#3B82F6]'
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-[#3B82F6]'
                   }`}
               >
                 <i className="fas fa-envelope"></i>
                 <span>Email</span>
-                <span className={`${activeTab === 'email' ? 'bg-[#3B82F6]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} text-white text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-semibold`}>
+                <span className={`${activeTab === 'email' ? 'bg-[#3B82F6]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
                   {campaigns.filter(c => c.type === 'email').length}
                 </span>
               </button>
               <button
                 onClick={() => setActiveTab('sms')}
-                className={`py-2 sm:py-3 px-1 font-semibold flex items-center space-x-1 sm:space-x-2 border-b-2 transition-all whitespace-nowrap text-sm sm:text-base ${activeTab === 'sms'
+                className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'sms'
                   ? 'border-[#F59E0B] text-[#F59E0B]'
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-[#F59E0B]'
                   }`}
               >
                 <i className="fas fa-sms"></i>
                 <span>SMS</span>
-                <span className="bg-gray-200 text-gray-700 dark:text-gray-300 text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-semibold">
+                <span className="bg-gray-200 text-gray-700 dark:text-gray-300 text-xs px-2 py-1 rounded-full font-semibold">
                   0
                 </span>
               </button>
@@ -1123,14 +1123,14 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
         {/* SMS Coming Soon */}
         {activeTab === 'sms' && (
-          <div className="text-center py-12 sm:py-20">
-            <div className="text-4xl sm:text-6xl mb-4 sm:mb-6">🚧</div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 sm:mb-3">Em breve!</h2>
-            <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 mb-6 sm:mb-8 px-4">
+          <div className="text-center py-20">
+            <div className="text-6xl mb-6">🚧</div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">Em breve!</h2>
+            <p className="text-gray-700 dark:text-gray-300 mb-8">
               O envio de SMS estará disponível em breve.<br />
               Por enquanto, use <strong>WhatsApp</strong> ou <strong>Email</strong>.
             </p>
-            <Button variant="outline" className="border-[#F59E0B] text-[#F59E0B] hover:bg-orange-50 text-sm">
+            <Button variant="outline" className="border-[#F59E0B] text-[#F59E0B] hover:bg-orange-50">
               <i className="fas fa-bell mr-2"></i>
               Notificar quando disponível
             </Button>
@@ -1139,12 +1139,12 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
         {/* WhatsApp & Email Content */}
         {(activeTab === 'whatsapp' || activeTab === 'email') && (
-          <div className="space-y-6 sm:space-y-10">
+          <div className="space-y-10">
             {/* Loading State */}
             {isLoadingCampaigns && (
-              <div className="text-center py-12 sm:py-20">
-                <div className="inline-block animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-t-2 border-b-2 border-[#10B981] mb-4"></div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">Carregando campanhas...</p>
+              <div className="text-center py-20">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#10B981] mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400">Carregando campanhas...</p>
               </div>
             )}
 
@@ -1152,28 +1152,28 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
             {!isLoadingCampaigns && (
               <>
                 <section>
-                  <h3 className="text-base sm:text-lg font-semibold text-foreground dark:text-foreground mb-3 sm:mb-4 flex items-center space-x-2">
+                  <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <i className="fas fa-play-circle text-[#10B981]"></i>
                     <span>Campanhas Ativas</span>
-                    <span className="text-xs sm:text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({activeCampaigns.length})</span>
+                    <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({activeCampaigns.length})</span>
                   </h3>
                   {activeCampaigns.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                       {activeCampaigns.map((campaign) => (
-                        <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-4 sm:p-6 hover:shadow-md transition-shadow duration-200">
-                          <div className="flex items-start justify-between mb-3 sm:mb-4">
-                            <div className="min-w-0 flex-1">
-                              <h4 className="font-semibold text-foreground dark:text-foreground mb-1 truncate text-sm sm:text-base">{campaign.name}</h4>
+                        <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-6 hover:shadow-md transition-shadow duration-200">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
                               <div className="flex items-center space-x-2">
                                 {campaign.status === 'paused' ? (
                                   <>
                                     <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                                    <span className="text-xs sm:text-sm text-yellow-600 dark:text-yellow-400 font-medium">⏸️ Pausada</span>
+                                    <span className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">⏸️ Pausada</span>
                                   </>
                                 ) : (
                                   <>
                                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                    <span className="text-xs sm:text-sm text-green-600 dark:text-green-400 font-medium">Enviando...</span>
+                                    <span className="text-sm text-green-600 dark:text-green-400 font-medium">Enviando agora...</span>
                                   </>
                                 )}
                               </div>
@@ -1181,20 +1181,20 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             <DropdownMenu campaign={campaign} />
                           </div>
 
-                          <div className="mb-3 sm:mb-4">
-                            <div className="flex justify-between text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
-                              <span>{campaign.sent?.toLocaleString()} / {campaign.totalRecipients.toLocaleString()}</span>
+                          <div className="mb-4">
+                            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+                              <span>{campaign.sent?.toLocaleString()} / {campaign.totalRecipients.toLocaleString()} enviadas</span>
                               <span>{campaign.progress}%</span>
                             </div>
-                            <div className="w-full bg-muted dark:bg-muted rounded-full h-1.5 sm:h-2">
+                            <div className="w-full bg-muted dark:bg-muted rounded-full h-2">
                               <div
-                                className="bg-[#10B981] h-1.5 sm:h-2 rounded-full transition-all duration-300"
+                                className="bg-[#10B981] h-2 rounded-full transition-all duration-300"
                                 style={{ width: `${campaign.progress}%` }}
                               />
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-3 sm:mb-4 text-xs sm:text-sm">
+                          <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                             <div>
                               <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Entregues</span>
                               <p className="font-semibold text-gray-900 dark:text-white">{campaign.delivered?.toLocaleString()}</p>
@@ -1204,29 +1204,29 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                               <p className="font-semibold text-gray-900 dark:text-white">{campaign.read?.toLocaleString()}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Tempo rest.</span>
+                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Tempo restante</span>
                               <p className="font-semibold text-gray-900 dark:text-white">{formatMinutes(campaign.estimatedTime || 0)}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Taxa entrega</span>
+                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Taxa de entrega</span>
                               <p className="font-semibold text-gray-900 dark:text-white">{campaign.deliveryRate}%</p>
                             </div>
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="flex gap-2 pt-3 sm:pt-4 border-t border-gray-100 dark:border-border">
+                          <div className="flex gap-2 pt-4 border-t border-gray-100 dark:border-border">
                             <button
                               onClick={() => handlePauseCampaign(campaign.id)}
-                              className="flex-1 inline-flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-all duration-200"
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-all duration-200"
                             >
-                              <Pause className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <Pause className="w-4 h-4" />
                               <span>Pausar</span>
                             </button>
                             <button
                               onClick={() => handleCancelCampaign(campaign)}
-                              className="flex-1 inline-flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-gray-700 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-800 transition-all duration-200"
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-gray-700 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-800 transition-all duration-200"
                             >
-                              <X className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <X className="w-4 h-4" />
                               <span>Cancelar</span>
                             </button>
                           </div>
@@ -1234,22 +1234,22 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8 sm:py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <div className="text-3xl sm:text-4xl mb-2 sm:mb-3 opacity-40">💤</div>
-                      <p className="text-muted-foreground dark:text-muted-foreground text-sm sm:text-base">Nenhuma campanha ativa no momento</p>
+                    <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
+                      <div className="text-4xl mb-3 opacity-40">💤</div>
+                      <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha ativa no momento</p>
                     </div>
                   )}
                 </section>
 
                 {/* Scheduled Campaigns */}
                 <section>
-                  <h3 className="text-base sm:text-lg font-semibold text-foreground dark:text-foreground mb-3 sm:mb-4 flex items-center space-x-2">
+                  <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <i className="fas fa-clock text-[#F59E0B]"></i>
                     <span>Campanhas Agendadas</span>
-                    <span className="text-xs sm:text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({scheduledCampaigns.length})</span>
+                    <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({scheduledCampaigns.length})</span>
                   </h3>
                   {scheduledCampaigns.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                       {scheduledCampaigns.map((campaign) => {
                         // ✅ Verificar se scheduledDate existe e é válida
                         const hasValidDate = campaign.scheduledDate && !isNaN(new Date(campaign.scheduledDate).getTime());
@@ -1257,13 +1257,13 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                         const formattedDate = hasValidDate ? formatDate(campaign.scheduledDate!) : 'Data não definida';
 
                         return (
-                          <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-4 sm:p-6 hover:shadow-md transition-shadow duration-200">
-                            <div className="flex items-start justify-between mb-3 sm:mb-4">
-                              <div className="min-w-0 flex-1">
-                                <h4 className="font-semibold text-foreground dark:text-foreground mb-1 truncate text-sm sm:text-base">{campaign.name}</h4>
+                          <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-6 hover:shadow-md transition-shadow duration-200">
+                            <div className="flex items-start justify-between mb-4">
+                              <div>
+                                <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
                                 <div className="flex items-center space-x-2">
-                                  <i className="fas fa-calendar-alt text-[#F59E0B] text-xs sm:text-sm"></i>
-                                  <span className={`text-xs sm:text-sm truncate ${!hasValidDate ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-500 dark:text-gray-400'}`}>
+                                  <i className="fas fa-calendar-alt text-[#F59E0B] text-sm"></i>
+                                  <span className={`text-sm ${!hasValidDate ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-500 dark:text-gray-400'}`}>
                                     {formattedDate}
                                   </span>
                                 </div>
@@ -1271,13 +1271,13 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                               <DropdownMenu campaign={campaign} />
                             </div>
 
-                            <div className="mb-3 sm:mb-4">
-                              <div className={`border rounded-lg p-2.5 sm:p-3 ${!hasValidDate ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-900/30'}`}>
+                            <div className="mb-4">
+                              <div className={`border rounded-lg p-3 ${!hasValidDate ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-900/30'}`}>
                                 <div className="flex items-center space-x-2 mb-1">
-                                  <i className={`fas fa-hourglass-half text-xs sm:text-sm ${!hasValidDate ? 'text-red-500 dark:text-red-400' : 'text-blue-500 dark:text-blue-400'}`}></i>
-                                  <span className={`text-xs sm:text-sm font-medium ${!hasValidDate ? 'text-red-700 dark:text-red-400' : 'text-blue-700 dark:text-blue-400'}`}>
+                                  <i className={`fas fa-hourglass-half text-sm ${!hasValidDate ? 'text-red-500 dark:text-red-400' : 'text-blue-500 dark:text-blue-400'}`}></i>
+                                  <span className={`text-sm font-medium ${!hasValidDate ? 'text-red-700 dark:text-red-400' : 'text-blue-700 dark:text-blue-400'}`}>
                                     {!hasValidDate
-                                      ? 'Agendar data'
+                                      ? 'Agendar data de envio'
                                       : daysUntil === 0
                                         ? 'Hoje'
                                         : daysUntil === 1
@@ -1286,26 +1286,26 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                                     }
                                   </span>
                                 </div>
-                                <p className={`text-xs sm:text-sm ${!hasValidDate ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                                <p className={`text-sm ${!hasValidDate ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
                                   {campaign.totalRecipients.toLocaleString()} destinatários
                                 </p>
                               </div>
                             </div>
 
                             {/* Action Buttons - Scheduled */}
-                            <div className="flex gap-2 pt-3 sm:pt-4 border-t border-gray-100 dark:border-border">
+                            <div className="flex gap-2 pt-4 border-t border-gray-100 dark:border-border">
                               <button
                                 onClick={() => handleEditCampaign(campaign)}
-                                className="flex-1 inline-flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-700 border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200"
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-700 border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200"
                               >
-                                <Edit2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <Edit2 className="w-4 h-4" />
                                 <span>Editar</span>
                               </button>
                               <button
                                 onClick={() => handleSendNow(campaign.id, campaign.name)}
-                                className="flex-1 inline-flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white bg-[#10B981] border border-transparent rounded-lg hover:bg-[#059669] transition-all duration-200 shadow-sm hover:shadow"
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#10B981] border border-transparent rounded-lg hover:bg-[#059669] transition-all duration-200 shadow-sm hover:shadow"
                               >
-                                <Send className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <Send className="w-4 h-4" />
                                 <span>Enviar</span>
                               </button>
                             </div>
@@ -1314,30 +1314,30 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                       })}
                     </div>
                   ) : (
-                    <div className="text-center py-8 sm:py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <div className="text-3xl sm:text-4xl mb-2 sm:mb-3 opacity-40">📅</div>
-                      <p className="text-muted-foreground dark:text-muted-foreground text-sm sm:text-base">Nenhuma campanha agendada</p>
+                    <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
+                      <div className="text-4xl mb-3 opacity-40">📅</div>
+                      <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha agendada</p>
                     </div>
                   )}
                 </section>
 
                 {/* Draft/Saved Campaigns */}
                 <section>
-                  <h3 className="text-base sm:text-lg font-semibold text-foreground dark:text-foreground mb-3 sm:mb-4 flex items-center space-x-2">
+                  <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <i className="fas fa-save text-blue-500"></i>
                     <span>Campanhas Salvas (Rascunhos)</span>
-                    <span className="text-xs sm:text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({draftCampaigns.length})</span>
+                    <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({draftCampaigns.length})</span>
                   </h3>
                   {draftCampaigns.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                       {draftCampaigns.map((campaign) => (
-                        <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-4 sm:p-6 hover:shadow-md transition-shadow duration-200">
-                          <div className="flex items-start justify-between mb-3 sm:mb-4">
-                            <div className="min-w-0 flex-1">
-                              <h4 className="font-semibold text-foreground dark:text-foreground mb-1 truncate text-sm sm:text-base">{campaign.name}</h4>
+                        <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-6 hover:shadow-md transition-shadow duration-200">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
                               <div className="flex items-center space-x-2">
-                                <i className="fas fa-file-alt text-blue-500 text-xs sm:text-sm"></i>
-                                <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400 truncate">
+                                <i className="fas fa-file-alt text-blue-500 text-sm"></i>
+                                <span className="text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">
                                   {campaign.createdAt ? formatDate(campaign.createdAt) : 'Sem data'}
                                 </span>
                               </div>
@@ -1345,34 +1345,34 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             <DropdownMenu campaign={campaign} />
                           </div>
 
-                          <div className="mb-3 sm:mb-4">
-                            <div className="border rounded-lg p-2.5 sm:p-3 bg-gray-50 dark:bg-gray-900/10 border-gray-200 dark:border-gray-900/30">
+                          <div className="mb-4">
+                            <div className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-900/10 border-gray-200 dark:border-gray-900/30">
                               <div className="flex items-center space-x-2 mb-1">
-                                <i className="fas fa-users text-xs sm:text-sm text-gray-500 dark:text-gray-400"></i>
-                                <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-400">
+                                <i className="fas fa-users text-sm text-gray-500 dark:text-gray-400"></i>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-400">
                                   {campaign.totalRecipients.toLocaleString()} destinatários
                                 </span>
                               </div>
-                              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
                                 Pronto para envio
                               </p>
                             </div>
                           </div>
 
                           {/* Action Buttons - Draft */}
-                          <div className="flex gap-2 pt-3 sm:pt-4 border-t border-gray-100 dark:border-border">
+                          <div className="flex gap-2 pt-4 border-t border-gray-100 dark:border-border">
                             <button
                               onClick={() => handleEditCampaign(campaign)}
-                              className="flex-1 inline-flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-700 border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200"
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-700 border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200"
                             >
-                              <Edit2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <Edit2 className="w-4 h-4" />
                               <span>Editar</span>
                             </button>
                             <button
                               onClick={() => handleSendNow(campaign.id, campaign.name)}
-                              className="flex-1 inline-flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white bg-[#10B981] border border-transparent rounded-lg hover:bg-[#059669] transition-all duration-200 shadow-sm hover:shadow"
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#10B981] border border-transparent rounded-lg hover:bg-[#059669] transition-all duration-200 shadow-sm hover:shadow"
                             >
-                              <Send className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <Send className="w-4 h-4" />
                               <span>Enviar</span>
                             </button>
                           </div>
@@ -1380,42 +1380,42 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8 sm:py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <div className="text-3xl sm:text-4xl mb-2 sm:mb-3 opacity-40">💾</div>
-                      <p className="text-muted-foreground dark:text-muted-foreground text-sm sm:text-base">Nenhuma campanha salva</p>
+                    <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
+                      <div className="text-4xl mb-3 opacity-40">💾</div>
+                      <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha salva</p>
                     </div>
                   )}
                 </section>
 
                 {/* Completed Campaigns */}
                 <section>
-                  <h3 className="text-base sm:text-lg font-semibold text-foreground dark:text-foreground mb-3 sm:mb-4 flex items-center space-x-2">
+                  <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <i className="fas fa-check-circle text-green-500"></i>
                     <span>Campanhas Concluídas</span>
-                    <span className="text-xs sm:text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({completedCampaigns.length})</span>
+                    <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({completedCampaigns.length})</span>
                   </h3>
                   {completedCampaigns.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                       {completedCampaigns.map((campaign) => (
-                        <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-4 sm:p-6 hover:shadow-md transition-shadow duration-200">
-                          <div className="flex items-start justify-between mb-3 sm:mb-4">
-                            <div className="min-w-0 flex-1">
-                              <h4 className="font-semibold text-foreground dark:text-foreground mb-1 truncate text-sm sm:text-base">{campaign.name}</h4>
+                        <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-6 hover:shadow-md transition-shadow duration-200">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
                               <div className="flex items-center space-x-2">
-                                <i className="fas fa-calendar-check text-green-500 text-xs sm:text-sm"></i>
-                                <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400 truncate">{formatDate(campaign.completedDate!)}</span>
+                                <i className="fas fa-calendar-check text-green-500 text-sm"></i>
+                                <span className="text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">{formatDate(campaign.completedDate!)}</span>
                               </div>
                             </div>
                             <DropdownMenu campaign={campaign} />
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-3 sm:mb-4 text-xs sm:text-sm">
+                          <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                             <div>
                               <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Total enviadas</span>
                               <p className="font-semibold text-gray-900 dark:text-white">{campaign.sent?.toLocaleString()}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Taxa entrega</span>
+                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Taxa de entrega</span>
                               <p className="font-semibold text-green-600 dark:text-green-400">{campaign.deliveryRate}%</p>
                             </div>
                             <div>
@@ -1432,18 +1432,18 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             onClick={() => handleViewReport(campaign)}
                             variant="outline"
                             size="sm"
-                            className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 border-0 font-medium text-xs sm:text-sm"
+                            className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 border-0 font-medium"
                           >
                             <i className="fas fa-chart-bar mr-2"></i>
-                            Ver Relatório
+                            Ver Relatório Completo
                           </Button>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8 sm:py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <div className="text-3xl sm:text-4xl mb-2 sm:mb-3 opacity-40">📊</div>
-                      <p className="text-muted-foreground dark:text-muted-foreground text-sm sm:text-base">Nenhuma campanha concluída</p>
+                    <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
+                      <div className="text-4xl mb-3 opacity-40">📊</div>
+                      <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha concluída</p>
                     </div>
                   )}
                 </section>

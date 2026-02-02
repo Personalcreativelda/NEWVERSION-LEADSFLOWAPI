@@ -1,5 +1,6 @@
 import cors, { CorsOptions } from 'cors';
 import { config } from '../config/env';
+import { RequestHandler } from 'express';
 
 const allowedOrigins = config.corsOrigins;
 
@@ -11,6 +12,13 @@ if (allowedOrigins.length === 0) {
   );
 }
 
+// Rotas que não precisam de Origin header (webhooks, APIs externas, admin)
+const noOriginRequiredPaths = [
+  '/api/webhooks/',
+  '/api/whatsapp/config',
+  '/health'
+];
+
 const options: CorsOptions = {
   origin: (origin, callback) => {
     // If no origins configured, block all requests
@@ -18,13 +26,10 @@ const options: CorsOptions = {
       return callback(new Error('CORS is not configured. Set CORS_ORIGINS environment variable.'));
     }
 
-    // Allow requests with no origin (e.g., mobile apps, Postman) only in development
+    // Allow requests with no origin for webhooks and admin routes
+    // These are checked in the middleware below
     if (!origin) {
-      const isDevelopment = process.env.NODE_ENV !== 'production';
-      if (isDevelopment) {
-        return callback(null, true);
-      }
-      return callback(new Error('Origin header is required'));
+      return callback(null, true);
     }
 
     // Check if origin is in allowed list
@@ -37,4 +42,24 @@ const options: CorsOptions = {
   credentials: true,
 };
 
-export const corsMiddleware = cors(options);
+const corsHandler = cors(options);
+
+// Middleware that checks origin requirements based on path
+export const corsMiddleware: RequestHandler = (req, res, next) => {
+  const origin = req.headers.origin;
+  const path = req.path;
+
+  // Check if this path doesn't require origin
+  const isNoOriginRequired = noOriginRequiredPaths.some(p => path.startsWith(p));
+
+  // If no origin and path requires it, block
+  if (!origin && !isNoOriginRequired) {
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+    if (!isDevelopment) {
+      return res.status(403).json({ error: 'Origin header is required' });
+    }
+  }
+
+  // Apply cors handler
+  corsHandler(req, res, next);
+};

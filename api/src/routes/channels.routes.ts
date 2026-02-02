@@ -8,6 +8,55 @@ const router = Router();
 const channelsService = new ChannelsService();
 const whatsappService = new WhatsAppService();
 
+// ✅ Função helper para configurar webhook automaticamente na Evolution API
+async function configureWebhookForInstance(instanceId: string): Promise<void> {
+    const webhookUrl = process.env.WEBHOOK_URL || process.env.API_URL || process.env.SERVICE_URL_API;
+    const evolutionUrl = process.env.EVOLUTION_API_URL;
+    const apiKey = process.env.EVOLUTION_API_KEY;
+
+    if (!webhookUrl || !evolutionUrl || !apiKey) {
+        console.warn('[Channels] Cannot configure webhook - missing WEBHOOK_URL, EVOLUTION_API_URL, or EVOLUTION_API_KEY');
+        return;
+    }
+
+    const fullWebhookUrl = `${webhookUrl.replace(/\/$/, '')}/api/webhooks/evolution/messages`;
+
+    console.log(`[Channels] 🔧 Auto-configuring webhook for instance: ${instanceId}`);
+    console.log(`[Channels] Webhook URL: ${fullWebhookUrl}`);
+
+    try {
+        const webhookConfig = {
+            url: fullWebhookUrl,
+            webhook_by_events: false,
+            webhook_base64: true,
+            events: [
+                'MESSAGES_UPSERT',
+                'MESSAGES_UPDATE',
+                'CONNECTION_UPDATE',
+                'QRCODE_UPDATED',
+            ],
+        };
+
+        const response = await fetch(`${evolutionUrl}/webhook/set/${instanceId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': apiKey,
+            },
+            body: JSON.stringify(webhookConfig),
+        });
+
+        if (response.ok) {
+            console.log(`[Channels] ✅ Webhook configured successfully for: ${instanceId}`);
+        } else {
+            const errorText = await response.text();
+            console.warn(`[Channels] ⚠️ Failed to configure webhook for ${instanceId}:`, errorText);
+        }
+    } catch (error: any) {
+        console.error(`[Channels] ❌ Error configuring webhook for ${instanceId}:`, error.message);
+    }
+}
+
 router.use(authMiddleware);
 
 // GET /api/channels - Lista todos os canais do usuário
@@ -66,6 +115,7 @@ router.post('/', async (req, res, next) => {
             }
             // Normalize credentials to include instance_id
             credentials.instance_id = instanceId;
+            credentials.instance_name = instanceId; // Garantir que ambos existem
 
             // Verificar se já existe canal com esse instance_id
             const existing = await channelsService.findByInstanceId(credentials.instance_id, user.id);
@@ -75,6 +125,10 @@ router.post('/', async (req, res, next) => {
                     status: requestedStatus || 'active',
                     credentials
                 }, user.id);
+
+                // Configurar webhook automaticamente (mesmo se canal já existe)
+                await configureWebhookForInstance(instanceId);
+
                 return res.status(200).json(updated);
             }
 
@@ -105,6 +159,10 @@ router.post('/', async (req, res, next) => {
             }, user.id);
 
             console.log(`[Channels] WhatsApp channel created: ${channel.id} with status: ${finalStatus}`);
+
+            // ✅ IMPORTANTE: Configurar webhook automaticamente na Evolution API
+            await configureWebhookForInstance(instanceId);
+
             return res.status(201).json(channel);
         }
 
@@ -149,13 +207,53 @@ router.delete('/:id', async (req, res, next) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const deleted = await channelsService.delete(req.params.id, user.id);
-        if (!deleted) {
+        const channelId = req.params.id;
+        console.log(`[Channels] Deleting channel: ${channelId} for user: ${user.id}`);
+
+        // Primeiro, buscar o canal para obter informações
+        const channel = await channelsService.findById(channelId, user.id);
+
+        // Se for WhatsApp, também deletar a instância na Evolution API
+        if (channel && channel.type === 'whatsapp') {
+            const instanceId = channel.credentials?.instance_id || channel.credentials?.instance_name;
+            if (instanceId && whatsappService.isReady()) {
+                try {
+                    console.log(`[Channels] Also deleting Evolution API instance: ${instanceId}`);
+                    await whatsappService.deleteInstance(instanceId);
+                    console.log(`[Channels] Evolution API instance deleted: ${instanceId}`);
+                } catch (e: any) {
+                    console.warn(`[Channels] Could not delete Evolution API instance: ${e.message}`);
+                    // Continua mesmo se falhar (instância pode já ter sido deletada)
+                }
+            }
+        }
+
+        // Deletar do banco de dados
+        const deleted = await channelsService.delete(channelId, user.id);
+
+        // Se não encontrou no banco mas temos instanceId na URL, tentar deletar da Evolution
+        if (!deleted && !channel) {
+            // Tentar extrair instanceId do ID (pode ser que o frontend esteja enviando instanceId ao invés de channelId)
+            console.log(`[Channels] Channel not found in DB, checking if ${channelId} is an instance name...`);
+
+            // Verificar se é um nome de instância
+            if (channelId.startsWith('leadflow_') && whatsappService.isReady()) {
+                try {
+                    await whatsappService.deleteInstance(channelId);
+                    console.log(`[Channels] Deleted Evolution instance directly: ${channelId}`);
+                    return res.json({ success: true, message: 'Instance deleted from Evolution API' });
+                } catch (e: any) {
+                    console.warn(`[Channels] Could not delete instance: ${e.message}`);
+                }
+            }
+
             return res.status(404).json({ error: 'Channel not found' });
         }
 
+        console.log(`[Channels] Channel deleted successfully: ${channelId}`);
         res.json({ success: true });
     } catch (error) {
+        console.error('[Channels] Error deleting channel:', error);
         next(error);
     }
 });
