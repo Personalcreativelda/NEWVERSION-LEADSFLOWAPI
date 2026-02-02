@@ -46,27 +46,61 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
         setConnectionStatus('validating');
 
         try {
-            // First get the Instagram Business Account ID from the page
-            const pageResponse = await fetch(
-                `https://graph.facebook.com/v18.0/me/accounts?fields=instagram_business_account{id,username,name,profile_picture_url}&access_token=${accessToken}`
-            );
-            const pageData = await pageResponse.json();
-
-            if (pageData.error) {
-                throw new Error(pageData.error.message || 'Token inválido');
-            }
-
-            // Find the Instagram business account
             let igAccount = null;
-            for (const page of pageData.data || []) {
-                if (page.instagram_business_account) {
-                    igAccount = page.instagram_business_account;
-                    break;
-                }
-            }
+            const token = accessToken.trim();
 
-            if (!igAccount) {
-                throw new Error('Nenhuma conta Instagram Business encontrada. Verifique se sua página do Facebook está vinculada a uma conta profissional do Instagram.');
+            // Detectar tipo de token baseado no prefixo
+            // IGAA... = Instagram User Token (da Instagram Basic Display API ou Instagram Graph API)
+            // EAA... = Facebook Page Token (da Facebook Graph API)
+            const isInstagramToken = token.startsWith('IGAA') || token.startsWith('IGA');
+
+            if (isInstagramToken) {
+                // Token do Instagram - usar Instagram Graph API diretamente
+                console.log('[Instagram] Detectado token do Instagram (IGAA/IGA), usando Instagram Graph API');
+
+                const igResponse = await fetch(
+                    `https://graph.instagram.com/me?fields=id,username,account_type,name&access_token=${token}`
+                );
+                const igData = await igResponse.json();
+
+                if (igData.error) {
+                    console.error('[Instagram] Error:', igData.error);
+                    throw new Error(igData.error.message || 'Token do Instagram inválido');
+                }
+
+                igAccount = {
+                    id: igData.id,
+                    username: igData.username,
+                    name: igData.name || igData.username
+                };
+
+                console.log('[Instagram] Conta encontrada:', igAccount);
+
+            } else {
+                // Token do Facebook - buscar Instagram Business Account via Pages
+                console.log('[Instagram] Detectado token do Facebook (EAA), usando Facebook Graph API');
+
+                const pageResponse = await fetch(
+                    `https://graph.facebook.com/v18.0/me/accounts?fields=instagram_business_account{id,username,name,profile_picture_url}&access_token=${token}`
+                );
+                const pageData = await pageResponse.json();
+
+                if (pageData.error) {
+                    console.error('[Instagram] Error:', pageData.error);
+                    throw new Error(pageData.error.message || 'Token inválido');
+                }
+
+                // Find the Instagram business account
+                for (const page of pageData.data || []) {
+                    if (page.instagram_business_account) {
+                        igAccount = page.instagram_business_account;
+                        break;
+                    }
+                }
+
+                if (!igAccount) {
+                    throw new Error('Nenhuma conta Instagram Business encontrada. Verifique se sua página do Facebook está vinculada a uma conta profissional do Instagram.');
+                }
             }
 
             setAccountInfo({
@@ -83,15 +117,16 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                 status: 'active',
                 credentials: {
                     instagram_id: igAccount.id,
-                    access_token: accessToken,
-                    username: igAccount.username
+                    access_token: token,
+                    username: igAccount.username,
+                    token_type: isInstagramToken ? 'instagram' : 'facebook'
                 }
             });
 
             setConnectionStatus('connected');
             setStep('success');
             toast.success('Instagram conectado com sucesso!');
-            
+
             setTimeout(() => {
                 onSuccess();
                 onClose();
@@ -171,9 +206,9 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                             </div>
 
                             {/* Instructions */}
-                            <div 
+                            <div
                                 className="p-4 rounded-lg border"
-                                style={{ 
+                                style={{
                                     backgroundColor: 'hsl(var(--muted))',
                                     borderColor: 'hsl(var(--border))'
                                 }}
@@ -185,12 +220,15 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                                             Como obter o token de acesso:
                                         </p>
                                         <ol className="list-decimal list-inside space-y-1">
-                                            <li>Acesse o <strong>Meta Business Suite</strong></li>
-                                            <li>Vá em <strong>Configurações &gt; Contas do Instagram</strong></li>
-                                            <li>Vincule sua conta do Instagram à página</li>
-                                            <li>No <strong>Meta for Developers</strong>, gere um token com permissões do Instagram</li>
-                                            <li>Copie o token e cole abaixo</li>
+                                            <li>Acesse o <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:underline">Meta for Developers</a></li>
+                                            <li>Crie ou selecione seu app</li>
+                                            <li>Vá em <strong>Instagram &gt; API Settings</strong></li>
+                                            <li>Gere um <strong>Access Token</strong> com permissões de messaging</li>
+                                            <li>Configure o webhook: <code className="bg-black/30 px-1 rounded text-xs">/api/webhooks/instagram</code></li>
                                         </ol>
+                                        <p className="mt-2 text-xs opacity-70">
+                                            Aceita tokens <code className="bg-black/30 px-1 rounded">IGAA...</code> (Instagram) ou <code className="bg-black/30 px-1 rounded">EAA...</code> (Facebook Page)
+                                        </p>
                                     </div>
                                 </div>
                             </div>
