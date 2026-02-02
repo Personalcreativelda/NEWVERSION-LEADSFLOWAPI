@@ -166,13 +166,37 @@ router.post('/', async (req, res, next) => {
             return res.status(201).json(channel);
         }
 
+        // Para Telegram, configurar webhook automaticamente
+        if (type === 'telegram' && credentials?.bot_token) {
+            const webhookUrl = process.env.WEBHOOK_URL || process.env.API_URL || process.env.SERVICE_URL_API;
+            if (webhookUrl) {
+                const telegramWebhookUrl = `${webhookUrl.replace(/\/$/, '')}/api/webhooks/telegram`;
+                try {
+                    const telegramResponse = await fetch(
+                        `https://api.telegram.org/bot${credentials.bot_token}/setWebhook?url=${encodeURIComponent(telegramWebhookUrl)}`
+                    );
+                    const telegramData = await telegramResponse.json();
+                    if (telegramData.ok) {
+                        console.log(`[Channels] ✅ Telegram webhook configured: ${telegramWebhookUrl}`);
+                    } else {
+                        console.warn(`[Channels] ⚠️ Failed to configure Telegram webhook:`, telegramData);
+                    }
+                } catch (err: any) {
+                    console.error(`[Channels] ❌ Error configuring Telegram webhook:`, err.message);
+                }
+            }
+        }
+
+        // Para outros canais (Telegram, Facebook, Instagram), usar o status enviado ou 'active'
         const channel = await channelsService.create({
             type,
             name,
-            status: 'inactive',
+            status: requestedStatus || 'active',
             credentials: credentials || {},
             settings: settings || {}
         }, user.id);
+
+        console.log(`[Channels] ${type} channel created: ${channel.id} with status: ${channel.status}`);
 
         res.status(201).json(channel);
     } catch (error) {

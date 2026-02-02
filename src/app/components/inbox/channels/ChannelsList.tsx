@@ -4,6 +4,9 @@ import { channelsApi } from '../../../services/api/inbox';
 import { ChannelCard } from './ChannelCard';
 import { WhatsAppConnect } from './WhatsAppConnect';
 import { WhatsAppCloudConnect } from './WhatsAppCloudConnect';
+import { TelegramConnect } from './TelegramConnect';
+import { FacebookConnect } from './FacebookConnect';
+import { InstagramConnect } from './InstagramConnect';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import {
@@ -21,27 +24,12 @@ import {
 } from 'lucide-react';
 
 // Configuração dos canais disponíveis para conexão
+// Ordem: WhatsApp primeiro, depois Facebook, Instagram, Telegram e outros
 const AVAILABLE_CHANNELS = [
-    {
-        id: 'website',
-        name: 'Site',
-        description: 'Criar um widget de chat ao vivo',
-        icon: Globe,
-        color: 'text-blue-500',
-        available: false
-    },
-    {
-        id: 'facebook',
-        name: 'Facebook',
-        description: 'Conectar sua página do Facebook',
-        icon: Facebook,
-        color: 'text-blue-600',
-        available: false
-    },
     {
         id: 'whatsapp',
         name: 'WhatsApp',
-        description: 'Evolution API (Self-hosted)',
+        description: 'API não oficial',
         icon: MessageCircle,
         color: 'text-green-500',
         available: true,
@@ -55,6 +43,38 @@ const AVAILABLE_CHANNELS = [
         color: 'text-green-600',
         available: true,
         provider: 'cloud_api'
+    },
+    {
+        id: 'facebook',
+        name: 'Facebook',
+        description: 'Conectar sua página do Facebook',
+        icon: Facebook,
+        color: 'text-blue-600',
+        available: true
+    },
+    {
+        id: 'instagram',
+        name: 'Instagram',
+        description: 'Conecte sua conta do Instagram',
+        icon: Instagram,
+        color: 'text-pink-600',
+        available: true
+    },
+    {
+        id: 'telegram',
+        name: 'Telegram',
+        description: 'Conecte seu bot do Telegram',
+        icon: Send,
+        color: 'text-blue-400',
+        available: true
+    },
+    {
+        id: 'website',
+        name: 'Site',
+        description: 'Criar um widget de chat ao vivo',
+        icon: Globe,
+        color: 'text-blue-500',
+        available: false
     },
     {
         id: 'sms',
@@ -79,22 +99,6 @@ const AVAILABLE_CHANNELS = [
         icon: Code,
         color: 'text-gray-500',
         available: false
-    },
-    {
-        id: 'telegram',
-        name: 'Telegram',
-        description: 'Conecte seu bot do Telegram',
-        icon: Send,
-        color: 'text-blue-400',
-        available: true
-    },
-    {
-        id: 'instagram',
-        name: 'Instagram',
-        description: 'Conecte sua conta do Instagram',
-        icon: Instagram,
-        color: 'text-pink-600',
-        available: false
     }
 ];
 
@@ -103,6 +107,9 @@ export function ChannelsList() {
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [cloudModalOpen, setCloudModalOpen] = useState(false);
+    const [telegramModalOpen, setTelegramModalOpen] = useState(false);
+    const [facebookModalOpen, setFacebookModalOpen] = useState(false);
+    const [instagramModalOpen, setInstagramModalOpen] = useState(false);
     const [activeStep, setActiveStep] = useState(1);
 
     useEffect(() => {
@@ -126,6 +133,12 @@ export function ChannelsList() {
             setModalOpen(true);
         } else if (channelId === 'whatsapp_cloud') {
             setCloudModalOpen(true);
+        } else if (channelId === 'telegram') {
+            setTelegramModalOpen(true);
+        } else if (channelId === 'facebook') {
+            setFacebookModalOpen(true);
+        } else if (channelId === 'instagram') {
+            setInstagramModalOpen(true);
         } else {
             toast.info('Integração em breve!', {
                 description: 'Estamos finalizando os últimos ajustes deste canal.'
@@ -141,6 +154,19 @@ export function ChannelsList() {
             toast.success('Canal removido');
         } catch (error) {
             toast.error('Erro ao remover canal');
+        }
+    };
+
+    const handleRename = async (channel: Channel, newName: string) => {
+        try {
+            await channelsApi.update(channel.id, { name: newName });
+            setChannels(prev => prev.map(c => 
+                c.id === channel.id ? { ...c, name: newName } : c
+            ));
+            toast.success('Nome atualizado com sucesso');
+        } catch (error) {
+            console.error('Erro ao renomear canal:', error);
+            toast.error('Erro ao renomear canal');
         }
     };
 
@@ -255,6 +281,7 @@ export function ChannelsList() {
                                     key={channel.id}
                                     channel={channel}
                                     onDelete={handleDelete}
+                                    onRename={handleRename}
                                     onEdit={(ch) => {
                                         // Reconectar canal
                                         if (ch.type === 'whatsapp') {
@@ -346,6 +373,36 @@ export function ChannelsList() {
                     setCloudModalOpen(false);
                     loadChannels();
                     toast.success('WhatsApp Cloud API conectada!');
+                }}
+            />
+
+            <TelegramConnect
+                isOpen={telegramModalOpen}
+                onClose={() => setTelegramModalOpen(false)}
+                onSuccess={() => {
+                    setTelegramModalOpen(false);
+                    loadChannels();
+                    toast.success('Telegram conectado!');
+                }}
+            />
+
+            <FacebookConnect
+                isOpen={facebookModalOpen}
+                onClose={() => setFacebookModalOpen(false)}
+                onSuccess={() => {
+                    setFacebookModalOpen(false);
+                    loadChannels();
+                    toast.success('Facebook Messenger conectado!');
+                }}
+            />
+
+            <InstagramConnect
+                isOpen={instagramModalOpen}
+                onClose={() => setInstagramModalOpen(false)}
+                onSuccess={() => {
+                    setInstagramModalOpen(false);
+                    loadChannels();
+                    toast.success('Instagram conectado!');
                 }}
             />
         </div>

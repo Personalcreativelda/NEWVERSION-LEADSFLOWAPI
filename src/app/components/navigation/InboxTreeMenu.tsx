@@ -4,6 +4,7 @@ import {
     MessageCircle, Instagram, Facebook, Send, Mail
 } from 'lucide-react';
 import { channelsApi } from '../../services/api/inbox';
+import { useInboxFilters, type InboxFilterType } from '../../hooks/useInboxFilters';
 
 interface InboxTreeMenuProps {
     currentPage: string;
@@ -28,11 +29,14 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
     const [channels, setChannels] = useState<any[]>([]);
     const [loadingChannels, setLoadingChannels] = useState(false);
     
-    // Parse query params to detect active filter
-    const urlParams = new URLSearchParams(window.location.search);
-    const activeChannel = urlParams.get('channel');
-    const activeStatus = urlParams.get('status');
+    // Usar hook centralizado de filtros
+    const { filters, setFilterType, setChannelFilter, setStatusFilter, clearFilters } = useInboxFilters();
+    
+    // Determinar estado ativo baseado nos filtros
     const isInboxActive = currentPage === 'inbox' || currentPage === 'inbox-conversations';
+    const isAllConversationsActive = isInboxActive && filters.type === 'all' && !filters.channel && !filters.status;
+    const isMentionsActive = isInboxActive && filters.type === 'mentions';
+    const isUnattendedActive = isInboxActive && filters.type === 'unattended';
 
     // Helper para retornar ícone por tipo de canal
     const getChannelIcon = (type: string) => {
@@ -92,16 +96,30 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
     };
 
     const handleConversationsClick = () => {
+        // Limpar todos os filtros para mostrar todas as conversas
+        clearFilters();
         onNavigate('inbox');
-        // Clear query params for "all conversations"
-        window.history.pushState({}, '', '/dashboard/inbox');
     };
 
-    const handleChannelClick = (channelType: string) => {
-        onNavigate('inbox', { channel: channelType });
+    const handleMentionsClick = () => {
+        setFilterType('mentions');
+        onNavigate('inbox', { filter: 'mentions' });
+    };
+
+    const handleUnattendedClick = () => {
+        setFilterType('unattended');
+        onNavigate('inbox', { filter: 'unattended' });
+    };
+
+    const handleChannelClick = (channelId: string) => {
+        // Definir filtro de canal por ID (mantém outros filtros)
+        setChannelFilter(channelId);
+        onNavigate('inbox', { channel: channelId });
     };
 
     const handleStatusClick = (status: string) => {
+        // Definir filtro de status (mantém outros filtros)
+        setStatusFilter(status);
         onNavigate('inbox', { status });
     };
 
@@ -113,11 +131,11 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
             <button
                 onClick={handleConversationsClick}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                    isInboxActive && !activeChannel && !activeStatus
+                    isAllConversationsActive
                         ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
                         : 'hover:bg-white/10'
                 }`}
-                style={!(isInboxActive && !activeChannel && !activeStatus) ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
+                style={!isAllConversationsActive ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
             >
                 <Inbox className="w-5 h-5" />
                 <span className="flex-1 text-left font-medium">{t.conversas || 'Conversas'}</span>
@@ -125,9 +143,13 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
 
             {/* 2. Menções */}
             <button
-                onClick={() => onNavigate('inbox', { filter: 'mentions' })}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors hover:bg-white/10"
-                style={{ color: 'hsl(var(--sidebar-foreground) / 0.8)' }}
+                onClick={handleMentionsClick}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                    isMentionsActive
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : 'hover:bg-white/10'
+                }`}
+                style={!isMentionsActive ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
             >
                 <AtSign className="w-5 h-5" />
                 <span className="flex-1 text-left font-medium">{t.mentions || 'Menções'}</span>
@@ -135,9 +157,13 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
 
             {/* 3. Não atendidas */}
             <button
-                onClick={() => onNavigate('inbox', { filter: 'unattended' })}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors hover:bg-white/10"
-                style={{ color: 'hsl(var(--sidebar-foreground) / 0.8)' }}
+                onClick={handleUnattendedClick}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                    isUnattendedActive
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : 'hover:bg-white/10'
+                }`}
+                style={!isUnattendedActive ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
             >
                 <Bell className="w-5 h-5" />
                 <span className="flex-1 text-left font-medium">{t.unattended || 'Não atendidas'}</span>
@@ -147,12 +173,17 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
             <div>
                 <button
                     onClick={() => setShowChannels(!showChannels)}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors hover:bg-white/10"
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                        filters.channel ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+                    } hover:bg-white/10`}
                     style={{ color: 'hsl(var(--sidebar-foreground) / 0.8)' }}
                 >
                     {showChannels ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     <Hash className="w-5 h-5" />
                     <span className="flex-1 text-left font-medium">{t.canais || 'Canais'}</span>
+                    {filters.channel && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-500">1</span>
+                    )}
                 </button>
 
                 {showChannels && (
@@ -176,6 +207,7 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                             channels.map((channel, index) => {
                                 const ChannelIcon = getChannelIcon(channel.type);
                                 const channelColor = getChannelColor(channel.type);
+                                const isChannelActive = filters.channel === channel.id;
                                 return (
                                     <div key={channel.id} className="relative flex items-center">
                                         {/* Linha horizontal conectando ao item */}
@@ -184,13 +216,13 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                                             style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
                                         />
                                         <button
-                                            onClick={() => handleChannelClick(channel.type)}
+                                            onClick={() => handleChannelClick(channel.id)}
                                             className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-colors ml-4 ${
-                                                activeChannel === channel.type
+                                                isChannelActive
                                                     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
                                                     : 'hover:bg-white/10'
                                             }`}
-                                            style={activeChannel !== channel.type ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
+                                            style={!isChannelActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
                                         >
                                             <ChannelIcon className={`w-3.5 h-3.5 flex-shrink-0 ${channelColor}`} />
                                             <span className="truncate">{channel.name || channel.type}</span>
@@ -207,12 +239,17 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
             <div>
                 <button
                     onClick={() => setShowStatus(!showStatus)}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors hover:bg-white/10"
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                        filters.status ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+                    } hover:bg-white/10`}
                     style={{ color: 'hsl(var(--sidebar-foreground) / 0.8)' }}
                 >
                     {showStatus ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     <Tag className="w-5 h-5" />
                     <span className="flex-1 text-left font-medium">{t.status || 'Status'}</span>
+                    {filters.status && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-500">1</span>
+                    )}
                 </button>
 
                 {showStatus && (
@@ -222,27 +259,30 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                             className="absolute left-[7px] top-0 bottom-0 w-[1px] opacity-20"
                             style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
                         />
-                        {STATUS_OPTIONS.map((status) => (
-                            <div key={status.value} className="relative flex items-center">
-                                {/* Linha horizontal conectando ao item */}
-                                <div 
-                                    className="absolute left-[7px] w-[8px] h-[1px] opacity-20"
-                                    style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
-                                />
-                                <button
-                                    onClick={() => handleStatusClick(status.value)}
-                                    className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-colors ml-4 ${
-                                        activeStatus === status.value
-                                            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                                            : 'hover:bg-white/10'
-                                    }`}
-                                    style={activeStatus !== status.value ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
-                                >
-                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${status.color.replace('text-', 'bg-')}`} />
-                                    <span className="truncate">{status.label}</span>
-                                </button>
-                            </div>
-                        ))}
+                        {STATUS_OPTIONS.map((status) => {
+                            const isStatusActive = filters.status === status.value;
+                            return (
+                                <div key={status.value} className="relative flex items-center">
+                                    {/* Linha horizontal conectando ao item */}
+                                    <div 
+                                        className="absolute left-[7px] w-[8px] h-[1px] opacity-20"
+                                        style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
+                                    />
+                                    <button
+                                        onClick={() => handleStatusClick(status.value)}
+                                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-colors ml-4 ${
+                                            isStatusActive
+                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                                                : 'hover:bg-white/10'
+                                        }`}
+                                        style={!isStatusActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
+                                    >
+                                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${status.color.replace('text-', 'bg-')}`} />
+                                        <span className="truncate">{status.label}</span>
+                                    </button>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>

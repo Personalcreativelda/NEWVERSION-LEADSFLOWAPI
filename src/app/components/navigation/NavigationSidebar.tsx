@@ -60,10 +60,28 @@ export default function NavigationSidebar({
 
   const t = translations[language];
 
-  const handleItemClick = (pageId: string) => {
+  // Função de navegação que suporta query params opcionais
+  const handleItemClick = (pageId: string, queryParams?: Record<string, string>) => {
     if (onNavigate) {
       onNavigate(pageId);
     }
+    
+    // Atualizar URL com query params se fornecidos
+    if (queryParams && Object.keys(queryParams).length > 0) {
+      const params = new URLSearchParams();
+      Object.entries(queryParams).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+      });
+      const queryString = params.toString();
+      const newUrl = queryString 
+        ? `/dashboard/${pageId}?${queryString}`
+        : `/dashboard/${pageId}`;
+      window.history.replaceState({}, '', newUrl);
+    } else if (pageId === 'inbox') {
+      // Limpar query params quando navegar para inbox sem filtros
+      window.history.replaceState({}, '', '/dashboard/inbox');
+    }
+    
     if (isMobile) {
       onClose();
     }

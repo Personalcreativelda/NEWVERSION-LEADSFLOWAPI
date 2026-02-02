@@ -108,9 +108,14 @@ export function useInbox(options: UseInboxOptions = {}) {
     });
 
     const selectConversation = useCallback(async (conversation: ConversationWithDetails) => {
-        setSelectedConversation(conversation);
+        // Atualizar conversa selecionada imediatamente com unread_count zerado
+        const updatedConversation = conversation.unread_count > 0 
+            ? { ...conversation, unread_count: 0 }
+            : conversation;
+        
+        setSelectedConversation(updatedConversation);
 
-        // Marcar como lida
+        // Marcar como lida no backend
         if (conversation.unread_count > 0) {
             await markConversationAsRead(conversation.id);
             wsMarkAsRead(conversation.id);

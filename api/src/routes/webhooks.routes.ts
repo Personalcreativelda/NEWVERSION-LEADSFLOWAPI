@@ -639,4 +639,226 @@ router.post('/evolution/messages', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TELEGRAM WEBHOOKS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ✅ Verificação de saúde do webhook Telegram
+router.get('/telegram', async (_req, res) => {
+  console.log('[Telegram Webhook] GET request received - webhook is accessible');
+  res.json({
+    success: true,
+    message: 'Telegram webhook endpoint is accessible',
+    endpoint: '/api/webhooks/telegram',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ Webhook para receber mensagens do Telegram
+router.post('/telegram', async (req, res) => {
+  try {
+    console.log('[Telegram Webhook] ===== WEBHOOK RECEBIDO =====');
+    console.log('[Telegram Webhook] Body:', JSON.stringify(req.body).substring(0, 2000));
+
+    const update = req.body;
+
+    // Telegram envia diferentes tipos de updates
+    // Vamos processar apenas mensagens de texto por enquanto
+    const message = update.message || update.edited_message;
+    
+    if (!message) {
+      console.log('[Telegram Webhook] Update sem mensagem, ignorando');
+      return res.json({ success: true, message: 'No message in update' });
+    }
+
+    // Ignorar mensagens de grupos/supergrupos
+    if (message.chat.type !== 'private') {
+      console.log('[Telegram Webhook] Ignorando mensagem de grupo:', message.chat.type);
+      return res.json({ success: true, message: 'Group messages ignored' });
+    }
+
+    const chatId = message.chat.id.toString();
+    const fromUser = message.from;
+    const text = message.text || message.caption || '[Mídia]';
+    const contactName = [fromUser.first_name, fromUser.last_name].filter(Boolean).join(' ') || fromUser.username || chatId;
+
+    console.log('[Telegram Webhook] Chat ID:', chatId);
+    console.log('[Telegram Webhook] From:', contactName);
+    console.log('[Telegram Webhook] Text:', text.substring(0, 100));
+
+    // Encontrar canal pelo bot_id no credentials
+    // O bot_id é o ID do bot que recebeu a mensagem (disponível no webhook como update.message.chat.id do bot)
+    // Mas como o Telegram não envia o bot_id diretamente, precisamos buscar de outra forma
+    // Vamos buscar todos os canais Telegram ativos e verificar se algum corresponde
+    
+    // Primeiro, tentar encontrar por uma conversa existente
+    let channelResult = await query(
+      `SELECT DISTINCT c.* FROM channels c
+       INNER JOIN conversations conv ON conv.channel_id = c.id
+       WHERE c.type = 'telegram' 
+       AND c.status = 'active'
+       AND conv.contact_identifier = $1`,
+      [chatId]
+    );
+
+    // Se não encontrou por conversa, buscar o primeiro canal Telegram ativo
+    // (isso funciona quando há apenas um bot configurado)
+    if (channelResult.rows.length === 0) {
+      console.log('[Telegram Webhook] Nenhuma conversa existente, buscando canal Telegram ativo...');
+      channelResult = await query(
+        `SELECT * FROM channels 
+         WHERE type = 'telegram' 
+         AND status = 'active'
+         ORDER BY created_at DESC
+         LIMIT 1`
+      );
+    }
+
+    if (channelResult.rows.length === 0) {
+      console.warn('[Telegram Webhook] Nenhum canal Telegram ativo encontrado');
+      return res.status(404).json({ error: 'No active Telegram channel found' });
+    }
+
+    const channel = channelResult.rows[0];
+    console.log('[Telegram Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
+
+    // Buscar ou criar lead pelo chatId
+    let lead = await query(
+      `SELECT * FROM leads WHERE user_id = $1 AND telegram_id = $2`,
+      [channel.user_id, chatId]
+    );
+
+    let leadId: string;
+
+    if (lead.rows.length === 0) {
+      // Criar lead automaticamente
+      console.log('[Telegram Webhook] Criando novo lead:', contactName);
+      const leadResult = await query(
+        `INSERT INTO leads (user_id, name, telegram_id, source, status)
+         VALUES ($1, $2, $3, 'telegram', 'new')
+         RETURNING *`,
+        [channel.user_id, contactName, chatId]
+      );
+      leadId = leadResult.rows[0].id;
+    } else {
+      leadId = lead.rows[0].id;
+    }
+
+    // Buscar ou criar conversa
+    const conversation = await conversationsService.findOrCreate(
+      channel.user_id,
+      channel.id,
+      chatId, // contact_identifier
+      leadId,
+      {
+        contact_name: contactName,
+        telegram_username: fromUser.username || null
+      }
+    );
+
+    // Determinar tipo de mídia
+    let mediaType = null;
+    let mediaUrl = null;
+
+    if (message.photo) {
+      mediaType = 'image';
+    } else if (message.video) {
+      mediaType = 'video';
+    } else if (message.audio || message.voice) {
+      mediaType = 'audio';
+    } else if (message.document) {
+      mediaType = 'document';
+    } else if (message.sticker) {
+      mediaType = 'sticker';
+    }
+
+    // Salvar mensagem
+    const messageResult = await query(
+      `INSERT INTO messages (
+        user_id, conversation_id, lead_id, direction, channel, 
+        content, media_url, media_type, status, external_id, metadata
+      )
+       VALUES ($1, $2, $3, 'in', 'telegram', $4, $5, $6, 'delivered', $7, $8)
+       RETURNING *`,
+      [
+        channel.user_id,
+        conversation.id,
+        leadId,
+        text,
+        mediaUrl,
+        mediaType,
+        message.message_id.toString(),
+        JSON.stringify({
+          chat_id: chatId,
+          from: fromUser,
+          date: message.date,
+          update_id: update.update_id
+        })
+      ]
+    );
+
+    const savedMessage = messageResult.rows[0];
+    console.log('[Telegram Webhook] Mensagem salva:', savedMessage.id);
+
+    // Atualizar conversa
+    await conversationsService.updateUnreadCount(conversation.id, 1);
+    await query(
+      `UPDATE conversations
+       SET last_message_at = NOW(),
+           status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [conversation.id]
+    );
+
+    // Buscar conversa atualizada
+    const updatedConversation = await query(
+      `SELECT c.*,
+              ch.name as channel_name,
+              l.name as lead_name
+       FROM conversations c
+       LEFT JOIN channels ch ON c.channel_id = ch.id
+       LEFT JOIN leads l ON c.lead_id = l.id
+       WHERE c.id = $1`,
+      [conversation.id]
+    );
+
+    // Emitir WebSocket
+    const wsService = getWebSocketService();
+    if (wsService) {
+      console.log('[Telegram Webhook] Emitindo WebSocket para usuário:', channel.user_id);
+
+      wsService.emitNewMessage(channel.user_id, {
+        conversationId: conversation.id,
+        message: savedMessage,
+        conversation: updatedConversation.rows[0] || conversation
+      });
+
+      const totalUnreadResult = await query(
+        `SELECT SUM(unread_count) as total FROM conversations WHERE user_id = $1`,
+        [channel.user_id]
+      );
+      const totalUnread = parseInt(totalUnreadResult.rows[0]?.total || '0');
+
+      wsService.emitUnreadCountUpdate(channel.user_id, {
+        totalUnread,
+        conversationId: conversation.id,
+        unreadCount: (updatedConversation.rows[0]?.unread_count || 0) + 1
+      });
+
+      console.log('[Telegram Webhook] WebSocket emitido!');
+    }
+
+    // Telegram espera resposta 200 OK
+    res.json({ success: true, message_id: savedMessage.id });
+  } catch (error) {
+    console.error('[Telegram Webhook] Erro:', error);
+    // Sempre retornar 200 para o Telegram não reenviar
+    res.json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
 export default router;

@@ -12,7 +12,7 @@ export interface Channel {
     status: 'active' | 'inactive' | 'error' | 'connecting';
     provider?: WhatsAppProvider; // Para diferenciar Evolution API vs Cloud API
     credentials: {
-        // Evolution API
+        // Evolution API (WhatsApp)
         instance_id?: string;
         instance_name?: string;
         phone_number?: string;
@@ -22,8 +22,19 @@ export interface Channel {
         business_id?: string;
         access_token?: string;
         verify_token?: string;
-        // Facebook/Instagram
+        // Facebook
         page_id?: string;
+        page_access_token?: string;
+        page_name?: string;
+        // Instagram
+        instagram_id?: string;
+        username?: string;
+        // Telegram
+        bot_token?: string;
+        bot_username?: string;
+        bot_id?: number;
+        // Allow additional properties
+        [key: string]: any;
     };
     settings: {
         auto_reply?: boolean;

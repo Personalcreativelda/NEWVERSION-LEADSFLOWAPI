@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ConversationList } from '../../inbox/ConversationList';
 import { useInbox } from '../../../hooks/useInbox';
+import { useInboxFilters } from '../../../hooks/useInboxFilters';
 import { conversationsApi, contactsApi } from '../../../services/api/inbox';
-import { Settings, Search, Filter, Plus } from 'lucide-react';
+import { Settings, Search, Filter, Plus, X } from 'lucide-react';
 import { ChatPanel } from '../../inbox/ChatPanel';
 import { EmptyState } from '../../inbox/EmptyState';
 import { ContactDetailsPanel } from '../../inbox/ContactDetailsPanel';
@@ -27,16 +28,14 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
         sendMessage
     } = useInbox();
 
+    // Hook centralizado de filtros
+    const { filters, clearFilters, hasActiveFilters, getActiveFiltersDescription } = useInboxFilters();
+
     const [showContactDetails, setShowContactDetails] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [showNewConversationModal, setShowNewConversationModal] = useState(false);
     const [isCreatingConversation, setIsCreatingConversation] = useState(false);
     const [isEditingLead, setIsEditingLead] = useState(false);
-
-    // Get filters from URL query params
-    const urlParams = new URLSearchParams(window.location.search);
-    const channelFilter = urlParams.get('channel');
-    const statusFilter = urlParams.get('status');
 
     // Handle conversation creation from phone number
     const handleCreateConversation = async (phone: string, name: string) => {
@@ -125,40 +124,53 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
         }
     };
 
-    // Filtrar grupos e contatos inválidos - apenas conversas individuais válidas
-    const individualConversations = conversations.filter(conv => {
-        const jid = conv.metadata?.jid || conv.id || '';
-        const isGroup = jid.includes('@g.us');
-        const isValidContact = jid.includes('@lid') || jid.includes('@s.whatsapp.net');
-        const hasValidName = conv.contact?.name && conv.contact.name !== 'Desconhecido';
-        const hasValidPhone = conv.contact?.phone && conv.contact.phone.length >= 5;
-        
-        // Excluir grupos e contatos sem dados válidos
-        if (isGroup) return false;
-        if (!isValidContact) return false;
-        
-        // Filtrar por canal (channel)
-        if (channelFilter) {
-            const convChannel = conv.channel?.type?.toLowerCase() || 'whatsapp';
-            if (convChannel !== channelFilter.toLowerCase()) return false;
-        }
-        
-        // Filtrar por status do lead
-        if (statusFilter) {
-            const convStatus = conv.contact?.status?.toLowerCase() || '';
-            if (convStatus !== statusFilter.toLowerCase()) return false;
-        }
-        
-        // Filtrar por busca
-        if (searchQuery) {
-            const query = searchQuery.toLowerCase();
-            const name = conv.contact?.name?.toLowerCase() || '';
-            const phone = conv.contact?.phone?.toLowerCase() || '';
-            return name.includes(query) || phone.includes(query);
-        }
-        
-        return true;
-    });
+    // Filtrar conversas baseado nos filtros aplicados
+    const filteredConversations = useMemo(() => {
+        return conversations.filter(conv => {
+            const jid = conv.metadata?.jid || conv.id || '';
+            const isGroup = jid.includes('@g.us');
+            const isValidContact = jid.includes('@lid') || jid.includes('@s.whatsapp.net');
+            
+            // Excluir grupos e contatos sem dados válidos
+            if (isGroup) return false;
+            if (!isValidContact) return false;
+            
+            // Filtrar por tipo (mentions, unattended)
+            if (filters.type === 'mentions') {
+                // Mostrar apenas conversas onde o usuário foi mencionado
+                const hasMention = conv.metadata?.hasMention || conv.has_mention || false;
+                if (!hasMention) return false;
+            } else if (filters.type === 'unattended') {
+                // Mostrar apenas conversas não atendidas (sem responsável ou sem resposta)
+                const hasAssignee = conv.assignee_id || conv.metadata?.assigneeId;
+                const hasOutgoingMessage = conv.last_message?.direction === 'out';
+                // Não atendida = sem responsável OU última mensagem foi recebida (não respondida)
+                if (hasAssignee && hasOutgoingMessage) return false;
+            }
+            
+            // Filtrar por canal (channel) - usando channel_id
+            if (filters.channel) {
+                const convChannelId = conv.channel_id || conv.channel?.id;
+                if (convChannelId !== filters.channel) return false;
+            }
+            
+            // Filtrar por status do lead
+            if (filters.status) {
+                const convStatus = conv.contact?.status?.toLowerCase() || '';
+                if (convStatus !== filters.status.toLowerCase()) return false;
+            }
+            
+            // Filtrar por busca
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                const name = conv.contact?.name?.toLowerCase() || '';
+                const phone = conv.contact?.phone?.toLowerCase() || '';
+                return name.includes(query) || phone.includes(query);
+            }
+            
+            return true;
+        });
+    }, [conversations, filters, searchQuery]);
 
     const handleOpenSettings = () => {
         if (onNavigate) {
@@ -250,12 +262,36 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
                             onChange={(e) => handleSearch(e.target.value)}
                         />
                     </div>
+
+                    {/* Indicador de filtros ativos */}
+                    {hasActiveFilters && (
+                        <div className="flex items-center gap-2 mt-3 px-1">
+                            <div 
+                                className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs"
+                                style={{ 
+                                    backgroundColor: 'hsl(var(--primary) / 0.1)',
+                                    color: 'hsl(var(--primary))'
+                                }}
+                            >
+                                <Filter size={12} />
+                                <span className="truncate font-medium">{getActiveFiltersDescription()}</span>
+                            </div>
+                            <button
+                                onClick={clearFilters}
+                                className="p-1.5 rounded-lg hover:bg-muted transition-all"
+                                style={{ color: 'hsl(var(--muted-foreground))' }}
+                                title="Limpar filtros"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* List Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                     <ConversationList
-                        conversations={individualConversations}
+                        conversations={filteredConversations}
                         selectedId={selectedConversation?.id || null}
                         onSelect={selectConversation}
                         loading={conversationsLoading}
