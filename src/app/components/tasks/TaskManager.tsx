@@ -198,23 +198,24 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen overflow-x-hidden">
+      <div className="space-y-4 sm:space-y-6 px-3 sm:px-0">
       {/* Header com ação destacada */}
-      <div className="pt-6 pb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="space-y-2">
+      <div className="pt-4 sm:pt-6 pb-4 sm:pb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="space-y-1 sm:space-y-2">
           <h1
-            className="text-[32px] font-semibold text-[#1F2937] dark:text-[#F1F5F9]"
+            className="text-2xl sm:text-[32px] font-semibold text-[#1F2937] dark:text-[#F1F5F9]"
             style={{ letterSpacing: '-0.5px' }}
           >
             Tarefas e Follow-ups
           </h1>
-          <p className="text-[15px] text-[#6B7280] dark:text-[#6B7280]">
+          <p className="text-sm sm:text-[15px] text-[#6B7280] dark:text-[#6B7280]">
             Gerencie suas atividades e lembretes
           </p>
         </div>
         <Button
           onClick={() => setShowNewTaskModal(true)}
-          className="gap-2 px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-sm shadow-[#2563EB]/15 transition"
+          className="gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-sm shadow-[#2563EB]/15 transition w-full sm:w-auto"
         >
           <Plus className="w-4 h-4" />
           Nova Tarefa
@@ -222,62 +223,65 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4 bg-card dark:bg-card border-border dark:border-border">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="p-3 sm:p-4 bg-card dark:bg-card border-border dark:border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">Total Pendentes</p>
-              <p className="text-2xl mt-1 text-foreground dark:text-foreground">{stats.total}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">Total Pendentes</p>
+              <p className="text-xl sm:text-2xl mt-1 text-foreground dark:text-foreground">{stats.total}</p>
             </div>
-            <Circle className="w-8 h-8 text-blue-600" />
+            <Circle className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
           </div>
         </Card>
 
-        <Card className="p-4 bg-card dark:bg-card border-border dark:border-border">
+        <Card className="p-3 sm:p-4 bg-card dark:bg-card border-border dark:border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">Para Hoje</p>
-              <p className={`text-2xl mt-1 text-orange-600`}>{stats.today}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">Para Hoje</p>
+              <p className={`text-xl sm:text-2xl mt-1 text-orange-600`}>{stats.today}</p>
             </div>
-            <Clock className="w-8 h-8 text-orange-600" />
+            <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600" />
           </div>
         </Card>
 
-        <Card className="p-4 bg-card dark:bg-card border-border dark:border-border">
+        <Card className="p-3 sm:p-4 bg-card dark:bg-card border-border dark:border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">Atrasadas</p>
-              <p className={`text-2xl mt-1 text-red-600`}>{stats.overdue}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">Atrasadas</p>
+              <p className={`text-xl sm:text-2xl mt-1 text-red-600`}>{stats.overdue}</p>
             </div>
-            <AlertCircle className="w-8 h-8 text-red-600" />
+            <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 text-red-600" />
           </div>
         </Card>
 
-        <Card className="p-4 bg-card dark:bg-card border-border dark:border-border">
+        <Card className="p-3 sm:p-4 bg-card dark:bg-card border-border dark:border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">Concluídas</p>
-              <p className={`text-2xl mt-1 text-green-600`}>{stats.completed}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">Concluídas</p>
+              <p className={`text-xl sm:text-2xl mt-1 text-green-600`}>{stats.completed}</p>
             </div>
-            <CheckCircle2 className="w-8 h-8 text-green-600" />
+            <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
           </div>
         </Card>
       </div>
 
 
       {/* Filtros */}
-      <Card className="p-4 bg-card border-border">
-        <div className="flex flex-wrap gap-3 items-center">
-          <Filter className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+      <Card className="p-3 sm:p-4 bg-card border-border overflow-x-auto">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-3 sm:items-center min-w-max sm:min-w-0">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+            <span className="text-xs sm:text-sm text-muted-foreground sm:hidden">Filtros</span>
+          </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-1 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-hide">
             {['all', 'today', 'overdue', 'upcoming', 'completed'].map(f => (
               <Button
                 key={f}
                 variant="ghost"
                 size="sm"
                 onClick={() => setFilter(f as any)}
-                className={`transition-colors ${filter === f
+                className={`transition-colors text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 whitespace-nowrap flex-shrink-0 ${filter === f
                   ? '!bg-blue-600 !text-white'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                   }`}
@@ -291,45 +295,47 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
             ))}
           </div>
 
-          <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+          <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-600" />
 
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-[140px] bg-background text-foreground border-border">
-              <SelectValue placeholder="Prioridade" />
-            </SelectTrigger>
-            <SelectContent className="text-popover-foreground border-border shadow-md">
-              <SelectItem value="all" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Todas Prioridades</SelectItem>
-              {PRIORITY_LEVELS.map(p => (
-                <SelectItem key={p.value} value={p.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{p.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2 sm:gap-2 flex-wrap sm:flex-nowrap">
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-full sm:w-[140px] bg-background text-foreground border-border text-xs sm:text-sm">
+                <SelectValue placeholder="Prioridade" />
+              </SelectTrigger>
+              <SelectContent className="text-popover-foreground border-border shadow-md">
+                <SelectItem value="all" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Todas Prioridades</SelectItem>
+                {PRIORITY_LEVELS.map(p => (
+                  <SelectItem key={p.value} value={p.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[140px] bg-background text-foreground border-border">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent className="text-popover-foreground border-border shadow-md">
-              <SelectItem value="all" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Todos os Tipos</SelectItem>
-              {TASK_TYPES.map(t => (
-                <SelectItem key={t.value} value={t.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{t.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full sm:w-[140px] bg-background text-foreground border-border text-xs sm:text-sm">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent className="text-popover-foreground border-border shadow-md">
+                <SelectItem value="all" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Todos os Tipos</SelectItem>
+                {TASK_TYPES.map(t => (
+                  <SelectItem key={t.value} value={t.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </Card>
 
       {/* Lista de Tarefas */}
-      <div className="space-y-3">
+      <div className="space-y-2 sm:space-y-3 pb-6">
         {filteredTasks.length === 0 ? (
-          <Card className="p-12 text-center bg-card dark:bg-card border-border dark:border-border">
-            <div className="w-16 h-16 rounded-full bg-muted dark:bg-muted mx-auto flex items-center justify-center mb-4">
-              <CheckCircle2 className="w-8 h-8 text-muted-foreground" />
+          <Card className="p-8 sm:p-12 text-center bg-card dark:bg-card border-border dark:border-border">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-muted dark:bg-muted mx-auto flex items-center justify-center mb-3 sm:mb-4">
+              <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
             </div>
-            <p className="text-lg text-foreground dark:text-foreground">
+            <p className="text-base sm:text-lg text-foreground dark:text-foreground">
               Nenhuma tarefa encontrada
             </p>
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
+            <p className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground mt-1">
               {filter === 'all' ? 'Crie uma nova tarefa para começar' : 'Tente ajustar os filtros'}
             </p>
           </Card>
@@ -344,22 +350,22 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
             return (
               <Card
                 key={task.id}
-                className={`p-4 transition-all bg-card dark:bg-card border-border dark:border-border hover:bg-muted/50 dark:hover:bg-muted/50 ${task.status === 'completed' ? 'opacity-60' : ''}`}
+                className={`p-3 sm:p-4 transition-all bg-card dark:bg-card border-border dark:border-border hover:bg-muted/50 dark:hover:bg-muted/50 ${task.status === 'completed' ? 'opacity-60' : ''}`}
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-2 sm:gap-4">
                   <Checkbox
                     checked={task.status === 'completed'}
                     onCheckedChange={() => handleToggleTask(task.id)}
-                    className="mt-1"
+                    className="mt-0.5 sm:mt-1 flex-shrink-0"
                   />
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <Icon className={`w-4 h-4 ${typeInfo.color}`} />
+                          <Icon className={`w-3 h-3 sm:w-4 sm:h-4 ${typeInfo.color} flex-shrink-0`} />
                           <h3
-                            className={`${isDark ? 'text-white' : 'text-gray-900'} ${task.status === 'completed' ? 'line-through' : ''
+                            className={`text-sm sm:text-base truncate ${isDark ? 'text-white' : 'text-gray-900'} ${task.status === 'completed' ? 'line-through' : ''
                               }`}
                           >
                             {task.title}
@@ -367,46 +373,47 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                         </div>
 
                         {task.description && (
-                          <p className={`text-sm ${isDark ? 'text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-300'} mb-2`}>
+                          <p className={`text-xs sm:text-sm line-clamp-2 ${isDark ? 'text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-300'} mb-2`}>
                             {task.description}
                           </p>
                         )}
 
-                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2">
                           {task.leadName && (
-                            <Badge variant="outline" className="gap-1">
-                              <User className="w-3 h-3" />
-                              {task.leadName}
+                            <Badge variant="outline" className="gap-1 text-xs px-1.5 py-0.5">
+                              <User className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                              <span className="truncate max-w-[80px] sm:max-w-none">{task.leadName}</span>
                             </Badge>
                           )}
 
-                          <Badge className={priorityInfo.color}>
-                            <div className={`w-2 h-2 rounded-full ${priorityInfo.dot} mr-1`}></div>
+                          <Badge className={`${priorityInfo.color} text-xs px-1.5 py-0.5`}>
+                            <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${priorityInfo.dot} mr-1`}></div>
                             {priorityInfo.label}
                           </Badge>
 
-                          <Badge variant="outline" className={`gap-1 ${isOverdue ? 'border-red-500 text-red-600' : isDueToday ? 'border-orange-500 text-orange-600' : ''}`}>
-                            <CalendarIcon className="w-3 h-3" />
-                            {format(new Date(task.dueDate), "dd 'de' MMMM", { locale: ptBR })}
+                          <Badge variant="outline" className={`gap-1 text-xs px-1.5 py-0.5 ${isOverdue ? 'border-red-500 text-red-600' : isDueToday ? 'border-orange-500 text-orange-600' : ''}`}>
+                            <CalendarIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                            <span className="hidden xs:inline">{format(new Date(task.dueDate), "dd 'de' MMMM", { locale: ptBR })}</span>
+                            <span className="xs:hidden">{format(new Date(task.dueDate), "dd/MM", { locale: ptBR })}</span>
                           </Badge>
 
                           {isOverdue && (
-                            <Badge variant="destructive" className="gap-1">
-                              <AlertCircle className="w-3 h-3" />
-                              Atrasada
+                            <Badge variant="destructive" className="gap-1 text-xs px-1.5 py-0.5">
+                              <AlertCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                              <span className="hidden sm:inline">Atrasada</span>
                             </Badge>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 mt-2 sm:mt-0">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteTask(task.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1.5 sm:p-2"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </Button>
                       </div>
                     </div>
@@ -417,50 +424,51 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
           })
         )}
       </div>
+      </div>
 
       {/* Modal de Nova Tarefa */}
       <Dialog open={showNewTaskModal} onOpenChange={setShowNewTaskModal}>
-        <DialogContent className="max-w-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl p-6">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl p-4 sm:p-6 mx-2 sm:mx-auto">
           <DialogHeader>
-            <DialogTitle className="text-foreground dark:text-foreground">Nova Tarefa</DialogTitle>
-            <DialogDescription className="text-muted-foreground dark:text-muted-foreground">
+            <DialogTitle className="text-foreground dark:text-foreground text-lg sm:text-xl">Nova Tarefa</DialogTitle>
+            <DialogDescription className="text-muted-foreground dark:text-muted-foreground text-sm">
               Crie uma nova tarefa ou lembrete
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 mt-4">
+          <div className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
             <div>
-              <label className={`text-sm mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
+              <label className={`text-xs sm:text-sm mb-1.5 sm:mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
                 Título *
               </label>
               <Input
                 value={newTask.title}
                 onChange={e => setNewTask({ ...newTask, title: e.target.value })}
                 placeholder="Ex: Ligar para cliente..."
-                className="!bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
+                className="!bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200 text-sm sm:text-base"
               />
             </div>
 
             <div>
-              <label className={`text-sm mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
+              <label className={`text-xs sm:text-sm mb-1.5 sm:mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
                 Descrição
               </label>
               <Textarea
                 value={newTask.description}
                 onChange={e => setNewTask({ ...newTask, description: e.target.value })}
                 placeholder="Detalhes da tarefa..."
-                rows={3}
-                className="!bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
+                rows={2}
+                className="!bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200 text-sm sm:text-base"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className={`text-sm mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
+                <label className={`text-xs sm:text-sm mb-1.5 sm:mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
                   Tipo
                 </label>
                 <Select value={newTask.type} onValueChange={type => setNewTask({ ...newTask, type })}>
-                  <SelectTrigger className="bg-background text-foreground border-border">
+                  <SelectTrigger className="bg-background text-foreground border-border text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="text-popover-foreground border-border shadow-md max-h-[200px] z-[9999]">
@@ -472,11 +480,11 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
               </div>
 
               <div>
-                <label className={`text-sm mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
+                <label className={`text-xs sm:text-sm mb-1.5 sm:mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
                   Prioridade
                 </label>
                 <Select value={newTask.priority} onValueChange={priority => setNewTask({ ...newTask, priority })}>
-                  <SelectTrigger className="bg-background text-foreground border-border">
+                  <SelectTrigger className="bg-background text-foreground border-border text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="text-popover-foreground border-border shadow-md z-[9999]">
@@ -489,14 +497,14 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
             </div>
 
             <div>
-              <label className={`text-sm mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
+              <label className={`text-xs sm:text-sm mb-1.5 sm:mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
                 Lead Relacionado (opcional)
               </label>
               <Select
                 value={newTask.leadId || 'none'}
                 onValueChange={leadId => setNewTask({ ...newTask, leadId: leadId === 'none' ? '' : leadId })}
               >
-                <SelectTrigger className="!bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200">
+                <SelectTrigger className="!bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200 text-sm">
                   <SelectValue placeholder="Selecione um lead..." />
                 </SelectTrigger>
                 <SelectContent className="!bg-white dark:!bg-white border border-gray-200 dark:border-gray-700 shadow-lg max-h-[200px] z-[9999]">
@@ -511,12 +519,12 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
             </div>
 
             <div>
-              <label className={`text-sm mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
+              <label className={`text-xs sm:text-sm mb-1.5 sm:mb-2 block ${isDark ? 'text-gray-300' : 'text-muted-foreground'}`}>
                 Data de Vencimento
               </label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200 font-normal text-left">
+                  <Button variant="outline" className="w-full justify-start !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200 font-normal text-left text-sm">
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {format(newTask.dueDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   </Button>
@@ -533,11 +541,11 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
               </Popover>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4">
-              <Button variant="outline" onClick={() => setShowNewTaskModal(false)}>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-3 sm:pt-4">
+              <Button variant="outline" onClick={() => setShowNewTaskModal(false)} className="w-full sm:w-auto">
                 Cancelar
               </Button>
-              <Button onClick={handleCreateTask}>
+              <Button onClick={handleCreateTask} className="w-full sm:w-auto">
                 Criar Tarefa
               </Button>
             </div>

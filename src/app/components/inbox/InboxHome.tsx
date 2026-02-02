@@ -27,7 +27,7 @@ export default function InboxHome({ onNavigate }: InboxHomeProps) {
 
     return (
         <div 
-            className="flex-1 flex items-center justify-center p-8 h-full"
+            className="flex-1 flex items-center justify-center p-4 sm:p-8 h-full min-h-[calc(100vh-120px)] overflow-y-auto"
             style={{ backgroundColor: 'hsl(var(--background))' }}
         >
             <EmptyState onOpenSettings={handleOpenSettings} />

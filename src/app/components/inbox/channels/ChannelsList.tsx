@@ -146,83 +146,86 @@ export function ChannelsList() {
 
     return (
         <div 
-            className="h-full flex flex-col md:flex-row rounded-xl border overflow-hidden"
+            className="min-h-screen flex flex-col lg:flex-row rounded-xl border overflow-hidden"
             style={{ 
                 backgroundColor: 'hsl(var(--background))',
                 borderColor: 'hsl(var(--border))'
             }}
         >
 
-            {/* Sidebar Stepper (Visual) */}
+            {/* Sidebar Stepper (Visual) - Colapsável no mobile */}
             <div 
-                className="w-full md:w-64 border-r p-6 flex-shrink-0"
+                className="w-full lg:w-64 border-b lg:border-b-0 lg:border-r p-4 lg:p-6 flex-shrink-0"
                 style={{ 
                     backgroundColor: 'hsl(var(--card))',
                     borderColor: 'hsl(var(--border))'
                 }}
             >
                 <h2 
-                    className="text-lg font-bold mb-8"
+                    className="text-base lg:text-lg font-bold mb-4 lg:mb-8"
                     style={{ color: 'hsl(var(--foreground))' }}
                 >
                     Caixas de Entrada
                 </h2>
 
-                <div className="relative space-y-8">
-                    {/* Linha vertical conectora */}
+                <div className="relative space-y-4 lg:space-y-8">
+                    {/* Linha vertical conectora - escondida no mobile */}
                     <div 
-                        className="absolute left-[15px] top-8 bottom-8 w-0.5 -z-10"
+                        className="absolute left-[15px] top-8 bottom-8 w-0.5 -z-10 hidden lg:block"
                         style={{ backgroundColor: 'hsl(var(--border))' }}
                     ></div>
 
-                    {/* Step 1 */}
-                    <div className="flex gap-4">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 1 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 1 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>
-                            1
+                    {/* Steps em linha no mobile, vertical no desktop */}
+                    <div className="flex lg:flex-col gap-4 lg:gap-8 overflow-x-auto pb-2 lg:pb-0">
+                        {/* Step 1 */}
+                        <div className="flex gap-2 lg:gap-4 flex-shrink-0">
+                            <div className={`w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-xs lg:text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 1 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 1 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>
+                                1
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className={`text-sm font-medium ${activeStep === 1 ? 'text-blue-600 dark:text-blue-400' : ''}`} style={activeStep === 1 ? {} : { color: 'hsl(var(--foreground))' }}>
+                                    Escolha o Canal
+                                </h3>
+                                <p className="text-[10px] lg:text-xs mt-0.5 lg:mt-1 leading-relaxed hidden lg:block" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    Escolha o provedor que você deseja integrar.
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className={`font-medium ${activeStep === 1 ? 'text-blue-600 dark:text-blue-400' : ''}`} style={activeStep === 1 ? {} : { color: 'hsl(var(--foreground))' }}>
-                                Escolha o Canal
-                            </h3>
-                            <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Escolha o provedor que você deseja integrar.
-                            </p>
-                        </div>
-                    </div>
 
-                    {/* Step 2 */}
-                    <div className="flex gap-4">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 2 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 2 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>
-                            2
+                        {/* Step 2 */}
+                        <div className="flex gap-2 lg:gap-4 flex-shrink-0">
+                            <div className={`w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-xs lg:text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 2 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 2 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>
+                                2
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className="text-sm font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    Configuração
+                                </h3>
+                                <p className="text-[10px] lg:text-xs mt-0.5 lg:mt-1 leading-relaxed hidden lg:block" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    Autentique sua conta e configure a caixa de entrada.
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Configuração
-                            </h3>
-                            <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Autentique sua conta e configure a caixa de entrada.
-                            </p>
-                        </div>
-                    </div>
 
-                    {/* Step 3 */}
-                    <div className="flex gap-4">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 3 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 3 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>
-                            3
-                        </div>
-                        <div>
-                            <h3 className="font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Pronto!
-                            </h3>
-                            <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Comece a atender seus leads centralizados.
-                            </p>
+                        {/* Step 3 */}
+                        <div className="flex gap-2 lg:gap-4 flex-shrink-0">
+                            <div className={`w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-xs lg:text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 3 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 3 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>
+                                3
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className="text-sm font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    Pronto!
+                                </h3>
+                                <p className="text-[10px] lg:text-xs mt-0.5 lg:mt-1 leading-relaxed hidden lg:block" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    Comece a atender seus leads centralizados.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Status de Ativos */}
-                <div className="mt-12 pt-6 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
+                {/* Status de Ativos - Escondido no mobile */}
+                <div className="hidden lg:block mt-12 pt-6 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
                     <h4 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'hsl(var(--muted-foreground))' }}>
                         Seus Canais Ativos
                     </h4>
@@ -240,16 +243,16 @@ export function ChannelsList() {
             </div>
 
             {/* Main Content: Channel Grid */}
-            <div className="flex-1 overflow-y-auto p-6 md:p-10">
+            <div className="flex-1 overflow-y-auto p-4 lg:p-10">
 
                 {/* Seção de Canais Ativos (Cards completos) */}
                 {channels.length > 0 && (
-                    <div className="mb-10">
-                        <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
-                            <span className="w-1.5 h-6 bg-green-500 rounded-full"></span>
+                    <div className="mb-6 lg:mb-10">
+                        <h2 className="text-lg lg:text-xl font-bold mb-4 lg:mb-6 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
+                            <span className="w-1 h-5 lg:w-1.5 lg:h-6 bg-green-500 rounded-full"></span>
                             Canais Conectados
                         </h2>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
                             {channels.map(channel => (
                                 <ChannelCard
                                     key={channel.id}
@@ -272,34 +275,34 @@ export function ChannelsList() {
 
                 {/* Grid de Seleção (Estilo Chatwoot) */}
                 <div>
-                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
-                        <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
+                    <h2 className="text-lg lg:text-xl font-bold mb-4 lg:mb-6 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
+                        <span className="w-1 h-5 lg:w-1.5 lg:h-6 bg-blue-500 rounded-full"></span>
                         Adicionar Novo Canal
                     </h2>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
                         {AVAILABLE_CHANNELS.map((item) => {
                             const Icon = item.icon;
                             return (
                                 <button
                                     key={item.id}
                                     onClick={() => handleConnect(item.id)}
-                                    className="group flex flex-col items-start p-6 border rounded-xl hover:border-blue-500 hover:shadow-md transition-all text-left"
+                                    className="group flex flex-col items-start p-4 lg:p-6 border rounded-xl hover:border-blue-500 hover:shadow-md transition-all text-left"
                                     style={{ 
                                         backgroundColor: 'hsl(var(--card))',
                                         borderColor: 'hsl(var(--border))'
                                     }}
                                 >
                                     <div 
-                                        className={`p-3 rounded-lg mb-4 group-hover:scale-110 transition-transform ${item.color}`}
+                                        className={`p-2 lg:p-3 rounded-lg mb-2 lg:mb-4 group-hover:scale-110 transition-transform ${item.color}`}
                                         style={{ backgroundColor: 'hsl(var(--muted))' }}
                                     >
-                                        <Icon size={24} />
+                                        <Icon size={20} className="lg:w-6 lg:h-6" />
                                     </div>
-                                    <h3 className="font-bold mb-1" style={{ color: 'hsl(var(--foreground))' }}>
+                                    <h3 className="text-sm lg:text-base font-bold mb-0.5 lg:mb-1" style={{ color: 'hsl(var(--foreground))' }}>
                                         {item.name}
                                     </h3>
-                                    <p className="text-xs leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    <p className="text-[10px] lg:text-xs leading-relaxed line-clamp-2" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                         {item.description}
                                     </p>
                                 </button>
@@ -308,19 +311,19 @@ export function ChannelsList() {
 
                         {/* Coming Soon Card */}
                         <div 
-                            className="flex flex-col items-start p-6 border border-dashed rounded-xl opacity-60"
+                            className="flex flex-col items-start p-4 lg:p-6 border border-dashed rounded-xl opacity-60"
                             style={{ borderColor: 'hsl(var(--border))' }}
                         >
                             <div 
-                                className="p-3 rounded-lg mb-4"
+                                className="p-2 lg:p-3 rounded-lg mb-2 lg:mb-4"
                                 style={{ backgroundColor: 'hsl(var(--muted))' }}
                             >
-                                <Plus size={24} style={{ color: 'hsl(var(--muted-foreground))' }} />
+                                <Plus size={20} className="lg:w-6 lg:h-6" style={{ color: 'hsl(var(--muted-foreground))' }} />
                             </div>
-                            <h3 className="font-bold mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                            <h3 className="text-sm lg:text-base font-bold mb-0.5 lg:mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 Em breve! 🚀
                             </h3>
-                            <p className="text-xs leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                            <p className="text-[10px] lg:text-xs leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 Mais canais serão adicionados futuramente.
                             </p>
                         </div>
