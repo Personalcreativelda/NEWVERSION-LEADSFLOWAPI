@@ -695,9 +695,9 @@ router.post('/telegram', async (req, res) => {
     let channelResult = await query(
       `SELECT DISTINCT c.* FROM channels c
        INNER JOIN conversations conv ON conv.channel_id = c.id
-       WHERE c.type = 'telegram' 
+       WHERE c.type = 'telegram'
        AND c.status = 'active'
-       AND conv.contact_identifier = $1`,
+       AND conv.remote_jid = $1`,
       [chatId]
     );
 
@@ -854,10 +854,272 @@ router.post('/telegram', async (req, res) => {
   } catch (error) {
     console.error('[Telegram Webhook] Erro:', error);
     // Sempre retornar 200 para o Telegram não reenviar
-    res.json({ 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    res.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INSTAGRAM WEBHOOKS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ✅ Verificação de webhook do Instagram (GET para validação do Facebook)
+router.get('/instagram', async (req, res) => {
+  console.log('[Instagram Webhook] GET request - webhook verification');
+
+  // Facebook envia um desafio para verificar o webhook
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  // Token de verificação (pode ser configurado no .env)
+  const verifyToken = process.env.INSTAGRAM_VERIFY_TOKEN || process.env.META_VERIFY_TOKEN || 'leadsflow_verify_token';
+
+  if (mode === 'subscribe' && token === verifyToken) {
+    console.log('[Instagram Webhook] Verificação bem-sucedida');
+    return res.status(200).send(challenge);
+  }
+
+  // Se não é verificação, retornar info do endpoint
+  res.json({
+    success: true,
+    message: 'Instagram webhook endpoint is accessible',
+    endpoint: '/api/webhooks/instagram',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ Webhook para receber mensagens do Instagram (Meta Graph API)
+router.post('/instagram', async (req, res) => {
+  try {
+    console.log('[Instagram Webhook] ===== WEBHOOK RECEBIDO =====');
+    console.log('[Instagram Webhook] Body:', JSON.stringify(req.body).substring(0, 2000));
+
+    const body = req.body;
+
+    // Instagram/Meta envia webhooks com estrutura específica
+    // Formato: { object: 'instagram', entry: [...] }
+    if (body.object !== 'instagram') {
+      console.log('[Instagram Webhook] Objeto não é instagram:', body.object);
+      return res.sendStatus(200);
+    }
+
+    // Processar cada entrada
+    for (const entry of body.entry || []) {
+      const instagramId = entry.id; // ID da conta Instagram Business
+
+      console.log('[Instagram Webhook] Processing entry for Instagram ID:', instagramId);
+
+      // Processar mensagens (messaging)
+      for (const messagingEvent of entry.messaging || []) {
+        const senderId = messagingEvent.sender?.id;
+        const recipientId = messagingEvent.recipient?.id;
+        const timestamp = messagingEvent.timestamp;
+        const message = messagingEvent.message;
+
+        // Ignorar se não tem mensagem ou se é echo (mensagem enviada por nós)
+        if (!message || message.is_echo) {
+          console.log('[Instagram Webhook] Ignorando: sem mensagem ou é echo');
+          continue;
+        }
+
+        console.log('[Instagram Webhook] Mensagem de:', senderId);
+        console.log('[Instagram Webhook] Para:', recipientId);
+        console.log('[Instagram Webhook] Conteúdo:', message.text?.substring(0, 100));
+
+        // Encontrar canal pelo instagram_id nas credentials
+        const channelResult = await query(
+          `SELECT * FROM channels
+           WHERE type = 'instagram'
+           AND status = 'active'
+           AND (credentials->>'instagram_id' = $1 OR credentials->>'instagram_id' = $2)`,
+          [recipientId, instagramId]
+        );
+
+        if (channelResult.rows.length === 0) {
+          console.warn('[Instagram Webhook] Canal não encontrado para Instagram ID:', recipientId || instagramId);
+          continue;
+        }
+
+        const channel = channelResult.rows[0];
+        console.log('[Instagram Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
+
+        // Extrair conteúdo da mensagem
+        let messageContent = message.text || '';
+        let mediaType = null;
+        let mediaUrl = null;
+
+        // Verificar anexos (imagens, vídeos, etc.)
+        if (message.attachments && message.attachments.length > 0) {
+          const attachment = message.attachments[0];
+          mediaUrl = attachment.payload?.url;
+
+          switch (attachment.type) {
+            case 'image':
+              mediaType = 'image';
+              if (!messageContent) messageContent = '[Imagem]';
+              break;
+            case 'video':
+              mediaType = 'video';
+              if (!messageContent) messageContent = '[Vídeo]';
+              break;
+            case 'audio':
+              mediaType = 'audio';
+              if (!messageContent) messageContent = '[Áudio]';
+              break;
+            case 'file':
+              mediaType = 'document';
+              if (!messageContent) messageContent = '[Arquivo]';
+              break;
+            default:
+              if (!messageContent) messageContent = '[Mídia]';
+          }
+        }
+
+        // Buscar informações do remetente via Graph API (opcional)
+        let contactName = senderId;
+        try {
+          const credentials = channel.credentials;
+          if (credentials?.access_token) {
+            const userResponse = await fetch(
+              `https://graph.facebook.com/v18.0/${senderId}?fields=username,name&access_token=${credentials.access_token}`
+            );
+            const userData = await userResponse.json();
+            if (userData.username || userData.name) {
+              contactName = userData.username || userData.name;
+            }
+          }
+        } catch (e) {
+          console.log('[Instagram Webhook] Não foi possível obter info do usuário:', e);
+        }
+
+        // Buscar ou criar lead pelo instagram_id
+        let lead = await query(
+          `SELECT * FROM leads WHERE user_id = $1 AND instagram_id = $2`,
+          [channel.user_id, senderId]
+        );
+
+        let leadId: string;
+
+        if (lead.rows.length === 0) {
+          // Criar lead automaticamente
+          console.log('[Instagram Webhook] Criando novo lead:', contactName);
+          const leadResult = await query(
+            `INSERT INTO leads (user_id, name, instagram_id, source, status)
+             VALUES ($1, $2, $3, 'instagram', 'new')
+             RETURNING *`,
+            [channel.user_id, contactName, senderId]
+          );
+          leadId = leadResult.rows[0].id;
+        } else {
+          leadId = lead.rows[0].id;
+        }
+
+        // Buscar ou criar conversa
+        const conversation = await conversationsService.findOrCreate(
+          channel.user_id,
+          channel.id,
+          senderId, // Usando senderId como remote_jid para Instagram
+          leadId,
+          {
+            contact_name: contactName,
+            instagram_id: senderId
+          }
+        );
+
+        // Salvar mensagem
+        const messageResult = await query(
+          `INSERT INTO messages (
+            user_id, conversation_id, lead_id, direction, channel,
+            content, media_url, media_type, status, external_id, metadata
+          )
+           VALUES ($1, $2, $3, 'in', 'instagram', $4, $5, $6, 'delivered', $7, $8)
+           RETURNING *`,
+          [
+            channel.user_id,
+            conversation.id,
+            leadId,
+            messageContent,
+            mediaUrl,
+            mediaType,
+            message.mid || `ig_${timestamp}`,
+            JSON.stringify({
+              sender_id: senderId,
+              recipient_id: recipientId,
+              timestamp: timestamp,
+              instagram_id: instagramId
+            })
+          ]
+        );
+
+        const savedMessage = messageResult.rows[0];
+        console.log('[Instagram Webhook] Mensagem salva:', savedMessage.id);
+
+        // Atualizar conversa
+        await conversationsService.updateUnreadCount(conversation.id, 1);
+        await query(
+          `UPDATE conversations
+           SET last_message_at = NOW(),
+               status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [conversation.id]
+        );
+
+        // Buscar conversa atualizada
+        const updatedConversation = await query(
+          `SELECT c.*,
+                  ch.name as channel_name,
+                  l.name as lead_name
+           FROM conversations c
+           LEFT JOIN channels ch ON c.channel_id = ch.id
+           LEFT JOIN leads l ON c.lead_id = l.id
+           WHERE c.id = $1`,
+          [conversation.id]
+        );
+
+        // Emitir WebSocket
+        const wsService = getWebSocketService();
+        if (wsService) {
+          console.log('[Instagram Webhook] Emitindo WebSocket para usuário:', channel.user_id);
+
+          wsService.emitNewMessage(channel.user_id, {
+            conversationId: conversation.id,
+            message: savedMessage,
+            conversation: updatedConversation.rows[0] || conversation
+          });
+
+          const totalUnreadResult = await query(
+            `SELECT SUM(unread_count) as total FROM conversations WHERE user_id = $1`,
+            [channel.user_id]
+          );
+          const totalUnread = parseInt(totalUnreadResult.rows[0]?.total || '0');
+
+          wsService.emitUnreadCountUpdate(channel.user_id, {
+            totalUnread,
+            conversationId: conversation.id,
+            unreadCount: (updatedConversation.rows[0]?.unread_count || 0) + 1
+          });
+
+          console.log('[Instagram Webhook] WebSocket emitido!');
+        }
+      }
+
+      // Processar mudanças (changes) - stories, mentions, etc.
+      for (const change of entry.changes || []) {
+        console.log('[Instagram Webhook] Change:', change.field, change.value);
+        // Por enquanto, apenas logamos - pode ser expandido no futuro
+      }
+    }
+
+    // Meta/Instagram espera resposta 200 OK
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('[Instagram Webhook] Erro:', error);
+    // Sempre retornar 200 para o Meta não reenviar
+    res.sendStatus(200);
   }
 });
 
