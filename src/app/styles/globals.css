@@ -1,0 +1,692 @@
+/* Estilos globais do LeadsFlow - Compatible with Tailwind CSS v4 */
+
+@import "tailwindcss";
+
+:root {
+  --font-size: 16px;
+  
+  /* MODO CLARO - Cores otimizadas para contraste WCAG AA */
+  --background: 0 0% 98%;
+  --foreground: 240 13% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 13% 18%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 13% 18%;
+  --primary: 240 13% 18%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 6% 94%;
+  --secondary-foreground: 240 13% 18%;
+  --muted: 240 6% 92%;
+  --muted-foreground: 240 6% 32%;
+  --accent: 214 94% 94%;
+  --accent-foreground: 240 13% 18%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 6% 88%;
+  --input: 240 6% 88%;
+  --input-background: 0 0% 100%;
+  --switch-background: 240 6% 92%;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: 214 94% 94%;
+  
+  /* Cores de Acento - Iguais em ambos os modos */
+  --success: 161 84% 64%;
+  --pink: 0 84% 60%;
+  --orange: 30 84% 74%;
+  --purple: 280 75% 84%;
+  --blue: 214 94% 94%;
+  --yellow: 45 96% 56%;
+  
+  /* Charts - Cores de acento */
+  --chart-1: 161 84% 64%;
+  --chart-2: 214 94% 94%;
+  --chart-3: 280 75% 84%;
+  --chart-4: 30 84% 74%;
+  --chart-5: 0 84% 60%;
+  
+  --radius: 0.625rem;
+
+  /* Message tone colors (light) */
+  --tone-default-bg: var(--card);
+  --tone-default-border: var(--border);
+  --tone-default-foreground: var(--foreground);
+  --tone-warning-bg: 40 100% 96%;
+  --tone-warning-border: 36 92% 72%;
+  --tone-warning-foreground: 32 83% 32%;
+  --tone-success-bg: 146 68% 94%;
+  --tone-success-border: 146 55% 60%;
+  --tone-success-foreground: 150 45% 30%;
+  --tone-danger-bg: 355 82% 95%;
+  --tone-danger-border: 352 70% 70%;
+  --tone-danger-foreground: 350 73% 35%;
+  
+  /* ✅ Sidebar SEMPRE ESCURO - preto neutro sem tom azulado */
+  --sidebar: 0 0% 8%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-primary: 161 84% 64%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 14%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 0 0% 16%;
+  --sidebar-ring: 214 94% 94%;
+  --sidebar-muted: 0 0% 50%;
+  
+  /* Texto em diferentes níveis - Modo Claro */
+  --text-primary: 240 13% 18%;
+  --text-secondary: 240 5% 30%;
+  --text-tertiary: 240 4% 45%;
+}
+
+.dark {
+  /* MODO ESCURO - Preto puro neutro sem tom azulado */
+  --background: 0 0% 8%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 11%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 11%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 0 0% 100%;
+  --primary-foreground: 0 0% 8%;
+  --secondary: 0 0% 14%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 16%;
+  --muted-foreground: 0 0% 65%;
+  --accent: 214 94% 94%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 18%;
+  --input: 0 0% 16%;
+  --input-background: 0 0% 11%;
+  --ring: 214 94% 94%;
+  
+  /* Cores de Acento - Iguais em ambos os modos */
+  --success: 161 84% 64%;
+  --pink: 0 84% 60%;
+  --orange: 30 84% 74%;
+  --purple: 280 75% 84%;
+  --blue: 214 94% 94%;
+  --yellow: 45 96% 56%;
+  
+  /* Charts - Cores de acento */
+  --chart-1: 161 84% 64%;
+  --chart-2: 214 94% 94%;
+  --chart-3: 280 75% 84%;
+  --chart-4: 30 84% 74%;
+  --chart-5: 0 84% 60%;
+  
+  /* Texto em diferentes níveis */
+  --text-primary: 0 0% 100%;
+  --text-secondary: 0 0% 65%;
+  --text-tertiary: 0 0% 42%;
+
+  /* Message tone colors (dark) */
+  --tone-default-bg: 0 0% 21%;
+  --tone-default-border: 0 0% 32%;
+  --tone-default-foreground: 0 0% 100%;
+  --tone-warning-bg: 37 96% 18%;
+  --tone-warning-border: 38 92% 40%;
+  --tone-warning-foreground: 46 96% 80%;
+  --tone-success-bg: 149 83% 14%;
+  --tone-success-border: 149 70% 32%;
+  --tone-success-foreground: 149 70% 75%;
+  --tone-danger-bg: 352 80% 16%;
+  --tone-danger-border: 352 70% 36%;
+  --tone-danger-foreground: 352 84% 78%;
+
+  /* ✅ Sidebar SEMPRE ESCURO - preto neutro sem tom azulado */
+  --sidebar: 0 0% 8%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-primary: 161 84% 64%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 14%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 0 0% 16%;
+  --sidebar-ring: 214 94% 94%;
+  --sidebar-muted: 0 0% 50%;
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+    outline-color: hsl(var(--ring) / 0.5);
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    transition: background-color 200ms ease-in-out, color 200ms ease-in-out;
+  }
+  
+  /* FORÇAR preto puro no dark mode */
+  .dark body,
+  .dark .dashboard-container,
+  .dark main,
+  .dark .min-h-screen {
+    background-color: #141414 !important;
+  }
+  
+  /* Cards no dark mode - preto um pouco mais claro */
+  .dark .bg-card {
+    background-color: #1c1c1c !important;
+  }
+}
+
+/* Estilos de navegação do Sidebar que respondem ao tema */
+.sidebar-nav-item {
+  color: hsl(var(--sidebar-foreground) / 0.7);
+}
+.sidebar-nav-item:hover {
+  color: hsl(var(--sidebar-foreground) / 0.9);
+}
+.sidebar-nav-item-icon {
+  color: hsl(var(--sidebar-foreground) / 0.5);
+}
+.sidebar-nav-item:hover .sidebar-nav-item-icon {
+  color: hsl(var(--sidebar-foreground) / 0.7);
+}
+/* Subitems do submenu */
+.sidebar-nav-subitem {
+  color: hsl(var(--sidebar-foreground) / 0.55);
+}
+.sidebar-nav-subitem:hover {
+  color: hsl(var(--sidebar-foreground) / 0.85);
+}
+.sidebar-nav-subitem.active {
+  color: hsl(var(--sidebar-foreground));
+  background-color: hsl(0 0% 100% / 0.08);
+  border-radius: 0.375rem;
+}
+.sidebar-nav-bullet {
+  background-color: hsl(var(--sidebar-foreground) / 0.25);
+}
+.sidebar-nav-subitem:hover .sidebar-nav-bullet {
+  background-color: hsl(var(--sidebar-foreground) / 0.5);
+}
+.sidebar-nav-subitem.active .sidebar-nav-bullet {
+  background-color: hsl(var(--sidebar-primary));
+}
+.sidebar-user-name {
+  color: hsl(var(--sidebar-foreground));
+}
+.sidebar-user-plan {
+  color: hsl(var(--sidebar-foreground) / 0.6);
+}
+.sidebar-logout-btn {
+  color: hsl(var(--sidebar-foreground) / 0.5);
+}
+.sidebar-logout-btn:hover {
+  color: hsl(0 84% 60%);
+  background-color: hsl(0 84% 60% / 0.1);
+}
+
+@layer utilities {
+  .surface-default {
+    background-color: hsl(var(--card));
+    color: hsl(var(--foreground));
+  }
+
+  .surface-muted {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--foreground));
+  }
+
+  .surface-popover {
+    background-color: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+  }
+
+  .modal-panel {
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+    border-color: hsl(var(--border));
+    box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.25);
+  }
+
+  .message-tone-default {
+    background-color: hsl(var(--tone-default-bg));
+    color: hsl(var(--tone-default-foreground));
+    border-color: hsl(var(--tone-default-border));
+  }
+
+  .message-tone-warning {
+    background-color: hsl(var(--tone-warning-bg));
+    color: hsl(var(--tone-warning-foreground));
+    border-color: hsl(var(--tone-warning-border));
+  }
+
+  .message-tone-success {
+    background-color: hsl(var(--tone-success-bg));
+    color: hsl(var(--tone-success-foreground));
+    border-color: hsl(var(--tone-success-border));
+  }
+
+  .message-tone-danger {
+    background-color: hsl(var(--tone-danger-bg));
+    color: hsl(var(--tone-danger-foreground));
+    border-color: hsl(var(--tone-danger-border));
+  }
+
+  .message-card {
+    transition: background-color 250ms ease, border-color 250ms ease, color 250ms ease;
+  }
+
+  .theme-transition,
+  .theme-transition * {
+    transition: background-color 250ms ease, color 250ms ease, border-color 250ms ease !important;
+  }
+
+  .text-subtle {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .border-default {
+    border: 1px solid hsl(var(--border));
+  }
+
+  /* Map legacy Tailwind gray text utilities to theme tokens */
+  .text-gray-900,
+  .text-slate-900,
+  .text-neutral-900 {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .text-gray-800,
+  .text-gray-700,
+  .text-slate-800,
+  .text-slate-700,
+  .text-neutral-800,
+  .text-neutral-700 {
+    color: hsl(var(--text-secondary)) !important;
+  }
+
+  .text-gray-600,
+  .text-gray-500,
+  .text-slate-600,
+  .text-slate-500,
+  .text-neutral-600,
+  .text-neutral-500 {
+    color: hsl(var(--text-tertiary)) !important;
+  }
+
+  .text-gray-400,
+  .text-gray-300,
+  .text-slate-400,
+  .text-slate-300,
+  .text-neutral-400,
+  .text-neutral-300 {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .text-gray-200,
+  .text-gray-100,
+  .text-slate-200,
+  .text-slate-100,
+  .text-neutral-200,
+  .text-neutral-100 {
+    color: hsl(var(--muted-foreground) / 0.7) !important;
+  }
+
+  .dark .dark\:text-gray-900,
+  .dark .dark\:text-slate-900,
+  .dark .dark\:text-neutral-900 {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark .dark\:text-gray-800,
+  .dark .dark\:text-gray-700,
+  .dark .dark\:text-slate-800,
+  .dark .dark\:text-slate-700,
+  .dark .dark\:text-neutral-800,
+  .dark .dark\:text-neutral-700 {
+    color: hsl(var(--text-secondary)) !important;
+  }
+
+  .dark .dark\:text-gray-600,
+  .dark .dark\:text-gray-500,
+  .dark .dark\:text-slate-600,
+  .dark .dark\:text-slate-500,
+  .dark .dark\:text-neutral-600,
+  .dark .dark\:text-neutral-500 {
+    color: hsl(var(--text-tertiary)) !important;
+  }
+
+  .dark .dark\:text-gray-400,
+  .dark .dark\:text-gray-300,
+  .dark .dark\:text-slate-400,
+  .dark .dark\:text-slate-300,
+  .dark .dark\:text-neutral-400,
+  .dark .dark\:text-neutral-300 {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  /* Align common gray backgrounds with theme surfaces */
+  .bg-gray-50,
+  .bg-slate-50,
+  .bg-neutral-50,
+  .hover\:bg-gray-50:hover,
+  .hover\:bg-slate-50:hover,
+  .hover\:bg-neutral-50:hover {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  .bg-gray-100,
+  .bg-slate-100,
+  .bg-neutral-100,
+  .hover\:bg-gray-100:hover,
+  .hover\:bg-slate-100:hover,
+  .hover\:bg-neutral-100:hover {
+    background-color: hsl(var(--secondary)) !important;
+  }
+
+  .bg-gray-200,
+  .bg-slate-200,
+  .bg-neutral-200 {
+    background-color: hsl(var(--secondary) / 0.85) !important;
+  }
+
+  .dark .dark\:bg-gray-700,
+  .dark .dark\:bg-gray-800,
+  .dark .dark\:bg-gray-900,
+  .dark .dark\:bg-gray-950,
+  .dark .dark\:bg-slate-700,
+  .dark .dark\:bg-slate-800,
+  .dark .dark\:bg-slate-900,
+  .dark .dark\:bg-neutral-700,
+  .dark .dark\:bg-neutral-800,
+  .dark .dark\:bg-neutral-900 {
+    background-color: hsl(var(--card)) !important;
+  }
+  
+  /* Override para hover backgrounds em dark mode */
+  .dark .dark\:hover\:bg-gray-600:hover,
+  .dark .dark\:hover\:bg-gray-700:hover,
+  .dark .dark\:hover\:bg-slate-600:hover,
+  .dark .dark\:hover\:bg-slate-700:hover {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  /* FORÇAR preto neutro no modo escuro para classes slate/gray sem prefixo dark: */
+  .dark .bg-slate-700,
+  .dark .bg-slate-800,
+  .dark .bg-slate-900,
+  .dark .bg-gray-700,
+  .dark .bg-gray-800,
+  .dark .bg-gray-900 {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  .dark .hover\:bg-slate-700:hover,
+  .dark .hover\:bg-slate-800:hover,
+  .dark .hover\:bg-gray-700:hover,
+  .dark .hover\:bg-gray-800:hover {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  .dark .border-slate-600,
+  .dark .border-slate-700,
+  .dark .border-slate-800,
+  .dark .border-gray-600,
+  .dark .border-gray-700,
+  .dark .border-gray-800 {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* Override para dark: prefix borders */
+  .dark .dark\:border-gray-600,
+  .dark .dark\:border-gray-700,
+  .dark .dark\:border-gray-800,
+  .dark .dark\:border-slate-600,
+  .dark .dark\:border-slate-700,
+  .dark .dark\:border-slate-800 {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .border-gray-200,
+  .border-gray-300,
+  .border-slate-200,
+  .border-slate-300,
+  .border-neutral-200,
+  .border-neutral-300,
+  .hover\:border-gray-200:hover,
+  .hover\:border-gray-300:hover,
+  .hover\:border-slate-200:hover,
+  .hover\:border-slate-300:hover,
+  .hover\:border-neutral-200:hover,
+  .hover\:border-neutral-300:hover {
+    border-color: hsl(var(--border)) !important;
+  }
+}
+.campaign-modal {
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
+
+.campaign-modal .bg-gray-50,
+.campaign-modal .bg-gray-100,
+.campaign-modal .hover\:bg-gray-50:hover,
+.campaign-modal .hover\:bg-gray-100:hover {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.campaign-modal .border-gray-200,
+.campaign-modal .border-gray-300,
+.campaign-modal .border-gray-600,
+.campaign-modal .border-gray-700,
+.campaign-modal .hover\:border-gray-200:hover,
+.campaign-modal .hover\:border-gray-300:hover,
+.campaign-modal .hover\:border-gray-600:hover,
+.campaign-modal .hover\:border-gray-700:hover {
+  border-color: hsl(var(--border));
+}
+
+.campaign-modal .bg-gray-800,
+.campaign-modal .dark\:bg-gray-800,
+.campaign-modal .dark\:bg-gray-800\/50,
+.campaign-modal .dark\:hover\:bg-gray-800:hover {
+  background-color: hsl(var(--muted));
+}
+
+.campaign-modal .bg-gray-200,
+.campaign-modal .bg-gray-300,
+.campaign-modal .hover\:bg-gray-200:hover,
+.campaign-modal .hover\:bg-gray-300:hover {
+  background-color: hsl(var(--muted));
+}
+
+.campaign-modal .text-gray-900,
+.campaign-modal .text-gray-800,
+.campaign-modal .text-gray-700,
+.campaign-modal .text-gray-600,
+.campaign-modal .text-gray-500,
+.campaign-modal .text-gray-400 {
+  color: hsl(var(--muted-foreground));
+}
+
+.campaign-modal .dark\:text-gray-300,
+.campaign-modal .dark\:text-gray-200,
+.campaign-modal .dark\:text-gray-100,
+.campaign-modal .dark\:text-gray-400 {
+  color: hsl(var(--muted-foreground));
+}
+
+.campaign-modal .text-gray-900 {
+  color: hsl(var(--foreground));
+}
+
+/* Custom Scrollbar */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(160, 160, 178, 0.5) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(160, 160, 178, 0.5);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(160, 160, 178, 0.7);
+}
+
+.dark .scrollbar-thin {
+  scrollbar-color: rgba(108, 108, 128, 0.5) transparent;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(108, 108, 128, 0.5);
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(108, 108, 128, 0.7);
+}
+
+/* Notifications Panel Scrollbar */
+.notifications-scroll {
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+}
+
+.notifications-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notifications-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notifications-scroll::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.notifications-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+  background-clip: padding-box;
+}
+
+/* Dark Mode */
+.dark .notifications-scroll {
+  scrollbar-color: #475569 transparent;
+}
+
+.dark .notifications-scroll::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.dark .notifications-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748B;
+  background-clip: padding-box;
+}
+
+/* Animações de notificação */
+@keyframes slideOut {
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.notification-removing {
+  animation: slideOut 200ms ease-out;
+}
+
+/* Mobile - Botões de notificação sempre visíveis */
+@media (max-width: 768px) {
+  .notification-actions-mobile {
+    opacity: 1 !important;
+  }
+}
+
+/* Chat Widget Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.4s ease-out;
+}
+
+/* Smooth scrolling for chat */
+.chat-scroll-smooth {
+  scroll-behavior: smooth;
+}
+
+/* ✨ SCROLLBAR CUSTOMIZADA MODERNA */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Scrollbar Modo Escuro */
+.dark ::-webkit-scrollbar-thumb {
+  background: #4B5563;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6B7280;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+}
+
+.dark * {
+  scrollbar-color: #4B5563 transparent;
+}
+
+/* Transições suaves para o tema */
+* {
+  transition-property: background-color, border-color, color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}

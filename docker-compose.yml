@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  api:
+    build: ./api
+    ports:
+      - "${API_PORT:-4000}:4000"
+    env_file: .env
+    environment:
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT:-5432}
+      - PG_DATABASE=${PG_DATABASE:-leadflow}
+      - PG_USER=${PG_USER}
+      - PG_PASSWORD=${PG_PASSWORD}
+      - PG_SSL=${PG_SSL:-false}
+      - PORT=4000
+      - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-LeadsFlow API <noreply@leadsflowapi.com>}
+      - APP_URL=${APP_URL:-http://localhost:3000}
+      - REQUIRE_EMAIL_CONFIRMATION=${REQUIRE_EMAIL_CONFIRMATION:-false}
+      - ALLOW_SETUP=${ALLOW_SETUP:-false}
+      - DEMO_EMAIL=${DEMO_EMAIL:-}
+      - DEMO_PASSWORD=${DEMO_PASSWORD:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-}
+      - MINIO_PORT=${MINIO_PORT:-9000}
+      - MINIO_USE_SSL=${MINIO_USE_SSL:-true}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-}
+      - MINIO_BUCKET=${MINIO_BUCKET:-leadflow-avatars}
+      - MINIO_REGION=${MINIO_REGION:-us-east-1}
+      - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-}
+      - SERVICE_USER_MINIO=${SERVICE_USER_MINIO:-}
+      - SERVICE_PASSWORD_MINIO=${SERVICE_PASSWORD_MINIO:-}
+      - N8N_CAMPAIGN_WEBHOOK_URL=${N8N_CAMPAIGN_WEBHOOK_URL:-}
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_CHATWOOT_URL: ${VITE_CHATWOOT_URL:-}
+        VITE_CHATWOOT_TOKEN: ${VITE_CHATWOOT_TOKEN:-}
+        VITE_N8N_WEBHOOK_URL: ${VITE_N8N_WEBHOOK_URL:-}
+        VITE_N8N_SUPPORT_WEBHOOK_URL: ${VITE_N8N_SUPPORT_WEBHOOK_URL:-}
+        VITE_N8N_PLAN_LIMITS_WEBHOOK_URL: ${VITE_N8N_PLAN_LIMITS_WEBHOOK_URL:-}
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:4000}
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-}
+      - VITE_CHATWOOT_URL=${VITE_CHATWOOT_URL:-}
+      - VITE_CHATWOOT_TOKEN=${VITE_CHATWOOT_TOKEN:-}
+      - VITE_N8N_WEBHOOK_URL=${VITE_N8N_WEBHOOK_URL:-}
+      - VITE_N8N_SUPPORT_WEBHOOK_URL=${VITE_N8N_SUPPORT_WEBHOOK_URL:-}
+      - VITE_N8N_PLAN_LIMITS_WEBHOOK_URL=${VITE_N8N_PLAN_LIMITS_WEBHOOK_URL:-}
+    depends_on:
+      - api
+    restart: unless-stopped

@@ -1,0 +1,196 @@
+{
+  "name": "LeadsFlow - Campaign Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "campaign-trigger",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook - Campaign Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "campaign-trigger"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.leadsflowapi.com/api/webhooks/n8n/leads?userId={{$json.userId}}&limit={{$json.settings.recipientCount || 100}}",
+        "authentication": "none",
+        "options": {}
+      },
+      "id": "http-get-leads",
+      "name": "Buscar Leads da API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrair array de leads da resposta\nconst response = $input.first().json;\nconst leads = response.leads || [];\n\n// Obter dados da campanha do webhook\nconst campaignData = $node['Webhook - Campaign Trigger'].json;\n\n// Retornar cada lead como item separado para iterar\nreturn leads.map(lead => ({\n  json: {\n    ...lead,\n    campaignId: campaignData.campaignId,\n    userId: campaignData.userId,\n    template: campaignData.template,\n    media_urls: campaignData.media_urls\n  }\n}));"
+      },
+      "id": "code-prepare-leads",
+      "name": "Preparar Leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Substituir variáveis no template\nconst lead = $input.item.json;\nconst template = lead.template || '';\n\nlet message = template\n  .replace(/{{\\s*name\\s*}}/gi, lead.nome || '')\n  .replace(/{{\\s*nome\\s*}}/gi, lead.nome || '')\n  .replace(/{{\\s*phone\\s*}}/gi, lead.telefone || '')\n  .replace(/{{\\s*telefone\\s*}}/gi, lead.telefone || '')\n  .replace(/{{\\s*email\\s*}}/gi, lead.email || '')\n  .replace(/{{\\s*company\\s*}}/gi, lead.empresa || '')\n  .replace(/{{\\s*empresa\\s*}}/gi, lead.empresa || '');\n\nreturn {\n  json: {\n    ...lead,\n    messageToSend: message,\n    phoneNumber: lead.telefone\n  }\n};"
+      },
+      "id": "code-format-message",
+      "name": "Formatar Mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolution.personalcreativelda.com/message/sendText/LeadsFlow",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{$json.phoneNumber}}\",\n  \"text\": \"{{$json.messageToSend}}\"\n}",
+        "options": {}
+      },
+      "id": "http-send-whatsapp",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "evolution-api-credentials",
+          "name": "Evolution API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aguardar um pouco entre mensagens (rate limiting)\nawait new Promise(resolve => setTimeout(resolve, 1000));\n\n// Passar dados para frente\nreturn $input.all();"
+      },
+      "id": "code-delay",
+      "name": "Aguardar (Rate Limit)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calcular estatísticas finais\nconst allItems = $input.all();\n\nconst stats = {\n  sent: 0,\n  delivered: 0,\n  read: 0,\n  replied: 0,\n  failed: 0\n};\n\nallItems.forEach(item => {\n  const response = item.json;\n  \n  // Verificar se o envio foi bem-sucedido\n  if (response.key && response.key.id) {\n    stats.sent++;\n  } else {\n    stats.failed++;\n  }\n});\n\n// Obter dados da campanha\nconst campaignData = $node['Webhook - Campaign Trigger'].json;\n\nreturn [{\n  json: {\n    campaignId: campaignData.campaignId,\n    userId: campaignData.userId,\n    stats: stats,\n    totalProcessed: allItems.length\n  }\n}];"
+      },
+      "id": "code-aggregate-stats",
+      "name": "Calcular Estatísticas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.leadsflowapi.com/api/webhooks/n8n/campaigns/complete",
+        "authentication": "none",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"campaignId\": \"{{$json.campaignId}}\",\n  \"userId\": \"{{$json.userId}}\",\n  \"status\": \"completed\",\n  \"stats\": {{$json.stats}}\n}",
+        "options": {}
+      },
+      "id": "http-complete-campaign",
+      "name": "Marcar Campanha como Concluída",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1650, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Campaign Trigger": {
+      "main": [
+        [
+          {
+            "node": "Buscar Leads da API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Leads da API": {
+      "main": [
+        [
+          {
+            "node": "Preparar Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Leads": {
+      "main": [
+        [
+          {
+            "node": "Formatar Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Mensagem": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Aguardar (Rate Limit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar (Rate Limit)": {
+      "main": [
+        [
+          {
+            "node": "Calcular Estatísticas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular Estatísticas": {
+      "main": [
+        [
+          {
+            "node": "Marcar Campanha como Concluída",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-22T00:00:00.000Z",
+  "versionId": "1"
+}

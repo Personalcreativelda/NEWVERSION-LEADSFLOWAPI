@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">LeadFlow Icon</title>
+  <desc id="desc">Gradient square with lightning bolt representing the LeadFlow dashboard logo.</desc>
+  <defs>
+    <linearGradient id="leadflowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="28" height="28" rx="8" fill="url(#leadflowGradient)" />
+  <path d="M18.2 4L6.8 18h8.2l-1.2 12 11.4-14h-8.4L18.2 4z" fill="#FFFFFF" />
+</svg>

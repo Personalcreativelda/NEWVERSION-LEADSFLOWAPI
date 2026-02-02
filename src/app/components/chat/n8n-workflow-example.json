@@ -1,0 +1,345 @@
+{
+  "name": "LeadsFlow - Chat Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chat-message",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.message.toLowerCase()}}",
+              "operation": "contains",
+              "value2": "lead"
+            }
+          ]
+        }
+      },
+      "name": "Is About Leads?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "response",
+              "value": "Para adicionar leads, você pode:\n\n1. **Importar de CSV/Excel**\n2. **Adicionar manualmente** no dashboard\n3. **Conectar via WhatsApp** (Evolution API)\n4. **Integrar com Facebook/Google Ads**\n\nQual método você prefere?"
+            }
+          ],
+          "array": [
+            {
+              "name": "quickReplies",
+              "value": "=[{\"text\": \"➕ Adicionar manualmente\", \"action\": \"navigate:/leads\"}, {\"text\": \"📤 Importar CSV\", \"action\": \"import_csv\"}, {\"text\": \"💬 WhatsApp\", \"action\": \"whatsapp_integration\"}]"
+            }
+          ],
+          "boolean": [
+            {
+              "name": "showSatisfaction",
+              "value": false
+            }
+          ]
+        }
+      },
+      "name": "Response - Leads",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.message.toLowerCase()}}",
+              "operation": "contains",
+              "value2": "plano"
+            }
+          ]
+        }
+      },
+      "name": "Is About Plans?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "response",
+              "value": "Nossos planos:\n\n• **Gratuito**: 30 leads/mês\n• **Professional**: 500 leads/mês - R$97\n• **Unlimited**: Leads ilimitados - R$197\n\nTodos os planos incluem 30 dias de acesso."
+            }
+          ],
+          "array": [
+            {
+              "name": "quickReplies",
+              "value": "=[{\"text\": \"💳 Ver Planos\", \"action\": \"navigate:/plans\"}, {\"text\": \"📊 Meu Plano Atual\", \"action\": \"current_plan\"}]"
+            }
+          ],
+          "boolean": [
+            {
+              "name": "showSatisfaction",
+              "value": false
+            }
+          ]
+        }
+      },
+      "name": "Response - Plans",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.message.toLowerCase()}}",
+              "operation": "contains",
+              "value2": "suporte"
+            }
+          ]
+        }
+      },
+      "name": "Is About Support?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 500]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "response",
+              "value": "Vou transferir você para nossa equipe de suporte. Um atendente humano responderá em breve.\n\nEnquanto isso, você pode:\n• Enviar email: suporte@leadsflow.com\n• WhatsApp: +55 11 98765-4321"
+            }
+          ],
+          "array": [
+            {
+              "name": "quickReplies",
+              "value": "=[{\"text\": \"📧 Enviar Email\", \"action\": \"email_support\"}, {\"text\": \"💬 WhatsApp\", \"action\": \"whatsapp_support\"}]"
+            }
+          ],
+          "boolean": [
+            {
+              "name": "showSatisfaction",
+              "value": true
+            }
+          ]
+        }
+      },
+      "name": "Response - Support",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "message": "Você é o assistente virtual do LeadsFlow, um CRM de gestão de leads. Responda de forma profissional, objetiva e em português do Brasil. Use formatação markdown quando apropriado. Seja útil e direto ao ponto."
+            },
+            {
+              "role": "user",
+              "message": "={{$json.message}}\n\nContexto:\n- Página atual: {{$json.context.currentPage}}\n- Plano do usuário: {{$json.context.userPlan}}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 500
+        }
+      },
+      "name": "OpenAI GPT-4",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1050, 600],
+      "credentials": {
+        "openAiApi": {
+          "id": "1",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "response",
+              "value": "={{$json.choices[0].message.content}}"
+            }
+          ],
+          "array": [
+            {
+              "name": "quickReplies",
+              "value": "=[{\"text\": \"📊 Dashboard\", \"action\": \"navigate:/dashboard\"}, {\"text\": \"⚙️ Configurações\", \"action\": \"navigate:/settings\"}, {\"text\": \"💬 Falar com humano\", \"action\": \"contact_support\"}]"
+            }
+          ],
+          "boolean": [
+            {
+              "name": "showSatisfaction",
+              "value": false
+            }
+          ]
+        }
+      },
+      "name": "Format AI Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1250, 600]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}"
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 400]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is About Leads?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is About Leads?": {
+      "main": [
+        [
+          {
+            "node": "Response - Leads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is About Plans?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is About Plans?": {
+      "main": [
+        [
+          {
+            "node": "Response - Plans",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is About Support?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is About Support?": {
+      "main": [
+        [
+          {
+            "node": "Response - Support",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI GPT-4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response - Leads": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response - Plans": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response - Support": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI GPT-4": {
+      "main": [
+        [
+          {
+            "node": "Format AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format AI Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null
+}

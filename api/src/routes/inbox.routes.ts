@@ -1,0 +1,1206 @@
+import { Router } from 'express';
+import multer from 'multer';
+import { authMiddleware } from '../middleware/auth.middleware';
+import { InboxService } from '../services/inbox.service';
+import { MessagesService } from '../services/messages.service';
+import { WhatsAppService } from '../services/whatsapp.service';
+import { ChannelsService } from '../services/channels.service';
+import { LeadsService } from '../services/leads.service';
+import { ConversationsService } from '../services/conversations.service';
+import { getStorageService } from '../services/storage.service';
+
+const router = Router();
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB max file size
+  },
+  fileFilter: (_req, file, cb) => {
+    // Allow images, videos, documents, and audio
+    const allowedMimes = [
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'video/mp4', 'video/webm', 'video/quicktime',
+      'audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/webm',
+      'application/pdf', 'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain'
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not allowed`));
+    }
+  }
+});
+const inboxService = new InboxService();
+const messagesService = new MessagesService();
+const whatsappService = new WhatsAppService();
+const channelsService = new ChannelsService();
+const leadsService = new LeadsService();
+const conversationsService = new ConversationsService();
+
+// Helper function to generate instance name from user ID (legacy/fallback)
+const getUserInstanceName = (userId: string): string => {
+  return `leadflow_${userId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+};
+
+// Get the active WhatsApp instance from saved channels
+const getActiveWhatsAppInstance = async (userId: string): Promise<string | null> => {
+  try {
+    const channels = await channelsService.findByType('whatsapp', userId);
+    const activeChannel = channels.find(ch => ch.status === 'active');
+    if (activeChannel && activeChannel.credentials) {
+      // Return instance_id or instance_name from credentials
+      return activeChannel.credentials.instance_id || activeChannel.credentials.instance_name || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('[Inbox] Error getting active WhatsApp instance:', error);
+    return null;
+  }
+};
+
+// Get the active WhatsApp channel object (with ID and credentials)
+const getActiveWhatsAppChannel = async (userId: string): Promise<any | null> => {
+  try {
+    const channels = await channelsService.findByType('whatsapp', userId);
+    const activeChannel = channels.find(ch => ch.status === 'active');
+    return activeChannel || (channels.length > 0 ? channels[0] : null);
+  } catch (error) {
+    console.error('[Inbox] Error getting active WhatsApp channel:', error);
+    return null;
+  }
+};
+
+// Helper to normalize phone number for WhatsApp JID
+const normalizePhoneToJid = (phone: string): string => {
+  // Remove all non-digit characters
+  const digits = phone.replace(/\D/g, '');
+  return `${digits}@s.whatsapp.net`;
+};
+
+// Helper to extract phone from JID
+const extractPhoneFromJid = (jid: string): string => {
+  return jid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace('@lid', '');
+};
+
+router.use(authMiddleware);
+
+// Check Evolution API status for inbox
+router.get('/status', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // First try to get instance from saved channels, fallback to legacy
+    const savedInstance = await getActiveWhatsAppInstance(user.id);
+    const instanceId = savedInstance || getUserInstanceName(user.id);
+    console.log('[Inbox Status] Using instanceId:', instanceId, '(from saved channel:', !!savedInstance, ')');
+    
+    const isEvolutionReady = whatsappService.isReady();
+
+    let instanceStatus = 'unknown';
+    let connectionState = null;
+
+    if (isEvolutionReady) {
+      try {
+        // Try to get the instance status from Evolution API
+        const status = await whatsappService.getStatus(instanceId) as any;
+        connectionState = status?.state || status?.instance?.state || status?.connectionState || 'unknown';
+        instanceStatus = connectionState === 'open' ? 'connected' : connectionState;
+      } catch (error: any) {
+        console.log('[Inbox Status] Failed to get instance status:', error?.message);
+        instanceStatus = 'not_found';
+      }
+    }
+
+    res.json({
+      evolution_configured: isEvolutionReady,
+      instance_id: instanceId,
+      instance_status: instanceStatus,
+      connection_state: connectionState,
+      message: !isEvolutionReady
+        ? 'Evolution API não está configurado. Configure EVOLUTION_API_URL e EVOLUTION_API_KEY.'
+        : instanceStatus === 'not_found'
+          ? 'Instância do WhatsApp não encontrada. Conecte seu WhatsApp nas configurações de integrações.'
+          : instanceStatus === 'open' || instanceStatus === 'connected'
+            ? 'WhatsApp conectado e pronto para uso.'
+            : 'WhatsApp desconectado. Reconecte nas configurações de integrações.',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Upload file for inbox messages (images, videos, documents, audio)
+router.post('/upload', upload.single('file'), async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    console.log('[Inbox Upload] Uploading file:', req.file.originalname, 'type:', req.file.mimetype, 'size:', req.file.size);
+
+    const storageService = getStorageService();
+    const mediaUrl = await storageService.uploadFile(req.file, 'inbox-media', user.id);
+
+    // Determine media type from mime type
+    let mediaType = 'document';
+    if (req.file.mimetype.startsWith('image/')) {
+      mediaType = 'image';
+    } else if (req.file.mimetype.startsWith('video/')) {
+      mediaType = 'video';
+    } else if (req.file.mimetype.startsWith('audio/')) {
+      mediaType = 'audio';
+    }
+
+    console.log('[Inbox Upload] File uploaded successfully:', mediaUrl, 'type:', mediaType);
+
+    res.json({
+      success: true,
+      url: mediaUrl,
+      media_type: mediaType,
+      original_name: req.file.originalname,
+      mime_type: req.file.mimetype,
+      size: req.file.size
+    });
+  } catch (error: any) {
+    console.error('[Inbox Upload] Error:', error);
+    next(error);
+  }
+});
+
+// Helper to normalize phone for comparison (remove + and leading zeros)
+const normalizePhoneForMatch = (phone: string | null | undefined): string => {
+  if (!phone) return '';
+  // Remove all non-digits
+  const digits = phone.replace(/\D/g, '');
+  // Remove leading zeros
+  return digits.replace(/^0+/, '');
+};
+
+// Get all conversations from database - only shows conversations with actual messages
+router.get('/conversations', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { query: dbQuery } = require('../database/connection');
+    const search = req.query.search as string | undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : 50;
+    const offset = req.query.offset ? Number(req.query.offset) : 0;
+
+    console.log('[Inbox] Fetching conversations for user:', user.id);
+
+    // STEP 1: Get conversations from database that have messages
+    // This is the correct approach - like Chatwoot, only show conversations with actual history
+    let sql = `
+      SELECT DISTINCT ON (c.id)
+        c.*,
+        l.name as lead_name,
+        l.email as lead_email,
+        l.phone as lead_phone,
+        l.whatsapp as lead_whatsapp,
+        l.avatar_url as lead_avatar,
+        l.status as lead_status,
+        l.company as lead_company,
+        l.source as lead_source,
+        ch.type as channel_type,
+        ch.name as channel_name,
+        ch.status as channel_status,
+        (
+          SELECT json_build_object(
+            'id', m.id,
+            'content', m.content,
+            'direction', m.direction,
+            'status', m.status,
+            'created_at', m.created_at,
+            'media_url', m.media_url,
+            'media_type', m.media_type
+          )
+          FROM messages m
+          WHERE m.conversation_id = c.id
+          ORDER BY m.created_at DESC
+          LIMIT 1
+        ) as last_message,
+        (
+          SELECT COUNT(*)::int 
+          FROM messages m 
+          WHERE m.conversation_id = c.id
+        ) as message_count
+      FROM conversations c
+      LEFT JOIN leads l ON c.lead_id = l.id
+      LEFT JOIN channels ch ON c.channel_id = ch.id
+      WHERE c.user_id = $1
+    `;
+
+    const params: any[] = [user.id];
+    let paramIndex = 2;
+
+    // Add search filter
+    if (search) {
+      sql += ` AND (
+        l.name ILIKE $${paramIndex} OR 
+        l.phone ILIKE $${paramIndex} OR 
+        l.email ILIKE $${paramIndex} OR
+        c.metadata->>'contact_name' ILIKE $${paramIndex} OR
+        c.remote_jid ILIKE $${paramIndex}
+      )`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    sql += ` ORDER BY c.id, c.last_message_at DESC NULLS LAST`;
+    sql += ` LIMIT $${paramIndex}`;
+    params.push(limit);
+    paramIndex++;
+
+    if (offset > 0) {
+      sql += ` OFFSET $${paramIndex}`;
+      params.push(offset);
+    }
+
+    let dbConversations: any[] = [];
+    try {
+      const result = await dbQuery(sql, params);
+      dbConversations = result.rows;
+      console.log('[Inbox] Found', dbConversations.length, 'conversations in database');
+    } catch (err: any) {
+      console.error('[Inbox] Database query error:', err?.message);
+      // If table doesn't exist, return empty array
+      if (err?.code === '42P01') {
+        console.log('[Inbox] Conversations table does not exist yet');
+        return res.json([]);
+      }
+      throw err;
+    }
+
+    // Transform to frontend format
+    const conversations = dbConversations.map((conv: any) => {
+      const displayName = conv.lead_name || conv.metadata?.contact_name || conv.remote_jid?.split('@')[0] || 'Desconhecido';
+      const phone = conv.lead_phone || conv.lead_whatsapp || conv.metadata?.phone || conv.remote_jid?.split('@')[0];
+      const profilePic = conv.lead_avatar || conv.metadata?.profile_picture || null;
+      
+      return {
+        // CORREÇÃO: Usar sempre o UUID real da conversa, não o remote_jid
+        // O remote_jid é compartilhado entre conversas com o mesmo número, causando conflitos
+        id: conv.id,
+        user_id: conv.user_id,
+        lead_id: conv.lead_id,
+        channel_id: conv.channel_id,
+        remote_jid: conv.remote_jid,
+        status: conv.status || 'open',
+        assigned_to: conv.assigned_to,
+        last_message_at: conv.last_message_at || conv.updated_at,
+        unread_count: conv.unread_count || 0,
+        is_group: conv.is_group || false,
+        message_count: conv.message_count || 0,
+        metadata: {
+          contact_name: displayName,
+          phone: phone,
+          profile_picture: profilePic,
+          is_group: conv.is_group || false,
+          jid: conv.remote_jid,
+          lead_status: conv.lead_status,
+        },
+        created_at: conv.created_at,
+        updated_at: conv.updated_at,
+        contact: {
+          id: conv.lead_id,
+          name: displayName,
+          phone: phone,
+          avatar_url: profilePic,
+          is_group: conv.is_group || false,
+          status: conv.lead_status,
+          email: conv.lead_email,
+          company: conv.lead_company,
+          source: conv.lead_source,
+        },
+        channel: {
+          id: conv.channel_id,
+          type: conv.channel_type || 'whatsapp',
+          name: conv.channel_name || 'WhatsApp',
+          status: conv.channel_status || 'active',
+        },
+        last_message: conv.last_message || {
+          id: 'empty',
+          content: 'Sem mensagens...',
+          direction: 'in',
+          status: 'delivered',
+          created_at: conv.created_at,
+        },
+      };
+    });
+
+    // Sort by last_message_at descending
+    conversations.sort((a: any, b: any) => {
+      const dateA = new Date(a.last_message_at || 0).getTime();
+      const dateB = new Date(b.last_message_at || 0).getTime();
+      return dateB - dateA;
+    });
+
+    console.log(`[Inbox] Returning ${conversations.length} conversations with actual message history`);
+    res.json(conversations);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Create new conversation
+router.post('/conversations/create', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { contactId, channelType } = req.body;
+    const { query: dbQuery } = require('../database/connection');
+
+    console.log('[Inbox] ========== CREATE CONVERSATION ==========');
+    console.log('[Inbox] Request body:', JSON.stringify(req.body, null, 2));
+    console.log('[Inbox] Creating conversation with contactId:', contactId, 'type:', typeof contactId);
+    console.log('[Inbox] channelType:', channelType);
+    console.log('[Inbox] user.id:', user.id);
+
+    if (!contactId) {
+      console.error('[Inbox] contactId is missing from request body');
+      return res.status(400).json({ error: 'contactId is required' });
+    }
+
+    // Get contact details
+    console.log('[Inbox] Searching for contact with id:', contactId, 'and user_id:', user.id);
+    const contactResult = await dbQuery(
+      'SELECT * FROM contacts WHERE id = $1 AND user_id = $2',
+      [contactId, user.id]
+    );
+    console.log('[Inbox] Contact query result rows:', contactResult.rows.length);
+    if (contactResult.rows.length > 0) {
+      console.log('[Inbox] Found contact:', JSON.stringify(contactResult.rows[0], null, 2));
+    }
+
+    if (contactResult.rows.length === 0) {
+      console.error('[Inbox] Contact NOT found for id:', contactId);
+      // Try to find contact without user_id filter to debug
+      const debugResult = await dbQuery('SELECT id, user_id FROM contacts WHERE id = $1', [contactId]);
+      console.log('[Inbox] Debug - contact exists?:', debugResult.rows.length > 0);
+      if (debugResult.rows.length > 0) {
+        console.log('[Inbox] Debug - contact belongs to user:', debugResult.rows[0].user_id, 'but request from:', user.id);
+      }
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    const contact = contactResult.rows[0];
+    
+    // Validate if contact has WhatsApp number
+    const whatsappNumber = contact.whatsapp || contact.phone;
+    if (!whatsappNumber || whatsappNumber.trim() === '') {
+      return res.status(400).json({ 
+        error: 'Este contato não possui número de WhatsApp configurado. Por favor, adicione um número de WhatsApp ao contato primeiro.' 
+      });
+    }
+    
+    // Get or create channel
+    let channel;
+    console.log('[Inbox] Searching for channel with type:', channelType || 'whatsapp', 'user_id:', user.id, 'status: active');
+    const channelsResult = await dbQuery(
+      'SELECT * FROM channels WHERE type = $1 AND user_id = $2 AND status = $3 ORDER BY created_at DESC LIMIT 1',
+      [channelType || 'whatsapp', user.id, 'active']
+    );
+    console.log('[Inbox] Channels found:', channelsResult.rows.length);
+
+    if (channelsResult.rows.length > 0) {
+      channel = channelsResult.rows[0];
+      console.log('[Inbox] Using channel:', channel.id, channel.name);
+    } else {
+      // Log all channels for this user to debug
+      const allChannelsResult = await dbQuery(
+        'SELECT id, type, name, status FROM channels WHERE user_id = $1',
+        [user.id]
+      );
+      console.log('[Inbox] All channels for user:', JSON.stringify(allChannelsResult.rows, null, 2));
+      console.error('[Inbox] ERROR: No active channel found!');
+      return res.status(400).json({ error: 'No active channel found. Please configure WhatsApp first.' });
+    }
+
+    // Create remote JID from phone/whatsapp
+    const phone = whatsappNumber;
+    if (!phone) {
+      return res.status(400).json({ error: 'Contact has no phone number' });
+    }
+
+    const remoteJid = normalizePhoneToJid(phone);
+
+    // Check if conversation already exists
+    const existingConvResult = await dbQuery(
+      'SELECT * FROM conversations WHERE remote_jid = $1 AND user_id = $2',
+      [remoteJid, user.id]
+    );
+
+    if (existingConvResult.rows.length > 0) {
+      // Return existing conversation
+      const existingConv = existingConvResult.rows[0];
+      return res.json({
+        // CORREÇÃO: Usar sempre o UUID real da conversa
+        id: existingConv.id,
+        user_id: existingConv.user_id,
+        lead_id: existingConv.lead_id,
+        channel_id: existingConv.channel_id,
+        remote_jid: existingConv.remote_jid,
+        status: existingConv.status || 'open',
+        contact: {
+          id: contact.id,
+          name: contact.name,
+          phone: contact.phone,
+          email: contact.email,
+          avatar_url: null,
+        },
+        channel: {
+          id: channel.id,
+          type: channel.type,
+          name: channel.name,
+          status: channel.status,
+        },
+        last_message: null,
+        unread_count: 0,
+        created_at: existingConv.created_at,
+      });
+    }
+
+    // Try to find associated lead by phone/whatsapp
+    let leadId = contact.lead_id || null;
+    if (!leadId) {
+      const leadResult = await dbQuery(
+        `SELECT id FROM leads 
+         WHERE user_id = $1 
+         AND (phone = $2 OR whatsapp = $2 OR phone = $3 OR whatsapp = $3)
+         LIMIT 1`,
+        [user.id, phone, normalizePhoneToJid(phone)]
+      );
+      if (leadResult.rows.length > 0) {
+        leadId = leadResult.rows[0].id;
+      }
+    }
+
+    // Create new conversation
+    const newConvResult = await dbQuery(
+      `INSERT INTO conversations (user_id, lead_id, channel_id, remote_jid, status, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        user.id,
+        leadId,
+        channel.id,
+        remoteJid,
+        'open',
+        JSON.stringify({
+          contact_id: contactId,
+          contact_name: contact.name,
+          phone: phone,
+          jid: remoteJid,
+          is_group: false
+        })
+      ]
+    );
+
+    const newConv = newConvResult.rows[0];
+
+    res.status(201).json({
+      // CORREÇÃO: Usar sempre o UUID real da conversa
+      id: newConv.id,
+      user_id: newConv.user_id,
+      lead_id: newConv.lead_id,
+      channel_id: newConv.channel_id,
+      remote_jid: newConv.remote_jid,
+      status: newConv.status,
+      contact: {
+        id: contact.id,
+        name: contact.name,
+        phone: contact.phone,
+        email: contact.email,
+        avatar_url: null,
+      },
+      channel: {
+        id: channel.id,
+        type: channel.type,
+        name: channel.name,
+        status: channel.status,
+      },
+      last_message: null,
+      unread_count: 0,
+      created_at: newConv.created_at,
+    });
+  } catch (error) {
+    console.error('[Inbox] Error creating conversation:', error);
+    next(error);
+  }
+});
+
+// Get messages for a specific conversation from Evolution API or Database
+router.get('/conversations/:conversationIdOrJid/messages', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { conversationIdOrJid } = req.params;
+    const { query: dbQuery } = require('../database/connection');
+    
+    // First try to get instance from saved channels, fallback to legacy
+    const savedInstance = await getActiveWhatsAppInstance(user.id);
+    const instanceId = savedInstance || getUserInstanceName(user.id);
+
+    // Determine the type of ID we received
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationIdOrJid);
+    const isJid = conversationIdOrJid.includes('@');
+    const isPhone = /^\d+$/.test(conversationIdOrJid);
+    
+    let remoteJid: string | null = null;
+    let conversationId: string | null = null;
+    
+    console.log('[Inbox Messages] Looking for:', conversationIdOrJid, { isUUID, isJid, isPhone });
+
+    // If it's a JID or phone, use it directly for Evolution API
+    if (isJid) {
+      remoteJid = conversationIdOrJid;
+      // Also try to find the conversation in database
+      try {
+        const convResult = await dbQuery(
+          'SELECT id FROM conversations WHERE remote_jid = $1 AND user_id = $2 LIMIT 1',
+          [remoteJid, user.id]
+        );
+        if (convResult.rows.length > 0) {
+          conversationId = convResult.rows[0].id;
+        }
+      } catch (e) {
+        console.warn('[Inbox] Could not find conversation by remote_jid:', e);
+      }
+    } else if (isPhone) {
+      remoteJid = normalizePhoneToJid(conversationIdOrJid);
+    } else if (isUUID) {
+      conversationId = conversationIdOrJid;
+      // Try to get remote_jid from conversation
+      try {
+        const convResult = await dbQuery(
+          'SELECT remote_jid FROM conversations WHERE id = $1 AND user_id = $2 LIMIT 1',
+          [conversationId, user.id]
+        );
+        if (convResult.rows.length > 0) {
+          remoteJid = convResult.rows[0].remote_jid;
+        }
+      } catch (e) {
+        console.warn('[Inbox] Could not find conversation by ID:', e);
+      }
+    }
+
+    // STEP 1: Try to fetch messages from local database first
+    let localMessages: any[] = [];
+    if (conversationId || remoteJid) {
+      try {
+        let msgSql = `
+          SELECT 
+            m.*,
+            l.name as sender_name,
+            l.avatar_url as sender_avatar
+          FROM messages m
+          LEFT JOIN leads l ON m.lead_id = l.id
+          WHERE m.user_id = $1
+        `;
+        const msgParams: any[] = [user.id];
+        let paramIdx = 2;
+        
+        if (conversationId) {
+          msgSql += ` AND m.conversation_id = $${paramIdx}`;
+          msgParams.push(conversationId);
+          paramIdx++;
+        } else if (remoteJid) {
+          // Try to match by remote_jid in metadata
+          msgSql += ` AND (m.metadata->>'remote_jid' = $${paramIdx} OR m.metadata->>'remote_jid' LIKE $${paramIdx + 1})`;
+          msgParams.push(remoteJid);
+          msgParams.push(`%${extractPhoneFromJid(remoteJid)}%`);
+          paramIdx += 2;
+        }
+        
+        msgSql += ` ORDER BY m.created_at ASC LIMIT $${paramIdx}`;
+        msgParams.push(req.query.limit ? Number(req.query.limit) : 100);
+        
+        const msgResult = await dbQuery(msgSql, msgParams);
+        localMessages = msgResult.rows.map((msg: any) => ({
+          id: msg.id,
+          conversation_id: msg.conversation_id,
+          direction: msg.direction,
+          channel: msg.channel || 'whatsapp',
+          content: msg.content,
+          status: msg.status,
+          created_at: msg.created_at,
+          sent_at: msg.sent_at,
+          delivered_at: msg.delivered_at,
+          read_at: msg.read_at,
+          media_url: msg.media_url,
+          media_type: msg.media_type,
+          metadata: msg.metadata,
+          sender: msg.direction === 'out' ? {
+            id: user.id,
+            name: 'Você',
+            avatar_url: null,
+          } : {
+            id: msg.lead_id,
+            name: msg.sender_name || 'Contato',
+            avatar_url: msg.sender_avatar,
+          }
+        }));
+        console.log('[Inbox] Found', localMessages.length, 'messages in local database');
+      } catch (dbErr) {
+        console.warn('[Inbox] Database message fetch error:', dbErr);
+      }
+    }
+
+    // If we have local messages, return them
+    if (localMessages.length > 0) {
+      return res.json(localMessages);
+    }
+
+    // STEP 2: If no local messages and we have a JID, try Evolution API
+    if ((isJid || isPhone) && whatsappService.isReady() && remoteJid) {
+      try {
+        console.log('[Inbox] Fetching messages from Evolution API for:', remoteJid);
+
+        const messagesResult = await whatsappService.fetchMessages(
+          instanceId,
+          remoteJid,
+          req.query.limit ? Number(req.query.limit) : 100
+        ) as any;
+
+        // Handle different response formats from Evolution API
+        const rawMessages = Array.isArray(messagesResult)
+          ? messagesResult
+          : messagesResult?.messages || [];
+
+        // Transform Evolution API messages to our format
+        const messages = rawMessages.map((msg: any) => {
+          const messageContent =
+            msg.message?.conversation ||
+            msg.message?.extendedTextMessage?.text ||
+            msg.message?.imageMessage?.caption ||
+            msg.message?.videoMessage?.caption ||
+            msg.message?.documentMessage?.caption ||
+            (msg.message?.imageMessage ? '[Imagem]' : '') ||
+            (msg.message?.videoMessage ? '[Vídeo]' : '') ||
+            (msg.message?.audioMessage ? '[Áudio]' : '') ||
+            (msg.message?.documentMessage ? '[Documento]' : '') ||
+            (msg.message?.stickerMessage ? '[Sticker]' : '') ||
+            (msg.message?.contactMessage ? '[Contato]' : '') ||
+            (msg.message?.locationMessage ? '[Localização]' : '') ||
+            '[Mensagem]';
+
+          return {
+            id: msg.key?.id || msg.id,
+            direction: msg.key?.fromMe ? 'out' : 'in',
+            channel: 'whatsapp',
+            content: messageContent,
+            status: msg.status || 'delivered',
+            created_at: msg.messageTimestamp
+              ? new Date(msg.messageTimestamp * 1000).toISOString()
+              : new Date().toISOString(),
+            media_url: msg.message?.imageMessage?.url ||
+                      msg.message?.videoMessage?.url ||
+                      msg.message?.audioMessage?.url ||
+                      msg.message?.documentMessage?.url || null,
+            media_type: msg.message?.imageMessage ? 'image' :
+                       msg.message?.videoMessage ? 'video' :
+                       msg.message?.audioMessage ? 'audio' :
+                       msg.message?.documentMessage ? 'document' : null,
+          };
+        }).sort((a: any, b: any) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+
+        console.log(`[Inbox] Returning ${messages.length} messages from Evolution API`);
+        return res.json(messages);
+      } catch (evolutionError) {
+        console.warn('[Inbox] Evolution API message fetch failed:', evolutionError);
+        // Return empty since we already checked local database
+        return res.json([]);
+      }
+    }
+
+    // No messages found anywhere
+    console.log('[Inbox] No messages found for:', conversationIdOrJid);
+    res.json([]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Mark conversation as read
+router.post('/conversations/:leadId/read', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const result = await inboxService.markAsRead(user.id, req.params.leadId);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Send a message in a conversation
+router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { content, channel, media_url, media_type } = req.body;
+    const messageContent = content?.trim() || '';
+    
+    // Content is required only if no media is attached
+    if (!messageContent && !media_url) {
+      return res.status(400).json({ error: 'Content or media is required' });
+    }
+
+    const { conversationIdOrJid } = req.params;
+    const messageChannel = channel || 'whatsapp';
+    // First try to get instance from saved channels, fallback to legacy
+    const savedInstance = await getActiveWhatsAppInstance(user.id);
+    const instanceId = savedInstance || getUserInstanceName(user.id);
+
+    const { query: dbQuery } = require('../database/connection');
+
+    // Determine the type of ID we received
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationIdOrJid);
+    const isJid = conversationIdOrJid.includes('@');
+    const isPhone = /^\d+$/.test(conversationIdOrJid);
+    
+    let phone: string | null = null;
+    let leadId: string | null = null;
+    let remoteJid: string | null = null;
+    let conversationId: string | null = null;
+    
+    console.log('[Inbox Send] Processing:', conversationIdOrJid, { isUUID, isJid, isPhone });
+    
+    // If it's a JID, extract phone and use it directly
+    if (isJid) {
+      remoteJid = conversationIdOrJid;
+      phone = extractPhoneFromJid(conversationIdOrJid);
+      // Try to find associated conversation
+      try {
+        const convResult = await dbQuery(
+          'SELECT c.id, c.lead_id FROM conversations c WHERE c.remote_jid = $1 AND c.user_id = $2 LIMIT 1',
+          [remoteJid, user.id]
+        );
+        if (convResult.rows.length > 0) {
+          conversationId = convResult.rows[0].id;
+          leadId = convResult.rows[0].lead_id;
+        }
+      } catch (e) {
+        console.warn('[Inbox] Could not find conversation by remote_jid:', e);
+      }
+    } else if (isPhone) {
+      phone = conversationIdOrJid;
+      remoteJid = normalizePhoneToJid(phone);
+    } else if (isUUID) {
+      // Could be a conversation ID or a lead ID
+      // Try conversation first
+      try {
+        const convResult = await dbQuery(
+          'SELECT c.*, l.phone as lead_phone, l.whatsapp as lead_whatsapp FROM conversations c LEFT JOIN leads l ON c.lead_id = l.id WHERE c.id = $1 AND c.user_id = $2 LIMIT 1',
+          [conversationIdOrJid, user.id]
+        );
+        if (convResult.rows.length > 0) {
+          conversationId = convResult.rows[0].id;
+          leadId = convResult.rows[0].lead_id;
+          remoteJid = convResult.rows[0].remote_jid;
+          phone = convResult.rows[0].lead_phone || convResult.rows[0].lead_whatsapp || extractPhoneFromJid(remoteJid || '');
+          console.log('[Inbox Send] Found conversation:', conversationId, 'lead:', leadId, 'phone:', phone);
+        }
+      } catch (e) {
+        console.warn('[Inbox] Error finding conversation by ID:', e);
+      }
+      
+      // If not a conversation, try as lead ID
+      if (!conversationId) {
+        try {
+          const leadResult = await dbQuery('SELECT * FROM leads WHERE id = $1 AND user_id = $2', [conversationIdOrJid, user.id]);
+          const lead = leadResult.rows[0];
+          if (lead) {
+            phone = lead.whatsapp || lead.phone;
+            leadId = lead.id;
+            remoteJid = phone ? normalizePhoneToJid(phone) : null;
+            console.log('[Inbox Send] Found lead:', leadId, 'phone:', phone);
+          }
+        } catch (e) {
+          console.warn('[Inbox] Error finding lead by ID:', e);
+        }
+      }
+    }
+    
+    // Try to find associated lead if we have a phone
+    if (!leadId && phone) {
+      const normalizedPhone = normalizePhoneForMatch(phone);
+      if (normalizedPhone.length >= 8) {
+        try {
+          const leadResult = await dbQuery(
+            `SELECT * FROM leads WHERE user_id = $1 AND (
+              REPLACE(REPLACE(REPLACE(phone, '+', ''), '-', ''), ' ', '') LIKE $2
+              OR REPLACE(REPLACE(REPLACE(whatsapp, '+', ''), '-', ''), ' ', '') LIKE $2
+            ) LIMIT 1`,
+            [user.id, `%${normalizedPhone}`]
+          );
+          if (leadResult.rows.length > 0) {
+            leadId = leadResult.rows[0].id;
+            console.log('[Inbox Send] Found lead for phone:', phone, '-> leadId:', leadId);
+          }
+        } catch (e) {
+          console.warn('[Inbox] Error finding lead by phone:', e);
+        }
+      }
+    }
+
+    // For @lid JIDs, we need to send using the remoteJid directly
+    const isLidFormat = remoteJid?.endsWith('@lid');
+    const isGroupFormat = remoteJid?.endsWith('@g.us');
+
+    if (!phone && !remoteJid && messageChannel === 'whatsapp') {
+      return res.status(400).json({ error: 'No phone number available' });
+    }
+
+    // Send via WhatsApp
+    let externalResult: any = null;
+    if (messageChannel === 'whatsapp' && (phone || remoteJid)) {
+      try {
+        console.log('[Inbox] Sending WhatsApp message:', { instanceId, phone, remoteJid, isLidFormat, isGroupFormat });
+        
+        // Use remoteJid for @lid format (Cloud API), otherwise use phone number
+        const numberToSend = isLidFormat || isGroupFormat ? remoteJid : phone;
+        
+        // If we have media, send with media
+        if (media_url && media_type) {
+          externalResult = await whatsappService.sendMedia({
+            instanceId,
+            number: numberToSend!,
+            mediaUrl: media_url,
+            mediaType: media_type,
+            caption: messageContent || undefined, // Sem legenda se vazio
+          });
+        } else {
+          externalResult = await whatsappService.sendMessage({
+            instanceId,
+            number: numberToSend!,
+            text: messageContent,
+          });
+        }
+      } catch (whatsappError) {
+        console.error('[Inbox] WhatsApp send error:', whatsappError);
+        return res.status(500).json({ error: 'Failed to send WhatsApp message' });
+      }
+    }
+
+    // ALWAYS store message in database (for history tracking)
+    let message = null;
+    const finalRemoteJid = remoteJid || normalizePhoneToJid(phone || '');
+    
+    try {
+      // If we don't have a conversation yet, find or create one
+      if (!conversationId) {
+        const activeChannel = await getActiveWhatsAppChannel(user.id);
+        if (activeChannel) {
+          const conversation = await conversationsService.findOrCreate(
+            user.id,
+            activeChannel.id,
+            finalRemoteJid,
+            leadId || undefined,
+            {
+              contact_name: leadId ? 'Lead' : phone,
+              phone: phone,
+            }
+          );
+          conversationId = conversation.id;
+          console.log('[Inbox] Conversation found/created:', conversationId);
+        }
+      }
+
+      message = await messagesService.create({
+        conversation_id: conversationId,
+        lead_id: leadId,
+        direction: 'out',
+        channel: messageChannel,
+        content: messageContent || (media_type ? `[${media_type}]` : ''),
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        external_id: externalResult?.key?.id || null,
+        media_url: media_url || null,
+        media_type: media_type || null,
+        metadata: {
+          whatsapp_result: externalResult,
+          remote_jid: finalRemoteJid,
+          phone: phone,
+        },
+      }, user.id);
+      console.log('[Inbox] Message saved to database:', message.id, 'conversation:', conversationId);
+
+      // Update lead's last_contact_at if we have a lead
+      if (leadId) {
+        await dbQuery('UPDATE leads SET last_contact_at = NOW() WHERE id = $1', [leadId]);
+      }
+    } catch (dbError) {
+      console.warn('[Inbox] Failed to save message to database:', dbError);
+      // Don't fail the request, the WhatsApp message was sent
+    }
+
+    // Return the message directly (not wrapped in success object) for frontend compatibility
+    res.json(message || {
+      id: externalResult?.key?.id || `msg_${Date.now()}`,
+      direction: 'out',
+      channel: 'whatsapp',
+      content: messageContent || (media_type ? `[${media_type}]` : ''),
+      status: 'sent',
+      created_at: new Date().toISOString(),
+      media_url: media_url || null,
+      media_type: media_type || null,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get unread count
+router.get('/unread-count', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // First try to get instance from saved channels, fallback to legacy
+    const savedInstance = await getActiveWhatsAppInstance(user.id);
+    const instanceId = savedInstance || getUserInstanceName(user.id);
+
+    // Try Evolution API first
+    if (whatsappService.isReady()) {
+      try {
+        const chats = await whatsappService.fetchChats(instanceId) as any[];
+        if (Array.isArray(chats)) {
+          const totalUnread = chats.reduce((sum: number, chat: any) => sum + (chat.unreadCount || 0), 0);
+          return res.json({ count: totalUnread });
+        }
+      } catch (evolutionError) {
+        console.warn('[Inbox] Evolution API unread count failed:', evolutionError);
+      }
+    }
+
+    // Fallback to local database
+    const count = await inboxService.getUnreadCount(user.id);
+    res.json({ count });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ✅ Send Audio (Voice Message)
+router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('audio'), async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { conversationIdOrJid } = req.params;
+    
+    console.log('[Inbox Audio] Processing audio for:', conversationIdOrJid);
+    console.log('[Inbox Audio] File received:', req.file ? { name: req.file.originalname, size: req.file.size, type: req.file.mimetype } : 'No file');
+
+    // Get the instance for this user
+    const savedInstance = await getActiveWhatsAppInstance(user.id);
+    const instanceId = savedInstance || getUserInstanceName(user.id);
+
+    if (!instanceId) {
+      console.error('[Inbox Audio] No WhatsApp instance configured');
+      return res.status(400).json({ error: 'No WhatsApp instance configured' });
+    }
+
+    console.log('[Inbox Audio] Using instance:', instanceId);
+
+    // Detect if it's a JID or UUID
+    const isJid = conversationIdOrJid.includes('@');
+    let remoteJid = isJid ? conversationIdOrJid : null;
+    let phone = '';
+
+    if (isJid) {
+      phone = conversationIdOrJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '');
+    } else {
+      // Get conversation details
+      const conversation = await conversationsService.getById(conversationIdOrJid);
+      if (conversation) {
+        remoteJid = conversation.remote_jid;
+        phone = remoteJid?.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '') || '';
+      }
+    }
+
+    if (!remoteJid && !phone) {
+      return res.status(400).json({ error: 'Invalid conversation or phone number' });
+    }
+
+    // Upload audio to MinIO first
+    let audioUrl = '';
+    if (req.file) {
+      const storageService = getStorageService();
+      // Use uploadBuffer para buffer com nome e mimetype
+      audioUrl = await storageService.uploadBuffer(
+        req.file.buffer,
+        req.file.originalname || `audio_${Date.now()}.webm`,
+        req.file.mimetype || 'audio/webm',
+        `inbox-media`,
+        user.id
+      );
+      console.log('[Inbox Audio] Uploaded to:', audioUrl);
+    } else if (req.body.audio_base64) {
+      // If audio is sent as base64, upload it first
+      const base64Data = req.body.audio_base64;
+      const audioBuffer = Buffer.from(base64Data, 'base64');
+      const storageService = getStorageService();
+      audioUrl = await storageService.uploadBuffer(
+        audioBuffer,
+        `audio_${Date.now()}.webm`,
+        'audio/webm',
+        `inbox-media`,
+        user.id
+      );
+      console.log('[Inbox Audio] Uploaded base64 to:', audioUrl);
+    }
+
+    if (!audioUrl && !req.body.audio_url) {
+      return res.status(400).json({ error: 'Audio file or URL required' });
+    }
+
+    const finalAudioUrl = audioUrl || req.body.audio_url;
+
+    // Send via Evolution API
+    const result = await whatsappService.sendAudio({
+      instanceId,
+      number: remoteJid?.includes('@lid') || remoteJid?.includes('@g.us') ? remoteJid! : phone,
+      audioUrl: finalAudioUrl,
+    });
+
+    console.log('[Inbox Audio] Evolution API result:', result);
+
+    // Save to database - use conversation ID if available
+    const messageConversationId = !isJid ? conversationIdOrJid : null;
+    
+    // Extract external ID from result (Evolution API response format varies)
+    const externalId = (result as any)?.key?.id || (result as any)?.message?.id || null;
+    
+    const message = await messagesService.create({
+      conversation_id: messageConversationId,
+      direction: 'out',
+      channel: 'whatsapp',
+      content: '🎤 Mensagem de voz',
+      status: 'sent',
+      sent_at: new Date().toISOString(),
+      external_id: externalId,
+      media_url: finalAudioUrl,
+      media_type: 'audio',
+      metadata: { whatsapp_result: result, remote_jid: remoteJid },
+    }, user.id);
+
+    console.log('[Inbox Audio] Message saved:', message?.id);
+    console.log('[Inbox Audio] Sent successfully');
+    res.json(message);
+  } catch (error) {
+    console.error('[Inbox Audio] Error:', error);
+    next(error);
+  }
+});
+
+// ✅ Send Sticker
+router.post('/conversations/:conversationIdOrJid/send-sticker', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { conversationIdOrJid } = req.params;
+    const { sticker_url, sticker_base64 } = req.body;
+
+    if (!sticker_url && !sticker_base64) {
+      return res.status(400).json({ error: 'Sticker URL or base64 required' });
+    }
+
+    console.log('[Inbox Sticker] Processing for:', conversationIdOrJid);
+
+    // Get the instance for this user
+    const savedInstance = await getActiveWhatsAppInstance(user.id);
+    const instanceId = savedInstance || getUserInstanceName(user.id);
+
+    if (!instanceId) {
+      return res.status(400).json({ error: 'No WhatsApp instance configured' });
+    }
+
+    // Detect if it's a JID or UUID
+    const isJid = conversationIdOrJid.includes('@');
+    let remoteJid = isJid ? conversationIdOrJid : null;
+    let phone = '';
+
+    if (isJid) {
+      phone = conversationIdOrJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '');
+    } else {
+      const conversation = await conversationsService.getById(conversationIdOrJid);
+      if (conversation) {
+        remoteJid = conversation.remote_jid;
+        phone = remoteJid?.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '') || '';
+      }
+    }
+
+    if (!remoteJid && !phone) {
+      return res.status(400).json({ error: 'Invalid conversation or phone number' });
+    }
+
+    // Send via Evolution API
+    const result = await whatsappService.sendSticker({
+      instanceId,
+      number: remoteJid?.includes('@lid') || remoteJid?.includes('@g.us') ? remoteJid! : phone,
+      stickerUrl: sticker_url,
+      stickerBase64: sticker_base64,
+    });
+
+    // Extract external ID from result
+    const externalId = (result as any)?.key?.id || (result as any)?.message?.id || null;
+
+    // Save to database
+    const message = await messagesService.create({
+      conversation_id: isJid ? null : conversationIdOrJid,
+      direction: 'out',
+      channel: 'whatsapp',
+      content: '🎨 Sticker',
+      status: 'sent',
+      sent_at: new Date().toISOString(),
+      external_id: externalId,
+      media_url: sticker_url || null,
+      media_type: 'sticker',
+      metadata: { whatsapp_result: result, remote_jid: remoteJid },
+    }, user.id);
+
+    console.log('[Inbox Sticker] Sent successfully');
+    res.json(message);
+  } catch (error) {
+    console.error('[Inbox Sticker] Error:', error);
+    next(error);
+  }
+});
+
+export default router;

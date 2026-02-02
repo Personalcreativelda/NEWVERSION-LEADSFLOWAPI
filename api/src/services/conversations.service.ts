@@ -1,0 +1,120 @@
+// INBOX: Service para gerenciar conversas
+import { query } from '../database/connection';
+
+export interface Conversation {
+    id: string;
+    user_id: string;
+    lead_id: string | null;
+    channel_id: string;
+    remote_jid: string;
+    status: 'open' | 'closed' | 'pending' | 'snoozed';
+    assigned_to: string | null;
+    last_message_at: string;
+    unread_count: number;
+    metadata: any;
+    created_at: string;
+    updated_at: string;
+}
+
+export class ConversationsService {
+    /**
+     * Busca ou cria uma conversa
+     */
+    async findOrCreate(
+        userId: string,
+        channelId: string,
+        remoteJid: string,
+        leadId?: string,
+        metadata?: any
+    ): Promise<Conversation> {
+        // Validação: remoteJid deve ser válido (conter @ para WhatsApp)
+        if (!remoteJid || !remoteJid.includes('@')) {
+            throw new Error('Invalid remote JID: WhatsApp number is required');
+        }
+
+        // Tentar encontrar conversa existente
+        let result = await query(
+            `SELECT * FROM conversations 
+       WHERE user_id = $1 AND channel_id = $2 AND remote_jid = $3`,
+            [userId, channelId, remoteJid]
+        );
+
+        if (result.rows.length > 0) {
+            return result.rows[0];
+        }
+
+        // Criar nova conversa
+        result = await query(
+            `INSERT INTO conversations (user_id, lead_id, channel_id, remote_jid, metadata)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+            [userId, leadId || null, channelId, remoteJid, JSON.stringify(metadata || {})]
+        );
+
+        return result.rows[0];
+    }
+
+    /**
+     * Atualiza contador de não lidas
+     */
+    async updateUnreadCount(conversationId: string, increment: number): Promise<void> {
+        await query(
+            `UPDATE conversations 
+       SET unread_count = GREATEST(0, unread_count + $1),
+           updated_at = NOW()
+       WHERE id = $2`,
+            [increment, conversationId]
+        );
+    }
+
+    /**
+     * Marca conversa como lida
+     */
+    async markAsRead(conversationId: string, userId: string): Promise<void> {
+        await query(
+            `UPDATE conversations 
+       SET unread_count = 0, updated_at = NOW()
+       WHERE id = $1 AND user_id = $2`,
+            [conversationId, userId]
+        );
+    }
+
+    /**
+     * Busca conversa por ID
+     */
+    async getById(conversationId: string): Promise<Conversation | null> {
+        const result = await query(
+            `SELECT * FROM conversations WHERE id = $1`,
+            [conversationId]
+        );
+        return result.rows[0] || null;
+    }
+
+    /**
+     * Atualiza status da conversa
+     */
+    async updateStatus(
+        conversationId: string,
+        status: Conversation['status'],
+        userId: string
+    ): Promise<void> {
+        await query(
+            `UPDATE conversations 
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2 AND user_id = $3`,
+            [status, conversationId, userId]
+        );
+    }
+
+    /**
+     * Atualiza lead_id da conversa
+     */
+    async updateLead(conversationId: string, leadId: string, userId: string): Promise<void> {
+        await query(
+            `UPDATE conversations 
+       SET lead_id = $1, updated_at = NOW()
+       WHERE id = $2 AND user_id = $3`,
+            [leadId, conversationId, userId]
+        );
+    }
+}
