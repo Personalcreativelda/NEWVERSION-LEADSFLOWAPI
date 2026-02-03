@@ -4,7 +4,7 @@ import { query } from '../database/connection';
 export interface Channel {
     id: string;
     user_id: string;
-    type: 'whatsapp' | 'facebook' | 'instagram' | 'telegram';
+    type: 'whatsapp' | 'whatsapp_cloud' | 'facebook' | 'instagram' | 'telegram' | 'email' | 'website';
     name: string;
     status: 'active' | 'inactive' | 'error' | 'connecting';
     credentials: any;
@@ -96,13 +96,26 @@ export class ChannelsService {
      */
     async findByType(type: string, userId: string): Promise<Channel[]> {
         const result = await query(
-            `SELECT * FROM channels 
-             WHERE user_id = $1 
+            `SELECT * FROM channels
+             WHERE user_id = $1
              AND type = $2
              ORDER BY created_at DESC`,
             [userId, type]
         );
         return result.rows;
+    }
+
+    /**
+     * Busca canal por campo de credential específico
+     */
+    async findByCredentialField(field: string, value: string, userId: string): Promise<Channel | null> {
+        const result = await query(
+            `SELECT * FROM channels
+             WHERE user_id = $1
+             AND credentials->>$2 = $3`,
+            [userId, field, value]
+        );
+        return result.rows[0] || null;
     }
 
     /**

@@ -1123,4 +1123,604 @@ router.post('/instagram', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// WHATSAPP CLOUD API WEBHOOKS (API Oficial da Meta)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ✅ Verificação de webhook do WhatsApp Cloud (GET para validação do Facebook)
+router.get('/whatsapp-cloud/:channelId?', async (req, res) => {
+  console.log('[WhatsApp Cloud Webhook] GET request - webhook verification');
+
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  // Se tem channelId, buscar verify_token específico do canal
+  let expectedToken = process.env.WHATSAPP_VERIFY_TOKEN || 'leadflow_verify';
+
+  if (req.params.channelId) {
+    try {
+      const channelResult = await query(
+        `SELECT credentials FROM channels WHERE id = $1`,
+        [req.params.channelId]
+      );
+      if (channelResult.rows[0]?.credentials?.verify_token) {
+        expectedToken = channelResult.rows[0].credentials.verify_token;
+      }
+    } catch (e) {
+      console.log('[WhatsApp Cloud Webhook] Could not fetch channel verify token');
+    }
+  }
+
+  if (mode === 'subscribe' && token === expectedToken) {
+    console.log('[WhatsApp Cloud Webhook] Verificação bem-sucedida');
+    return res.status(200).send(challenge);
+  }
+
+  res.json({
+    success: true,
+    message: 'WhatsApp Cloud webhook endpoint is accessible',
+    endpoint: '/api/webhooks/whatsapp-cloud',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ Webhook para receber mensagens do WhatsApp Cloud API
+router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
+  try {
+    console.log('[WhatsApp Cloud Webhook] ===== WEBHOOK RECEBIDO =====');
+    console.log('[WhatsApp Cloud Webhook] Body:', JSON.stringify(req.body).substring(0, 2000));
+
+    const body = req.body;
+
+    // WhatsApp Cloud envia webhooks com estrutura específica
+    if (body.object !== 'whatsapp_business_account') {
+      console.log('[WhatsApp Cloud Webhook] Objeto não é whatsapp_business_account:', body.object);
+      return res.sendStatus(200);
+    }
+
+    // Processar cada entrada
+    for (const entry of body.entry || []) {
+      const wabaId = entry.id;
+
+      for (const change of entry.changes || []) {
+        if (change.field !== 'messages') continue;
+
+        const value = change.value;
+        const phoneNumberId = value.metadata?.phone_number_id;
+        const displayPhoneNumber = value.metadata?.display_phone_number;
+
+        // Processar mensagens recebidas
+        for (const message of value.messages || []) {
+          const senderId = message.from; // Número do remetente
+          const messageId = message.id;
+          const timestamp = message.timestamp;
+          const messageType = message.type;
+
+          // Extrair conteúdo da mensagem
+          let messageContent = '';
+          let mediaType = null;
+          let mediaUrl = null;
+
+          switch (messageType) {
+            case 'text':
+              messageContent = message.text?.body || '';
+              break;
+            case 'image':
+              mediaType = 'image';
+              messageContent = message.image?.caption || '[Imagem]';
+              break;
+            case 'video':
+              mediaType = 'video';
+              messageContent = message.video?.caption || '[Vídeo]';
+              break;
+            case 'audio':
+              mediaType = 'audio';
+              messageContent = '[Áudio]';
+              break;
+            case 'document':
+              mediaType = 'document';
+              messageContent = message.document?.filename || '[Documento]';
+              break;
+            case 'sticker':
+              mediaType = 'sticker';
+              messageContent = '[Sticker]';
+              break;
+            case 'location':
+              messageContent = `[Localização: ${message.location?.latitude}, ${message.location?.longitude}]`;
+              break;
+            case 'contacts':
+              messageContent = '[Contato]';
+              break;
+            default:
+              messageContent = `[${messageType}]`;
+          }
+
+          // Encontrar canal pelo phone_number_id
+          let channelResult;
+          if (req.params.channelId) {
+            channelResult = await query(
+              `SELECT * FROM channels WHERE id = $1 AND status = 'active'`,
+              [req.params.channelId]
+            );
+          } else {
+            channelResult = await query(
+              `SELECT * FROM channels
+               WHERE type = 'whatsapp_cloud'
+               AND status = 'active'
+               AND credentials->>'phone_number_id' = $1`,
+              [phoneNumberId]
+            );
+          }
+
+          if (channelResult.rows.length === 0) {
+            console.warn('[WhatsApp Cloud Webhook] Canal não encontrado para phone_number_id:', phoneNumberId);
+            continue;
+          }
+
+          const channel = channelResult.rows[0];
+          console.log('[WhatsApp Cloud Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
+
+          // Obter nome do contato
+          let contactName = senderId;
+          const contacts = value.contacts || [];
+          if (contacts.length > 0 && contacts[0].profile?.name) {
+            contactName = contacts[0].profile.name;
+          }
+
+          // Buscar ou criar lead
+          const phone = senderId.replace(/\D/g, '');
+          let lead = await query(
+            `SELECT * FROM leads WHERE user_id = $1 AND (phone = $2 OR whatsapp = $2)`,
+            [channel.user_id, phone]
+          );
+
+          let leadId: string;
+
+          if (lead.rows.length === 0) {
+            console.log('[WhatsApp Cloud Webhook] Criando novo lead:', contactName);
+            const leadResult = await query(
+              `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
+               VALUES ($1, $2, $3, $3, 'whatsapp_cloud', 'new')
+               RETURNING *`,
+              [channel.user_id, contactName, phone]
+            );
+            leadId = leadResult.rows[0].id;
+          } else {
+            leadId = lead.rows[0].id;
+          }
+
+          // Buscar ou criar conversa
+          const remoteJid = `${senderId}@s.whatsapp.net`;
+          const conversation = await conversationsService.findOrCreate(
+            channel.user_id,
+            channel.id,
+            remoteJid,
+            leadId,
+            {
+              contact_name: contactName,
+              phone: phone
+            }
+          );
+
+          // Salvar mensagem
+          const messageResult = await query(
+            `INSERT INTO messages (
+              user_id, conversation_id, lead_id, direction, channel,
+              content, media_url, media_type, status, external_id, metadata
+            )
+             VALUES ($1, $2, $3, 'in', 'whatsapp_cloud', $4, $5, $6, 'delivered', $7, $8)
+             RETURNING *`,
+            [
+              channel.user_id,
+              conversation.id,
+              leadId,
+              messageContent,
+              mediaUrl,
+              mediaType,
+              messageId,
+              JSON.stringify({
+                phone_number_id: phoneNumberId,
+                waba_id: wabaId,
+                from: senderId,
+                timestamp: timestamp,
+                message_type: messageType
+              })
+            ]
+          );
+
+          const savedMessage = messageResult.rows[0];
+          console.log('[WhatsApp Cloud Webhook] Mensagem salva:', savedMessage.id);
+
+          // Atualizar conversa
+          await conversationsService.updateUnreadCount(conversation.id, 1);
+          await query(
+            `UPDATE conversations
+             SET last_message_at = NOW(),
+                 status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [conversation.id]
+          );
+
+          // Emitir WebSocket
+          const wsService = getWebSocketService();
+          if (wsService) {
+            const updatedConversation = await query(
+              `SELECT c.*, ch.name as channel_name, l.name as lead_name
+               FROM conversations c
+               LEFT JOIN channels ch ON c.channel_id = ch.id
+               LEFT JOIN leads l ON c.lead_id = l.id
+               WHERE c.id = $1`,
+              [conversation.id]
+            );
+
+            wsService.emitNewMessage(channel.user_id, {
+              conversationId: conversation.id,
+              message: savedMessage,
+              conversation: updatedConversation.rows[0] || conversation
+            });
+
+            const totalUnreadResult = await query(
+              `SELECT SUM(unread_count) as total FROM conversations WHERE user_id = $1`,
+              [channel.user_id]
+            );
+            const totalUnread = parseInt(totalUnreadResult.rows[0]?.total || '0');
+
+            wsService.emitUnreadCountUpdate(channel.user_id, {
+              totalUnread,
+              conversationId: conversation.id,
+              unreadCount: (updatedConversation.rows[0]?.unread_count || 0) + 1
+            });
+
+            console.log('[WhatsApp Cloud Webhook] WebSocket emitido!');
+          }
+        }
+
+        // Processar status de mensagem (delivered, read)
+        for (const status of value.statuses || []) {
+          console.log('[WhatsApp Cloud Webhook] Status update:', status.status, 'for message:', status.id);
+          // Atualizar status da mensagem no banco se necessário
+          if (status.status === 'delivered' || status.status === 'read') {
+            await query(
+              `UPDATE messages SET status = $1, updated_at = NOW() WHERE external_id = $2`,
+              [status.status, status.id]
+            );
+          }
+        }
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('[WhatsApp Cloud Webhook] Erro:', error);
+    res.sendStatus(200);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WEBSITE WIDGET WEBHOOKS (Chat embed para sites)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ✅ Receber mensagens do widget de chat do site
+router.post('/website/:channelId', async (req, res) => {
+  try {
+    console.log('[Website Widget Webhook] ===== MENSAGEM RECEBIDA =====');
+    console.log('[Website Widget Webhook] Body:', JSON.stringify(req.body).substring(0, 1000));
+
+    const { channelId } = req.params;
+    const { visitorId, visitorName, visitorEmail, message, pageUrl, userAgent } = req.body;
+
+    if (!channelId || !message) {
+      return res.status(400).json({ error: 'channelId and message are required' });
+    }
+
+    // Buscar canal
+    const channelResult = await query(
+      `SELECT * FROM channels WHERE id = $1 AND type = 'website' AND status = 'active'`,
+      [channelId]
+    );
+
+    if (channelResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Channel not found' });
+    }
+
+    const channel = channelResult.rows[0];
+
+    // Buscar ou criar lead pelo visitorId/email
+    let lead = null;
+    if (visitorEmail) {
+      const leadResult = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND email = $2`,
+        [channel.user_id, visitorEmail]
+      );
+      lead = leadResult.rows[0];
+    }
+
+    if (!lead && visitorId) {
+      const leadResult = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND metadata->>'visitor_id' = $2`,
+        [channel.user_id, visitorId]
+      );
+      lead = leadResult.rows[0];
+    }
+
+    let leadId: string;
+
+    if (!lead) {
+      // Criar novo lead
+      const contactName = visitorName || visitorEmail || `Visitante ${visitorId?.substring(0, 8) || 'Anônimo'}`;
+      const leadResult = await query(
+        `INSERT INTO leads (user_id, name, email, source, status, metadata)
+         VALUES ($1, $2, $3, 'website', 'new', $4)
+         RETURNING *`,
+        [
+          channel.user_id,
+          contactName,
+          visitorEmail || null,
+          JSON.stringify({ visitor_id: visitorId, page_url: pageUrl, user_agent: userAgent })
+        ]
+      );
+      leadId = leadResult.rows[0].id;
+    } else {
+      leadId = lead.id;
+    }
+
+    // Buscar ou criar conversa
+    const remoteJid = visitorId || visitorEmail || `web_${Date.now()}`;
+    const conversation = await conversationsService.findOrCreate(
+      channel.user_id,
+      channel.id,
+      remoteJid,
+      leadId,
+      {
+        contact_name: visitorName || visitorEmail || 'Visitante',
+        visitor_id: visitorId
+      }
+    );
+
+    // Salvar mensagem
+    const messageResult = await query(
+      `INSERT INTO messages (
+        user_id, conversation_id, lead_id, direction, channel,
+        content, status, metadata
+      )
+       VALUES ($1, $2, $3, 'in', 'website', $4, 'delivered', $5)
+       RETURNING *`,
+      [
+        channel.user_id,
+        conversation.id,
+        leadId,
+        message,
+        JSON.stringify({ page_url: pageUrl, user_agent: userAgent, visitor_id: visitorId })
+      ]
+    );
+
+    const savedMessage = messageResult.rows[0];
+
+    // Atualizar conversa
+    await conversationsService.updateUnreadCount(conversation.id, 1);
+    await query(
+      `UPDATE conversations
+       SET last_message_at = NOW(),
+           status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [conversation.id]
+    );
+
+    // Emitir WebSocket
+    const wsService = getWebSocketService();
+    if (wsService) {
+      const updatedConversation = await query(
+        `SELECT c.*, ch.name as channel_name, l.name as lead_name
+         FROM conversations c
+         LEFT JOIN channels ch ON c.channel_id = ch.id
+         LEFT JOIN leads l ON c.lead_id = l.id
+         WHERE c.id = $1`,
+        [conversation.id]
+      );
+
+      wsService.emitNewMessage(channel.user_id, {
+        conversationId: conversation.id,
+        message: savedMessage,
+        conversation: updatedConversation.rows[0] || conversation
+      });
+    }
+
+    res.json({
+      success: true,
+      conversationId: conversation.id,
+      messageId: savedMessage.id
+    });
+  } catch (error) {
+    console.error('[Website Widget Webhook] Erro:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ✅ Obter mensagens de uma conversa do widget (para o visitante)
+router.get('/website/:channelId/messages', async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const { visitorId, conversationId } = req.query;
+
+    if (!channelId || (!visitorId && !conversationId)) {
+      return res.status(400).json({ error: 'channelId and visitorId or conversationId are required' });
+    }
+
+    let conversation;
+    if (conversationId) {
+      const result = await query(
+        `SELECT c.* FROM conversations c
+         JOIN channels ch ON c.channel_id = ch.id
+         WHERE c.id = $1 AND ch.id = $2`,
+        [conversationId, channelId]
+      );
+      conversation = result.rows[0];
+    } else {
+      const result = await query(
+        `SELECT c.* FROM conversations c
+         JOIN channels ch ON c.channel_id = ch.id
+         WHERE ch.id = $1 AND c.remote_jid = $2`,
+        [channelId, visitorId]
+      );
+      conversation = result.rows[0];
+    }
+
+    if (!conversation) {
+      return res.json({ messages: [] });
+    }
+
+    const messagesResult = await query(
+      `SELECT id, content, direction, created_at, media_url, media_type
+       FROM messages
+       WHERE conversation_id = $1
+       ORDER BY created_at ASC
+       LIMIT 100`,
+      [conversation.id]
+    );
+
+    res.json({
+      conversationId: conversation.id,
+      messages: messagesResult.rows
+    });
+  } catch (error) {
+    console.error('[Website Widget] Erro ao buscar mensagens:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EMAIL WEBHOOKS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ✅ Receber emails via webhook (para integração com serviços de email)
+router.post('/email/:channelId', async (req, res) => {
+  try {
+    console.log('[Email Webhook] ===== EMAIL RECEBIDO =====');
+    console.log('[Email Webhook] Body:', JSON.stringify(req.body).substring(0, 1000));
+
+    const { channelId } = req.params;
+    const { from, to, subject, text, html, messageId, attachments } = req.body;
+
+    if (!channelId || !from) {
+      return res.status(400).json({ error: 'channelId and from are required' });
+    }
+
+    // Buscar canal
+    const channelResult = await query(
+      `SELECT * FROM channels WHERE id = $1 AND type = 'email' AND status = 'active'`,
+      [channelId]
+    );
+
+    if (channelResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Channel not found' });
+    }
+
+    const channel = channelResult.rows[0];
+
+    // Extrair email e nome do remetente
+    const emailMatch = from.match(/<(.+)>/) || [null, from];
+    const senderEmail = emailMatch[1] || from;
+    const senderName = from.replace(/<.+>/, '').trim() || senderEmail;
+
+    // Buscar ou criar lead pelo email
+    let lead = await query(
+      `SELECT * FROM leads WHERE user_id = $1 AND email = $2`,
+      [channel.user_id, senderEmail]
+    );
+
+    let leadId: string;
+
+    if (lead.rows.length === 0) {
+      const leadResult = await query(
+        `INSERT INTO leads (user_id, name, email, source, status)
+         VALUES ($1, $2, $3, 'email', 'new')
+         RETURNING *`,
+        [channel.user_id, senderName, senderEmail]
+      );
+      leadId = leadResult.rows[0].id;
+    } else {
+      leadId = lead.rows[0].id;
+    }
+
+    // Buscar ou criar conversa
+    const conversation = await conversationsService.findOrCreate(
+      channel.user_id,
+      channel.id,
+      senderEmail,
+      leadId,
+      {
+        contact_name: senderName,
+        email: senderEmail
+      }
+    );
+
+    // Preparar conteúdo da mensagem
+    const content = text || html?.replace(/<[^>]*>/g, '') || '[Sem conteúdo]';
+    const fullContent = subject ? `**${subject}**\n\n${content}` : content;
+
+    // Salvar mensagem
+    const messageResult = await query(
+      `INSERT INTO messages (
+        user_id, conversation_id, lead_id, direction, channel,
+        content, status, external_id, metadata
+      )
+       VALUES ($1, $2, $3, 'in', 'email', $4, 'delivered', $5, $6)
+       RETURNING *`,
+      [
+        channel.user_id,
+        conversation.id,
+        leadId,
+        fullContent.substring(0, 10000),
+        messageId || null,
+        JSON.stringify({
+          from: from,
+          to: to,
+          subject: subject,
+          has_attachments: attachments?.length > 0 || false
+        })
+      ]
+    );
+
+    const savedMessage = messageResult.rows[0];
+
+    // Atualizar conversa
+    await conversationsService.updateUnreadCount(conversation.id, 1);
+    await query(
+      `UPDATE conversations
+       SET last_message_at = NOW(),
+           status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [conversation.id]
+    );
+
+    // Emitir WebSocket
+    const wsService = getWebSocketService();
+    if (wsService) {
+      const updatedConversation = await query(
+        `SELECT c.*, ch.name as channel_name, l.name as lead_name
+         FROM conversations c
+         LEFT JOIN channels ch ON c.channel_id = ch.id
+         LEFT JOIN leads l ON c.lead_id = l.id
+         WHERE c.id = $1`,
+        [conversation.id]
+      );
+
+      wsService.emitNewMessage(channel.user_id, {
+        conversationId: conversation.id,
+        message: savedMessage,
+        conversation: updatedConversation.rows[0] || conversation
+      });
+    }
+
+    res.json({ success: true, messageId: savedMessage.id });
+  } catch (error) {
+    console.error('[Email Webhook] Erro:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
