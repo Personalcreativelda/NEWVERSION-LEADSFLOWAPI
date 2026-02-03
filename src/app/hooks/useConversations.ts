@@ -1,34 +1,51 @@
 // INBOX: Hook para gerenciar conversas
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { conversationsApi } from '../services/api/inbox';
 import type { ConversationWithDetails } from '../types/inbox';
 
-export function useConversations(onlyWithHistory: boolean = false) {
+// Intervalo de polling em ms (30 segundos como fallback quando WS não funciona)
+const POLLING_INTERVAL = 30000;
+
+interface UseConversationsOptions {
+    enablePolling?: boolean;
+}
+
+export function useConversations(onlyWithHistory: boolean = false, options: UseConversationsOptions = {}) {
+    const { enablePolling = true } = options;
     const [conversations, setConversations] = useState<ConversationWithDetails[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [unreadCount, setUnreadCount] = useState(0);
+    const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    const fetchConversations = useCallback(async (search?: string) => {
+    const fetchConversations = useCallback(async (search?: string, silent: boolean = false) => {
         try {
-            setLoading(true);
+            if (!silent) {
+                setLoading(true);
+            }
             setError(null);
-            const data = await conversationsApi.getAll({ 
-                search, 
+            const data = await conversationsApi.getAll({
+                search,
                 limit: 100,
-                only_with_history: onlyWithHistory 
+                only_with_history: onlyWithHistory
             });
             setConversations(data);
+            setLastUpdate(new Date());
 
             // Calcular total de não lidas
             const total = data.reduce((sum, conv) => sum + conv.unread_count, 0);
             setUnreadCount(total);
         } catch (err: any) {
             console.error('[useConversations] Error fetching:', err);
-            setError(err.message || 'Failed to load conversations');
+            if (!silent) {
+                setError(err.message || 'Failed to load conversations');
+            }
         } finally {
-            setLoading(false);
+            if (!silent) {
+                setLoading(false);
+            }
         }
     }, [onlyWithHistory]);
 
@@ -108,9 +125,50 @@ export function useConversations(onlyWithHistory: boolean = false) {
         fetchConversations(query);
     }, [fetchConversations]);
 
+    // Função para iniciar polling
+    const startPolling = useCallback(() => {
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+        }
+
+        pollingIntervalRef.current = setInterval(() => {
+            console.log('[useConversations] Polling for updates...');
+            fetchConversations(searchQuery, true); // silent: true para não mostrar loading
+        }, POLLING_INTERVAL);
+    }, [fetchConversations, searchQuery]);
+
+    // Função para parar polling
+    const stopPolling = useCallback(() => {
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+        }
+    }, []);
+
+    // Buscar conversas inicialmente
     useEffect(() => {
         fetchConversations();
     }, [fetchConversations]);
+
+    // Iniciar polling se habilitado
+    useEffect(() => {
+        if (enablePolling) {
+            startPolling();
+        }
+
+        return () => {
+            stopPolling();
+        };
+    }, [enablePolling, startPolling, stopPolling]);
+
+    // Limpar polling ao desmontar
+    useEffect(() => {
+        return () => {
+            if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current);
+            }
+        };
+    }, []);
 
     return {
         conversations,
@@ -118,10 +176,13 @@ export function useConversations(onlyWithHistory: boolean = false) {
         error,
         unreadCount,
         searchQuery,
+        lastUpdate,
         refreshConversations,
         markAsRead,
         updateConversation,
         addNewMessage,
-        search
+        search,
+        startPolling,
+        stopPolling
     };
 }

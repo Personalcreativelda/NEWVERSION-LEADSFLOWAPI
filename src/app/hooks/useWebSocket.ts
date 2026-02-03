@@ -12,12 +12,15 @@ interface UseWebSocketOptions {
     onUnreadCountUpdate?: (data: WebSocketEvents['unread_count_update']) => void;
     onConversationRead?: (data: WebSocketEvents['conversation_read']) => void;
     onUserTyping?: (data: WebSocketEvents['user_typing']) => void;
+    onReconnect?: () => void; // Callback when reconnected
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const socketRef = useRef<Socket | null>(null);
+    const wasConnectedRef = useRef(false);
+    const reconnectAttemptsRef = useRef(0);
 
     const connect = useCallback(() => {
         const token = localStorage.getItem('token');
@@ -30,18 +33,41 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         try {
             const socket = io(WS_URL, {
                 auth: { token },
-                transports: ['websocket', 'polling']
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionAttempts: 10,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                timeout: 20000
             });
 
             socket.on('connect', () => {
                 console.log('[WebSocket] Connected');
                 setIsConnected(true);
                 setError(null);
+
+                // Se estava conectado antes e reconectou, chamar callback
+                if (wasConnectedRef.current && reconnectAttemptsRef.current > 0) {
+                    console.log('[WebSocket] Reconnected - triggering refresh');
+                    options.onReconnect?.();
+                }
+
+                wasConnectedRef.current = true;
+                reconnectAttemptsRef.current = 0;
             });
 
-            socket.on('disconnect', () => {
-                console.log('[WebSocket] Disconnected');
+            socket.on('disconnect', (reason) => {
+                console.log('[WebSocket] Disconnected:', reason);
                 setIsConnected(false);
+            });
+
+            socket.on('reconnect_attempt', (attempt) => {
+                console.log('[WebSocket] Reconnection attempt:', attempt);
+                reconnectAttemptsRef.current = attempt;
+            });
+
+            socket.on('reconnect', (attempt) => {
+                console.log('[WebSocket] Reconnected after', attempt, 'attempts');
             });
 
             socket.on('connect_error', (err) => {
