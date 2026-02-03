@@ -3,7 +3,7 @@ import type { UIEvent } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Phone, Mail, MessageCircle, Trash2, Edit2, MoreVertical, ChevronDown, BarChart3, Clock, CheckCircle2, TrendingUp, GripVertical, DollarSign, StickyNote, Calendar, MessageSquare, Settings, Plus, X, RotateCcw, Globe, Flag, AlertTriangle, AlertCircle, Minus } from 'lucide-react';
+import { Phone, Mail, MessageCircle, Trash2, Edit2, MoreVertical, ChevronDown, BarChart3, Clock, CheckCircle2, TrendingUp, GripVertical, DollarSign, StickyNote, Calendar, MessageSquare, Settings, Plus, X, RotateCcw, Globe, Flag, AlertTriangle, AlertCircle, Minus, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, Instagram, Send, Megaphone, type LucideIcon } from 'lucide-react';
 import type { TabKey } from '../modals/LeadDetailModal';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -31,11 +31,12 @@ const DEFAULT_FUNNEL_STAGES = [
 ];
 
 // Pre-configured funnel templates
-export const FUNNEL_TEMPLATES = {
+export const FUNNEL_TEMPLATES: Record<string, { name: string; description: string; icon: LucideIcon; iconColor: string; stages: FunnelStage[] }> = {
   vendas: {
     name: 'Vendas B2B',
     description: 'Funil clássico para vendas corporativas',
-    icon: '💼',
+    icon: Briefcase,
+    iconColor: 'text-amber-500',
     stages: [
       { id: 'lead', label: 'Leads', color: 'bg-cyan-500', borderColor: 'border-l-cyan-500', glowColor: 'shadow-cyan-500/20', iconColor: 'text-cyan-400', badgeBg: 'bg-cyan-500/10', badgeText: 'text-cyan-400' },
       { id: 'qualificacao', label: 'Qualificação', color: 'bg-purple-500', borderColor: 'border-l-purple-500', glowColor: 'shadow-purple-500/20', iconColor: 'text-purple-400', badgeBg: 'bg-purple-500/10', badgeText: 'text-purple-400' },
@@ -48,7 +49,8 @@ export const FUNNEL_TEMPLATES = {
   imobiliario: {
     name: 'Imobiliário',
     description: 'Ideal para corretores e imobiliárias',
-    icon: '🏠',
+    icon: Home,
+    iconColor: 'text-orange-500',
     stages: [
       { id: 'interessado', label: 'Interessados', color: 'bg-cyan-500', borderColor: 'border-l-cyan-500', glowColor: 'shadow-cyan-500/20', iconColor: 'text-cyan-400', badgeBg: 'bg-cyan-500/10', badgeText: 'text-cyan-400' },
       { id: 'visita', label: 'Visita Agendada', color: 'bg-purple-500', borderColor: 'border-l-purple-500', glowColor: 'shadow-purple-500/20', iconColor: 'text-purple-400', badgeBg: 'bg-purple-500/10', badgeText: 'text-purple-400' },
@@ -61,7 +63,8 @@ export const FUNNEL_TEMPLATES = {
   ecommerce: {
     name: 'E-commerce',
     description: 'Para lojas online e dropshipping',
-    icon: '🛒',
+    icon: ShoppingCart,
+    iconColor: 'text-blue-500',
     stages: [
       { id: 'visitante', label: 'Visitantes', color: 'bg-cyan-500', borderColor: 'border-l-cyan-500', glowColor: 'shadow-cyan-500/20', iconColor: 'text-cyan-400', badgeBg: 'bg-cyan-500/10', badgeText: 'text-cyan-400' },
       { id: 'carrinho', label: 'Carrinho', color: 'bg-purple-500', borderColor: 'border-l-purple-500', glowColor: 'shadow-purple-500/20', iconColor: 'text-purple-400', badgeBg: 'bg-purple-500/10', badgeText: 'text-purple-400' },
@@ -74,7 +77,8 @@ export const FUNNEL_TEMPLATES = {
   servicos: {
     name: 'Serviços',
     description: 'Para prestadores de serviços',
-    icon: '🔧',
+    icon: Wrench,
+    iconColor: 'text-gray-400',
     stages: [
       { id: 'contato', label: 'Primeiro Contato', color: 'bg-cyan-500', borderColor: 'border-l-cyan-500', glowColor: 'shadow-cyan-500/20', iconColor: 'text-cyan-400', badgeBg: 'bg-cyan-500/10', badgeText: 'text-cyan-400' },
       { id: 'orcamento', label: 'Orçamento', color: 'bg-purple-500', borderColor: 'border-l-purple-500', glowColor: 'shadow-purple-500/20', iconColor: 'text-purple-400', badgeBg: 'bg-purple-500/10', badgeText: 'text-purple-400' },
@@ -86,7 +90,8 @@ export const FUNNEL_TEMPLATES = {
   saas: {
     name: 'SaaS / Software',
     description: 'Para empresas de software e SaaS',
-    icon: '💻',
+    icon: Monitor,
+    iconColor: 'text-cyan-500',
     stages: [
       { id: 'trial', label: 'Trial', color: 'bg-cyan-500', borderColor: 'border-l-cyan-500', glowColor: 'shadow-cyan-500/20', iconColor: 'text-cyan-400', badgeBg: 'bg-cyan-500/10', badgeText: 'text-cyan-400' },
       { id: 'onboarding', label: 'Onboarding', color: 'bg-purple-500', borderColor: 'border-l-purple-500', glowColor: 'shadow-purple-500/20', iconColor: 'text-purple-400', badgeBg: 'bg-purple-500/10', badgeText: 'text-purple-400' },
@@ -99,7 +104,8 @@ export const FUNNEL_TEMPLATES = {
   recrutamento: {
     name: 'Recrutamento',
     description: 'Para RH e agências de recrutamento',
-    icon: '👥',
+    icon: Users2,
+    iconColor: 'text-purple-500',
     stages: [
       { id: 'candidato', label: 'Candidatos', color: 'bg-cyan-500', borderColor: 'border-l-cyan-500', glowColor: 'shadow-cyan-500/20', iconColor: 'text-cyan-400', badgeBg: 'bg-cyan-500/10', badgeText: 'text-cyan-400' },
       { id: 'triagem', label: 'Triagem', color: 'bg-purple-500', borderColor: 'border-l-purple-500', glowColor: 'shadow-purple-500/20', iconColor: 'text-purple-400', badgeBg: 'bg-purple-500/10', badgeText: 'text-purple-400' },
@@ -159,18 +165,19 @@ const PRIORITY_CONFIG = {
   urgente: { label: 'Urgente', color: 'text-red-400', bgColor: 'bg-red-500/10', icon: AlertTriangle },
 };
 
-// Common origins for display
-const ORIGIN_ICONS: Record<string, string> = {
-  whatsapp: '💬',
-  instagram: '📸',
-  facebook: '👤',
-  website: '🌐',
-  email: '📧',
-  telefone: '📞',
-  indicacao: '🤝',
-  evento: '🎪',
-  anuncio: '📢',
-  organico: '🌱',
+// Common origins for display with Lucide icons
+const ORIGIN_CONFIG: Record<string, { icon: LucideIcon; color: string; label: string }> = {
+  whatsapp: { icon: MessageCircle, color: 'text-green-500', label: 'WhatsApp' },
+  instagram: { icon: Instagram, color: 'text-pink-500', label: 'Instagram' },
+  facebook: { icon: Users2, color: 'text-blue-500', label: 'Facebook' },
+  website: { icon: Globe, color: 'text-cyan-500', label: 'Website' },
+  email: { icon: Mail, color: 'text-orange-500', label: 'Email' },
+  telefone: { icon: Phone, color: 'text-blue-400', label: 'Telefone' },
+  indicacao: { icon: Users2, color: 'text-purple-500', label: 'Indicação' },
+  evento: { icon: Calendar, color: 'text-yellow-500', label: 'Evento' },
+  anuncio: { icon: Megaphone, color: 'text-red-500', label: 'Anúncio' },
+  organico: { icon: TrendingUp, color: 'text-green-400', label: 'Orgânico' },
+  telegram: { icon: Send, color: 'text-blue-400', label: 'Telegram' },
 };
 
 // Format currency with proper NaN handling
@@ -314,15 +321,22 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
       {/* Origin + Priority badges */}
       {(lead.origem || lead.prioridade) && (
         <div className="flex items-center gap-1.5 mb-2 px-1 flex-wrap">
-          {lead.origem && (
-            <span
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${isDark ? 'bg-white/5 text-gray-400' : 'bg-gray-100 text-gray-600'}`}
-              title={`Origem: ${lead.origem}`}
-            >
-              <span>{ORIGIN_ICONS[lead.origem.toLowerCase()] || '📍'}</span>
-              <span className="truncate max-w-[60px]">{lead.origem}</span>
-            </span>
-          )}
+          {lead.origem && (() => {
+            const originKey = lead.origem.toLowerCase();
+            const originConfig = ORIGIN_CONFIG[originKey];
+            const OriginIcon = originConfig?.icon || Globe;
+            const iconColor = originConfig?.color || 'text-gray-400';
+            const originLabel = originConfig?.label || lead.origem;
+            return (
+              <span
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${isDark ? 'bg-white/5 text-gray-400' : 'bg-gray-100 text-gray-600'}`}
+                title={`Origem: ${originLabel}`}
+              >
+                <OriginIcon className={`h-3 w-3 ${iconColor}`} />
+                <span className="truncate max-w-[60px]">{originLabel}</span>
+              </span>
+            );
+          })()}
           {lead.prioridade && PRIORITY_CONFIG[lead.prioridade] && (
             <span
               className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${PRIORITY_CONFIG[lead.prioridade].bgColor} ${PRIORITY_CONFIG[lead.prioridade].color}`}
@@ -1104,34 +1118,37 @@ export default function SalesFunnel({
 
               <div className="p-4 space-y-4">
                 {/* Template Selector */}
-                <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/30 border-slate-700' : 'bg-blue-50/50 border-blue-100'}`}>
+                <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/30 border-slate-700' : 'bg-gray-50/50 border-gray-200'}`}>
                   <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    <span>📋</span>
+                    <Settings className="w-4 h-4" />
                     Templates Prontos
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {Object.entries(FUNNEL_TEMPLATES).map(([key, template]) => (
-                      <button
-                        key={key}
-                        onClick={() => {
-                          if (confirm(`Aplicar template "${template.name}"? Isso substituirá suas etapas atuais.`)) {
-                            setStages(template.stages);
-                          }
-                        }}
-                        className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all hover:scale-105 ${isDark
-                          ? 'bg-slate-800/50 border-slate-600 hover:border-blue-500/50 hover:bg-slate-700/50'
-                          : 'bg-white border-gray-200 hover:border-blue-300 hover:bg-blue-50/30'
-                          }`}
-                      >
-                        <span className="text-2xl">{template.icon}</span>
-                        <span className={`text-xs font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                          {template.name}
-                        </span>
-                        <span className={`text-[10px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                          {template.stages.length} etapas
-                        </span>
-                      </button>
-                    ))}
+                    {Object.entries(FUNNEL_TEMPLATES).map(([key, template]) => {
+                      const TemplateIcon = template.icon;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => {
+                            if (confirm(`Aplicar template "${template.name}"? Isso substituirá suas etapas atuais.`)) {
+                              setStages(template.stages);
+                            }
+                          }}
+                          className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all hover:scale-105 ${isDark
+                            ? 'bg-slate-800/50 border-slate-600 hover:border-slate-500 hover:bg-slate-700/50'
+                            : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                        >
+                          <TemplateIcon className={`w-6 h-6 ${template.iconColor}`} />
+                          <span className={`text-xs font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {template.name}
+                          </span>
+                          <span className={`text-[10px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {template.stages.length} etapas
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
