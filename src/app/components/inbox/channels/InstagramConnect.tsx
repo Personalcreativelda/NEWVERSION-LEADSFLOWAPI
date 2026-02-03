@@ -1,8 +1,11 @@
 // INBOX: Modal de Conexão Instagram via Instagram Business API
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
-import { Instagram, Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle } from 'lucide-react';
+import { Instagram, Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
+
+// URL base da API (pegar do env ou usar padrão)
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
 interface InstagramConnectProps {
     isOpen: boolean;
@@ -20,6 +23,24 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
     const [error, setError] = useState<string | null>(null);
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
     const [accountInfo, setAccountInfo] = useState<{ username?: string; name?: string; profile_picture_url?: string } | null>(null);
+
+    // Detectar tipo de token em tempo real
+    const tokenType = useMemo(() => {
+        const token = accessToken.trim();
+        if (token.startsWith('IGAA') || token.startsWith('IGA')) return 'instagram';
+        if (token.startsWith('EAA')) return 'facebook';
+        return null;
+    }, [accessToken]);
+
+    // URLs do webhook
+    const webhookUrl = `${API_URL}/api/webhooks/instagram`;
+    const verifyToken = 'leadsflow_verify_token';
+
+    // Copiar para clipboard
+    const copyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        toast.success(`${label} copiado!`);
+    };
 
     // Reset state when modal closes
     useEffect(() => {
@@ -205,6 +226,56 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                                 </div>
                             </div>
 
+                            {/* Webhook Configuration */}
+                            <div
+                                className="p-4 rounded-lg border border-blue-500/30 bg-blue-500/10"
+                            >
+                                <div className="flex items-start gap-3">
+                                    <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                                    <div className="text-sm text-blue-200 w-full">
+                                        <p className="font-medium mb-2">Configuração do Webhook no Meta:</p>
+
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between bg-black/20 rounded px-2 py-1">
+                                                <span className="text-xs text-blue-300">Callback URL:</span>
+                                                <div className="flex items-center gap-1">
+                                                    <code className="text-xs font-mono text-blue-100">{webhookUrl}</code>
+                                                    <button
+                                                        onClick={() => copyToClipboard(webhookUrl, 'URL')}
+                                                        className="p-1 hover:bg-blue-500/20 rounded"
+                                                    >
+                                                        <Copy className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between bg-black/20 rounded px-2 py-1">
+                                                <span className="text-xs text-blue-300">Verify Token:</span>
+                                                <div className="flex items-center gap-1">
+                                                    <code className="text-xs font-mono text-blue-100">{verifyToken}</code>
+                                                    <button
+                                                        onClick={() => copyToClipboard(verifyToken, 'Token')}
+                                                        className="p-1 hover:bg-blue-500/20 rounded"
+                                                    >
+                                                        <Copy className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <a
+                                            href="https://developers.facebook.com/apps"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 mt-2 text-xs text-blue-300 hover:text-blue-200"
+                                        >
+                                            <ExternalLink className="w-3 h-3" />
+                                            Configurar no Meta for Developers
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Instructions */}
                             <div
                                 className="p-4 rounded-lg border"
@@ -221,21 +292,18 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                                         </p>
                                         <ol className="list-decimal list-inside space-y-1">
                                             <li>Acesse o <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:underline">Meta for Developers</a></li>
-                                            <li>Crie ou selecione seu app</li>
-                                            <li>Vá em <strong>Instagram &gt; API Settings</strong></li>
-                                            <li>Gere um <strong>Access Token</strong> com permissões de messaging</li>
-                                            <li>Configure o webhook: <code className="bg-black/30 px-1 rounded text-xs">/api/webhooks/instagram</code></li>
+                                            <li>Selecione seu app e vá em <strong>Messenger &gt; Configurações</strong></li>
+                                            <li>Em <strong>Webhooks</strong>, adicione a URL acima</li>
+                                            <li>Conecte sua <strong>Página do Facebook</strong> vinculada ao Instagram</li>
+                                            <li>Gere um <strong>Page Access Token</strong> (começa com EAA...)</li>
                                         </ol>
-                                        <p className="mt-2 text-xs opacity-70">
-                                            Aceita tokens <code className="bg-black/30 px-1 rounded">IGAA...</code> (Instagram) ou <code className="bg-black/30 px-1 rounded">EAA...</code> (Facebook Page)
-                                        </p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Token Input */}
                             <div>
-                                <label 
+                                <label
                                     className="block text-sm font-medium mb-2"
                                     style={{ color: 'hsl(var(--foreground))' }}
                                 >
@@ -247,15 +315,56 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                                     placeholder="EAAxxxxxx..."
                                     rows={3}
                                     className="w-full px-4 py-3 rounded-lg border text-sm font-mono resize-none"
-                                    style={{ 
+                                    style={{
                                         backgroundColor: 'hsl(var(--background))',
-                                        borderColor: 'hsl(var(--border))',
+                                        borderColor: tokenType === 'instagram' ? 'rgb(234, 179, 8)' : 'hsl(var(--border))',
                                         color: 'hsl(var(--foreground))'
                                     }}
                                 />
-                                <p className="text-xs mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                    Use o mesmo token da sua página do Facebook que está vinculada ao Instagram
-                                </p>
+
+                                {/* Token Type Indicator */}
+                                {tokenType === 'facebook' && (
+                                    <div className="flex items-center gap-2 mt-2 text-xs text-green-400">
+                                        <CheckCircle className="w-3 h-3" />
+                                        Token de Página Facebook (EAA) - Suporta receber mensagens DM
+                                    </div>
+                                )}
+
+                                {tokenType === 'instagram' && (
+                                    <div className="mt-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                                        <div className="flex items-start gap-2">
+                                            <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                                            <div className="text-xs text-yellow-200">
+                                                <p className="font-medium text-yellow-400 mb-1">
+                                                    Token IGAA detectado - NÃO suporta DMs!
+                                                </p>
+                                                <p className="text-yellow-300/80">
+                                                    Tokens <code className="bg-black/30 px-1 rounded">IGAA...</code> são da Instagram Basic Display API
+                                                    e <strong>não recebem mensagens diretas</strong>.
+                                                </p>
+                                                <p className="mt-1 text-yellow-300/80">
+                                                    Para receber DMs, você precisa de um <strong>Page Access Token</strong> (EAA...)
+                                                    da sua Página do Facebook vinculada ao Instagram.
+                                                </p>
+                                                <a
+                                                    href="https://developers.facebook.com/docs/instagram-api/overview#instagram-messaging-api"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 mt-2 text-yellow-400 hover:text-yellow-300"
+                                                >
+                                                    <ExternalLink className="w-3 h-3" />
+                                                    Ver documentação da Instagram Messaging API
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!tokenType && accessToken.trim() && (
+                                    <p className="text-xs mt-1 text-orange-400">
+                                        Token não reconhecido. Use EAA... (Facebook) ou IGAA... (Instagram)
+                                    </p>
+                                )}
                             </div>
 
                             {/* Error */}
