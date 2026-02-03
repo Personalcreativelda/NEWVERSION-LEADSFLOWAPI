@@ -27,9 +27,12 @@ export class ConversationsService {
         leadId?: string,
         metadata?: any
     ): Promise<Conversation> {
-        // Validação: remoteJid deve ser válido (conter @ para WhatsApp)
-        if (!remoteJid || !remoteJid.includes('@')) {
-            throw new Error('Invalid remote JID: WhatsApp number is required');
+        // Validação: remoteJid deve ser válido
+        // - WhatsApp: formato xxx@s.whatsapp.net ou xxx@g.us
+        // - Telegram: ID numérico (ex: 123456789)
+        // - Instagram: ID numérico (ex: 17841234567890)
+        if (!remoteJid || remoteJid.trim() === '') {
+            throw new Error('Invalid remote JID: identifier is required');
         }
 
         // Tentar encontrar conversa existente

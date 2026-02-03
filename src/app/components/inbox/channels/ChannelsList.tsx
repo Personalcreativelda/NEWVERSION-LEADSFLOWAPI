@@ -7,6 +7,8 @@ import { WhatsAppCloudConnect } from './WhatsAppCloudConnect';
 import { TelegramConnect } from './TelegramConnect';
 import { FacebookConnect } from './FacebookConnect';
 import { InstagramConnect } from './InstagramConnect';
+import { WebsiteWidgetConnect } from './WebsiteWidgetConnect';
+import { EmailConnect } from './EmailConnect';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import {
@@ -70,11 +72,19 @@ const AVAILABLE_CHANNELS = [
     },
     {
         id: 'website',
-        name: 'Site',
-        description: 'Criar um widget de chat ao vivo',
+        name: 'Chat do Site',
+        description: 'Widget de chat para seu website',
         icon: Globe,
-        color: 'text-blue-500',
-        available: false
+        color: 'text-violet-500',
+        available: true
+    },
+    {
+        id: 'email',
+        name: 'E-Mail',
+        description: 'Receba emails na caixa de entrada',
+        icon: Mail,
+        color: 'text-cyan-500',
+        available: true
     },
     {
         id: 'sms',
@@ -82,14 +92,6 @@ const AVAILABLE_CHANNELS = [
         description: 'Integrar canal SMS (Twilio)',
         icon: Smartphone,
         color: 'text-purple-500',
-        available: false
-    },
-    {
-        id: 'email',
-        name: 'E-Mail',
-        description: 'Conectar Gmail/Outlook',
-        icon: Mail,
-        color: 'text-red-500',
         available: false
     },
     {
@@ -110,6 +112,8 @@ export function ChannelsList() {
     const [telegramModalOpen, setTelegramModalOpen] = useState(false);
     const [facebookModalOpen, setFacebookModalOpen] = useState(false);
     const [instagramModalOpen, setInstagramModalOpen] = useState(false);
+    const [websiteModalOpen, setWebsiteModalOpen] = useState(false);
+    const [emailModalOpen, setEmailModalOpen] = useState(false);
     const [activeStep, setActiveStep] = useState(1);
 
     useEffect(() => {
@@ -139,6 +143,10 @@ export function ChannelsList() {
             setFacebookModalOpen(true);
         } else if (channelId === 'instagram') {
             setInstagramModalOpen(true);
+        } else if (channelId === 'website') {
+            setWebsiteModalOpen(true);
+        } else if (channelId === 'email') {
+            setEmailModalOpen(true);
         } else {
             toast.info('Integração em breve!', {
                 description: 'Estamos finalizando os últimos ajustes deste canal.'
@@ -171,18 +179,18 @@ export function ChannelsList() {
     };
 
     return (
-        <div 
+        <div
             className="h-full flex flex-col md:flex-row rounded-xl border overflow-hidden"
-            style={{ 
+            style={{
                 backgroundColor: 'hsl(var(--background))',
                 borderColor: 'hsl(var(--border))'
             }}
         >
 
-            {/* Sidebar Stepper (Visual) */}
-            <div 
-                className="w-full md:w-64 border-r p-6 flex-shrink-0"
-                style={{ 
+            {/* Sidebar Stepper (Visual) - Hidden on mobile */}
+            <div
+                className="hidden md:block w-64 border-r p-6 flex-shrink-0"
+                style={{
                     backgroundColor: 'hsl(var(--card))',
                     borderColor: 'hsl(var(--border))'
                 }}
@@ -403,6 +411,26 @@ export function ChannelsList() {
                     setInstagramModalOpen(false);
                     loadChannels();
                     toast.success('Instagram conectado!');
+                }}
+            />
+
+            <WebsiteWidgetConnect
+                isOpen={websiteModalOpen}
+                onClose={() => setWebsiteModalOpen(false)}
+                onSuccess={() => {
+                    setWebsiteModalOpen(false);
+                    loadChannels();
+                    toast.success('Chat do site configurado!');
+                }}
+            />
+
+            <EmailConnect
+                isOpen={emailModalOpen}
+                onClose={() => setEmailModalOpen(false)}
+                onSuccess={() => {
+                    setEmailModalOpen(false);
+                    loadChannels();
+                    toast.success('Canal de email criado!');
                 }}
             />
         </div>

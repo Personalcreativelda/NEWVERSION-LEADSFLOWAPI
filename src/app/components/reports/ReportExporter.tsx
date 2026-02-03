@@ -418,20 +418,20 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl bg-card border-border">
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto bg-card border-border mx-auto">
         <DialogHeader>
           <DialogTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-foreground'}`}>
             <FileText className="w-5 h-5" />
-            Gerar Relatório Avançado
+            <span className="text-base md:text-lg">Gerar Relatório</span>
           </DialogTitle>
-          <DialogDescription className={isDark ? 'text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-300'}>
-            Personalize e exporte um relatório detalhado dos seus leads
+          <DialogDescription className={`text-sm ${isDark ? 'text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
+            Personalize e exporte um relatório detalhado
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 mt-4">
+        <div className="space-y-4 md:space-y-6 mt-4">
           {/* Configurações do Relatório */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             <div>
               <label className={`text-sm mb-2 block ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                 Período

@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import {
   Search, Plus, Filter, X,
   Pause, BarChart3, FileText, Edit2,
-  Send, Trash2, Copy, MoreVertical
+  Send, Trash2, Copy, MoreVertical,
+  FileDown, Bell, Calendar, MessageCircle,
+  Mail, MessageSquare, PlayCircle, Clock,
+  Timer, Save, Users, CheckCircle, CalendarCheck
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -901,7 +904,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     onClick={() => handleExportData(campaign)}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                   >
-                    <i className="fas fa-file-export w-4 text-center"></i>
+                    <FileDown className="w-4 h-4" />
                     <span>Exportar Dados</span>
                   </button>
                   <button
@@ -912,7 +915,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                   >
-                    <i className="fas fa-bell w-4 text-center"></i>
+                    <Bell className="w-4 h-4" />
                     <span>Configurar Alertas</span>
                   </button>
                 </>
@@ -945,7 +948,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                   >
-                    <i className="fas fa-calendar-alt w-4 text-center"></i>
+                    <Calendar className="w-4 h-4" />
                     <span>Alterar Horário</span>
                   </button>
                   <div className="border-t border-gray-100 dark:border-border my-1"></div>
@@ -1044,29 +1047,29 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   return (
     <div className="min-h-screen bg-background dark:bg-background">
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Search & Filters */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
+        <div className="mb-6 md:mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <div className="relative flex-1 sm:flex-none">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-600 dark:text-gray-400 w-5 h-5" />
                 <Input
                   type="text"
                   placeholder="Buscar campanhas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-80 focus:ring-2 focus:ring-[#10B981] !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
+                  className="pl-10 pr-4 py-2 w-full sm:w-80 focus:ring-2 focus:ring-[#10B981] !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
                 />
               </div>
-              <Button variant="outline" className="flex items-center space-x-2 border-gray-300 dark:border-border text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800">
+              <Button variant="outline" className="flex items-center justify-center space-x-2 border-gray-300 dark:border-border text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800">
                 <Filter className="w-4 h-4" />
                 <span>Filtros</span>
               </Button>
             </div>
             <Button
               onClick={() => setChannelSelectorOpen(true)}
-              className="bg-[#10B981] hover:bg-green-600 text-white font-medium shadow-sm flex items-center space-x-2"
+              className="bg-[#10B981] hover:bg-green-600 text-white font-medium shadow-sm flex items-center justify-center space-x-2 w-full sm:w-auto"
             >
               <Plus className="w-4 h-4" />
               <span>Nova Campanha</span>
@@ -1075,9 +1078,9 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
         </div>
 
         {/* Channel Tabs */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200 dark:border-border">
-            <nav className="flex space-x-8">
+        <div className="mb-6 md:mb-8">
+          <div className="border-b border-gray-200 dark:border-border overflow-x-auto scrollbar-hide">
+            <nav className="flex space-x-4 md:space-x-8 min-w-max">
               <button
                 onClick={() => setActiveTab('whatsapp')}
                 className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'whatsapp'
@@ -1085,7 +1088,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-[#10B981]'
                   }`}
               >
-                <i className="fab fa-whatsapp"></i>
+                <MessageCircle className="w-4 h-4" />
                 <span>WhatsApp</span>
                 <span className={`${activeTab === 'whatsapp' ? 'bg-[#10B981]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
                   {campaigns.filter(c => c.type === 'whatsapp').length}
@@ -1098,7 +1101,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-[#3B82F6]'
                   }`}
               >
-                <i className="fas fa-envelope"></i>
+                <Mail className="w-4 h-4" />
                 <span>Email</span>
                 <span className={`${activeTab === 'email' ? 'bg-[#3B82F6]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
                   {campaigns.filter(c => c.type === 'email').length}
@@ -1111,7 +1114,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-[#F59E0B]'
                   }`}
               >
-                <i className="fas fa-sms"></i>
+                <MessageSquare className="w-4 h-4" />
                 <span>SMS</span>
                 <span className="bg-gray-200 text-gray-700 dark:text-gray-300 text-xs px-2 py-1 rounded-full font-semibold">
                   0
@@ -1131,7 +1134,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
               Por enquanto, use <strong>WhatsApp</strong> ou <strong>Email</strong>.
             </p>
             <Button variant="outline" className="border-[#F59E0B] text-[#F59E0B] hover:bg-orange-50">
-              <i className="fas fa-bell mr-2"></i>
+              <Bell className="w-4 h-4 mr-2" />
               Notificar quando disponível
             </Button>
           </div>
@@ -1153,7 +1156,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
               <>
                 <section>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
-                    <i className="fas fa-play-circle text-[#10B981]"></i>
+                    <PlayCircle className="w-5 h-5 text-[#10B981]" />
                     <span>Campanhas Ativas</span>
                     <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({activeCampaigns.length})</span>
                   </h3>
@@ -1244,7 +1247,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 {/* Scheduled Campaigns */}
                 <section>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
-                    <i className="fas fa-clock text-[#F59E0B]"></i>
+                    <Clock className="w-5 h-5 text-[#F59E0B]" />
                     <span>Campanhas Agendadas</span>
                     <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({scheduledCampaigns.length})</span>
                   </h3>
@@ -1262,7 +1265,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                               <div>
                                 <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
                                 <div className="flex items-center space-x-2">
-                                  <i className="fas fa-calendar-alt text-[#F59E0B] text-sm"></i>
+                                  <Calendar className="w-4 h-4 text-[#F59E0B]" />
                                   <span className={`text-sm ${!hasValidDate ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-500 dark:text-gray-400'}`}>
                                     {formattedDate}
                                   </span>
@@ -1274,7 +1277,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             <div className="mb-4">
                               <div className={`border rounded-lg p-3 ${!hasValidDate ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-900/30'}`}>
                                 <div className="flex items-center space-x-2 mb-1">
-                                  <i className={`fas fa-hourglass-half text-sm ${!hasValidDate ? 'text-red-500 dark:text-red-400' : 'text-blue-500 dark:text-blue-400'}`}></i>
+                                  <Timer className={`w-4 h-4 ${!hasValidDate ? 'text-red-500 dark:text-red-400' : 'text-blue-500 dark:text-blue-400'}`} />
                                   <span className={`text-sm font-medium ${!hasValidDate ? 'text-red-700 dark:text-red-400' : 'text-blue-700 dark:text-blue-400'}`}>
                                     {!hasValidDate
                                       ? 'Agendar data de envio'
@@ -1324,7 +1327,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 {/* Draft/Saved Campaigns */}
                 <section>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
-                    <i className="fas fa-save text-blue-500"></i>
+                    <Save className="w-5 h-5 text-blue-500" />
                     <span>Campanhas Salvas (Rascunhos)</span>
                     <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({draftCampaigns.length})</span>
                   </h3>
@@ -1336,7 +1339,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             <div>
                               <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
                               <div className="flex items-center space-x-2">
-                                <i className="fas fa-file-alt text-blue-500 text-sm"></i>
+                                <FileText className="w-4 h-4 text-blue-500" />
                                 <span className="text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">
                                   {campaign.createdAt ? formatDate(campaign.createdAt) : 'Sem data'}
                                 </span>
@@ -1348,7 +1351,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                           <div className="mb-4">
                             <div className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-900/10 border-gray-200 dark:border-gray-900/30">
                               <div className="flex items-center space-x-2 mb-1">
-                                <i className="fas fa-users text-sm text-gray-500 dark:text-gray-400"></i>
+                                <Users className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-400">
                                   {campaign.totalRecipients.toLocaleString()} destinatários
                                 </span>
@@ -1390,7 +1393,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 {/* Completed Campaigns */}
                 <section>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
-                    <i className="fas fa-check-circle text-green-500"></i>
+                    <CheckCircle className="w-5 h-5 text-green-500" />
                     <span>Campanhas Concluídas</span>
                     <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({completedCampaigns.length})</span>
                   </h3>
@@ -1402,7 +1405,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             <div>
                               <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
                               <div className="flex items-center space-x-2">
-                                <i className="fas fa-calendar-check text-green-500 text-sm"></i>
+                                <CalendarCheck className="w-4 h-4 text-green-500" />
                                 <span className="text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">{formatDate(campaign.completedDate!)}</span>
                               </div>
                             </div>
@@ -1434,7 +1437,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             size="sm"
                             className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 border-0 font-medium"
                           >
-                            <i className="fas fa-chart-bar mr-2"></i>
+                            <BarChart3 className="w-4 h-4 mr-2" />
                             Ver Relatório Completo
                           </Button>
                         </div>

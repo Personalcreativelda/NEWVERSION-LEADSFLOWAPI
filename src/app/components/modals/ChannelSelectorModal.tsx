@@ -49,25 +49,25 @@ export default function ChannelSelectorModal({ isOpen, onClose, onSelectChannel 
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="surface-default border border-border rounded-2xl shadow-xl max-w-4xl w-full mx-auto overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-200">
+      <div className="surface-default border border-border rounded-xl sm:rounded-2xl shadow-xl max-w-4xl w-full mx-auto overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 max-h-[95vh] overflow-y-auto">
         {/* Header */}
-        <div className="relative px-8 py-6 border-b border-border surface-muted">
-          <div>
-            <h2 className="text-3xl font-bold text-foreground mb-2">Criar Nova Campanha</h2>
-            <p className="text-subtle">Escolha o canal de envio para sua campanha</p>
+        <div className="relative px-4 sm:px-8 py-4 sm:py-6 border-b border-border surface-muted">
+          <div className="pr-10">
+            <h2 className="text-xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2">Criar Nova Campanha</h2>
+            <p className="text-subtle text-sm sm:text-base">Escolha o canal de envio para sua campanha</p>
           </div>
           <button
             onClick={onClose}
-            className="absolute top-6 right-6 text-subtle hover:text-foreground transition-colors p-2 hover:bg-muted rounded-lg group"
+            className="absolute top-4 right-4 sm:top-6 sm:right-6 text-subtle hover:text-foreground transition-colors p-2 hover:bg-muted rounded-lg group"
           >
             <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-8 surface-default">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="p-4 sm:p-8 surface-default">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             {channels.map((channel, index) => {
               const Icon = channel.icon;
               const isDisabled = !channel.available;
@@ -85,10 +85,10 @@ export default function ChannelSelectorModal({ isOpen, onClose, onSelectChannel 
                   onMouseEnter={() => channel.available && setHoveredCard(channel.id)}
                   onMouseLeave={() => setHoveredCard(null)}
                   className={`
-                    relative overflow-hidden rounded-2xl border-2 p-8 text-center
+                    relative overflow-hidden rounded-xl sm:rounded-2xl border-2 p-4 sm:p-8 text-center
                     transition-all duration-300 ease-out
-                    ${isDisabled 
-                      ? 'border-border surface-muted cursor-not-allowed opacity-60' 
+                    ${isDisabled
+                      ? 'border-border surface-muted cursor-not-allowed opacity-60'
                       : `border-border surface-default cursor-pointer hover:border-transparent ${
                           isHovered ? `${channel.shadowHover} -translate-y-2` : ''
                         }`
@@ -126,51 +126,51 @@ export default function ChannelSelectorModal({ isOpen, onClose, onSelectChannel 
                   )}
                   
                   {/* Icon */}
-                  <div className="mb-6 relative">
-                    <div 
+                  <div className="mb-4 sm:mb-6 relative">
+                    <div
                       className={`
-                        w-16 h-16 mx-auto rounded-2xl flex items-center justify-center
+                        w-12 h-12 sm:w-16 sm:h-16 mx-auto rounded-xl sm:rounded-2xl flex items-center justify-center
                         transition-all duration-300
-                        ${isDisabled 
-                          ? 'bg-muted' 
+                        ${isDisabled
+                          ? 'bg-muted'
                           : channel.bgGradient
                         }
                         ${isHovered && channel.available ? 'scale-110 rotate-3' : 'scale-100 rotate-0'}
                       `}
                     >
-                      <Icon 
-                        className={`w-9 h-9 text-white transition-all duration-300 ${
+                      <Icon
+                        className={`w-6 h-6 sm:w-9 sm:h-9 text-white transition-all duration-300 ${
                           isHovered && channel.available ? 'scale-110' : 'scale-100'
-                        }`} 
-                        strokeWidth={2.5} 
+                        }`}
+                        strokeWidth={2.5}
                       />
                     </div>
-                    
+
                     {/* Pulsing Ring on Hover */}
                     {channel.available && isHovered && (
-                      <div 
-                        className={`absolute inset-0 w-16 h-16 mx-auto rounded-2xl ${channel.bgGradient} opacity-20 animate-ping`}
+                      <div
+                        className={`absolute inset-0 w-12 h-12 sm:w-16 sm:h-16 mx-auto rounded-xl sm:rounded-2xl ${channel.bgGradient} opacity-20 animate-ping`}
                       />
                     )}
                   </div>
-                  
+
                   {/* Title */}
-                  <h3 className={`text-xl font-bold mb-3 transition-colors duration-200 ${
+                  <h3 className={`text-lg sm:text-xl font-bold mb-2 sm:mb-3 transition-colors duration-200 ${
                     isDisabled ? 'text-subtle/70' : 'text-foreground'
                   }`}>
                     {channel.name}
                   </h3>
-                  
+
                   {/* Description */}
-                  <p className="text-sm text-subtle leading-relaxed mb-6 min-h-[48px]">
+                  <p className="text-xs sm:text-sm text-subtle leading-relaxed mb-4 sm:mb-6 min-h-[36px] sm:min-h-[48px]">
                     {channel.description}
                   </p>
                   
                   {/* Button */}
                   {channel.available && (
-                    <button 
+                    <button
                       className={`
-                        w-full py-3 px-6 rounded-xl text-white font-semibold text-sm
+                        w-full py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl text-white font-semibold text-xs sm:text-sm
                         transition-all duration-200 shadow-sm
                         ${channel.buttonBg}
                         transform active:scale-95
@@ -187,10 +187,10 @@ export default function ChannelSelectorModal({ isOpen, onClose, onSelectChannel 
         </div>
 
         {/* Footer */}
-        <div className="px-8 py-5 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 border-t border-border">
-          <div className="flex items-center justify-center gap-2 text-sm">
-            <span className="text-2xl animate-pulse">💡</span>
-            <p className="text-subtle">
+        <div className="px-4 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 border-t border-border">
+          <div className="flex items-center justify-center gap-2 text-xs sm:text-sm">
+            <span className="text-xl sm:text-2xl animate-pulse">💡</span>
+            <p className="text-subtle text-center">
               <strong className="font-semibold text-foreground">Dica:</strong> Combine diferentes canais para melhores resultados!
             </p>
           </div>

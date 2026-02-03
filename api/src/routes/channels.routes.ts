@@ -107,7 +107,45 @@ router.post('/', async (req, res, next) => {
             return res.status(400).json({ error: 'Type and name are required' });
         }
 
-        // Para WhatsApp, validar credenciais
+        // Para WhatsApp Cloud API (API Oficial da Meta)
+        if (type === 'whatsapp_cloud') {
+            const phoneNumberId = credentials?.phone_number_id;
+            const accessToken = credentials?.access_token;
+
+            if (!phoneNumberId || !accessToken) {
+                return res.status(400).json({ error: 'phone_number_id and access_token are required for WhatsApp Cloud' });
+            }
+
+            // Verificar se já existe canal com esse phone_number_id
+            const existingResult = await channelsService.findByCredentialField('phone_number_id', phoneNumberId, user.id);
+            if (existingResult) {
+                // Atualizar canal existente
+                const updated = await channelsService.update(existingResult.id, {
+                    status: requestedStatus || 'active',
+                    credentials
+                }, user.id);
+                return res.status(200).json(updated);
+            }
+
+            // Criar novo canal
+            const channel = await channelsService.create({
+                type: 'whatsapp_cloud',
+                name,
+                status: requestedStatus || 'active',
+                credentials: {
+                    phone_number_id: phoneNumberId,
+                    waba_id: credentials.waba_id || null,
+                    access_token: accessToken,
+                    verify_token: credentials.verify_token || 'leadflow_verify'
+                },
+                settings: settings || {}
+            }, user.id);
+
+            console.log(`[Channels] WhatsApp Cloud channel created: ${channel.id}`);
+            return res.status(201).json(channel);
+        }
+
+        // Para WhatsApp Evolution API
         if (type === 'whatsapp') {
             const instanceId = credentials?.instance_id || credentials?.instance_name;
             if (!instanceId) {

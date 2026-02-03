@@ -41,6 +41,8 @@ import UpgradeModal from './modals/UpgradeModal';
 import { SendMessageModal } from './SendMessageModal';
 import ImportarLeadsModal from './modals/ImportarLeadsModal';
 import CampaignEmailModal from './modals/CampaignEmailModal';
+import CampaignWhatsAppModal from './modals/CampaignWhatsAppModal';
+import ChannelSelectorModal from './modals/ChannelSelectorModal';
 import EnviarEmailModal from './modals/EnviarEmailModal';
 import ImportandoWhatsAppModal from './modals/ImportandoWhatsAppModal';
 import PreviewWhatsAppLeadsModal from './modals/PreviewWhatsAppLeadsModal';
@@ -135,6 +137,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   const [zombieLeadsDetected, setZombieLeadsDetected] = useState<string[]>([]);
   const [modalReportExporter, setModalReportExporter] = useState(false);
   const [modalLeadDetail, setModalLeadDetail] = useState(false);
+  const [channelSelectorOpen, setChannelSelectorOpen] = useState(false);
+  const [campaignWhatsAppModalOpen, setCampaignWhatsAppModalOpen] = useState(false);
   const [leadDetailInitialTab, setLeadDetailInitialTab] = useState<LeadDetailTabKey>('notas');
 
   const [leadSelecionado, setLeadSelecionado] = useState<Lead | null>(null);
@@ -1859,7 +1863,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   onToggleEmailMarketing={handleToggleEmailMarketing}
                   onSendEmail={handleSendEmail}
                   onNovoLead={handleNovoLead}
-                  onCampaigns={() => setCurrentPage('campaigns')}
+                  onCampaigns={() => setChannelSelectorOpen(true)}
                   onDeleteMultiple={handleDeleteMultiple}
                   userPlan={user?.plan || 'free'}
                   planExpired={planExpired}
@@ -1928,7 +1932,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   onToggleEmailMarketing={handleToggleEmailMarketing}
                   onSendEmail={handleSendEmail}
                   onNovoLead={handleNovoLead}
-                  onCampaigns={() => setCurrentPage('campaigns')}
+                  onCampaigns={() => setChannelSelectorOpen(true)}
                   userPlan={user?.plan || 'free'}
                   planExpired={planExpired}
                 />
@@ -2259,6 +2263,32 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         onClose={() => setModalReportExporter(false)}
         leads={leads}
         isDark={isDark}
+      />
+
+      {/* Channel Selector Modal - Opens from Leads Table Campaign Button */}
+      <ChannelSelectorModal
+        isOpen={channelSelectorOpen}
+        onClose={() => setChannelSelectorOpen(false)}
+        onSelectChannel={(channel) => {
+          setChannelSelectorOpen(false);
+          if (channel === 'whatsapp') {
+            setCampaignWhatsAppModalOpen(true);
+          } else if (channel === 'email') {
+            setModalEmailMarketing(true);
+          }
+        }}
+      />
+
+      {/* Campaign WhatsApp Modal */}
+      <CampaignWhatsAppModal
+        isOpen={campaignWhatsAppModalOpen}
+        onClose={() => setCampaignWhatsAppModalOpen(false)}
+        leads={leads}
+        isDark={isDark}
+        onCampaignCreated={() => {
+          setCampaignWhatsAppModalOpen(false);
+          carregarLeads();
+        }}
       />
       </div>
     </div>
