@@ -198,26 +198,27 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 md:px-0">
       {/* Header com ação destacada */}
       <div className="pt-6 pb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
           <h1
-            className="text-[32px] font-semibold text-[#1F2937] dark:text-[#F1F5F9]"
+            className="text-2xl md:text-[32px] font-semibold text-[#1F2937] dark:text-[#F1F5F9] truncate"
             style={{ letterSpacing: '-0.5px' }}
           >
             Tarefas e Follow-ups
           </h1>
-          <p className="text-[15px] text-[#6B7280] dark:text-[#6B7280]">
+          <p className="text-sm md:text-[15px] text-[#6B7280] dark:text-[#6B7280]">
             Gerencie suas atividades e lembretes
           </p>
         </div>
         <Button
           onClick={() => setShowNewTaskModal(true)}
-          className="gap-2 px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-sm shadow-[#2563EB]/15 transition"
+          className="gap-2 px-4 md:px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-sm shadow-[#2563EB]/15 transition flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
-          Nova Tarefa
+          <span className="hidden sm:inline">Nova Tarefa</span>
+          <span className="sm:hidden">Nova</span>
         </Button>
       </div>
 
@@ -266,56 +267,60 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
 
 
       {/* Filtros */}
-      <Card className="p-4 bg-card border-border">
-        <div className="flex flex-wrap gap-3 items-center">
-          <Filter className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+      <Card className="p-4 bg-card border-border overflow-hidden">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex items-center gap-3">
+            <Filter className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0 hidden md:block" />
 
-          <div className="flex gap-2">
-            {['all', 'today', 'overdue', 'upcoming', 'completed'].map(f => (
-              <Button
-                key={f}
-                variant="ghost"
-                size="sm"
-                onClick={() => setFilter(f as any)}
-                className={`transition-colors ${filter === f
-                  ? '!bg-blue-600 !text-white'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                  }`}
-              >
-                {f === 'all' && 'Todas'}
-                {f === 'today' && 'Hoje'}
-                {f === 'overdue' && 'Atrasadas'}
-                {f === 'upcoming' && 'Próximas'}
-                {f === 'completed' && 'Concluídas'}
-              </Button>
-            ))}
+            <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+              {['all', 'today', 'overdue', 'upcoming', 'completed'].map(f => (
+                <Button
+                  key={f}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFilter(f as any)}
+                  className={`transition-colors flex-shrink-0 ${filter === f
+                    ? '!bg-blue-600 !text-white'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                >
+                  {f === 'all' && 'Todas'}
+                  {f === 'today' && 'Hoje'}
+                  {f === 'overdue' && 'Atrasadas'}
+                  {f === 'upcoming' && 'Próximas'}
+                  {f === 'completed' && 'Concluídas'}
+                </Button>
+              ))}
+            </div>
           </div>
 
-          <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+          <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-600" />
 
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-[140px] bg-background text-foreground border-border">
-              <SelectValue placeholder="Prioridade" />
-            </SelectTrigger>
-            <SelectContent className="text-popover-foreground border-border shadow-md">
-              <SelectItem value="all" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Todas Prioridades</SelectItem>
-              {PRIORITY_LEVELS.map(p => (
-                <SelectItem key={p.value} value={p.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{p.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-[140px] bg-background text-foreground border-border flex-shrink-0">
+                <SelectValue placeholder="Prioridade" />
+              </SelectTrigger>
+              <SelectContent className="text-popover-foreground border-border shadow-md">
+                <SelectItem value="all" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Todas Prioridades</SelectItem>
+                {PRIORITY_LEVELS.map(p => (
+                  <SelectItem key={p.value} value={p.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[140px] bg-background text-foreground border-border">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent className="text-popover-foreground border-border shadow-md">
-              <SelectItem value="all" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Todos os Tipos</SelectItem>
-              {TASK_TYPES.map(t => (
-                <SelectItem key={t.value} value={t.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{t.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[140px] bg-background text-foreground border-border flex-shrink-0">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent className="text-popover-foreground border-border shadow-md">
+                <SelectItem value="all" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Todos os Tipos</SelectItem>
+                {TASK_TYPES.map(t => (
+                  <SelectItem key={t.value} value={t.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </Card>
 

@@ -1044,29 +1044,29 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   return (
     <div className="min-h-screen bg-background dark:bg-background">
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Search & Filters */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
+        <div className="mb-6 md:mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <div className="relative flex-1 sm:flex-none">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-600 dark:text-gray-400 w-5 h-5" />
                 <Input
                   type="text"
                   placeholder="Buscar campanhas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-80 focus:ring-2 focus:ring-[#10B981] !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
+                  className="pl-10 pr-4 py-2 w-full sm:w-80 focus:ring-2 focus:ring-[#10B981] !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
                 />
               </div>
-              <Button variant="outline" className="flex items-center space-x-2 border-gray-300 dark:border-border text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800">
+              <Button variant="outline" className="flex items-center justify-center space-x-2 border-gray-300 dark:border-border text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800">
                 <Filter className="w-4 h-4" />
                 <span>Filtros</span>
               </Button>
             </div>
             <Button
               onClick={() => setChannelSelectorOpen(true)}
-              className="bg-[#10B981] hover:bg-green-600 text-white font-medium shadow-sm flex items-center space-x-2"
+              className="bg-[#10B981] hover:bg-green-600 text-white font-medium shadow-sm flex items-center justify-center space-x-2 w-full sm:w-auto"
             >
               <Plus className="w-4 h-4" />
               <span>Nova Campanha</span>
@@ -1075,9 +1075,9 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
         </div>
 
         {/* Channel Tabs */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200 dark:border-border">
-            <nav className="flex space-x-8">
+        <div className="mb-6 md:mb-8">
+          <div className="border-b border-gray-200 dark:border-border overflow-x-auto scrollbar-hide">
+            <nav className="flex space-x-4 md:space-x-8 min-w-max">
               <button
                 onClick={() => setActiveTab('whatsapp')}
                 className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'whatsapp'

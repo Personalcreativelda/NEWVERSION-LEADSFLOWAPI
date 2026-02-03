@@ -179,18 +179,18 @@ export function ChannelsList() {
     };
 
     return (
-        <div 
+        <div
             className="h-full flex flex-col md:flex-row rounded-xl border overflow-hidden"
-            style={{ 
+            style={{
                 backgroundColor: 'hsl(var(--background))',
                 borderColor: 'hsl(var(--border))'
             }}
         >
 
-            {/* Sidebar Stepper (Visual) */}
-            <div 
-                className="w-full md:w-64 border-r p-6 flex-shrink-0"
-                style={{ 
+            {/* Sidebar Stepper (Visual) - Hidden on mobile */}
+            <div
+                className="hidden md:block w-64 border-r p-6 flex-shrink-0"
+                style={{
                     backgroundColor: 'hsl(var(--card))',
                     borderColor: 'hsl(var(--border))'
                 }}
