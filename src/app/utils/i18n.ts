@@ -97,6 +97,7 @@ export const translations: Record<Language, Translations> = {
     analytics: 'Analytics',
     tasksFollowup: 'Tarefas & Follow-up',
     campaigns: 'Campanhas',
+    assistants: 'Assistentes IA',
     plan: 'Plano',
     integrations: 'Integrações',
     security: 'Segurança',
