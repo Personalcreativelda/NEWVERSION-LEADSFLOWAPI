@@ -1,6 +1,5 @@
 // Service para gerenciar assistentes do marketplace (produtos de IA)
 import { query } from '../database/connection';
-import axios from 'axios';
 
 export interface Assistant {
     id: string;
@@ -112,7 +111,7 @@ export class AssistantsService {
             [userId]
         );
 
-        return result.rows.map(row => ({
+        return result.rows.map((row: Record<string, any>) => ({
             id: row.id,
             user_id: row.user_id,
             assistant_id: row.assistant_id,
@@ -430,30 +429,41 @@ export class AssistantsService {
         try {
             console.log(`[Assistants] Sending ${action} webhook to n8n for assistant ${assistant.slug}`);
 
-            await axios.post(webhookUrl, {
-                action,
-                timestamp: new Date().toISOString(),
-                assistant: {
-                    id: assistant.id,
-                    slug: assistant.slug,
-                    name: assistant.name,
-                    category: assistant.category
-                },
-                userAssistant: {
-                    id: userAssistant.id,
-                    userId,
-                    channelId: userAssistant.channel_id,
-                    config: userAssistant.config,
-                    isActive: userAssistant.is_active,
-                    isConfigured: userAssistant.is_configured
-                }
-            }, {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            const response = await fetch(webhookUrl, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Leadflow-Source': 'assistants-service'
                 },
-                timeout: 10000
+                body: JSON.stringify({
+                    action,
+                    timestamp: new Date().toISOString(),
+                    assistant: {
+                        id: assistant.id,
+                        slug: assistant.slug,
+                        name: assistant.name,
+                        category: assistant.category
+                    },
+                    userAssistant: {
+                        id: userAssistant.id,
+                        userId,
+                        channelId: userAssistant.channel_id,
+                        config: userAssistant.config,
+                        isActive: userAssistant.is_active,
+                        isConfigured: userAssistant.is_configured
+                    }
+                }),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
 
             console.log(`[Assistants] Webhook sent successfully for ${action}`);
         } catch (error: any) {
