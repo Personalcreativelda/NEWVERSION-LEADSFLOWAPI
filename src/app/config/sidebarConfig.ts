@@ -49,7 +49,6 @@ export const sidebarConfig: SidebarItemConfig[] = [
             },
             // Separador (opcional)
             { id: 'inbox-settings', labelKey: 'configuracoesInbox', path: '/dashboard/inbox/settings' },
-            { id: 'inbox-assistants', labelKey: 'assistentesIA', path: '/dashboard/inbox/ai-assistants' },
             { id: 'inbox-automations', labelKey: 'regrasAutomacao', path: '/dashboard/inbox/automations' },
         ]
     },

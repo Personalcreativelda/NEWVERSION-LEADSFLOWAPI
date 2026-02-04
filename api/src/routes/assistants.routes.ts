@@ -7,12 +7,17 @@ const router = Router();
 const assistantsService = new AssistantsService();
 
 // GET /api/assistants/available - Lista assistentes disponíveis no marketplace (público)
-router.get('/available', async (_req, res, next) => {
+router.get('/available', async (_req, res) => {
     try {
         const assistants = await assistantsService.findAllAvailable();
         res.json(assistants);
-    } catch (error) {
-        next(error);
+    } catch (error: any) {
+        console.error('[Assistants] Error fetching available assistants:', error.message);
+        // Se a tabela não existir, retornar array vazio em vez de erro
+        if (error.code === '42P01') { // relation does not exist
+            return res.json([]);
+        }
+        res.status(500).json({ error: 'Erro ao buscar assistentes', details: error.message });
     }
 });
 
@@ -33,7 +38,7 @@ router.get('/slug/:slug', async (req, res, next) => {
 router.use(authMiddleware);
 
 // GET /api/assistants - Lista assistentes conectados do usuário
-router.get('/', async (req, res, next) => {
+router.get('/', async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -42,8 +47,12 @@ router.get('/', async (req, res, next) => {
 
         const userAssistants = await assistantsService.findUserAssistants(user.id);
         res.json(userAssistants);
-    } catch (error) {
-        next(error);
+    } catch (error: any) {
+        console.error('[Assistants] Error fetching user assistants:', error.message);
+        if (error.code === '42P01') {
+            return res.json([]);
+        }
+        res.status(500).json({ error: 'Erro ao buscar assistentes', details: error.message });
     }
 });
 
