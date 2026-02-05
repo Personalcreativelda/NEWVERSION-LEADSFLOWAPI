@@ -1,6 +1,6 @@
 import {
     Home, Users, MessageSquare, Workflow, BarChart3,
-    CheckSquare, Zap, Crown, Settings, Shield, User, Bot
+    CheckSquare, Zap, Crown, Settings, Shield, User
 } from 'lucide-react';
 
 export interface SidebarItemConfig {
@@ -57,7 +57,6 @@ export const sidebarConfig: SidebarItemConfig[] = [
     { id: 'analytics', labelKey: 'analytics', icon: BarChart3, path: '/dashboard/analytics' },
     { id: 'tasks', labelKey: 'tasksFollowup', icon: CheckSquare, path: '/dashboard/tasks' },
     { id: 'campaigns', labelKey: 'campaigns', icon: Zap, path: '/dashboard/campaigns' },
-    { id: 'assistants', labelKey: 'assistants', icon: Bot, path: '/dashboard/assistants' },
     { id: 'plan', labelKey: 'plan', icon: Crown, path: '/dashboard/plan' },
     { id: 'integrations', labelKey: 'integrations', icon: Settings, path: '/dashboard/integrations' },
     { id: 'security', labelKey: 'security', icon: Shield, path: '/dashboard/security' },

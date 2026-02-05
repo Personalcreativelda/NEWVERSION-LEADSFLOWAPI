@@ -29,7 +29,6 @@ import SecurityPage from './settings/SecurityPage';
 import AccountSettingsPage from './settings/AccountSettingsPage';
 import AdminPage from './settings/AdminPage';
 import CampaignsPage from './pages/CampaignsPage';
-import AssistantsPage from './pages/AssistantsPage';
 import InboxPage from './pages/InboxPage';
 
 // Modal imports
@@ -1946,10 +1945,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                 isDark={isDark}
                 userPlan={(user?.plan || user?.subscription_plan || 'free') as 'free' | 'business' | 'enterprise'}
               />
-            )}
-
-            {currentPage === 'assistants' && (
-              <AssistantsPage isDark={isDark} />
             )}
 
             {(currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations') && (

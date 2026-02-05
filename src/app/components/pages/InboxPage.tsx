@@ -1,7 +1,7 @@
 import React from 'react';
 import InboxConversations from './inbox/InboxConversations';
 import InboxSettings from './inbox/InboxSettings';
-import InboxAssistants from './inbox/InboxAssistants';
+import AssistantsPage from './AssistantsPage';
 import InboxAutomations from './inbox/InboxAutomations';
 
 interface InboxPageProps {
@@ -20,7 +20,7 @@ export default function InboxPage({ isDark, leads, currentSubPage = 'conversatio
                 return <InboxSettings />;
             case 'ai-assistants':
             case 'assistants':
-                return <InboxAssistants />;
+                return <AssistantsPage isDark={isDark} />;
             case 'automations':
                 return <InboxAutomations />;
             case 'inbox':
