@@ -80,6 +80,7 @@ export class AssistantsService {
      * Lista todos os assistentes disponíveis no marketplace (globais + custom do user)
      */
     async findAllAvailable(userId?: string): Promise<Assistant[]> {
+        await this.ensureColumns();
         try {
             const result = await query(
                 `SELECT * FROM assistants
@@ -123,11 +124,79 @@ export class AssistantsService {
     }
 
     /**
-     * Garante que as colunas novas existem (migração automática)
+     * Garante que as tabelas e colunas existem (migração automática)
      */
     private migrationDone = false;
     private async ensureColumns(): Promise<void> {
         if (this.migrationDone) return;
+
+        // Criar tabelas se não existirem
+        try {
+            await query(`
+                CREATE TABLE IF NOT EXISTS assistants (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    name VARCHAR(255) NOT NULL,
+                    slug VARCHAR(100) UNIQUE NOT NULL,
+                    description TEXT,
+                    short_description VARCHAR(500),
+                    icon VARCHAR(100) DEFAULT 'bot',
+                    color VARCHAR(20) DEFAULT '#3B82F6',
+                    category VARCHAR(100) DEFAULT 'general',
+                    features TEXT[],
+                    price_monthly DECIMAL(10, 2) DEFAULT 0,
+                    price_annual DECIMAL(10, 2) DEFAULT 0,
+                    is_free BOOLEAN DEFAULT false,
+                    is_active BOOLEAN DEFAULT true,
+                    is_featured BOOLEAN DEFAULT false,
+                    is_custom BOOLEAN DEFAULT false,
+                    created_by UUID,
+                    n8n_webhook_url TEXT,
+                    default_config JSONB DEFAULT '{}',
+                    required_channels TEXT[] DEFAULT '{}',
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            `);
+            await query(`
+                CREATE TABLE IF NOT EXISTS user_assistants (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    user_id UUID,
+                    assistant_id UUID REFERENCES assistants(id) ON DELETE CASCADE,
+                    is_active BOOLEAN DEFAULT true,
+                    is_configured BOOLEAN DEFAULT false,
+                    config JSONB DEFAULT '{}',
+                    channel_id UUID,
+                    channel_ids UUID[] DEFAULT '{}',
+                    n8n_workflow_id VARCHAR(255),
+                    last_triggered_at TIMESTAMP WITH TIME ZONE,
+                    stats JSONB DEFAULT '{"conversations": 0, "messages_sent": 0, "messages_received": 0}',
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    UNIQUE(user_id, assistant_id)
+                )
+            `);
+            await query(`
+                CREATE TABLE IF NOT EXISTS assistant_logs (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    user_assistant_id UUID REFERENCES user_assistants(id) ON DELETE CASCADE,
+                    conversation_id VARCHAR(255),
+                    contact_phone VARCHAR(50),
+                    contact_name VARCHAR(255),
+                    message_in TEXT,
+                    message_out TEXT,
+                    tokens_used INTEGER DEFAULT 0,
+                    response_time_ms INTEGER DEFAULT 0,
+                    status VARCHAR(50) DEFAULT 'success',
+                    error_message TEXT,
+                    metadata JSONB DEFAULT '{}',
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            `);
+        } catch (err: any) {
+            console.error('[Assistants] Table creation error:', err.message);
+        }
+
+        // Adicionar colunas novas se não existirem
         const migrations = [
             'ALTER TABLE assistants ADD COLUMN IF NOT EXISTS is_custom BOOLEAN DEFAULT false',
             'ALTER TABLE assistants ADD COLUMN IF NOT EXISTS created_by UUID',
@@ -237,6 +306,7 @@ export class AssistantsService {
      * Lista assistentes conectados do usuário
      */
     async findUserAssistants(userId: string): Promise<UserAssistant[]> {
+        await this.ensureColumns();
         const result = await query(
             `SELECT ua.*,
                     a.name, a.slug, a.description, a.short_description,
