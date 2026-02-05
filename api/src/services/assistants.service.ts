@@ -80,13 +80,24 @@ export class AssistantsService {
      * Lista todos os assistentes disponíveis no marketplace (globais + custom do user)
      */
     async findAllAvailable(userId?: string): Promise<Assistant[]> {
-        const result = await query(
-            `SELECT * FROM assistants
-             WHERE is_active = true AND (is_custom = false OR created_by = $1)
-             ORDER BY is_featured DESC, is_free DESC, is_custom ASC, name ASC`,
-            [userId || null]
-        );
-        return result.rows;
+        try {
+            const result = await query(
+                `SELECT * FROM assistants
+                 WHERE is_active = true AND (is_custom = false OR created_by = $1)
+                 ORDER BY is_featured DESC, is_free DESC, is_custom ASC, name ASC`,
+                [userId || null]
+            );
+            return result.rows;
+        } catch (error: any) {
+            // Fallback if is_custom/created_by columns don't exist yet
+            if (error.code === '42703') {
+                const result = await query(
+                    `SELECT * FROM assistants WHERE is_active = true ORDER BY is_featured DESC, is_free DESC, name ASC`
+                );
+                return result.rows;
+            }
+            throw error;
+        }
     }
 
     /**
@@ -112,9 +123,37 @@ export class AssistantsService {
     }
 
     /**
+     * Garante que as colunas novas existem (migração automática)
+     */
+    private async ensureColumns(): Promise<void> {
+        try {
+            await query(`
+                DO $$ BEGIN
+                    ALTER TABLE assistants ADD COLUMN is_custom BOOLEAN DEFAULT false;
+                EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+            `);
+            await query(`
+                DO $$ BEGIN
+                    ALTER TABLE assistants ADD COLUMN created_by UUID;
+                EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+            `);
+            await query(`
+                DO $$ BEGIN
+                    ALTER TABLE user_assistants ADD COLUMN channel_ids UUID[] DEFAULT '{}';
+                EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+            `);
+        } catch (err) {
+            console.error('[Assistants] Error ensuring columns:', err);
+        }
+    }
+
+    /**
      * Cria um assistente personalizado do usuário
      */
     async createCustomAssistant(userId: string, input: CreateAssistantInput): Promise<Assistant> {
+        // Garantir que as colunas novas existem
+        await this.ensureColumns();
+
         const slug = `custom-${userId.slice(0, 8)}-${Date.now()}`;
         const defaultConfig: Record<string, any> = {};
         if (input.greeting) defaultConfig.greeting = input.greeting;
@@ -304,6 +343,9 @@ export class AssistantsService {
      * Conecta um assistente ao usuário com múltiplos canais
      */
     async connectAssistant(assistantId: string, userId: string, channelIds?: string[]): Promise<UserAssistant> {
+        // Garantir que as colunas novas existem
+        await this.ensureColumns();
+
         // Verificar se o assistente existe
         const assistant = await this.findAssistantById(assistantId);
         if (!assistant) {

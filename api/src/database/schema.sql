@@ -442,3 +442,16 @@ INSERT INTO assistants (name, slug, description, short_description, icon, color,
   '{"greeting": "Olá! Bem-vindo à nossa loja. Posso ajudar com seu pedido?", "catalog": [], "payment_methods": []}'::jsonb
 )
 ON CONFLICT (slug) DO NOTHING;
+
+-- Migrations: add new columns to existing tables (safe to re-run)
+DO $$ BEGIN
+  ALTER TABLE assistants ADD COLUMN is_custom BOOLEAN DEFAULT false;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE assistants ADD COLUMN created_by UUID;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE user_assistants ADD COLUMN channel_ids UUID[] DEFAULT '{}';
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;

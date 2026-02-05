@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/assistants/create - Cria um assistente personalizado
-router.post('/create', async (req, res, next) => {
+router.post('/create', async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -96,8 +96,12 @@ router.post('/create', async (req, res, next) => {
 
         res.status(201).json(assistant);
     } catch (error: any) {
-        console.error('[Assistants] Error creating assistant:', error.message);
-        next(error);
+        console.error('[Assistants] Error creating assistant:', error.message, error.code);
+        // Handle missing columns gracefully
+        if (error.code === '42703') { // undefined_column
+            return res.status(500).json({ error: 'Tabela precisa de migração. Execute o schema.sql novamente.', details: error.message });
+        }
+        res.status(500).json({ error: 'Erro ao criar assistente', details: error.message });
     }
 });
 
