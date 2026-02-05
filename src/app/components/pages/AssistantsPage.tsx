@@ -262,8 +262,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       resetCreateForm();
       loadData();
     } catch (error: any) {
-      console.error('[AssistantsPage] Error creating/updating assistant:', error);
-      toast.error(error.response?.data?.error || 'Erro ao salvar assistente');
+      console.error('[AssistantsPage] Error creating/updating assistant:', error.response?.data || error);
+      const msg = error.response?.data?.details || error.response?.data?.error || 'Erro ao salvar assistente';
+      toast.error(msg);
     } finally {
       setActionLoading(false);
     }

@@ -96,12 +96,13 @@ router.post('/create', async (req, res) => {
 
         res.status(201).json(assistant);
     } catch (error: any) {
-        console.error('[Assistants] Error creating assistant:', error.message, error.code);
-        // Handle missing columns gracefully
-        if (error.code === '42703') { // undefined_column
-            return res.status(500).json({ error: 'Tabela precisa de migração. Execute o schema.sql novamente.', details: error.message });
-        }
-        res.status(500).json({ error: 'Erro ao criar assistente', details: error.message });
+        console.error('[Assistants] Error creating assistant:', error.message, error.code, error.detail);
+        res.status(500).json({
+            error: 'Erro ao criar assistente',
+            details: error.message,
+            code: error.code,
+            hint: error.hint || error.detail || null
+        });
     }
 });
 

@@ -444,14 +444,6 @@ INSERT INTO assistants (name, slug, description, short_description, icon, color,
 ON CONFLICT (slug) DO NOTHING;
 
 -- Migrations: add new columns to existing tables (safe to re-run)
-DO $$ BEGIN
-  ALTER TABLE assistants ADD COLUMN is_custom BOOLEAN DEFAULT false;
-EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-
-DO $$ BEGIN
-  ALTER TABLE assistants ADD COLUMN created_by UUID;
-EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-
-DO $$ BEGIN
-  ALTER TABLE user_assistants ADD COLUMN channel_ids UUID[] DEFAULT '{}';
-EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+ALTER TABLE assistants ADD COLUMN IF NOT EXISTS is_custom BOOLEAN DEFAULT false;
+ALTER TABLE assistants ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE user_assistants ADD COLUMN IF NOT EXISTS channel_ids UUID[] DEFAULT '{}';

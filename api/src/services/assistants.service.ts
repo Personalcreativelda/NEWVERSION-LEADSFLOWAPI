@@ -125,26 +125,22 @@ export class AssistantsService {
     /**
      * Garante que as colunas novas existem (migração automática)
      */
+    private migrationDone = false;
     private async ensureColumns(): Promise<void> {
-        try {
-            await query(`
-                DO $$ BEGIN
-                    ALTER TABLE assistants ADD COLUMN is_custom BOOLEAN DEFAULT false;
-                EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-            `);
-            await query(`
-                DO $$ BEGIN
-                    ALTER TABLE assistants ADD COLUMN created_by UUID;
-                EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-            `);
-            await query(`
-                DO $$ BEGIN
-                    ALTER TABLE user_assistants ADD COLUMN channel_ids UUID[] DEFAULT '{}';
-                EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-            `);
-        } catch (err) {
-            console.error('[Assistants] Error ensuring columns:', err);
+        if (this.migrationDone) return;
+        const migrations = [
+            'ALTER TABLE assistants ADD COLUMN IF NOT EXISTS is_custom BOOLEAN DEFAULT false',
+            'ALTER TABLE assistants ADD COLUMN IF NOT EXISTS created_by UUID',
+            "ALTER TABLE user_assistants ADD COLUMN IF NOT EXISTS channel_ids UUID[] DEFAULT '{}'",
+        ];
+        for (const sql of migrations) {
+            try {
+                await query(sql);
+            } catch (err: any) {
+                console.error('[Assistants] Migration error:', sql, err.message);
+            }
         }
+        this.migrationDone = true;
     }
 
     /**
