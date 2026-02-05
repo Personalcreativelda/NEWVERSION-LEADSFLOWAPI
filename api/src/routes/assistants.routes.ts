@@ -6,10 +6,22 @@ import { AssistantsService } from '../services/assistants.service';
 const router = Router();
 const assistantsService = new AssistantsService();
 
-// GET /api/assistants/available - Lista assistentes disponíveis no marketplace (público)
-router.get('/available', async (_req, res) => {
+// GET /api/assistants/available - Lista assistentes disponíveis no marketplace
+router.get('/available', async (req, res) => {
     try {
-        const assistants = await assistantsService.findAllAvailable();
+        // Tentar extrair userId do token se disponível
+        let userId: string | undefined;
+        try {
+            const authHeader = req.headers.authorization;
+            if (authHeader?.startsWith('Bearer ')) {
+                const jwt = await import('jsonwebtoken');
+                const token = authHeader.slice(7);
+                const decoded = jwt.default.verify(token, process.env.JWT_SECRET || 'secret') as any;
+                userId = decoded.id || decoded.userId;
+            }
+        } catch { /* ignore auth errors for public endpoint */ }
+
+        const assistants = await assistantsService.findAllAvailable(userId);
         res.json(assistants);
     } catch (error: any) {
         console.error('[Assistants] Error fetching available assistants:', error.message);
@@ -56,6 +68,77 @@ router.get('/', async (req, res) => {
     }
 });
 
+// POST /api/assistants/create - Cria um assistente personalizado
+router.post('/create', async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { name, description, short_description, icon, color, category, features, instructions, greeting } = req.body;
+
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'Nome é obrigatório' });
+        }
+
+        const assistant = await assistantsService.createCustomAssistant(user.id, {
+            name: name.trim(),
+            description,
+            short_description,
+            icon,
+            color,
+            category,
+            features,
+            instructions,
+            greeting
+        });
+
+        res.status(201).json(assistant);
+    } catch (error: any) {
+        console.error('[Assistants] Error creating assistant:', error.message);
+        next(error);
+    }
+});
+
+// PUT /api/assistants/:id/edit - Atualiza um assistente personalizado
+router.put('/:id/edit', async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const assistant = await assistantsService.updateCustomAssistant(req.params.id, user.id, req.body);
+        if (!assistant) {
+            return res.status(404).json({ error: 'Assistente não encontrado ou sem permissão' });
+        }
+
+        res.json(assistant);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// DELETE /api/assistants/:id/delete - Deleta um assistente personalizado
+router.delete('/:id/delete', async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const deleted = await assistantsService.deleteCustomAssistant(req.params.id, user.id);
+        if (!deleted) {
+            return res.status(404).json({ error: 'Assistente não encontrado ou sem permissão' });
+        }
+
+        res.json({ success: true, message: 'Assistente deletado com sucesso' });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // GET /api/assistants/:id - Busca assistente conectado por ID
 router.get('/:id', async (req, res, next) => {
     try {
@@ -83,13 +166,17 @@ router.post('/connect', async (req, res, next) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const { assistantId, channelId } = req.body;
+        const { assistantId, channelIds } = req.body;
 
         if (!assistantId) {
             return res.status(400).json({ error: 'assistantId é obrigatório' });
         }
 
-        const userAssistant = await assistantsService.connectAssistant(assistantId, user.id, channelId);
+        const userAssistant = await assistantsService.connectAssistant(
+            assistantId,
+            user.id,
+            Array.isArray(channelIds) ? channelIds : channelIds ? [channelIds] : undefined
+        );
         res.status(201).json(userAssistant);
     } catch (error: any) {
         if (error.message === 'Assistente não encontrado') {
@@ -121,6 +208,30 @@ router.post('/:id/disconnect', async (req, res, next) => {
     }
 });
 
+// PUT /api/assistants/:id/channels - Atualiza os canais conectados
+router.put('/:id/channels', async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { channelIds } = req.body;
+        if (!Array.isArray(channelIds)) {
+            return res.status(400).json({ error: 'channelIds deve ser um array' });
+        }
+
+        const userAssistant = await assistantsService.updateChannels(req.params.id, user.id, channelIds);
+        if (!userAssistant) {
+            return res.status(404).json({ error: 'Assistente não encontrado' });
+        }
+
+        res.json(userAssistant);
+    } catch (error) {
+        next(error);
+    }
+});
+
 // PUT /api/assistants/:id/configure - Atualiza configuração do assistente
 router.put('/:id/configure', async (req, res, next) => {
     try {
@@ -129,7 +240,7 @@ router.put('/:id/configure', async (req, res, next) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const { config, channelId } = req.body;
+        const { config, channelIds } = req.body;
 
         if (!config) {
             return res.status(400).json({ error: 'config é obrigatório' });
@@ -139,7 +250,7 @@ router.put('/:id/configure', async (req, res, next) => {
             req.params.id,
             user.id,
             config,
-            channelId
+            channelIds
         );
 
         if (!userAssistant) {

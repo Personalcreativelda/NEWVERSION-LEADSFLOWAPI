@@ -16,6 +16,8 @@ export interface Assistant {
     is_free: boolean;
     is_active: boolean;
     is_featured: boolean;
+    is_custom: boolean;
+    created_by: string | null;
     n8n_webhook_url: string | null;
     default_config: any;
     required_channels: string[];
@@ -31,6 +33,7 @@ export interface UserAssistant {
     is_configured: boolean;
     config: any;
     channel_id: string | null;
+    channel_ids: string[];
     n8n_workflow_id: string | null;
     last_triggered_at: string | null;
     stats: {
@@ -60,15 +63,28 @@ export interface AssistantLog {
     created_at: string;
 }
 
+export interface CreateAssistantInput {
+    name: string;
+    description?: string;
+    short_description?: string;
+    icon?: string;
+    color?: string;
+    category?: string;
+    features?: string[];
+    instructions?: string;
+    greeting?: string;
+}
+
 export class AssistantsService {
     /**
-     * Lista todos os assistentes disponíveis no marketplace
+     * Lista todos os assistentes disponíveis no marketplace (globais + custom do user)
      */
-    async findAllAvailable(): Promise<Assistant[]> {
+    async findAllAvailable(userId?: string): Promise<Assistant[]> {
         const result = await query(
             `SELECT * FROM assistants
-             WHERE is_active = true
-             ORDER BY is_featured DESC, is_free DESC, name ASC`
+             WHERE is_active = true AND (is_custom = false OR created_by = $1)
+             ORDER BY is_featured DESC, is_free DESC, is_custom ASC, name ASC`,
+            [userId || null]
         );
         return result.rows;
     }
@@ -96,6 +112,93 @@ export class AssistantsService {
     }
 
     /**
+     * Cria um assistente personalizado do usuário
+     */
+    async createCustomAssistant(userId: string, input: CreateAssistantInput): Promise<Assistant> {
+        const slug = `custom-${userId.slice(0, 8)}-${Date.now()}`;
+        const defaultConfig: Record<string, any> = {};
+        if (input.greeting) defaultConfig.greeting = input.greeting;
+        if (input.instructions) defaultConfig.instructions = input.instructions;
+
+        const result = await query(
+            `INSERT INTO assistants (
+                name, slug, description, short_description,
+                icon, color, category, features,
+                is_free, is_active, is_custom, created_by,
+                default_config
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, true, true, $9, $10)
+             RETURNING *`,
+            [
+                input.name,
+                slug,
+                input.description || '',
+                input.short_description || input.description || '',
+                input.icon || 'bot',
+                input.color || '#3B82F6',
+                input.category || 'custom',
+                input.features || [],
+                userId,
+                JSON.stringify(defaultConfig)
+            ]
+        );
+
+        return result.rows[0];
+    }
+
+    /**
+     * Atualiza um assistente personalizado do usuário
+     */
+    async updateCustomAssistant(assistantId: string, userId: string, input: Partial<CreateAssistantInput>): Promise<Assistant | null> {
+        const assistant = await this.findAssistantById(assistantId);
+        if (!assistant || !assistant.is_custom || assistant.created_by !== userId) {
+            return null;
+        }
+
+        const fields: string[] = [];
+        const values: any[] = [];
+        let idx = 1;
+
+        if (input.name !== undefined) { fields.push(`name = $${idx++}`); values.push(input.name); }
+        if (input.description !== undefined) { fields.push(`description = $${idx++}`); values.push(input.description); }
+        if (input.short_description !== undefined) { fields.push(`short_description = $${idx++}`); values.push(input.short_description); }
+        if (input.icon !== undefined) { fields.push(`icon = $${idx++}`); values.push(input.icon); }
+        if (input.color !== undefined) { fields.push(`color = $${idx++}`); values.push(input.color); }
+        if (input.category !== undefined) { fields.push(`category = $${idx++}`); values.push(input.category); }
+        if (input.features !== undefined) { fields.push(`features = $${idx++}`); values.push(input.features); }
+
+        if (input.greeting !== undefined || input.instructions !== undefined) {
+            const config = assistant.default_config || {};
+            if (input.greeting !== undefined) config.greeting = input.greeting;
+            if (input.instructions !== undefined) config.instructions = input.instructions;
+            fields.push(`default_config = $${idx++}`);
+            values.push(JSON.stringify(config));
+        }
+
+        if (fields.length === 0) return assistant;
+
+        fields.push('updated_at = NOW()');
+        values.push(assistantId);
+
+        const result = await query(
+            `UPDATE assistants SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+            values
+        );
+
+        return result.rows[0] || null;
+    }
+
+    /**
+     * Deleta um assistente personalizado do usuário
+     */
+    async deleteCustomAssistant(assistantId: string, userId: string): Promise<boolean> {
+        const result = await query(
+            'DELETE FROM assistants WHERE id = $1 AND is_custom = true AND created_by = $2 RETURNING id',
+            [assistantId, userId]
+        );
+        return (result.rowCount ?? 0) > 0;
+    }
+
+    /**
      * Lista assistentes conectados do usuário
      */
     async findUserAssistants(userId: string): Promise<UserAssistant[]> {
@@ -103,7 +206,7 @@ export class AssistantsService {
             `SELECT ua.*,
                     a.name, a.slug, a.description, a.short_description,
                     a.icon, a.color, a.category, a.features,
-                    a.price_monthly, a.is_free, a.default_config
+                    a.price_monthly, a.is_free, a.is_custom, a.created_by, a.default_config
              FROM user_assistants ua
              JOIN assistants a ON ua.assistant_id = a.id
              WHERE ua.user_id = $1
@@ -119,6 +222,7 @@ export class AssistantsService {
             is_configured: row.is_configured,
             config: row.config,
             channel_id: row.channel_id,
+            channel_ids: row.channel_ids || [],
             n8n_workflow_id: row.n8n_workflow_id,
             last_triggered_at: row.last_triggered_at,
             stats: row.stats,
@@ -136,6 +240,8 @@ export class AssistantsService {
                 features: row.features,
                 price_monthly: row.price_monthly,
                 is_free: row.is_free,
+                is_custom: row.is_custom,
+                created_by: row.created_by,
                 default_config: row.default_config
             } as Assistant
         }));
@@ -149,7 +255,8 @@ export class AssistantsService {
             `SELECT ua.*,
                     a.name, a.slug, a.description, a.short_description,
                     a.icon, a.color, a.category, a.features,
-                    a.price_monthly, a.is_free, a.default_config, a.n8n_webhook_url
+                    a.price_monthly, a.is_free, a.is_custom, a.created_by,
+                    a.default_config, a.n8n_webhook_url
              FROM user_assistants ua
              JOIN assistants a ON ua.assistant_id = a.id
              WHERE ua.id = $1 AND ua.user_id = $2`,
@@ -167,6 +274,7 @@ export class AssistantsService {
             is_configured: row.is_configured,
             config: row.config,
             channel_id: row.channel_id,
+            channel_ids: row.channel_ids || [],
             n8n_workflow_id: row.n8n_workflow_id,
             last_triggered_at: row.last_triggered_at,
             stats: row.stats,
@@ -184,6 +292,8 @@ export class AssistantsService {
                 features: row.features,
                 price_monthly: row.price_monthly,
                 is_free: row.is_free,
+                is_custom: row.is_custom,
+                created_by: row.created_by,
                 default_config: row.default_config,
                 n8n_webhook_url: row.n8n_webhook_url
             } as Assistant
@@ -191,9 +301,9 @@ export class AssistantsService {
     }
 
     /**
-     * Conecta um assistente ao usuário
+     * Conecta um assistente ao usuário com múltiplos canais
      */
-    async connectAssistant(assistantId: string, userId: string, channelId?: string): Promise<UserAssistant> {
+    async connectAssistant(assistantId: string, userId: string, channelIds?: string[]): Promise<UserAssistant> {
         // Verificar se o assistente existe
         const assistant = await this.findAssistantById(assistantId);
         if (!assistant) {
@@ -210,23 +320,27 @@ export class AssistantsService {
             throw new Error('Assistente já está conectado');
         }
 
+        const channelIdsArray = channelIds && channelIds.length > 0 ? channelIds : [];
+        const primaryChannelId = channelIdsArray.length > 0 ? channelIdsArray[0] : null;
+
         // Criar conexão
         const result = await query(
-            `INSERT INTO user_assistants (user_id, assistant_id, config, channel_id, is_active, is_configured)
-             VALUES ($1, $2, $3, $4, true, false)
+            `INSERT INTO user_assistants (user_id, assistant_id, config, channel_id, channel_ids, is_active, is_configured)
+             VALUES ($1, $2, $3, $4, $5, true, false)
              RETURNING *`,
-            [userId, assistantId, JSON.stringify(assistant.default_config || {}), channelId || null]
+            [userId, assistantId, JSON.stringify(assistant.default_config || {}), primaryChannelId, channelIdsArray]
         );
 
         const userAssistant = result.rows[0];
 
         // Enviar webhook para n8n para criar/configurar o workflow (silenciosamente)
-        this.sendN8nWebhook(assistant, userAssistant, userId, 'connect').catch(err => {
+        this.sendN8nWebhook(assistant, { ...userAssistant, channel_ids: channelIdsArray }, userId, 'connect').catch(err => {
             console.error('[Assistants] Error sending n8n webhook:', err.message);
         });
 
         return {
             ...userAssistant,
+            channel_ids: channelIdsArray,
             assistant
         };
     }
@@ -262,21 +376,56 @@ export class AssistantsService {
     }
 
     /**
+     * Atualiza os canais conectados de um assistente
+     */
+    async updateChannels(userAssistantId: string, userId: string, channelIds: string[]): Promise<UserAssistant | null> {
+        const primaryChannelId = channelIds.length > 0 ? channelIds[0] : null;
+
+        const result = await query(
+            `UPDATE user_assistants
+             SET channel_ids = $1, channel_id = $2, updated_at = NOW()
+             WHERE id = $3 AND user_id = $4
+             RETURNING *`,
+            [channelIds, primaryChannelId, userAssistantId, userId]
+        );
+
+        if (!result.rows[0]) return null;
+
+        const userAssistant = await this.findUserAssistantById(userAssistantId, userId);
+
+        if (userAssistant?.assistant) {
+            this.sendN8nWebhook(
+                userAssistant.assistant,
+                userAssistant,
+                userId,
+                'configure'
+            ).catch(err => {
+                console.error('[Assistants] Error sending n8n channels webhook:', err.message);
+            });
+        }
+
+        return userAssistant;
+    }
+
+    /**
      * Atualiza configuração do assistente do usuário
      */
     async updateConfiguration(
         userAssistantId: string,
         userId: string,
         config: any,
-        channelId?: string
+        channelIds?: string[]
     ): Promise<UserAssistant | null> {
         const fields: string[] = ['config = $1', 'is_configured = true', 'updated_at = NOW()'];
         const values: any[] = [JSON.stringify(config)];
         let paramIndex = 2;
 
-        if (channelId !== undefined) {
+        if (channelIds !== undefined) {
+            fields.push(`channel_ids = $${paramIndex++}`);
+            values.push(channelIds);
+            const primaryChannelId = channelIds.length > 0 ? channelIds[0] : null;
             fields.push(`channel_id = $${paramIndex++}`);
-            values.push(channelId);
+            values.push(primaryChannelId);
         }
 
         values.push(userAssistantId, userId);
@@ -451,6 +600,7 @@ export class AssistantsService {
                         id: userAssistant.id,
                         userId,
                         channelId: userAssistant.channel_id,
+                        channelIds: userAssistant.channel_ids || [],
                         config: userAssistant.config,
                         isActive: userAssistant.is_active,
                         isConfigured: userAssistant.is_configured

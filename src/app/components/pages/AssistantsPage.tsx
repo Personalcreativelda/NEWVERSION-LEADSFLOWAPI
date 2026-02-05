@@ -2,14 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Bot, Search, Plus, Settings, Power, PowerOff, Trash2,
   Briefcase, Headphones, Calendar, Users, ShoppingCart,
-  Zap, ChevronRight, X, Check, Loader2, BarChart3,
-  MessageSquare, Clock, Star, Crown, Sparkles, Link2, Unlink2
+  Zap, X, Check, Loader2,
+  MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
+  Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
-import { assistantsApi, type Assistant, type UserAssistant } from '../../services/api/assistants';
+import { assistantsApi, type Assistant, type UserAssistant, type CreateAssistantInput } from '../../services/api/assistants';
 import { channelsApi } from '../../services/api/inbox';
 import type { Channel } from '../../types/inbox';
 
@@ -27,7 +28,24 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   'bot': Bot,
   'zap': Zap,
   'star': Star,
+  'message-square': MessageSquare,
 };
+
+const ICON_OPTIONS = [
+  { value: 'bot', label: 'Bot', icon: Bot },
+  { value: 'briefcase', label: 'Vendas', icon: Briefcase },
+  { value: 'headphones', label: 'Suporte', icon: Headphones },
+  { value: 'calendar', label: 'Agenda', icon: Calendar },
+  { value: 'users', label: 'Leads', icon: Users },
+  { value: 'shopping-cart', label: 'Pedidos', icon: ShoppingCart },
+  { value: 'zap', label: 'Automação', icon: Zap },
+  { value: 'message-square', label: 'Chat', icon: MessageSquare },
+];
+
+const COLOR_OPTIONS = [
+  '#3B82F6', '#10B981', '#6366F1', '#F59E0B', '#EC4899',
+  '#EF4444', '#8B5CF6', '#14B8A6', '#F97316', '#06B6D4',
+];
 
 const CATEGORY_LABELS: Record<string, string> = {
   'sales': 'Vendas',
@@ -36,6 +54,25 @@ const CATEGORY_LABELS: Record<string, string> = {
   'marketing': 'Marketing',
   'ecommerce': 'E-commerce',
   'general': 'Geral',
+  'custom': 'Personalizado',
+};
+
+const CHANNEL_ICONS: Record<string, React.ComponentType<any>> = {
+  'whatsapp': MessageCircle,
+  'instagram': Instagram,
+  'facebook': Facebook,
+  'messenger': Facebook,
+  'telegram': Send,
+  'email': Mail,
+};
+
+const CHANNEL_COLORS: Record<string, string> = {
+  'whatsapp': 'text-green-500',
+  'instagram': 'text-pink-500',
+  'facebook': 'text-blue-600',
+  'messenger': 'text-blue-600',
+  'telegram': 'text-sky-500',
+  'email': 'text-gray-500',
 };
 
 export default function AssistantsPage({ isDark }: AssistantsPageProps) {
@@ -50,11 +87,27 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   // Modal states
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedAssistant, setSelectedAssistant] = useState<Assistant | null>(null);
   const [selectedUserAssistant, setSelectedUserAssistant] = useState<UserAssistant | null>(null);
-  const [selectedChannelId, setSelectedChannelId] = useState<string>('');
+  const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([]);
   const [configValues, setConfigValues] = useState<Record<string, any>>({});
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Create modal state
+  const [createForm, setCreateForm] = useState<CreateAssistantInput>({
+    name: '',
+    description: '',
+    short_description: '',
+    icon: 'bot',
+    color: '#3B82F6',
+    category: 'custom',
+    features: [],
+    greeting: '',
+    instructions: '',
+  });
+  const [newFeature, setNewFeature] = useState('');
+  const [editingAssistantId, setEditingAssistantId] = useState<string | null>(null);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -83,7 +136,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   // Filter assistants
   const filteredAssistants = availableAssistants.filter(assistant => {
     const matchesSearch = assistant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      assistant.description.toLowerCase().includes(searchTerm.toLowerCase());
+      (assistant.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || assistant.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -98,17 +151,26 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     return userAssistants.find(ua => ua.assistant_id === assistantId);
   };
 
+  // Toggle channel selection
+  const toggleChannelSelection = (channelId: string) => {
+    setSelectedChannelIds(prev =>
+      prev.includes(channelId)
+        ? prev.filter(id => id !== channelId)
+        : [...prev, channelId]
+    );
+  };
+
   // Handle connect
   const handleConnect = async () => {
     if (!selectedAssistant) return;
 
     try {
       setActionLoading(true);
-      await assistantsApi.connect(selectedAssistant.id, selectedChannelId || undefined);
+      await assistantsApi.connect(selectedAssistant.id, selectedChannelIds.length > 0 ? selectedChannelIds : undefined);
       toast.success(`${selectedAssistant.name} conectado com sucesso!`);
       setConnectModalOpen(false);
       setSelectedAssistant(null);
-      setSelectedChannelId('');
+      setSelectedChannelIds([]);
       loadData();
     } catch (error: any) {
       console.error('[AssistantsPage] Error connecting:', error);
@@ -156,7 +218,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       await assistantsApi.configure(
         selectedUserAssistant.id,
         configValues,
-        selectedChannelId || undefined
+        selectedChannelIds.length > 0 ? selectedChannelIds : undefined
       );
       toast.success('Configuração salva com sucesso!');
       setConfigModalOpen(false);
@@ -174,12 +236,118 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const openConfigModal = (userAssistant: UserAssistant) => {
     setSelectedUserAssistant(userAssistant);
     setConfigValues(userAssistant.config || {});
-    setSelectedChannelId(userAssistant.channel_id || '');
+    setSelectedChannelIds(userAssistant.channel_ids || []);
     setConfigModalOpen(true);
   };
 
+  // Handle create assistant
+  const handleCreateAssistant = async () => {
+    if (!createForm.name.trim()) {
+      toast.error('Nome é obrigatório');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+
+      if (editingAssistantId) {
+        await assistantsApi.update(editingAssistantId, createForm);
+        toast.success('Assistente atualizado com sucesso!');
+      } else {
+        await assistantsApi.create(createForm);
+        toast.success('Assistente criado com sucesso!');
+      }
+
+      setCreateModalOpen(false);
+      resetCreateForm();
+      loadData();
+    } catch (error: any) {
+      console.error('[AssistantsPage] Error creating/updating assistant:', error);
+      toast.error(error.response?.data?.error || 'Erro ao salvar assistente');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle delete custom assistant
+  const handleDeleteAssistant = async (assistant: Assistant) => {
+    if (!confirm(`Deseja realmente deletar o assistente "${assistant.name}"? Esta ação não pode ser desfeita.`)) return;
+
+    try {
+      setActionLoading(true);
+      await assistantsApi.deleteAssistant(assistant.id);
+      toast.success('Assistente deletado com sucesso');
+      loadData();
+    } catch (error) {
+      console.error('[AssistantsPage] Error deleting assistant:', error);
+      toast.error('Erro ao deletar assistente');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Open edit modal
+  const openEditModal = (assistant: Assistant) => {
+    setEditingAssistantId(assistant.id);
+    setCreateForm({
+      name: assistant.name,
+      description: assistant.description || '',
+      short_description: assistant.short_description || '',
+      icon: assistant.icon || 'bot',
+      color: assistant.color || '#3B82F6',
+      category: assistant.category || 'custom',
+      features: assistant.features || [],
+      greeting: assistant.default_config?.greeting || '',
+      instructions: assistant.default_config?.instructions || '',
+    });
+    setCreateModalOpen(true);
+  };
+
+  const resetCreateForm = () => {
+    setCreateForm({
+      name: '',
+      description: '',
+      short_description: '',
+      icon: 'bot',
+      color: '#3B82F6',
+      category: 'custom',
+      features: [],
+      greeting: '',
+      instructions: '',
+    });
+    setNewFeature('');
+    setEditingAssistantId(null);
+  };
+
+  const addFeature = () => {
+    if (newFeature.trim() && (createForm.features?.length || 0) < 8) {
+      setCreateForm(prev => ({
+        ...prev,
+        features: [...(prev.features || []), newFeature.trim()]
+      }));
+      setNewFeature('');
+    }
+  };
+
+  const removeFeature = (idx: number) => {
+    setCreateForm(prev => ({
+      ...prev,
+      features: (prev.features || []).filter((_, i) => i !== idx)
+    }));
+  };
+
+  // Get channel name by ID
+  const getChannelById = (channelId: string) => channels.find(c => c.id === channelId);
+
   // Categories from available assistants
   const categories = ['all', ...new Set(availableAssistants.map(a => a.category))];
+
+  // Render channel icon
+  const renderChannelIcon = (type: string, size: string = 'w-3.5 h-3.5') => {
+    const ChannelIcon = CHANNEL_ICONS[type?.toLowerCase()] || Hash;
+    const color = CHANNEL_COLORS[type?.toLowerCase()] || 'text-gray-500';
+    return <ChannelIcon className={`${size} ${color}`} />;
+  };
 
   // Render assistant card
   const renderAssistantCard = (assistant: Assistant, isMarketplace: boolean = true) => {
@@ -206,6 +374,16 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
           </div>
         )}
 
+        {/* Custom badge */}
+        {assistant.is_custom && (
+          <div className="absolute -top-2 -right-2">
+            <Badge className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-0 gap-1">
+              <Edit3 className="h-3 w-3" />
+              Personalizado
+            </Badge>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-start gap-4 mb-4">
           <div
@@ -223,7 +401,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             </p>
           </div>
           {/* Price or Free badge */}
-          {assistant.is_free ? (
+          {assistant.is_free || assistant.is_custom ? (
             <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">
               Grátis
             </Badge>
@@ -257,6 +435,27 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             </span>
           )}
         </div>
+
+        {/* Connected channels */}
+        {userAssistant && (userAssistant.channel_ids?.length > 0) && (
+          <div className={`flex flex-wrap items-center gap-1.5 mb-4 py-2 px-3 rounded-lg ${
+            isDark ? 'bg-slate-900/50' : 'bg-gray-50'
+          }`}>
+            <span className={`text-[10px] font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Canais:</span>
+            {userAssistant.channel_ids.map(channelId => {
+              const channel = getChannelById(channelId);
+              if (!channel) return null;
+              return (
+                <span key={channelId} className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full ${
+                  isDark ? 'bg-slate-700' : 'bg-white border border-gray-200'
+                }`}>
+                  {renderChannelIcon(channel.type, 'w-3 h-3')}
+                  {channel.name || channel.type}
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         {/* Stats for connected assistants */}
         {!isMarketplace && userAssistant && (
@@ -304,17 +503,40 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </Button>
               </>
             ) : (
-              <Button
-                className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
-                size="sm"
-                onClick={() => {
-                  setSelectedAssistant(assistant);
-                  setConnectModalOpen(true);
-                }}
-              >
-                <Link2 className="w-4 h-4 mr-1.5" />
-                Conectar
-              </Button>
+              <>
+                <Button
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedAssistant(assistant);
+                    setSelectedChannelIds([]);
+                    setConnectModalOpen(true);
+                  }}
+                >
+                  <Link2 className="w-4 h-4 mr-1.5" />
+                  Conectar
+                </Button>
+                {/* Edit/Delete for custom assistants */}
+                {assistant.is_custom && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEditModal(assistant)}
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                      onClick={() => handleDeleteAssistant(assistant)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
+              </>
             )
           ) : (
             <>
@@ -369,7 +591,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   };
 
   return (
-    <div className="flex flex-col h-full p-4 md:p-6">
+    <div className="flex flex-col h-full overflow-y-auto p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
         <div>
@@ -377,19 +599,33 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             Assistentes de IA
           </h1>
           <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-            Conecte assistentes inteligentes para automatizar seu atendimento
+            Conecte assistentes inteligentes aos seus canais para automatizar o atendimento
           </p>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full md:w-72">
-          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
-          <Input
-            placeholder="Buscar assistentes..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className={`pl-9 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}
-          />
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* Create button */}
+          <Button
+            onClick={() => {
+              resetCreateForm();
+              setCreateModalOpen(true);
+            }}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Criar Assistente
+          </Button>
+
+          {/* Search */}
+          <div className="relative flex-1 md:w-72 md:flex-none">
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
+            <Input
+              placeholder="Buscar assistentes..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`pl-9 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}
+            />
+          </div>
         </div>
       </div>
 
@@ -484,7 +720,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         </div>
       )}
 
-      {/* Connect Modal */}
+      {/* Connect Modal - Multi-channel */}
       {connectModalOpen && selectedAssistant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className={`w-full max-w-md rounded-2xl shadow-2xl ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
@@ -496,6 +732,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 onClick={() => {
                   setConnectModalOpen(false);
                   setSelectedAssistant(null);
+                  setSelectedChannelIds([]);
                 }}
                 className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
               >
@@ -527,43 +764,57 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
               </div>
 
-              {/* Channel Selection */}
+              {/* Channel Selection - Multi-select with checkboxes */}
               <div>
                 <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Canal (opcional)
+                  Selecione os canais para conectar
                 </label>
-                <select
-                  value={selectedChannelId}
-                  onChange={(e) => setSelectedChannelId(e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                    isDark
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
-                >
-                  <option value="">Todos os canais</option>
-                  {channels.map(channel => (
-                    <option key={channel.id} value={channel.id}>
-                      {channel.name} ({channel.type})
-                    </option>
-                  ))}
-                </select>
-                <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                  Selecione um canal específico ou deixe em branco para usar em todos
+                {channels.length === 0 ? (
+                  <div className={`text-center py-4 rounded-lg border-2 border-dashed ${isDark ? 'border-slate-700 text-gray-500' : 'border-gray-200 text-gray-400'}`}>
+                    <Hash className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                    <p className="text-xs">Nenhum canal conectado</p>
+                    <p className="text-[10px] mt-1">Conecte canais na página de configurações</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {channels.map(channel => {
+                      const isSelected = selectedChannelIds.includes(channel.id);
+                      return (
+                        <button
+                          key={channel.id}
+                          type="button"
+                          onClick={() => toggleChannelSelection(channel.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors text-left ${
+                            isSelected
+                              ? isDark
+                                ? 'bg-blue-900/30 border-blue-500/50 text-blue-400'
+                                : 'bg-blue-50 border-blue-300 text-blue-700'
+                              : isDark
+                                ? 'bg-slate-800 border-slate-700 hover:border-slate-600 text-gray-300'
+                                : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
+                            isSelected
+                              ? 'bg-blue-600 border-blue-600'
+                              : isDark ? 'border-slate-600' : 'border-gray-300'
+                          }`}>
+                            {isSelected && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          {renderChannelIcon(channel.type)}
+                          <span className="flex-1 text-sm font-medium">{channel.name || channel.type}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-700 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+                            {channel.type}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  O assistente responderá nas caixas de entrada dos canais selecionados
                 </p>
               </div>
-
-              {/* Price Info */}
-              {!selectedAssistant.is_free && (
-                <div className={`p-3 rounded-lg ${isDark ? 'bg-amber-900/20 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
-                  <div className="flex items-center gap-2">
-                    <Crown className="w-4 h-4 text-amber-500" />
-                    <span className={`text-sm font-medium ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedAssistant.price_monthly)}/mês
-                    </span>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className={`flex items-center justify-end gap-2 p-4 border-t ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
@@ -572,6 +823,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 onClick={() => {
                   setConnectModalOpen(false);
                   setSelectedAssistant(null);
+                  setSelectedChannelIds([]);
                 }}
               >
                 Cancelar
@@ -586,7 +838,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 ) : (
                   <Link2 className="w-4 h-4 mr-2" />
                 )}
-                Conectar
+                Conectar {selectedChannelIds.length > 0 ? `(${selectedChannelIds.length} ${selectedChannelIds.length === 1 ? 'canal' : 'canais'})` : ''}
               </Button>
             </div>
           </div>
@@ -616,24 +868,37 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               {/* Channel Selection */}
               <div>
                 <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Canal
+                  Canais conectados
                 </label>
-                <select
-                  value={selectedChannelId}
-                  onChange={(e) => setSelectedChannelId(e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                    isDark
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
-                >
-                  <option value="">Todos os canais</option>
-                  {channels.map(channel => (
-                    <option key={channel.id} value={channel.id}>
-                      {channel.name} ({channel.type})
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-2 max-h-36 overflow-y-auto">
+                  {channels.map(channel => {
+                    const isSelected = selectedChannelIds.includes(channel.id);
+                    return (
+                      <button
+                        key={channel.id}
+                        type="button"
+                        onClick={() => toggleChannelSelection(channel.id)}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors text-left ${
+                          isSelected
+                            ? isDark
+                              ? 'bg-blue-900/30 border-blue-500/50 text-blue-400'
+                              : 'bg-blue-50 border-blue-300 text-blue-700'
+                            : isDark
+                              ? 'bg-slate-800 border-slate-700 hover:border-slate-600 text-gray-300'
+                              : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
+                          isSelected ? 'bg-blue-600 border-blue-600' : isDark ? 'border-slate-600' : 'border-gray-300'
+                        }`}>
+                          {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                        </div>
+                        {renderChannelIcon(channel.type, 'w-3.5 h-3.5')}
+                        <span className="text-sm">{channel.name || channel.type}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Greeting */}
@@ -761,6 +1026,201 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   <Check className="w-4 h-4 mr-2" />
                 )}
                 Salvar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create/Edit Assistant Modal */}
+      {createModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className={`w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl shadow-2xl ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
+            <div className={`sticky top-0 z-10 flex items-center justify-between p-4 border-b ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
+              <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                {editingAssistantId ? 'Editar Assistente' : 'Criar Assistente'}
+              </h3>
+              <button
+                onClick={() => {
+                  setCreateModalOpen(false);
+                  resetCreateForm();
+                }}
+                className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Name */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Nome *
+                </label>
+                <Input
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Ex: Assistente de Vendas"
+                  className={isDark ? 'bg-slate-800 border-slate-700' : ''}
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Descrição
+                </label>
+                <textarea
+                  value={createForm.description || ''}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+                  rows={2}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                  }`}
+                  placeholder="Descrição detalhada do assistente..."
+                />
+              </div>
+
+              {/* Icon and Color */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Ícone
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {ICON_OPTIONS.map(opt => {
+                      const OptIcon = opt.icon;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setCreateForm(prev => ({ ...prev, icon: opt.value }))}
+                          className={`p-2 rounded-lg border transition-colors flex items-center justify-center ${
+                            createForm.icon === opt.value
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                              : isDark ? 'border-slate-700 hover:border-slate-600' : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          title={opt.label}
+                        >
+                          <OptIcon className="w-5 h-5" style={{ color: createForm.color }} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Cor
+                  </label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {COLOR_OPTIONS.map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setCreateForm(prev => ({ ...prev, color }))}
+                        className={`w-8 h-8 rounded-lg transition-all ${
+                          createForm.color === color ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Greeting */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Mensagem de Boas-vindas
+                </label>
+                <textarea
+                  value={createForm.greeting || ''}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, greeting: e.target.value }))}
+                  rows={2}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                  }`}
+                  placeholder="Ex: Olá! Como posso ajudar você hoje?"
+                />
+              </div>
+
+              {/* Instructions */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Instruções / Prompt
+                </label>
+                <textarea
+                  value={createForm.instructions || ''}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, instructions: e.target.value }))}
+                  rows={4}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                  }`}
+                  placeholder="Descreva como o assistente deve se comportar, que tipo de perguntas deve responder, tom de voz, etc..."
+                />
+                <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  Estas instruções definem o comportamento do assistente nas conversas
+                </p>
+              </div>
+
+              {/* Features */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Funcionalidades
+                </label>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    value={newFeature}
+                    onChange={(e) => setNewFeature(e.target.value)}
+                    placeholder="Ex: Qualificação de leads"
+                    className={`flex-1 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFeature())}
+                  />
+                  <Button variant="outline" size="sm" onClick={addFeature} disabled={(createForm.features?.length || 0) >= 8}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(createForm.features || []).map((feature, idx) => (
+                    <span
+                      key={idx}
+                      className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                        isDark ? 'bg-slate-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {feature}
+                      <button onClick={() => removeFeature(idx)} className="hover:text-red-500">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className={`sticky bottom-0 flex items-center justify-end gap-2 p-4 border-t ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCreateModalOpen(false);
+                  resetCreateForm();
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleCreateAssistant}
+                disabled={actionLoading || !createForm.name.trim()}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+              >
+                {actionLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : editingAssistantId ? (
+                  <Check className="w-4 h-4 mr-2" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
+                {editingAssistantId ? 'Salvar' : 'Criar Assistente'}
               </Button>
             </div>
           </div>

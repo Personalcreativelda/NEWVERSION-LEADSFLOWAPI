@@ -37,6 +37,8 @@ export interface Assistant {
     is_free: boolean;
     is_active: boolean;
     is_featured: boolean;
+    is_custom: boolean;
+    created_by: string | null;
     default_config: Record<string, any>;
     required_channels: string[];
     created_at: string;
@@ -51,6 +53,7 @@ export interface UserAssistant {
     is_configured: boolean;
     config: Record<string, any>;
     channel_id: string | null;
+    channel_ids: string[];
     n8n_workflow_id: string | null;
     last_triggered_at: string | null;
     stats: {
@@ -77,6 +80,18 @@ export interface AssistantLog {
     error_message: string | null;
     metadata: Record<string, any>;
     created_at: string;
+}
+
+export interface CreateAssistantInput {
+    name: string;
+    description?: string;
+    short_description?: string;
+    icon?: string;
+    color?: string;
+    category?: string;
+    features?: string[];
+    instructions?: string;
+    greeting?: string;
 }
 
 export const assistantsApi = {
@@ -113,12 +128,35 @@ export const assistantsApi = {
     },
 
     /**
-     * Conecta um assistente
+     * Cria um assistente personalizado
      */
-    async connect(assistantId: string, channelId?: string): Promise<UserAssistant> {
+    async create(input: CreateAssistantInput): Promise<Assistant> {
+        const { data } = await api.post<Assistant>('/assistants/create', input);
+        return data;
+    },
+
+    /**
+     * Atualiza um assistente personalizado
+     */
+    async update(assistantId: string, input: Partial<CreateAssistantInput>): Promise<Assistant> {
+        const { data } = await api.put<Assistant>(`/assistants/${assistantId}/edit`, input);
+        return data;
+    },
+
+    /**
+     * Deleta um assistente personalizado
+     */
+    async deleteAssistant(assistantId: string): Promise<void> {
+        await api.delete(`/assistants/${assistantId}/delete`);
+    },
+
+    /**
+     * Conecta um assistente com múltiplos canais
+     */
+    async connect(assistantId: string, channelIds?: string[]): Promise<UserAssistant> {
         const { data } = await api.post<UserAssistant>('/assistants/connect', {
             assistantId,
-            channelId
+            channelIds
         });
         return data;
     },
@@ -131,12 +169,22 @@ export const assistantsApi = {
     },
 
     /**
+     * Atualiza os canais conectados de um assistente
+     */
+    async updateChannels(userAssistantId: string, channelIds: string[]): Promise<UserAssistant> {
+        const { data } = await api.put<UserAssistant>(`/assistants/${userAssistantId}/channels`, {
+            channelIds
+        });
+        return data;
+    },
+
+    /**
      * Atualiza configuração do assistente
      */
-    async configure(userAssistantId: string, config: Record<string, any>, channelId?: string): Promise<UserAssistant> {
+    async configure(userAssistantId: string, config: Record<string, any>, channelIds?: string[]): Promise<UserAssistant> {
         const { data } = await api.put<UserAssistant>(`/assistants/${userAssistantId}/configure`, {
             config,
-            channelId
+            channelIds
         });
         return data;
     },
