@@ -4,7 +4,8 @@ import {
   Briefcase, Headphones, Calendar, Users, ShoppingCart,
   Zap, X, Check, Loader2,
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
-  Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash
+  Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash,
+  Key, Brain, Eye, EyeOff
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -95,6 +96,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const [actionLoading, setActionLoading] = useState(false);
 
   // Create modal state
+  const [showApiKey, setShowApiKey] = useState(false);
+
   const [createForm, setCreateForm] = useState<CreateAssistantInput>({
     name: '',
     description: '',
@@ -939,6 +942,101 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                   Descreva como o assistente deve se comportar e responder
                 </p>
+              </div>
+
+              {/* AI Configuration */}
+              <div className={`p-4 rounded-lg border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-blue-50/50 border-blue-200'}`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Brain className={`w-4 h-4 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+                  <h4 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    Configuração de IA
+                  </h4>
+                </div>
+
+                {/* AI Provider */}
+                <div className="mb-3">
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Provedor de IA
+                  </label>
+                  <select
+                    value={configValues.ai_provider || 'openai'}
+                    onChange={(e) => setConfigValues({ ...configValues, ai_provider: e.target.value, ai_model: '' })}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                      isDark
+                        ? 'bg-slate-800 border-slate-600 text-white'
+                        : 'bg-white border-gray-300 text-gray-900'
+                    }`}
+                  >
+                    <option value="openai">OpenAI (ChatGPT)</option>
+                    <option value="gemini">Google Gemini</option>
+                  </select>
+                </div>
+
+                {/* AI Model */}
+                <div className="mb-3">
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Modelo
+                  </label>
+                  <select
+                    value={configValues.ai_model || ''}
+                    onChange={(e) => setConfigValues({ ...configValues, ai_model: e.target.value })}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                      isDark
+                        ? 'bg-slate-800 border-slate-600 text-white'
+                        : 'bg-white border-gray-300 text-gray-900'
+                    }`}
+                  >
+                    {(configValues.ai_provider || 'openai') === 'openai' ? (
+                      <>
+                        <option value="">gpt-4o-mini (padrão)</option>
+                        <option value="gpt-4o">GPT-4o</option>
+                        <option value="gpt-4o-mini">GPT-4o Mini</option>
+                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="">gemini-2.0-flash (padrão)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                {/* API Key */}
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    API Key
+                  </label>
+                  <div className="relative">
+                    <Key className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={configValues.ai_api_key || ''}
+                      onChange={(e) => setConfigValues({ ...configValues, ai_api_key: e.target.value })}
+                      placeholder={`Cole sua ${(configValues.ai_provider || 'openai') === 'openai' ? 'OpenAI' : 'Google'} API Key`}
+                      className={`w-full pl-9 pr-10 py-2 rounded-lg border text-sm ${
+                        isDark
+                          ? 'bg-slate-800 border-slate-600 text-white placeholder:text-gray-500'
+                          : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <p className={`text-[10px] mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                    {(configValues.ai_provider || 'openai') === 'openai'
+                      ? 'Obtenha em platform.openai.com/api-keys'
+                      : 'Obtenha em aistudio.google.com/apikey'}
+                  </p>
+                </div>
               </div>
 
               {/* Business Hours */}

@@ -6,6 +6,8 @@ import { ConversationsService } from '../services/conversations.service';
 import { LeadsService } from '../services/leads.service';
 // INBOX: Importar WebSocket service para notificações em tempo real
 import { getWebSocketService } from '../services/websocket.service';
+// IA: Importar processador de assistentes
+import { assistantProcessor } from '../services/assistant-processor.service';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -629,6 +631,24 @@ router.post('/evolution/messages', async (req, res) => {
       console.warn('[Evolution Webhook] WebSocket service não disponível');
     }
 
+    // Processar assistente de IA (assíncrono - não bloqueia a resposta)
+    if (content && content.trim()) {
+      assistantProcessor.processIncomingMessage({
+        channelId: channel.id,
+        channelType: channel.type || 'whatsapp',
+        conversationId: conversation.id,
+        userId: channel.user_id,
+        contactPhone: phone || remoteJid,
+        contactName: contactName,
+        messageContent: content,
+        credentials: channel.credentials
+      }).then(replied => {
+        if (replied) console.log('[Evolution Webhook] Assistente IA respondeu automaticamente');
+      }).catch(err => {
+        console.error('[Evolution Webhook] Erro no assistente IA:', err.message);
+      });
+    }
+
     res.json({ success: true, message_id: message.id });
   } catch (error) {
     console.error('[Evolution Webhook] Erro ao processar mensagem:', error);
@@ -847,6 +867,24 @@ router.post('/telegram', async (req, res) => {
       });
 
       console.log('[Telegram Webhook] WebSocket emitido!');
+    }
+
+    // Processar assistente de IA (assíncrono)
+    if (text && text.trim()) {
+      assistantProcessor.processIncomingMessage({
+        channelId: channel.id,
+        channelType: 'telegram',
+        conversationId: conversation.id,
+        userId: channel.user_id,
+        contactPhone: chatId,
+        contactName: contactName,
+        messageContent: text,
+        credentials: channel.credentials
+      }).then(replied => {
+        if (replied) console.log('[Telegram Webhook] Assistente IA respondeu');
+      }).catch(err => {
+        console.error('[Telegram Webhook] Erro no assistente IA:', err.message);
+      });
     }
 
     // Telegram espera resposta 200 OK
@@ -1104,6 +1142,24 @@ router.post('/instagram', async (req, res) => {
           });
 
           console.log('[Instagram Webhook] WebSocket emitido!');
+        }
+
+        // Processar assistente de IA (assíncrono - não bloqueia a resposta)
+        if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+          assistantProcessor.processIncomingMessage({
+            channelId: channel.id,
+            channelType: 'instagram',
+            conversationId: conversation.id,
+            userId: channel.user_id,
+            contactPhone: senderId,
+            contactName: contactName,
+            messageContent: messageContent,
+            credentials: channel.credentials
+          }).then(replied => {
+            if (replied) console.log('[Instagram Webhook] Assistente IA respondeu automaticamente');
+          }).catch(err => {
+            console.error('[Instagram Webhook] Erro no assistente IA:', err.message);
+          });
         }
       }
 
@@ -1374,6 +1430,24 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
             });
 
             console.log('[WhatsApp Cloud Webhook] WebSocket emitido!');
+          }
+
+          // Processar assistente de IA (assíncrono - não bloqueia a resposta)
+          if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+            assistantProcessor.processIncomingMessage({
+              channelId: channel.id,
+              channelType: 'whatsapp_cloud',
+              conversationId: conversation.id,
+              userId: channel.user_id,
+              contactPhone: phone || senderId,
+              contactName: contactName,
+              messageContent: messageContent,
+              credentials: channel.credentials
+            }).then(replied => {
+              if (replied) console.log('[WhatsApp Cloud Webhook] Assistente IA respondeu automaticamente');
+            }).catch(err => {
+              console.error('[WhatsApp Cloud Webhook] Erro no assistente IA:', err.message);
+            });
           }
         }
 
