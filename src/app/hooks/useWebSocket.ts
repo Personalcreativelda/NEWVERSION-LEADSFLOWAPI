@@ -40,7 +40,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             return;
         }
 
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('leadflow_access_token');
 
         if (!token) {
             console.warn('[WebSocket] No authentication token found');
