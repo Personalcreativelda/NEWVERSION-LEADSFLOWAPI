@@ -204,6 +204,8 @@ class UserWebhooksService {
   async findActiveByEvent(userId: string, event: WebhookEventType, channelId?: string): Promise<UserWebhook[]> {
     await this.ensureTable();
 
+    console.log(`[UserWebhooks] Finding active webhooks for user=${userId}, event=${event}, channelId=${channelId || 'any'}`);
+
     let sql = `
       SELECT * FROM user_webhooks
       WHERE user_id = $1
@@ -218,7 +220,10 @@ class UserWebhooksService {
       params.push(channelId);
     }
 
+    console.log(`[UserWebhooks] Query:`, sql.replace(/\s+/g, ' ').trim(), 'Params:', params);
+
     const result = await query(sql, params);
+    console.log(`[UserWebhooks] Found ${result.rows.length} webhook(s)`);
     return result.rows;
   }
 

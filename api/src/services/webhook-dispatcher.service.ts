@@ -38,6 +38,8 @@ class WebhookDispatcher {
    * Esta função é assíncrona e não bloqueia
    */
   async dispatch(userId: string, event: WebhookEventType, data: any, channelId?: string): Promise<void> {
+    console.log(`[WebhookDispatcher] Queueing event: ${event} for user: ${userId}, channelId: ${channelId || 'all'}`);
+
     // Adicionar na fila para processamento assíncrono
     this.queue.push({ userId, event, payload: data, channelId });
 
@@ -68,14 +70,19 @@ class WebhookDispatcher {
 
   private async dispatchToWebhooks(userId: string, event: WebhookEventType, data: any, channelId?: string): Promise<void> {
     try {
+      console.log(`[WebhookDispatcher] Looking for webhooks: userId=${userId}, event=${event}, channelId=${channelId || 'any'}`);
+
       // Buscar webhooks ativos para este evento
       const webhooks = await userWebhooksService.findActiveByEvent(userId, event, channelId);
 
+      console.log(`[WebhookDispatcher] Found ${webhooks.length} active webhook(s) for event ${event}`);
+
       if (webhooks.length === 0) {
+        console.log(`[WebhookDispatcher] No webhooks found for event ${event} - skipping`);
         return;
       }
 
-      console.log(`[WebhookDispatcher] Dispatching ${event} to ${webhooks.length} webhook(s)`);
+      console.log(`[WebhookDispatcher] Dispatching ${event} to ${webhooks.length} webhook(s):`, webhooks.map(w => ({ id: w.id, name: w.name, url: w.url })));
 
       // Construir payload padrão
       const payload: WebhookPayload = {
@@ -97,6 +104,8 @@ class WebhookDispatcher {
   }
 
   private async sendToWebhook(webhook: UserWebhook, payload: WebhookPayload): Promise<void> {
+    console.log(`[WebhookDispatcher] Sending to webhook ${webhook.id} (${webhook.name}) at ${webhook.url}`);
+
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -136,7 +145,9 @@ class WebhookDispatcher {
         });
 
         if (!response.ok) {
-          console.warn(`[WebhookDispatcher] Webhook ${webhook.id} returned ${response.status}`);
+          console.warn(`[WebhookDispatcher] Webhook ${webhook.id} returned ${response.status}: ${responseText.substring(0, 200)}`);
+        } else {
+          console.log(`[WebhookDispatcher] Webhook ${webhook.id} sent successfully (HTTP ${response.status})`);
         }
       } catch (fetchError: any) {
         clearTimeout(timeout);
