@@ -27,6 +27,56 @@ const CATEGORY_CONFIG: Record<string, { color: string; bgColor: string; label: s
   whatsapp: { color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', label: 'WhatsApp' },
 };
 
+// Eventos estáticos como fallback (caso a API não responda)
+const STATIC_EVENTS: WebhookEventsResponse = {
+  events: {
+    'message.received': { name: 'Mensagem Recebida', description: 'Quando uma nova mensagem é recebida de um contato', category: 'messages' },
+    'message.sent': { name: 'Mensagem Enviada', description: 'Quando uma mensagem é enviada para um contato', category: 'messages' },
+    'message.updated': { name: 'Mensagem Atualizada', description: 'Quando o status de uma mensagem é atualizado (entregue, lida)', category: 'messages' },
+    'message.deleted': { name: 'Mensagem Deletada', description: 'Quando uma mensagem é deletada', category: 'messages' },
+    'conversation.created': { name: 'Conversa Criada', description: 'Quando uma nova conversa é iniciada', category: 'conversations' },
+    'conversation.updated': { name: 'Conversa Atualizada', description: 'Quando uma conversa é atualizada (status, tags, etc.)', category: 'conversations' },
+    'conversation.resolved': { name: 'Conversa Resolvida', description: 'Quando uma conversa é marcada como resolvida/fechada', category: 'conversations' },
+    'conversation.reopened': { name: 'Conversa Reaberta', description: 'Quando uma conversa fechada é reaberta', category: 'conversations' },
+    'contact.created': { name: 'Contato Criado', description: 'Quando um novo contato/lead é criado', category: 'contacts' },
+    'contact.updated': { name: 'Contato Atualizado', description: 'Quando dados de um contato são atualizados', category: 'contacts' },
+    'channel.connected': { name: 'Canal Conectado', description: 'Quando um canal é conectado com sucesso', category: 'channels' },
+    'channel.disconnected': { name: 'Canal Desconectado', description: 'Quando um canal é desconectado', category: 'channels' },
+    'channel.qr_updated': { name: 'QR Code Atualizado', description: 'Quando o QR Code do WhatsApp é atualizado', category: 'channels' },
+    'whatsapp.connection.update': { name: 'Status da Conexão', description: 'Atualizações de conexão do WhatsApp', category: 'whatsapp' },
+    'whatsapp.presence.update': { name: 'Presença Atualizada', description: 'Quando o status de presença muda (online, digitando, etc.)', category: 'whatsapp' },
+    'whatsapp.groups.update': { name: 'Grupo Atualizado', description: 'Atualizações em grupos do WhatsApp', category: 'whatsapp' },
+  },
+  categories: {
+    messages: [
+      { event: 'message.received', name: 'Mensagem Recebida', description: 'Quando uma nova mensagem é recebida de um contato' },
+      { event: 'message.sent', name: 'Mensagem Enviada', description: 'Quando uma mensagem é enviada para um contato' },
+      { event: 'message.updated', name: 'Mensagem Atualizada', description: 'Quando o status de uma mensagem é atualizado (entregue, lida)' },
+      { event: 'message.deleted', name: 'Mensagem Deletada', description: 'Quando uma mensagem é deletada' },
+    ],
+    conversations: [
+      { event: 'conversation.created', name: 'Conversa Criada', description: 'Quando uma nova conversa é iniciada' },
+      { event: 'conversation.updated', name: 'Conversa Atualizada', description: 'Quando uma conversa é atualizada (status, tags, etc.)' },
+      { event: 'conversation.resolved', name: 'Conversa Resolvida', description: 'Quando uma conversa é marcada como resolvida/fechada' },
+      { event: 'conversation.reopened', name: 'Conversa Reaberta', description: 'Quando uma conversa fechada é reaberta' },
+    ],
+    contacts: [
+      { event: 'contact.created', name: 'Contato Criado', description: 'Quando um novo contato/lead é criado' },
+      { event: 'contact.updated', name: 'Contato Atualizado', description: 'Quando dados de um contato são atualizados' },
+    ],
+    channels: [
+      { event: 'channel.connected', name: 'Canal Conectado', description: 'Quando um canal é conectado com sucesso' },
+      { event: 'channel.disconnected', name: 'Canal Desconectado', description: 'Quando um canal é desconectado' },
+      { event: 'channel.qr_updated', name: 'QR Code Atualizado', description: 'Quando o QR Code do WhatsApp é atualizado' },
+    ],
+    whatsapp: [
+      { event: 'whatsapp.connection.update', name: 'Status da Conexão', description: 'Atualizações de conexão do WhatsApp' },
+      { event: 'whatsapp.presence.update', name: 'Presença Atualizada', description: 'Quando o status de presença muda (online, digitando, etc.)' },
+      { event: 'whatsapp.groups.update', name: 'Grupo Atualizado', description: 'Atualizações em grupos do WhatsApp' },
+    ],
+  },
+};
+
 export default function InboxAutomations() {
   const [webhooks, setWebhooks] = useState<UserWebhook[]>([]);
   const [eventsData, setEventsData] = useState<WebhookEventsResponse | null>(null);
@@ -61,17 +111,27 @@ export default function InboxAutomations() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [webhooksData, events, channelsList] = await Promise.all([
-        userWebhooksApi.getAll(),
-        userWebhooksApi.getEvents(),
-        channelsApi.getAll(),
+
+      // Carregar webhooks e canais
+      const [webhooksData, channelsList] = await Promise.all([
+        userWebhooksApi.getAll().catch(() => []),
+        channelsApi.getAll().catch(() => []),
       ]);
       setWebhooks(webhooksData);
-      setEventsData(events);
       setChannels(channelsList);
+
+      // Tentar carregar eventos da API, usar fallback estático se falhar
+      try {
+        const events = await userWebhooksApi.getEvents();
+        setEventsData(events);
+      } catch {
+        console.log('[Webhooks] Using static events fallback');
+        setEventsData(STATIC_EVENTS);
+      }
     } catch (error) {
       console.error('[Webhooks] Error loading data:', error);
-      toast.error('Erro ao carregar webhooks');
+      // Usar eventos estáticos mesmo em caso de erro total
+      setEventsData(STATIC_EVENTS);
     } finally {
       setLoading(false);
     }
@@ -555,7 +615,7 @@ export default function InboxAutomations() {
                   Selecione os eventos que deseja receber no webhook
                 </p>
 
-                {eventsData && Object.entries(eventsData.categories).map(([category, events]) => {
+                {Object.entries((eventsData || STATIC_EVENTS).categories).map(([category, events]) => {
                   const config = CATEGORY_CONFIG[category] || { color: 'text-gray-500', bgColor: 'bg-gray-500/10', label: category };
                   const categoryEventKeys = events.map(e => e.event);
                   const allSelected = categoryEventKeys.every(e => formData.events.includes(e));
