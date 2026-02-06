@@ -8,6 +8,8 @@ import { LeadsService } from '../services/leads.service';
 import { getWebSocketService } from '../services/websocket.service';
 // IA: Importar processador de assistentes
 import { assistantProcessor } from '../services/assistant-processor.service';
+// Webhooks: Importar dispatcher para enviar eventos para webhooks do usuário
+import { webhookDispatcher } from '../services/webhook-dispatcher.service';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -631,6 +633,21 @@ router.post('/evolution/messages', async (req, res) => {
       console.warn('[Evolution Webhook] WebSocket service não disponível');
     }
 
+    // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+    webhookDispatcher.dispatchMessageReceived(channel.user_id, {
+      channelId: channel.id,
+      channelType: 'whatsapp',
+      channelName: channel.name,
+      conversationId: conversation.id,
+      messageId: message.id,
+      content: messageContent,
+      contactName: contactName,
+      contactPhone: phone,
+      mediaType: mediaType || undefined,
+      mediaUrl: mediaUrl || undefined,
+      rawPayload: req.body,
+    }).catch(err => console.error('[Evolution Webhook] Erro ao disparar webhook:', err.message));
+
     // Processar assistente de IA (assíncrono - não bloqueia a resposta)
     if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
       assistantProcessor.processIncomingMessage({
@@ -868,6 +885,19 @@ router.post('/telegram', async (req, res) => {
 
       console.log('[Telegram Webhook] WebSocket emitido!');
     }
+
+    // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+    webhookDispatcher.dispatchMessageReceived(channel.user_id, {
+      channelId: channel.id,
+      channelType: 'telegram',
+      channelName: channel.name,
+      conversationId: conversation.id,
+      messageId: savedMessage.id,
+      content: text || '[Mídia]',
+      contactName: contactName,
+      contactPhone: chatId,
+      rawPayload: req.body,
+    }).catch(err => console.error('[Telegram Webhook] Erro ao disparar webhook:', err.message));
 
     // Processar assistente de IA (assíncrono)
     if (text && text.trim()) {
@@ -1143,6 +1173,19 @@ router.post('/instagram', async (req, res) => {
 
           console.log('[Instagram Webhook] WebSocket emitido!');
         }
+
+        // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+        webhookDispatcher.dispatchMessageReceived(channel.user_id, {
+          channelId: channel.id,
+          channelType: 'instagram',
+          channelName: channel.name,
+          conversationId: conversation.id,
+          messageId: savedMessage.id,
+          content: messageContent,
+          contactName: contactName,
+          contactPhone: senderId,
+          rawPayload: entry,
+        }).catch(err => console.error('[Instagram Webhook] Erro ao disparar webhook:', err.message));
 
         // Processar assistente de IA (assíncrono - não bloqueia a resposta)
         if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
@@ -1431,6 +1474,20 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
 
             console.log('[WhatsApp Cloud Webhook] WebSocket emitido!');
           }
+
+          // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+          webhookDispatcher.dispatchMessageReceived(channel.user_id, {
+            channelId: channel.id,
+            channelType: 'whatsapp_cloud',
+            channelName: channel.name,
+            conversationId: conversation.id,
+            messageId: savedMessage.id,
+            content: messageContent,
+            contactName: contactName,
+            contactPhone: phone || senderId,
+            mediaType: mediaType || undefined,
+            rawPayload: message,
+          }).catch(err => console.error('[WhatsApp Cloud Webhook] Erro ao disparar webhook:', err.message));
 
           // Processar assistente de IA (assíncrono - não bloqueia a resposta)
           if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
