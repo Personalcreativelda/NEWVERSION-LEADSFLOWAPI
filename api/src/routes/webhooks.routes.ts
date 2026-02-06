@@ -497,15 +497,55 @@ router.post('/evolution/messages', async (req, res) => {
     let mediaUrl = null;
     let mediaType = null;
 
+    // Verificar diferentes locais onde a mídia pode estar no payload do Evolution API
     if (msg?.imageMessage) {
       mediaType = 'image';
+      mediaUrl = msg.imageMessage.url ||
+                 msg.imageMessage.directPath ||
+                 messageData.media?.url ||
+                 messageData.mediaUrl ||
+                 (msg.imageMessage.base64 ? `data:image/jpeg;base64,${msg.imageMessage.base64}` : null);
     } else if (msg?.videoMessage) {
       mediaType = 'video';
+      mediaUrl = msg.videoMessage.url ||
+                 msg.videoMessage.directPath ||
+                 messageData.media?.url ||
+                 messageData.mediaUrl;
     } else if (msg?.audioMessage) {
       mediaType = 'audio';
+      mediaUrl = msg.audioMessage.url ||
+                 msg.audioMessage.directPath ||
+                 messageData.media?.url ||
+                 messageData.mediaUrl;
     } else if (msg?.documentMessage) {
       mediaType = 'document';
+      mediaUrl = msg.documentMessage.url ||
+                 msg.documentMessage.directPath ||
+                 messageData.media?.url ||
+                 messageData.mediaUrl;
+    } else if (msg?.stickerMessage) {
+      mediaType = 'sticker';
+      mediaUrl = msg.stickerMessage.url ||
+                 messageData.media?.url;
     }
+
+    // Fallback: tentar extrair de outras localizações comuns
+    if (!mediaUrl && messageData.media) {
+      mediaUrl = messageData.media.url || messageData.media.base64;
+      if (!mediaType && messageData.media.mimetype) {
+        if (messageData.media.mimetype.startsWith('image')) mediaType = 'image';
+        else if (messageData.media.mimetype.startsWith('video')) mediaType = 'video';
+        else if (messageData.media.mimetype.startsWith('audio')) mediaType = 'audio';
+        else mediaType = 'document';
+      }
+    }
+
+    // Se ainda não tem URL, verificar no nível raiz do messageData
+    if (!mediaUrl) {
+      mediaUrl = messageData.mediaUrl || messageData.media_url || messageData.base64Media;
+    }
+
+    console.log('[Evolution Webhook] Mídia detectada:', { mediaType, mediaUrl: mediaUrl ? mediaUrl.substring(0, 100) + '...' : null });
 
     // Extrair telefone do JID
     const phone = remoteJid.split('@')[0];

@@ -990,24 +990,8 @@ router.get('/unread-count', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // First try to get instance from saved channels, fallback to legacy
-    const savedInstance = await getActiveWhatsAppInstance(user.id);
-    const instanceId = savedInstance || getUserInstanceName(user.id);
-
-    // Try Evolution API first
-    if (whatsappService.isReady()) {
-      try {
-        const chats = await whatsappService.fetchChats(instanceId) as any[];
-        if (Array.isArray(chats)) {
-          const totalUnread = chats.reduce((sum: number, chat: any) => sum + (chat.unreadCount || 0), 0);
-          return res.json({ count: totalUnread });
-        }
-      } catch (evolutionError) {
-        console.warn('[Inbox] Evolution API unread count failed:', evolutionError);
-      }
-    }
-
-    // Fallback to local database
+    // Usar apenas contagem do banco de dados local para consistência
+    // A contagem do Evolution API pode estar dessincronizada com o app
     const count = await inboxService.getUnreadCount(user.id);
     res.json({ count });
   } catch (error) {
