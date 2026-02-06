@@ -632,7 +632,7 @@ router.post('/evolution/messages', async (req, res) => {
     }
 
     // Processar assistente de IA (assíncrono - não bloqueia a resposta)
-    if (content && content.trim()) {
+    if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
       assistantProcessor.processIncomingMessage({
         channelId: channel.id,
         channelType: channel.type || 'whatsapp',
@@ -640,7 +640,7 @@ router.post('/evolution/messages', async (req, res) => {
         userId: channel.user_id,
         contactPhone: phone || remoteJid,
         contactName: contactName,
-        messageContent: content,
+        messageContent: messageContent,
         credentials: channel.credentials
       }).then(replied => {
         if (replied) console.log('[Evolution Webhook] Assistente IA respondeu automaticamente');
