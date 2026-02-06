@@ -13,7 +13,7 @@ const api = axios.create({
 
 // Interceptor para adicionar token de autenticação
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('leadflow_access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
