@@ -637,19 +637,36 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
   useEffect(() => {
     const initialize = async () => {
+      // DEBUG: Log full URL to see what we're receiving
+      console.log('[Initialize] Full URL:', window.location.href);
+      console.log('[Initialize] Hash:', window.location.hash);
+      console.log('[Initialize] Search:', window.location.search);
+
       // Process OAuth callback FIRST, before any other auth checks
       const hash = window.location.hash;
-      if (hash.startsWith('#oauth_callback')) {
+
+      // Check for oauth_callback in hash
+      if (hash.includes('oauth_callback') || hash.includes('access_token')) {
         console.log('[Initialize] OAuth callback detected, processing...');
         setLoading(true);
 
         try {
-          const hashContent = hash.substring('#oauth_callback&'.length);
+          // Handle different formats: #oauth_callback&... or #access_token=...
+          let hashContent = hash.substring(1); // Remove #
+          if (hashContent.startsWith('oauth_callback&')) {
+            hashContent = hashContent.substring('oauth_callback&'.length);
+          }
+
           const hashParams = new URLSearchParams(hashContent);
+          console.log('[Initialize] Hash params:', Object.fromEntries(hashParams.entries()));
 
           const accessToken = hashParams.get('access_token');
           const refreshToken = hashParams.get('refresh_token');
           const userBase64 = hashParams.get('user');
+
+          console.log('[Initialize] Access token present:', !!accessToken);
+          console.log('[Initialize] Refresh token present:', !!refreshToken);
+          console.log('[Initialize] User base64 present:', !!userBase64);
 
           if (accessToken) {
             console.log('[Initialize] Saving OAuth tokens...');
