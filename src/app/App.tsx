@@ -23,6 +23,53 @@ import { mockAuth } from './utils/auth-mock';
 import { Toaster } from './components/ui/sonner';
 import { getSupabaseClient } from './utils/supabase/client';
 
+// ============================================
+// CAPTURE OAUTH HASH IMMEDIATELY ON SCRIPT LOAD
+// This runs before React initializes, so the hash won't be lost
+// ============================================
+const CAPTURED_HASH = window.location.hash;
+const CAPTURED_URL = window.location.href;
+console.log('[OAuth Capture] Hash captured on load:', CAPTURED_HASH);
+console.log('[OAuth Capture] Full URL on load:', CAPTURED_URL);
+
+// Process OAuth callback immediately if detected
+let OAUTH_PROCESSED = false;
+if (CAPTURED_HASH.includes('oauth_callback') || CAPTURED_HASH.includes('access_token')) {
+  console.log('[OAuth Capture] OAuth callback detected in hash!');
+  try {
+    let hashContent = CAPTURED_HASH.substring(1); // Remove #
+    if (hashContent.startsWith('oauth_callback&')) {
+      hashContent = hashContent.substring('oauth_callback&'.length);
+    }
+    const hashParams = new URLSearchParams(hashContent);
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+    const userBase64 = hashParams.get('user');
+
+    if (accessToken) {
+      console.log('[OAuth Capture] Tokens found, saving to localStorage...');
+      localStorage.setItem('leadflow_access_token', accessToken);
+      if (refreshToken) {
+        localStorage.setItem('leadflow_refresh_token', refreshToken);
+      }
+
+      if (userBase64) {
+        const userJsonDecoded = atob(userBase64);
+        const userData = JSON.parse(userJsonDecoded);
+        localStorage.setItem('leadflow_user', JSON.stringify(userData));
+        console.log('[OAuth Capture] User saved:', userData.email);
+      }
+
+      // Clean up URL immediately
+      window.history.replaceState({}, document.title, window.location.pathname);
+      OAUTH_PROCESSED = true;
+      console.log('[OAuth Capture] ✅ OAuth data captured and saved!');
+    }
+  } catch (error) {
+    console.error('[OAuth Capture] Error processing OAuth hash:', error);
+  }
+}
+
 declare global {
   interface Window {
     chatwootSDK?: {
@@ -637,67 +684,25 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
   useEffect(() => {
     const initialize = async () => {
-      // DEBUG: Log full URL to see what we're receiving
-      console.log('[Initialize] Full URL:', window.location.href);
-      console.log('[Initialize] Hash:', window.location.hash);
-      console.log('[Initialize] Search:', window.location.search);
+      console.log('[Initialize] Starting... OAUTH_PROCESSED:', OAUTH_PROCESSED);
 
-      // Process OAuth callback FIRST, before any other auth checks
-      const hash = window.location.hash;
-
-      // Check for oauth_callback in hash
-      if (hash.includes('oauth_callback') || hash.includes('access_token')) {
-        console.log('[Initialize] OAuth callback detected, processing...');
-        setLoading(true);
-
-        try {
-          // Handle different formats: #oauth_callback&... or #access_token=...
-          let hashContent = hash.substring(1); // Remove #
-          if (hashContent.startsWith('oauth_callback&')) {
-            hashContent = hashContent.substring('oauth_callback&'.length);
-          }
-
-          const hashParams = new URLSearchParams(hashContent);
-          console.log('[Initialize] Hash params:', Object.fromEntries(hashParams.entries()));
-
-          const accessToken = hashParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token');
-          const userBase64 = hashParams.get('user');
-
-          console.log('[Initialize] Access token present:', !!accessToken);
-          console.log('[Initialize] Refresh token present:', !!refreshToken);
-          console.log('[Initialize] User base64 present:', !!userBase64);
-
-          if (accessToken) {
-            console.log('[Initialize] Saving OAuth tokens...');
-            localStorage.setItem('leadflow_access_token', accessToken);
-            if (refreshToken) {
-              localStorage.setItem('leadflow_refresh_token', refreshToken);
-            }
+      // If OAuth was already processed on script load, load user and go to dashboard
+      if (OAUTH_PROCESSED) {
+        console.log('[Initialize] OAuth was processed on script load, loading user...');
+        const storedUser = localStorage.getItem('leadflow_user');
+        if (storedUser) {
+          try {
+            const userData = JSON.parse(storedUser);
+            setUser(userData);
             startSessionExpiryTimer();
-
-            if (userBase64) {
-              const userJsonDecoded = atob(userBase64);
-              const userData = JSON.parse(userJsonDecoded);
-              if (userData.id) {
-                localStorage.setItem('leadflow_user', JSON.stringify(userData));
-                setUser(userData);
-                console.log('[Initialize] OAuth user authenticated:', userData.email);
-              }
-            }
-
-            // Clean up URL
-            window.history.replaceState({}, document.title, window.location.pathname);
             setCurrentPage('dashboard');
             setLoading(false);
-            console.log('[Initialize] ✅ OAuth login completed!');
+            console.log('[Initialize] ✅ OAuth user loaded from localStorage:', userData.email);
             return;
+          } catch (e) {
+            console.error('[Initialize] Error parsing stored user:', e);
           }
-        } catch (error) {
-          console.error('[Initialize] OAuth callback error:', error);
-          window.history.replaceState({}, document.title, window.location.pathname);
         }
-        setLoading(false);
       }
 
       const resetHandled = checkPasswordResetCallback();
