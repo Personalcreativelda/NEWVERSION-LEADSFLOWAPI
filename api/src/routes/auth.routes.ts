@@ -87,16 +87,19 @@ router.get('/google/callback', async (req, res, next) => {
     // Redirect to frontend with tokens in URL fragment (hash)
     // This is secure because URL fragments are not sent to server in HTTP requests
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
-    const tokenData = {
+
+    // Encode user data as base64 to avoid URL encoding issues with special characters
+    const userBase64 = Buffer.from(JSON.stringify(authResult.user)).toString('base64');
+
+    const tokenData = new URLSearchParams({
       access_token: authResult.session.access_token,
       refresh_token: authResult.session.refresh_token,
-      user: JSON.stringify(authResult.user),
-    };
+      user: userBase64,
+    });
 
-    const fragment = new URLSearchParams(tokenData).toString();
-    const redirectUrl = `${appUrl}/#oauth_callback&${fragment}`;
+    const redirectUrl = `${appUrl}/#oauth_callback&${tokenData.toString()}`;
 
-    console.log('[Auth Google] Redirecting to frontend with tokens...');
+    console.log('[Auth Google] Redirecting to frontend:', appUrl);
     return res.redirect(redirectUrl);
 
   } catch (error: any) {

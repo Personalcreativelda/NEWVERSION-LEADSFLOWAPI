@@ -345,10 +345,12 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
           }
           startSessionExpiryTimer();
 
-          // Parse and store user
+          // Parse and store user (base64 encoded from backend)
           if (userJson) {
             try {
-              const user = JSON.parse(decodeURIComponent(userJson));
+              // Decode base64 to JSON string, then parse
+              const userJsonDecoded = atob(userJson);
+              const user = JSON.parse(userJsonDecoded);
               if (user.id) {
                 localStorage.setItem('leadflow_user', JSON.stringify(user));
                 setUser(user);
