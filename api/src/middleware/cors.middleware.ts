@@ -12,10 +12,12 @@ if (allowedOrigins.length === 0) {
   );
 }
 
-// Rotas que não precisam de Origin header (webhooks, APIs externas, admin)
+// Rotas que não precisam de Origin header (webhooks, APIs externas, OAuth callbacks, admin)
 const noOriginRequiredPaths = [
   '/api/webhooks/',
   '/api/whatsapp/config',
+  '/api/auth/google',      // Google OAuth - navegação direta do browser
+  '/api/auth/google/callback', // Google OAuth callback
   '/health'
 ];
 
