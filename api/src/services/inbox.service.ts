@@ -105,12 +105,28 @@ export class InboxService {
 
   /**
    * Mark messages as read for a conversation
+   * Also resets unread_count in conversations table
    */
-  async markAsRead(userId: string, leadId: string) {
+  async markAsRead(userId: string, conversationIdOrLeadId: string) {
+    // Update messages
     const result = await query(
-      `UPDATE messages SET status = 'read', read_at = NOW() WHERE user_id = $1 AND lead_id = $2 AND direction = 'in' AND status != 'read' RETURNING id`,
-      [userId, leadId]
+      `UPDATE messages SET status = 'read', read_at = NOW()
+       WHERE user_id = $1
+       AND (lead_id = $2 OR conversation_id = $2)
+       AND direction = 'in'
+       AND status != 'read'
+       RETURNING id`,
+      [userId, conversationIdOrLeadId]
     );
+
+    // Reset unread_count in conversations table
+    await query(
+      `UPDATE conversations SET unread_count = 0
+       WHERE user_id = $1
+       AND (id = $2 OR lead_id = $2)`,
+      [userId, conversationIdOrLeadId]
+    );
+
     return { updated: result.rowCount };
   }
 
