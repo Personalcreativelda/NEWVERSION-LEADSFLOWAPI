@@ -86,7 +86,8 @@ router.get('/google/callback', async (req, res, next) => {
 
     // Redirect to frontend with tokens in URL fragment (hash)
     // This is secure because URL fragments are not sent to server in HTTP requests
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    // FRONTEND_URL is where the dashboard/app is hosted (e.g., app.leadsflowapi.com)
+    const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
 
     // Encode user data as base64 to avoid URL encoding issues with special characters
     const userBase64 = Buffer.from(JSON.stringify(authResult.user)).toString('base64');
@@ -97,16 +98,16 @@ router.get('/google/callback', async (req, res, next) => {
       user: userBase64,
     });
 
-    const redirectUrl = `${appUrl}/#oauth_callback&${tokenData.toString()}`;
+    const redirectUrl = `${frontendUrl}/#oauth_callback&${tokenData.toString()}`;
 
-    console.log('[Auth Google] Redirecting to frontend:', appUrl);
+    console.log('[Auth Google] Redirecting to frontend:', frontendUrl);
     return res.redirect(redirectUrl);
 
   } catch (error: any) {
     console.error('[Auth Google] OAuth callback error:', error);
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
     const errorMessage = encodeURIComponent(error.message || 'Erro ao autenticar com Google');
-    return res.redirect(`${appUrl}/login?error=oauth_failed&message=${errorMessage}`);
+    return res.redirect(`${frontendUrl}/login?error=oauth_failed&message=${errorMessage}`);
   }
 });
 

@@ -47,9 +47,10 @@ export class GoogleOAuthService {
     this.clientId = process.env.GOOGLE_CLIENT_ID || '';
     this.clientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
 
-    // Construct redirect URI from APP_URL or API_URL
-    const baseUrl = process.env.APP_URL || process.env.VITE_API_URL || 'http://localhost:4000';
-    this.redirectUri = `${baseUrl.replace(/\/$/, '')}/api/auth/google/callback`;
+    // Use API_URL for the callback (where Google sends the code)
+    // This should be the API domain, not the frontend
+    const apiUrl = process.env.API_URL || process.env.VITE_API_URL || 'http://localhost:4000';
+    this.redirectUri = `${apiUrl.replace(/\/$/, '')}/api/auth/google/callback`;
 
     if (!this.clientId || !this.clientSecret) {
       console.warn('[GoogleOAuth] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not configured');
