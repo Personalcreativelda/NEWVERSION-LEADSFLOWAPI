@@ -532,6 +532,13 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     try {
       console.log('[checkAuth] Starting authentication check...');
 
+      // Skip auth check if we're in an OAuth callback - let the OAuth handler process first
+      const hash = window.location.hash;
+      if (hash.startsWith('#oauth_callback')) {
+        console.log('[checkAuth] OAuth callback detected, skipping auth check...');
+        return;
+      }
+
       if (isSessionExpired()) {
         console.log('[checkAuth] Session expired');
         await forceLogout('Session expired (initial check)');
@@ -630,6 +637,52 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
   useEffect(() => {
     const initialize = async () => {
+      // Process OAuth callback FIRST, before any other auth checks
+      const hash = window.location.hash;
+      if (hash.startsWith('#oauth_callback')) {
+        console.log('[Initialize] OAuth callback detected, processing...');
+        setLoading(true);
+
+        try {
+          const hashContent = hash.substring('#oauth_callback&'.length);
+          const hashParams = new URLSearchParams(hashContent);
+
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          const userBase64 = hashParams.get('user');
+
+          if (accessToken) {
+            console.log('[Initialize] Saving OAuth tokens...');
+            localStorage.setItem('leadflow_access_token', accessToken);
+            if (refreshToken) {
+              localStorage.setItem('leadflow_refresh_token', refreshToken);
+            }
+            startSessionExpiryTimer();
+
+            if (userBase64) {
+              const userJsonDecoded = atob(userBase64);
+              const userData = JSON.parse(userJsonDecoded);
+              if (userData.id) {
+                localStorage.setItem('leadflow_user', JSON.stringify(userData));
+                setUser(userData);
+                console.log('[Initialize] OAuth user authenticated:', userData.email);
+              }
+            }
+
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            setCurrentPage('dashboard');
+            setLoading(false);
+            console.log('[Initialize] ✅ OAuth login completed!');
+            return;
+          }
+        } catch (error) {
+          console.error('[Initialize] OAuth callback error:', error);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        setLoading(false);
+      }
+
       const resetHandled = checkPasswordResetCallback();
 
       if (!resetHandled) {
