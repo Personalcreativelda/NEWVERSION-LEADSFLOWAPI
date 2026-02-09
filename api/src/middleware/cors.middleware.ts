@@ -16,6 +16,8 @@ if (allowedOrigins.length === 0) {
 const noOriginRequiredPaths = [
   '/api/webhooks/',
   '/api/whatsapp/config',
+  '/api/whatsapp/validate-numbers',  // N8N validation
+  '/api/whatsapp/validate-leads',    // N8N validation
   '/api/auth/google',      // Google OAuth - navegação direta do browser
   '/api/auth/google/callback', // Google OAuth callback
   '/health'

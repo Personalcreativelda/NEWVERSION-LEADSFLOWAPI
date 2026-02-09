@@ -4,6 +4,7 @@ import { query } from '../database/connection';
 import { ChannelsService } from '../services/channels.service';
 import { ConversationsService } from '../services/conversations.service';
 import { LeadsService } from '../services/leads.service';
+import { WhatsAppService } from '../services/whatsapp.service';
 // INBOX: Importar WebSocket service para notificações em tempo real
 import { getWebSocketService } from '../services/websocket.service';
 // IA: Importar processador de assistentes
@@ -15,6 +16,7 @@ const router = Router();
 const channelsService = new ChannelsService();
 const conversationsService = new ConversationsService();
 const leadsService = new LeadsService();
+const whatsappService = new WhatsAppService();
 
 // ✅ Webhook para N8N cadastrar novos leads
 router.post('/n8n/leads', async (req, res) => {
@@ -1891,6 +1893,175 @@ router.post('/email/:channelId', async (req, res) => {
   } catch (error) {
     console.error('[Email Webhook] Erro:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================
+// ✅ WEBHOOK N8N - VALIDAR NÚMEROS WHATSAPP
+// ============================================
+/**
+ * Valida se números de telefone têm WhatsApp
+ * USE ESTE ENDPOINT NO N8N antes de enviar mensagens
+ *
+ * POST /api/webhooks/n8n/validate-whatsapp
+ * Body: {
+ *   numbers: string[],       // Lista de números para validar
+ *   instanceId: string       // ID da instância WhatsApp (obrigatório)
+ * }
+ *
+ * Response: {
+ *   results: [{ number, exists, jid?, name? }],
+ *   valid: string[],
+ *   invalid: string[],
+ *   summary: { total, valid, invalid }
+ * }
+ */
+router.post('/n8n/validate-whatsapp', async (req, res) => {
+  try {
+    console.log('[N8N Webhook] Validando números WhatsApp:', JSON.stringify(req.body).substring(0, 200));
+
+    const { numbers, instanceId, instanceName } = req.body;
+
+    // Aceitar instanceId ou instanceName
+    const instance = instanceId || instanceName;
+
+    if (!instance) {
+      return res.status(400).json({
+        error: 'instanceId ou instanceName é obrigatório',
+        example: {
+          numbers: ['+5511999999999'],
+          instanceId: 'leadflow_xxx_instance'
+        }
+      });
+    }
+
+    if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {
+      return res.status(400).json({
+        error: 'numbers array é obrigatório',
+        example: {
+          numbers: ['+5511999999999', '5511888888888'],
+          instanceId: 'leadflow_xxx_instance'
+        }
+      });
+    }
+
+    // Limitar para evitar abusos
+    if (numbers.length > 100) {
+      return res.status(400).json({
+        error: 'Máximo 100 números por request via webhook',
+        received: numbers.length
+      });
+    }
+
+    // Verificar se a instância existe no sistema
+    const channelResult = await query(
+      `SELECT id, user_id FROM channels
+       WHERE (credentials->>'instance_id' = $1 OR credentials->>'instance_name' = $1)
+       AND type = 'whatsapp'
+       LIMIT 1`,
+      [instance]
+    );
+
+    if (channelResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Instância WhatsApp não encontrada',
+        instanceId: instance
+      });
+    }
+
+    console.log(`[N8N Webhook] Validando ${numbers.length} números via instância: ${instance}`);
+
+    // Validar números
+    const result = await whatsappService.checkWhatsAppNumbers(instance, numbers);
+
+    console.log(`[N8N Webhook] Validação completa: ${result.valid.length} válidos, ${result.invalid.length} inválidos`);
+
+    res.json({
+      ...result,
+      summary: {
+        total: numbers.length,
+        valid: result.valid.length,
+        invalid: result.invalid.length
+      },
+      instanceId: instance
+    });
+  } catch (error: any) {
+    console.error('[N8N Webhook] Erro ao validar números:', error);
+    res.status(500).json({
+      error: 'Erro ao validar números',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Validar um único número (mais simples para workflows N8N)
+ *
+ * POST /api/webhooks/n8n/check-whatsapp
+ * Body: {
+ *   number: string,         // Número para validar
+ *   instanceId: string      // ID da instância WhatsApp
+ * }
+ *
+ * Response: {
+ *   number: string,
+ *   exists: boolean,
+ *   jid?: string,
+ *   name?: string
+ * }
+ */
+router.post('/n8n/check-whatsapp', async (req, res) => {
+  try {
+    const { number, instanceId, instanceName } = req.body;
+    const instance = instanceId || instanceName;
+
+    if (!instance || !number) {
+      return res.status(400).json({
+        error: 'number e instanceId são obrigatórios',
+        example: {
+          number: '+5511999999999',
+          instanceId: 'leadflow_xxx_instance'
+        }
+      });
+    }
+
+    // Verificar se instância existe
+    const channelResult = await query(
+      `SELECT id FROM channels
+       WHERE (credentials->>'instance_id' = $1 OR credentials->>'instance_name' = $1)
+       AND type = 'whatsapp'
+       LIMIT 1`,
+      [instance]
+    );
+
+    if (channelResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Instância WhatsApp não encontrada',
+        instanceId: instance
+      });
+    }
+
+    console.log(`[N8N Webhook] Verificando número ${number} via instância ${instance}`);
+
+    // Validar número
+    const result = await whatsappService.checkWhatsAppNumbers(instance, [number]);
+
+    // Retornar resultado simplificado para um número
+    const numberResult = result.results[0];
+
+    res.json({
+      number: numberResult?.number || number,
+      exists: numberResult?.exists ?? true,
+      jid: numberResult?.jid || null,
+      name: numberResult?.name || null,
+      hasWhatsApp: numberResult?.exists ?? true  // Alias mais legível
+    });
+  } catch (error: any) {
+    console.error('[N8N Webhook] Erro ao verificar número:', error);
+    res.status(500).json({
+      error: 'Erro ao verificar número',
+      message: error.message
+    });
   }
 });
 
