@@ -673,7 +673,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
     }
   };
 
-  const handleSendNow = async (id: string, name: string) => {
+  const handleSendNow = async (id: string, name: string, type?: string) => {
     if (confirm(`Enviar campanha "${name}" agora?`)) {
       try {
         const token = localStorage.getItem('leadflow_access_token');
@@ -682,30 +682,54 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
           return;
         }
 
-        // ✅ Atualizar status para 'active' no banco
-        const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/${id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            status: 'active',
-          }),
-        });
+        // Para campanhas WhatsApp, usar o endpoint de execução direto
+        // que envia as mensagens e cria conversas no inbox automaticamente
+        if (type === 'whatsapp') {
+          console.log('[CampaignsPage] Executando campanha WhatsApp diretamente...');
 
-        if (!response.ok) {
-          throw new Error('Erro ao iniciar campanha');
+          const executeResponse = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/${id}/execute`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+
+          if (!executeResponse.ok) {
+            const errorData = await executeResponse.json();
+            throw new Error(errorData.error || 'Erro ao executar campanha');
+          }
+
+          const result = await executeResponse.json();
+          console.log('[CampaignsPage] Campanha iniciada:', result);
+
+          toast.success(`Campanha "${name}" iniciada! Enviando para ${result.totalLeads} contatos...`);
+        } else {
+          // Para outros tipos (email), apenas atualizar status
+          const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/${id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              status: 'active',
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Erro ao iniciar campanha');
+          }
+
+          toast.success(`Campanha "${name}" iniciada!`);
         }
 
         // ✅ Recarregar campanhas do banco
         await reloadCampaigns();
-
         setDropdownOpen(null);
-        toast.success(`Campanha "${name}" iniciada!`);
-      } catch (error) {
+      } catch (error: any) {
         console.error('[CampaignsPage] Erro ao iniciar campanha:', error);
-        toast.error('Erro ao iniciar campanha');
+        toast.error(error.message || 'Erro ao iniciar campanha');
       }
     }
   };
@@ -1305,7 +1329,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                                 <span>Editar</span>
                               </button>
                               <button
-                                onClick={() => handleSendNow(campaign.id, campaign.name)}
+                                onClick={() => handleSendNow(campaign.id, campaign.name, campaign.type)}
                                 className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#10B981] border border-transparent rounded-lg hover:bg-[#059669] transition-all duration-200 shadow-sm hover:shadow"
                               >
                                 <Send className="w-4 h-4" />
@@ -1372,7 +1396,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                               <span>Editar</span>
                             </button>
                             <button
-                              onClick={() => handleSendNow(campaign.id, campaign.name)}
+                              onClick={() => handleSendNow(campaign.id, campaign.name, campaign.type)}
                               className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#10B981] border border-transparent rounded-lg hover:bg-[#059669] transition-all duration-200 shadow-sm hover:shadow"
                             >
                               <Send className="w-4 h-4" />
