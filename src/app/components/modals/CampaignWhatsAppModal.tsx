@@ -1760,11 +1760,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   PREVIEW EM TEMPO REAL
                 </Label>
 
-                <div className="bg-[#ECE5DD] p-4 rounded-lg border border-[var(--border-input)]">
+                <div className="bg-[#ECE5DD] dark:bg-[#0B141A] p-4 rounded-lg border border-[var(--border-input)]">
                   <div className="space-y-2 max-w-[320px]">
                     {/* ✅ PREVIEW DE IMAGENS COM LEGENDA */}
                     {attachments.filter(att => att.type.startsWith('image/')).map((att, i) => (
-                      <div key={i} className="bg-white dark:bg-gray-700 rounded-lg shadow-sm overflow-hidden">
+                      <div key={i} className="bg-[#DCF8C6] dark:bg-[#005C4B] rounded-lg shadow-sm overflow-hidden">
                         {/* Imagem */}
                         {att.preview && (
                           <img
@@ -1776,9 +1776,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
                         {/* Legenda da imagem (se tiver) */}
                         {att.caption && (
-                          <div className="bg-white dark:bg-gray-700 p-3">
+                          <div className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3">
                             <div
-                              className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words"
+                              className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap break-words"
                               dangerouslySetInnerHTML={{ __html: renderFormattedPreview(att.caption) }}
                               style={{
                                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -1786,7 +1786,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               }}
                             />
                             <div className="flex items-center justify-end gap-1 mt-2">
-                              <span className="text-xs text-gray-500 dark:text-gray-700 dark:text-gray-300">14:30</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-300">14:30</span>
                               <Check className="w-3 h-3 text-blue-500" />
                             </div>
                           </div>
@@ -1794,8 +1794,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
                         {/* Se não tiver legenda, mostrar apenas checkmark */}
                         {!att.caption && (
-                          <div className="flex items-center justify-end gap-1 p-2 bg-white dark:bg-gray-700">
-                            <span className="text-xs text-gray-500 dark:text-gray-700 dark:text-gray-300">14:30</span>
+                          <div className="flex items-center justify-end gap-1 p-2 bg-[#DCF8C6] dark:bg-[#005C4B]">
+                            <span className="text-xs text-gray-600 dark:text-gray-300">14:30</span>
                             <Check className="w-3 h-3 text-blue-500" />
                           </div>
                         )}
@@ -1804,7 +1804,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
                     {/* ✅ PREVIEW DE VÍDEOS COM LEGENDA */}
                     {attachments.filter(att => att.type.startsWith('video/')).map((att, i) => (
-                      <div key={i} className="bg-white dark:bg-gray-700 rounded-lg shadow-sm overflow-hidden">
+                      <div key={i} className="bg-[#DCF8C6] dark:bg-[#005C4B] rounded-lg shadow-sm overflow-hidden">
                         {/* Vídeo */}
                         {att.preview && (
                           <div className="relative">
@@ -1821,9 +1821,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
                         {/* Legenda do vídeo (se tiver) */}
                         {att.caption && (
-                          <div className="bg-white dark:bg-gray-700 p-3">
+                          <div className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3">
                             <div
-                              className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words"
+                              className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap break-words"
                               dangerouslySetInnerHTML={{ __html: renderFormattedPreview(att.caption) }}
                               style={{
                                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -1831,7 +1831,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               }}
                             />
                             <div className="flex items-center justify-end gap-1 mt-2">
-                              <span className="text-xs text-gray-500 dark:text-gray-700 dark:text-gray-300">14:30</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-300">14:30</span>
                               <Check className="w-3 h-3 text-blue-500" />
                             </div>
                           </div>
@@ -1839,7 +1839,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
                         {/* Se não tiver legenda, mostrar apenas checkmark */}
                         {!att.caption && (
-                          <div className="flex items-center justify-end gap-1 p-2 bg-white dark:bg-gray-700">
+                          <div className="flex items-center justify-end gap-1 p-2 bg-[#DCF8C6] dark:bg-[#005C4B]">
                             <span className="text-xs text-gray-500 dark:text-gray-700 dark:text-gray-300">14:30</span>
                             <Check className="w-3 h-3 text-blue-500" />
                           </div>
@@ -1849,9 +1849,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
                     {/* ✅ MENSAGEM DE TEXTO (separada - sempre em balão verde) */}
                     {message && (
-                      <div className="bg-[#DCF8C6] dark:bg-green-900/30 p-3 rounded-lg shadow-sm">
+                      <div className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3 rounded-lg shadow-sm">
                         <div
-                          className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words"
+                          className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap break-words"
                           dangerouslySetInnerHTML={{ __html: renderFormattedPreview(message) }}
                           style={{
                             fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -1859,7 +1859,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                           }}
                         />
                         <div className="flex items-center justify-end gap-1 mt-2">
-                          <span className="text-xs text-gray-500 dark:text-gray-700 dark:text-gray-300">14:31</span>
+                          <span className="text-xs text-gray-600 dark:text-gray-300">14:31</span>
                           <Check className="w-3 h-3 text-blue-500" />
                         </div>
                       </div>
@@ -1867,13 +1867,13 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
                     {/* ✅ ARQUIVOS (documentos, PDFs, etc - NÃO imagem nem vídeo) */}
                     {attachments.filter(att => !att.type.startsWith('image/') && !att.type.startsWith('video/')).map((att, i) => (
-                      <div key={i} className="bg-[#DCF8C6] dark:bg-green-900/30 p-3 rounded-lg shadow-sm">
-                        <div className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200 bg-white/50 dark:bg-gray-700/50 p-2 rounded">
+                      <div key={i} className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3 rounded-lg shadow-sm">
+                        <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-white bg-white/50 dark:bg-black/20 p-2 rounded">
                           📄
                           <span className="truncate font-medium">{att.name}</span>
                         </div>
                         <div className="flex items-center justify-end gap-1 mt-2">
-                          <span className="text-xs text-gray-500 dark:text-gray-700 dark:text-gray-300">14:32</span>
+                          <span className="text-xs text-gray-600 dark:text-gray-300">14:32</span>
                           <Check className="w-3 h-3 text-blue-500" />
                         </div>
                       </div>
@@ -1881,8 +1881,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
                     {/* ✅ PLACEHOLDER quando não há conteúdo */}
                     {!message && attachments.length === 0 && (
-                      <div className="bg-[#DCF8C6] dark:bg-green-900/30 p-3 rounded-lg shadow-sm">
-                        <p className="text-sm text-gray-400 dark:text-gray-700 dark:text-gray-300 italic">Digite uma mensagem ou adicione uma imagem...</p>
+                      <div className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3 rounded-lg shadow-sm">
+                        <p className="text-sm text-gray-500 dark:text-gray-300 italic">Digite uma mensagem ou adicione uma imagem...</p>
                       </div>
                     )}
                   </div>
