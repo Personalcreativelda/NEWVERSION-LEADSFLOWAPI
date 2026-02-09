@@ -2065,4 +2065,509 @@ router.post('/n8n/check-whatsapp', async (req, res) => {
   }
 });
 
+// ============================================
+// ✅ WEBHOOK N8N - REGISTRAR MENSAGEM DE CAMPANHA NO INBOX
+// ============================================
+
+/**
+ * Registra uma mensagem de campanha no inbox
+ * USE ESTE ENDPOINT NO N8N após enviar cada mensagem de campanha
+ * Isso cria a conversa e mensagem para aparecer no inbox
+ *
+ * POST /api/webhooks/n8n/campaign-message
+ * Body: {
+ *   campaignId: string,      // ID da campanha
+ *   campaignName?: string,   // Nome da campanha (opcional)
+ *   userId: string,          // ID do usuário dono da campanha
+ *   leadId?: string,         // ID do lead (opcional)
+ *   phone: string,           // Número do destinatário
+ *   leadName?: string,       // Nome do lead (opcional)
+ *   message: string,         // Conteúdo da mensagem enviada
+ *   instanceId: string,      // ID/nome da instância WhatsApp
+ *   mediaUrl?: string,       // URL da mídia (se houver)
+ *   mediaType?: string,      // Tipo da mídia (image, video, document)
+ *   externalId?: string,     // ID da mensagem no WhatsApp (se disponível)
+ *   status?: string          // Status: sent, delivered, failed (default: sent)
+ * }
+ *
+ * Response: {
+ *   success: true,
+ *   conversationId: string,
+ *   messageId: string
+ * }
+ */
+router.post('/n8n/campaign-message', async (req, res) => {
+  try {
+    console.log('[N8N Campaign] ===== REGISTRANDO MENSAGEM DE CAMPANHA =====');
+    console.log('[N8N Campaign] Body:', JSON.stringify(req.body).substring(0, 500));
+
+    const {
+      campaignId,
+      campaignName,
+      userId,
+      leadId,
+      phone,
+      leadName,
+      message,
+      instanceId,
+      instanceName,
+      mediaUrl,
+      mediaType,
+      externalId,
+      status = 'sent'
+    } = req.body;
+
+    const instance = instanceId || instanceName;
+
+    // Validações obrigatórias
+    if (!userId) {
+      return res.status(400).json({
+        error: 'userId é obrigatório',
+        example: { userId: 'uuid-do-usuario', phone: '+5511999999999', message: 'Olá!', instanceId: 'leadflow_xxx' }
+      });
+    }
+
+    if (!phone) {
+      return res.status(400).json({
+        error: 'phone é obrigatório',
+        example: { userId: 'uuid', phone: '+5511999999999', message: 'Olá!', instanceId: 'leadflow_xxx' }
+      });
+    }
+
+    if (!message) {
+      return res.status(400).json({
+        error: 'message é obrigatório',
+        example: { userId: 'uuid', phone: '+5511999999999', message: 'Olá!', instanceId: 'leadflow_xxx' }
+      });
+    }
+
+    if (!instance) {
+      return res.status(400).json({
+        error: 'instanceId ou instanceName é obrigatório',
+        example: { userId: 'uuid', phone: '+5511999999999', message: 'Olá!', instanceId: 'leadflow_xxx' }
+      });
+    }
+
+    // Buscar canal pelo instanceId
+    const channelResult = await query(
+      `SELECT * FROM channels
+       WHERE (credentials->>'instance_id' = $1 OR credentials->>'instance_name' = $1)
+       AND type = 'whatsapp'
+       AND user_id = $2
+       LIMIT 1`,
+      [instance, userId]
+    );
+
+    if (channelResult.rows.length === 0) {
+      // Tentar buscar qualquer canal WhatsApp do usuário
+      const fallbackResult = await query(
+        `SELECT * FROM channels WHERE user_id = $1 AND type = 'whatsapp' AND status = 'active' LIMIT 1`,
+        [userId]
+      );
+
+      if (fallbackResult.rows.length === 0) {
+        return res.status(404).json({
+          error: 'Canal WhatsApp não encontrado para este usuário',
+          userId,
+          instanceId: instance
+        });
+      }
+    }
+
+    const channel = channelResult.rows[0] || (await query(
+      `SELECT * FROM channels WHERE user_id = $1 AND type = 'whatsapp' AND status = 'active' LIMIT 1`,
+      [userId]
+    )).rows[0];
+
+    if (!channel) {
+      return res.status(404).json({
+        error: 'Nenhum canal WhatsApp ativo encontrado',
+        userId
+      });
+    }
+
+    console.log('[N8N Campaign] Canal encontrado:', channel.id);
+
+    // Normalizar número de telefone
+    const cleanPhone = phone.replace(/\D/g, '');
+    const remoteJid = `${cleanPhone}@s.whatsapp.net`;
+
+    // Buscar ou criar lead se não foi fornecido
+    let finalLeadId = leadId;
+    let contactName = leadName || cleanPhone;
+
+    if (!finalLeadId) {
+      // Buscar lead pelo telefone
+      const leadResult = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND (phone = $2 OR whatsapp = $2 OR telefone = $2)`,
+        [userId, cleanPhone]
+      );
+
+      if (leadResult.rows.length > 0) {
+        finalLeadId = leadResult.rows[0].id;
+        contactName = leadResult.rows[0].name || leadResult.rows[0].nome || contactName;
+      } else {
+        // Criar novo lead automaticamente
+        console.log('[N8N Campaign] Criando lead para:', cleanPhone);
+        const newLeadResult = await query(
+          `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
+           VALUES ($1, $2, $3, $3, 'campaign', 'contacted')
+           RETURNING *`,
+          [userId, contactName, cleanPhone]
+        );
+        finalLeadId = newLeadResult.rows[0].id;
+      }
+    }
+
+    console.log('[N8N Campaign] Lead ID:', finalLeadId);
+
+    // Criar ou buscar conversa
+    const conversation = await conversationsService.findOrCreate(
+      userId,
+      channel.id,
+      remoteJid,
+      finalLeadId,
+      {
+        contact_name: contactName,
+        phone: cleanPhone,
+        campaign_id: campaignId,
+        campaign_name: campaignName,
+        source: 'campaign'
+      }
+    );
+
+    console.log('[N8N Campaign] Conversa ID:', conversation.id);
+
+    // Criar mensagem
+    const messageResult = await query(
+      `INSERT INTO messages (
+        user_id, conversation_id, lead_id, campaign_id, direction, channel,
+        content, media_url, media_type, status, external_id, metadata, sent_at
+      )
+       VALUES ($1, $2, $3, $4, 'out', 'whatsapp', $5, $6, $7, $8, $9, $10, NOW())
+       RETURNING *`,
+      [
+        userId,
+        conversation.id,
+        finalLeadId,
+        campaignId || null,
+        message,
+        mediaUrl || null,
+        mediaType || null,
+        status,
+        externalId || null,
+        JSON.stringify({
+          campaign_id: campaignId,
+          campaign_name: campaignName,
+          instance_id: instance,
+          phone: cleanPhone,
+          remote_jid: remoteJid,
+          source: 'n8n_campaign'
+        })
+      ]
+    );
+
+    const savedMessage = messageResult.rows[0];
+    console.log('[N8N Campaign] Mensagem salva:', savedMessage.id);
+
+    // Atualizar conversa - last_message_at e status
+    await query(
+      `UPDATE conversations
+       SET last_message_at = NOW(),
+           status = 'open',
+           updated_at = NOW()
+       WHERE id = $1`,
+      [conversation.id]
+    );
+
+    // Buscar conversa atualizada para WebSocket
+    const updatedConversation = await query(
+      `SELECT c.*,
+              ch.name as channel_name,
+              l.name as lead_name,
+              l.phone as lead_phone
+       FROM conversations c
+       LEFT JOIN channels ch ON c.channel_id = ch.id
+       LEFT JOIN leads l ON c.lead_id = l.id
+       WHERE c.id = $1`,
+      [conversation.id]
+    );
+
+    // Emitir WebSocket para atualizar inbox em tempo real
+    const wsService = getWebSocketService();
+    if (wsService) {
+      console.log('[N8N Campaign] Emitindo WebSocket para usuário:', userId);
+
+      // Emitir nova mensagem
+      wsService.emitNewMessage(userId, {
+        conversationId: conversation.id,
+        message: savedMessage,
+        conversation: updatedConversation.rows[0] || conversation
+      });
+
+      // Emitir atualização de conversas
+      wsService.emitConversationUpdate(userId, {
+        conversationId: conversation.id,
+        conversation: updatedConversation.rows[0] || conversation
+      });
+
+      console.log('[N8N Campaign] WebSocket emitido!');
+    }
+
+    // Se houver campaignId, atualizar estatísticas da campanha
+    if (campaignId) {
+      try {
+        await query(
+          `UPDATE campaigns
+           SET stats = jsonb_set(
+             COALESCE(stats, '{"sent":0}'::jsonb),
+             '{sent}',
+             (COALESCE((stats->>'sent')::int, 0) + 1)::text::jsonb
+           ),
+           updated_at = NOW()
+           WHERE id = $1`,
+          [campaignId]
+        );
+      } catch (e) {
+        console.warn('[N8N Campaign] Erro ao atualizar stats da campanha:', e);
+      }
+    }
+
+    console.log('[N8N Campaign] ✅ Mensagem de campanha registrada com sucesso!');
+
+    res.json({
+      success: true,
+      conversationId: conversation.id,
+      messageId: savedMessage.id,
+      leadId: finalLeadId,
+      channelId: channel.id
+    });
+  } catch (error: any) {
+    console.error('[N8N Campaign] Erro ao registrar mensagem:', error);
+    res.status(500).json({
+      error: 'Erro ao registrar mensagem de campanha',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Registrar múltiplas mensagens de campanha de uma vez (batch)
+ * Útil para registrar todas as mensagens no final do envio
+ *
+ * POST /api/webhooks/n8n/campaign-messages-batch
+ * Body: {
+ *   campaignId: string,
+ *   campaignName?: string,
+ *   userId: string,
+ *   instanceId: string,
+ *   messages: [
+ *     { phone: string, leadId?: string, leadName?: string, message: string, status?: string }
+ *   ]
+ * }
+ */
+router.post('/n8n/campaign-messages-batch', async (req, res) => {
+  try {
+    console.log('[N8N Campaign Batch] ===== REGISTRANDO LOTE DE MENSAGENS =====');
+
+    const {
+      campaignId,
+      campaignName,
+      userId,
+      instanceId,
+      instanceName,
+      messages
+    } = req.body;
+
+    const instance = instanceId || instanceName;
+
+    if (!userId || !instance || !messages || !Array.isArray(messages)) {
+      return res.status(400).json({
+        error: 'userId, instanceId e messages[] são obrigatórios',
+        example: {
+          userId: 'uuid',
+          instanceId: 'leadflow_xxx',
+          campaignId: 'uuid-campanha',
+          messages: [
+            { phone: '+5511999999999', message: 'Olá!' }
+          ]
+        }
+      });
+    }
+
+    // Buscar canal
+    const channelResult = await query(
+      `SELECT * FROM channels
+       WHERE (credentials->>'instance_id' = $1 OR credentials->>'instance_name' = $1)
+       AND type = 'whatsapp'
+       AND user_id = $2
+       LIMIT 1`,
+      [instance, userId]
+    );
+
+    let channel = channelResult.rows[0];
+
+    if (!channel) {
+      const fallbackResult = await query(
+        `SELECT * FROM channels WHERE user_id = $1 AND type = 'whatsapp' AND status = 'active' LIMIT 1`,
+        [userId]
+      );
+      channel = fallbackResult.rows[0];
+    }
+
+    if (!channel) {
+      return res.status(404).json({
+        error: 'Canal WhatsApp não encontrado',
+        userId
+      });
+    }
+
+    console.log(`[N8N Campaign Batch] Processando ${messages.length} mensagens...`);
+
+    const results: any[] = [];
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const msg of messages) {
+      try {
+        if (!msg.phone || !msg.message) {
+          results.push({ phone: msg.phone, success: false, error: 'phone e message são obrigatórios' });
+          errorCount++;
+          continue;
+        }
+
+        const cleanPhone = msg.phone.replace(/\D/g, '');
+        const remoteJid = `${cleanPhone}@s.whatsapp.net`;
+
+        // Buscar ou criar lead
+        let leadId = msg.leadId;
+        let contactName = msg.leadName || cleanPhone;
+
+        if (!leadId) {
+          const leadResult = await query(
+            `SELECT * FROM leads WHERE user_id = $1 AND (phone = $2 OR whatsapp = $2 OR telefone = $2)`,
+            [userId, cleanPhone]
+          );
+
+          if (leadResult.rows.length > 0) {
+            leadId = leadResult.rows[0].id;
+            contactName = leadResult.rows[0].name || leadResult.rows[0].nome || contactName;
+          } else {
+            const newLeadResult = await query(
+              `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
+               VALUES ($1, $2, $3, $3, 'campaign', 'contacted')
+               RETURNING *`,
+              [userId, contactName, cleanPhone]
+            );
+            leadId = newLeadResult.rows[0].id;
+          }
+        }
+
+        // Criar conversa
+        const conversation = await conversationsService.findOrCreate(
+          userId,
+          channel.id,
+          remoteJid,
+          leadId,
+          {
+            contact_name: contactName,
+            phone: cleanPhone,
+            campaign_id: campaignId,
+            source: 'campaign'
+          }
+        );
+
+        // Criar mensagem
+        const messageResult = await query(
+          `INSERT INTO messages (
+            user_id, conversation_id, lead_id, campaign_id, direction, channel,
+            content, status, metadata, sent_at
+          )
+           VALUES ($1, $2, $3, $4, 'out', 'whatsapp', $5, $6, $7, NOW())
+           RETURNING *`,
+          [
+            userId,
+            conversation.id,
+            leadId,
+            campaignId || null,
+            msg.message,
+            msg.status || 'sent',
+            JSON.stringify({
+              campaign_id: campaignId,
+              campaign_name: campaignName,
+              instance_id: instance,
+              phone: cleanPhone,
+              source: 'n8n_campaign_batch'
+            })
+          ]
+        );
+
+        // Atualizar conversa
+        await query(
+          `UPDATE conversations SET last_message_at = NOW(), status = 'open', updated_at = NOW() WHERE id = $1`,
+          [conversation.id]
+        );
+
+        results.push({
+          phone: cleanPhone,
+          success: true,
+          conversationId: conversation.id,
+          messageId: messageResult.rows[0].id,
+          leadId
+        });
+        successCount++;
+      } catch (e: any) {
+        results.push({ phone: msg.phone, success: false, error: e.message });
+        errorCount++;
+      }
+    }
+
+    // Atualizar stats da campanha
+    if (campaignId && successCount > 0) {
+      try {
+        await query(
+          `UPDATE campaigns
+           SET stats = jsonb_set(
+             COALESCE(stats, '{"sent":0}'::jsonb),
+             '{sent}',
+             (COALESCE((stats->>'sent')::int, 0) + $1)::text::jsonb
+           ),
+           updated_at = NOW()
+           WHERE id = $2`,
+          [successCount, campaignId]
+        );
+      } catch (e) {
+        console.warn('[N8N Campaign Batch] Erro ao atualizar stats:', e);
+      }
+    }
+
+    // Emitir WebSocket para atualizar inbox
+    const wsService = getWebSocketService();
+    if (wsService) {
+      wsService.emitConversationUpdate(userId, {
+        type: 'batch_update',
+        count: successCount
+      });
+    }
+
+    console.log(`[N8N Campaign Batch] ✅ Concluído: ${successCount} sucesso, ${errorCount} erros`);
+
+    res.json({
+      success: true,
+      summary: {
+        total: messages.length,
+        success: successCount,
+        errors: errorCount
+      },
+      results
+    });
+  } catch (error: any) {
+    console.error('[N8N Campaign Batch] Erro:', error);
+    res.status(500).json({
+      error: 'Erro ao processar lote de mensagens',
+      message: error.message
+    });
+  }
+});
+
 export default router;
