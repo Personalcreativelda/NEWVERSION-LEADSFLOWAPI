@@ -4,9 +4,13 @@ import { authMiddleware } from '../middleware/auth.middleware';
 import { LeadsService } from '../services/leads.service';
 import { notificationsService } from '../services/notifications.service';
 import { getStorageService } from '../services/storage.service';
+import { WhatsAppService } from '../services/whatsapp.service';
+import { ChannelsService } from '../services/channels.service';
 
 const router = Router();
 const leadsService = new LeadsService();
+const whatsappService = new WhatsAppService();
+const channelsService = new ChannelsService();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.use(authMiddleware);
@@ -216,6 +220,221 @@ router.post('/remove-duplicates', async (req, res, next) => {
     const result = await leadsService.removeDuplicates(user.id);
     res.json(result);
   } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * ============================================
+ * ✅ IMPORTAR LEADS COM VALIDAÇÃO DE WHATSAPP
+ * ============================================
+ *
+ * Importa leads e valida quais números têm WhatsApp ANTES de adicionar ao sistema.
+ * Isso evita que números inválidos entrem no funil e travem automações.
+ *
+ * POST /api/leads/import-with-validation
+ * Body: {
+ *   leads: [{ name, phone/telefone, email?, ... }],
+ *   source?: string,
+ *   validateWhatsApp?: boolean (default: true),
+ *   skipInvalid?: boolean (default: false - adiciona todos mas marca inválidos)
+ * }
+ *
+ * Response: {
+ *   imported: number,
+ *   skipped: number,
+ *   validWhatsApp: number,
+ *   invalidWhatsApp: number,
+ *   invalidLeads: [{ name, phone, reason }]
+ * }
+ */
+router.post('/import-with-validation', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const {
+      leads,
+      source,
+      validateWhatsApp = true,
+      skipInvalid = false,
+      instanceId: requestedInstanceId
+    } = req.body;
+
+    if (!leads || !Array.isArray(leads) || leads.length === 0) {
+      return res.status(400).json({ error: 'leads array is required' });
+    }
+
+    // Limit
+    if (leads.length > 500) {
+      return res.status(400).json({
+        error: 'Maximum 500 leads per request with validation',
+        received: leads.length
+      });
+    }
+
+    console.log(`[Leads Import] Starting import with validation: ${leads.length} leads, validateWhatsApp=${validateWhatsApp}, skipInvalid=${skipInvalid}`);
+
+    // If not validating, just do regular import
+    if (!validateWhatsApp) {
+      const result = await leadsService.importBulk(leads, user.id, { source });
+      return res.json({
+        ...result,
+        validWhatsApp: 0,
+        invalidWhatsApp: 0,
+        validationSkipped: true,
+      });
+    }
+
+    // Get WhatsApp instance
+    let instanceId = requestedInstanceId;
+    if (!instanceId) {
+      const channels = await channelsService.findByType('whatsapp', user.id);
+      const activeChannel = channels.find(c => c.status === 'active');
+      if (activeChannel?.credentials?.instance_id) {
+        instanceId = activeChannel.credentials.instance_id;
+      }
+    }
+
+    if (!instanceId) {
+      // No WhatsApp connected - import without validation
+      console.log('[Leads Import] No WhatsApp instance found, importing without validation');
+      const result = await leadsService.importBulk(leads, user.id, { source });
+      return res.json({
+        ...result,
+        validWhatsApp: 0,
+        invalidWhatsApp: 0,
+        validationSkipped: true,
+        warning: 'No active WhatsApp instance found. Leads imported without WhatsApp validation.',
+      });
+    }
+
+    // Extract phone numbers from leads
+    const leadsWithPhones = leads.map((lead, index) => {
+      const phone = lead.telefone || lead.phone || lead.whatsapp || lead.numero;
+      return {
+        index,
+        lead,
+        phone: phone ? String(phone).replace(/\D/g, '') : null,
+      };
+    });
+
+    // Get only leads with phone numbers
+    const phonesToValidate = leadsWithPhones
+      .filter(l => l.phone && l.phone.length >= 10)
+      .map(l => l.phone!);
+
+    console.log(`[Leads Import] Validating ${phonesToValidate.length} phone numbers on WhatsApp`);
+
+    // Validate numbers on WhatsApp
+    let validationResult: { valid: string[]; invalid: string[]; results: any[] } = {
+      valid: [],
+      invalid: [],
+      results: [],
+    };
+
+    if (phonesToValidate.length > 0) {
+      try {
+        validationResult = await whatsappService.checkWhatsAppNumbers(instanceId, phonesToValidate);
+      } catch (e: any) {
+        console.warn('[Leads Import] WhatsApp validation failed:', e.message);
+        // Continue without validation
+      }
+    }
+
+    // Create sets for quick lookup
+    const validPhones = new Set(validationResult.valid.map(p => p.replace(/\D/g, '')));
+    const invalidPhones = new Set(validationResult.invalid.map(p => p.replace(/\D/g, '')));
+
+    // Separate valid and invalid leads
+    const validLeads: any[] = [];
+    const invalidLeadsList: Array<{ name: string; phone: string; reason: string }> = [];
+
+    for (const item of leadsWithPhones) {
+      const name = item.lead.name || item.lead.nome || 'Unknown';
+
+      if (!item.phone || item.phone.length < 10) {
+        if (!skipInvalid) {
+          // Add anyway but mark as no phone
+          validLeads.push({
+            ...item.lead,
+            whatsapp_validated: false,
+            whatsapp_validation_reason: 'no_phone',
+          });
+        } else {
+          invalidLeadsList.push({
+            name,
+            phone: item.phone || '',
+            reason: 'No valid phone number',
+          });
+        }
+        continue;
+      }
+
+      // Check if phone is valid on WhatsApp
+      if (invalidPhones.has(item.phone)) {
+        if (!skipInvalid) {
+          // Add anyway but mark as invalid WhatsApp
+          validLeads.push({
+            ...item.lead,
+            whatsapp_validated: false,
+            whatsapp_validation_reason: 'not_on_whatsapp',
+          });
+        } else {
+          invalidLeadsList.push({
+            name,
+            phone: item.phone,
+            reason: 'Number not registered on WhatsApp',
+          });
+        }
+      } else {
+        // Valid or not checked (assume valid)
+        validLeads.push({
+          ...item.lead,
+          whatsapp_validated: validPhones.has(item.phone),
+          whatsapp_validation_reason: validPhones.has(item.phone) ? 'valid' : 'not_checked',
+        });
+      }
+    }
+
+    console.log(`[Leads Import] After validation: ${validLeads.length} to import, ${invalidLeadsList.length} invalid`);
+
+    // Import valid leads
+    let importResult = { imported: 0, duplicatesSkipped: 0, skipped: 0, total: 0 };
+    if (validLeads.length > 0) {
+      importResult = await leadsService.importBulk(validLeads, user.id, { source });
+    }
+
+    // Create notification
+    if (importResult.imported > 0) {
+      await notificationsService.createNotification(
+        user.id,
+        'leads_imported',
+        'Leads Importados com Validação',
+        `${importResult.imported} lead(s) importados. ${invalidLeadsList.length} número(s) sem WhatsApp ${skipInvalid ? 'ignorados' : 'marcados'}.`,
+        'upload',
+        {
+          imported: importResult.imported,
+          validWhatsApp: validationResult.valid.length,
+          invalidWhatsApp: invalidLeadsList.length,
+        }
+      );
+    }
+
+    res.json({
+      imported: importResult.imported,
+      duplicatesSkipped: importResult.duplicatesSkipped,
+      skipped: importResult.skipped + invalidLeadsList.length,
+      total: leads.length,
+      validWhatsApp: validationResult.valid.length,
+      invalidWhatsApp: invalidLeadsList.length,
+      invalidLeads: invalidLeadsList.length > 0 ? invalidLeadsList : undefined,
+      skipInvalidApplied: skipInvalid,
+    });
+  } catch (error) {
+    console.error('[Leads Import] Error:', error);
     next(error);
   }
 });

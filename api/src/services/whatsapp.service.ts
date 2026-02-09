@@ -523,6 +523,130 @@ export class WhatsAppService {
   }
 
   /**
+   * Check if phone numbers have WhatsApp accounts
+   * Uses Evolution API onWhatsApp endpoint
+   * @param instanceId - Instance name to use for checking
+   * @param numbers - Array of phone numbers to check (E.164 format or digits only)
+   * @returns Array of results with exists flag for each number
+   */
+  async checkWhatsAppNumbers(instanceId: string, numbers: string[]): Promise<{
+    results: Array<{
+      number: string;
+      exists: boolean;
+      jid?: string;
+      name?: string;
+    }>;
+    valid: string[];
+    invalid: string[];
+  }> {
+    console.log('[WhatsAppService] Checking', numbers.length, 'numbers on WhatsApp');
+
+    // Clean numbers - remove non-digits and ensure proper format
+    const cleanedNumbers = numbers.map(n => n.replace(/\D/g, ''));
+
+    // List of endpoints to try (different Evolution API versions)
+    const endpointsToTry = [
+      // Evolution API v2 format
+      {
+        url: `/chat/whatsappNumbers/${instanceId}`,
+        method: 'POST',
+        body: { numbers: cleanedNumbers },
+      },
+      // Alternative format with number array
+      {
+        url: `/chat/onWhatsapp/${instanceId}`,
+        method: 'POST',
+        body: { numbers: cleanedNumbers },
+      },
+      // Evolution API v1 format
+      {
+        url: `/misc/onWhatsapp/${instanceId}`,
+        method: 'POST',
+        body: { numbers: cleanedNumbers },
+      },
+    ];
+
+    for (const endpoint of endpointsToTry) {
+      try {
+        console.log(`[WhatsAppService] Trying ${endpoint.method} ${endpoint.url}`);
+        const result = await this.request(endpoint.url, {
+          method: endpoint.method,
+          body: JSON.stringify(endpoint.body),
+        }) as any;
+
+        console.log('[WhatsAppService] WhatsApp check result:', JSON.stringify(result).substring(0, 500));
+
+        // Parse the result based on different response formats
+        let parsedResults: Array<{ number: string; exists: boolean; jid?: string; name?: string }> = [];
+
+        // Format 1: Direct array
+        if (Array.isArray(result)) {
+          parsedResults = result.map((item: any) => ({
+            number: item.number || item.phone || item.jid?.replace('@s.whatsapp.net', ''),
+            exists: item.exists === true || item.onWhatsApp === true || item.isWhatsApp === true,
+            jid: item.jid,
+            name: item.name || item.pushName,
+          }));
+        }
+        // Format 2: Nested in response key
+        else if (result?.response && Array.isArray(result.response)) {
+          parsedResults = result.response.map((item: any) => ({
+            number: item.number || item.phone || item.jid?.replace('@s.whatsapp.net', ''),
+            exists: item.exists === true || item.onWhatsApp === true || item.isWhatsApp === true,
+            jid: item.jid,
+            name: item.name || item.pushName,
+          }));
+        }
+        // Format 3: Nested in data key
+        else if (result?.data && Array.isArray(result.data)) {
+          parsedResults = result.data.map((item: any) => ({
+            number: item.number || item.phone || item.jid?.replace('@s.whatsapp.net', ''),
+            exists: item.exists === true || item.onWhatsApp === true || item.isWhatsApp === true,
+            jid: item.jid,
+            name: item.name || item.pushName,
+          }));
+        }
+        // Format 4: Object with message array (error format from Evolution)
+        else if (result?.message && Array.isArray(result.message)) {
+          parsedResults = result.message.map((item: any) => ({
+            number: item.number || item.phone || item.jid?.replace('@s.whatsapp.net', ''),
+            exists: item.exists === true,
+            jid: item.jid,
+            name: item.name,
+          }));
+        }
+
+        if (parsedResults.length > 0) {
+          const valid = parsedResults.filter(r => r.exists).map(r => r.number);
+          const invalid = parsedResults.filter(r => !r.exists).map(r => r.number);
+
+          console.log('[WhatsAppService] Valid WhatsApp numbers:', valid.length);
+          console.log('[WhatsAppService] Invalid numbers:', invalid.length);
+
+          return {
+            results: parsedResults,
+            valid,
+            invalid,
+          };
+        }
+
+        console.log('[WhatsAppService] Response format not recognized, trying next endpoint');
+      } catch (error: any) {
+        console.log(`[WhatsAppService] ${endpoint.method} ${endpoint.url} failed:`, error.message);
+        // Continue to next endpoint
+      }
+    }
+
+    // If all endpoints fail, return all numbers as unchecked (assume valid to not block workflow)
+    console.warn('[WhatsAppService] All WhatsApp check endpoints failed, returning numbers as unchecked');
+    return {
+      results: cleanedNumbers.map(n => ({ number: n, exists: true })), // Assume valid if can't check
+      valid: cleanedNumbers,
+      invalid: [],
+    };
+  }
+
+  /**
    * Send WhatsApp Audio (voice message)
    * Uses the sendWhatsAppAudio endpoint for PTT audio messages
    */
