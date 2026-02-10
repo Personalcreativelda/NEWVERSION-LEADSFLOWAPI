@@ -4,13 +4,19 @@ import { query } from '../database/connection';
 import { ChannelsService } from '../services/channels.service';
 import { ConversationsService } from '../services/conversations.service';
 import { LeadsService } from '../services/leads.service';
+import { WhatsAppService } from '../services/whatsapp.service';
 // INBOX: Importar WebSocket service para notificações em tempo real
 import { getWebSocketService } from '../services/websocket.service';
+// IA: Importar processador de assistentes
+import { assistantProcessor } from '../services/assistant-processor.service';
+// Webhooks: Importar dispatcher para enviar eventos para webhooks do usuário
+import { webhookDispatcher } from '../services/webhook-dispatcher.service';
 
 const router = Router();
 const channelsService = new ChannelsService();
 const conversationsService = new ConversationsService();
 const leadsService = new LeadsService();
+const whatsappService = new WhatsAppService();
 
 // ✅ Webhook para N8N cadastrar novos leads
 router.post('/n8n/leads', async (req, res) => {
@@ -493,15 +499,55 @@ router.post('/evolution/messages', async (req, res) => {
     let mediaUrl = null;
     let mediaType = null;
 
+    // Verificar diferentes locais onde a mídia pode estar no payload do Evolution API
     if (msg?.imageMessage) {
       mediaType = 'image';
+      mediaUrl = msg.imageMessage.url ||
+                 msg.imageMessage.directPath ||
+                 messageData.media?.url ||
+                 messageData.mediaUrl ||
+                 (msg.imageMessage.base64 ? `data:image/jpeg;base64,${msg.imageMessage.base64}` : null);
     } else if (msg?.videoMessage) {
       mediaType = 'video';
+      mediaUrl = msg.videoMessage.url ||
+                 msg.videoMessage.directPath ||
+                 messageData.media?.url ||
+                 messageData.mediaUrl;
     } else if (msg?.audioMessage) {
       mediaType = 'audio';
+      mediaUrl = msg.audioMessage.url ||
+                 msg.audioMessage.directPath ||
+                 messageData.media?.url ||
+                 messageData.mediaUrl;
     } else if (msg?.documentMessage) {
       mediaType = 'document';
+      mediaUrl = msg.documentMessage.url ||
+                 msg.documentMessage.directPath ||
+                 messageData.media?.url ||
+                 messageData.mediaUrl;
+    } else if (msg?.stickerMessage) {
+      mediaType = 'sticker';
+      mediaUrl = msg.stickerMessage.url ||
+                 messageData.media?.url;
     }
+
+    // Fallback: tentar extrair de outras localizações comuns
+    if (!mediaUrl && messageData.media) {
+      mediaUrl = messageData.media.url || messageData.media.base64;
+      if (!mediaType && messageData.media.mimetype) {
+        if (messageData.media.mimetype.startsWith('image')) mediaType = 'image';
+        else if (messageData.media.mimetype.startsWith('video')) mediaType = 'video';
+        else if (messageData.media.mimetype.startsWith('audio')) mediaType = 'audio';
+        else mediaType = 'document';
+      }
+    }
+
+    // Se ainda não tem URL, verificar no nível raiz do messageData
+    if (!mediaUrl) {
+      mediaUrl = messageData.mediaUrl || messageData.media_url || messageData.base64Media;
+    }
+
+    console.log('[Evolution Webhook] Mídia detectada:', { mediaType, mediaUrl: mediaUrl ? mediaUrl.substring(0, 100) + '...' : null });
 
     // Extrair telefone do JID
     const phone = remoteJid.split('@')[0];
@@ -627,6 +673,39 @@ router.post('/evolution/messages', async (req, res) => {
       console.log('[Evolution Webhook] WebSocket emitido com sucesso!');
     } else {
       console.warn('[Evolution Webhook] WebSocket service não disponível');
+    }
+
+    // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+    webhookDispatcher.dispatchMessageReceived(channel.user_id, {
+      channelId: channel.id,
+      channelType: 'whatsapp',
+      channelName: channel.name,
+      conversationId: conversation.id,
+      messageId: message.id,
+      content: messageContent,
+      contactName: contactName,
+      contactPhone: phone,
+      mediaType: mediaType || undefined,
+      mediaUrl: mediaUrl || undefined,
+      rawPayload: req.body,
+    }).catch(err => console.error('[Evolution Webhook] Erro ao disparar webhook:', err.message));
+
+    // Processar assistente de IA (assíncrono - não bloqueia a resposta)
+    if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+      assistantProcessor.processIncomingMessage({
+        channelId: channel.id,
+        channelType: channel.type || 'whatsapp',
+        conversationId: conversation.id,
+        userId: channel.user_id,
+        contactPhone: phone || remoteJid,
+        contactName: contactName,
+        messageContent: messageContent,
+        credentials: channel.credentials
+      }).then(replied => {
+        if (replied) console.log('[Evolution Webhook] Assistente IA respondeu automaticamente');
+      }).catch(err => {
+        console.error('[Evolution Webhook] Erro no assistente IA:', err.message);
+      });
     }
 
     res.json({ success: true, message_id: message.id });
@@ -847,6 +926,37 @@ router.post('/telegram', async (req, res) => {
       });
 
       console.log('[Telegram Webhook] WebSocket emitido!');
+    }
+
+    // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+    webhookDispatcher.dispatchMessageReceived(channel.user_id, {
+      channelId: channel.id,
+      channelType: 'telegram',
+      channelName: channel.name,
+      conversationId: conversation.id,
+      messageId: savedMessage.id,
+      content: text || '[Mídia]',
+      contactName: contactName,
+      contactPhone: chatId,
+      rawPayload: req.body,
+    }).catch(err => console.error('[Telegram Webhook] Erro ao disparar webhook:', err.message));
+
+    // Processar assistente de IA (assíncrono)
+    if (text && text.trim()) {
+      assistantProcessor.processIncomingMessage({
+        channelId: channel.id,
+        channelType: 'telegram',
+        conversationId: conversation.id,
+        userId: channel.user_id,
+        contactPhone: chatId,
+        contactName: contactName,
+        messageContent: text,
+        credentials: channel.credentials
+      }).then(replied => {
+        if (replied) console.log('[Telegram Webhook] Assistente IA respondeu');
+      }).catch(err => {
+        console.error('[Telegram Webhook] Erro no assistente IA:', err.message);
+      });
     }
 
     // Telegram espera resposta 200 OK
@@ -1104,6 +1214,37 @@ router.post('/instagram', async (req, res) => {
           });
 
           console.log('[Instagram Webhook] WebSocket emitido!');
+        }
+
+        // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+        webhookDispatcher.dispatchMessageReceived(channel.user_id, {
+          channelId: channel.id,
+          channelType: 'instagram',
+          channelName: channel.name,
+          conversationId: conversation.id,
+          messageId: savedMessage.id,
+          content: messageContent,
+          contactName: contactName,
+          contactPhone: senderId,
+          rawPayload: entry,
+        }).catch(err => console.error('[Instagram Webhook] Erro ao disparar webhook:', err.message));
+
+        // Processar assistente de IA (assíncrono - não bloqueia a resposta)
+        if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+          assistantProcessor.processIncomingMessage({
+            channelId: channel.id,
+            channelType: 'instagram',
+            conversationId: conversation.id,
+            userId: channel.user_id,
+            contactPhone: senderId,
+            contactName: contactName,
+            messageContent: messageContent,
+            credentials: channel.credentials
+          }).then(replied => {
+            if (replied) console.log('[Instagram Webhook] Assistente IA respondeu automaticamente');
+          }).catch(err => {
+            console.error('[Instagram Webhook] Erro no assistente IA:', err.message);
+          });
         }
       }
 
@@ -1374,6 +1515,38 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
             });
 
             console.log('[WhatsApp Cloud Webhook] WebSocket emitido!');
+          }
+
+          // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+          webhookDispatcher.dispatchMessageReceived(channel.user_id, {
+            channelId: channel.id,
+            channelType: 'whatsapp_cloud',
+            channelName: channel.name,
+            conversationId: conversation.id,
+            messageId: savedMessage.id,
+            content: messageContent,
+            contactName: contactName,
+            contactPhone: phone || senderId,
+            mediaType: mediaType || undefined,
+            rawPayload: message,
+          }).catch(err => console.error('[WhatsApp Cloud Webhook] Erro ao disparar webhook:', err.message));
+
+          // Processar assistente de IA (assíncrono - não bloqueia a resposta)
+          if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+            assistantProcessor.processIncomingMessage({
+              channelId: channel.id,
+              channelType: 'whatsapp_cloud',
+              conversationId: conversation.id,
+              userId: channel.user_id,
+              contactPhone: phone || senderId,
+              contactName: contactName,
+              messageContent: messageContent,
+              credentials: channel.credentials
+            }).then(replied => {
+              if (replied) console.log('[WhatsApp Cloud Webhook] Assistente IA respondeu automaticamente');
+            }).catch(err => {
+              console.error('[WhatsApp Cloud Webhook] Erro no assistente IA:', err.message);
+            });
           }
         }
 
@@ -1720,6 +1893,680 @@ router.post('/email/:channelId', async (req, res) => {
   } catch (error) {
     console.error('[Email Webhook] Erro:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================
+// ✅ WEBHOOK N8N - VALIDAR NÚMEROS WHATSAPP
+// ============================================
+/**
+ * Valida se números de telefone têm WhatsApp
+ * USE ESTE ENDPOINT NO N8N antes de enviar mensagens
+ *
+ * POST /api/webhooks/n8n/validate-whatsapp
+ * Body: {
+ *   numbers: string[],       // Lista de números para validar
+ *   instanceId: string       // ID da instância WhatsApp (obrigatório)
+ * }
+ *
+ * Response: {
+ *   results: [{ number, exists, jid?, name? }],
+ *   valid: string[],
+ *   invalid: string[],
+ *   summary: { total, valid, invalid }
+ * }
+ */
+router.post('/n8n/validate-whatsapp', async (req, res) => {
+  try {
+    console.log('[N8N Webhook] Validando números WhatsApp:', JSON.stringify(req.body).substring(0, 200));
+
+    const { numbers, instanceId, instanceName } = req.body;
+
+    // Aceitar instanceId ou instanceName
+    const instance = instanceId || instanceName;
+
+    if (!instance) {
+      return res.status(400).json({
+        error: 'instanceId ou instanceName é obrigatório',
+        example: {
+          numbers: ['+5511999999999'],
+          instanceId: 'leadflow_xxx_instance'
+        }
+      });
+    }
+
+    if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {
+      return res.status(400).json({
+        error: 'numbers array é obrigatório',
+        example: {
+          numbers: ['+5511999999999', '5511888888888'],
+          instanceId: 'leadflow_xxx_instance'
+        }
+      });
+    }
+
+    // Limitar para evitar abusos
+    if (numbers.length > 100) {
+      return res.status(400).json({
+        error: 'Máximo 100 números por request via webhook',
+        received: numbers.length
+      });
+    }
+
+    // Verificar se a instância existe no sistema
+    const channelResult = await query(
+      `SELECT id, user_id FROM channels
+       WHERE (credentials->>'instance_id' = $1 OR credentials->>'instance_name' = $1)
+       AND type = 'whatsapp'
+       LIMIT 1`,
+      [instance]
+    );
+
+    if (channelResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Instância WhatsApp não encontrada',
+        instanceId: instance
+      });
+    }
+
+    console.log(`[N8N Webhook] Validando ${numbers.length} números via instância: ${instance}`);
+
+    // Validar números
+    const result = await whatsappService.checkWhatsAppNumbers(instance, numbers);
+
+    console.log(`[N8N Webhook] Validação completa: ${result.valid.length} válidos, ${result.invalid.length} inválidos`);
+
+    res.json({
+      ...result,
+      summary: {
+        total: numbers.length,
+        valid: result.valid.length,
+        invalid: result.invalid.length
+      },
+      instanceId: instance
+    });
+  } catch (error: any) {
+    console.error('[N8N Webhook] Erro ao validar números:', error);
+    res.status(500).json({
+      error: 'Erro ao validar números',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Validar um único número (mais simples para workflows N8N)
+ *
+ * POST /api/webhooks/n8n/check-whatsapp
+ * Body: {
+ *   number: string,         // Número para validar
+ *   instanceId: string      // ID da instância WhatsApp
+ * }
+ *
+ * Response: {
+ *   number: string,
+ *   exists: boolean,
+ *   jid?: string,
+ *   name?: string
+ * }
+ */
+router.post('/n8n/check-whatsapp', async (req, res) => {
+  try {
+    const { number, instanceId, instanceName } = req.body;
+    const instance = instanceId || instanceName;
+
+    if (!instance || !number) {
+      return res.status(400).json({
+        error: 'number e instanceId são obrigatórios',
+        example: {
+          number: '+5511999999999',
+          instanceId: 'leadflow_xxx_instance'
+        }
+      });
+    }
+
+    // Verificar se instância existe
+    const channelResult = await query(
+      `SELECT id FROM channels
+       WHERE (credentials->>'instance_id' = $1 OR credentials->>'instance_name' = $1)
+       AND type = 'whatsapp'
+       LIMIT 1`,
+      [instance]
+    );
+
+    if (channelResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Instância WhatsApp não encontrada',
+        instanceId: instance
+      });
+    }
+
+    console.log(`[N8N Webhook] Verificando número ${number} via instância ${instance}`);
+
+    // Validar número
+    const result = await whatsappService.checkWhatsAppNumbers(instance, [number]);
+
+    // Retornar resultado simplificado para um número
+    const numberResult = result.results[0];
+
+    res.json({
+      number: numberResult?.number || number,
+      exists: numberResult?.exists ?? true,
+      jid: numberResult?.jid || null,
+      name: numberResult?.name || null,
+      hasWhatsApp: numberResult?.exists ?? true  // Alias mais legível
+    });
+  } catch (error: any) {
+    console.error('[N8N Webhook] Erro ao verificar número:', error);
+    res.status(500).json({
+      error: 'Erro ao verificar número',
+      message: error.message
+    });
+  }
+});
+
+// ============================================
+// ✅ WEBHOOK N8N - REGISTRAR MENSAGEM DE CAMPANHA NO INBOX
+// ============================================
+
+/**
+ * Registra uma mensagem de campanha no inbox
+ * USE ESTE ENDPOINT NO N8N após enviar cada mensagem de campanha
+ * Isso cria a conversa e mensagem para aparecer no inbox
+ *
+ * POST /api/webhooks/n8n/campaign-message
+ * Body: {
+ *   campaignId: string,      // ID da campanha
+ *   campaignName?: string,   // Nome da campanha (opcional)
+ *   userId: string,          // ID do usuário dono da campanha
+ *   leadId?: string,         // ID do lead (opcional)
+ *   phone: string,           // Número do destinatário
+ *   leadName?: string,       // Nome do lead (opcional)
+ *   message: string,         // Conteúdo da mensagem enviada
+ *   instanceId: string,      // ID/nome da instância WhatsApp
+ *   mediaUrl?: string,       // URL da mídia (se houver)
+ *   mediaType?: string,      // Tipo da mídia (image, video, document)
+ *   externalId?: string,     // ID da mensagem no WhatsApp (se disponível)
+ *   status?: string          // Status: sent, delivered, failed (default: sent)
+ * }
+ *
+ * Response: {
+ *   success: true,
+ *   conversationId: string,
+ *   messageId: string
+ * }
+ */
+router.post('/n8n/campaign-message', async (req, res) => {
+  try {
+    console.log('[N8N Campaign] ===== REGISTRANDO MENSAGEM DE CAMPANHA =====');
+    console.log('[N8N Campaign] Body:', JSON.stringify(req.body).substring(0, 500));
+
+    const {
+      campaignId,
+      campaignName,
+      userId,
+      leadId,
+      phone,
+      leadName,
+      message,
+      instanceId,
+      instanceName,
+      mediaUrl,
+      mediaType,
+      externalId,
+      status = 'sent'
+    } = req.body;
+
+    const instance = instanceId || instanceName;
+
+    // Validações obrigatórias
+    if (!userId) {
+      return res.status(400).json({
+        error: 'userId é obrigatório',
+        example: { userId: 'uuid-do-usuario', phone: '+5511999999999', message: 'Olá!', instanceId: 'leadflow_xxx' }
+      });
+    }
+
+    if (!phone) {
+      return res.status(400).json({
+        error: 'phone é obrigatório',
+        example: { userId: 'uuid', phone: '+5511999999999', message: 'Olá!', instanceId: 'leadflow_xxx' }
+      });
+    }
+
+    if (!message) {
+      return res.status(400).json({
+        error: 'message é obrigatório',
+        example: { userId: 'uuid', phone: '+5511999999999', message: 'Olá!', instanceId: 'leadflow_xxx' }
+      });
+    }
+
+    if (!instance) {
+      return res.status(400).json({
+        error: 'instanceId ou instanceName é obrigatório',
+        example: { userId: 'uuid', phone: '+5511999999999', message: 'Olá!', instanceId: 'leadflow_xxx' }
+      });
+    }
+
+    // Buscar canal pelo instanceId
+    const channelResult = await query(
+      `SELECT * FROM channels
+       WHERE (credentials->>'instance_id' = $1 OR credentials->>'instance_name' = $1)
+       AND type = 'whatsapp'
+       AND user_id = $2
+       LIMIT 1`,
+      [instance, userId]
+    );
+
+    if (channelResult.rows.length === 0) {
+      // Tentar buscar qualquer canal WhatsApp do usuário
+      const fallbackResult = await query(
+        `SELECT * FROM channels WHERE user_id = $1 AND type = 'whatsapp' AND status = 'active' LIMIT 1`,
+        [userId]
+      );
+
+      if (fallbackResult.rows.length === 0) {
+        return res.status(404).json({
+          error: 'Canal WhatsApp não encontrado para este usuário',
+          userId,
+          instanceId: instance
+        });
+      }
+    }
+
+    const channel = channelResult.rows[0] || (await query(
+      `SELECT * FROM channels WHERE user_id = $1 AND type = 'whatsapp' AND status = 'active' LIMIT 1`,
+      [userId]
+    )).rows[0];
+
+    if (!channel) {
+      return res.status(404).json({
+        error: 'Nenhum canal WhatsApp ativo encontrado',
+        userId
+      });
+    }
+
+    console.log('[N8N Campaign] Canal encontrado:', channel.id);
+
+    // Normalizar número de telefone
+    const cleanPhone = phone.replace(/\D/g, '');
+    const remoteJid = `${cleanPhone}@s.whatsapp.net`;
+
+    // Buscar ou criar lead se não foi fornecido
+    let finalLeadId = leadId;
+    let contactName = leadName || cleanPhone;
+
+    if (!finalLeadId) {
+      // Buscar lead pelo telefone
+      const leadResult = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND (phone = $2 OR whatsapp = $2 OR telefone = $2)`,
+        [userId, cleanPhone]
+      );
+
+      if (leadResult.rows.length > 0) {
+        finalLeadId = leadResult.rows[0].id;
+        contactName = leadResult.rows[0].name || leadResult.rows[0].nome || contactName;
+      } else {
+        // Criar novo lead automaticamente
+        console.log('[N8N Campaign] Criando lead para:', cleanPhone);
+        const newLeadResult = await query(
+          `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
+           VALUES ($1, $2, $3, $3, 'campaign', 'contacted')
+           RETURNING *`,
+          [userId, contactName, cleanPhone]
+        );
+        finalLeadId = newLeadResult.rows[0].id;
+      }
+    }
+
+    console.log('[N8N Campaign] Lead ID:', finalLeadId);
+
+    // Criar ou buscar conversa
+    const conversation = await conversationsService.findOrCreate(
+      userId,
+      channel.id,
+      remoteJid,
+      finalLeadId,
+      {
+        contact_name: contactName,
+        phone: cleanPhone,
+        campaign_id: campaignId,
+        campaign_name: campaignName,
+        source: 'campaign'
+      }
+    );
+
+    console.log('[N8N Campaign] Conversa ID:', conversation.id);
+
+    // Criar mensagem
+    const messageResult = await query(
+      `INSERT INTO messages (
+        user_id, conversation_id, lead_id, campaign_id, direction, channel,
+        content, media_url, media_type, status, external_id, metadata, sent_at
+      )
+       VALUES ($1, $2, $3, $4, 'out', 'whatsapp', $5, $6, $7, $8, $9, $10, NOW())
+       RETURNING *`,
+      [
+        userId,
+        conversation.id,
+        finalLeadId,
+        campaignId || null,
+        message,
+        mediaUrl || null,
+        mediaType || null,
+        status,
+        externalId || null,
+        JSON.stringify({
+          campaign_id: campaignId,
+          campaign_name: campaignName,
+          instance_id: instance,
+          phone: cleanPhone,
+          remote_jid: remoteJid,
+          source: 'n8n_campaign'
+        })
+      ]
+    );
+
+    const savedMessage = messageResult.rows[0];
+    console.log('[N8N Campaign] Mensagem salva:', savedMessage.id);
+
+    // Atualizar conversa - last_message_at e status
+    await query(
+      `UPDATE conversations
+       SET last_message_at = NOW(),
+           status = 'open',
+           updated_at = NOW()
+       WHERE id = $1`,
+      [conversation.id]
+    );
+
+    // Buscar conversa atualizada para WebSocket
+    const updatedConversation = await query(
+      `SELECT c.*,
+              ch.name as channel_name,
+              l.name as lead_name,
+              l.phone as lead_phone
+       FROM conversations c
+       LEFT JOIN channels ch ON c.channel_id = ch.id
+       LEFT JOIN leads l ON c.lead_id = l.id
+       WHERE c.id = $1`,
+      [conversation.id]
+    );
+
+    // Emitir WebSocket para atualizar inbox em tempo real
+    const wsService = getWebSocketService();
+    if (wsService) {
+      console.log('[N8N Campaign] Emitindo WebSocket para usuário:', userId);
+
+      // Emitir nova mensagem
+      wsService.emitNewMessage(userId, {
+        conversationId: conversation.id,
+        message: savedMessage,
+        conversation: updatedConversation.rows[0] || conversation
+      });
+
+      // Emitir atualização de conversas
+      wsService.emitConversationUpdate(userId, {
+        conversationId: conversation.id,
+        conversation: updatedConversation.rows[0] || conversation
+      });
+
+      console.log('[N8N Campaign] WebSocket emitido!');
+    }
+
+    // Se houver campaignId, atualizar estatísticas da campanha
+    if (campaignId) {
+      try {
+        await query(
+          `UPDATE campaigns
+           SET stats = jsonb_set(
+             COALESCE(stats, '{"sent":0}'::jsonb),
+             '{sent}',
+             (COALESCE((stats->>'sent')::int, 0) + 1)::text::jsonb
+           ),
+           updated_at = NOW()
+           WHERE id = $1`,
+          [campaignId]
+        );
+      } catch (e) {
+        console.warn('[N8N Campaign] Erro ao atualizar stats da campanha:', e);
+      }
+    }
+
+    console.log('[N8N Campaign] ✅ Mensagem de campanha registrada com sucesso!');
+
+    res.json({
+      success: true,
+      conversationId: conversation.id,
+      messageId: savedMessage.id,
+      leadId: finalLeadId,
+      channelId: channel.id
+    });
+  } catch (error: any) {
+    console.error('[N8N Campaign] Erro ao registrar mensagem:', error);
+    res.status(500).json({
+      error: 'Erro ao registrar mensagem de campanha',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Registrar múltiplas mensagens de campanha de uma vez (batch)
+ * Útil para registrar todas as mensagens no final do envio
+ *
+ * POST /api/webhooks/n8n/campaign-messages-batch
+ * Body: {
+ *   campaignId: string,
+ *   campaignName?: string,
+ *   userId: string,
+ *   instanceId: string,
+ *   messages: [
+ *     { phone: string, leadId?: string, leadName?: string, message: string, status?: string }
+ *   ]
+ * }
+ */
+router.post('/n8n/campaign-messages-batch', async (req, res) => {
+  try {
+    console.log('[N8N Campaign Batch] ===== REGISTRANDO LOTE DE MENSAGENS =====');
+
+    const {
+      campaignId,
+      campaignName,
+      userId,
+      instanceId,
+      instanceName,
+      messages
+    } = req.body;
+
+    const instance = instanceId || instanceName;
+
+    if (!userId || !instance || !messages || !Array.isArray(messages)) {
+      return res.status(400).json({
+        error: 'userId, instanceId e messages[] são obrigatórios',
+        example: {
+          userId: 'uuid',
+          instanceId: 'leadflow_xxx',
+          campaignId: 'uuid-campanha',
+          messages: [
+            { phone: '+5511999999999', message: 'Olá!' }
+          ]
+        }
+      });
+    }
+
+    // Buscar canal
+    const channelResult = await query(
+      `SELECT * FROM channels
+       WHERE (credentials->>'instance_id' = $1 OR credentials->>'instance_name' = $1)
+       AND type = 'whatsapp'
+       AND user_id = $2
+       LIMIT 1`,
+      [instance, userId]
+    );
+
+    let channel = channelResult.rows[0];
+
+    if (!channel) {
+      const fallbackResult = await query(
+        `SELECT * FROM channels WHERE user_id = $1 AND type = 'whatsapp' AND status = 'active' LIMIT 1`,
+        [userId]
+      );
+      channel = fallbackResult.rows[0];
+    }
+
+    if (!channel) {
+      return res.status(404).json({
+        error: 'Canal WhatsApp não encontrado',
+        userId
+      });
+    }
+
+    console.log(`[N8N Campaign Batch] Processando ${messages.length} mensagens...`);
+
+    const results: any[] = [];
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const msg of messages) {
+      try {
+        if (!msg.phone || !msg.message) {
+          results.push({ phone: msg.phone, success: false, error: 'phone e message são obrigatórios' });
+          errorCount++;
+          continue;
+        }
+
+        const cleanPhone = msg.phone.replace(/\D/g, '');
+        const remoteJid = `${cleanPhone}@s.whatsapp.net`;
+
+        // Buscar ou criar lead
+        let leadId = msg.leadId;
+        let contactName = msg.leadName || cleanPhone;
+
+        if (!leadId) {
+          const leadResult = await query(
+            `SELECT * FROM leads WHERE user_id = $1 AND (phone = $2 OR whatsapp = $2 OR telefone = $2)`,
+            [userId, cleanPhone]
+          );
+
+          if (leadResult.rows.length > 0) {
+            leadId = leadResult.rows[0].id;
+            contactName = leadResult.rows[0].name || leadResult.rows[0].nome || contactName;
+          } else {
+            const newLeadResult = await query(
+              `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
+               VALUES ($1, $2, $3, $3, 'campaign', 'contacted')
+               RETURNING *`,
+              [userId, contactName, cleanPhone]
+            );
+            leadId = newLeadResult.rows[0].id;
+          }
+        }
+
+        // Criar conversa
+        const conversation = await conversationsService.findOrCreate(
+          userId,
+          channel.id,
+          remoteJid,
+          leadId,
+          {
+            contact_name: contactName,
+            phone: cleanPhone,
+            campaign_id: campaignId,
+            source: 'campaign'
+          }
+        );
+
+        // Criar mensagem
+        const messageResult = await query(
+          `INSERT INTO messages (
+            user_id, conversation_id, lead_id, campaign_id, direction, channel,
+            content, status, metadata, sent_at
+          )
+           VALUES ($1, $2, $3, $4, 'out', 'whatsapp', $5, $6, $7, NOW())
+           RETURNING *`,
+          [
+            userId,
+            conversation.id,
+            leadId,
+            campaignId || null,
+            msg.message,
+            msg.status || 'sent',
+            JSON.stringify({
+              campaign_id: campaignId,
+              campaign_name: campaignName,
+              instance_id: instance,
+              phone: cleanPhone,
+              source: 'n8n_campaign_batch'
+            })
+          ]
+        );
+
+        // Atualizar conversa
+        await query(
+          `UPDATE conversations SET last_message_at = NOW(), status = 'open', updated_at = NOW() WHERE id = $1`,
+          [conversation.id]
+        );
+
+        results.push({
+          phone: cleanPhone,
+          success: true,
+          conversationId: conversation.id,
+          messageId: messageResult.rows[0].id,
+          leadId
+        });
+        successCount++;
+      } catch (e: any) {
+        results.push({ phone: msg.phone, success: false, error: e.message });
+        errorCount++;
+      }
+    }
+
+    // Atualizar stats da campanha
+    if (campaignId && successCount > 0) {
+      try {
+        await query(
+          `UPDATE campaigns
+           SET stats = jsonb_set(
+             COALESCE(stats, '{"sent":0}'::jsonb),
+             '{sent}',
+             (COALESCE((stats->>'sent')::int, 0) + $1)::text::jsonb
+           ),
+           updated_at = NOW()
+           WHERE id = $2`,
+          [successCount, campaignId]
+        );
+      } catch (e) {
+        console.warn('[N8N Campaign Batch] Erro ao atualizar stats:', e);
+      }
+    }
+
+    // Emitir WebSocket para atualizar inbox
+    const wsService = getWebSocketService();
+    if (wsService) {
+      wsService.emitConversationUpdate(userId, {
+        type: 'batch_update',
+        count: successCount
+      });
+    }
+
+    console.log(`[N8N Campaign Batch] ✅ Concluído: ${successCount} sucesso, ${errorCount} erros`);
+
+    res.json({
+      success: true,
+      summary: {
+        total: messages.length,
+        success: successCount,
+        errors: errorCount
+      },
+      results
+    });
+  } catch (error: any) {
+    console.error('[N8N Campaign Batch] Erro:', error);
+    res.status(500).json({
+      error: 'Erro ao processar lote de mensagens',
+      message: error.message
+    });
   }
 });
 

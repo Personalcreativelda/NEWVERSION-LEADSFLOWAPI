@@ -3,7 +3,7 @@ import { ConversationList } from '../../inbox/ConversationList';
 import { useInbox } from '../../../hooks/useInbox';
 import { useInboxFilters } from '../../../hooks/useInboxFilters';
 import { conversationsApi, contactsApi } from '../../../services/api/inbox';
-import { Settings, Search, Filter, Plus, X } from 'lucide-react';
+import { Settings, Search, Filter, Plus, X, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { ChatPanel } from '../../inbox/ChatPanel';
 import { EmptyState } from '../../inbox/EmptyState';
 import { ContactDetailsPanel } from '../../inbox/ContactDetailsPanel';
@@ -25,7 +25,9 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
         messages,
         messagesLoading,
         sending,
-        sendMessage
+        sendMessage,
+        wsConnected,
+        lastUpdate
     } = useInbox();
 
     // Hook centralizado de filtros
@@ -209,7 +211,7 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
                 >
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
-                            <h1 
+                            <h1
                                 className="text-lg font-bold"
                                 style={{ color: 'hsl(var(--foreground))' }}
                             >
@@ -220,8 +222,41 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
                                     {unreadCount}
                                 </span>
                             )}
+                            {/* Connection Status Indicator */}
+                            <div
+                                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-pointer transition-colors ${
+                                    wsConnected
+                                        ? 'bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20'
+                                        : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/20'
+                                }`}
+                                title={wsConnected
+                                    ? 'Tempo real ativo - mensagens aparecem instantaneamente'
+                                    : 'Modo polling - atualização automática a cada 30s. Clique em atualizar para forçar.'}
+                                onClick={() => !wsConnected && refreshConversations()}
+                            >
+                                {wsConnected ? (
+                                    <>
+                                        <Wifi size={12} />
+                                        <span className="hidden sm:inline">Ao vivo</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <WifiOff size={12} />
+                                        <span className="hidden sm:inline">Polling</span>
+                                    </>
+                                )}
+                            </div>
                         </div>
                         <div className="flex items-center gap-1">
+                            {/* Botão Atualizar */}
+                            <button
+                                onClick={refreshConversations}
+                                className="p-2 rounded-lg hover:bg-muted transition-all"
+                                style={{ color: 'hsl(var(--muted-foreground))' }}
+                                title={`Atualizar conversas (última: ${lastUpdate ? new Date(lastUpdate).toLocaleTimeString() : 'nunca'})`}
+                            >
+                                <RefreshCw size={18} className={conversationsLoading ? 'animate-spin' : ''} />
+                            </button>
                             <button
                                 className="p-2 rounded-lg hover:bg-muted transition-all"
                                 style={{ color: 'hsl(var(--muted-foreground))' }}
@@ -229,9 +264,9 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
                             >
                                 <Filter size={18} />
                             </button>
-                            
+
                             {/* Botão Nova Conversa */}
-                            <button 
+                            <button
                                 onClick={() => setShowNewConversationModal(true)}
                                 className="p-2 rounded-lg hover:bg-muted transition-all"
                                 style={{ color: 'hsl(var(--muted-foreground))' }}

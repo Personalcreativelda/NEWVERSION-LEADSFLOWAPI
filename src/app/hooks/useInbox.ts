@@ -1,5 +1,5 @@
 // INBOX: Hook principal que integra conversas, mensagens e WebSocket
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useConversations } from './useConversations';
 import { useMessages } from './useMessages';
 import { useWebSocket } from './useWebSocket';
@@ -10,11 +10,13 @@ const NOTIFICATION_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2869
 
 interface UseInboxOptions {
     onlyWithHistory?: boolean;
+    enablePolling?: boolean;
 }
 
 export function useInbox(options: UseInboxOptions = {}) {
-    const { onlyWithHistory = false } = options;
+    const { onlyWithHistory = false, enablePolling = true } = options;
     const [selectedConversation, setSelectedConversation] = useState<ConversationWithDetails | null>(null);
+    const refreshConversationsRef = useRef<() => void>(() => {});
 
     // Função para tocar som
     const playNotificationSound = useCallback(() => {
@@ -36,12 +38,18 @@ export function useInbox(options: UseInboxOptions = {}) {
         error: conversationsError,
         unreadCount,
         searchQuery,
+        lastUpdate,
         refreshConversations,
         markAsRead: markConversationAsRead,
         updateConversation,
         addNewMessage: addNewMessageToList,
         search
-    } = useConversations(onlyWithHistory);
+    } = useConversations(onlyWithHistory, { enablePolling });
+
+    // Manter referência atualizada para refreshConversations
+    useEffect(() => {
+        refreshConversationsRef.current = refreshConversations;
+    }, [refreshConversations]);
 
     const {
         messages,
@@ -104,7 +112,13 @@ export function useInbox(options: UseInboxOptions = {}) {
             if (data.conversationId !== selectedConversation?.id) {
                 updateConversation(data.conversationId, { unread_count: 0 });
             }
-        }, [selectedConversation?.id, updateConversation])
+        }, [selectedConversation?.id, updateConversation]),
+
+        // Callback quando WebSocket reconecta - atualizar conversas
+        onReconnect: useCallback(() => {
+            console.log('[useInbox] WebSocket reconectado - atualizando conversas');
+            refreshConversationsRef.current();
+        }, [])
     });
 
     const selectConversation = useCallback(async (conversation: ConversationWithDetails) => {
@@ -150,6 +164,7 @@ export function useInbox(options: UseInboxOptions = {}) {
         searchQuery,
         search,
         refreshConversations,
+        lastUpdate,
 
         // Messages
         messages,

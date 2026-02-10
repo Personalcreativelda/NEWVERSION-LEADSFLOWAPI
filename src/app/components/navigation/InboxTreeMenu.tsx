@@ -211,20 +211,20 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                                 return (
                                     <div key={channel.id} className="relative flex items-center">
                                         {/* Linha horizontal conectando ao item */}
-                                        <div 
+                                        <div
                                             className="absolute left-[7px] w-[8px] h-[1px] opacity-20"
                                             style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
                                         />
                                         <button
                                             onClick={() => handleChannelClick(channel.id)}
-                                            className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-colors ml-4 ${
+                                            className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
                                                 isChannelActive
                                                     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
                                                     : 'hover:bg-white/10'
                                             }`}
                                             style={!isChannelActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
                                         >
-                                            <ChannelIcon className={`w-3.5 h-3.5 flex-shrink-0 ${channelColor}`} />
+                                            <ChannelIcon className={`w-4 h-4 flex-shrink-0 ${channelColor}`} />
                                             <span className="truncate">{channel.name || channel.type}</span>
                                         </button>
                                     </div>
@@ -264,20 +264,20 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                             return (
                                 <div key={status.value} className="relative flex items-center">
                                     {/* Linha horizontal conectando ao item */}
-                                    <div 
+                                    <div
                                         className="absolute left-[7px] w-[8px] h-[1px] opacity-20"
                                         style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
                                     />
                                     <button
                                         onClick={() => handleStatusClick(status.value)}
-                                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-colors ml-4 ${
+                                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
                                             isStatusActive
                                                 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
                                                 : 'hover:bg-white/10'
                                         }`}
                                         style={!isStatusActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
                                     >
-                                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${status.color.replace('text-', 'bg-')}`} />
+                                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${status.color.replace('text-', 'bg-')}`} />
                                         <span className="truncate">{status.label}</span>
                                     </button>
                                 </div>

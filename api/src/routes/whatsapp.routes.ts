@@ -745,6 +745,254 @@ router.post('/fix-webhook/:instanceId', async (req, res, next) => {
   }
 });
 
+// ============================================
+// ✅ VALIDAR NÚMEROS DE WHATSAPP
+// ============================================
+
+/**
+ * Verifica se números de telefone têm WhatsApp
+ * Use este endpoint ANTES de enviar campanhas/mensagens em massa
+ * para evitar erros com números inválidos
+ *
+ * POST /api/whatsapp/validate-numbers
+ * Body: { numbers: string[], instanceId?: string }
+ *
+ * Response: {
+ *   results: [{ number, exists, jid?, name? }],
+ *   valid: string[],    // Números que têm WhatsApp
+ *   invalid: string[],  // Números que NÃO têm WhatsApp
+ *   summary: { total, valid, invalid }
+ * }
+ */
+router.post('/validate-numbers', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { numbers, instanceId: requestedInstanceId } = req.body;
+
+    if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {
+      return res.status(400).json({
+        error: 'numbers array is required',
+        example: { numbers: ['+5511999999999', '5511888888888'] }
+      });
+    }
+
+    // Limit to prevent abuse
+    if (numbers.length > 1000) {
+      return res.status(400).json({
+        error: 'Maximum 1000 numbers per request',
+        received: numbers.length
+      });
+    }
+
+    // Get instance to use
+    let instanceId = requestedInstanceId;
+
+    if (!instanceId) {
+      // Find first active WhatsApp channel for user
+      const channels = await channelsService.findByType('whatsapp', user.id);
+      const activeChannel = channels.find(c => c.status === 'active');
+
+      if (activeChannel && activeChannel.credentials?.instance_id) {
+        instanceId = activeChannel.credentials.instance_id;
+      } else {
+        return res.status(400).json({
+          error: 'No active WhatsApp instance found. Please connect WhatsApp first or provide instanceId.'
+        });
+      }
+    } else {
+      // Verify user owns this instance
+      if (!instanceBelongsToUser(instanceId, user.id)) {
+        return res.status(403).json({ error: 'Forbidden: You can only use your own instances' });
+      }
+    }
+
+    console.log(`[WhatsApp Routes] Validating ${numbers.length} numbers via instance: ${instanceId}`);
+
+    // Check numbers on WhatsApp
+    const result = await whatsappService.checkWhatsAppNumbers(instanceId, numbers);
+
+    console.log(`[WhatsApp Routes] Validation complete: ${result.valid.length} valid, ${result.invalid.length} invalid`);
+
+    res.json({
+      ...result,
+      summary: {
+        total: numbers.length,
+        valid: result.valid.length,
+        invalid: result.invalid.length,
+      },
+      instanceId,
+    });
+  } catch (error) {
+    console.error('[WhatsApp Routes] Error validating numbers:', error);
+    next(error);
+  }
+});
+
+/**
+ * Validar números de leads específicos antes de enviar campanha
+ *
+ * POST /api/whatsapp/validate-leads
+ * Body: { leadIds: string[], instanceId?: string }
+ *
+ * Response: {
+ *   validLeads: [{ leadId, phone, exists, name? }],
+ *   invalidLeads: [{ leadId, phone, exists, name? }],
+ *   summary: { total, valid, invalid }
+ * }
+ */
+router.post('/validate-leads', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { leadIds, instanceId: requestedInstanceId } = req.body;
+
+    if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
+      return res.status(400).json({
+        error: 'leadIds array is required',
+        example: { leadIds: ['uuid-1', 'uuid-2'] }
+      });
+    }
+
+    // Limit to prevent abuse
+    if (leadIds.length > 500) {
+      return res.status(400).json({
+        error: 'Maximum 500 leads per request',
+        received: leadIds.length
+      });
+    }
+
+    // Get instance to use
+    let instanceId = requestedInstanceId;
+
+    if (!instanceId) {
+      const channels = await channelsService.findByType('whatsapp', user.id);
+      const activeChannel = channels.find(c => c.status === 'active');
+
+      if (activeChannel && activeChannel.credentials?.instance_id) {
+        instanceId = activeChannel.credentials.instance_id;
+      } else {
+        return res.status(400).json({
+          error: 'No active WhatsApp instance found. Please connect WhatsApp first.'
+        });
+      }
+    } else {
+      if (!instanceBelongsToUser(instanceId, user.id)) {
+        return res.status(403).json({ error: 'Forbidden: You can only use your own instances' });
+      }
+    }
+
+    console.log(`[WhatsApp Routes] Validating ${leadIds.length} leads via instance: ${instanceId}`);
+
+    // Get all leads and their phone numbers
+    const leadsWithPhones: Array<{ leadId: string; phone: string; name?: string }> = [];
+    const leadsWithoutPhone: string[] = [];
+
+    for (const leadId of leadIds) {
+      try {
+        const lead = await leadsService.findById(leadId, user.id);
+        if (!lead) {
+          leadsWithoutPhone.push(leadId);
+          continue;
+        }
+
+        const phone = (lead as any).telefone || (lead as any).phone || (lead as any).whatsapp;
+        if (!phone) {
+          leadsWithoutPhone.push(leadId);
+          continue;
+        }
+
+        leadsWithPhones.push({
+          leadId,
+          phone,
+          name: (lead as any).name || (lead as any).nome,
+        });
+      } catch (e) {
+        leadsWithoutPhone.push(leadId);
+      }
+    }
+
+    if (leadsWithPhones.length === 0) {
+      return res.json({
+        validLeads: [],
+        invalidLeads: leadsWithoutPhone.map(id => ({ leadId: id, phone: null, exists: false, reason: 'No phone number' })),
+        summary: {
+          total: leadIds.length,
+          valid: 0,
+          invalid: leadIds.length,
+          noPhone: leadsWithoutPhone.length,
+        },
+      });
+    }
+
+    // Check numbers on WhatsApp
+    const phoneNumbers = leadsWithPhones.map(l => l.phone);
+    const validationResult = await whatsappService.checkWhatsAppNumbers(instanceId, phoneNumbers);
+
+    // Map results back to leads
+    const validLeads: Array<{ leadId: string; phone: string; exists: boolean; name?: string; jid?: string }> = [];
+    const invalidLeads: Array<{ leadId: string; phone: string; exists: boolean; name?: string; reason?: string }> = [];
+
+    for (const leadData of leadsWithPhones) {
+      const cleanPhone = leadData.phone.replace(/\D/g, '');
+      const validationEntry = validationResult.results.find(r =>
+        r.number === cleanPhone || r.number === leadData.phone.replace(/\D/g, '')
+      );
+
+      if (validationEntry?.exists) {
+        validLeads.push({
+          leadId: leadData.leadId,
+          phone: leadData.phone,
+          exists: true,
+          name: leadData.name,
+          jid: validationEntry.jid,
+        });
+      } else {
+        invalidLeads.push({
+          leadId: leadData.leadId,
+          phone: leadData.phone,
+          exists: false,
+          name: leadData.name,
+          reason: 'Number not registered on WhatsApp',
+        });
+      }
+    }
+
+    // Add leads without phone to invalid list
+    for (const leadId of leadsWithoutPhone) {
+      invalidLeads.push({
+        leadId,
+        phone: '',
+        exists: false,
+        reason: 'Lead not found or no phone number',
+      });
+    }
+
+    console.log(`[WhatsApp Routes] Lead validation complete: ${validLeads.length} valid, ${invalidLeads.length} invalid`);
+
+    res.json({
+      validLeads,
+      invalidLeads,
+      summary: {
+        total: leadIds.length,
+        valid: validLeads.length,
+        invalid: invalidLeads.length,
+        noPhone: leadsWithoutPhone.length,
+      },
+      instanceId,
+    });
+  } catch (error) {
+    console.error('[WhatsApp Routes] Error validating leads:', error);
+    next(error);
+  }
+});
+
 // Debug endpoint to check environment variables
 router.get('/config', async (_req, res) => {
   const webhookUrl = process.env.WEBHOOK_URL || process.env.API_URL || process.env.SERVICE_URL_API;

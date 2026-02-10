@@ -1,7 +1,6 @@
 import { mockAuth } from './auth-mock';
 import { getApiBaseUrl } from './api-client';
 import type { Lead, LeadNote, ScheduledConversation, InboxConversation, Message } from '../types';
-import { getSupabaseClient } from './supabase/client';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -745,35 +744,24 @@ export const authApi = {
   },
 
   signInWithGoogle: async () => {
-    console.log('[Auth] Initiating Google OAuth sign-in...');
+    console.log('[Auth] Initiating Google OAuth sign-in (Direct, without Supabase)...');
 
     try {
-      const supabase = getSupabaseClient();
+      // Redirect to backend Google OAuth endpoint
+      // The backend will handle the OAuth flow and redirect back with tokens
+      const apiUrl = API_BASE_URL || window.location.origin;
+      const googleAuthUrl = `${apiUrl}/api/auth/google`;
 
-      const redirectUrl = `${window.location.origin}${window.location.pathname}`;
-      console.log('[Auth] OAuth redirect URL:', redirectUrl);
+      console.log('[Auth] Redirecting to Google OAuth via backend:', googleAuthUrl);
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      });
+      // Redirect the browser to initiate OAuth flow
+      window.location.href = googleAuthUrl;
 
-      if (error) {
-        console.error('[Auth] Google OAuth error:', error);
-        throw error;
-      }
-
-      console.log('[Auth] Google OAuth initiated successfully');
-      return { success: true, data };
+      // This function won't return as the page is redirecting
+      return { success: true, redirecting: true };
     } catch (error: any) {
       console.error('[Auth] Failed to initiate Google OAuth:', error);
-      throw new Error(error.message || 'Erro ao conectar com Google. Verifique a configuração do Supabase.');
+      throw new Error(error.message || 'Erro ao conectar com Google.');
     }
   },
 };

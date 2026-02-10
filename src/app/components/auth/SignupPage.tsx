@@ -4,7 +4,6 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { AlertCircle, CheckCircle, Eye, EyeOff, MailCheck, Zap, X } from 'lucide-react';
 import { authApi } from '../../utils/api';
-import { getSupabaseClient } from '../../utils/supabase/client';
 import { metaEvents } from '../MetaPixel';
 
 interface SignupPageProps {
@@ -90,21 +89,10 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
     setLoading(true);
 
     try {
-      const supabase = getSupabaseClient();
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-
-      if (error) {
-        throw error;
-      }
-
+      // Use direct Google OAuth via backend (without Supabase)
+      await authApi.signInWithGoogle();
       // Redirect will happen automatically
-      console.log('[Google Signup] Redirecting to Google...');
+      console.log('[Google Signup] Redirecting to Google via backend...');
     } catch (err: any) {
       console.error('[Google Signup Error]', err);
       setError(err.message || 'Erro ao criar conta com Google');

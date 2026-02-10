@@ -319,3 +319,131 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE TRIGGER update_scheduled_conversations_updated_at BEFORE UPDATE ON scheduled_conversations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- AI Assistants table (available assistants/products)
+CREATE TABLE IF NOT EXISTS assistants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    short_description VARCHAR(500),
+    icon VARCHAR(100) DEFAULT 'bot',
+    color VARCHAR(20) DEFAULT '#3B82F6',
+    category VARCHAR(100) DEFAULT 'general',
+    features TEXT[],
+    price_monthly DECIMAL(10, 2) DEFAULT 0,
+    price_annual DECIMAL(10, 2) DEFAULT 0,
+    is_free BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true,
+    is_featured BOOLEAN DEFAULT false,
+    is_custom BOOLEAN DEFAULT false,
+    created_by UUID,
+    n8n_webhook_url TEXT,
+    default_config JSONB DEFAULT '{}',
+    required_channels TEXT[] DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- User's connected assistants
+CREATE TABLE IF NOT EXISTS user_assistants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    assistant_id UUID REFERENCES assistants(id) ON DELETE CASCADE,
+    is_active BOOLEAN DEFAULT true,
+    is_configured BOOLEAN DEFAULT false,
+    config JSONB DEFAULT '{}',
+    channel_id UUID,
+    channel_ids UUID[] DEFAULT '{}',
+    n8n_workflow_id VARCHAR(255),
+    last_triggered_at TIMESTAMP WITH TIME ZONE,
+    stats JSONB DEFAULT '{"conversations": 0, "messages_sent": 0, "messages_received": 0}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, assistant_id)
+);
+
+-- Assistant conversation logs (for analytics)
+CREATE TABLE IF NOT EXISTS assistant_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_assistant_id UUID REFERENCES user_assistants(id) ON DELETE CASCADE,
+    conversation_id VARCHAR(255),
+    contact_phone VARCHAR(50),
+    contact_name VARCHAR(255),
+    message_in TEXT,
+    message_out TEXT,
+    tokens_used INTEGER DEFAULT 0,
+    response_time_ms INTEGER,
+    status VARCHAR(50) DEFAULT 'success',
+    error_message TEXT,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for assistants
+CREATE INDEX IF NOT EXISTS idx_assistants_slug ON assistants(slug);
+CREATE INDEX IF NOT EXISTS idx_assistants_category ON assistants(category);
+CREATE INDEX IF NOT EXISTS idx_assistants_is_active ON assistants(is_active);
+CREATE INDEX IF NOT EXISTS idx_user_assistants_user_id ON user_assistants(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_assistants_assistant_id ON user_assistants(assistant_id);
+CREATE INDEX IF NOT EXISTS idx_user_assistants_is_active ON user_assistants(is_active);
+CREATE INDEX IF NOT EXISTS idx_assistant_logs_user_assistant_id ON assistant_logs(user_assistant_id);
+CREATE INDEX IF NOT EXISTS idx_assistant_logs_created_at ON assistant_logs(created_at DESC);
+
+-- Triggers for assistants
+DO $$ BEGIN
+  CREATE TRIGGER update_assistants_updated_at BEFORE UPDATE ON assistants FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TRIGGER update_user_assistants_updated_at BEFORE UPDATE ON user_assistants FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Insert default assistants
+INSERT INTO assistants (name, slug, description, short_description, icon, color, category, features, price_monthly, is_free, is_active, is_featured, default_config) VALUES
+('Assistente de Vendas', 'sales-assistant',
+  'Assistente de IA especializado em vendas que qualifica leads, responde perguntas sobre produtos e agenda reuniões automaticamente.',
+  'Qualifica leads e agenda reuniões automaticamente',
+  'briefcase', '#10B981', 'sales',
+  ARRAY['Qualificação automática de leads', 'Respostas sobre produtos', 'Agendamento de reuniões', 'Follow-up automático'],
+  0, true, true, true,
+  '{"greeting": "Olá! Sou o assistente de vendas. Como posso ajudar?", "qualification_questions": [], "products": []}'::jsonb
+),
+('Suporte ao Cliente', 'support-assistant',
+  'Assistente de IA para suporte ao cliente que responde dúvidas frequentes, cria tickets e escala para atendentes humanos quando necessário.',
+  'Responde dúvidas e cria tickets automaticamente',
+  'headphones', '#6366F1', 'support',
+  ARRAY['FAQ automático', 'Criação de tickets', 'Escalação inteligente', 'Histórico de conversas'],
+  29.90, false, true, true,
+  '{"greeting": "Olá! Sou o assistente de suporte. Em que posso ajudar?", "faq": [], "escalation_keywords": []}'::jsonb
+),
+('Agendamento Inteligente', 'scheduling-assistant',
+  'Assistente de IA para agendamento de consultas, reuniões e serviços com integração ao calendário.',
+  'Agenda consultas e reuniões automaticamente',
+  'calendar', '#F59E0B', 'scheduling',
+  ARRAY['Agendamento 24/7', 'Confirmação automática', 'Lembretes por WhatsApp', 'Reagendamento fácil'],
+  19.90, false, true, false,
+  '{"greeting": "Olá! Posso ajudar você a agendar um horário.", "available_slots": [], "duration_minutes": 30}'::jsonb
+),
+('Captação de Leads', 'lead-capture-assistant',
+  'Assistente de IA focado em capturar informações de leads e nutri-los com conteúdo relevante.',
+  'Captura e nutre leads automaticamente',
+  'users', '#EC4899', 'marketing',
+  ARRAY['Captura de dados', 'Nutrição de leads', 'Segmentação automática', 'Envio de materiais'],
+  24.90, false, true, false,
+  '{"greeting": "Olá! Gostaria de receber mais informações?", "capture_fields": ["name", "email", "phone"], "materials": []}'::jsonb
+),
+('Assistente de Pedidos', 'orders-assistant',
+  'Assistente de IA para receber pedidos, mostrar cardápio/catálogo e processar vendas via WhatsApp.',
+  'Recebe pedidos e processa vendas',
+  'shopping-cart', '#EF4444', 'ecommerce',
+  ARRAY['Catálogo digital', 'Carrinho de compras', 'Cálculo de frete', 'Pagamento integrado'],
+  39.90, false, true, false,
+  '{"greeting": "Olá! Bem-vindo à nossa loja. Posso ajudar com seu pedido?", "catalog": [], "payment_methods": []}'::jsonb
+)
+ON CONFLICT (slug) DO NOTHING;
+
+-- Migrations: add new columns to existing tables (safe to re-run)
+ALTER TABLE assistants ADD COLUMN IF NOT EXISTS is_custom BOOLEAN DEFAULT false;
+ALTER TABLE assistants ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE user_assistants ADD COLUMN IF NOT EXISTS channel_ids UUID[] DEFAULT '{}';

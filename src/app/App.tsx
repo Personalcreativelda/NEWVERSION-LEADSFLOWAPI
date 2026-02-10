@@ -23,6 +23,53 @@ import { mockAuth } from './utils/auth-mock';
 import { Toaster } from './components/ui/sonner';
 import { getSupabaseClient } from './utils/supabase/client';
 
+// ============================================
+// CAPTURE OAUTH HASH IMMEDIATELY ON SCRIPT LOAD
+// This runs before React initializes, so the hash won't be lost
+// ============================================
+const CAPTURED_HASH = window.location.hash;
+const CAPTURED_URL = window.location.href;
+console.log('[OAuth Capture] Hash captured on load:', CAPTURED_HASH);
+console.log('[OAuth Capture] Full URL on load:', CAPTURED_URL);
+
+// Process OAuth callback immediately if detected
+let OAUTH_PROCESSED = false;
+if (CAPTURED_HASH.includes('oauth_callback') || CAPTURED_HASH.includes('access_token')) {
+  console.log('[OAuth Capture] OAuth callback detected in hash!');
+  try {
+    let hashContent = CAPTURED_HASH.substring(1); // Remove #
+    if (hashContent.startsWith('oauth_callback&')) {
+      hashContent = hashContent.substring('oauth_callback&'.length);
+    }
+    const hashParams = new URLSearchParams(hashContent);
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+    const userBase64 = hashParams.get('user');
+
+    if (accessToken) {
+      console.log('[OAuth Capture] Tokens found, saving to localStorage...');
+      localStorage.setItem('leadflow_access_token', accessToken);
+      if (refreshToken) {
+        localStorage.setItem('leadflow_refresh_token', refreshToken);
+      }
+
+      if (userBase64) {
+        const userJsonDecoded = atob(userBase64);
+        const userData = JSON.parse(userJsonDecoded);
+        localStorage.setItem('leadflow_user', JSON.stringify(userData));
+        console.log('[OAuth Capture] User saved:', userData.email);
+      }
+
+      // Clean up URL immediately
+      window.history.replaceState({}, document.title, window.location.pathname);
+      OAUTH_PROCESSED = true;
+      console.log('[OAuth Capture] ✅ OAuth data captured and saved!');
+    }
+  } catch (error) {
+    console.error('[OAuth Capture] Error processing OAuth hash:', error);
+  }
+}
+
 declare global {
   interface Window {
     chatwootSDK?: {
@@ -297,110 +344,158 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     setVersionNotification(null);
   };
 
-  // OAuth Callback Handler
+  // OAuth Callback Handler (Direct Google OAuth - without Supabase)
   useEffect(() => {
     const handleOAuthCallback = async () => {
       try {
-        const supabase = getSupabaseClient();
-
-        // Check if we have an OAuth callback in the URL
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        // Check for new OAuth callback format: #oauth_callback&access_token=...
+        const hash = window.location.hash;
         const queryParams = new URLSearchParams(window.location.search);
 
-        // Check for access_token in hash (OAuth callback) or code in query (OAuth flow)
-        const hasOAuthCallback = hashParams.get('access_token') || queryParams.get('code');
-
-        if (!hasOAuthCallback) {
-          return;
-        }
-
-        console.log('[OAuth] Detected OAuth callback, processing...');
-        setLoading(true);
-
-        // Get session from Supabase
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError || !session) {
-          console.error('[OAuth] No session found after OAuth callback:', sessionError);
+        // Check for error in query params (from failed OAuth)
+        const oauthError = queryParams.get('error');
+        if (oauthError) {
+          const errorMessage = queryParams.get('message') || 'Erro ao autenticar com Google';
+          console.error('[OAuth] OAuth error:', oauthError, errorMessage);
+          alert(decodeURIComponent(errorMessage));
+          window.history.replaceState({}, document.title, window.location.pathname);
           setLoading(false);
           return;
         }
 
-        console.log('[OAuth] Supabase session obtained:', {
-          email: session.user.email,
-          provider: session.user.app_metadata.provider,
-        });
+        // Check for new direct Google OAuth callback format
+        // Format: #oauth_callback&access_token=...&refresh_token=...&user=...
+        if (hash.startsWith('#oauth_callback')) {
+          console.log('[OAuth] Detected direct Google OAuth callback...');
+          setLoading(true);
 
-        // Extract user info
-        const email = session.user.email;
-        const name = session.user.user_metadata.full_name || session.user.user_metadata.name;
-        const avatar_url = session.user.user_metadata.avatar_url || session.user.user_metadata.picture;
-        const provider = session.user.app_metadata.provider || 'google';
+          // Parse the hash parameters (skip the #oauth_callback& prefix)
+          const hashContent = hash.substring('#oauth_callback&'.length);
+          const hashParams = new URLSearchParams(hashContent);
 
-        if (!email) {
-          console.error('[OAuth] No email in OAuth user data');
-          setLoading(false);
-          return;
-        }
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          const userJson = hashParams.get('user');
 
-        // Send to backend to create/get user in PostgreSQL
-        console.log('[OAuth] Syncing with backend...');
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/auth/oauth/callback`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email,
-            name,
-            avatar_url,
-            provider,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Failed to process OAuth login');
-        }
-
-        const data = await response.json();
-        console.log('[OAuth] Backend response:', data);
-
-        // Store tokens from backend
-        if (data.session?.access_token) {
-          localStorage.setItem('leadflow_access_token', data.session.access_token);
-          if (data.session.refresh_token) {
-            localStorage.setItem('leadflow_refresh_token', data.session.refresh_token);
-          }
-          startSessionExpiryTimer();
-        }
-
-        // Store user
-        if (data.user) {
-          if (data.user.id) {
-            localStorage.setItem('leadflow_user', JSON.stringify(data.user));
-            setUser(data.user);
-          } else {
-            // Se não houver id, limpa localStorage e força logout
-            localStorage.removeItem('leadflow_user');
-            localStorage.removeItem('leadflow_access_token');
-            localStorage.removeItem('leadflow_refresh_token');
-            setUser(null);
+          if (!accessToken) {
+            console.error('[OAuth] No access token in callback');
             setLoading(false);
-            alert('Erro ao obter ID do usuário. Faça login novamente.');
-            setCurrentPage('login');
             return;
           }
+
+          console.log('[OAuth] Processing tokens from backend...');
+
+          // Store tokens
+          localStorage.setItem('leadflow_access_token', accessToken);
+          if (refreshToken) {
+            localStorage.setItem('leadflow_refresh_token', refreshToken);
+          }
+          startSessionExpiryTimer();
+
+          // Parse and store user (base64 encoded from backend)
+          if (userJson) {
+            try {
+              // Decode base64 to JSON string, then parse
+              const userJsonDecoded = atob(userJson);
+              const user = JSON.parse(userJsonDecoded);
+              if (user.id) {
+                localStorage.setItem('leadflow_user', JSON.stringify(user));
+                setUser(user);
+                console.log('[OAuth] User authenticated:', user.email);
+              } else {
+                throw new Error('User ID missing');
+              }
+            } catch (e) {
+              console.error('[OAuth] Failed to parse user data:', e);
+              localStorage.removeItem('leadflow_user');
+              localStorage.removeItem('leadflow_access_token');
+              localStorage.removeItem('leadflow_refresh_token');
+              setUser(null);
+              setLoading(false);
+              alert('Erro ao processar dados do usuário. Tente novamente.');
+              setCurrentPage('login');
+              return;
+            }
+          }
+
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+
+          // Redirect to dashboard
+          setCurrentPage('dashboard');
+          setLoading(false);
+
+          console.log('[OAuth] ✅ Google OAuth login completed successfully!');
+          return;
         }
 
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+        // Legacy: Check for old Supabase OAuth callback format (access_token in hash or code in query)
+        const hashParams = new URLSearchParams(hash.substring(1));
+        const hasLegacyCallback = hashParams.get('access_token') || queryParams.get('code');
 
-        // Redirect to dashboard
-        setCurrentPage('dashboard');
-        setLoading(false);
+        if (hasLegacyCallback) {
+          console.log('[OAuth] Detected legacy OAuth callback, trying Supabase fallback...');
+          setLoading(true);
 
-        console.log('[OAuth] ✅ OAuth login completed successfully!');
+          try {
+            const supabase = getSupabaseClient();
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+            if (sessionError || !session) {
+              console.error('[OAuth] No Supabase session found:', sessionError);
+              setLoading(false);
+              return;
+            }
+
+            // Extract user info from Supabase session
+            const email = session.user.email;
+            const name = session.user.user_metadata.full_name || session.user.user_metadata.name;
+            const avatar_url = session.user.user_metadata.avatar_url || session.user.user_metadata.picture;
+            const provider = session.user.app_metadata.provider || 'google';
+
+            if (!email) {
+              console.error('[OAuth] No email in OAuth user data');
+              setLoading(false);
+              return;
+            }
+
+            // Send to backend
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/auth/oauth/callback`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, name, avatar_url, provider }),
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to process OAuth login');
+            }
+
+            const data = await response.json();
+
+            // Store tokens
+            if (data.session?.access_token) {
+              localStorage.setItem('leadflow_access_token', data.session.access_token);
+              if (data.session.refresh_token) {
+                localStorage.setItem('leadflow_refresh_token', data.session.refresh_token);
+              }
+              startSessionExpiryTimer();
+            }
+
+            if (data.user?.id) {
+              localStorage.setItem('leadflow_user', JSON.stringify(data.user));
+              setUser(data.user);
+            }
+
+            window.history.replaceState({}, document.title, window.location.pathname);
+            setCurrentPage('dashboard');
+            setLoading(false);
+
+            console.log('[OAuth] ✅ Legacy OAuth login completed!');
+          } catch (error) {
+            console.error('[OAuth] Legacy OAuth error:', error);
+            setLoading(false);
+          }
+        }
       } catch (error) {
         console.error('[OAuth] Error processing OAuth callback:', error);
         setLoading(false);
@@ -483,6 +578,13 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
   const checkAuth = useCallback(async () => {
     try {
       console.log('[checkAuth] Starting authentication check...');
+
+      // Skip auth check if we're in an OAuth callback - let the OAuth handler process first
+      const hash = window.location.hash;
+      if (hash.startsWith('#oauth_callback')) {
+        console.log('[checkAuth] OAuth callback detected, skipping auth check...');
+        return;
+      }
 
       if (isSessionExpired()) {
         console.log('[checkAuth] Session expired');
@@ -582,6 +684,27 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
   useEffect(() => {
     const initialize = async () => {
+      console.log('[Initialize] Starting... OAUTH_PROCESSED:', OAUTH_PROCESSED);
+
+      // If OAuth was already processed on script load, load user and go to dashboard
+      if (OAUTH_PROCESSED) {
+        console.log('[Initialize] OAuth was processed on script load, loading user...');
+        const storedUser = localStorage.getItem('leadflow_user');
+        if (storedUser) {
+          try {
+            const userData = JSON.parse(storedUser);
+            setUser(userData);
+            startSessionExpiryTimer();
+            setCurrentPage('dashboard');
+            setLoading(false);
+            console.log('[Initialize] ✅ OAuth user loaded from localStorage:', userData.email);
+            return;
+          } catch (e) {
+            console.error('[Initialize] Error parsing stored user:', e);
+          }
+        }
+      }
+
       const resetHandled = checkPasswordResetCallback();
 
       if (!resetHandled) {

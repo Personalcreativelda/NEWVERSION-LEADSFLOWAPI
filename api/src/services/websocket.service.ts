@@ -142,8 +142,14 @@ export class WebSocketService {
      * Emitir atualização de conversa
      */
     emitConversationUpdate(userId: string, data: {
-        conversationId: string;
-        updates: any;
+        conversationId?: string;
+        conversation?: any;
+        updates?: any;
+        type?: string;
+        count?: number;
+        campaignId?: string;
+        campaignName?: string;
+        stats?: any;
     }) {
         console.log(`[WebSocket] Emitindo atualização de conversa para usuário ${userId}`);
         this.io.to(`user:${userId}`).emit('conversation_update', {

@@ -13,9 +13,146 @@ import {
   setupDemoAccount,
   setupAdminAccount,
 } from '../services/auth.service';
+import { googleOAuthService } from '../services/google-oauth.service';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const router = Router();
+
+// ============================================
+// Google OAuth Routes (Direct, without Supabase)
+// ============================================
+
+// GET /auth/google - Initiate Google OAuth flow
+router.get('/google', async (req, res, next) => {
+  try {
+    if (!googleOAuthService.isConfigured()) {
+      return res.status(503).json({
+        error: 'Google OAuth não está configurado. Configure GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.'
+      });
+    }
+
+    // Get frontend redirect URL if provided
+    const frontendRedirectUrl = req.query.redirect as string | undefined;
+
+    const { url, state } = googleOAuthService.getAuthorizationUrl(frontendRedirectUrl);
+
+    console.log('[Auth Google] Redirecting to Google OAuth...');
+
+    // Redirect to Google OAuth
+    return res.redirect(url);
+  } catch (error) {
+    console.error('[Auth Google] Error initiating OAuth:', error);
+    return next(error);
+  }
+});
+
+// GET /auth/google/callback - Handle Google OAuth callback
+router.get('/google/callback', async (req, res, next) => {
+  try {
+    const { code, state, error: oauthError } = req.query;
+
+    // Handle OAuth errors from Google
+    if (oauthError) {
+      console.error('[Auth Google] OAuth error from Google:', oauthError);
+      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      return res.redirect(`${appUrl}/login?error=oauth_error&message=${encodeURIComponent(String(oauthError))}`);
+    }
+
+    if (!code || typeof code !== 'string') {
+      console.error('[Auth Google] No authorization code received');
+      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      return res.redirect(`${appUrl}/login?error=no_code`);
+    }
+
+    // Validate state token for CSRF protection
+    if (state && typeof state === 'string') {
+      const stateValidation = googleOAuthService.validateState(state);
+      if (!stateValidation.valid) {
+        console.error('[Auth Google] Invalid state token');
+        const appUrl = process.env.APP_URL || 'http://localhost:3000';
+        return res.redirect(`${appUrl}/login?error=invalid_state`);
+      }
+    }
+
+    console.log('[Auth Google] Processing OAuth callback with code...');
+
+    // Complete OAuth flow - exchange code for user info
+    const userData = await googleOAuthService.completeOAuthFlow(code);
+
+    // Create or update user and get session
+    const authResult = await loginWithOAuth(userData);
+
+    console.log('[Auth Google] User authenticated:', userData.email);
+
+    // Redirect to frontend with tokens in URL fragment (hash)
+    // This is secure because URL fragments are not sent to server in HTTP requests
+    // FRONTEND_URL is where the dashboard/app is hosted (e.g., app.leadsflowapi.com)
+    const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+
+    // Encode user data as base64 to avoid URL encoding issues with special characters
+    const userBase64 = Buffer.from(JSON.stringify(authResult.user)).toString('base64');
+
+    const tokenData = new URLSearchParams({
+      access_token: authResult.session.access_token,
+      refresh_token: authResult.session.refresh_token,
+      user: userBase64,
+    });
+
+    const redirectUrl = `${frontendUrl}/#oauth_callback&${tokenData.toString()}`;
+
+    console.log('[Auth Google] Redirecting to frontend:', frontendUrl);
+    return res.redirect(redirectUrl);
+
+  } catch (error: any) {
+    console.error('[Auth Google] OAuth callback error:', error);
+    const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
+    const errorMessage = encodeURIComponent(error.message || 'Erro ao autenticar com Google');
+    return res.redirect(`${frontendUrl}/login?error=oauth_failed&message=${errorMessage}`);
+  }
+});
+
+// POST /auth/google/token - Exchange code for tokens (alternative for SPA)
+router.post('/google/token', async (req, res, next) => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    // Complete OAuth flow
+    const userData = await googleOAuthService.completeOAuthFlow(code);
+
+    // Create or update user and get session
+    const authResult = await loginWithOAuth(userData);
+
+    console.log('[Auth Google] User authenticated via token endpoint:', userData.email);
+
+    return res.json(authResult);
+  } catch (error) {
+    console.error('[Auth Google] Token exchange error:', error);
+    return next(error);
+  }
+});
+
+// GET /auth/google/url - Get OAuth URL without redirect (for popup/iframe flows)
+router.get('/google/url', async (req, res, next) => {
+  try {
+    if (!googleOAuthService.isConfigured()) {
+      return res.status(503).json({
+        error: 'Google OAuth não está configurado. Configure GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.'
+      });
+    }
+
+    const frontendRedirectUrl = req.query.redirect as string | undefined;
+    const { url, state } = googleOAuthService.getAuthorizationUrl(frontendRedirectUrl);
+
+    return res.json({ url, state });
+  } catch (error) {
+    console.error('[Auth Google] Error generating OAuth URL:', error);
+    return next(error);
+  }
+});
 
 router.post('/login', async (req, res, next) => {
   try {

@@ -20,6 +20,8 @@ import emailCampaignsRoutes from './email-campaigns';
 // INBOX: Importar rotas de canais e assistentes
 import channelsRoutes from './channels.routes';
 import aiAssistantsRoutes from './ai-assistants.routes';
+import assistantsRoutes from './assistants.routes';
+import userWebhooksRoutes from './user-webhooks.routes';
 import versionRoutes from './version.routes';
 
 const router = Router();
@@ -46,6 +48,8 @@ router.use('/email-campaigns', emailCampaignsRoutes);
 // INBOX: Registrar rotas de canais e assistentes
 router.use('/channels', channelsRoutes);
 router.use('/ai-assistants', aiAssistantsRoutes);
+router.use('/assistants', assistantsRoutes);
+router.use('/user-webhooks', userWebhooksRoutes);
 router.use('/version', versionRoutes);
 
 router.get('/health', (_req, res) => {

@@ -51,7 +51,7 @@ export default function SidebarGroup({
             </button>
 
             <div
-                className={`overflow-hidden transition-all duration-75 ease-in-out ${isExpanded ? 'max-h-[500px] opacity-100 mt-1' : 'max-h-0 opacity-0'
+                className={`overflow-hidden transition-all duration-75 ease-in-out ${isExpanded ? 'max-h-[1000px] opacity-100 mt-1' : 'max-h-0 opacity-0'
                     }`}
             >
                 <ul className="pl-6 space-y-0.5 py-1">
