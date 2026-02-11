@@ -633,8 +633,14 @@ router.post('/evolution/messages', async (req, res) => {
       }
     }
 
-    // Se não temos base64 mas temos mediaType, tentar baixar da Evolution API
-    if (!mediaUrl && mediaType && !mediaBase64) {
+    // Se só temos directPath (não acessível diretamente via HTTP), limpar para tentar fallback
+    if (mediaUrl && !mediaUrl.startsWith('http') && !mediaUrl.startsWith('data:')) {
+      console.warn('[Evolution Webhook] URL de mídia não acessível (directPath):', mediaUrl?.substring(0, 100));
+      mediaUrl = null;
+    }
+
+    // Se não temos URL válida mas temos mediaType, tentar baixar da Evolution API
+    if (!mediaUrl && mediaType) {
       const evolutionUrl = process.env.EVOLUTION_API_URL;
       const apiKey = process.env.EVOLUTION_API_KEY;
       const msgKey = messageData.key;
@@ -664,12 +670,6 @@ router.post('/evolution/messages', async (req, res) => {
           console.warn('[Evolution Webhook] Falha ao baixar mídia via Evolution API:', dlErr.message);
         }
       }
-    }
-
-    // Se só temos directPath (não acessível diretamente), tentar descartar
-    if (mediaUrl && !mediaUrl.startsWith('http') && !mediaUrl.startsWith('data:')) {
-      console.warn('[Evolution Webhook] URL de mídia não acessível (directPath):', mediaUrl?.substring(0, 100));
-      mediaUrl = null;
     }
 
     console.log('[Evolution Webhook] Mídia final:', { mediaType, hasUrl: !!mediaUrl });

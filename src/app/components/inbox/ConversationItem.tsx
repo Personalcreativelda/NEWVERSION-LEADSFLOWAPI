@@ -10,7 +10,10 @@ import {
     Users,
     Clock,
     Check,
-    CheckCheck
+    CheckCheck,
+    Mail,
+    Globe,
+    Smartphone
 } from 'lucide-react';
 
 interface ConversationItemProps {
@@ -63,6 +66,13 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
                         WhatsApp
                     </span>
                 );
+            case 'whatsapp_cloud':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                        <Smartphone size={10} />
+                        WhatsApp Cloud
+                    </span>
+                );
             case 'telegram':
                 return (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400">
@@ -82,6 +92,20 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400">
                         <Instagram size={10} />
                         Instagram
+                    </span>
+                );
+            case 'email':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400">
+                        <Mail size={10} />
+                        Email
+                    </span>
+                );
+            case 'website':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
+                        <Globe size={10} />
+                        Website
                     </span>
                 );
             default:

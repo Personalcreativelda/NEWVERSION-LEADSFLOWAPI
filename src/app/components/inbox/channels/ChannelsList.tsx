@@ -25,7 +25,8 @@ import {
     Plus,
     Settings,
     ChevronDown,
-    ChevronRight
+    ChevronRight,
+    Phone
 } from 'lucide-react';
 
 // Configuração dos canais disponíveis para conexão
@@ -44,7 +45,7 @@ const AVAILABLE_CHANNELS = [
         id: 'whatsapp_cloud',
         name: 'WhatsApp Cloud',
         description: 'API Oficial da Meta',
-        icon: MessageCircle,
+        icon: Smartphone,
         color: 'text-green-600',
         available: true,
         provider: 'cloud_api'
