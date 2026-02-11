@@ -1188,8 +1188,9 @@ router.post('/conversations/:conversationIdOrJid/send-sticker', async (req, res,
 });
 
 // Proxy de mídia: serve ficheiros do MinIO/storage através da API
-// Resolve problemas de CORS e URLs internas do MinIO
-router.get('/media-proxy', authMiddleware, async (req, res, next) => {
+// Resolve problemas de CORS, Helmet CORP e URLs internas do MinIO
+// NÃO usa authMiddleware porque <img> tags não enviam Authorization headers
+router.get('/media-proxy', async (req, res) => {
   try {
     const url = req.query.url as string;
     if (!url) {
@@ -1211,9 +1212,12 @@ router.get('/media-proxy', authMiddleware, async (req, res, next) => {
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     const contentLength = response.headers.get('content-length');
 
+    // Headers para permitir cross-origin embedding (override Helmet CORP)
     res.setHeader('Content-Type', contentType);
     if (contentLength) res.setHeader('Content-Length', contentLength);
     res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
 
     // Stream the response
     const arrayBuffer = await response.arrayBuffer();

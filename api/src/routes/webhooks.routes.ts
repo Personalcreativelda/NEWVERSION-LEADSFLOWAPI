@@ -969,20 +969,70 @@ router.post('/telegram', async (req, res) => {
       }
     );
 
-    // Determinar tipo de mídia
-    let mediaType = null;
-    let mediaUrl = null;
+    // Determinar tipo de mídia e fazer download via Telegram Bot API
+    let mediaType: string | null = null;
+    let mediaUrl: string | null = null;
+    let fileId: string | null = null;
 
     if (message.photo) {
       mediaType = 'image';
+      // photo é um array de tamanhos, pegar o maior (último)
+      fileId = message.photo[message.photo.length - 1]?.file_id;
     } else if (message.video) {
       mediaType = 'video';
-    } else if (message.audio || message.voice) {
+      fileId = message.video.file_id;
+    } else if (message.audio) {
       mediaType = 'audio';
+      fileId = message.audio.file_id;
+    } else if (message.voice) {
+      mediaType = 'audio';
+      fileId = message.voice.file_id;
     } else if (message.document) {
       mediaType = 'document';
+      fileId = message.document.file_id;
     } else if (message.sticker) {
       mediaType = 'sticker';
+      fileId = message.sticker.file_id;
+    } else if (message.video_note) {
+      mediaType = 'video';
+      fileId = message.video_note.file_id;
+    }
+
+    // Se tem mídia, baixar via Telegram Bot API e fazer upload para storage
+    if (fileId && mediaType) {
+      const botToken = channel.credentials?.bot_token || channel.credentials?.token;
+      if (botToken) {
+        try {
+          // 1. Obter file_path via getFile
+          const fileResponse = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
+          const fileData: any = await fileResponse.json();
+
+          if (fileData.ok && fileData.result?.file_path) {
+            // 2. Baixar o arquivo
+            const downloadUrl = `https://api.telegram.org/file/bot${botToken}/${fileData.result.file_path}`;
+            const mediaResponse = await fetch(downloadUrl);
+
+            if (mediaResponse.ok) {
+              const buffer = Buffer.from(await mediaResponse.arrayBuffer());
+              const contentType = mediaResponse.headers.get('content-type') || 'application/octet-stream';
+
+              // 3. Determinar extensão
+              const extParts = fileData.result.file_path.split('.');
+              const ext = extParts.length > 1 ? extParts[extParts.length - 1] : (mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : 'bin');
+              const filename = `telegram_${mediaType}_${Date.now()}.${ext}`;
+
+              // 4. Upload para storage
+              const storageService = getStorageService();
+              mediaUrl = await storageService.uploadBuffer(buffer, filename, contentType, 'inbox-media', channel.user_id);
+              console.log('[Telegram Webhook] Mídia uploaded:', mediaUrl?.substring(0, 100));
+            }
+          }
+        } catch (mediaErr: any) {
+          console.error('[Telegram Webhook] Erro ao baixar mídia:', mediaErr.message);
+        }
+      } else {
+        console.warn('[Telegram Webhook] Sem bot_token para baixar mídia');
+      }
     }
 
     // Salvar mensagem
