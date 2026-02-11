@@ -11,6 +11,8 @@ import { getWebSocketService } from '../services/websocket.service';
 import { assistantProcessor } from '../services/assistant-processor.service';
 // Webhooks: Importar dispatcher para enviar eventos para webhooks do usuário
 import { webhookDispatcher } from '../services/webhook-dispatcher.service';
+// Storage: Importar para upload de mídia recebida
+import { getStorageService } from '../services/storage.service';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -439,11 +441,23 @@ router.post('/evolution/messages', async (req, res) => {
       return res.json({ success: true, message: 'No message data to process' });
     }
 
-    // Ignorar mensagens enviadas pelo próprio usuário (já salvamos no momento do envio)
+    // Detectar se é mensagem enviada pelo próprio usuário (fromMe)
+    // NÃO ignoramos mais automaticamente - verificamos se já existe no banco
+    // Respostas feitas pelo celular vêm como fromMe=true mas não foram salvas pela dashboard
     const isFromMe = messageData.key?.fromMe === true || messageData.fromMe === true;
-    if (isFromMe) {
-      console.log('[Evolution Webhook] Ignorando mensagem enviada pelo próprio usuário');
-      return res.json({ success: true, message: 'Outgoing message ignored (already saved on send)' });
+    const externalMsgId = messageData.key?.id || messageData.id || messageData.messageId;
+
+    if (isFromMe && externalMsgId) {
+      // Verificar se esta mensagem já foi salva pela dashboard (envio pelo sistema)
+      const existingMsg = await query(
+        `SELECT id FROM messages WHERE external_id = $1 LIMIT 1`,
+        [externalMsgId]
+      );
+      if (existingMsg.rows.length > 0) {
+        console.log('[Evolution Webhook] Mensagem fromMe já existe no banco (enviada pela dashboard), ignorando:', externalMsgId);
+        return res.json({ success: true, message: 'Outgoing message already saved' });
+      }
+      console.log('[Evolution Webhook] Mensagem fromMe nova (enviada pelo celular), processando:', externalMsgId);
     }
 
     // Encontrar canal pelo instance_id OU instance_name
@@ -496,45 +510,45 @@ router.post('/evolution/messages', async (req, res) => {
     console.log('[Evolution Webhook] Conteúdo extraído:', messageContent.substring(0, 100));
 
     // Extrair mídia se houver
-    let mediaUrl = null;
-    let mediaType = null;
+    let mediaUrl: string | null = null;
+    let mediaType: string | null = null;
+    let mediaBase64: string | null = null;
+    let mediaMimetype: string | null = null;
 
     // Verificar diferentes locais onde a mídia pode estar no payload do Evolution API
     if (msg?.imageMessage) {
       mediaType = 'image';
-      mediaUrl = msg.imageMessage.url ||
-                 msg.imageMessage.directPath ||
-                 messageData.media?.url ||
-                 messageData.mediaUrl ||
-                 (msg.imageMessage.base64 ? `data:image/jpeg;base64,${msg.imageMessage.base64}` : null);
+      mediaMimetype = msg.imageMessage.mimetype || 'image/jpeg';
+      mediaBase64 = msg.imageMessage.base64 || messageData.media?.base64 || null;
+      mediaUrl = msg.imageMessage.url || messageData.media?.url || messageData.mediaUrl || null;
     } else if (msg?.videoMessage) {
       mediaType = 'video';
-      mediaUrl = msg.videoMessage.url ||
-                 msg.videoMessage.directPath ||
-                 messageData.media?.url ||
-                 messageData.mediaUrl;
+      mediaMimetype = msg.videoMessage.mimetype || 'video/mp4';
+      mediaBase64 = msg.videoMessage.base64 || messageData.media?.base64 || null;
+      mediaUrl = msg.videoMessage.url || messageData.media?.url || messageData.mediaUrl || null;
     } else if (msg?.audioMessage) {
       mediaType = 'audio';
-      mediaUrl = msg.audioMessage.url ||
-                 msg.audioMessage.directPath ||
-                 messageData.media?.url ||
-                 messageData.mediaUrl;
+      mediaMimetype = msg.audioMessage.mimetype || 'audio/ogg';
+      mediaBase64 = msg.audioMessage.base64 || messageData.media?.base64 || null;
+      mediaUrl = msg.audioMessage.url || messageData.media?.url || messageData.mediaUrl || null;
     } else if (msg?.documentMessage) {
       mediaType = 'document';
-      mediaUrl = msg.documentMessage.url ||
-                 msg.documentMessage.directPath ||
-                 messageData.media?.url ||
-                 messageData.mediaUrl;
+      mediaMimetype = msg.documentMessage.mimetype || 'application/octet-stream';
+      mediaBase64 = msg.documentMessage.base64 || messageData.media?.base64 || null;
+      mediaUrl = msg.documentMessage.url || messageData.media?.url || messageData.mediaUrl || null;
     } else if (msg?.stickerMessage) {
       mediaType = 'sticker';
-      mediaUrl = msg.stickerMessage.url ||
-                 messageData.media?.url;
+      mediaMimetype = msg.stickerMessage.mimetype || 'image/webp';
+      mediaBase64 = msg.stickerMessage.base64 || messageData.media?.base64 || null;
+      mediaUrl = msg.stickerMessage.url || messageData.media?.url || null;
     }
 
-    // Fallback: tentar extrair de outras localizações comuns
-    if (!mediaUrl && messageData.media) {
-      mediaUrl = messageData.media.url || messageData.media.base64;
+    // Fallback: tentar extrair de messageData.media
+    if (!mediaBase64 && !mediaUrl && messageData.media) {
+      mediaBase64 = messageData.media.base64 || null;
+      mediaUrl = messageData.media.url || null;
       if (!mediaType && messageData.media.mimetype) {
+        mediaMimetype = messageData.media.mimetype;
         if (messageData.media.mimetype.startsWith('image')) mediaType = 'image';
         else if (messageData.media.mimetype.startsWith('video')) mediaType = 'video';
         else if (messageData.media.mimetype.startsWith('audio')) mediaType = 'audio';
@@ -542,12 +556,52 @@ router.post('/evolution/messages', async (req, res) => {
       }
     }
 
-    // Se ainda não tem URL, verificar no nível raiz do messageData
-    if (!mediaUrl) {
-      mediaUrl = messageData.mediaUrl || messageData.media_url || messageData.base64Media;
+    // Fallback no nível raiz do messageData
+    if (!mediaBase64 && !mediaUrl) {
+      mediaBase64 = messageData.base64Media || messageData.base64 || null;
+      mediaUrl = messageData.mediaUrl || messageData.media_url || null;
     }
 
-    console.log('[Evolution Webhook] Mídia detectada:', { mediaType, mediaUrl: mediaUrl ? mediaUrl.substring(0, 100) + '...' : null });
+    // Se temos base64, fazer upload para MinIO para ter uma URL persistente
+    if (mediaBase64 && mediaType) {
+      try {
+        const storageService = getStorageService();
+        // Limpar prefixo data:...;base64, se presente
+        const cleanBase64 = mediaBase64.replace(/^data:[^;]+;base64,/, '');
+        const buffer = Buffer.from(cleanBase64, 'base64');
+
+        // Gerar extensão baseada no mimetype
+        const extMap: Record<string, string> = {
+          'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+          'video/mp4': 'mp4', 'video/webm': 'webm',
+          'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/webm': 'webm',
+          'application/pdf': 'pdf',
+        };
+        const ext = extMap[mediaMimetype || ''] || (mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : 'bin');
+        const filename = `whatsapp_${mediaType}_${Date.now()}.${ext}`;
+
+        mediaUrl = await storageService.uploadBuffer(
+          buffer,
+          filename,
+          mediaMimetype || 'application/octet-stream',
+          'inbox-media',
+          channel.user_id
+        );
+        console.log('[Evolution Webhook] Mídia uploaded para storage:', mediaUrl?.substring(0, 100));
+      } catch (uploadErr) {
+        console.error('[Evolution Webhook] Erro ao fazer upload da mídia:', uploadErr);
+        // Manter base64 data URI como fallback
+        mediaUrl = `data:${mediaMimetype || 'application/octet-stream'};base64,${mediaBase64.substring(0, 100000)}`;
+      }
+    }
+
+    // Se só temos directPath (não acessível diretamente), tentar descartar
+    if (mediaUrl && !mediaUrl.startsWith('http') && !mediaUrl.startsWith('data:')) {
+      console.warn('[Evolution Webhook] URL de mídia não acessível (directPath):', mediaUrl?.substring(0, 100));
+      mediaUrl = null; // Descartar directPath que não funciona
+    }
+
+    console.log('[Evolution Webhook] Mídia detectada:', { mediaType, hasUrl: !!mediaUrl });
 
     // Extrair telefone do JID
     const phone = remoteJid.split('@')[0];
@@ -589,27 +643,34 @@ router.post('/evolution/messages', async (req, res) => {
       }
     );
 
+    // Determinar direção da mensagem: fromMe = 'out' (resposta pelo celular), caso contrário = 'in'
+    const messageDirection = isFromMe ? 'out' : 'in';
+    const messageStatus = isFromMe ? 'sent' : 'delivered';
+
     // Salvar mensagem
     const messageResult = await query(
       `INSERT INTO messages (
-        user_id, conversation_id, lead_id, direction, channel, 
+        user_id, conversation_id, lead_id, direction, channel,
         content, media_url, media_type, status, external_id, metadata
       )
-       VALUES ($1, $2, $3, 'in', 'whatsapp', $4, $5, $6, 'delivered', $7, $8)
+       VALUES ($1, $2, $3, $4, 'whatsapp', $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         channel.user_id,
         conversation.id,
         leadId,
+        messageDirection,
         messageContent,
         mediaUrl,
         mediaType,
+        messageStatus,
         messageData.key?.id || messageData.id || messageData.messageId,
         JSON.stringify({
           from: messageData.key?.remoteJid || remoteJid,
           timestamp: messageData.messageTimestamp || messageData.timestamp || Date.now(),
           pushName: messageData.pushName || contactName,
-          fromMe: messageData.key?.fromMe || false,
+          fromMe: isFromMe,
+          source: isFromMe ? 'phone' : 'contact',
           rawPayload: JSON.stringify(req.body).substring(0, 500)
         })
       ]
@@ -617,10 +678,12 @@ router.post('/evolution/messages', async (req, res) => {
 
     const message = messageResult.rows[0];
 
-    console.log('[Evolution Webhook] Mensagem salva com sucesso:', message.id);
+    console.log('[Evolution Webhook] Mensagem salva com sucesso:', message.id, 'direction:', messageDirection);
 
-    // Atualizar unread_count e last_message_at da conversa
-    await conversationsService.updateUnreadCount(conversation.id, 1);
+    // Atualizar last_message_at e unread_count (só incrementa se for mensagem recebida, não enviada)
+    if (!isFromMe) {
+      await conversationsService.updateUnreadCount(conversation.id, 1);
+    }
     await query(
       `UPDATE conversations
        SET last_message_at = NOW(),
@@ -630,7 +693,7 @@ router.post('/evolution/messages', async (req, res) => {
       [conversation.id]
     );
 
-    console.log('[Evolution Webhook] Conversa atualizada: unread_count incrementado');
+    console.log('[Evolution Webhook] Conversa atualizada:', isFromMe ? 'sem incremento de unread (fromMe)' : 'unread_count incrementado');
 
     // Buscar conversa atualizada para enviar via WebSocket
     const updatedConversation = await query(

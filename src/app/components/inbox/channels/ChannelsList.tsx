@@ -261,12 +261,22 @@ export function ChannelsList() {
                         Seus Canais Ativos
                     </h4>
                     <div className="space-y-3">
-                        {channels.length > 0 ? channels.map(c => (
-                            <div key={c.id} className="flex items-center gap-2 text-sm" style={{ color: 'hsl(var(--foreground))' }}>
-                                <span className={`w-2 h-2 rounded-full ${c.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                                <span className="truncate">{c.name}</span>
-                            </div>
-                        )) : (
+                        {channels.length > 0 ? channels.map(c => {
+                            // Ícone e cor baseados no tipo do canal
+                            const channelConfig = AVAILABLE_CHANNELS.find(
+                                ac => ac.id === c.type || (c.type === 'whatsapp' && ac.id === 'whatsapp')
+                            );
+                            const ChannelIcon = channelConfig?.icon || MessageSquare;
+                            const iconColor = channelConfig?.color || 'text-gray-500';
+
+                            return (
+                                <div key={c.id} className="flex items-center gap-2 text-sm" style={{ color: 'hsl(var(--foreground))' }}>
+                                    <ChannelIcon className={`w-4 h-4 flex-shrink-0 ${iconColor}`} />
+                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${c.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                    <span className="truncate">{c.name}</span>
+                                </div>
+                            );
+                        }) : (
                             <p className="text-xs italic" style={{ color: 'hsl(var(--muted-foreground))' }}>Nenhum canal ativo</p>
                         )}
                     </div>

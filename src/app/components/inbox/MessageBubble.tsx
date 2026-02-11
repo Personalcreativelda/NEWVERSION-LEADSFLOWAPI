@@ -104,33 +104,65 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 {/* Media Content */}
                 {message.media_url && (
                     <div className="mb-2">
-                        {message.media_type === 'image' ? (
+                        {message.media_type === 'image' || message.media_type === 'sticker' ? (
                             <img
                                 src={message.media_url}
                                 alt="Mídia"
                                 className="rounded-md w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity"
                                 onClick={() => window.open(message.media_url, '_blank')}
+                                onError={(e) => {
+                                    // Fallback para imagens que falharam ao carregar
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const fallback = document.createElement('div');
+                                    fallback.className = `flex items-center gap-2 p-3 rounded ${isOut ? 'bg-teal-700' : 'bg-gray-100 dark:bg-gray-700'}`;
+                                    fallback.innerHTML = `<svg class="w-5 h-5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg><span class="text-xs opacity-60">Imagem indisponível</span>`;
+                                    target.parentElement?.appendChild(fallback);
+                                }}
+                            />
+                        ) : message.media_type === 'audio' ? (
+                            <audio
+                                controls
+                                src={message.media_url}
+                                className="w-full max-w-[280px] h-10"
+                                preload="metadata"
+                            >
+                                <a href={message.media_url} target="_blank" rel="noopener noreferrer">
+                                    Ouvir áudio
+                                </a>
+                            </audio>
+                        ) : message.media_type === 'video' ? (
+                            <video
+                                controls
+                                src={message.media_url}
+                                className="rounded-md w-full max-h-64"
+                                preload="metadata"
                             />
                         ) : (
                             <a
                                 href={message.media_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className={`flex items-center gap-2 p-2 rounded bg-opacity-10 ${isOut ? 'bg-white text-white' : 'bg-blue-50 text-blue-600'}`}
+                                className={`flex items-center gap-2 p-2 rounded ${isOut ? 'bg-teal-700 text-white' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}
                             >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                 </svg>
-                                <span className="truncate">Anexo ({message.media_type})</span>
+                                <span className="truncate text-sm">Documento ({message.media_type})</span>
+                                <svg className="w-4 h-4 flex-shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
                             </a>
                         )}
                     </div>
                 )}
 
-                {/* Text Content */}
-                <div className="whitespace-pre-wrap break-words">
-                    {message.content}
-                </div>
+                {/* Text Content - não mostrar placeholder de mídia quando tem mídia real */}
+                {message.content && message.content !== '[Mídia]' && message.content !== '[Imagem]' && message.content !== '[Vídeo]' && message.content !== '[Áudio]' && message.content !== '[Documento]' && message.content !== '[Sticker]' && (
+                    <div className="whitespace-pre-wrap break-words">
+                        {message.content}
+                    </div>
+                )}
 
                 {/* Metadata */}
                 <div className={`flex justify-end items-center gap-1 mt-1 text-[10px] ${isOut ? 'text-blue-100' : 'text-gray-400'}`}>

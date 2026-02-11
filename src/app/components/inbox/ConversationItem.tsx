@@ -56,28 +56,35 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
 
     const ChannelBadge = () => {
         switch (channel?.type) {
-            case 'whatsapp': 
+            case 'whatsapp':
                 return (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
                         <MessageCircle size={10} />
                         WhatsApp
                     </span>
                 );
-            case 'facebook': 
+            case 'telegram':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400">
+                        <Send size={10} />
+                        Telegram
+                    </span>
+                );
+            case 'facebook':
                 return (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
                         <Facebook size={10} />
                         Facebook
                     </span>
                 );
-            case 'instagram': 
+            case 'instagram':
                 return (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400">
                         <Instagram size={10} />
                         Instagram
                     </span>
                 );
-            default: 
+            default:
                 return null;
         }
     };
