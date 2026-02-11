@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import type { Channel } from '../../../types/inbox';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
-import { RefreshCw, Trash2, CheckCircle2, XCircle, Loader2, MessageCircle, Pencil, X, Check, Send, Facebook, Instagram, Mail, Globe, Smartphone } from 'lucide-react';
+import { RefreshCw, Trash2, CheckCircle2, XCircle, Loader2, MessageCircle, Pencil, X, Check, Send, Facebook, Instagram, Mail, Globe, Cloud } from 'lucide-react';
 
 interface ChannelCardProps {
     channel: Channel;
@@ -29,7 +29,7 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                     </svg>
                 );
             case 'whatsapp_cloud':
-                return <Smartphone className="w-5 h-5" />;
+                return <Cloud className="w-5 h-5" />;
             case 'facebook':
                 return <Facebook className="w-5 h-5" />;
             case 'instagram':

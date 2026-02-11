@@ -1527,28 +1527,41 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
           let mediaType = null;
           let mediaUrl = null;
 
+          let mediaId: string | null = null;
+          let mediaMimetype: string | null = null;
+
           switch (messageType) {
             case 'text':
               messageContent = message.text?.body || '';
               break;
             case 'image':
               mediaType = 'image';
+              mediaId = message.image?.id || null;
+              mediaMimetype = message.image?.mime_type || 'image/jpeg';
               messageContent = message.image?.caption || '[Imagem]';
               break;
             case 'video':
               mediaType = 'video';
+              mediaId = message.video?.id || null;
+              mediaMimetype = message.video?.mime_type || 'video/mp4';
               messageContent = message.video?.caption || '[Vídeo]';
               break;
             case 'audio':
               mediaType = 'audio';
+              mediaId = message.audio?.id || null;
+              mediaMimetype = message.audio?.mime_type || 'audio/ogg';
               messageContent = '[Áudio]';
               break;
             case 'document':
               mediaType = 'document';
+              mediaId = message.document?.id || null;
+              mediaMimetype = message.document?.mime_type || 'application/octet-stream';
               messageContent = message.document?.filename || '[Documento]';
               break;
             case 'sticker':
               mediaType = 'sticker';
+              mediaId = message.sticker?.id || null;
+              mediaMimetype = message.sticker?.mime_type || 'image/webp';
               messageContent = '[Sticker]';
               break;
             case 'location':
@@ -1585,6 +1598,60 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
 
           const channel = channelResult.rows[0];
           console.log('[WhatsApp Cloud Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
+
+          // Baixar mídia via Graph API se tiver mediaId
+          if (mediaId && mediaType) {
+            const accessToken = channel.credentials?.access_token;
+            if (accessToken) {
+              try {
+                console.log('[WhatsApp Cloud Webhook] Baixando mídia:', mediaId, mediaType);
+
+                // Step 1: Get media URL from Meta Graph API
+                const mediaInfoResponse = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+                  headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                const mediaInfo = await mediaInfoResponse.json();
+
+                if (mediaInfo.url) {
+                  // Step 2: Download the actual media file
+                  const mediaDownloadResponse = await fetch(mediaInfo.url, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                  });
+
+                  if (mediaDownloadResponse.ok) {
+                    const arrayBuffer = await mediaDownloadResponse.arrayBuffer();
+                    const buffer = Buffer.from(arrayBuffer);
+
+                    // Step 3: Upload to MinIO storage
+                    const storageService = getStorageService();
+                    const extMap: Record<string, string> = {
+                      'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+                      'video/mp4': 'mp4', 'video/3gpp': '3gp',
+                      'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/aac': 'aac',
+                      'application/pdf': 'pdf',
+                    };
+                    const ext = extMap[mediaMimetype || ''] || (mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : 'bin');
+                    const filename = `cloud_${mediaType}_${Date.now()}.${ext}`;
+
+                    mediaUrl = await storageService.uploadBuffer(
+                      buffer, filename,
+                      mediaMimetype || 'application/octet-stream',
+                      'inbox-media', channel.user_id
+                    );
+                    console.log('[WhatsApp Cloud Webhook] Mídia uploaded:', mediaUrl?.substring(0, 100));
+                  } else {
+                    console.warn('[WhatsApp Cloud Webhook] Falha ao baixar mídia:', mediaDownloadResponse.status);
+                  }
+                } else {
+                  console.warn('[WhatsApp Cloud Webhook] Sem URL na resposta do media info:', mediaInfo);
+                }
+              } catch (mediaErr) {
+                console.error('[WhatsApp Cloud Webhook] Erro ao baixar mídia:', mediaErr);
+              }
+            } else {
+              console.warn('[WhatsApp Cloud Webhook] Sem access_token no canal para baixar mídia');
+            }
+          }
 
           // Obter nome do contato
           let contactName = senderId;
@@ -1649,7 +1716,8 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
                 waba_id: wabaId,
                 from: senderId,
                 timestamp: timestamp,
-                message_type: messageType
+                message_type: messageType,
+                media_id: mediaId || undefined
               })
             ]
           );

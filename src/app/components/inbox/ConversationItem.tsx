@@ -13,7 +13,7 @@ import {
     CheckCheck,
     Mail,
     Globe,
-    Smartphone
+    Cloud
 } from 'lucide-react';
 
 interface ConversationItemProps {
@@ -69,7 +69,7 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
             case 'whatsapp_cloud':
                 return (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                        <Smartphone size={10} />
+                        <Cloud size={10} />
                         WhatsApp Cloud
                     </span>
                 );
