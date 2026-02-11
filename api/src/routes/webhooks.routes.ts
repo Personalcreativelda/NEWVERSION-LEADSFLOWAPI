@@ -37,7 +37,7 @@ router.post('/n8n/leads', async (req, res) => {
 
     // Inserir lead no banco de dados
     const result = await query(
-      `INSERT INTO leads (user_id, nome, telefone, email, empresa, status, origem, observacoes, created_at, updated_at)
+      `INSERT INTO leads (user_id, name, phone, email, company, status, source, notes, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
        RETURNING *`,
       [
@@ -46,7 +46,7 @@ router.post('/n8n/leads', async (req, res) => {
         telefone || null,
         email || null,
         empresa || null,
-        status || 'novo',
+        status || 'new',
         origem || 'n8n',
         observacoes || null
       ]

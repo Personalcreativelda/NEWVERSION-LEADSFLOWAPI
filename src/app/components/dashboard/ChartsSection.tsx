@@ -2,6 +2,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import type { Lead } from '../../types';
 import FilterBar from './FilterBar';
 import { useMemo } from 'react';
+import { MessageCircle, Cloud, Mail, Instagram, Facebook, Send, Globe, Megaphone, Webhook, Phone, Search, Link, Hash } from 'lucide-react';
 
 interface ChartsSectionProps {
   leads: Lead[];
@@ -30,28 +31,68 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
   // Mapeamento de nomes de origem para exibição mais clara
   const origemLabels: Record<string, string> = {
     'whatsapp': 'WhatsApp',
+    'whatsapp_cloud': 'WhatsApp Cloud',
     'facebook': 'Facebook',
+    'messenger': 'Messenger',
     'instagram': 'Instagram',
+    'telegram': 'Telegram',
+    'email': 'Email',
+    'website': 'Website',
     'site': 'Site',
+    'campaign': 'Campanha',
+    'n8n': 'Automação (N8N)',
     'indicacao': 'Indicação',
     'google': 'Google',
     'linkedin': 'LinkedIn',
-    'email': 'Email',
     'telefone': 'Telefone',
+    'manual': 'Manual',
+    'unknown': 'Manual',
+    'inbox': 'Caixa de Entrada',
     'outros': 'Outros',
   };
 
-  // ✅ MAPEAMENTO DE CORES ESPECÍFICAS POR ORIGEM
+  // Mapeamento de ícones por origem
+  const origemIcons: Record<string, any> = {
+    'whatsapp': MessageCircle,
+    'whatsapp_cloud': Cloud,
+    'facebook': Facebook,
+    'messenger': Facebook,
+    'instagram': Instagram,
+    'telegram': Send,
+    'email': Mail,
+    'website': Globe,
+    'site': Globe,
+    'campaign': Megaphone,
+    'n8n': Webhook,
+    'indicacao': Link,
+    'google': Search,
+    'linkedin': Link,
+    'telefone': Phone,
+    'manual': Hash,
+    'unknown': Hash,
+    'inbox': Mail,
+  };
+
+  // Mapeamento de cores específicas por origem (canais)
   const origemColors: Record<string, string> = {
-    'whatsapp': '#00D9A3',     // Verde
+    'whatsapp': '#25D366',     // Verde WhatsApp
+    'whatsapp_cloud': '#128C7E', // Verde escuro WhatsApp Cloud
+    'facebook': '#1877F2',     // Azul Facebook
+    'messenger': '#0084FF',    // Azul Messenger
+    'instagram': '#E4405F',    // Rosa Instagram
+    'telegram': '#0088CC',     // Azul Telegram
+    'email': '#06B6D4',        // Ciano
+    'website': '#8B5CF6',      // Roxo
+    'site': '#8B5CF6',         // Roxo
+    'campaign': '#F59E0B',     // Amarelo/Laranja
+    'n8n': '#FF6D5A',          // Laranja N8N
     'indicacao': '#FFA26B',    // Laranja
-    'instagram': '#FF6B9D',    // Rosa
-    'facebook': '#5B9FED',     // Azul
-    'site': '#B794F6',         // Roxo
     'google': '#FFD93D',       // Amarelo
-    'linkedin': '#5B9FED',     // Azul
-    'email': '#B794F6',        // Roxo
-    'telefone': '#00D9A3',     // Verde
+    'linkedin': '#0A66C2',     // Azul LinkedIn
+    'telefone': '#10B981',     // Verde
+    'manual': '#6B7280',       // Cinza
+    'unknown': '#6B7280',      // Cinza
+    'inbox': '#3B82F6',        // Azul
     'outros': '#A0A0B2',       // Cinza
   };
 
@@ -70,8 +111,10 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
         return {
           name: origemLabels[normalizedName] || name,
           value,
-          color: origemColors[normalizedName] || barColors[0], // Cor específica ou fallback
+          color: origemColors[normalizedName] || barColors[0],
           fullName: origemLabels[normalizedName] || name,
+          icon: origemIcons[normalizedName] || Hash,
+          key: normalizedName,
         };
       })
       .sort((a, b) => b.value - a.value);
@@ -259,28 +302,33 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
                 </BarChart>
               </ResponsiveContainer>
               
-              {/* ✨ TABELA COM VALORES E PERCENTUAIS */}
+              {/* Tabela com ícones de canal, valores e percentuais */}
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {origemChartData.map((item, index) => {
                     const percentage = leads.length > 0 ? ((item.value / leads.length) * 100).toFixed(1) : '0';
+                    const IconComponent = item.icon;
                     return (
                       <div key={`row-${index}`} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div 
-                            className="w-3 h-3 rounded-full flex-shrink-0" 
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span className="text-sm font-medium text-muted-foreground">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: `${item.color}18` }}
+                          >
+                            <IconComponent className="w-3.5 h-3.5" style={{ color: item.color }} />
+                          </div>
+                          <span className="text-sm font-medium text-foreground">
                             {item.name}
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-semibold text-foreground">
-                            {item.value} leads
+                            {item.value}
                           </span>
-                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 min-w-[45px] text-right">
-                            ({percentage}%)
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full min-w-[45px] text-center"
+                            style={{ backgroundColor: `${item.color}18`, color: item.color }}
+                          >
+                            {percentage}%
                           </span>
                         </div>
                       </div>

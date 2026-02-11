@@ -119,6 +119,7 @@ class EmailPollingService {
       try {
         // Get the last known UID for this channel
         let lastUid = this.lastUids.get(channel.id) || 0;
+        const isFirstSync = lastUid === 0;
 
         // If first time, check what we already have in DB
         if (lastUid === 0) {
@@ -134,20 +135,41 @@ class EmailPollingService {
           }
         }
 
-        // Fetch new messages (UID greater than last known)
-        const searchCriteria = lastUid > 0 ? `${lastUid + 1}:*` : '1:*';
+        let searchCriteria: string;
         let newCount = 0;
-
-        // Only process last 20 messages if first time (to avoid huge backlog)
-        const maxFirstTime = lastUid === 0 ? 20 : 100;
+        const maxMessages = isFirstSync && lastUid === 0 ? 20 : 100;
         let processed = 0;
+
+        if (lastUid > 0) {
+          // Incremental sync: fetch only new messages after last known UID
+          searchCriteria = `${lastUid + 1}:*`;
+        } else {
+          // First time sync: fetch only recent emails (last 30 days)
+          // Use mailbox uidNext to calculate starting point for recent messages
+          const mailboxStatus = client.mailbox;
+          const uidNext = (mailboxStatus as any)?.uidNext || 0;
+
+          if (uidNext > 0) {
+            // Fetch only the last ~50 UIDs to find the 20 most recent
+            const startUid = Math.max(1, uidNext - 50);
+            searchCriteria = `${startUid}:*`;
+            console.log(`[Email Polling] First sync for ${channel.name}: fetching UIDs ${startUid}:* (uidNext: ${uidNext})`);
+          } else {
+            // Fallback: use date-based search for last 30 days
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            const dateStr = thirtyDaysAgo.toISOString().split('T')[0].replace(/-/g, '');
+            searchCriteria = '1:*';
+            console.log(`[Email Polling] First sync for ${channel.name}: fetching all (fallback)`);
+          }
+        }
 
         for await (const msg of client.fetch(searchCriteria, {
           envelope: true,
           source: true,
           uid: true
         })) {
-          if (processed >= maxFirstTime) break;
+          if (processed >= maxMessages) break;
 
           // Skip if we already have this UID
           if (msg.uid <= lastUid) continue;
