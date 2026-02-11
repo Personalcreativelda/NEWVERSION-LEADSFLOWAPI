@@ -1187,4 +1187,41 @@ router.post('/conversations/:conversationIdOrJid/send-sticker', async (req, res,
   }
 });
 
+// Proxy de mídia: serve ficheiros do MinIO/storage através da API
+// Resolve problemas de CORS e URLs internas do MinIO
+router.get('/media-proxy', authMiddleware, async (req, res, next) => {
+  try {
+    const url = req.query.url as string;
+    if (!url) {
+      return res.status(400).json({ error: 'URL parameter is required' });
+    }
+
+    // Validar que é uma URL HTTP válida (não permitir file://, etc.)
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return res.status(400).json({ error: 'Only HTTP/HTTPS URLs are supported' });
+    }
+
+    console.log('[Media Proxy] Fetching:', url.substring(0, 200));
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to fetch media' });
+    }
+
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    const contentLength = response.headers.get('content-length');
+
+    res.setHeader('Content-Type', contentType);
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
+    // Stream the response
+    const arrayBuffer = await response.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (error: any) {
+    console.error('[Media Proxy] Error:', error.message);
+    res.status(500).json({ error: 'Failed to proxy media' });
+  }
+});
+
 export default router;

@@ -1,6 +1,8 @@
 // INBOX: Componente de mensagem individual
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { MessageWithSender } from '../../types/inbox';
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
 interface MessageBubbleProps {
     message: MessageWithSender;
@@ -9,6 +11,7 @@ interface MessageBubbleProps {
 export function MessageBubble({ message }: MessageBubbleProps) {
     const isOut = message.direction === 'out';
     const [imageError, setImageError] = useState(false);
+    const [useProxy, setUseProxy] = useState(false);
 
     const formatTime = (dateString: string | number) => {
         if (!dateString && dateString !== 0) return '';
@@ -16,27 +19,19 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             let date: Date;
             const strValue = String(dateString);
 
-            // Check if it's a Unix timestamp in seconds (10 digits) - like 1769767959
             if (/^\d{10}$/.test(strValue)) {
                 date = new Date(parseInt(strValue) * 1000);
             } else if (/^\d{13}$/.test(strValue)) {
-                // Unix timestamp in milliseconds
                 date = new Date(parseInt(strValue));
             } else if (typeof dateString === 'number') {
-                // If it's a number, assume seconds if small, otherwise milliseconds
                 date = dateString > 9999999999 ? new Date(dateString) : new Date(dateString * 1000);
             } else {
-                // ISO string or other date format
                 date = new Date(dateString);
             }
 
-            if (isNaN(date.getTime())) {
-                console.log('[MessageBubble] Invalid date:', dateString);
-                return '';
-            }
+            if (isNaN(date.getTime())) return '';
             return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        } catch (err) {
-            console.log('[MessageBubble] Error parsing date:', dateString, err);
+        } catch {
             return '';
         }
     };
@@ -88,7 +83,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         }
     };
 
-    // Verificar se a URL é válida (não directPath, não vazia)
+    // Verificar se a URL é válida
     const isValidMediaUrl = (url: string | undefined): boolean => {
         if (!url) return false;
         if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return true;
@@ -97,7 +92,28 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
     const hasValidMedia = isValidMediaUrl(message.media_url);
 
-    // Determinar conteúdo de texto visível (esconder placeholders quando tem mídia)
+    // URL da imagem: tentar original primeiro, depois proxy
+    const imageUrl = useMemo(() => {
+        if (!message.media_url) return '';
+        if (useProxy && message.media_url.startsWith('http')) {
+            return `${API_URL}/api/inbox/media-proxy?url=${encodeURIComponent(message.media_url)}`;
+        }
+        return message.media_url;
+    }, [message.media_url, useProxy]);
+
+    // Handler de erro: primeiro tenta via proxy, depois desiste
+    const handleImageError = () => {
+        if (!useProxy && message.media_url?.startsWith('http')) {
+            // Primeira falha: tentar via proxy da API
+            console.log('[MessageBubble] Imagem falhou, tentando via proxy:', message.media_url?.substring(0, 80));
+            setUseProxy(true);
+        } else {
+            // Proxy também falhou: mostrar fallback
+            setImageError(true);
+        }
+    };
+
+    // Placeholders de mídia
     const mediaPlaceholders = ['[Mídia]', '[Imagem]', '[Vídeo]', '[Áudio]', '[Documento]', '[Sticker]', '[image]', '[video]', '[audio]', '[document]', '[sticker]'];
     const isMediaPlaceholder = mediaPlaceholders.includes(message.content || '');
     const showTextContent = message.content && (!isMediaPlaceholder || !hasValidMedia);
@@ -121,11 +137,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     <div className="mb-2">
                         {(message.media_type === 'image' || message.media_type === 'sticker') && !imageError ? (
                             <img
-                                src={message.media_url}
+                                src={imageUrl}
                                 alt="Mídia"
                                 className="rounded-md w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                                onClick={() => window.open(message.media_url, '_blank')}
-                                onError={() => setImageError(true)}
+                                onClick={() => window.open(imageUrl, '_blank')}
+                                onError={handleImageError}
                             />
                         ) : (message.media_type === 'image' || message.media_type === 'sticker') && imageError ? (
                             <a

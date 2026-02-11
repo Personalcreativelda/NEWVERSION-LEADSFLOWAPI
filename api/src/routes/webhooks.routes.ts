@@ -519,35 +519,60 @@ router.post('/evolution/messages', async (req, res) => {
     if (msg?.imageMessage) {
       mediaType = 'image';
       mediaMimetype = msg.imageMessage.mimetype || 'image/jpeg';
-      mediaBase64 = msg.imageMessage.base64 || messageData.media?.base64 || null;
-      mediaUrl = msg.imageMessage.url || messageData.media?.url || messageData.mediaUrl || null;
+      mediaBase64 = msg.imageMessage.base64 || null;
+      mediaUrl = msg.imageMessage.url || null;
     } else if (msg?.videoMessage) {
       mediaType = 'video';
       mediaMimetype = msg.videoMessage.mimetype || 'video/mp4';
-      mediaBase64 = msg.videoMessage.base64 || messageData.media?.base64 || null;
-      mediaUrl = msg.videoMessage.url || messageData.media?.url || messageData.mediaUrl || null;
+      mediaBase64 = msg.videoMessage.base64 || null;
+      mediaUrl = msg.videoMessage.url || null;
     } else if (msg?.audioMessage) {
       mediaType = 'audio';
       mediaMimetype = msg.audioMessage.mimetype || 'audio/ogg';
-      mediaBase64 = msg.audioMessage.base64 || messageData.media?.base64 || null;
-      mediaUrl = msg.audioMessage.url || messageData.media?.url || messageData.mediaUrl || null;
+      mediaBase64 = msg.audioMessage.base64 || null;
+      mediaUrl = msg.audioMessage.url || null;
     } else if (msg?.documentMessage) {
       mediaType = 'document';
       mediaMimetype = msg.documentMessage.mimetype || 'application/octet-stream';
-      mediaBase64 = msg.documentMessage.base64 || messageData.media?.base64 || null;
-      mediaUrl = msg.documentMessage.url || messageData.media?.url || messageData.mediaUrl || null;
+      mediaBase64 = msg.documentMessage.base64 || null;
+      mediaUrl = msg.documentMessage.url || null;
     } else if (msg?.stickerMessage) {
       mediaType = 'sticker';
       mediaMimetype = msg.stickerMessage.mimetype || 'image/webp';
-      mediaBase64 = msg.stickerMessage.base64 || messageData.media?.base64 || null;
-      mediaUrl = msg.stickerMessage.url || messageData.media?.url || null;
+      mediaBase64 = msg.stickerMessage.base64 || null;
+      mediaUrl = msg.stickerMessage.url || null;
     }
 
-    // Fallback: tentar extrair de messageData.media
-    if (!mediaBase64 && !mediaUrl && messageData.media) {
+    // Evolution API v2 pode colocar base64 em diversos locais dependendo da versão
+    // Tentar todos os locais possíveis se não encontramos base64 ainda
+    if (!mediaBase64 && mediaType) {
+      mediaBase64 =
+        msg?.base64 ||                          // msg.base64 (Evolution v2 coloca aqui com webhook_base64=true)
+        messageData.media?.base64 ||            // messageData.media.base64
+        messageData.base64 ||                   // messageData.base64
+        messageData.base64Media ||              // messageData.base64Media
+        body.base64 ||                          // body.base64
+        body.data?.base64 ||                    // body.data.base64
+        null;
+      if (mediaBase64) {
+        console.log('[Evolution Webhook] Base64 encontrado em fallback, tamanho:', mediaBase64.length);
+      }
+    }
+
+    // Fallback URL: tentar vários locais
+    if (!mediaUrl && mediaType) {
+      mediaUrl =
+        messageData.media?.url ||
+        messageData.mediaUrl ||
+        messageData.media_url ||
+        null;
+    }
+
+    // Fallback: tentar extrair de messageData.media se não detectou tipo ainda
+    if (!mediaBase64 && !mediaUrl && !mediaType && messageData.media) {
       mediaBase64 = messageData.media.base64 || null;
       mediaUrl = messageData.media.url || null;
-      if (!mediaType && messageData.media.mimetype) {
+      if (messageData.media.mimetype) {
         mediaMimetype = messageData.media.mimetype;
         if (messageData.media.mimetype.startsWith('image')) mediaType = 'image';
         else if (messageData.media.mimetype.startsWith('video')) mediaType = 'video';
@@ -556,11 +581,22 @@ router.post('/evolution/messages', async (req, res) => {
       }
     }
 
-    // Fallback no nível raiz do messageData
-    if (!mediaBase64 && !mediaUrl) {
-      mediaBase64 = messageData.base64Media || messageData.base64 || null;
-      mediaUrl = messageData.mediaUrl || messageData.media_url || null;
+    // Detectar messageType do payload para garantir que não perdemos mídia
+    const messageType = messageData.messageType || messageData.type;
+    if (!mediaType && messageType) {
+      const typeMap: Record<string, string> = {
+        'imageMessage': 'image', 'videoMessage': 'video', 'audioMessage': 'audio',
+        'documentMessage': 'document', 'stickerMessage': 'sticker'
+      };
+      if (typeMap[messageType]) {
+        mediaType = typeMap[messageType];
+        console.log('[Evolution Webhook] Tipo de mídia detectado via messageType:', mediaType);
+      }
     }
+
+    console.log('[Evolution Webhook] Mídia pré-upload:', {
+      mediaType, hasBase64: !!mediaBase64, base64Len: mediaBase64?.length || 0, hasUrl: !!mediaUrl
+    });
 
     // Se temos base64, fazer upload para MinIO para ter uma URL persistente
     if (mediaBase64 && mediaType) {
@@ -590,18 +626,53 @@ router.post('/evolution/messages', async (req, res) => {
         console.log('[Evolution Webhook] Mídia uploaded para storage:', mediaUrl?.substring(0, 100));
       } catch (uploadErr) {
         console.error('[Evolution Webhook] Erro ao fazer upload da mídia:', uploadErr);
-        // Manter base64 data URI como fallback
-        mediaUrl = `data:${mediaMimetype || 'application/octet-stream'};base64,${mediaBase64.substring(0, 100000)}`;
+        // Fallback: guardar base64 completo como data URI (sem truncar)
+        const cleanBase64 = mediaBase64.replace(/^data:[^;]+;base64,/, '');
+        mediaUrl = `data:${mediaMimetype || 'application/octet-stream'};base64,${cleanBase64}`;
+        console.log('[Evolution Webhook] Usando data URI como fallback, tamanho:', mediaUrl.length);
+      }
+    }
+
+    // Se não temos base64 mas temos mediaType, tentar baixar da Evolution API
+    if (!mediaUrl && mediaType && !mediaBase64) {
+      const evolutionUrl = process.env.EVOLUTION_API_URL;
+      const apiKey = process.env.EVOLUTION_API_KEY;
+      const msgKey = messageData.key;
+      if (evolutionUrl && apiKey && instance && msgKey) {
+        try {
+          console.log('[Evolution Webhook] Tentando baixar mídia via Evolution API...');
+          const mediaResponse = await fetch(`${evolutionUrl}/chat/getBase64FromMediaMessage/${instance}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+            body: JSON.stringify({ message: { key: msgKey } })
+          });
+          if (mediaResponse.ok) {
+            const mediaData = await mediaResponse.json();
+            const fetchedBase64 = mediaData.base64 || mediaData.data?.base64;
+            if (fetchedBase64) {
+              console.log('[Evolution Webhook] Mídia baixada via API, tamanho:', fetchedBase64.length);
+              const storageService = getStorageService();
+              const cleanB64 = fetchedBase64.replace(/^data:[^;]+;base64,/, '');
+              const buffer = Buffer.from(cleanB64, 'base64');
+              const ext = mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'bin';
+              const filename = `whatsapp_${mediaType}_${Date.now()}.${ext}`;
+              mediaUrl = await storageService.uploadBuffer(buffer, filename, mediaMimetype || 'application/octet-stream', 'inbox-media', channel.user_id);
+              console.log('[Evolution Webhook] Mídia (via API) uploaded:', mediaUrl?.substring(0, 100));
+            }
+          }
+        } catch (dlErr: any) {
+          console.warn('[Evolution Webhook] Falha ao baixar mídia via Evolution API:', dlErr.message);
+        }
       }
     }
 
     // Se só temos directPath (não acessível diretamente), tentar descartar
     if (mediaUrl && !mediaUrl.startsWith('http') && !mediaUrl.startsWith('data:')) {
       console.warn('[Evolution Webhook] URL de mídia não acessível (directPath):', mediaUrl?.substring(0, 100));
-      mediaUrl = null; // Descartar directPath que não funciona
+      mediaUrl = null;
     }
 
-    console.log('[Evolution Webhook] Mídia detectada:', { mediaType, hasUrl: !!mediaUrl });
+    console.log('[Evolution Webhook] Mídia final:', { mediaType, hasUrl: !!mediaUrl });
 
     // Extrair telefone do JID
     const phone = remoteJid.split('@')[0];

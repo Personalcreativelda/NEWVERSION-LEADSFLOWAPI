@@ -16,6 +16,30 @@ const readSchemaFile = () => {
   throw new Error('schema.sql not found. Ensure it exists in src/database.');
 };
 
+// Executar migrações pendentes automaticamente
+const runPendingMigrations = async () => {
+  try {
+    // Migração: Atualizar CHECK constraint da tabela channels para incluir email e website
+    await pool.query(`
+      DO $$
+      BEGIN
+        -- Remover constraints antigos
+        ALTER TABLE channels DROP CONSTRAINT IF EXISTS channels_type_check;
+        ALTER TABLE channels DROP CONSTRAINT IF EXISTS channels_type_check1;
+        -- Adicionar constraint atualizado
+        ALTER TABLE channels ADD CONSTRAINT channels_type_check
+          CHECK (type IN ('whatsapp', 'whatsapp_cloud', 'facebook', 'instagram', 'telegram', 'email', 'website'));
+      EXCEPTION
+        WHEN others THEN
+          RAISE NOTICE 'Channels type constraint migration: %', SQLERRM;
+      END $$;
+    `);
+    console.log('[DB] Channel type constraint updated (email, website added)');
+  } catch (error: any) {
+    console.warn('[DB] Migration warning:', error.message);
+  }
+};
+
 export const initDatabase = async () => {
   try {
     const schema = readSchemaFile();
@@ -29,4 +53,7 @@ export const initDatabase = async () => {
       throw error;
     }
   }
+
+  // Sempre executar migrações pendentes
+  await runPendingMigrations();
 };
