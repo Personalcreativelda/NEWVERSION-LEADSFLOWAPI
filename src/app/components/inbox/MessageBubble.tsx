@@ -1,5 +1,5 @@
 // INBOX: Componente de mensagem individual
-import React from 'react';
+import React, { useState } from 'react';
 import type { MessageWithSender } from '../../types/inbox';
 
 interface MessageBubbleProps {
@@ -8,13 +8,14 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message }: MessageBubbleProps) {
     const isOut = message.direction === 'out';
+    const [imageError, setImageError] = useState(false);
 
     const formatTime = (dateString: string | number) => {
         if (!dateString && dateString !== 0) return '';
         try {
             let date: Date;
             const strValue = String(dateString);
-            
+
             // Check if it's a Unix timestamp in seconds (10 digits) - like 1769767959
             if (/^\d{10}$/.test(strValue)) {
                 date = new Date(parseInt(strValue) * 1000);
@@ -28,7 +29,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 // ISO string or other date format
                 date = new Date(dateString);
             }
-            
+
             if (isNaN(date.getTime())) {
                 console.log('[MessageBubble] Invalid date:', dateString);
                 return '';
@@ -87,6 +88,20 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         }
     };
 
+    // Verificar se a URL é válida (não directPath, não vazia)
+    const isValidMediaUrl = (url: string | undefined): boolean => {
+        if (!url) return false;
+        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return true;
+        return false;
+    };
+
+    const hasValidMedia = isValidMediaUrl(message.media_url);
+
+    // Determinar conteúdo de texto visível (esconder placeholders quando tem mídia)
+    const mediaPlaceholders = ['[Mídia]', '[Imagem]', '[Vídeo]', '[Áudio]', '[Documento]', '[Sticker]', '[image]', '[video]', '[audio]', '[document]', '[sticker]'];
+    const isMediaPlaceholder = mediaPlaceholders.includes(message.content || '');
+    const showTextContent = message.content && (!isMediaPlaceholder || !hasValidMedia);
+
     return (
         <div className={`flex w-full mb-2 px-4 ${isOut ? 'justify-end' : 'justify-start'}`}>
             <div
@@ -95,31 +110,38 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                         ? 'bg-teal-600 dark:bg-teal-700 text-white rounded-br-none'
                         : 'rounded-bl-none border'
                     }`}
-                style={!isOut ? { 
+                style={!isOut ? {
                     backgroundColor: 'hsl(var(--card))',
                     borderColor: 'hsl(var(--border))',
                     color: 'hsl(var(--foreground))'
                 } : undefined}
             >
                 {/* Media Content */}
-                {message.media_url && (
+                {hasValidMedia && (
                     <div className="mb-2">
-                        {message.media_type === 'image' || message.media_type === 'sticker' ? (
+                        {(message.media_type === 'image' || message.media_type === 'sticker') && !imageError ? (
                             <img
                                 src={message.media_url}
                                 alt="Mídia"
                                 className="rounded-md w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity"
                                 onClick={() => window.open(message.media_url, '_blank')}
-                                onError={(e) => {
-                                    // Fallback para imagens que falharam ao carregar
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = 'none';
-                                    const fallback = document.createElement('div');
-                                    fallback.className = `flex items-center gap-2 p-3 rounded ${isOut ? 'bg-teal-700' : 'bg-gray-100 dark:bg-gray-700'}`;
-                                    fallback.innerHTML = `<svg class="w-5 h-5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg><span class="text-xs opacity-60">Imagem indisponível</span>`;
-                                    target.parentElement?.appendChild(fallback);
-                                }}
+                                onError={() => setImageError(true)}
                             />
+                        ) : (message.media_type === 'image' || message.media_type === 'sticker') && imageError ? (
+                            <a
+                                href={message.media_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`flex items-center gap-2 p-3 rounded cursor-pointer ${isOut ? 'bg-teal-700 hover:bg-teal-800' : 'bg-gray-100 dark:bg-gray-700 hover:opacity-80'}`}
+                            >
+                                <svg className="w-5 h-5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span className="text-xs opacity-60">Abrir imagem</span>
+                                <svg className="w-4 h-4 opacity-40 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                            </a>
                         ) : message.media_type === 'audio' ? (
                             <audio
                                 controls
@@ -157,8 +179,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     </div>
                 )}
 
-                {/* Text Content - não mostrar placeholder de mídia quando tem mídia real */}
-                {message.content && message.content !== '[Mídia]' && message.content !== '[Imagem]' && message.content !== '[Vídeo]' && message.content !== '[Áudio]' && message.content !== '[Documento]' && message.content !== '[Sticker]' && (
+                {/* Text Content */}
+                {showTextContent && (
                     <div className="whitespace-pre-wrap break-words">
                         {message.content}
                     </div>

@@ -104,15 +104,10 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
         }
     };
 
-    const handleDisconnect = async () => {
+    const handleDisconnect = () => {
         if (!confirm('Deseja realmente desconectar este canal?')) return;
-        try {
-            await channelsApi.delete(channel.id);
-            toast.success('Canal desconectado');
-            onDelete(channel);
-        } catch (error) {
-            toast.error('Erro ao desconectar');
-        }
+        // Delegar ao parent (onDelete) que já faz a chamada API e atualiza o state
+        onDelete(channel);
     };
 
     return (

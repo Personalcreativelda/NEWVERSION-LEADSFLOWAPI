@@ -1,10 +1,8 @@
-// INBOX: Modal de Conexão Email
+// INBOX: Modal de Conexão Email com SMTP/IMAP
 import React, { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
-import { Mail, Check, AlertCircle, Loader2, Copy, CheckCircle, Info, ExternalLink } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
+import { Mail, Check, AlertCircle, Loader2, Info, CheckCircle, Eye, EyeOff, ChevronRight } from 'lucide-react';
 
 interface EmailConnectProps {
     isOpen: boolean;
@@ -12,35 +10,104 @@ interface EmailConnectProps {
     onSuccess: () => void;
 }
 
+// Presets de provedores populares
+const EMAIL_PROVIDERS = [
+    {
+        id: 'gmail',
+        name: 'Gmail',
+        icon: '📧',
+        color: 'from-red-500 to-orange-500',
+        smtp: { host: 'smtp.gmail.com', port: '587', secure: false },
+        imap: { host: 'imap.gmail.com', port: '993', secure: true },
+        note: 'Use uma Senha de App (não sua senha normal). Ative em: Google > Segurança > Senhas de App.'
+    },
+    {
+        id: 'outlook',
+        name: 'Microsoft / Outlook',
+        icon: '📨',
+        color: 'from-blue-500 to-blue-700',
+        smtp: { host: 'smtp.office365.com', port: '587', secure: false },
+        imap: { host: 'outlook.office365.com', port: '993', secure: true },
+        note: 'Use sua senha normal ou uma Senha de App se tiver 2FA ativo.'
+    },
+    {
+        id: 'yahoo',
+        name: 'Yahoo Mail',
+        icon: '💜',
+        color: 'from-purple-500 to-purple-700',
+        smtp: { host: 'smtp.mail.yahoo.com', port: '587', secure: false },
+        imap: { host: 'imap.mail.yahoo.com', port: '993', secure: true },
+        note: 'Gere uma Senha de App em: Yahoo > Segurança da Conta > Gerar Senha de App.'
+    },
+    {
+        id: 'custom',
+        name: 'Outro Provedor (SMTP)',
+        icon: '⚙️',
+        color: 'from-gray-500 to-gray-700',
+        smtp: { host: '', port: '587', secure: false },
+        imap: { host: '', port: '993', secure: true },
+        note: 'Configure manualmente os dados do seu servidor SMTP/IMAP.'
+    }
+];
+
 export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) {
-    const [step, setStep] = useState<'form' | 'webhook' | 'success'>('form');
+    const [step, setStep] = useState<'provider' | 'config' | 'success'>('provider');
+    const [selectedProvider, setSelectedProvider] = useState<typeof EMAIL_PROVIDERS[0] | null>(null);
     const [loading, setLoading] = useState(false);
+    const [testingConnection, setTestingConnection] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [channelId, setChannelId] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
     const [formData, setFormData] = useState({
         name: '',
         email: '',
-        forwardingEmail: ''
+        password: '',
+        smtp_host: '',
+        smtp_port: '587',
+        smtp_secure: false,
+        imap_host: '',
+        imap_port: '993',
+        imap_secure: true,
+        from_name: ''
     });
 
     useEffect(() => {
         if (!isOpen) {
-            setStep('form');
+            setStep('provider');
+            setSelectedProvider(null);
             setFormData({
-                name: '',
-                email: '',
-                forwardingEmail: ''
+                name: '', email: '', password: '',
+                smtp_host: '', smtp_port: '587', smtp_secure: false,
+                imap_host: '', imap_port: '993', imap_secure: true,
+                from_name: ''
             });
             setError(null);
             setLoading(false);
-            setChannelId('');
+            setShowPassword(false);
         }
     }, [isOpen]);
 
+    const handleSelectProvider = (provider: typeof EMAIL_PROVIDERS[0]) => {
+        setSelectedProvider(provider);
+        setFormData(prev => ({
+            ...prev,
+            smtp_host: provider.smtp.host,
+            smtp_port: provider.smtp.port,
+            smtp_secure: provider.smtp.secure,
+            imap_host: provider.imap.host,
+            imap_port: provider.imap.port,
+            imap_secure: provider.imap.secure,
+        }));
+        setStep('config');
+    };
+
     const handleSubmit = async () => {
-        if (!formData.name.trim() || !formData.email.trim()) {
-            setError('Informe o nome e email do canal');
+        if (!formData.name.trim() || !formData.email.trim() || !formData.password.trim()) {
+            setError('Preencha todos os campos obrigatórios');
+            return;
+        }
+        if (!formData.smtp_host.trim()) {
+            setError('Informe o servidor SMTP');
             return;
         }
 
@@ -54,29 +121,41 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
                 status: 'active',
                 credentials: {
                     email: formData.email,
-                    forwarding_email: formData.forwardingEmail
+                    password: formData.password,
+                    provider: selectedProvider?.id || 'custom',
+                    from_name: formData.from_name || formData.name,
+                    smtp: {
+                        host: formData.smtp_host,
+                        port: parseInt(formData.smtp_port),
+                        secure: formData.smtp_secure,
+                        auth: {
+                            user: formData.email,
+                            pass: formData.password
+                        }
+                    },
+                    imap: {
+                        host: formData.imap_host,
+                        port: parseInt(formData.imap_port),
+                        secure: formData.imap_secure,
+                        auth: {
+                            user: formData.email,
+                            pass: formData.password
+                        }
+                    }
                 }
             });
 
             if (channel) {
-                setChannelId(channel.id);
-                setStep('webhook');
-                toast.success('Canal de email criado!');
+                setStep('success');
+                toast.success('Canal de email conectado!');
             }
         } catch (err: any) {
             console.error('Failed to create email channel:', err);
-            setError(err.message || 'Erro ao criar canal.');
+            setError(err.message || 'Erro ao criar canal de email.');
         } finally {
             setLoading(false);
         }
     };
-
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text);
-        toast.success('Copiado!');
-    };
-
-    const webhookUrl = `${API_URL}/api/webhooks/email/${channelId}`;
 
     if (!isOpen) return null;
 
@@ -105,10 +184,10 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                Caixa de Email
+                                {step === 'provider' ? 'Conectar Email' : step === 'config' ? (selectedProvider?.name || 'Configurar Email') : 'Sucesso!'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Receba emails na sua caixa de entrada
+                                {step === 'provider' ? 'Escolha seu provedor de email' : step === 'config' ? 'Configure SMTP e IMAP' : 'Canal criado com sucesso'}
                             </p>
                         </div>
                     </div>
@@ -122,60 +201,224 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
 
                 {/* Content */}
                 <div className="p-6 max-h-[70vh] overflow-y-auto">
-                    {step === 'form' && (
-                        <div className="space-y-6">
-                            {/* Info */}
-                            <div className="p-4 rounded-lg border border-blue-500/30 bg-blue-500/10">
-                                <div className="flex items-start gap-3">
-                                    <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                                    <div className="text-sm text-blue-200">
-                                        <p className="font-medium mb-1">Como funciona:</p>
-                                        <ul className="list-disc list-inside space-y-1 text-blue-300/80">
-                                            <li>Configure o encaminhamento de emails para nosso webhook</li>
-                                            <li>Emails recebidos aparecerão na sua caixa de entrada</li>
-                                            <li>Responda diretamente pelo LeadsFlow</li>
-                                        </ul>
+                    {/* Step 1: Provider Selection */}
+                    {step === 'provider' && (
+                        <div className="space-y-3">
+                            {EMAIL_PROVIDERS.map(provider => (
+                                <button
+                                    key={provider.id}
+                                    onClick={() => handleSelectProvider(provider)}
+                                    className="w-full flex items-center gap-4 p-4 rounded-xl border transition-all hover:shadow-md group"
+                                    style={{
+                                        borderColor: 'hsl(var(--border))',
+                                        backgroundColor: 'hsl(var(--background))'
+                                    }}
+                                >
+                                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${provider.color} flex items-center justify-center text-2xl flex-shrink-0`}>
+                                        {provider.icon}
                                     </div>
+                                    <div className="flex-1 text-left">
+                                        <h3 className="font-semibold text-sm" style={{ color: 'hsl(var(--foreground))' }}>
+                                            {provider.name}
+                                        </h3>
+                                        <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                            SMTP: {provider.smtp.host || 'Configurar manualmente'}
+                                        </p>
+                                    </div>
+                                    <ChevronRight className="w-5 h-5 opacity-30 group-hover:opacity-70 transition-opacity" style={{ color: 'hsl(var(--foreground))' }} />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Step 2: SMTP/IMAP Configuration */}
+                    {step === 'config' && selectedProvider && (
+                        <div className="space-y-5">
+                            {/* Provider Note */}
+                            {selectedProvider.note && (
+                                <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/10">
+                                    <div className="flex items-start gap-2">
+                                        <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                                        <p className="text-xs" style={{ color: 'hsl(var(--foreground))' }}>{selectedProvider.note}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Basic Info */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'hsl(var(--foreground))' }}>
+                                        Nome do Canal *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                                        placeholder="Ex: Suporte, Vendas"
+                                        className="w-full px-3 py-2.5 rounded-lg border text-sm"
+                                        style={{
+                                            backgroundColor: 'hsl(var(--background))',
+                                            borderColor: 'hsl(var(--border))',
+                                            color: 'hsl(var(--foreground))'
+                                        }}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'hsl(var(--foreground))' }}>
+                                        Nome do Remetente
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.from_name}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, from_name: e.target.value }))}
+                                        placeholder="Minha Empresa"
+                                        className="w-full px-3 py-2.5 rounded-lg border text-sm"
+                                        style={{
+                                            backgroundColor: 'hsl(var(--background))',
+                                            borderColor: 'hsl(var(--border))',
+                                            color: 'hsl(var(--foreground))'
+                                        }}
+                                    />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                    Nome do Canal *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                                    placeholder="Ex: Suporte, Vendas, Contato"
-                                    className="w-full px-4 py-3 rounded-lg border text-sm"
-                                    style={{
-                                        backgroundColor: 'hsl(var(--background))',
-                                        borderColor: 'hsl(var(--border))',
-                                        color: 'hsl(var(--foreground))'
-                                    }}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                    Email de Origem *
+                                <label className="block text-xs font-medium mb-1.5" style={{ color: 'hsl(var(--foreground))' }}>
+                                    Email *
                                 </label>
                                 <input
                                     type="email"
                                     value={formData.email}
                                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                                    placeholder="contato@suaempresa.com"
-                                    className="w-full px-4 py-3 rounded-lg border text-sm"
+                                    placeholder="seu@email.com"
+                                    className="w-full px-3 py-2.5 rounded-lg border text-sm"
                                     style={{
                                         backgroundColor: 'hsl(var(--background))',
                                         borderColor: 'hsl(var(--border))',
                                         color: 'hsl(var(--foreground))'
                                     }}
                                 />
-                                <p className="text-xs mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                    O email que receberá as mensagens
-                                </p>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium mb-1.5" style={{ color: 'hsl(var(--foreground))' }}>
+                                    Senha / Senha de App *
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={formData.password}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                                        placeholder="Senha do email ou App Password"
+                                        className="w-full px-3 py-2.5 pr-10 rounded-lg border text-sm"
+                                        style={{
+                                            backgroundColor: 'hsl(var(--background))',
+                                            borderColor: 'hsl(var(--border))',
+                                            color: 'hsl(var(--foreground))'
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    >
+                                        {showPassword ? <EyeOff className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} /> : <Eye className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* SMTP Config */}
+                            <div className="pt-2 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
+                                <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    Servidor SMTP (Envio)
+                                </h4>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="col-span-2">
+                                        <label className="block text-xs mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Host</label>
+                                        <input
+                                            type="text"
+                                            value={formData.smtp_host}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, smtp_host: e.target.value }))}
+                                            placeholder="smtp.exemplo.com"
+                                            className="w-full px-3 py-2 rounded-lg border text-sm font-mono"
+                                            style={{
+                                                backgroundColor: 'hsl(var(--background))',
+                                                borderColor: 'hsl(var(--border))',
+                                                color: 'hsl(var(--foreground))'
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Porta</label>
+                                        <input
+                                            type="text"
+                                            value={formData.smtp_port}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, smtp_port: e.target.value }))}
+                                            className="w-full px-3 py-2 rounded-lg border text-sm font-mono"
+                                            style={{
+                                                backgroundColor: 'hsl(var(--background))',
+                                                borderColor: 'hsl(var(--border))',
+                                                color: 'hsl(var(--foreground))'
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.smtp_secure}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, smtp_secure: e.target.checked }))}
+                                        className="rounded border-gray-300"
+                                    />
+                                    <span className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>SSL/TLS</span>
+                                </label>
+                            </div>
+
+                            {/* IMAP Config */}
+                            <div className="pt-2 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
+                                <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    Servidor IMAP (Recebimento)
+                                </h4>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="col-span-2">
+                                        <label className="block text-xs mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Host</label>
+                                        <input
+                                            type="text"
+                                            value={formData.imap_host}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, imap_host: e.target.value }))}
+                                            placeholder="imap.exemplo.com"
+                                            className="w-full px-3 py-2 rounded-lg border text-sm font-mono"
+                                            style={{
+                                                backgroundColor: 'hsl(var(--background))',
+                                                borderColor: 'hsl(var(--border))',
+                                                color: 'hsl(var(--foreground))'
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Porta</label>
+                                        <input
+                                            type="text"
+                                            value={formData.imap_port}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, imap_port: e.target.value }))}
+                                            className="w-full px-3 py-2 rounded-lg border text-sm font-mono"
+                                            style={{
+                                                backgroundColor: 'hsl(var(--background))',
+                                                borderColor: 'hsl(var(--border))',
+                                                color: 'hsl(var(--foreground))'
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.imap_secure}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, imap_secure: e.target.checked }))}
+                                        className="rounded border-gray-300"
+                                    />
+                                    <span className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>SSL/TLS</span>
+                                </label>
                             </div>
 
                             {error && (
@@ -185,28 +428,28 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
                                 </div>
                             )}
 
-                            <div className="flex gap-3">
+                            <div className="flex gap-3 pt-2">
                                 <button
-                                    onClick={onClose}
-                                    className="flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    onClick={() => { setStep('provider'); setError(null); }}
+                                    className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
                                     style={{ borderColor: 'hsl(var(--border))' }}
                                 >
-                                    Cancelar
+                                    Voltar
                                 </button>
                                 <button
                                     onClick={handleSubmit}
-                                    disabled={loading || !formData.name.trim() || !formData.email.trim()}
+                                    disabled={loading || !formData.name.trim() || !formData.email.trim() || !formData.password.trim() || !formData.smtp_host.trim()}
                                     className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            Criando...
+                                            Conectando...
                                         </>
                                     ) : (
                                         <>
                                             <Check className="w-4 h-4" />
-                                            Criar Canal
+                                            Conectar Email
                                         </>
                                     )}
                                 </button>
@@ -214,101 +457,17 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
                         </div>
                     )}
 
-                    {step === 'webhook' && (
-                        <div className="space-y-6">
-                            <div className="text-center">
-                                <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
-                                    <Mail className="w-8 h-8 text-blue-500" />
-                                </div>
-                                <h3 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                    Configure o Encaminhamento
-                                </h3>
-                                <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                    Configure seu provedor de email para encaminhar mensagens
-                                </p>
-                            </div>
-
-                            <div
-                                className="p-4 rounded-lg border"
-                                style={{
-                                    backgroundColor: 'hsl(var(--muted))',
-                                    borderColor: 'hsl(var(--border))'
-                                }}
-                            >
-                                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                    Webhook URL (para encaminhamento)
-                                </label>
-                                <div className="flex items-center gap-2">
-                                    <code
-                                        className="flex-1 px-3 py-2 rounded-lg text-xs break-all"
-                                        style={{
-                                            backgroundColor: 'hsl(var(--background))',
-                                            color: 'hsl(var(--foreground))'
-                                        }}
-                                    >
-                                        {webhookUrl}
-                                    </code>
-                                    <button
-                                        onClick={() => copyToClipboard(webhookUrl)}
-                                        className="p-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
-                                    >
-                                        <Copy className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="space-y-3">
-                                <p className="text-sm font-medium" style={{ color: 'hsl(var(--foreground))' }}>
-                                    Opções de Integração:
-                                </p>
-
-                                <div className="p-3 rounded-lg border" style={{ borderColor: 'hsl(var(--border))' }}>
-                                    <p className="text-sm font-medium" style={{ color: 'hsl(var(--foreground))' }}>
-                                        Zapier / Make / N8N
-                                    </p>
-                                    <p className="text-xs mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                        Configure um gatilho de email e envie para o webhook acima
-                                    </p>
-                                </div>
-
-                                <div className="p-3 rounded-lg border" style={{ borderColor: 'hsl(var(--border))' }}>
-                                    <p className="text-sm font-medium" style={{ color: 'hsl(var(--foreground))' }}>
-                                        SendGrid / Mailgun Inbound Parse
-                                    </p>
-                                    <p className="text-xs mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                        Configure o webhook de recebimento para a URL acima
-                                    </p>
-                                </div>
-
-                                <div className="p-3 rounded-lg border" style={{ borderColor: 'hsl(var(--border))' }}>
-                                    <p className="text-sm font-medium" style={{ color: 'hsl(var(--foreground))' }}>
-                                        Gmail / Outlook via API
-                                    </p>
-                                    <p className="text-xs mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                        Use APIs de terceiros como Nylas ou diretamente via N8N
-                                    </p>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={() => setStep('success')}
-                                className="w-full px-4 py-3 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 transition-colors"
-                            >
-                                Concluir Configuração
-                            </button>
-                        </div>
-                    )}
-
+                    {/* Step 3: Success */}
                     {step === 'success' && (
                         <div className="text-center py-8">
                             <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
                                 <CheckCircle className="w-10 h-10 text-green-500" />
                             </div>
                             <h3 className="text-xl font-semibold mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                Canal de Email Criado!
+                                Canal de Email Conectado!
                             </h3>
                             <p className="text-sm mb-6" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Configure o encaminhamento no seu provedor de email para começar a receber mensagens.
+                                Seu email foi configurado via SMTP/IMAP. As mensagens começarão a aparecer na sua caixa de entrada.
                             </p>
                             <button
                                 onClick={() => { onSuccess(); onClose(); }}

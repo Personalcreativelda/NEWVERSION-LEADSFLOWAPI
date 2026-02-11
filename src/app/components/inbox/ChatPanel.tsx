@@ -1,55 +1,68 @@
 // INBOX: Painel de Chat modernizado
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { ChatHeader } from './ChatHeader';
 import { ChatBackground } from './ChatBackground';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
-import { useMessages } from '../../hooks/useMessages';
-import type { ConversationWithDetails } from '../../types/inbox';
+import type { ConversationWithDetails, MessageWithSender } from '../../types/inbox';
 import { Loader2 } from 'lucide-react';
 
 interface ChatPanelProps {
     conversation: ConversationWithDetails;
     onBack?: () => void;
     onEditLead?: () => void;
+    // Props de mensagens do parent (useInbox com WebSocket)
+    messages?: MessageWithSender[];
+    messagesLoading?: boolean;
+    messagesError?: string | null;
+    sending?: boolean;
+    messagesEndRef?: React.RefObject<HTMLDivElement>;
+    onSendMessage?: (content: string, mediaUrl?: string, mediaType?: string) => Promise<void>;
+    onSendAudio?: (audioBlob: Blob) => Promise<void>;
 }
 
-export function ChatPanel({ conversation, onBack, onEditLead }: ChatPanelProps) {
+export function ChatPanel({
+    conversation,
+    onBack,
+    onEditLead,
+    messages: externalMessages,
+    messagesLoading: externalMessagesLoading,
+    messagesError: externalMessagesError,
+    sending: externalSending,
+    messagesEndRef: externalMessagesEndRef,
+    onSendMessage,
+    onSendAudio
+}: ChatPanelProps) {
     const [isTyping, setIsTyping] = useState(false);
     const [searchHighlight, setSearchHighlight] = useState<string>('');
-    
-    // Use useMessages directly with the conversation ID
-    const {
-        messages,
-        loading: messagesLoading,
-        error: messagesError,
-        sending,
-        messagesEndRef,
-        sendMessage,
-        sendAudio,
-    } = useMessages(conversation?.id || null);
-    
+    const internalEndRef = useRef<HTMLDivElement>(null);
+
+    // Usar dados externos (do useInbox com WebSocket) se disponíveis
+    const messages = externalMessages || [];
+    const messagesLoading = externalMessagesLoading ?? false;
+    const messagesError = externalMessagesError ?? null;
+    const sending = externalSending ?? false;
+    const messagesEndRef = externalMessagesEndRef || internalEndRef;
+
     const handleTyping = (typing: boolean) => {
         setIsTyping(typing);
-        // Could send typing status via WebSocket here
     };
 
     const handleSearchInChat = useCallback((query: string) => {
         setSearchHighlight(query);
-        // TODO: Implement scroll to first match and highlight
     }, []);
 
     return (
-        <div 
+        <div
             className="flex flex-col h-full max-h-full relative overflow-hidden"
             style={{ backgroundColor: 'hsl(var(--background))', height: '100%', maxHeight: '100%' }}
         >
 
             {/* Header - Fixed */}
             <div className="flex-shrink-0">
-                <ChatHeader 
-                    conversation={conversation} 
-                    onBack={onBack} 
+                <ChatHeader
+                    conversation={conversation}
+                    onBack={onBack}
                     onEditLead={onEditLead}
                     onSearchInChat={handleSearchInChat}
                 />
@@ -72,15 +85,15 @@ export function ChatPanel({ conversation, onBack, onEditLead }: ChatPanelProps) 
 
                     {!messagesLoading && messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center py-20 opacity-60">
-                            <div 
+                            <div
                                 className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
                                 style={{ backgroundColor: 'hsl(var(--muted))' }}
                             >
-                                <svg 
-                                    className="w-10 h-10" 
+                                <svg
+                                    className="w-10 h-10"
                                     style={{ color: 'hsl(var(--muted-foreground))' }}
-                                    fill="none" 
-                                    stroke="currentColor" 
+                                    fill="none"
+                                    stroke="currentColor"
                                     viewBox="0 0 24 24"
                                 >
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -107,16 +120,16 @@ export function ChatPanel({ conversation, onBack, onEditLead }: ChatPanelProps) 
             )}
 
             {/* Input Area - Fixed */}
-            <div 
+            <div
                 className="flex-shrink-0 p-3 border-t transition-colors"
-                style={{ 
+                style={{
                     backgroundColor: 'hsl(var(--card))',
                     borderColor: 'hsl(var(--border))'
                 }}
             >
                 <MessageInput
-                    onSendMessage={sendMessage}
-                    onSendAudio={sendAudio}
+                    onSendMessage={onSendMessage || (async () => {})}
+                    onSendAudio={onSendAudio}
                     disabled={messagesLoading || !!messagesError}
                     onTyping={handleTyping}
                     isSending={sending}

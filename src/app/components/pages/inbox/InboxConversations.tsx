@@ -24,8 +24,11 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
         refreshConversations,
         messages,
         messagesLoading,
+        messagesError,
         sending,
+        messagesEndRef,
         sendMessage,
+        sendAudio,
         wsConnected,
         lastUpdate
     } = useInbox();
@@ -352,6 +355,13 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
                         conversation={selectedConversation}
                         onBack={handleBack}
                         onEditLead={handleEditLead}
+                        messages={messages}
+                        messagesLoading={messagesLoading}
+                        messagesError={messagesError}
+                        sending={sending}
+                        messagesEndRef={messagesEndRef}
+                        onSendMessage={sendMessage}
+                        onSendAudio={sendAudio}
                     />
                 ) : (
                     <div 
