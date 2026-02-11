@@ -910,6 +910,27 @@ const mapLeadToApiPayload = (leadData: any) => {
   };
 };
 
+// Normalizar status de inglês para português (canais criam com 'new', dashboard espera 'novo')
+const normalizeStatus = (status: string | undefined): string => {
+  if (!status) return 'novo';
+  const statusMap: Record<string, string> = {
+    'new': 'novo',
+    'contacted': 'contatado',
+    'qualified': 'qualificado',
+    'negotiation': 'negociacao',
+    'in_negotiation': 'negociacao',
+    'in negotiation': 'negociacao',
+    'converted': 'convertido',
+    'lost': 'perdido',
+    'rejected': 'perdido',
+    'discarded': 'perdido',
+    'waiting': 'qualificado',
+    'closed': 'convertido',
+  };
+  const normalized = status.toLowerCase().trim();
+  return statusMap[normalized] || status;
+};
+
 const mapLeadFromApi = (lead: any): Lead => {
   if (!lead) {
     return lead;
@@ -930,7 +951,7 @@ const mapLeadFromApi = (lead: any): Lead => {
     email: lead.email || '',
     interesse: custom.interesse ?? lead.interesse ?? '',
     origem: lead.source || lead.origem || '',
-    status: lead.status || 'novo',
+    status: normalizeStatus(lead.status),
     data: custom.data || lead.data || lead.created_at,
     agente_atual: custom.agente_atual ?? lead.agente_atual ?? '',
     observacoes: lead.notes || lead.observacoes || lead.observacao || '',

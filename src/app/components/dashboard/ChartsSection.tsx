@@ -2,7 +2,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import type { Lead } from '../../types';
 import FilterBar from './FilterBar';
 import { useMemo } from 'react';
-import { MessageCircle, Cloud, Mail, Instagram, Facebook, Send, Globe, Megaphone, Webhook, Phone, Search, Link, Hash } from 'lucide-react';
+import { MessageCircle, Cloud, Mail, Instagram, Facebook, Send, Globe, Megaphone, Webhook, Phone, Search, Link, Hash, Smartphone, Users } from 'lucide-react';
 
 interface ChartsSectionProps {
   leads: Lead[];
@@ -28,26 +28,28 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
   const barColors = ['#B794F6', '#5B9FED', '#00D9A3', '#FFA26B', '#FF6B9D', '#FFD93D', '#B794F6', '#5B9FED', '#00D9A3', '#FFA26B'];
   const pieColors = ['#B794F6', '#00D9A3', '#FFA26B', '#FF6B9D', '#5B9FED', '#FFD93D'];
 
-  // Mapeamento de nomes de origem para exibição mais clara
+  // Mapeamento de nomes de origem para exibição
   const origemLabels: Record<string, string> = {
-    'whatsapp': 'WhatsApp',
+    'whatsapp': 'WhatsApp Não Oficial',
     'whatsapp_cloud': 'WhatsApp Cloud',
     'facebook': 'Facebook',
-    'messenger': 'Messenger',
+    'messenger': 'Facebook Messenger',
     'instagram': 'Instagram',
     'telegram': 'Telegram',
     'email': 'Email',
-    'website': 'Website',
+    'website': 'Site',
     'site': 'Site',
+    'twilio': 'Twilio (SMS)',
+    'sms': 'Twilio (SMS)',
+    'indicacao': 'Indicação',
     'campaign': 'Campanha',
     'n8n': 'Automação (N8N)',
-    'indicacao': 'Indicação',
     'google': 'Google',
     'linkedin': 'LinkedIn',
     'telefone': 'Telefone',
     'manual': 'Manual',
     'unknown': 'Manual',
-    'inbox': 'Caixa de Entrada',
+    'inbox': 'Inbox',
     'outros': 'Outros',
   };
 
@@ -62,9 +64,11 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     'email': Mail,
     'website': Globe,
     'site': Globe,
+    'twilio': Smartphone,
+    'sms': Smartphone,
+    'indicacao': Users,
     'campaign': Megaphone,
     'n8n': Webhook,
-    'indicacao': Link,
     'google': Search,
     'linkedin': Link,
     'telefone': Phone,
@@ -84,9 +88,11 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     'email': '#06B6D4',        // Ciano
     'website': '#8B5CF6',      // Roxo
     'site': '#8B5CF6',         // Roxo
+    'twilio': '#F22F46',       // Vermelho Twilio
+    'sms': '#F22F46',          // Vermelho Twilio
+    'indicacao': '#FFA26B',    // Laranja
     'campaign': '#F59E0B',     // Amarelo/Laranja
     'n8n': '#FF6D5A',          // Laranja N8N
-    'indicacao': '#FFA26B',    // Laranja
     'google': '#FFD93D',       // Amarelo
     'linkedin': '#0A66C2',     // Azul LinkedIn
     'telefone': '#10B981',     // Verde
