@@ -60,7 +60,7 @@ import { leadsApi, userApi, integrationsApi } from '../utils/api';
 import { useLeadsAutoRefresh } from '../hooks/useLeadsAutoRefresh';
 import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
 
-import { AlertTriangle, CheckCircle2, CopyX, Download, MailX } from 'lucide-react';
+import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X } from 'lucide-react';
 
 // Types
 interface Lead {

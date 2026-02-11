@@ -16,6 +16,7 @@ import {
     Facebook,
     MessageCircle,
     Cloud,
+    Smartphone,
     Mail,
     Code,
     Send,
