@@ -234,6 +234,16 @@ export class AssistantProcessorService {
                 break;
             }
 
+            case 'facebook': {
+                const accessToken = credentials.page_access_token || credentials.access_token;
+                const recipientId = ctx.contactPhone; // Facebook PSID
+                if (!accessToken || !recipientId) {
+                    throw new Error('Sem credenciais para Facebook Messenger');
+                }
+                await this.sendFacebookMessage(accessToken, recipientId, text);
+                break;
+            }
+
             default:
                 console.warn(`[AssistantProcessor] Canal ${ctx.channelType} não suportado para resposta automática`);
         }
@@ -326,6 +336,26 @@ export class AssistantProcessorService {
             const err = await response.text();
             throw new Error(`Instagram API error: ${err}`);
         }
+    }
+
+    /**
+     * Envia mensagem via Facebook Messenger Graph API
+     */
+    private async sendFacebookMessage(accessToken: string, recipientId: string, text: string): Promise<void> {
+        const response = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(accessToken)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                recipient: { id: recipientId },
+                message: { text }
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`Facebook Messenger API error: ${err}`);
+        }
+        console.log(`[AssistantProcessor] Resposta enviada via Facebook Messenger para ${recipientId}`);
     }
 }
 
