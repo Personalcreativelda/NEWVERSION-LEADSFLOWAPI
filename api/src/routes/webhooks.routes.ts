@@ -1197,6 +1197,174 @@ router.get('/facebook', async (req, res) => {
   });
 });
 
+// ✅ Diagnóstico do webhook do Facebook - retorna status dos canais e subscription
+router.get('/facebook/debug', async (req, res) => {
+  try {
+    // Buscar todos os canais Facebook
+    const channelsResult = await query(
+      `SELECT id, name, status, credentials, created_at, updated_at
+       FROM channels WHERE type = 'facebook' ORDER BY created_at DESC`
+    );
+
+    const channels = channelsResult.rows.map((ch: any) => {
+      const creds = ch.credentials || {};
+      return {
+        id: ch.id,
+        name: ch.name,
+        status: ch.status,
+        page_id: creds.page_id || 'N/A',
+        page_name: creds.page_name || 'N/A',
+        has_token: !!(creds.page_access_token || creds.access_token),
+        created_at: ch.created_at,
+        updated_at: ch.updated_at
+      };
+    });
+
+    // Buscar conversas do Facebook
+    const convsResult = await query(
+      `SELECT c.id, c.remote_jid, c.status, c.channel_id, c.created_at,
+              ch.type as channel_type, ch.name as channel_name
+       FROM conversations c
+       LEFT JOIN channels ch ON c.channel_id = ch.id
+       WHERE ch.type = 'facebook'
+       ORDER BY c.created_at DESC LIMIT 10`
+    );
+
+    // Buscar mensagens do Facebook
+    const msgsResult = await query(
+      `SELECT id, conversation_id, direction, channel, content, created_at
+       FROM messages
+       WHERE channel = 'facebook'
+       ORDER BY created_at DESC LIMIT 10`
+    );
+
+    res.json({
+      success: true,
+      facebook_channels: channels,
+      facebook_conversations: convsResult.rows,
+      facebook_messages: msgsResult.rows,
+      total_channels: channels.length,
+      total_conversations: convsResult.rows.length,
+      total_messages: msgsResult.rows.length,
+      webhook_url: '/api/webhooks/facebook',
+      verify_token: process.env.FACEBOOK_VERIFY_TOKEN || process.env.META_VERIFY_TOKEN || 'leadsflow_verify_token'
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Endpoint de teste: simula uma mensagem do Facebook para verificar o fluxo
+router.post('/facebook/test', async (req, res) => {
+  try {
+    // Buscar primeiro canal Facebook ativo
+    const channelResult = await query(
+      `SELECT * FROM channels WHERE type = 'facebook' AND status = 'active' ORDER BY created_at DESC LIMIT 1`
+    );
+
+    if (channelResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Nenhum canal Facebook ativo encontrado. Conecte o Facebook primeiro.' });
+    }
+
+    const channel = channelResult.rows[0];
+    const pageId = channel.credentials?.page_id || 'test_page';
+    const testSenderId = req.body.sender_id || 'test_user_' + Date.now();
+    const testMessage = req.body.message || 'Mensagem de teste do Facebook Messenger';
+
+    console.log('[Facebook Test] Simulando mensagem para canal:', channel.id);
+
+    // Criar lead de teste
+    let lead = await query(
+      `SELECT * FROM leads WHERE user_id = $1 AND facebook_id = $2`,
+      [channel.user_id, testSenderId]
+    );
+
+    let leadId: string;
+    if (lead.rows.length === 0) {
+      const leadResult = await query(
+        `INSERT INTO leads (user_id, name, facebook_id, source, status)
+         VALUES ($1, $2, $3, 'facebook', 'new')
+         RETURNING *`,
+        [channel.user_id, 'Teste Facebook', testSenderId]
+      );
+      leadId = leadResult.rows[0].id;
+    } else {
+      leadId = lead.rows[0].id;
+    }
+
+    // Criar conversa
+    const conversation = await conversationsService.findOrCreate(
+      channel.user_id,
+      channel.id,
+      testSenderId,
+      leadId,
+      { contact_name: 'Teste Facebook', facebook_psid: testSenderId }
+    );
+
+    // Salvar mensagem
+    const messageResult = await query(
+      `INSERT INTO messages (
+        user_id, conversation_id, lead_id, direction, channel,
+        content, status, external_id, metadata
+      )
+       VALUES ($1, $2, $3, 'in', 'facebook', $4, 'delivered', $5, $6)
+       RETURNING *`,
+      [
+        channel.user_id,
+        conversation.id,
+        leadId,
+        testMessage,
+        `fb_test_${Date.now()}`,
+        JSON.stringify({ test: true, sender_id: testSenderId, page_id: pageId })
+      ]
+    );
+
+    // Atualizar conversa
+    await conversationsService.updateUnreadCount(conversation.id, 1);
+    await query(
+      `UPDATE conversations
+       SET last_message_at = NOW(),
+           status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [conversation.id]
+    );
+
+    // Emitir WebSocket
+    const wsService = getWebSocketService();
+    if (wsService) {
+      const updatedConv = await query(
+        `SELECT c.*, ch.name as channel_name, l.name as lead_name
+         FROM conversations c
+         LEFT JOIN channels ch ON c.channel_id = ch.id
+         LEFT JOIN leads l ON c.lead_id = l.id
+         WHERE c.id = $1`,
+        [conversation.id]
+      );
+
+      wsService.emitNewMessage(channel.user_id, {
+        conversationId: conversation.id,
+        message: messageResult.rows[0],
+        conversation: updatedConv.rows[0] || conversation
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Mensagem de teste criada com sucesso!',
+      channel_id: channel.id,
+      channel_name: channel.name,
+      conversation_id: conversation.id,
+      message_id: messageResult.rows[0].id,
+      lead_id: leadId,
+      instructions: 'Atualize a página da inbox para ver a mensagem de teste'
+    });
+  } catch (error: any) {
+    console.error('[Facebook Test] Erro:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ✅ Webhook para receber mensagens do Facebook Messenger
 router.post('/facebook', async (req, res) => {
   try {
