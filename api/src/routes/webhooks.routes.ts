@@ -1171,6 +1171,296 @@ router.post('/telegram/:botToken?', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// FACEBOOK MESSENGER WEBHOOKS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ✅ Verificação de webhook do Facebook Messenger (GET para validação da Meta)
+router.get('/facebook', async (req, res) => {
+  console.log('[Facebook Webhook] GET request - webhook verification');
+
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  const verifyToken = process.env.FACEBOOK_VERIFY_TOKEN || process.env.META_VERIFY_TOKEN || 'leadsflow_verify_token';
+
+  if (mode === 'subscribe' && token === verifyToken) {
+    console.log('[Facebook Webhook] Verificação bem-sucedida');
+    return res.status(200).send(challenge);
+  }
+
+  res.json({
+    success: true,
+    message: 'Facebook Messenger webhook endpoint is accessible',
+    endpoint: '/api/webhooks/facebook',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ Webhook para receber mensagens do Facebook Messenger
+router.post('/facebook', async (req, res) => {
+  try {
+    console.log('[Facebook Webhook] ===== WEBHOOK RECEBIDO =====');
+    console.log('[Facebook Webhook] Body:', JSON.stringify(req.body).substring(0, 2000));
+
+    const body = req.body;
+
+    // Facebook Messenger envia webhooks com object: 'page'
+    if (body.object !== 'page') {
+      console.log('[Facebook Webhook] Objeto não é page:', body.object);
+      return res.sendStatus(200);
+    }
+
+    for (const entry of body.entry || []) {
+      const pageId = entry.id;
+
+      console.log('[Facebook Webhook] Processing entry for Page ID:', pageId);
+
+      for (const messagingEvent of entry.messaging || []) {
+        const senderId = messagingEvent.sender?.id;
+        const recipientId = messagingEvent.recipient?.id;
+        const timestamp = messagingEvent.timestamp;
+        const message = messagingEvent.message;
+
+        // Ignorar se não tem mensagem ou se é echo (mensagem enviada por nós)
+        if (!message || message.is_echo) {
+          console.log('[Facebook Webhook] Ignorando: sem mensagem ou é echo');
+          continue;
+        }
+
+        console.log('[Facebook Webhook] Mensagem de:', senderId);
+        console.log('[Facebook Webhook] Para:', recipientId);
+        console.log('[Facebook Webhook] Conteúdo:', message.text?.substring(0, 100));
+
+        // Encontrar canal pelo page_id nas credentials
+        let channelResult = await query(
+          `SELECT * FROM channels
+           WHERE type = 'facebook'
+           AND status = 'active'
+           AND (credentials->>'page_id' = $1 OR credentials->>'page_id' = $2)`,
+          [recipientId, pageId]
+        );
+
+        if (channelResult.rows.length === 0) {
+          console.warn('[Facebook Webhook] Canal não encontrado para Page ID:', recipientId || pageId);
+          continue;
+        }
+
+        const channel = channelResult.rows[0];
+        console.log('[Facebook Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
+
+        // Extrair conteúdo da mensagem
+        let messageContent = message.text || '';
+        let mediaType: string | null = null;
+        let mediaUrl: string | null = null;
+
+        // Verificar anexos (imagens, vídeos, etc.)
+        if (message.attachments && message.attachments.length > 0) {
+          const attachment = message.attachments[0];
+          mediaUrl = attachment.payload?.url || null;
+
+          switch (attachment.type) {
+            case 'image':
+              mediaType = 'image';
+              if (!messageContent) messageContent = '[Imagem]';
+              break;
+            case 'video':
+              mediaType = 'video';
+              if (!messageContent) messageContent = '[Vídeo]';
+              break;
+            case 'audio':
+              mediaType = 'audio';
+              if (!messageContent) messageContent = '[Áudio]';
+              break;
+            case 'file':
+              mediaType = 'document';
+              if (!messageContent) messageContent = '[Arquivo]';
+              break;
+            case 'location':
+              if (!messageContent) {
+                const coords = attachment.payload?.coordinates;
+                messageContent = coords
+                  ? `[Localização: ${coords.lat}, ${coords.long}]`
+                  : '[Localização]';
+              }
+              break;
+            default:
+              if (!messageContent) messageContent = '[Mídia]';
+          }
+        }
+
+        // Buscar nome do remetente via Graph API
+        let contactName = senderId;
+        try {
+          const accessToken = channel.credentials?.page_access_token || channel.credentials?.access_token;
+          if (accessToken) {
+            const userResponse = await fetch(
+              `https://graph.facebook.com/v21.0/${senderId}?fields=first_name,last_name,name,profile_pic&access_token=${accessToken}`
+            );
+            const userData: any = await userResponse.json();
+            if (userData.name) {
+              contactName = userData.name;
+            } else if (userData.first_name) {
+              contactName = [userData.first_name, userData.last_name].filter(Boolean).join(' ');
+            }
+          }
+        } catch (e) {
+          console.log('[Facebook Webhook] Não foi possível obter info do usuário:', e);
+        }
+
+        // Buscar ou criar lead pelo facebook_id
+        let lead = await query(
+          `SELECT * FROM leads WHERE user_id = $1 AND facebook_id = $2`,
+          [channel.user_id, senderId]
+        );
+
+        let leadId: string;
+
+        if (lead.rows.length === 0) {
+          console.log('[Facebook Webhook] Criando novo lead:', contactName);
+          const leadResult = await query(
+            `INSERT INTO leads (user_id, name, facebook_id, source, status)
+             VALUES ($1, $2, $3, 'facebook', 'new')
+             RETURNING *`,
+            [channel.user_id, contactName, senderId]
+          );
+          leadId = leadResult.rows[0].id;
+        } else {
+          leadId = lead.rows[0].id;
+        }
+
+        // Buscar ou criar conversa
+        const conversation = await conversationsService.findOrCreate(
+          channel.user_id,
+          channel.id,
+          senderId, // PSID como remote_jid
+          leadId,
+          {
+            contact_name: contactName,
+            facebook_psid: senderId
+          }
+        );
+
+        // Salvar mensagem
+        const messageResult = await query(
+          `INSERT INTO messages (
+            user_id, conversation_id, lead_id, direction, channel,
+            content, media_url, media_type, status, external_id, metadata
+          )
+           VALUES ($1, $2, $3, 'in', 'facebook', $4, $5, $6, 'delivered', $7, $8)
+           RETURNING *`,
+          [
+            channel.user_id,
+            conversation.id,
+            leadId,
+            messageContent,
+            mediaUrl,
+            mediaType,
+            message.mid || `fb_${timestamp}`,
+            JSON.stringify({
+              sender_id: senderId,
+              recipient_id: recipientId,
+              page_id: pageId,
+              timestamp: timestamp
+            })
+          ]
+        );
+
+        const savedMessage = messageResult.rows[0];
+        console.log('[Facebook Webhook] Mensagem salva:', savedMessage.id);
+
+        // Atualizar conversa
+        await conversationsService.updateUnreadCount(conversation.id, 1);
+        await query(
+          `UPDATE conversations
+           SET last_message_at = NOW(),
+               status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [conversation.id]
+        );
+
+        // Buscar conversa atualizada
+        const updatedConversation = await query(
+          `SELECT c.*,
+                  ch.name as channel_name,
+                  l.name as lead_name
+           FROM conversations c
+           LEFT JOIN channels ch ON c.channel_id = ch.id
+           LEFT JOIN leads l ON c.lead_id = l.id
+           WHERE c.id = $1`,
+          [conversation.id]
+        );
+
+        // Emitir WebSocket
+        const wsService = getWebSocketService();
+        if (wsService) {
+          console.log('[Facebook Webhook] Emitindo WebSocket para usuário:', channel.user_id);
+
+          wsService.emitNewMessage(channel.user_id, {
+            conversationId: conversation.id,
+            message: savedMessage,
+            conversation: updatedConversation.rows[0] || conversation
+          });
+
+          const totalUnreadResult = await query(
+            `SELECT SUM(unread_count) as total FROM conversations WHERE user_id = $1`,
+            [channel.user_id]
+          );
+          const totalUnread = parseInt(totalUnreadResult.rows[0]?.total || '0');
+
+          wsService.emitUnreadCountUpdate(channel.user_id, {
+            totalUnread,
+            conversationId: conversation.id,
+            unreadCount: (updatedConversation.rows[0]?.unread_count || 0) + 1
+          });
+
+          console.log('[Facebook Webhook] WebSocket emitido!');
+        }
+
+        // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+        webhookDispatcher.dispatchMessageReceived(channel.user_id, {
+          channelId: channel.id,
+          channelType: 'facebook',
+          channelName: channel.name,
+          conversationId: conversation.id,
+          messageId: savedMessage.id,
+          content: messageContent,
+          contactName: contactName,
+          contactPhone: senderId,
+          rawPayload: entry,
+        }).catch(err => console.error('[Facebook Webhook] Erro ao disparar webhook:', err.message));
+
+        // Processar assistente de IA (assíncrono)
+        if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+          assistantProcessor.processIncomingMessage({
+            channelId: channel.id,
+            channelType: 'facebook',
+            conversationId: conversation.id,
+            userId: channel.user_id,
+            contactPhone: senderId,
+            contactName: contactName,
+            messageContent: messageContent,
+            credentials: channel.credentials
+          }).then(replied => {
+            if (replied) console.log('[Facebook Webhook] Assistente IA respondeu automaticamente');
+          }).catch(err => {
+            console.error('[Facebook Webhook] Erro no assistente IA:', err.message);
+          });
+        }
+      }
+    }
+
+    // Meta espera resposta 200 OK
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('[Facebook Webhook] Erro:', error);
+    // Sempre retornar 200 para o Meta não reenviar
+    res.sendStatus(200);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // INSTAGRAM WEBHOOKS
 // ═══════════════════════════════════════════════════════════════════════════
 

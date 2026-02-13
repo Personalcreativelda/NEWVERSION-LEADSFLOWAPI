@@ -225,7 +225,61 @@ router.post('/', async (req, res, next) => {
             }
         }
 
-        // Para outros canais (Telegram, Facebook, Instagram), usar o status enviado ou 'active'
+        // Para Facebook Messenger, verificar duplicata e auto-subscribe à página
+        if (type === 'facebook' && credentials?.page_id) {
+            const existing = await channelsService.findByCredentialField('page_id', credentials.page_id, user.id);
+            if (existing) {
+                const updated = await channelsService.update(existing.id, {
+                    status: requestedStatus || 'active',
+                    credentials
+                }, user.id);
+                return res.status(200).json(updated);
+            }
+
+            // Criar canal
+            const channel = await channelsService.create({
+                type: 'facebook',
+                name,
+                status: requestedStatus || 'active',
+                credentials: {
+                    page_id: credentials.page_id,
+                    page_access_token: credentials.page_access_token,
+                    page_name: credentials.page_name
+                },
+                settings: settings || {}
+            }, user.id);
+
+            // Auto-subscribe à página para receber eventos de mensagens
+            const pageToken = credentials.page_access_token;
+            if (pageToken) {
+                try {
+                    const subscribeResponse = await fetch(
+                        `https://graph.facebook.com/v21.0/${credentials.page_id}/subscribed_apps`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                subscribed_fields: 'messages,messaging_postbacks,messaging_optins',
+                                access_token: pageToken
+                            })
+                        }
+                    );
+                    const subscribeData = await subscribeResponse.json();
+                    if (subscribeData.success) {
+                        console.log(`[Channels] ✅ Facebook page subscribed to messaging events: ${credentials.page_id}`);
+                    } else {
+                        console.warn(`[Channels] ⚠️ Failed to subscribe Facebook page:`, subscribeData);
+                    }
+                } catch (err: any) {
+                    console.error(`[Channels] ❌ Error subscribing Facebook page:`, err.message);
+                }
+            }
+
+            console.log(`[Channels] Facebook channel created: ${channel.id}`);
+            return res.status(201).json(channel);
+        }
+
+        // Para outros canais (Instagram, etc.), usar o status enviado ou 'active'
         const channel = await channelsService.create({
             type,
             name,
