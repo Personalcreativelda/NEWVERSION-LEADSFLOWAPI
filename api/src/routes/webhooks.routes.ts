@@ -1232,7 +1232,7 @@ router.post('/facebook', async (req, res) => {
         console.log('[Facebook Webhook] Para:', recipientId);
         console.log('[Facebook Webhook] Conteúdo:', message.text?.substring(0, 100));
 
-        // Encontrar canal pelo page_id nas credentials
+        // Encontrar canal pelo page_id nas credentials (tentar múltiplos campos)
         let channelResult = await query(
           `SELECT * FROM channels
            WHERE type = 'facebook'
@@ -1241,8 +1241,20 @@ router.post('/facebook', async (req, res) => {
           [recipientId, pageId]
         );
 
+        // Fallback: buscar qualquer canal Facebook ativo (caso page_id não bata)
         if (channelResult.rows.length === 0) {
-          console.warn('[Facebook Webhook] Canal não encontrado para Page ID:', recipientId || pageId);
+          console.log('[Facebook Webhook] Canal não encontrado por page_id, tentando fallback...');
+          channelResult = await query(
+            `SELECT * FROM channels
+             WHERE type = 'facebook'
+             AND status = 'active'
+             ORDER BY created_at DESC
+             LIMIT 1`
+          );
+        }
+
+        if (channelResult.rows.length === 0) {
+          console.warn('[Facebook Webhook] Nenhum canal Facebook ativo encontrado. Page ID:', recipientId || pageId);
           continue;
         }
 
