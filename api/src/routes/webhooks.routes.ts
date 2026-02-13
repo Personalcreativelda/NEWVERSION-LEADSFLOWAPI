@@ -950,26 +950,43 @@ router.post('/telegram/:botToken?', async (req, res) => {
     const channel = channelResult.rows[0];
     console.log('[Telegram Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
 
-    // Buscar ou criar lead pelo chatId
-    let lead = await query(
-      `SELECT * FROM leads WHERE user_id = $1 AND telegram_id = $2`,
-      [channel.user_id, chatId]
-    );
-
+    // Buscar ou criar lead pelo chatId (com fallback se coluna telegram_id não existe)
     let leadId: string;
-
-    if (lead.rows.length === 0) {
-      // Criar lead automaticamente
-      console.log('[Telegram Webhook] Criando novo lead:', contactName);
-      const leadResult = await query(
-        `INSERT INTO leads (user_id, name, telegram_id, source, status)
-         VALUES ($1, $2, $3, 'telegram', 'new')
-         RETURNING *`,
-        [channel.user_id, contactName, chatId]
+    try {
+      let lead = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND telegram_id = $2`,
+        [channel.user_id, chatId]
       );
-      leadId = leadResult.rows[0].id;
-    } else {
-      leadId = lead.rows[0].id;
+
+      if (lead.rows.length === 0) {
+        console.log('[Telegram Webhook] Criando novo lead:', contactName);
+        const leadResult = await query(
+          `INSERT INTO leads (user_id, name, telegram_id, source, status)
+           VALUES ($1, $2, $3, 'telegram', 'new')
+           RETURNING *`,
+          [channel.user_id, contactName, chatId]
+        );
+        leadId = leadResult.rows[0].id;
+      } else {
+        leadId = lead.rows[0].id;
+      }
+    } catch (colErr: any) {
+      console.warn('[Telegram Webhook] telegram_id column not available, using fallback');
+      let lead = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND name = $2 AND source = 'telegram' LIMIT 1`,
+        [channel.user_id, contactName]
+      );
+      if (lead.rows.length === 0) {
+        const leadResult = await query(
+          `INSERT INTO leads (user_id, name, source, status)
+           VALUES ($1, $2, 'telegram', 'new')
+           RETURNING *`,
+          [channel.user_id, contactName]
+        );
+        leadId = leadResult.rows[0].id;
+      } else {
+        leadId = lead.rows[0].id;
+      }
     }
 
     // Buscar ou criar conversa
@@ -1273,23 +1290,34 @@ router.post('/facebook/test', async (req, res) => {
 
     console.log('[Facebook Test] Simulando mensagem para canal:', channel.id);
 
-    // Criar lead de teste
-    let lead = await query(
-      `SELECT * FROM leads WHERE user_id = $1 AND facebook_id = $2`,
-      [channel.user_id, testSenderId]
-    );
-
+    // Criar lead de teste (com fallback se coluna facebook_id não existe)
     let leadId: string;
-    if (lead.rows.length === 0) {
+    try {
+      let lead = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND facebook_id = $2`,
+        [channel.user_id, testSenderId]
+      );
+      if (lead.rows.length === 0) {
+        const leadResult = await query(
+          `INSERT INTO leads (user_id, name, facebook_id, source, status)
+           VALUES ($1, $2, $3, 'facebook', 'new')
+           RETURNING *`,
+          [channel.user_id, 'Teste Facebook', testSenderId]
+        );
+        leadId = leadResult.rows[0].id;
+      } else {
+        leadId = lead.rows[0].id;
+      }
+    } catch (colErr: any) {
+      // Fallback: coluna facebook_id pode não existir ainda
+      console.log('[Facebook Test] facebook_id column not found, using fallback');
       const leadResult = await query(
-        `INSERT INTO leads (user_id, name, facebook_id, source, status)
-         VALUES ($1, $2, $3, 'facebook', 'new')
+        `INSERT INTO leads (user_id, name, source, status)
+         VALUES ($1, $2, 'facebook', 'new')
          RETURNING *`,
-        [channel.user_id, 'Teste Facebook', testSenderId]
+        [channel.user_id, 'Teste Facebook']
       );
       leadId = leadResult.rows[0].id;
-    } else {
-      leadId = lead.rows[0].id;
     }
 
     // Criar conversa
@@ -1488,25 +1516,45 @@ router.post('/facebook', async (req, res) => {
           console.log('[Facebook Webhook] Não foi possível obter info do usuário:', e);
         }
 
-        // Buscar ou criar lead pelo facebook_id
-        let lead = await query(
-          `SELECT * FROM leads WHERE user_id = $1 AND facebook_id = $2`,
-          [channel.user_id, senderId]
-        );
-
+        // Buscar ou criar lead pelo facebook_id (com fallback se coluna não existe)
         let leadId: string;
-
-        if (lead.rows.length === 0) {
-          console.log('[Facebook Webhook] Criando novo lead:', contactName);
-          const leadResult = await query(
-            `INSERT INTO leads (user_id, name, facebook_id, source, status)
-             VALUES ($1, $2, $3, 'facebook', 'new')
-             RETURNING *`,
-            [channel.user_id, contactName, senderId]
+        try {
+          let lead = await query(
+            `SELECT * FROM leads WHERE user_id = $1 AND facebook_id = $2`,
+            [channel.user_id, senderId]
           );
-          leadId = leadResult.rows[0].id;
-        } else {
-          leadId = lead.rows[0].id;
+
+          if (lead.rows.length === 0) {
+            console.log('[Facebook Webhook] Criando novo lead:', contactName);
+            const leadResult = await query(
+              `INSERT INTO leads (user_id, name, facebook_id, source, status)
+               VALUES ($1, $2, $3, 'facebook', 'new')
+               RETURNING *`,
+              [channel.user_id, contactName, senderId]
+            );
+            leadId = leadResult.rows[0].id;
+          } else {
+            leadId = lead.rows[0].id;
+          }
+        } catch (colErr: any) {
+          // Fallback: coluna facebook_id não existe ainda, criar lead sem ela
+          console.warn('[Facebook Webhook] facebook_id column not available, using fallback');
+          // Buscar por nome + source
+          let lead = await query(
+            `SELECT * FROM leads WHERE user_id = $1 AND name = $2 AND source = 'facebook' LIMIT 1`,
+            [channel.user_id, contactName]
+          );
+          if (lead.rows.length === 0) {
+            const leadResult = await query(
+              `INSERT INTO leads (user_id, name, source, status)
+               VALUES ($1, $2, 'facebook', 'new')
+               RETURNING *`,
+              [channel.user_id, contactName]
+            );
+            leadId = leadResult.rows[0].id;
+          } else {
+            leadId = lead.rows[0].id;
+          }
         }
 
         // Buscar ou criar conversa
@@ -1774,26 +1822,43 @@ router.post('/instagram', async (req, res) => {
           console.log('[Instagram Webhook] Não foi possível obter info do usuário:', e);
         }
 
-        // Buscar ou criar lead pelo instagram_id
-        let lead = await query(
-          `SELECT * FROM leads WHERE user_id = $1 AND instagram_id = $2`,
-          [channel.user_id, senderId]
-        );
-
+        // Buscar ou criar lead pelo instagram_id (com fallback se coluna não existe)
         let leadId: string;
-
-        if (lead.rows.length === 0) {
-          // Criar lead automaticamente
-          console.log('[Instagram Webhook] Criando novo lead:', contactName);
-          const leadResult = await query(
-            `INSERT INTO leads (user_id, name, instagram_id, source, status)
-             VALUES ($1, $2, $3, 'instagram', 'new')
-             RETURNING *`,
-            [channel.user_id, contactName, senderId]
+        try {
+          let lead = await query(
+            `SELECT * FROM leads WHERE user_id = $1 AND instagram_id = $2`,
+            [channel.user_id, senderId]
           );
-          leadId = leadResult.rows[0].id;
-        } else {
-          leadId = lead.rows[0].id;
+
+          if (lead.rows.length === 0) {
+            console.log('[Instagram Webhook] Criando novo lead:', contactName);
+            const leadResult = await query(
+              `INSERT INTO leads (user_id, name, instagram_id, source, status)
+               VALUES ($1, $2, $3, 'instagram', 'new')
+               RETURNING *`,
+              [channel.user_id, contactName, senderId]
+            );
+            leadId = leadResult.rows[0].id;
+          } else {
+            leadId = lead.rows[0].id;
+          }
+        } catch (colErr: any) {
+          console.warn('[Instagram Webhook] instagram_id column not available, using fallback');
+          let lead = await query(
+            `SELECT * FROM leads WHERE user_id = $1 AND name = $2 AND source = 'instagram' LIMIT 1`,
+            [channel.user_id, contactName]
+          );
+          if (lead.rows.length === 0) {
+            const leadResult = await query(
+              `INSERT INTO leads (user_id, name, source, status)
+               VALUES ($1, $2, 'instagram', 'new')
+               RETURNING *`,
+              [channel.user_id, contactName]
+            );
+            leadId = leadResult.rows[0].id;
+          } else {
+            leadId = lead.rows[0].id;
+          }
         }
 
         // Buscar ou criar conversa
