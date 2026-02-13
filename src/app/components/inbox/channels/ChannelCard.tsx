@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import type { Channel } from '../../../types/inbox';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
-import { RefreshCw, Trash2, Settings, CheckCircle2, XCircle, Loader2, MessageCircle, ExternalLink, Pencil, X, Check, Send, Facebook, Instagram } from 'lucide-react';
+import { RefreshCw, Trash2, CheckCircle2, XCircle, Loader2, MessageCircle, Pencil, X, Check, Send, Facebook, Instagram, Mail, Globe, Cloud } from 'lucide-react';
 
 interface ChannelCardProps {
     channel: Channel;
@@ -22,37 +22,46 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
 
     const getIcon = (type: string) => {
         switch (type) {
-            case 'whatsapp': 
-            case 'whatsapp_cloud':
+            case 'whatsapp':
                 return (
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                     </svg>
                 );
-            case 'facebook': 
+            case 'whatsapp_cloud':
+                return <Cloud className="w-5 h-5" />;
+            case 'facebook':
                 return <Facebook className="w-5 h-5" />;
-            case 'instagram': 
+            case 'instagram':
                 return <Instagram className="w-5 h-5" />;
-            case 'telegram': 
+            case 'telegram':
                 return <Send className="w-5 h-5" />;
-            default: 
+            case 'email':
+                return <Mail className="w-5 h-5" />;
+            case 'website':
+                return <Globe className="w-5 h-5" />;
+            default:
                 return <MessageCircle className="w-5 h-5" />;
         }
     };
 
     const getProviderLabel = () => {
-        if (channel.type === 'whatsapp_cloud') {
-            return 'Cloud API (Meta)';
-        } else if (channel.type === 'whatsapp') {
-            return 'API não oficial';
-        } else if (channel.type === 'telegram') {
-            return 'Telegram Bot';
-        } else if (channel.type === 'facebook') {
-            return 'Facebook Messenger';
-        } else if (channel.type === 'instagram') {
-            return 'Instagram Direct';
+        switch (channel.type) {
+            case 'whatsapp_cloud': return 'Cloud API (Meta)';
+            case 'whatsapp': return 'API não oficial';
+            case 'telegram': return 'Telegram Bot';
+            case 'facebook': return 'Facebook Messenger';
+            case 'instagram': return 'Instagram Direct';
+            case 'email': {
+                const provider = channel.credentials?.provider;
+                if (provider === 'gmail') return 'Gmail (SMTP/IMAP)';
+                if (provider === 'outlook') return 'Microsoft (SMTP/IMAP)';
+                if (provider === 'yahoo') return 'Yahoo (SMTP/IMAP)';
+                return 'Email (SMTP/IMAP)';
+            }
+            case 'website': return 'Chat Widget';
+            default: return null;
         }
-        return null;
     };
 
     const getIconBgColor = (type: string) => {
@@ -66,8 +75,33 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                 return 'bg-blue-600 text-white';
             case 'instagram':
                 return 'bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 text-white';
+            case 'email':
+                return 'bg-cyan-500 text-white';
+            case 'website':
+                return 'bg-purple-500 text-white';
             default:
                 return 'bg-gray-500 text-white';
+        }
+    };
+
+    // Cor da borda ativa por tipo de canal
+    const getActiveBorderColor = (type: string) => {
+        switch (type) {
+            case 'whatsapp':
+            case 'whatsapp_cloud':
+                return '#22c55e'; // green
+            case 'telegram':
+                return '#3b82f6'; // blue
+            case 'facebook':
+                return '#2563eb'; // blue-600
+            case 'instagram':
+                return '#ec4899'; // pink
+            case 'email':
+                return '#06b6d4'; // cyan
+            case 'website':
+                return '#a855f7'; // purple
+            default:
+                return '#6b7280'; // gray
         }
     };
 
@@ -104,42 +138,36 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
         }
     };
 
-    const handleDisconnect = async () => {
+    const handleDisconnect = () => {
         if (!confirm('Deseja realmente desconectar este canal?')) return;
-        try {
-            await channelsApi.delete(channel.id);
-            toast.success('Canal desconectado');
-            onDelete(channel);
-        } catch (error) {
-            toast.error('Erro ao desconectar');
-        }
+        onDelete(channel);
     };
 
+    const activeBorderColor = getActiveBorderColor(channel.type);
+
     return (
-        <div 
+        <div
             className="border rounded-xl overflow-hidden transition-shadow hover:shadow-lg"
-            style={{ 
+            style={{
                 backgroundColor: 'hsl(var(--card))',
-                borderColor: channel.status === 'active' ? 'hsl(142 76% 36%)' : 'hsl(var(--border))'
+                borderColor: channel.status === 'active' ? activeBorderColor : 'hsl(var(--border))'
             }}
         >
             {/* Header */}
-            <div 
+            <div
                 className="px-5 py-4 flex items-center justify-between cursor-pointer"
                 onClick={() => setExpanded(!expanded)}
                 style={{ backgroundColor: 'hsl(var(--card))' }}
             >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div 
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getIconBgColor(channel.type)}`}
-                    >
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getIconBgColor(channel.type)}`}>
                         {getIcon(channel.type)}
                     </div>
                     <div className="min-w-0 flex-1">
                         <h4 className="font-semibold leading-tight flex items-center gap-2 truncate" style={{ color: 'hsl(var(--foreground))' }}>
                             <span className="truncate">{channel.name}</span>
                             {channel.status === 'active' && (
-                                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: activeBorderColor }} />
                             )}
                         </h4>
                         <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
@@ -149,17 +177,17 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs whitespace-nowrap" style={{ 
-                        backgroundColor: channel.status === 'active' ? 'hsl(142 76% 36% / 0.15)' : 'hsl(var(--muted))',
-                        color: channel.status === 'active' ? 'hsl(142 76% 36%)' : 'hsl(var(--muted-foreground))'
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs whitespace-nowrap" style={{
+                        backgroundColor: channel.status === 'active' ? `${activeBorderColor}1A` : 'hsl(var(--muted))',
+                        color: channel.status === 'active' ? activeBorderColor : 'hsl(var(--muted-foreground))'
                     }}>
                         <div className={`w-2 h-2 rounded-full ${getStatusColor(channel.status)}`} />
                         <span>{getStatusText(channel.status)}</span>
                     </div>
-                    <svg 
-                        className={`w-5 h-5 transition-transform flex-shrink-0 ${expanded ? 'rotate-180' : ''}`} 
-                        fill="none" 
-                        stroke="currentColor" 
+                    <svg
+                        className={`w-5 h-5 transition-transform flex-shrink-0 ${expanded ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
                         viewBox="0 0 24 24"
                         style={{ color: 'hsl(var(--muted-foreground))' }}
                     >
@@ -170,16 +198,16 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
 
             {/* Expanded Content */}
             {expanded && (
-                <div 
+                <div
                     className="px-5 pb-5 pt-2 border-t animate-fadeIn"
                     style={{ borderColor: 'hsl(var(--border))' }}
                 >
                     {/* Channel Details */}
-                    <div 
+                    <div
                         className="p-4 rounded-lg mb-4 space-y-2"
                         style={{ backgroundColor: 'hsl(var(--muted))' }}
                     >
-                        {/* API não oficial details */}
+                        {/* WhatsApp API não oficial */}
                         {channel.type === 'whatsapp' && (
                             <>
                                 <div className="flex items-center gap-2 text-sm">
@@ -196,41 +224,22 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                                                     value={editName}
                                                     onChange={(e) => setEditName(e.target.value)}
                                                     className="px-2 py-1 text-xs rounded border font-mono"
-                                                    style={{ 
-                                                        borderColor: 'hsl(var(--border))',
-                                                        backgroundColor: 'hsl(var(--background))'
-                                                    }}
+                                                    style={{ borderColor: 'hsl(var(--border))', backgroundColor: 'hsl(var(--background))' }}
                                                     autoFocus
                                                 />
-                                                <button
-                                                    onClick={() => {
-                                                        if (onRename && editName.trim()) {
-                                                            onRename(channel, editName.trim());
-                                                        }
-                                                        setIsEditing(false);
-                                                    }}
-                                                    className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600"
-                                                >
+                                                <button onClick={() => { if (onRename && editName.trim()) onRename(channel, editName.trim()); setIsEditing(false); }}
+                                                    className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600">
                                                     <Check className="w-3 h-3" />
                                                 </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setEditName(channel.name);
-                                                        setIsEditing(false);
-                                                    }}
-                                                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600"
-                                                >
+                                                <button onClick={() => { setEditName(channel.name); setIsEditing(false); }}
+                                                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600">
                                                     <X className="w-3 h-3" />
                                                 </button>
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-1">
                                                 <code className="font-mono">{channel.credentials.instance_name || channel.credentials.instance_id}</code>
-                                                <button
-                                                    onClick={() => setIsEditing(true)}
-                                                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
-                                                    title="Editar nome"
-                                                >
+                                                <button onClick={() => setIsEditing(true)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded" title="Editar nome">
                                                     <Pencil className="w-3 h-3" style={{ color: 'hsl(var(--muted-foreground))' }} />
                                                 </button>
                                             </div>
@@ -240,7 +249,7 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                             </>
                         )}
 
-                        {/* Cloud API details */}
+                        {/* Cloud API */}
                         {channel.type === 'whatsapp_cloud' && (
                             <>
                                 <div className="flex items-center gap-2 text-sm">
@@ -255,31 +264,68 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                                         <code className="font-mono">{channel.credentials.phone_number_id}</code>
                                     </div>
                                 )}
-                                {channel.credentials.waba_id && (
+                            </>
+                        )}
+
+                        {/* Telegram */}
+                        {channel.type === 'telegram' && (
+                            <>
+                                <div className="flex items-center gap-2 text-sm">
+                                    <Send className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />
+                                    <span style={{ color: 'hsl(var(--muted-foreground))' }}>Telegram Bot API</span>
+                                </div>
+                                {channel.credentials?.bot_username && (
                                     <div className="text-xs" style={{ color: 'hsl(var(--foreground))' }}>
-                                        <span style={{ color: 'hsl(var(--muted-foreground))' }}>WABA ID: </span>
-                                        <code className="font-mono">{channel.credentials.waba_id}</code>
+                                        <span style={{ color: 'hsl(var(--muted-foreground))' }}>Bot: </span>
+                                        <code className="font-mono">@{channel.credentials.bot_username}</code>
                                     </div>
                                 )}
                             </>
                         )}
 
-                        {/* Phone number if available */}
-                        {channel.credentials.phone_number && (
+                        {/* Email */}
+                        {channel.type === 'email' && (
+                            <>
+                                <div className="flex items-center gap-2 text-sm">
+                                    <Mail className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />
+                                    <span style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                        {channel.credentials?.provider === 'gmail' ? 'Gmail' :
+                                         channel.credentials?.provider === 'outlook' ? 'Microsoft' :
+                                         channel.credentials?.provider === 'yahoo' ? 'Yahoo' : 'Email SMTP/IMAP'}
+                                    </span>
+                                </div>
+                                {channel.credentials?.email && (
+                                    <div className="text-xs" style={{ color: 'hsl(var(--foreground))' }}>
+                                        <span style={{ color: 'hsl(var(--muted-foreground))' }}>Email: </span>
+                                        <code className="font-mono">{channel.credentials.email}</code>
+                                    </div>
+                                )}
+                                {channel.credentials?.smtp?.host && (
+                                    <div className="text-xs" style={{ color: 'hsl(var(--foreground))' }}>
+                                        <span style={{ color: 'hsl(var(--muted-foreground))' }}>SMTP: </span>
+                                        <code className="font-mono">{channel.credentials.smtp.host}:{channel.credentials.smtp.port}</code>
+                                    </div>
+                                )}
+                                {channel.credentials?.imap?.host && (
+                                    <div className="text-xs" style={{ color: 'hsl(var(--foreground))' }}>
+                                        <span style={{ color: 'hsl(var(--muted-foreground))' }}>IMAP: </span>
+                                        <code className="font-mono">{channel.credentials.imap.host}:{channel.credentials.imap.port}</code>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {/* Phone number */}
+                        {channel.credentials?.phone_number && (
                             <div className="flex items-center gap-2 pt-2 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
                                 <span className="text-lg">📱</span>
                                 <div>
-                                    <span className="font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                        {channel.credentials.phone_number}
-                                    </span>
-                                    <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                        Seu WhatsApp está conectado e pronto para enviar mensagens.
-                                    </p>
+                                    <span className="font-semibold" style={{ color: 'hsl(var(--foreground))' }}>{channel.credentials.phone_number}</span>
+                                    <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>Canal conectado e pronto para enviar mensagens.</p>
                                 </div>
                             </div>
                         )}
 
-                        {/* Last sync */}
                         {channel.last_sync_at && (
                             <div className="text-xs pt-2" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 Última sincronização: {new Date(channel.last_sync_at).toLocaleString('pt-BR')}
@@ -288,55 +334,32 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex gap-2">
-                            <button
-                                onClick={handleSync}
-                                disabled={syncing || loading}
+                            <button onClick={handleSync} disabled={syncing || loading}
                                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
-                                style={{ 
-                                    borderColor: 'hsl(var(--border))',
-                                    color: 'hsl(var(--foreground))'
-                                }}
-                            >
-                                {syncing ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <RefreshCw className="w-4 h-4" />
-                                )}
+                                style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}>
+                                {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                                 {syncing ? 'Sincronizando...' : 'Sincronizar'}
                             </button>
 
-                            {/* Show Reconnect button for error/inactive status */}
                             {(channel.status === 'error' || channel.status === 'inactive') && channel.type === 'whatsapp' && (
-                                <button
-                                    onClick={() => onEdit(channel)}
-                                    disabled={loading}
-                                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors"
-                                >
-                                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                                    </svg>
+                                <button onClick={() => onEdit(channel)} disabled={loading}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors">
                                     Reconectar
                                 </button>
                             )}
                         </div>
 
                         <div className="flex gap-2">
-                            <button
-                                onClick={() => onDelete(channel)}
-                                disabled={loading}
-                                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                            >
+                            <button onClick={() => onDelete(channel)} disabled={loading}
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                                 <Trash2 className="w-4 h-4" />
-                                Apagar Instância
+                                Apagar
                             </button>
-                            
-                            <button
-                                onClick={handleDisconnect}
-                                disabled={loading}
-                                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
-                            >
+
+                            <button onClick={handleDisconnect} disabled={loading}
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors">
                                 <XCircle className="w-4 h-4" />
                                 Desconectar
                             </button>

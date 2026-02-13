@@ -20,6 +20,7 @@ const noOriginRequiredPaths = [
   '/api/whatsapp/validate-leads',    // N8N validation
   '/api/auth/google',      // Google OAuth - navegação direta do browser
   '/api/auth/google/callback', // Google OAuth callback
+  '/api/inbox/media-proxy',  // Media proxy - <img> tags não enviam Origin
   '/health'
 ];
 

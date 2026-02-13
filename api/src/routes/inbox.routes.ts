@@ -778,7 +778,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
     }
 
     const { conversationIdOrJid } = req.params;
-    const messageChannel = channel || 'whatsapp';
+    let messageChannel = channel || 'whatsapp';
     // First try to get instance from saved channels, fallback to legacy
     const savedInstance = await getActiveWhatsAppInstance(user.id);
     const instanceId = savedInstance || getUserInstanceName(user.id);
@@ -789,27 +789,36 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationIdOrJid);
     const isJid = conversationIdOrJid.includes('@');
     const isPhone = /^\d+$/.test(conversationIdOrJid);
-    
+
     let phone: string | null = null;
     let leadId: string | null = null;
     let remoteJid: string | null = null;
     let conversationId: string | null = null;
-    
+    let channelId: string | null = null;
+    let channelCredentials: any = null;
+
     console.log('[Inbox Send] Processing:', conversationIdOrJid, { isUUID, isJid, isPhone });
-    
+
     // If it's a JID, extract phone and use it directly
     if (isJid) {
       remoteJid = conversationIdOrJid;
       phone = extractPhoneFromJid(conversationIdOrJid);
-      // Try to find associated conversation
+      // Try to find associated conversation with channel info
       try {
         const convResult = await dbQuery(
-          'SELECT c.id, c.lead_id FROM conversations c WHERE c.remote_jid = $1 AND c.user_id = $2 LIMIT 1',
+          `SELECT c.id, c.lead_id, c.channel_id, ch.type as channel_type, ch.credentials as channel_credentials
+           FROM conversations c LEFT JOIN channels ch ON c.channel_id = ch.id
+           WHERE c.remote_jid = $1 AND c.user_id = $2 LIMIT 1`,
           [remoteJid, user.id]
         );
         if (convResult.rows.length > 0) {
           conversationId = convResult.rows[0].id;
           leadId = convResult.rows[0].lead_id;
+          channelId = convResult.rows[0].channel_id;
+          if (convResult.rows[0].channel_type) {
+            messageChannel = convResult.rows[0].channel_type;
+          }
+          channelCredentials = convResult.rows[0].channel_credentials;
         }
       } catch (e) {
         console.warn('[Inbox] Could not find conversation by remote_jid:', e);
@@ -819,23 +828,34 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       remoteJid = normalizePhoneToJid(phone);
     } else if (isUUID) {
       // Could be a conversation ID or a lead ID
-      // Try conversation first
+      // Try conversation first - include channel type detection
       try {
         const convResult = await dbQuery(
-          'SELECT c.*, l.phone as lead_phone, l.whatsapp as lead_whatsapp FROM conversations c LEFT JOIN leads l ON c.lead_id = l.id WHERE c.id = $1 AND c.user_id = $2 LIMIT 1',
+          `SELECT c.*, l.phone as lead_phone, l.whatsapp as lead_whatsapp,
+                  ch.type as channel_type, ch.credentials as channel_credentials
+           FROM conversations c
+           LEFT JOIN leads l ON c.lead_id = l.id
+           LEFT JOIN channels ch ON c.channel_id = ch.id
+           WHERE c.id = $1 AND c.user_id = $2 LIMIT 1`,
           [conversationIdOrJid, user.id]
         );
         if (convResult.rows.length > 0) {
           conversationId = convResult.rows[0].id;
           leadId = convResult.rows[0].lead_id;
           remoteJid = convResult.rows[0].remote_jid;
+          channelId = convResult.rows[0].channel_id;
           phone = convResult.rows[0].lead_phone || convResult.rows[0].lead_whatsapp || extractPhoneFromJid(remoteJid || '');
-          console.log('[Inbox Send] Found conversation:', conversationId, 'lead:', leadId, 'phone:', phone);
+          // Auto-detect channel type from conversation's channel
+          if (convResult.rows[0].channel_type) {
+            messageChannel = convResult.rows[0].channel_type;
+          }
+          channelCredentials = convResult.rows[0].channel_credentials;
+          console.log('[Inbox Send] Found conversation:', conversationId, 'channel_type:', messageChannel, 'lead:', leadId, 'phone:', phone);
         }
       } catch (e) {
         console.warn('[Inbox] Error finding conversation by ID:', e);
       }
-      
+
       // If not a conversation, try as lead ID
       if (!conversationId) {
         try {
@@ -852,7 +872,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         }
       }
     }
-    
+
     // Try to find associated lead if we have a phone
     if (!leadId && phone) {
       const normalizedPhone = normalizePhoneForMatch(phone);
@@ -875,31 +895,45 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       }
     }
 
+    // If we still don't have channel credentials and have a channel_id, fetch them
+    if (!channelCredentials && channelId) {
+      try {
+        const chResult = await dbQuery('SELECT credentials, type FROM channels WHERE id = $1', [channelId]);
+        if (chResult.rows.length > 0) {
+          channelCredentials = chResult.rows[0].credentials;
+          if (!channel) messageChannel = chResult.rows[0].type;
+        }
+      } catch (e) {
+        console.warn('[Inbox] Error fetching channel credentials:', e);
+      }
+    }
+
     // For @lid JIDs, we need to send using the remoteJid directly
     const isLidFormat = remoteJid?.endsWith('@lid');
     const isGroupFormat = remoteJid?.endsWith('@g.us');
 
-    if (!phone && !remoteJid && messageChannel === 'whatsapp') {
-      return res.status(400).json({ error: 'No phone number available' });
-    }
+    console.log('[Inbox Send] Channel type detected:', messageChannel, 'channelId:', channelId);
 
-    // Send via WhatsApp
+    // Send via the appropriate channel
     let externalResult: any = null;
-    if (messageChannel === 'whatsapp' && (phone || remoteJid)) {
+
+    if ((messageChannel === 'whatsapp' || messageChannel === 'whatsapp_cloud') && (phone || remoteJid)) {
+      // ===== WHATSAPP SENDING =====
+      if (!phone && !remoteJid) {
+        return res.status(400).json({ error: 'No phone number available' });
+      }
       try {
         console.log('[Inbox] Sending WhatsApp message:', { instanceId, phone, remoteJid, isLidFormat, isGroupFormat });
-        
-        // Use remoteJid for @lid format (Cloud API), otherwise use phone number
+
         const numberToSend = isLidFormat || isGroupFormat ? remoteJid : phone;
-        
-        // If we have media, send with media
+
         if (media_url && media_type) {
           externalResult = await whatsappService.sendMedia({
             instanceId,
             number: numberToSend!,
             mediaUrl: media_url,
             mediaType: media_type,
-            caption: messageContent || undefined, // Sem legenda se vazio
+            caption: messageContent || undefined,
           });
         } else {
           externalResult = await whatsappService.sendMessage({
@@ -912,12 +946,190 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         console.error('[Inbox] WhatsApp send error:', whatsappError);
         return res.status(500).json({ error: 'Failed to send WhatsApp message' });
       }
+
+    } else if (messageChannel === 'instagram' || messageChannel === 'facebook') {
+      // ===== INSTAGRAM / FACEBOOK SENDING via Graph API =====
+      const recipientId = remoteJid; // Instagram/Facebook uses PSID or IGSID as remote_jid
+      if (!recipientId) {
+        return res.status(400).json({ error: 'No recipient ID available for Instagram/Facebook' });
+      }
+
+      const accessToken = channelCredentials?.access_token || channelCredentials?.page_access_token;
+      if (!accessToken) {
+        console.error('[Inbox] No access token for Instagram/Facebook channel:', channelId);
+        return res.status(500).json({ error: 'Instagram/Facebook channel not properly configured (missing access_token)' });
+      }
+
+      try {
+        const graphApiUrl = 'https://graph.facebook.com/v21.0/me/messages';
+
+        if (media_url && media_type) {
+          // Send media via Graph API
+          let attachmentType = 'file';
+          if (media_type === 'image' || media_type?.startsWith('image')) attachmentType = 'image';
+          else if (media_type === 'video' || media_type?.startsWith('video')) attachmentType = 'video';
+          else if (media_type === 'audio' || media_type?.startsWith('audio')) attachmentType = 'audio';
+
+          // Send media attachment
+          const mediaPayload: any = {
+            recipient: { id: recipientId },
+            message: {
+              attachment: {
+                type: attachmentType,
+                payload: { url: media_url, is_reusable: true }
+              }
+            }
+          };
+
+          console.log('[Inbox] Sending Instagram/Facebook media:', { recipientId, attachmentType, media_url });
+          const mediaResponse = await fetch(`${graphApiUrl}?access_token=${accessToken}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(mediaPayload)
+          });
+          const mediaResult = await mediaResponse.json();
+
+          if (!mediaResponse.ok) {
+            console.error('[Inbox] Instagram/Facebook media send error:', mediaResult);
+            return res.status(500).json({ error: 'Failed to send media via Instagram/Facebook', details: mediaResult?.error?.message });
+          }
+
+          externalResult = mediaResult;
+
+          // If there's also a text caption, send it as a separate text message
+          if (messageContent) {
+            const textPayload = {
+              recipient: { id: recipientId },
+              message: { text: messageContent }
+            };
+            await fetch(`${graphApiUrl}?access_token=${accessToken}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(textPayload)
+            });
+          }
+        } else {
+          // Send text only
+          const textPayload = {
+            recipient: { id: recipientId },
+            message: { text: messageContent }
+          };
+
+          console.log('[Inbox] Sending Instagram/Facebook text:', { recipientId, text: messageContent.substring(0, 50) });
+          const textResponse = await fetch(`${graphApiUrl}?access_token=${accessToken}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(textPayload)
+          });
+          const textResult = await textResponse.json();
+
+          if (!textResponse.ok) {
+            console.error('[Inbox] Instagram/Facebook text send error:', textResult);
+            return res.status(500).json({ error: 'Failed to send message via Instagram/Facebook', details: textResult?.error?.message });
+          }
+
+          externalResult = textResult;
+        }
+
+        console.log('[Inbox] Instagram/Facebook message sent:', externalResult);
+      } catch (igError) {
+        console.error('[Inbox] Instagram/Facebook send error:', igError);
+        return res.status(500).json({ error: 'Failed to send Instagram/Facebook message' });
+      }
+
+    } else if (messageChannel === 'telegram') {
+      // ===== TELEGRAM SENDING via Bot API =====
+      const chatId = remoteJid; // Telegram uses chat_id as remote_jid
+      if (!chatId) {
+        return res.status(400).json({ error: 'No chat ID available for Telegram' });
+      }
+
+      const botToken = channelCredentials?.bot_token || channelCredentials?.token;
+      if (!botToken) {
+        console.error('[Inbox] No bot token for Telegram channel:', channelId);
+        return res.status(500).json({ error: 'Telegram channel not properly configured (missing bot_token)' });
+      }
+
+      try {
+        const telegramApiUrl = `https://api.telegram.org/bot${botToken}`;
+
+        if (media_url && media_type) {
+          // Send media via Telegram Bot API
+          let method = 'sendDocument';
+          let mediaField = 'document';
+
+          if (media_type === 'image' || media_type?.startsWith('image')) {
+            method = 'sendPhoto';
+            mediaField = 'photo';
+          } else if (media_type === 'video' || media_type?.startsWith('video')) {
+            method = 'sendVideo';
+            mediaField = 'video';
+          } else if (media_type === 'audio' || media_type?.startsWith('audio')) {
+            method = 'sendAudio';
+            mediaField = 'audio';
+          }
+
+          const mediaPayload: any = {
+            chat_id: chatId,
+            [mediaField]: media_url,
+          };
+          if (messageContent) {
+            mediaPayload.caption = messageContent;
+          }
+
+          console.log('[Inbox] Sending Telegram media:', { chatId, method, media_url });
+          const mediaResponse = await fetch(`${telegramApiUrl}/${method}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(mediaPayload)
+          });
+          const mediaResult = await mediaResponse.json();
+
+          if (!mediaResult.ok) {
+            console.error('[Inbox] Telegram media send error:', mediaResult);
+            return res.status(500).json({ error: 'Failed to send media via Telegram', details: mediaResult?.description });
+          }
+
+          externalResult = mediaResult.result;
+        } else {
+          // Send text only
+          const textPayload = {
+            chat_id: chatId,
+            text: messageContent,
+          };
+
+          console.log('[Inbox] Sending Telegram text:', { chatId, text: messageContent.substring(0, 50) });
+          const textResponse = await fetch(`${telegramApiUrl}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(textPayload)
+          });
+          const textResult = await textResponse.json();
+
+          if (!textResult.ok) {
+            console.error('[Inbox] Telegram text send error:', textResult);
+            return res.status(500).json({ error: 'Failed to send message via Telegram', details: textResult?.description });
+          }
+
+          externalResult = textResult.result;
+        }
+
+        console.log('[Inbox] Telegram message sent:', externalResult?.message_id);
+      } catch (tgError) {
+        console.error('[Inbox] Telegram send error:', tgError);
+        return res.status(500).json({ error: 'Failed to send Telegram message' });
+      }
+    } else if (!messageChannel || messageChannel === 'whatsapp') {
+      // Fallback: WhatsApp without phone/remoteJid
+      if (!phone && !remoteJid) {
+        return res.status(400).json({ error: 'No phone number available' });
+      }
     }
 
     // ALWAYS store message in database (for history tracking)
     let message = null;
     const finalRemoteJid = remoteJid || normalizePhoneToJid(phone || '');
-    
+
     try {
       // If we don't have a conversation yet, find or create one
       if (!conversationId) {
@@ -946,13 +1158,14 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         content: messageContent || (media_type ? `[${media_type}]` : ''),
         status: 'sent',
         sent_at: new Date().toISOString(),
-        external_id: externalResult?.key?.id || null,
+        external_id: externalResult?.key?.id || externalResult?.message_id || externalResult?.message_id?.toString() || null,
         media_url: media_url || null,
         media_type: media_type || null,
         metadata: {
-          whatsapp_result: externalResult,
+          external_result: externalResult,
           remote_jid: finalRemoteJid,
           phone: phone,
+          channel_type: messageChannel,
         },
       }, user.id);
       console.log('[Inbox] Message saved to database:', message.id, 'conversation:', conversationId);
@@ -963,14 +1176,13 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       }
     } catch (dbError) {
       console.warn('[Inbox] Failed to save message to database:', dbError);
-      // Don't fail the request, the WhatsApp message was sent
     }
 
     // Return the message directly (not wrapped in success object) for frontend compatibility
     res.json(message || {
-      id: externalResult?.key?.id || `msg_${Date.now()}`,
+      id: externalResult?.key?.id || externalResult?.message_id || `msg_${Date.now()}`,
       direction: 'out',
-      channel: 'whatsapp',
+      channel: messageChannel,
       content: messageContent || (media_type ? `[${media_type}]` : ''),
       status: 'sent',
       created_at: new Date().toISOString(),
@@ -999,41 +1211,63 @@ router.get('/unread-count', async (req, res, next) => {
   }
 });
 
-// ✅ Send Audio (Voice Message)
+// ✅ Send Audio (Voice Message) - supports WhatsApp, Instagram, Telegram
 router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('audio'), async (req, res, next) => {
   try {
     const user = req.user;
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
     const { conversationIdOrJid } = req.params;
-    
+    const { query: dbQuery } = require('../database/connection');
+
     console.log('[Inbox Audio] Processing audio for:', conversationIdOrJid);
     console.log('[Inbox Audio] File received:', req.file ? { name: req.file.originalname, size: req.file.size, type: req.file.mimetype } : 'No file');
 
-    // Get the instance for this user
-    const savedInstance = await getActiveWhatsAppInstance(user.id);
-    const instanceId = savedInstance || getUserInstanceName(user.id);
-
-    if (!instanceId) {
-      console.error('[Inbox Audio] No WhatsApp instance configured');
-      return res.status(400).json({ error: 'No WhatsApp instance configured' });
-    }
-
-    console.log('[Inbox Audio] Using instance:', instanceId);
-
-    // Detect if it's a JID or UUID
+    // Detect channel type from conversation
     const isJid = conversationIdOrJid.includes('@');
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationIdOrJid);
     let remoteJid = isJid ? conversationIdOrJid : null;
     let phone = '';
+    let channelType = 'whatsapp';
+    let channelCredentials: any = null;
+    let conversationId: string | null = null;
 
     if (isJid) {
       phone = conversationIdOrJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '');
-    } else {
-      // Get conversation details
-      const conversation = await conversationsService.getById(conversationIdOrJid);
-      if (conversation) {
-        remoteJid = conversation.remote_jid;
-        phone = remoteJid?.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '') || '';
+      // Try to find conversation with channel info
+      try {
+        const convResult = await dbQuery(
+          `SELECT c.id, c.channel_id, ch.type as channel_type, ch.credentials as channel_credentials
+           FROM conversations c LEFT JOIN channels ch ON c.channel_id = ch.id
+           WHERE c.remote_jid = $1 AND c.user_id = $2 LIMIT 1`,
+          [remoteJid, user.id]
+        );
+        if (convResult.rows.length > 0) {
+          conversationId = convResult.rows[0].id;
+          if (convResult.rows[0].channel_type) channelType = convResult.rows[0].channel_type;
+          channelCredentials = convResult.rows[0].channel_credentials;
+        }
+      } catch (e) {
+        console.warn('[Inbox Audio] Error finding conversation:', e);
+      }
+    } else if (isUUID) {
+      // Get conversation details with channel type
+      try {
+        const convResult = await dbQuery(
+          `SELECT c.*, ch.type as channel_type, ch.credentials as channel_credentials
+           FROM conversations c LEFT JOIN channels ch ON c.channel_id = ch.id
+           WHERE c.id = $1 AND c.user_id = $2 LIMIT 1`,
+          [conversationIdOrJid, user.id]
+        );
+        if (convResult.rows.length > 0) {
+          conversationId = convResult.rows[0].id;
+          remoteJid = convResult.rows[0].remote_jid;
+          phone = remoteJid?.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '') || '';
+          if (convResult.rows[0].channel_type) channelType = convResult.rows[0].channel_type;
+          channelCredentials = convResult.rows[0].channel_credentials;
+        }
+      } catch (e) {
+        console.warn('[Inbox Audio] Error finding conversation:', e);
       }
     }
 
@@ -1041,11 +1275,12 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
       return res.status(400).json({ error: 'Invalid conversation or phone number' });
     }
 
+    console.log('[Inbox Audio] Channel type:', channelType);
+
     // Upload audio to MinIO first
     let audioUrl = '';
     if (req.file) {
       const storageService = getStorageService();
-      // Use uploadBuffer para buffer com nome e mimetype
       audioUrl = await storageService.uploadBuffer(
         req.file.buffer,
         req.file.originalname || `audio_${Date.now()}.webm`,
@@ -1055,7 +1290,6 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
       );
       console.log('[Inbox Audio] Uploaded to:', audioUrl);
     } else if (req.body.audio_base64) {
-      // If audio is sent as base64, upload it first
       const base64Data = req.body.audio_base64;
       const audioBuffer = Buffer.from(base64Data, 'base64');
       const storageService = getStorageService();
@@ -1074,37 +1308,92 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
     }
 
     const finalAudioUrl = audioUrl || req.body.audio_url;
+    let result: any = null;
 
-    // Send via Evolution API
-    const result = await whatsappService.sendAudio({
-      instanceId,
-      number: remoteJid?.includes('@lid') || remoteJid?.includes('@g.us') ? remoteJid! : phone,
-      audioUrl: finalAudioUrl,
-    });
+    if (channelType === 'whatsapp' || channelType === 'whatsapp_cloud') {
+      // ===== WhatsApp audio =====
+      const savedInstance = await getActiveWhatsAppInstance(user.id);
+      const instanceId = savedInstance || getUserInstanceName(user.id);
+      if (!instanceId) {
+        return res.status(400).json({ error: 'No WhatsApp instance configured' });
+      }
+      result = await whatsappService.sendAudio({
+        instanceId,
+        number: remoteJid?.includes('@lid') || remoteJid?.includes('@g.us') ? remoteJid! : phone,
+        audioUrl: finalAudioUrl,
+      });
+      console.log('[Inbox Audio] WhatsApp result:', result);
 
-    console.log('[Inbox Audio] Evolution API result:', result);
+    } else if (channelType === 'instagram' || channelType === 'facebook') {
+      // ===== Instagram/Facebook audio =====
+      const recipientId = remoteJid;
+      const accessToken = channelCredentials?.access_token || channelCredentials?.page_access_token;
+      if (!accessToken || !recipientId) {
+        return res.status(500).json({ error: 'Instagram/Facebook channel not properly configured' });
+      }
+      const graphApiUrl = 'https://graph.facebook.com/v21.0/me/messages';
+      const audioPayload = {
+        recipient: { id: recipientId },
+        message: {
+          attachment: {
+            type: 'audio',
+            payload: { url: finalAudioUrl, is_reusable: true }
+          }
+        }
+      };
+      const response = await fetch(`${graphApiUrl}?access_token=${accessToken}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(audioPayload)
+      });
+      result = await response.json();
+      if (!response.ok) {
+        console.error('[Inbox Audio] Instagram/Facebook error:', result);
+        return res.status(500).json({ error: 'Failed to send audio via Instagram/Facebook', details: result?.error?.message });
+      }
+      console.log('[Inbox Audio] Instagram/Facebook result:', result);
 
-    // Save to database - use conversation ID if available
-    const messageConversationId = !isJid ? conversationIdOrJid : null;
-    
-    // Extract external ID from result (Evolution API response format varies)
-    const externalId = (result as any)?.key?.id || (result as any)?.message?.id || null;
-    
+    } else if (channelType === 'telegram') {
+      // ===== Telegram audio =====
+      const chatId = remoteJid;
+      const botToken = channelCredentials?.bot_token || channelCredentials?.token;
+      if (!botToken || !chatId) {
+        return res.status(500).json({ error: 'Telegram channel not properly configured' });
+      }
+      const telegramApiUrl = `https://api.telegram.org/bot${botToken}`;
+      const audioPayload = { chat_id: chatId, audio: finalAudioUrl };
+      const response = await fetch(`${telegramApiUrl}/sendAudio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(audioPayload)
+      });
+      const tgResult = await response.json();
+      if (!tgResult.ok) {
+        console.error('[Inbox Audio] Telegram error:', tgResult);
+        return res.status(500).json({ error: 'Failed to send audio via Telegram', details: tgResult?.description });
+      }
+      result = tgResult.result;
+      console.log('[Inbox Audio] Telegram result:', result);
+    }
+
+    // Save to database
+    const messageConversationId = conversationId || (!isJid ? conversationIdOrJid : null);
+    const externalId = (result as any)?.key?.id || (result as any)?.message_id?.toString() || (result as any)?.message?.id || null;
+
     const message = await messagesService.create({
       conversation_id: messageConversationId,
       direction: 'out',
-      channel: 'whatsapp',
-      content: '🎤 Mensagem de voz',
+      channel: channelType,
+      content: 'Mensagem de voz',
       status: 'sent',
       sent_at: new Date().toISOString(),
       external_id: externalId,
       media_url: finalAudioUrl,
       media_type: 'audio',
-      metadata: { whatsapp_result: result, remote_jid: remoteJid },
+      metadata: { external_result: result, remote_jid: remoteJid, channel_type: channelType },
     }, user.id);
 
     console.log('[Inbox Audio] Message saved:', message?.id);
-    console.log('[Inbox Audio] Sent successfully');
     res.json(message);
   } catch (error) {
     console.error('[Inbox Audio] Error:', error);
@@ -1184,6 +1473,47 @@ router.post('/conversations/:conversationIdOrJid/send-sticker', async (req, res,
   } catch (error) {
     console.error('[Inbox Sticker] Error:', error);
     next(error);
+  }
+});
+
+// Proxy de mídia: serve ficheiros do MinIO/storage através da API
+// Resolve problemas de CORS, Helmet CORP e URLs internas do MinIO
+// NÃO usa authMiddleware porque <img> tags não enviam Authorization headers
+router.get('/media-proxy', async (req, res) => {
+  try {
+    const url = req.query.url as string;
+    if (!url) {
+      return res.status(400).json({ error: 'URL parameter is required' });
+    }
+
+    // Validar que é uma URL HTTP válida (não permitir file://, etc.)
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return res.status(400).json({ error: 'Only HTTP/HTTPS URLs are supported' });
+    }
+
+    console.log('[Media Proxy] Fetching:', url.substring(0, 200));
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to fetch media' });
+    }
+
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    const contentLength = response.headers.get('content-length');
+
+    // Headers para permitir cross-origin embedding (override Helmet CORP)
+    res.setHeader('Content-Type', contentType);
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // Stream the response
+    const arrayBuffer = await response.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (error: any) {
+    console.error('[Media Proxy] Error:', error.message);
+    res.status(500).json({ error: 'Failed to proxy media' });
   }
 });
 

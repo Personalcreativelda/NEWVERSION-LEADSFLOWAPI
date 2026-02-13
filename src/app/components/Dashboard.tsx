@@ -60,7 +60,7 @@ import { leadsApi, userApi, integrationsApi } from '../utils/api';
 import { useLeadsAutoRefresh } from '../hooks/useLeadsAutoRefresh';
 import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
 
-import { AlertTriangle, CheckCircle2, CopyX, Download, MailX } from 'lucide-react';
+import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X } from 'lucide-react';
 
 // Types
 interface Lead {
@@ -488,6 +488,50 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     } catch (error) {
       console.error('Error updating lead:', error);
       toast.error('Erro ao atualizar lead. Por favor, tente novamente.');
+    }
+  };
+
+  // Deletar lead pelo ID (usado no SalesFunnel)
+  const handleDeletarLead = async (leadId: string) => {
+    try {
+      const response = await leadsApi.delete(leadId);
+      if (response.success) {
+        setLeads(leads.filter(l => l.id !== leadId));
+        toast.success('Lead deletado com sucesso!');
+        try {
+          await onRefreshUser?.();
+        } catch (_) {
+          onUserUpdate({ ...user, usage: { ...user.usage, leads: Math.max(0, (user.usage?.leads || 0) - 1) } });
+        }
+      }
+    } catch (error: any) {
+      if (error.message?.toLowerCase().includes('not found')) {
+        setLeads(leads.filter(l => l.id !== leadId));
+      } else {
+        toast.error('Erro ao deletar lead');
+      }
+    }
+  };
+
+  // Atualizar status de um lead (usado no SalesFunnel)
+  const handleAtualizarStatusLead = async (leadId: string, novoStatus: string) => {
+    const leadIndex = leads.findIndex(l => l.id === leadId);
+    if (leadIndex === -1) return;
+
+    const oldLead = leads[leadIndex];
+    const updatedLead = { ...oldLead, status: novoStatus };
+
+    // Atualização otimista
+    const newLeads = [...leads];
+    newLeads[leadIndex] = updatedLead;
+    setLeads(newLeads);
+
+    try {
+      await leadsApi.update(leadId, updatedLead);
+    } catch (error) {
+      // Reverter em caso de erro
+      setLeads(leads);
+      throw error;
     }
   };
 
@@ -1620,17 +1664,17 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     const hoje = new Date().toISOString().split('T')[0];
     const calculatedStats = {
       total: leadsFiltradosPorFiltros.length,
-      novosHoje: leadsFiltradosPorFiltros.filter((l) => l.data === hoje).length,
-      convertidos: leadsFiltradosPorFiltros.filter((l) => l.status === 'convertido').length,
+      novosHoje: leadsFiltradosPorFiltros.filter((l) => {
+        // Comparar usando startsWith para suportar tanto "2026-02-11" quanto "2026-02-11T10:30:00.000Z"
+        const leadDate = l.data || l.createdAt || '';
+        return leadDate.startsWith(hoje);
+      }).length,
+      convertidos: leadsFiltradosPorFiltros.filter((l) => {
+        const st = l.status?.toLowerCase();
+        return st === 'convertido' || st === 'converted';
+      }).length,
     };
-    
-    // ✅ LOG DETALHADO DO CONTADOR
-    console.log('[Dashboard] 📊 STATS CALCULADOS:');
-    console.log('[Dashboard] 📊 Total de leads (array): ' + leads.length);
-    console.log('[Dashboard] 📊 Leads filtrados: ' + leadsFiltradosPorFiltros.length);
-    console.log('[Dashboard] 📊 user.usage.leads (backend): ' + (user?.usage?.leads || 0));
-    console.log('[Dashboard] 📊 Stats sendo mostrados:', calculatedStats);
-    
+
     return calculatedStats;
   }, [leadsFiltradosPorFiltros, leads.length, user?.usage?.leads]);
 

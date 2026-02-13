@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
     ChevronRight, ChevronDown, Inbox, Hash, Tag, AtSign, Bell, Settings, Bot, Zap,
-    MessageCircle, Instagram, Facebook, Send, Mail
+    MessageCircle, Instagram, Facebook, Send, Mail, Cloud, Globe
 } from 'lucide-react';
 import { channelsApi } from '../../services/api/inbox';
 import { useInboxFilters, type InboxFilterType } from '../../hooks/useInboxFilters';
@@ -43,6 +43,8 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
         switch(type?.toLowerCase()) {
             case 'whatsapp':
                 return MessageCircle;
+            case 'whatsapp_cloud':
+                return Cloud;
             case 'instagram':
                 return Instagram;
             case 'facebook':
@@ -52,6 +54,8 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                 return Send;
             case 'email':
                 return Mail;
+            case 'website':
+                return Globe;
             default:
                 return Hash;
         }
@@ -62,6 +66,8 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
         switch(type?.toLowerCase()) {
             case 'whatsapp':
                 return 'text-green-500';
+            case 'whatsapp_cloud':
+                return 'text-green-600';
             case 'instagram':
                 return 'text-pink-500';
             case 'facebook':
@@ -70,7 +76,9 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
             case 'telegram':
                 return 'text-sky-500';
             case 'email':
-                return 'text-gray-600';
+                return 'text-cyan-500';
+            case 'website':
+                return 'text-purple-500';
             default:
                 return 'text-gray-500';
         }

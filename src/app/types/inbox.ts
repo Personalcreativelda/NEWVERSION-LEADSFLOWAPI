@@ -1,7 +1,7 @@
 // INBOX: TypeScript interfaces para o módulo Inbox
 // Compartilhado entre frontend e backend
 
-export type ChannelType = 'whatsapp' | 'whatsapp_cloud' | 'facebook' | 'instagram' | 'telegram';
+export type ChannelType = 'whatsapp' | 'whatsapp_cloud' | 'facebook' | 'instagram' | 'telegram' | 'email' | 'website' | 'sms';
 export type WhatsAppProvider = 'evolution_api' | 'cloud_api';
 
 export interface Channel {
@@ -80,7 +80,7 @@ export interface Message {
     contact_id: string | null;
     campaign_id: string | null;
     direction: 'in' | 'out';
-    channel: 'whatsapp' | 'facebook' | 'instagram' | 'telegram';
+    channel: 'whatsapp' | 'whatsapp_cloud' | 'facebook' | 'instagram' | 'telegram' | 'email' | 'website' | 'sms';
     content: string;
     media_url?: string;
     media_type?: 'image' | 'video' | 'audio' | 'document';

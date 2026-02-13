@@ -11,6 +11,8 @@ import { getWebSocketService } from '../services/websocket.service';
 import { assistantProcessor } from '../services/assistant-processor.service';
 // Webhooks: Importar dispatcher para enviar eventos para webhooks do usuário
 import { webhookDispatcher } from '../services/webhook-dispatcher.service';
+// Storage: Importar para upload de mídia recebida
+import { getStorageService } from '../services/storage.service';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -35,7 +37,7 @@ router.post('/n8n/leads', async (req, res) => {
 
     // Inserir lead no banco de dados
     const result = await query(
-      `INSERT INTO leads (user_id, nome, telefone, email, empresa, status, origem, observacoes, created_at, updated_at)
+      `INSERT INTO leads (user_id, name, phone, email, company, status, source, notes, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
        RETURNING *`,
       [
@@ -44,7 +46,7 @@ router.post('/n8n/leads', async (req, res) => {
         telefone || null,
         email || null,
         empresa || null,
-        status || 'novo',
+        status || 'new',
         origem || 'n8n',
         observacoes || null
       ]
@@ -439,11 +441,23 @@ router.post('/evolution/messages', async (req, res) => {
       return res.json({ success: true, message: 'No message data to process' });
     }
 
-    // Ignorar mensagens enviadas pelo próprio usuário (já salvamos no momento do envio)
+    // Detectar se é mensagem enviada pelo próprio usuário (fromMe)
+    // NÃO ignoramos mais automaticamente - verificamos se já existe no banco
+    // Respostas feitas pelo celular vêm como fromMe=true mas não foram salvas pela dashboard
     const isFromMe = messageData.key?.fromMe === true || messageData.fromMe === true;
-    if (isFromMe) {
-      console.log('[Evolution Webhook] Ignorando mensagem enviada pelo próprio usuário');
-      return res.json({ success: true, message: 'Outgoing message ignored (already saved on send)' });
+    const externalMsgId = messageData.key?.id || messageData.id || messageData.messageId;
+
+    if (isFromMe && externalMsgId) {
+      // Verificar se esta mensagem já foi salva pela dashboard (envio pelo sistema)
+      const existingMsg = await query(
+        `SELECT id FROM messages WHERE external_id = $1 LIMIT 1`,
+        [externalMsgId]
+      );
+      if (existingMsg.rows.length > 0) {
+        console.log('[Evolution Webhook] Mensagem fromMe já existe no banco (enviada pela dashboard), ignorando:', externalMsgId);
+        return res.json({ success: true, message: 'Outgoing message already saved' });
+      }
+      console.log('[Evolution Webhook] Mensagem fromMe nova (enviada pelo celular), processando:', externalMsgId);
     }
 
     // Encontrar canal pelo instance_id OU instance_name
@@ -496,45 +510,70 @@ router.post('/evolution/messages', async (req, res) => {
     console.log('[Evolution Webhook] Conteúdo extraído:', messageContent.substring(0, 100));
 
     // Extrair mídia se houver
-    let mediaUrl = null;
-    let mediaType = null;
+    let mediaUrl: string | null = null;
+    let mediaType: string | null = null;
+    let mediaBase64: string | null = null;
+    let mediaMimetype: string | null = null;
 
     // Verificar diferentes locais onde a mídia pode estar no payload do Evolution API
     if (msg?.imageMessage) {
       mediaType = 'image';
-      mediaUrl = msg.imageMessage.url ||
-                 msg.imageMessage.directPath ||
-                 messageData.media?.url ||
-                 messageData.mediaUrl ||
-                 (msg.imageMessage.base64 ? `data:image/jpeg;base64,${msg.imageMessage.base64}` : null);
+      mediaMimetype = msg.imageMessage.mimetype || 'image/jpeg';
+      mediaBase64 = msg.imageMessage.base64 || null;
+      mediaUrl = msg.imageMessage.url || null;
     } else if (msg?.videoMessage) {
       mediaType = 'video';
-      mediaUrl = msg.videoMessage.url ||
-                 msg.videoMessage.directPath ||
-                 messageData.media?.url ||
-                 messageData.mediaUrl;
+      mediaMimetype = msg.videoMessage.mimetype || 'video/mp4';
+      mediaBase64 = msg.videoMessage.base64 || null;
+      mediaUrl = msg.videoMessage.url || null;
     } else if (msg?.audioMessage) {
       mediaType = 'audio';
-      mediaUrl = msg.audioMessage.url ||
-                 msg.audioMessage.directPath ||
-                 messageData.media?.url ||
-                 messageData.mediaUrl;
+      mediaMimetype = msg.audioMessage.mimetype || 'audio/ogg';
+      mediaBase64 = msg.audioMessage.base64 || null;
+      mediaUrl = msg.audioMessage.url || null;
     } else if (msg?.documentMessage) {
       mediaType = 'document';
-      mediaUrl = msg.documentMessage.url ||
-                 msg.documentMessage.directPath ||
-                 messageData.media?.url ||
-                 messageData.mediaUrl;
+      mediaMimetype = msg.documentMessage.mimetype || 'application/octet-stream';
+      mediaBase64 = msg.documentMessage.base64 || null;
+      mediaUrl = msg.documentMessage.url || null;
     } else if (msg?.stickerMessage) {
       mediaType = 'sticker';
-      mediaUrl = msg.stickerMessage.url ||
-                 messageData.media?.url;
+      mediaMimetype = msg.stickerMessage.mimetype || 'image/webp';
+      mediaBase64 = msg.stickerMessage.base64 || null;
+      mediaUrl = msg.stickerMessage.url || null;
     }
 
-    // Fallback: tentar extrair de outras localizações comuns
-    if (!mediaUrl && messageData.media) {
-      mediaUrl = messageData.media.url || messageData.media.base64;
-      if (!mediaType && messageData.media.mimetype) {
+    // Evolution API v2 pode colocar base64 em diversos locais dependendo da versão
+    // Tentar todos os locais possíveis se não encontramos base64 ainda
+    if (!mediaBase64 && mediaType) {
+      mediaBase64 =
+        msg?.base64 ||                          // msg.base64 (Evolution v2 coloca aqui com webhook_base64=true)
+        messageData.media?.base64 ||            // messageData.media.base64
+        messageData.base64 ||                   // messageData.base64
+        messageData.base64Media ||              // messageData.base64Media
+        body.base64 ||                          // body.base64
+        body.data?.base64 ||                    // body.data.base64
+        null;
+      if (mediaBase64) {
+        console.log('[Evolution Webhook] Base64 encontrado em fallback, tamanho:', mediaBase64.length);
+      }
+    }
+
+    // Fallback URL: tentar vários locais
+    if (!mediaUrl && mediaType) {
+      mediaUrl =
+        messageData.media?.url ||
+        messageData.mediaUrl ||
+        messageData.media_url ||
+        null;
+    }
+
+    // Fallback: tentar extrair de messageData.media se não detectou tipo ainda
+    if (!mediaBase64 && !mediaUrl && !mediaType && messageData.media) {
+      mediaBase64 = messageData.media.base64 || null;
+      mediaUrl = messageData.media.url || null;
+      if (messageData.media.mimetype) {
+        mediaMimetype = messageData.media.mimetype;
         if (messageData.media.mimetype.startsWith('image')) mediaType = 'image';
         else if (messageData.media.mimetype.startsWith('video')) mediaType = 'video';
         else if (messageData.media.mimetype.startsWith('audio')) mediaType = 'audio';
@@ -542,12 +581,98 @@ router.post('/evolution/messages', async (req, res) => {
       }
     }
 
-    // Se ainda não tem URL, verificar no nível raiz do messageData
-    if (!mediaUrl) {
-      mediaUrl = messageData.mediaUrl || messageData.media_url || messageData.base64Media;
+    // Detectar messageType do payload para garantir que não perdemos mídia
+    const messageType = messageData.messageType || messageData.type;
+    if (!mediaType && messageType) {
+      const typeMap: Record<string, string> = {
+        'imageMessage': 'image', 'videoMessage': 'video', 'audioMessage': 'audio',
+        'documentMessage': 'document', 'stickerMessage': 'sticker'
+      };
+      if (typeMap[messageType]) {
+        mediaType = typeMap[messageType];
+        console.log('[Evolution Webhook] Tipo de mídia detectado via messageType:', mediaType);
+      }
     }
 
-    console.log('[Evolution Webhook] Mídia detectada:', { mediaType, mediaUrl: mediaUrl ? mediaUrl.substring(0, 100) + '...' : null });
+    console.log('[Evolution Webhook] Mídia pré-upload:', {
+      mediaType, hasBase64: !!mediaBase64, base64Len: mediaBase64?.length || 0, hasUrl: !!mediaUrl
+    });
+
+    // Se temos base64, fazer upload para MinIO para ter uma URL persistente
+    if (mediaBase64 && mediaType) {
+      try {
+        const storageService = getStorageService();
+        // Limpar prefixo data:...;base64, se presente
+        const cleanBase64 = mediaBase64.replace(/^data:[^;]+;base64,/, '');
+        const buffer = Buffer.from(cleanBase64, 'base64');
+
+        // Gerar extensão baseada no mimetype
+        const extMap: Record<string, string> = {
+          'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+          'video/mp4': 'mp4', 'video/webm': 'webm',
+          'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/webm': 'webm',
+          'application/pdf': 'pdf',
+        };
+        const ext = extMap[mediaMimetype || ''] || (mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : 'bin');
+        const filename = `whatsapp_${mediaType}_${Date.now()}.${ext}`;
+
+        mediaUrl = await storageService.uploadBuffer(
+          buffer,
+          filename,
+          mediaMimetype || 'application/octet-stream',
+          'inbox-media',
+          channel.user_id
+        );
+        console.log('[Evolution Webhook] Mídia uploaded para storage:', mediaUrl?.substring(0, 100));
+      } catch (uploadErr) {
+        console.error('[Evolution Webhook] Erro ao fazer upload da mídia:', uploadErr);
+        // Fallback: guardar base64 completo como data URI (sem truncar)
+        const cleanBase64 = mediaBase64.replace(/^data:[^;]+;base64,/, '');
+        mediaUrl = `data:${mediaMimetype || 'application/octet-stream'};base64,${cleanBase64}`;
+        console.log('[Evolution Webhook] Usando data URI como fallback, tamanho:', mediaUrl.length);
+      }
+    }
+
+    // Se só temos directPath (não acessível diretamente via HTTP), limpar para tentar fallback
+    if (mediaUrl && !mediaUrl.startsWith('http') && !mediaUrl.startsWith('data:')) {
+      console.warn('[Evolution Webhook] URL de mídia não acessível (directPath):', mediaUrl?.substring(0, 100));
+      mediaUrl = null;
+    }
+
+    // Se não temos URL válida mas temos mediaType, tentar baixar da Evolution API
+    if (!mediaUrl && mediaType) {
+      const evolutionUrl = process.env.EVOLUTION_API_URL;
+      const apiKey = process.env.EVOLUTION_API_KEY;
+      const msgKey = messageData.key;
+      if (evolutionUrl && apiKey && instance && msgKey) {
+        try {
+          console.log('[Evolution Webhook] Tentando baixar mídia via Evolution API...');
+          const mediaResponse = await fetch(`${evolutionUrl}/chat/getBase64FromMediaMessage/${instance}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+            body: JSON.stringify({ message: { key: msgKey } })
+          });
+          if (mediaResponse.ok) {
+            const mediaData = await mediaResponse.json();
+            const fetchedBase64 = mediaData.base64 || mediaData.data?.base64;
+            if (fetchedBase64) {
+              console.log('[Evolution Webhook] Mídia baixada via API, tamanho:', fetchedBase64.length);
+              const storageService = getStorageService();
+              const cleanB64 = fetchedBase64.replace(/^data:[^;]+;base64,/, '');
+              const buffer = Buffer.from(cleanB64, 'base64');
+              const ext = mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'bin';
+              const filename = `whatsapp_${mediaType}_${Date.now()}.${ext}`;
+              mediaUrl = await storageService.uploadBuffer(buffer, filename, mediaMimetype || 'application/octet-stream', 'inbox-media', channel.user_id);
+              console.log('[Evolution Webhook] Mídia (via API) uploaded:', mediaUrl?.substring(0, 100));
+            }
+          }
+        } catch (dlErr: any) {
+          console.warn('[Evolution Webhook] Falha ao baixar mídia via Evolution API:', dlErr.message);
+        }
+      }
+    }
+
+    console.log('[Evolution Webhook] Mídia final:', { mediaType, hasUrl: !!mediaUrl });
 
     // Extrair telefone do JID
     const phone = remoteJid.split('@')[0];
@@ -589,27 +714,34 @@ router.post('/evolution/messages', async (req, res) => {
       }
     );
 
+    // Determinar direção da mensagem: fromMe = 'out' (resposta pelo celular), caso contrário = 'in'
+    const messageDirection = isFromMe ? 'out' : 'in';
+    const messageStatus = isFromMe ? 'sent' : 'delivered';
+
     // Salvar mensagem
     const messageResult = await query(
       `INSERT INTO messages (
-        user_id, conversation_id, lead_id, direction, channel, 
+        user_id, conversation_id, lead_id, direction, channel,
         content, media_url, media_type, status, external_id, metadata
       )
-       VALUES ($1, $2, $3, 'in', 'whatsapp', $4, $5, $6, 'delivered', $7, $8)
+       VALUES ($1, $2, $3, $4, 'whatsapp', $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         channel.user_id,
         conversation.id,
         leadId,
+        messageDirection,
         messageContent,
         mediaUrl,
         mediaType,
+        messageStatus,
         messageData.key?.id || messageData.id || messageData.messageId,
         JSON.stringify({
           from: messageData.key?.remoteJid || remoteJid,
           timestamp: messageData.messageTimestamp || messageData.timestamp || Date.now(),
           pushName: messageData.pushName || contactName,
-          fromMe: messageData.key?.fromMe || false,
+          fromMe: isFromMe,
+          source: isFromMe ? 'phone' : 'contact',
           rawPayload: JSON.stringify(req.body).substring(0, 500)
         })
       ]
@@ -617,10 +749,12 @@ router.post('/evolution/messages', async (req, res) => {
 
     const message = messageResult.rows[0];
 
-    console.log('[Evolution Webhook] Mensagem salva com sucesso:', message.id);
+    console.log('[Evolution Webhook] Mensagem salva com sucesso:', message.id, 'direction:', messageDirection);
 
-    // Atualizar unread_count e last_message_at da conversa
-    await conversationsService.updateUnreadCount(conversation.id, 1);
+    // Atualizar last_message_at e unread_count (só incrementa se for mensagem recebida, não enviada)
+    if (!isFromMe) {
+      await conversationsService.updateUnreadCount(conversation.id, 1);
+    }
     await query(
       `UPDATE conversations
        SET last_message_at = NOW(),
@@ -630,7 +764,7 @@ router.post('/evolution/messages', async (req, res) => {
       [conversation.id]
     );
 
-    console.log('[Evolution Webhook] Conversa atualizada: unread_count incrementado');
+    console.log('[Evolution Webhook] Conversa atualizada:', isFromMe ? 'sem incremento de unread (fromMe)' : 'unread_count incrementado');
 
     // Buscar conversa atualizada para enviar via WebSocket
     const updatedConversation = await query(
@@ -734,17 +868,17 @@ router.get('/telegram', async (_req, res) => {
 });
 
 // ✅ Webhook para receber mensagens do Telegram
-router.post('/telegram', async (req, res) => {
+router.post('/telegram/:botToken?', async (req, res) => {
   try {
     console.log('[Telegram Webhook] ===== WEBHOOK RECEBIDO =====');
     console.log('[Telegram Webhook] Body:', JSON.stringify(req.body).substring(0, 2000));
 
     const update = req.body;
+    const botTokenParam = req.params.botToken;
 
     // Telegram envia diferentes tipos de updates
-    // Vamos processar apenas mensagens de texto por enquanto
     const message = update.message || update.edited_message;
-    
+
     if (!message) {
       console.log('[Telegram Webhook] Update sem mensagem, ignorando');
       return res.json({ success: true, message: 'No message in update' });
@@ -764,29 +898,44 @@ router.post('/telegram', async (req, res) => {
     console.log('[Telegram Webhook] Chat ID:', chatId);
     console.log('[Telegram Webhook] From:', contactName);
     console.log('[Telegram Webhook] Text:', text.substring(0, 100));
+    if (botTokenParam) {
+      console.log('[Telegram Webhook] Bot token from URL:', botTokenParam.substring(0, 10) + '...');
+    }
 
-    // Encontrar canal pelo bot_id no credentials
-    // O bot_id é o ID do bot que recebeu a mensagem (disponível no webhook como update.message.chat.id do bot)
-    // Mas como o Telegram não envia o bot_id diretamente, precisamos buscar de outra forma
-    // Vamos buscar todos os canais Telegram ativos e verificar se algum corresponde
-    
-    // Primeiro, tentar encontrar por uma conversa existente
-    let channelResult = await query(
-      `SELECT DISTINCT c.* FROM channels c
-       INNER JOIN conversations conv ON conv.channel_id = c.id
-       WHERE c.type = 'telegram'
-       AND c.status = 'active'
-       AND conv.remote_jid = $1`,
-      [chatId]
-    );
+    let channelResult;
 
-    // Se não encontrou por conversa, buscar o primeiro canal Telegram ativo
-    // (isso funciona quando há apenas um bot configurado)
+    // 1. Se botToken na URL, buscar canal pelo bot_token nos credentials
+    if (botTokenParam) {
+      channelResult = await query(
+        `SELECT * FROM channels
+         WHERE type = 'telegram'
+         AND status = 'active'
+         AND credentials->>'bot_token' = $1`,
+        [botTokenParam]
+      );
+      if (channelResult.rows.length > 0) {
+        console.log('[Telegram Webhook] Canal encontrado pelo bot_token da URL');
+      }
+    }
+
+    // 2. Senão, tentar encontrar por conversa existente
+    if (!channelResult || channelResult.rows.length === 0) {
+      channelResult = await query(
+        `SELECT DISTINCT c.* FROM channels c
+         INNER JOIN conversations conv ON conv.channel_id = c.id
+         WHERE c.type = 'telegram'
+         AND c.status = 'active'
+         AND conv.remote_jid = $1`,
+        [chatId]
+      );
+    }
+
+    // 3. Fallback: buscar qualquer canal Telegram ativo
     if (channelResult.rows.length === 0) {
       console.log('[Telegram Webhook] Nenhuma conversa existente, buscando canal Telegram ativo...');
       channelResult = await query(
-        `SELECT * FROM channels 
-         WHERE type = 'telegram' 
+        `SELECT * FROM channels
+         WHERE type = 'telegram'
          AND status = 'active'
          ORDER BY created_at DESC
          LIMIT 1`
@@ -801,26 +950,43 @@ router.post('/telegram', async (req, res) => {
     const channel = channelResult.rows[0];
     console.log('[Telegram Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
 
-    // Buscar ou criar lead pelo chatId
-    let lead = await query(
-      `SELECT * FROM leads WHERE user_id = $1 AND telegram_id = $2`,
-      [channel.user_id, chatId]
-    );
-
+    // Buscar ou criar lead pelo chatId (com fallback se coluna telegram_id não existe)
     let leadId: string;
-
-    if (lead.rows.length === 0) {
-      // Criar lead automaticamente
-      console.log('[Telegram Webhook] Criando novo lead:', contactName);
-      const leadResult = await query(
-        `INSERT INTO leads (user_id, name, telegram_id, source, status)
-         VALUES ($1, $2, $3, 'telegram', 'new')
-         RETURNING *`,
-        [channel.user_id, contactName, chatId]
+    try {
+      let lead = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND telegram_id = $2`,
+        [channel.user_id, chatId]
       );
-      leadId = leadResult.rows[0].id;
-    } else {
-      leadId = lead.rows[0].id;
+
+      if (lead.rows.length === 0) {
+        console.log('[Telegram Webhook] Criando novo lead:', contactName);
+        const leadResult = await query(
+          `INSERT INTO leads (user_id, name, telegram_id, source, status)
+           VALUES ($1, $2, $3, 'telegram', 'new')
+           RETURNING *`,
+          [channel.user_id, contactName, chatId]
+        );
+        leadId = leadResult.rows[0].id;
+      } else {
+        leadId = lead.rows[0].id;
+      }
+    } catch (colErr: any) {
+      console.warn('[Telegram Webhook] telegram_id column not available, using fallback');
+      let lead = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND name = $2 AND source = 'telegram' LIMIT 1`,
+        [channel.user_id, contactName]
+      );
+      if (lead.rows.length === 0) {
+        const leadResult = await query(
+          `INSERT INTO leads (user_id, name, source, status)
+           VALUES ($1, $2, 'telegram', 'new')
+           RETURNING *`,
+          [channel.user_id, contactName]
+        );
+        leadId = leadResult.rows[0].id;
+      } else {
+        leadId = lead.rows[0].id;
+      }
     }
 
     // Buscar ou criar conversa
@@ -835,20 +1001,70 @@ router.post('/telegram', async (req, res) => {
       }
     );
 
-    // Determinar tipo de mídia
-    let mediaType = null;
-    let mediaUrl = null;
+    // Determinar tipo de mídia e fazer download via Telegram Bot API
+    let mediaType: string | null = null;
+    let mediaUrl: string | null = null;
+    let fileId: string | null = null;
 
     if (message.photo) {
       mediaType = 'image';
+      // photo é um array de tamanhos, pegar o maior (último)
+      fileId = message.photo[message.photo.length - 1]?.file_id;
     } else if (message.video) {
       mediaType = 'video';
-    } else if (message.audio || message.voice) {
+      fileId = message.video.file_id;
+    } else if (message.audio) {
       mediaType = 'audio';
+      fileId = message.audio.file_id;
+    } else if (message.voice) {
+      mediaType = 'audio';
+      fileId = message.voice.file_id;
     } else if (message.document) {
       mediaType = 'document';
+      fileId = message.document.file_id;
     } else if (message.sticker) {
       mediaType = 'sticker';
+      fileId = message.sticker.file_id;
+    } else if (message.video_note) {
+      mediaType = 'video';
+      fileId = message.video_note.file_id;
+    }
+
+    // Se tem mídia, baixar via Telegram Bot API e fazer upload para storage
+    if (fileId && mediaType) {
+      const botToken = channel.credentials?.bot_token || channel.credentials?.token;
+      if (botToken) {
+        try {
+          // 1. Obter file_path via getFile
+          const fileResponse = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
+          const fileData: any = await fileResponse.json();
+
+          if (fileData.ok && fileData.result?.file_path) {
+            // 2. Baixar o arquivo
+            const downloadUrl = `https://api.telegram.org/file/bot${botToken}/${fileData.result.file_path}`;
+            const mediaResponse = await fetch(downloadUrl);
+
+            if (mediaResponse.ok) {
+              const buffer = Buffer.from(await mediaResponse.arrayBuffer());
+              const contentType = mediaResponse.headers.get('content-type') || 'application/octet-stream';
+
+              // 3. Determinar extensão
+              const extParts = fileData.result.file_path.split('.');
+              const ext = extParts.length > 1 ? extParts[extParts.length - 1] : (mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : 'bin');
+              const filename = `telegram_${mediaType}_${Date.now()}.${ext}`;
+
+              // 4. Upload para storage
+              const storageService = getStorageService();
+              mediaUrl = await storageService.uploadBuffer(buffer, filename, contentType, 'inbox-media', channel.user_id);
+              console.log('[Telegram Webhook] Mídia uploaded:', mediaUrl?.substring(0, 100));
+            }
+          }
+        } catch (mediaErr: any) {
+          console.error('[Telegram Webhook] Erro ao baixar mídia:', mediaErr.message);
+        }
+      } else {
+        console.warn('[Telegram Webhook] Sem bot_token para baixar mídia');
+      }
     }
 
     // Salvar mensagem
@@ -968,6 +1184,507 @@ router.post('/telegram', async (req, res) => {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FACEBOOK MESSENGER WEBHOOKS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ✅ Verificação de webhook do Facebook Messenger (GET para validação da Meta)
+router.get('/facebook', async (req, res) => {
+  console.log('[Facebook Webhook] GET request - webhook verification');
+
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  const verifyToken = process.env.FACEBOOK_VERIFY_TOKEN || process.env.META_VERIFY_TOKEN || 'leadsflow_verify_token';
+
+  if (mode === 'subscribe' && token === verifyToken) {
+    console.log('[Facebook Webhook] Verificação bem-sucedida');
+    return res.status(200).send(challenge);
+  }
+
+  res.json({
+    success: true,
+    message: 'Facebook Messenger webhook endpoint is accessible',
+    endpoint: '/api/webhooks/facebook',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ Diagnóstico do webhook do Facebook - retorna status dos canais e subscription
+router.get('/facebook/debug', async (req, res) => {
+  try {
+    // Buscar todos os canais Facebook
+    const channelsResult = await query(
+      `SELECT id, name, status, credentials, created_at, updated_at
+       FROM channels WHERE type = 'facebook' ORDER BY created_at DESC`
+    );
+
+    const channels = channelsResult.rows.map((ch: any) => {
+      const creds = ch.credentials || {};
+      return {
+        id: ch.id,
+        name: ch.name,
+        status: ch.status,
+        page_id: creds.page_id || 'N/A',
+        page_name: creds.page_name || 'N/A',
+        has_token: !!(creds.page_access_token || creds.access_token),
+        created_at: ch.created_at,
+        updated_at: ch.updated_at
+      };
+    });
+
+    // Buscar conversas do Facebook
+    const convsResult = await query(
+      `SELECT c.id, c.remote_jid, c.status, c.channel_id, c.created_at,
+              ch.type as channel_type, ch.name as channel_name
+       FROM conversations c
+       LEFT JOIN channels ch ON c.channel_id = ch.id
+       WHERE ch.type = 'facebook'
+       ORDER BY c.created_at DESC LIMIT 10`
+    );
+
+    // Buscar mensagens do Facebook
+    const msgsResult = await query(
+      `SELECT id, conversation_id, direction, channel, content, created_at
+       FROM messages
+       WHERE channel = 'facebook'
+       ORDER BY created_at DESC LIMIT 10`
+    );
+
+    res.json({
+      success: true,
+      facebook_channels: channels,
+      facebook_conversations: convsResult.rows,
+      facebook_messages: msgsResult.rows,
+      total_channels: channels.length,
+      total_conversations: convsResult.rows.length,
+      total_messages: msgsResult.rows.length,
+      webhook_url: '/api/webhooks/facebook',
+      verify_token: process.env.FACEBOOK_VERIFY_TOKEN || process.env.META_VERIFY_TOKEN || 'leadsflow_verify_token'
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Endpoint de teste: simula uma mensagem do Facebook para verificar o fluxo
+router.post('/facebook/test', async (req, res) => {
+  try {
+    // Buscar primeiro canal Facebook ativo
+    const channelResult = await query(
+      `SELECT * FROM channels WHERE type = 'facebook' AND status = 'active' ORDER BY created_at DESC LIMIT 1`
+    );
+
+    if (channelResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Nenhum canal Facebook ativo encontrado. Conecte o Facebook primeiro.' });
+    }
+
+    const channel = channelResult.rows[0];
+    const pageId = channel.credentials?.page_id || 'test_page';
+    const testSenderId = req.body.sender_id || 'test_user_' + Date.now();
+    const testMessage = req.body.message || 'Mensagem de teste do Facebook Messenger';
+
+    console.log('[Facebook Test] Simulando mensagem para canal:', channel.id);
+
+    // Criar lead de teste (com fallback se coluna facebook_id não existe)
+    let leadId: string;
+    try {
+      let lead = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND facebook_id = $2`,
+        [channel.user_id, testSenderId]
+      );
+      if (lead.rows.length === 0) {
+        const leadResult = await query(
+          `INSERT INTO leads (user_id, name, facebook_id, source, status)
+           VALUES ($1, $2, $3, 'facebook', 'new')
+           RETURNING *`,
+          [channel.user_id, 'Teste Facebook', testSenderId]
+        );
+        leadId = leadResult.rows[0].id;
+      } else {
+        leadId = lead.rows[0].id;
+      }
+    } catch (colErr: any) {
+      // Fallback: coluna facebook_id pode não existir ainda
+      console.log('[Facebook Test] facebook_id column not found, using fallback');
+      const leadResult = await query(
+        `INSERT INTO leads (user_id, name, source, status)
+         VALUES ($1, $2, 'facebook', 'new')
+         RETURNING *`,
+        [channel.user_id, 'Teste Facebook']
+      );
+      leadId = leadResult.rows[0].id;
+    }
+
+    // Criar conversa
+    const conversation = await conversationsService.findOrCreate(
+      channel.user_id,
+      channel.id,
+      testSenderId,
+      leadId,
+      { contact_name: 'Teste Facebook', facebook_psid: testSenderId }
+    );
+
+    // Salvar mensagem
+    const messageResult = await query(
+      `INSERT INTO messages (
+        user_id, conversation_id, lead_id, direction, channel,
+        content, status, external_id, metadata
+      )
+       VALUES ($1, $2, $3, 'in', 'facebook', $4, 'delivered', $5, $6)
+       RETURNING *`,
+      [
+        channel.user_id,
+        conversation.id,
+        leadId,
+        testMessage,
+        `fb_test_${Date.now()}`,
+        JSON.stringify({ test: true, sender_id: testSenderId, page_id: pageId })
+      ]
+    );
+
+    // Atualizar conversa
+    await conversationsService.updateUnreadCount(conversation.id, 1);
+    await query(
+      `UPDATE conversations
+       SET last_message_at = NOW(),
+           status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [conversation.id]
+    );
+
+    // Emitir WebSocket
+    const wsService = getWebSocketService();
+    if (wsService) {
+      const updatedConv = await query(
+        `SELECT c.*, ch.name as channel_name, l.name as lead_name
+         FROM conversations c
+         LEFT JOIN channels ch ON c.channel_id = ch.id
+         LEFT JOIN leads l ON c.lead_id = l.id
+         WHERE c.id = $1`,
+        [conversation.id]
+      );
+
+      wsService.emitNewMessage(channel.user_id, {
+        conversationId: conversation.id,
+        message: messageResult.rows[0],
+        conversation: updatedConv.rows[0] || conversation
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Mensagem de teste criada com sucesso!',
+      channel_id: channel.id,
+      channel_name: channel.name,
+      conversation_id: conversation.id,
+      message_id: messageResult.rows[0].id,
+      lead_id: leadId,
+      instructions: 'Atualize a página da inbox para ver a mensagem de teste'
+    });
+  } catch (error: any) {
+    console.error('[Facebook Test] Erro:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Webhook para receber mensagens do Facebook Messenger
+router.post('/facebook', async (req, res) => {
+  try {
+    console.log('[Facebook Webhook] ===== WEBHOOK RECEBIDO =====');
+    console.log('[Facebook Webhook] Body:', JSON.stringify(req.body).substring(0, 2000));
+
+    const body = req.body;
+
+    // Facebook Messenger envia webhooks com object: 'page'
+    if (body.object !== 'page') {
+      console.log('[Facebook Webhook] Objeto não é page:', body.object);
+      return res.sendStatus(200);
+    }
+
+    for (const entry of body.entry || []) {
+      const pageId = entry.id;
+
+      console.log('[Facebook Webhook] Processing entry for Page ID:', pageId);
+
+      for (const messagingEvent of entry.messaging || []) {
+        const senderId = messagingEvent.sender?.id;
+        const recipientId = messagingEvent.recipient?.id;
+        const timestamp = messagingEvent.timestamp;
+        const message = messagingEvent.message;
+
+        // Ignorar se não tem mensagem ou se é echo (mensagem enviada por nós)
+        if (!message || message.is_echo) {
+          console.log('[Facebook Webhook] Ignorando: sem mensagem ou é echo');
+          continue;
+        }
+
+        console.log('[Facebook Webhook] Mensagem de:', senderId);
+        console.log('[Facebook Webhook] Para:', recipientId);
+        console.log('[Facebook Webhook] Conteúdo:', message.text?.substring(0, 100));
+
+        // Encontrar canal pelo page_id nas credentials (tentar múltiplos campos)
+        let channelResult = await query(
+          `SELECT * FROM channels
+           WHERE type = 'facebook'
+           AND status = 'active'
+           AND (credentials->>'page_id' = $1 OR credentials->>'page_id' = $2)`,
+          [recipientId, pageId]
+        );
+
+        // Fallback: buscar qualquer canal Facebook ativo (caso page_id não bata)
+        if (channelResult.rows.length === 0) {
+          console.log('[Facebook Webhook] Canal não encontrado por page_id, tentando fallback...');
+          channelResult = await query(
+            `SELECT * FROM channels
+             WHERE type = 'facebook'
+             AND status = 'active'
+             ORDER BY created_at DESC
+             LIMIT 1`
+          );
+        }
+
+        if (channelResult.rows.length === 0) {
+          console.warn('[Facebook Webhook] Nenhum canal Facebook ativo encontrado. Page ID:', recipientId || pageId);
+          continue;
+        }
+
+        const channel = channelResult.rows[0];
+        console.log('[Facebook Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
+
+        // Extrair conteúdo da mensagem
+        let messageContent = message.text || '';
+        let mediaType: string | null = null;
+        let mediaUrl: string | null = null;
+
+        // Verificar anexos (imagens, vídeos, etc.)
+        if (message.attachments && message.attachments.length > 0) {
+          const attachment = message.attachments[0];
+          mediaUrl = attachment.payload?.url || null;
+
+          switch (attachment.type) {
+            case 'image':
+              mediaType = 'image';
+              if (!messageContent) messageContent = '[Imagem]';
+              break;
+            case 'video':
+              mediaType = 'video';
+              if (!messageContent) messageContent = '[Vídeo]';
+              break;
+            case 'audio':
+              mediaType = 'audio';
+              if (!messageContent) messageContent = '[Áudio]';
+              break;
+            case 'file':
+              mediaType = 'document';
+              if (!messageContent) messageContent = '[Arquivo]';
+              break;
+            case 'location':
+              if (!messageContent) {
+                const coords = attachment.payload?.coordinates;
+                messageContent = coords
+                  ? `[Localização: ${coords.lat}, ${coords.long}]`
+                  : '[Localização]';
+              }
+              break;
+            default:
+              if (!messageContent) messageContent = '[Mídia]';
+          }
+        }
+
+        // Buscar nome do remetente via Graph API
+        let contactName = senderId;
+        try {
+          const accessToken = channel.credentials?.page_access_token || channel.credentials?.access_token;
+          if (accessToken) {
+            const userResponse = await fetch(
+              `https://graph.facebook.com/v21.0/${senderId}?fields=first_name,last_name,name,profile_pic&access_token=${accessToken}`
+            );
+            const userData: any = await userResponse.json();
+            if (userData.name) {
+              contactName = userData.name;
+            } else if (userData.first_name) {
+              contactName = [userData.first_name, userData.last_name].filter(Boolean).join(' ');
+            }
+          }
+        } catch (e) {
+          console.log('[Facebook Webhook] Não foi possível obter info do usuário:', e);
+        }
+
+        // Buscar ou criar lead pelo facebook_id (com fallback se coluna não existe)
+        let leadId: string;
+        try {
+          let lead = await query(
+            `SELECT * FROM leads WHERE user_id = $1 AND facebook_id = $2`,
+            [channel.user_id, senderId]
+          );
+
+          if (lead.rows.length === 0) {
+            console.log('[Facebook Webhook] Criando novo lead:', contactName);
+            const leadResult = await query(
+              `INSERT INTO leads (user_id, name, facebook_id, source, status)
+               VALUES ($1, $2, $3, 'facebook', 'new')
+               RETURNING *`,
+              [channel.user_id, contactName, senderId]
+            );
+            leadId = leadResult.rows[0].id;
+          } else {
+            leadId = lead.rows[0].id;
+          }
+        } catch (colErr: any) {
+          // Fallback: coluna facebook_id não existe ainda, criar lead sem ela
+          console.warn('[Facebook Webhook] facebook_id column not available, using fallback');
+          // Buscar por nome + source
+          let lead = await query(
+            `SELECT * FROM leads WHERE user_id = $1 AND name = $2 AND source = 'facebook' LIMIT 1`,
+            [channel.user_id, contactName]
+          );
+          if (lead.rows.length === 0) {
+            const leadResult = await query(
+              `INSERT INTO leads (user_id, name, source, status)
+               VALUES ($1, $2, 'facebook', 'new')
+               RETURNING *`,
+              [channel.user_id, contactName]
+            );
+            leadId = leadResult.rows[0].id;
+          } else {
+            leadId = lead.rows[0].id;
+          }
+        }
+
+        // Buscar ou criar conversa
+        const conversation = await conversationsService.findOrCreate(
+          channel.user_id,
+          channel.id,
+          senderId, // PSID como remote_jid
+          leadId,
+          {
+            contact_name: contactName,
+            facebook_psid: senderId
+          }
+        );
+
+        // Salvar mensagem
+        const messageResult = await query(
+          `INSERT INTO messages (
+            user_id, conversation_id, lead_id, direction, channel,
+            content, media_url, media_type, status, external_id, metadata
+          )
+           VALUES ($1, $2, $3, 'in', 'facebook', $4, $5, $6, 'delivered', $7, $8)
+           RETURNING *`,
+          [
+            channel.user_id,
+            conversation.id,
+            leadId,
+            messageContent,
+            mediaUrl,
+            mediaType,
+            message.mid || `fb_${timestamp}`,
+            JSON.stringify({
+              sender_id: senderId,
+              recipient_id: recipientId,
+              page_id: pageId,
+              timestamp: timestamp
+            })
+          ]
+        );
+
+        const savedMessage = messageResult.rows[0];
+        console.log('[Facebook Webhook] Mensagem salva:', savedMessage.id);
+
+        // Atualizar conversa
+        await conversationsService.updateUnreadCount(conversation.id, 1);
+        await query(
+          `UPDATE conversations
+           SET last_message_at = NOW(),
+               status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [conversation.id]
+        );
+
+        // Buscar conversa atualizada
+        const updatedConversation = await query(
+          `SELECT c.*,
+                  ch.name as channel_name,
+                  l.name as lead_name
+           FROM conversations c
+           LEFT JOIN channels ch ON c.channel_id = ch.id
+           LEFT JOIN leads l ON c.lead_id = l.id
+           WHERE c.id = $1`,
+          [conversation.id]
+        );
+
+        // Emitir WebSocket
+        const wsService = getWebSocketService();
+        if (wsService) {
+          console.log('[Facebook Webhook] Emitindo WebSocket para usuário:', channel.user_id);
+
+          wsService.emitNewMessage(channel.user_id, {
+            conversationId: conversation.id,
+            message: savedMessage,
+            conversation: updatedConversation.rows[0] || conversation
+          });
+
+          const totalUnreadResult = await query(
+            `SELECT SUM(unread_count) as total FROM conversations WHERE user_id = $1`,
+            [channel.user_id]
+          );
+          const totalUnread = parseInt(totalUnreadResult.rows[0]?.total || '0');
+
+          wsService.emitUnreadCountUpdate(channel.user_id, {
+            totalUnread,
+            conversationId: conversation.id,
+            unreadCount: (updatedConversation.rows[0]?.unread_count || 0) + 1
+          });
+
+          console.log('[Facebook Webhook] WebSocket emitido!');
+        }
+
+        // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+        webhookDispatcher.dispatchMessageReceived(channel.user_id, {
+          channelId: channel.id,
+          channelType: 'facebook',
+          channelName: channel.name,
+          conversationId: conversation.id,
+          messageId: savedMessage.id,
+          content: messageContent,
+          contactName: contactName,
+          contactPhone: senderId,
+          rawPayload: entry,
+        }).catch(err => console.error('[Facebook Webhook] Erro ao disparar webhook:', err.message));
+
+        // Processar assistente de IA (assíncrono)
+        if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+          assistantProcessor.processIncomingMessage({
+            channelId: channel.id,
+            channelType: 'facebook',
+            conversationId: conversation.id,
+            userId: channel.user_id,
+            contactPhone: senderId,
+            contactName: contactName,
+            messageContent: messageContent,
+            credentials: channel.credentials
+          }).then(replied => {
+            if (replied) console.log('[Facebook Webhook] Assistente IA respondeu automaticamente');
+          }).catch(err => {
+            console.error('[Facebook Webhook] Erro no assistente IA:', err.message);
+          });
+        }
+      }
+    }
+
+    // Meta espera resposta 200 OK
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('[Facebook Webhook] Erro:', error);
+    // Sempre retornar 200 para o Meta não reenviar
+    res.sendStatus(200);
   }
 });
 
@@ -1105,26 +1822,43 @@ router.post('/instagram', async (req, res) => {
           console.log('[Instagram Webhook] Não foi possível obter info do usuário:', e);
         }
 
-        // Buscar ou criar lead pelo instagram_id
-        let lead = await query(
-          `SELECT * FROM leads WHERE user_id = $1 AND instagram_id = $2`,
-          [channel.user_id, senderId]
-        );
-
+        // Buscar ou criar lead pelo instagram_id (com fallback se coluna não existe)
         let leadId: string;
-
-        if (lead.rows.length === 0) {
-          // Criar lead automaticamente
-          console.log('[Instagram Webhook] Criando novo lead:', contactName);
-          const leadResult = await query(
-            `INSERT INTO leads (user_id, name, instagram_id, source, status)
-             VALUES ($1, $2, $3, 'instagram', 'new')
-             RETURNING *`,
-            [channel.user_id, contactName, senderId]
+        try {
+          let lead = await query(
+            `SELECT * FROM leads WHERE user_id = $1 AND instagram_id = $2`,
+            [channel.user_id, senderId]
           );
-          leadId = leadResult.rows[0].id;
-        } else {
-          leadId = lead.rows[0].id;
+
+          if (lead.rows.length === 0) {
+            console.log('[Instagram Webhook] Criando novo lead:', contactName);
+            const leadResult = await query(
+              `INSERT INTO leads (user_id, name, instagram_id, source, status)
+               VALUES ($1, $2, $3, 'instagram', 'new')
+               RETURNING *`,
+              [channel.user_id, contactName, senderId]
+            );
+            leadId = leadResult.rows[0].id;
+          } else {
+            leadId = lead.rows[0].id;
+          }
+        } catch (colErr: any) {
+          console.warn('[Instagram Webhook] instagram_id column not available, using fallback');
+          let lead = await query(
+            `SELECT * FROM leads WHERE user_id = $1 AND name = $2 AND source = 'instagram' LIMIT 1`,
+            [channel.user_id, contactName]
+          );
+          if (lead.rows.length === 0) {
+            const leadResult = await query(
+              `INSERT INTO leads (user_id, name, source, status)
+               VALUES ($1, $2, 'instagram', 'new')
+               RETURNING *`,
+              [channel.user_id, contactName]
+            );
+            leadId = leadResult.rows[0].id;
+          } else {
+            leadId = lead.rows[0].id;
+          }
         }
 
         // Buscar ou criar conversa
@@ -1343,28 +2077,41 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
           let mediaType = null;
           let mediaUrl = null;
 
+          let mediaId: string | null = null;
+          let mediaMimetype: string | null = null;
+
           switch (messageType) {
             case 'text':
               messageContent = message.text?.body || '';
               break;
             case 'image':
               mediaType = 'image';
+              mediaId = message.image?.id || null;
+              mediaMimetype = message.image?.mime_type || 'image/jpeg';
               messageContent = message.image?.caption || '[Imagem]';
               break;
             case 'video':
               mediaType = 'video';
+              mediaId = message.video?.id || null;
+              mediaMimetype = message.video?.mime_type || 'video/mp4';
               messageContent = message.video?.caption || '[Vídeo]';
               break;
             case 'audio':
               mediaType = 'audio';
+              mediaId = message.audio?.id || null;
+              mediaMimetype = message.audio?.mime_type || 'audio/ogg';
               messageContent = '[Áudio]';
               break;
             case 'document':
               mediaType = 'document';
+              mediaId = message.document?.id || null;
+              mediaMimetype = message.document?.mime_type || 'application/octet-stream';
               messageContent = message.document?.filename || '[Documento]';
               break;
             case 'sticker':
               mediaType = 'sticker';
+              mediaId = message.sticker?.id || null;
+              mediaMimetype = message.sticker?.mime_type || 'image/webp';
               messageContent = '[Sticker]';
               break;
             case 'location':
@@ -1401,6 +2148,60 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
 
           const channel = channelResult.rows[0];
           console.log('[WhatsApp Cloud Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
+
+          // Baixar mídia via Graph API se tiver mediaId
+          if (mediaId && mediaType) {
+            const accessToken = channel.credentials?.access_token;
+            if (accessToken) {
+              try {
+                console.log('[WhatsApp Cloud Webhook] Baixando mídia:', mediaId, mediaType);
+
+                // Step 1: Get media URL from Meta Graph API
+                const mediaInfoResponse = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+                  headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                const mediaInfo = await mediaInfoResponse.json();
+
+                if (mediaInfo.url) {
+                  // Step 2: Download the actual media file
+                  const mediaDownloadResponse = await fetch(mediaInfo.url, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                  });
+
+                  if (mediaDownloadResponse.ok) {
+                    const arrayBuffer = await mediaDownloadResponse.arrayBuffer();
+                    const buffer = Buffer.from(arrayBuffer);
+
+                    // Step 3: Upload to MinIO storage
+                    const storageService = getStorageService();
+                    const extMap: Record<string, string> = {
+                      'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+                      'video/mp4': 'mp4', 'video/3gpp': '3gp',
+                      'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/aac': 'aac',
+                      'application/pdf': 'pdf',
+                    };
+                    const ext = extMap[mediaMimetype || ''] || (mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : 'bin');
+                    const filename = `cloud_${mediaType}_${Date.now()}.${ext}`;
+
+                    mediaUrl = await storageService.uploadBuffer(
+                      buffer, filename,
+                      mediaMimetype || 'application/octet-stream',
+                      'inbox-media', channel.user_id
+                    );
+                    console.log('[WhatsApp Cloud Webhook] Mídia uploaded:', mediaUrl?.substring(0, 100));
+                  } else {
+                    console.warn('[WhatsApp Cloud Webhook] Falha ao baixar mídia:', mediaDownloadResponse.status);
+                  }
+                } else {
+                  console.warn('[WhatsApp Cloud Webhook] Sem URL na resposta do media info:', mediaInfo);
+                }
+              } catch (mediaErr) {
+                console.error('[WhatsApp Cloud Webhook] Erro ao baixar mídia:', mediaErr);
+              }
+            } else {
+              console.warn('[WhatsApp Cloud Webhook] Sem access_token no canal para baixar mídia');
+            }
+          }
 
           // Obter nome do contato
           let contactName = senderId;
@@ -1465,7 +2266,8 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
                 waba_id: wabaId,
                 from: senderId,
                 timestamp: timestamp,
-                message_type: messageType
+                message_type: messageType,
+                media_id: mediaId || undefined
               })
             ]
           );

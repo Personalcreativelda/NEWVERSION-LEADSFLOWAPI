@@ -15,6 +15,7 @@ import {
     Globe,
     Facebook,
     MessageCircle,
+    Cloud,
     Smartphone,
     Mail,
     Code,
@@ -22,7 +23,10 @@ import {
     Instagram,
     MessageSquare,
     Search,
-    Plus
+    Plus,
+    Settings,
+    ChevronDown,
+    ChevronRight
 } from 'lucide-react';
 
 // Configuração dos canais disponíveis para conexão
@@ -41,7 +45,7 @@ const AVAILABLE_CHANNELS = [
         id: 'whatsapp_cloud',
         name: 'WhatsApp Cloud',
         description: 'API Oficial da Meta',
-        icon: MessageCircle,
+        icon: Cloud,
         color: 'text-green-600',
         available: true,
         provider: 'cloud_api'
@@ -115,6 +119,21 @@ export function ChannelsList() {
     const [websiteModalOpen, setWebsiteModalOpen] = useState(false);
     const [emailModalOpen, setEmailModalOpen] = useState(false);
     const [activeStep, setActiveStep] = useState(1);
+    const [sidebarExpanded, setSidebarExpanded] = useState(true);
+    const [channelsExpanded, setChannelsExpanded] = useState(true);
+
+    // Abrir modal de edição para qualquer tipo de canal
+    const openEditModal = (channelType: string) => {
+        switch (channelType) {
+            case 'whatsapp': setModalOpen(true); break;
+            case 'whatsapp_cloud': setCloudModalOpen(true); break;
+            case 'telegram': setTelegramModalOpen(true); break;
+            case 'facebook': setFacebookModalOpen(true); break;
+            case 'instagram': setInstagramModalOpen(true); break;
+            case 'website': setWebsiteModalOpen(true); break;
+            case 'email': setEmailModalOpen(true); break;
+        }
+    };
 
     useEffect(() => {
         loadChannels();
@@ -195,81 +214,82 @@ export function ChannelsList() {
                     borderColor: 'hsl(var(--border))'
                 }}
             >
-                <h2 
-                    className="text-lg font-bold mb-8"
+                {/* Caixas de Entrada - Dropdown colapsável */}
+                <button
+                    onClick={() => setSidebarExpanded(!sidebarExpanded)}
+                    className="flex items-center justify-between w-full text-lg font-bold mb-4 hover:opacity-80 transition-opacity"
                     style={{ color: 'hsl(var(--foreground))' }}
                 >
-                    Caixas de Entrada
-                </h2>
+                    <span>Caixas de Entrada</span>
+                    {sidebarExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                </button>
 
-                <div className="relative space-y-8">
-                    {/* Linha vertical conectora */}
-                    <div 
-                        className="absolute left-[15px] top-8 bottom-8 w-0.5 -z-10"
-                        style={{ backgroundColor: 'hsl(var(--border))' }}
-                    ></div>
-
-                    {/* Step 1 */}
-                    <div className="flex gap-4">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 1 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 1 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>
-                            1
-                        </div>
-                        <div>
-                            <h3 className={`font-medium ${activeStep === 1 ? 'text-blue-600 dark:text-blue-400' : ''}`} style={activeStep === 1 ? {} : { color: 'hsl(var(--foreground))' }}>
-                                Escolha o Canal
-                            </h3>
-                            <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Escolha o provedor que você deseja integrar.
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Step 2 */}
-                    <div className="flex gap-4">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 2 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 2 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>
-                            2
-                        </div>
-                        <div>
-                            <h3 className="font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Configuração
-                            </h3>
-                            <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Autentique sua conta e configure a caixa de entrada.
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Step 3 */}
-                    <div className="flex gap-4">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 3 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 3 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>
-                            3
-                        </div>
-                        <div>
-                            <h3 className="font-medium" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Pronto!
-                            </h3>
-                            <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Comece a atender seus leads centralizados.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Status de Ativos */}
-                <div className="mt-12 pt-6 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                        Seus Canais Ativos
-                    </h4>
-                    <div className="space-y-3">
-                        {channels.length > 0 ? channels.map(c => (
-                            <div key={c.id} className="flex items-center gap-2 text-sm" style={{ color: 'hsl(var(--foreground))' }}>
-                                <span className={`w-2 h-2 rounded-full ${c.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                                <span className="truncate">{c.name}</span>
+                {sidebarExpanded && (
+                    <div className="relative space-y-8 mb-8">
+                        <div className="absolute left-[15px] top-8 bottom-8 w-0.5 -z-10" style={{ backgroundColor: 'hsl(var(--border))' }}></div>
+                        <div className="flex gap-4">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 1 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 1 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>1</div>
+                            <div>
+                                <h3 className={`font-medium text-sm ${activeStep === 1 ? 'text-blue-600 dark:text-blue-400' : ''}`} style={activeStep === 1 ? {} : { color: 'hsl(var(--foreground))' }}>Escolha o Canal</h3>
+                                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>Escolha o provedor que deseja integrar.</p>
                             </div>
-                        )) : (
-                            <p className="text-xs italic" style={{ color: 'hsl(var(--muted-foreground))' }}>Nenhum canal ativo</p>
-                        )}
+                        </div>
+                        <div className="flex gap-4">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 2 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 2 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>2</div>
+                            <div>
+                                <h3 className="font-medium text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>Configuração</h3>
+                                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>Autentique e configure a caixa de entrada.</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-4">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 3 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 3 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>3</div>
+                            <div>
+                                <h3 className="font-medium text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>Pronto!</h3>
+                                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>Comece a atender seus leads.</p>
+                            </div>
+                        </div>
                     </div>
+                )}
+
+                {/* Seus Canais Ativos - com engrenagem de configurações */}
+                <div className="pt-4 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
+                    <button
+                        onClick={() => setChannelsExpanded(!channelsExpanded)}
+                        className="flex items-center justify-between w-full mb-3 hover:opacity-80 transition-opacity"
+                    >
+                        <h4 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                            Seus Canais Ativos
+                        </h4>
+                        {channelsExpanded ? <ChevronDown className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} /> : <ChevronRight className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />}
+                    </button>
+                    {channelsExpanded && (
+                        <div className="space-y-1">
+                            {channels.length > 0 ? channels.map(c => {
+                                const channelConfig = AVAILABLE_CHANNELS.find(
+                                    ac => ac.id === c.type || (c.type === 'whatsapp' && ac.id === 'whatsapp')
+                                );
+                                const ChannelIcon = channelConfig?.icon || MessageSquare;
+                                const iconColor = channelConfig?.color || 'text-gray-500';
+
+                                return (
+                                    <div key={c.id} className="flex items-center gap-2 text-sm group py-1.5 px-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" style={{ color: 'hsl(var(--foreground))' }}>
+                                        <ChannelIcon className={`w-4 h-4 flex-shrink-0 ${iconColor}`} />
+                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${c.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                        <span className="truncate flex-1">{c.name}</span>
+                                        <button
+                                            onClick={() => openEditModal(c.type)}
+                                            className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+                                            title="Configurações do canal"
+                                        >
+                                            <Settings className="w-3.5 h-3.5" style={{ color: 'hsl(var(--muted-foreground))' }} />
+                                        </button>
+                                    </div>
+                                );
+                            }) : (
+                                <p className="text-xs italic px-2" style={{ color: 'hsl(var(--muted-foreground))' }}>Nenhum canal ativo</p>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -290,14 +310,7 @@ export function ChannelsList() {
                                     channel={channel}
                                     onDelete={handleDelete}
                                     onRename={handleRename}
-                                    onEdit={(ch) => {
-                                        // Reconectar canal
-                                        if (ch.type === 'whatsapp') {
-                                            setModalOpen(true);
-                                        } else if (ch.type === 'whatsapp_cloud') {
-                                            setCloudModalOpen(true);
-                                        }
-                                    }}
+                                    onEdit={(ch) => openEditModal(ch.type)}
                                     onSync={() => loadChannels()}
                                 />
                             ))}

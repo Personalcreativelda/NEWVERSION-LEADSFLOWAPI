@@ -58,6 +58,7 @@ export function useInbox(options: UseInboxOptions = {}) {
         sending,
         messagesEndRef,
         sendMessage,
+        sendAudio,
         addMessage,
         updateMessageStatus,
         refreshMessages,
@@ -173,6 +174,7 @@ export function useInbox(options: UseInboxOptions = {}) {
         sending,
         messagesEndRef,
         sendMessage: handleSendMessage,
+        sendAudio,
         refreshMessages,
         scrollToBottom,
 

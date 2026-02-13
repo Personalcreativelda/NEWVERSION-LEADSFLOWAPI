@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS channels (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    type VARCHAR(50) NOT NULL CHECK (type IN ('whatsapp', 'facebook', 'instagram', 'telegram')),
+    type VARCHAR(50) NOT NULL CHECK (type IN ('whatsapp', 'whatsapp_cloud', 'facebook', 'instagram', 'telegram', 'email', 'website')),
     name VARCHAR(255) NOT NULL,
     status VARCHAR(50) DEFAULT 'inactive' CHECK (status IN ('active', 'inactive', 'error', 'connecting')),
     credentials JSONB DEFAULT '{}',

@@ -225,7 +225,68 @@ router.post('/', async (req, res, next) => {
             }
         }
 
-        // Para outros canais (Telegram, Facebook, Instagram), usar o status enviado ou 'active'
+        // Para Facebook Messenger, verificar duplicata e auto-subscribe à página
+        if (type === 'facebook' && credentials?.page_id) {
+            const pageToken = credentials.page_access_token || credentials.access_token;
+
+            // Helper: subscribe a página para receber eventos do Messenger
+            const subscribePage = async (pageId: string, token: string) => {
+                try {
+                    // Meta API: subscribed_fields via query params (mais confiável)
+                    const subscribeUrl = `https://graph.facebook.com/v21.0/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,messaging_optins&access_token=${encodeURIComponent(token)}`;
+                    const subscribeResponse = await fetch(subscribeUrl, { method: 'POST' });
+                    const subscribeData = await subscribeResponse.json();
+                    if (subscribeData.success) {
+                        console.log(`[Channels] ✅ Facebook page subscribed to messaging events: ${pageId}`);
+                    } else {
+                        console.warn(`[Channels] ⚠️ Failed to subscribe Facebook page:`, JSON.stringify(subscribeData));
+                    }
+                    return subscribeData;
+                } catch (err: any) {
+                    console.error(`[Channels] ❌ Error subscribing Facebook page:`, err.message);
+                    return null;
+                }
+            };
+
+            const existing = await channelsService.findByCredentialField('page_id', credentials.page_id, user.id);
+            if (existing) {
+                const updated = await channelsService.update(existing.id, {
+                    status: requestedStatus || 'active',
+                    credentials: {
+                        ...existing.credentials,
+                        page_id: credentials.page_id,
+                        page_access_token: pageToken,
+                        page_name: credentials.page_name || existing.credentials?.page_name
+                    }
+                }, user.id);
+
+                // Sempre re-subscribe ao atualizar (token pode ter mudado)
+                if (pageToken) await subscribePage(credentials.page_id, pageToken);
+
+                return res.status(200).json(updated);
+            }
+
+            // Criar canal
+            const channel = await channelsService.create({
+                type: 'facebook',
+                name,
+                status: requestedStatus || 'active',
+                credentials: {
+                    page_id: credentials.page_id,
+                    page_access_token: pageToken,
+                    page_name: credentials.page_name
+                },
+                settings: settings || {}
+            }, user.id);
+
+            // Auto-subscribe à página para receber eventos de mensagens
+            if (pageToken) await subscribePage(credentials.page_id, pageToken);
+
+            console.log(`[Channels] Facebook channel created: ${channel.id}`);
+            return res.status(201).json(channel);
+        }
+
+        // Para outros canais (Instagram, etc.), usar o status enviado ou 'active'
         const channel = await channelsService.create({
             type,
             name,
@@ -359,6 +420,58 @@ router.post('/:id/sync', async (req, res, next) => {
                 console.error('[Channels] Error syncing WhatsApp status:', error);
                 await channelsService.updateStatus(channel.id, 'error', user.id);
                 return res.status(500).json({ error: 'Failed to sync channel status' });
+            }
+        }
+
+        // Para Facebook, re-subscribe à página e verificar token
+        if (channel.type === 'facebook') {
+            const pageToken = channel.credentials?.page_access_token || channel.credentials?.access_token;
+            const pageId = channel.credentials?.page_id;
+
+            if (!pageToken || !pageId) {
+                return res.status(400).json({ error: 'Facebook channel missing page_id or access_token' });
+            }
+
+            try {
+                // Verificar se o token ainda é válido
+                const tokenCheck = await fetch(
+                    `https://graph.facebook.com/v21.0/me?access_token=${pageToken}`
+                );
+                const tokenData = await tokenCheck.json();
+
+                if (tokenData.error) {
+                    await channelsService.updateStatus(channel.id, 'error', user.id);
+                    return res.json({
+                        success: false,
+                        status: 'error',
+                        error: tokenData.error.message || 'Token inválido ou expirado'
+                    });
+                }
+
+                // Re-subscribe à página
+                const subscribeUrl = `https://graph.facebook.com/v21.0/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,messaging_optins&access_token=${encodeURIComponent(pageToken)}`;
+                const subscribeResponse = await fetch(subscribeUrl, { method: 'POST' });
+                const subscribeData = await subscribeResponse.json();
+
+                const subscribed = subscribeData.success === true;
+                await channelsService.updateStatus(channel.id, subscribed ? 'active' : 'error', user.id);
+                await channelsService.updateLastSync(channel.id, user.id);
+
+                console.log(`[Channels] Facebook sync: page=${pageId}, subscribed=${subscribed}`);
+
+                return res.json({
+                    success: subscribed,
+                    status: subscribed ? 'active' : 'error',
+                    page_name: tokenData.name,
+                    page_id: tokenData.id,
+                    subscribed: subscribed,
+                    subscribe_response: subscribeData,
+                    synced_at: new Date().toISOString()
+                });
+            } catch (error: any) {
+                console.error('[Channels] Error syncing Facebook:', error);
+                await channelsService.updateStatus(channel.id, 'error', user.id);
+                return res.status(500).json({ error: 'Failed to sync Facebook channel: ' + error.message });
             }
         }
 

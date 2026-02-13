@@ -9,15 +9,16 @@ import { errorMiddleware } from './middleware/error.middleware';
 import { initDatabase } from './database/init';
 import { campaignScheduler } from './services/campaign-scheduler.service';
 import { campaignCleanupService } from './services/campaign-cleanup.service';
-// INBOX: Importar WebSocket service
+// INBOX: Importar WebSocket service e Email Polling
 import { initializeWebSocket } from './services/websocket.service';
+import { emailPollingService } from './services/email-polling.service';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
 
 app.use(helmet());
 app.use(corsMiddleware);
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('tiny'));
 
@@ -86,6 +87,10 @@ initDatabase().then(() => {
 
   initializeWebSocket(server);
   console.log('[Leadflow API] WebSocket server iniciado ✅');
+
+  // ✅ Iniciar polling de emails IMAP
+  emailPollingService.start();
+  console.log('[Leadflow API] Email polling service iniciado ✅');
 
   server.listen(port, () => {
     console.log(`[Leadflow API] Listening on port ${port}`);

@@ -24,8 +24,11 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
         refreshConversations,
         messages,
         messagesLoading,
+        messagesError,
         sending,
+        messagesEndRef,
         sendMessage,
+        sendAudio,
         wsConnected,
         lastUpdate
     } = useInbox();
@@ -129,12 +132,20 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
     // Filtrar conversas baseado nos filtros aplicados
     const filteredConversations = useMemo(() => {
         return conversations.filter(conv => {
-            const jid = conv.metadata?.jid || conv.id || '';
+            const jid = conv.metadata?.jid || conv.remote_jid || '';
+            const channelType = conv.channel?.type || '';
             const isGroup = jid.includes('@g.us');
-            const isValidContact = jid.includes('@lid') || jid.includes('@s.whatsapp.net');
-            
-            // Excluir grupos e contatos sem dados válidos
+
+            // Excluir grupos
             if (isGroup) return false;
+
+            // Verificar se é um contato válido:
+            // - WhatsApp: @lid ou @s.whatsapp.net
+            // - Telegram/Instagram/Facebook/Email: sempre válidos (usam IDs numéricos)
+            const isWhatsAppContact = jid.includes('@lid') || jid.includes('@s.whatsapp.net');
+            const isNonWhatsAppChannel = ['telegram', 'instagram', 'facebook', 'email', 'whatsapp_cloud', 'website'].includes(channelType);
+            const isValidContact = isWhatsAppContact || isNonWhatsAppChannel || /^\d+$/.test(jid);
+
             if (!isValidContact) return false;
             
             // Filtrar por tipo (mentions, unattended)
@@ -344,6 +355,13 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
                         conversation={selectedConversation}
                         onBack={handleBack}
                         onEditLead={handleEditLead}
+                        messages={messages}
+                        messagesLoading={messagesLoading}
+                        messagesError={messagesError}
+                        sending={sending}
+                        messagesEndRef={messagesEndRef}
+                        onSendMessage={sendMessage}
+                        onSendAudio={sendAudio}
                     />
                 ) : (
                     <div 

@@ -52,10 +52,10 @@ router.post('/create-or-find', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { phone, name } = req.body;
+    const { phone, name, channelType } = req.body;
     const { query: dbQuery } = require('../database/connection');
-    
-    console.log('[Contacts] create-or-find request - phone:', phone, 'name:', name, 'userId:', user.id);
+
+    console.log('[Contacts] create-or-find request - phone:', phone, 'name:', name, 'channelType:', channelType, 'userId:', user.id);
     
     if (!phone) {
       return res.status(400).json({ error: 'Phone number is required' });
@@ -91,7 +91,7 @@ router.post('/create-or-find', async (req, res, next) => {
           `INSERT INTO leads (user_id, name, phone, whatsapp, status, source)
            VALUES ($1, $2, $3, $3, $4, $5)
            RETURNING id`,
-          [user.id, leadName, phone, 'new', 'inbox']
+          [user.id, leadName, phone, 'new', channelType || 'whatsapp']
         );
         leadId = newLeadResult.rows[0].id;
       } catch (err) {

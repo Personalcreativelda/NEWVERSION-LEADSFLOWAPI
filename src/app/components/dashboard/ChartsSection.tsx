@@ -2,6 +2,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import type { Lead } from '../../types';
 import FilterBar from './FilterBar';
 import { useMemo } from 'react';
+import { MessageCircle, Cloud, Mail, Instagram, Facebook, Send, Globe, Megaphone, Webhook, Phone, Search, Link, Hash, Smartphone, Users } from 'lucide-react';
 
 interface ChartsSectionProps {
   leads: Lead[];
@@ -27,51 +28,97 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
   const barColors = ['#B794F6', '#5B9FED', '#00D9A3', '#FFA26B', '#FF6B9D', '#FFD93D', '#B794F6', '#5B9FED', '#00D9A3', '#FFA26B'];
   const pieColors = ['#B794F6', '#00D9A3', '#FFA26B', '#FF6B9D', '#5B9FED', '#FFD93D'];
 
-  // Mapeamento de nomes de origem para exibição mais clara
+  // Normalizar origens que não representam canais reais
+  // 'inbox' e 'unknown' são genéricos e devem ser mapeados para 'whatsapp' (canal principal)
+  const normalizeOrigem = (origem: string): string => {
+    const norm = origem.toLowerCase();
+    if (norm === 'inbox' || norm === 'unknown' || norm === 'manual') return 'whatsapp';
+    if (norm === 'messenger') return 'facebook';
+    return norm;
+  };
+
+  // Mapeamento de nomes de origem para exibição
   const origemLabels: Record<string, string> = {
     'whatsapp': 'WhatsApp',
+    'whatsapp_cloud': 'WhatsApp Cloud',
     'facebook': 'Facebook',
     'instagram': 'Instagram',
+    'telegram': 'Telegram',
+    'email': 'Email',
+    'website': 'Site',
     'site': 'Site',
+    'twilio': 'Twilio (SMS)',
+    'sms': 'Twilio (SMS)',
     'indicacao': 'Indicação',
+    'campaign': 'Campanha',
+    'n8n': 'Automação (N8N)',
     'google': 'Google',
     'linkedin': 'LinkedIn',
-    'email': 'Email',
     'telefone': 'Telefone',
     'outros': 'Outros',
   };
 
-  // ✅ MAPEAMENTO DE CORES ESPECÍFICAS POR ORIGEM
+  // Mapeamento de ícones por origem
+  const origemIcons: Record<string, any> = {
+    'whatsapp': MessageCircle,
+    'whatsapp_cloud': Cloud,
+    'facebook': Facebook,
+    'instagram': Instagram,
+    'telegram': Send,
+    'email': Mail,
+    'website': Globe,
+    'site': Globe,
+    'twilio': Smartphone,
+    'sms': Smartphone,
+    'indicacao': Users,
+    'campaign': Megaphone,
+    'n8n': Webhook,
+    'google': Search,
+    'linkedin': Link,
+    'telefone': Phone,
+  };
+
+  // Mapeamento de cores específicas por origem (canais)
   const origemColors: Record<string, string> = {
-    'whatsapp': '#00D9A3',     // Verde
+    'whatsapp': '#25D366',     // Verde WhatsApp
+    'whatsapp_cloud': '#128C7E', // Verde escuro WhatsApp Cloud
+    'facebook': '#1877F2',     // Azul Facebook
+    'instagram': '#E4405F',    // Rosa Instagram
+    'telegram': '#0088CC',     // Azul Telegram
+    'email': '#06B6D4',        // Ciano
+    'website': '#8B5CF6',      // Roxo
+    'site': '#8B5CF6',         // Roxo
+    'twilio': '#F22F46',       // Vermelho Twilio
+    'sms': '#F22F46',          // Vermelho Twilio
     'indicacao': '#FFA26B',    // Laranja
-    'instagram': '#FF6B9D',    // Rosa
-    'facebook': '#5B9FED',     // Azul
-    'site': '#B794F6',         // Roxo
+    'campaign': '#F59E0B',     // Amarelo/Laranja
+    'n8n': '#FF6D5A',          // Laranja N8N
     'google': '#FFD93D',       // Amarelo
-    'linkedin': '#5B9FED',     // Azul
-    'email': '#B794F6',        // Roxo
-    'telefone': '#00D9A3',     // Verde
+    'linkedin': '#0A66C2',     // Azul LinkedIn
+    'telefone': '#10B981',     // Verde
     'outros': '#A0A0B2',       // Cinza
   };
 
   // ✅ Processar dados para gráfico de origem com useMemo
   const origemChartData = useMemo(() => {
+    // Agrupar origens normalizadas (inbox/unknown/manual → whatsapp, messenger → facebook)
     const origemData = leads.reduce((acc: Record<string, number>, lead) => {
       if (lead.origem) {
-        acc[lead.origem] = (acc[lead.origem] || 0) + 1;
+        const normalized = normalizeOrigem(lead.origem);
+        acc[normalized] = (acc[normalized] || 0) + 1;
       }
       return acc;
     }, {});
 
     const chartData = Object.entries(origemData)
       .map(([name, value]) => {
-        const normalizedName = name.toLowerCase();
         return {
-          name: origemLabels[normalizedName] || name,
+          name: origemLabels[name] || name,
           value,
-          color: origemColors[normalizedName] || barColors[0], // Cor específica ou fallback
-          fullName: origemLabels[normalizedName] || name,
+          color: origemColors[name] || barColors[0],
+          fullName: origemLabels[name] || name,
+          icon: origemIcons[name] || Hash,
+          key: name,
         };
       })
       .sort((a, b) => b.value - a.value);
@@ -259,28 +306,33 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
                 </BarChart>
               </ResponsiveContainer>
               
-              {/* ✨ TABELA COM VALORES E PERCENTUAIS */}
+              {/* Tabela com ícones de canal, valores e percentuais */}
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {origemChartData.map((item, index) => {
                     const percentage = leads.length > 0 ? ((item.value / leads.length) * 100).toFixed(1) : '0';
+                    const IconComponent = item.icon;
                     return (
                       <div key={`row-${index}`} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div 
-                            className="w-3 h-3 rounded-full flex-shrink-0" 
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span className="text-sm font-medium text-muted-foreground">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: `${item.color}18` }}
+                          >
+                            <IconComponent className="w-3.5 h-3.5" style={{ color: item.color }} />
+                          </div>
+                          <span className="text-sm font-medium text-foreground">
                             {item.name}
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-semibold text-foreground">
-                            {item.value} leads
+                            {item.value}
                           </span>
-                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 min-w-[45px] text-right">
-                            ({percentage}%)
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full min-w-[45px] text-center"
+                            style={{ backgroundColor: `${item.color}18`, color: item.color }}
+                          >
+                            {percentage}%
                           </span>
                         </div>
                       </div>
