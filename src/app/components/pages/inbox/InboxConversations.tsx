@@ -143,7 +143,7 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
             // - WhatsApp: @lid ou @s.whatsapp.net
             // - Telegram/Instagram/Facebook/Email: sempre válidos (usam IDs numéricos)
             const isWhatsAppContact = jid.includes('@lid') || jid.includes('@s.whatsapp.net');
-            const isNonWhatsAppChannel = ['telegram', 'instagram', 'facebook', 'email'].includes(channelType);
+            const isNonWhatsAppChannel = ['telegram', 'instagram', 'facebook', 'email', 'whatsapp_cloud', 'website'].includes(channelType);
             const isValidContact = isWhatsAppContact || isNonWhatsAppChannel || /^\d+$/.test(jid);
 
             if (!isValidContact) return false;

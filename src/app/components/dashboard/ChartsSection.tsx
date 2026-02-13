@@ -28,12 +28,20 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
   const barColors = ['#B794F6', '#5B9FED', '#00D9A3', '#FFA26B', '#FF6B9D', '#FFD93D', '#B794F6', '#5B9FED', '#00D9A3', '#FFA26B'];
   const pieColors = ['#B794F6', '#00D9A3', '#FFA26B', '#FF6B9D', '#5B9FED', '#FFD93D'];
 
+  // Normalizar origens que não representam canais reais
+  // 'inbox' e 'unknown' são genéricos e devem ser mapeados para 'whatsapp' (canal principal)
+  const normalizeOrigem = (origem: string): string => {
+    const norm = origem.toLowerCase();
+    if (norm === 'inbox' || norm === 'unknown' || norm === 'manual') return 'whatsapp';
+    if (norm === 'messenger') return 'facebook';
+    return norm;
+  };
+
   // Mapeamento de nomes de origem para exibição
   const origemLabels: Record<string, string> = {
-    'whatsapp': 'WhatsApp Não Oficial',
+    'whatsapp': 'WhatsApp',
     'whatsapp_cloud': 'WhatsApp Cloud',
     'facebook': 'Facebook',
-    'messenger': 'Facebook Messenger',
     'instagram': 'Instagram',
     'telegram': 'Telegram',
     'email': 'Email',
@@ -47,9 +55,6 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     'google': 'Google',
     'linkedin': 'LinkedIn',
     'telefone': 'Telefone',
-    'manual': 'Manual',
-    'unknown': 'Manual',
-    'inbox': 'Inbox',
     'outros': 'Outros',
   };
 
@@ -58,7 +63,6 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     'whatsapp': MessageCircle,
     'whatsapp_cloud': Cloud,
     'facebook': Facebook,
-    'messenger': Facebook,
     'instagram': Instagram,
     'telegram': Send,
     'email': Mail,
@@ -72,9 +76,6 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     'google': Search,
     'linkedin': Link,
     'telefone': Phone,
-    'manual': Hash,
-    'unknown': Hash,
-    'inbox': Mail,
   };
 
   // Mapeamento de cores específicas por origem (canais)
@@ -82,7 +83,6 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     'whatsapp': '#25D366',     // Verde WhatsApp
     'whatsapp_cloud': '#128C7E', // Verde escuro WhatsApp Cloud
     'facebook': '#1877F2',     // Azul Facebook
-    'messenger': '#0084FF',    // Azul Messenger
     'instagram': '#E4405F',    // Rosa Instagram
     'telegram': '#0088CC',     // Azul Telegram
     'email': '#06B6D4',        // Ciano
@@ -96,31 +96,29 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     'google': '#FFD93D',       // Amarelo
     'linkedin': '#0A66C2',     // Azul LinkedIn
     'telefone': '#10B981',     // Verde
-    'manual': '#6B7280',       // Cinza
-    'unknown': '#6B7280',      // Cinza
-    'inbox': '#3B82F6',        // Azul
     'outros': '#A0A0B2',       // Cinza
   };
 
   // ✅ Processar dados para gráfico de origem com useMemo
   const origemChartData = useMemo(() => {
+    // Agrupar origens normalizadas (inbox/unknown/manual → whatsapp, messenger → facebook)
     const origemData = leads.reduce((acc: Record<string, number>, lead) => {
       if (lead.origem) {
-        acc[lead.origem] = (acc[lead.origem] || 0) + 1;
+        const normalized = normalizeOrigem(lead.origem);
+        acc[normalized] = (acc[normalized] || 0) + 1;
       }
       return acc;
     }, {});
 
     const chartData = Object.entries(origemData)
       .map(([name, value]) => {
-        const normalizedName = name.toLowerCase();
         return {
-          name: origemLabels[normalizedName] || name,
+          name: origemLabels[name] || name,
           value,
-          color: origemColors[normalizedName] || barColors[0],
-          fullName: origemLabels[normalizedName] || name,
-          icon: origemIcons[normalizedName] || Hash,
-          key: normalizedName,
+          color: origemColors[name] || barColors[0],
+          fullName: origemLabels[name] || name,
+          icon: origemIcons[name] || Hash,
+          key: name,
         };
       })
       .sort((a, b) => b.value - a.value);
