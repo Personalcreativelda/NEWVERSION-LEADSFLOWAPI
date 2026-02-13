@@ -868,17 +868,17 @@ router.get('/telegram', async (_req, res) => {
 });
 
 // ✅ Webhook para receber mensagens do Telegram
-router.post('/telegram', async (req, res) => {
+router.post('/telegram/:botToken?', async (req, res) => {
   try {
     console.log('[Telegram Webhook] ===== WEBHOOK RECEBIDO =====');
     console.log('[Telegram Webhook] Body:', JSON.stringify(req.body).substring(0, 2000));
 
     const update = req.body;
+    const botTokenParam = req.params.botToken;
 
     // Telegram envia diferentes tipos de updates
-    // Vamos processar apenas mensagens de texto por enquanto
     const message = update.message || update.edited_message;
-    
+
     if (!message) {
       console.log('[Telegram Webhook] Update sem mensagem, ignorando');
       return res.json({ success: true, message: 'No message in update' });
@@ -898,29 +898,44 @@ router.post('/telegram', async (req, res) => {
     console.log('[Telegram Webhook] Chat ID:', chatId);
     console.log('[Telegram Webhook] From:', contactName);
     console.log('[Telegram Webhook] Text:', text.substring(0, 100));
+    if (botTokenParam) {
+      console.log('[Telegram Webhook] Bot token from URL:', botTokenParam.substring(0, 10) + '...');
+    }
 
-    // Encontrar canal pelo bot_id no credentials
-    // O bot_id é o ID do bot que recebeu a mensagem (disponível no webhook como update.message.chat.id do bot)
-    // Mas como o Telegram não envia o bot_id diretamente, precisamos buscar de outra forma
-    // Vamos buscar todos os canais Telegram ativos e verificar se algum corresponde
-    
-    // Primeiro, tentar encontrar por uma conversa existente
-    let channelResult = await query(
-      `SELECT DISTINCT c.* FROM channels c
-       INNER JOIN conversations conv ON conv.channel_id = c.id
-       WHERE c.type = 'telegram'
-       AND c.status = 'active'
-       AND conv.remote_jid = $1`,
-      [chatId]
-    );
+    let channelResult;
 
-    // Se não encontrou por conversa, buscar o primeiro canal Telegram ativo
-    // (isso funciona quando há apenas um bot configurado)
+    // 1. Se botToken na URL, buscar canal pelo bot_token nos credentials
+    if (botTokenParam) {
+      channelResult = await query(
+        `SELECT * FROM channels
+         WHERE type = 'telegram'
+         AND status = 'active'
+         AND credentials->>'bot_token' = $1`,
+        [botTokenParam]
+      );
+      if (channelResult.rows.length > 0) {
+        console.log('[Telegram Webhook] Canal encontrado pelo bot_token da URL');
+      }
+    }
+
+    // 2. Senão, tentar encontrar por conversa existente
+    if (!channelResult || channelResult.rows.length === 0) {
+      channelResult = await query(
+        `SELECT DISTINCT c.* FROM channels c
+         INNER JOIN conversations conv ON conv.channel_id = c.id
+         WHERE c.type = 'telegram'
+         AND c.status = 'active'
+         AND conv.remote_jid = $1`,
+        [chatId]
+      );
+    }
+
+    // 3. Fallback: buscar qualquer canal Telegram ativo
     if (channelResult.rows.length === 0) {
       console.log('[Telegram Webhook] Nenhuma conversa existente, buscando canal Telegram ativo...');
       channelResult = await query(
-        `SELECT * FROM channels 
-         WHERE type = 'telegram' 
+        `SELECT * FROM channels
+         WHERE type = 'telegram'
          AND status = 'active'
          ORDER BY created_at DESC
          LIMIT 1`
