@@ -280,7 +280,7 @@ export class AssistantProcessorService {
      * Envia mensagem via WhatsApp Cloud API
      */
     private async sendWhatsAppCloudMessage(phoneNumberId: string, accessToken: string, to: string, text: string): Promise<void> {
-        const response = await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
+        const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

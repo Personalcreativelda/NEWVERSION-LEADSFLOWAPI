@@ -917,13 +917,13 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
     // Send via the appropriate channel
     let externalResult: any = null;
 
-    if ((messageChannel === 'whatsapp' || messageChannel === 'whatsapp_cloud') && (phone || remoteJid)) {
-      // ===== WHATSAPP SENDING =====
+    if (messageChannel === 'whatsapp' && (phone || remoteJid)) {
+      // ===== WHATSAPP (Evolution API) SENDING =====
       if (!phone && !remoteJid) {
         return res.status(400).json({ error: 'No phone number available' });
       }
       try {
-        console.log('[Inbox] Sending WhatsApp message:', { instanceId, phone, remoteJid, isLidFormat, isGroupFormat });
+        console.log('[Inbox] Sending WhatsApp message via Evolution:', { instanceId, phone, remoteJid, isLidFormat, isGroupFormat });
 
         const numberToSend = isLidFormat || isGroupFormat ? remoteJid : phone;
 
@@ -945,6 +945,87 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       } catch (whatsappError) {
         console.error('[Inbox] WhatsApp send error:', whatsappError);
         return res.status(500).json({ error: 'Failed to send WhatsApp message' });
+      }
+
+    } else if (messageChannel === 'whatsapp_cloud' && (phone || remoteJid)) {
+      // ===== WHATSAPP CLOUD (Graph API) SENDING =====
+      const phoneNumberId = channelCredentials?.phone_number_id;
+      const accessToken = channelCredentials?.access_token;
+
+      if (!phoneNumberId || !accessToken) {
+        console.error('[Inbox] WhatsApp Cloud channel missing credentials:', channelId);
+        return res.status(500).json({ error: 'WhatsApp Cloud channel not properly configured (missing phone_number_id or access_token)' });
+      }
+
+      const recipientPhone = phone?.replace(/\D/g, '') || remoteJid?.replace('@s.whatsapp.net', '');
+      if (!recipientPhone) {
+        return res.status(400).json({ error: 'No phone number available for WhatsApp Cloud' });
+      }
+
+      try {
+        console.log('[Inbox] Sending WhatsApp Cloud message via Graph API:', { phoneNumberId, recipientPhone });
+
+        if (media_url && media_type) {
+          // Send media via WhatsApp Cloud API
+          let waMediaType = 'document';
+          if (media_type === 'image' || media_type?.startsWith('image')) waMediaType = 'image';
+          else if (media_type === 'video' || media_type?.startsWith('video')) waMediaType = 'video';
+          else if (media_type === 'audio' || media_type?.startsWith('audio')) waMediaType = 'audio';
+
+          const mediaPayload: any = {
+            messaging_product: 'whatsapp',
+            to: recipientPhone,
+            type: waMediaType,
+            [waMediaType]: {
+              link: media_url,
+              ...(messageContent && waMediaType !== 'audio' ? { caption: messageContent } : {})
+            }
+          };
+
+          const mediaResponse = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify(mediaPayload)
+          });
+
+          const mediaResult = await mediaResponse.json();
+          if (!mediaResponse.ok) {
+            console.error('[Inbox] WhatsApp Cloud media send error:', mediaResult);
+            return res.status(500).json({ error: 'Failed to send media via WhatsApp Cloud', details: mediaResult?.error?.message });
+          }
+          externalResult = mediaResult;
+        } else {
+          // Send text message via WhatsApp Cloud API
+          const textPayload = {
+            messaging_product: 'whatsapp',
+            to: recipientPhone,
+            type: 'text',
+            text: { body: messageContent }
+          };
+
+          const textResponse = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify(textPayload)
+          });
+
+          const textResult = await textResponse.json();
+          if (!textResponse.ok) {
+            console.error('[Inbox] WhatsApp Cloud text send error:', textResult);
+            return res.status(500).json({ error: 'Failed to send message via WhatsApp Cloud', details: textResult?.error?.message });
+          }
+          externalResult = textResult;
+        }
+        console.log('[Inbox] WhatsApp Cloud send result:', externalResult);
+      } catch (whatsappCloudError) {
+        console.error('[Inbox] WhatsApp Cloud send error:', whatsappCloudError);
+        return res.status(500).json({ error: 'Failed to send WhatsApp Cloud message' });
       }
 
     } else if (messageChannel === 'instagram' || messageChannel === 'facebook') {
@@ -1310,8 +1391,8 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
     const finalAudioUrl = audioUrl || req.body.audio_url;
     let result: any = null;
 
-    if (channelType === 'whatsapp' || channelType === 'whatsapp_cloud') {
-      // ===== WhatsApp audio =====
+    if (channelType === 'whatsapp') {
+      // ===== WhatsApp audio (Evolution API) =====
       const savedInstance = await getActiveWhatsAppInstance(user.id);
       const instanceId = savedInstance || getUserInstanceName(user.id);
       if (!instanceId) {
@@ -1323,6 +1404,38 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
         audioUrl: finalAudioUrl,
       });
       console.log('[Inbox Audio] WhatsApp result:', result);
+
+    } else if (channelType === 'whatsapp_cloud') {
+      // ===== WhatsApp Cloud audio (Graph API) =====
+      const phoneNumberId = channelCredentials?.phone_number_id;
+      const accessToken = channelCredentials?.access_token;
+      if (!phoneNumberId || !accessToken) {
+        return res.status(500).json({ error: 'WhatsApp Cloud channel not properly configured' });
+      }
+      const recipientPhone = (phone || remoteJid?.replace('@s.whatsapp.net', ''))?.replace(/\D/g, '');
+      if (!recipientPhone) {
+        return res.status(400).json({ error: 'No phone number available for WhatsApp Cloud audio' });
+      }
+      const audioPayload = {
+        messaging_product: 'whatsapp',
+        to: recipientPhone,
+        type: 'audio',
+        audio: { link: finalAudioUrl }
+      };
+      const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(audioPayload)
+      });
+      result = await response.json();
+      if (!response.ok) {
+        console.error('[Inbox Audio] WhatsApp Cloud error:', result);
+        return res.status(500).json({ error: 'Failed to send audio via WhatsApp Cloud', details: result?.error?.message });
+      }
+      console.log('[Inbox Audio] WhatsApp Cloud result:', result);
 
     } else if (channelType === 'instagram' || channelType === 'facebook') {
       // ===== Instagram/Facebook audio =====

@@ -280,17 +280,17 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       setLoadingChannels(true);
       try {
         const response = await channelsApi.getAll();
-        // Filtrar apenas canais WhatsApp conectados (status pode ser 'connected' ou 'active')
+        // Filtrar canais WhatsApp e WhatsApp Cloud conectados
         const whatsappOnly = response.filter(
-          (ch: any) => ch.type === 'whatsapp' && (ch.status === 'connected' || ch.status === 'active')
+          (ch: any) => (ch.type === 'whatsapp' || ch.type === 'whatsapp_cloud') && (ch.status === 'connected' || ch.status === 'active')
         );
         setWhatsappChannels(whatsappOnly);
-        
+
         // Se tiver canais, selecionar o primeiro por padrão
         if (whatsappOnly.length > 0 && !selectedChannel) {
           setSelectedChannel(whatsappOnly[0].id);
         }
-        
+
         console.log('📱 Canais WhatsApp encontrados:', whatsappOnly.length, whatsappOnly);
       } catch (error) {
         console.error('❌ Erro ao buscar canais WhatsApp:', error);
@@ -778,20 +778,26 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         return;
       }
 
-      // ✅ Obter instância Evolution do canal selecionado
+      // ✅ Obter instância/credenciais do canal selecionado
       const selectedChannelData = whatsappChannels.find(ch => ch.id === selectedChannel);
       let evolutionInstance = '';
-      
+      const isWhatsAppCloud = selectedChannelData?.type === 'whatsapp_cloud';
+
       if (selectedChannelData) {
-        // Obter instância das credenciais do canal
-        const credentials = typeof selectedChannelData.credentials === 'string' 
-          ? JSON.parse(selectedChannelData.credentials) 
+        const credentials = typeof selectedChannelData.credentials === 'string'
+          ? JSON.parse(selectedChannelData.credentials)
           : selectedChannelData.credentials;
-        // Usar instance_id para a Evolution API (é o identificador completo usado nas chamadas)
-        evolutionInstance = credentials?.instance_id || credentials?.instance_name || selectedChannelData.name || '';
-        console.log('[Campaign WhatsApp] 📱 Instância selecionada:', evolutionInstance, '(Canal:', selectedChannelData.name, ')');
+
+        if (isWhatsAppCloud) {
+          // WhatsApp Cloud: usa phone_number_id como identificador
+          evolutionInstance = credentials?.phone_number_id || selectedChannelData.name || '';
+          console.log('[Campaign WhatsApp] ☁️ Canal WhatsApp Cloud selecionado:', evolutionInstance, '(Canal:', selectedChannelData.name, ')');
+        } else {
+          // Evolution API: usa instance_id
+          evolutionInstance = credentials?.instance_id || credentials?.instance_name || selectedChannelData.name || '';
+          console.log('[Campaign WhatsApp] 📱 Instância Evolution selecionada:', evolutionInstance, '(Canal:', selectedChannelData.name, ')');
+        }
       } else {
-        // Fallback para localStorage se não tiver canal selecionado
         evolutionInstance = localStorage.getItem('evolution_instance_name') || '';
         console.log('[Campaign WhatsApp] 📱 Usando instância do localStorage:', evolutionInstance);
       }
@@ -1055,6 +1061,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             skipInvalid,
             minDelaySeconds,
             maxDelaySeconds,
+            channelId: selectedChannel,
+            channelType: selectedChannelData?.type || 'whatsapp',
           },
           media_urls: allMediaUrls,
           // Construir data com timezone local do usuário
@@ -1152,6 +1160,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             skipInvalid,
             minDelaySeconds,
             maxDelaySeconds,
+            channelId: selectedChannel,
+            channelType: selectedChannelData?.type || 'whatsapp',
           },
           media_urls: allMediaUrls
         };
@@ -1483,13 +1493,16 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     className="w-full h-11 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                   >
                     {whatsappChannels.map((channel) => {
-                      const credentials = typeof channel.credentials === 'string' 
-                        ? JSON.parse(channel.credentials) 
+                      const credentials = typeof channel.credentials === 'string'
+                        ? JSON.parse(channel.credentials)
                         : channel.credentials;
-                      const instanceName = credentials?.instance_name || channel.name;
+                      const isCloud = channel.type === 'whatsapp_cloud';
+                      const instanceName = isCloud
+                        ? (credentials?.display_phone_number || credentials?.phone_number_id || 'Cloud')
+                        : (credentials?.instance_name || channel.name);
                       return (
                         <option key={channel.id} value={channel.id}>
-                          📱 {channel.name} ({instanceName})
+                          {isCloud ? '☁️' : '📱'} {channel.name} ({instanceName})
                         </option>
                       );
                     })}
