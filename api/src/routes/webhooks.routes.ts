@@ -1718,6 +1718,134 @@ router.get('/instagram', async (req, res) => {
   });
 });
 
+// ✅ Diagnóstico do webhook do Instagram
+router.get('/instagram/debug', async (req, res) => {
+  try {
+    const channelsResult = await query(
+      `SELECT id, name, status, credentials, created_at FROM channels WHERE type = 'instagram' ORDER BY created_at DESC`
+    );
+    const channels = channelsResult.rows.map((ch: any) => ({
+      id: ch.id,
+      name: ch.name,
+      status: ch.status,
+      instagram_id: ch.credentials?.instagram_id || 'N/A',
+      username: ch.credentials?.username || 'N/A',
+      has_token: !!(ch.credentials?.access_token),
+      token_type: ch.credentials?.token_type || 'N/A',
+      created_at: ch.created_at
+    }));
+
+    const convsResult = await query(
+      `SELECT c.id, c.remote_jid, c.status, c.channel_id, c.created_at,
+              ch.type as channel_type FROM conversations c
+       LEFT JOIN channels ch ON c.channel_id = ch.id
+       WHERE ch.type = 'instagram' ORDER BY c.created_at DESC LIMIT 10`
+    );
+
+    const msgsResult = await query(
+      `SELECT id, conversation_id, direction, channel, content, created_at
+       FROM messages WHERE channel = 'instagram' ORDER BY created_at DESC LIMIT 10`
+    );
+
+    res.json({
+      success: true,
+      instagram_channels: channels,
+      instagram_conversations: convsResult.rows,
+      instagram_messages: msgsResult.rows,
+      total_channels: channels.length,
+      total_conversations: convsResult.rows.length,
+      total_messages: msgsResult.rows.length,
+      webhook_url: '/api/webhooks/instagram',
+      verify_token: process.env.INSTAGRAM_VERIFY_TOKEN || process.env.META_VERIFY_TOKEN || 'leadsflow_verify_token'
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Endpoint de teste: simula uma mensagem do Instagram
+router.post('/instagram/test', async (req, res) => {
+  try {
+    const channelResult = await query(
+      `SELECT * FROM channels WHERE type = 'instagram' AND status = 'active' ORDER BY created_at DESC LIMIT 1`
+    );
+    if (channelResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Nenhum canal Instagram ativo encontrado.' });
+    }
+
+    const channel = channelResult.rows[0];
+    const testSenderId = req.body.sender_id || 'ig_test_user_' + Date.now();
+    const testMessage = req.body.message || 'Mensagem de teste do Instagram';
+
+    let leadId: string;
+    try {
+      let lead = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND instagram_id = $2`,
+        [channel.user_id, testSenderId]
+      );
+      if (lead.rows.length === 0) {
+        const leadResult = await query(
+          `INSERT INTO leads (user_id, name, instagram_id, source, status)
+           VALUES ($1, $2, $3, 'instagram', 'new') RETURNING *`,
+          [channel.user_id, 'Teste Instagram', testSenderId]
+        );
+        leadId = leadResult.rows[0].id;
+      } else {
+        leadId = lead.rows[0].id;
+      }
+    } catch {
+      const leadResult = await query(
+        `INSERT INTO leads (user_id, name, source, status)
+         VALUES ($1, $2, 'instagram', 'new') RETURNING *`,
+        [channel.user_id, 'Teste Instagram']
+      );
+      leadId = leadResult.rows[0].id;
+    }
+
+    const conversation = await conversationsService.findOrCreate(
+      channel.user_id, channel.id, testSenderId, leadId,
+      { contact_name: 'Teste Instagram', instagram_id: testSenderId }
+    );
+
+    const messageResult = await query(
+      `INSERT INTO messages (user_id, conversation_id, lead_id, direction, channel, content, status, external_id, metadata)
+       VALUES ($1, $2, $3, 'in', 'instagram', $4, 'delivered', $5, $6) RETURNING *`,
+      [channel.user_id, conversation.id, leadId, testMessage, `ig_test_${Date.now()}`,
+       JSON.stringify({ test: true, sender_id: testSenderId })]
+    );
+
+    await conversationsService.updateUnreadCount(conversation.id, 1);
+    await query(
+      `UPDATE conversations SET last_message_at = NOW(), status = CASE WHEN status = 'closed' THEN 'open' ELSE status END, updated_at = NOW() WHERE id = $1`,
+      [conversation.id]
+    );
+
+    const wsService = getWebSocketService();
+    if (wsService) {
+      const updatedConv = await query(
+        `SELECT c.*, ch.name as channel_name, l.name as lead_name FROM conversations c
+         LEFT JOIN channels ch ON c.channel_id = ch.id LEFT JOIN leads l ON c.lead_id = l.id WHERE c.id = $1`,
+        [conversation.id]
+      );
+      wsService.emitNewMessage(channel.user_id, {
+        conversationId: conversation.id,
+        message: messageResult.rows[0],
+        conversation: updatedConv.rows[0] || conversation
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Mensagem de teste Instagram criada!',
+      channel_id: channel.id,
+      conversation_id: conversation.id,
+      message_id: messageResult.rows[0].id
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ✅ Webhook para receber mensagens do Instagram (Meta Graph API)
 router.post('/instagram', async (req, res) => {
   try {
@@ -1757,7 +1885,7 @@ router.post('/instagram', async (req, res) => {
         console.log('[Instagram Webhook] Conteúdo:', message.text?.substring(0, 100));
 
         // Encontrar canal pelo instagram_id nas credentials
-        const channelResult = await query(
+        let channelResult = await query(
           `SELECT * FROM channels
            WHERE type = 'instagram'
            AND status = 'active'
@@ -1765,8 +1893,16 @@ router.post('/instagram', async (req, res) => {
           [recipientId, instagramId]
         );
 
+        // Fallback: buscar qualquer canal Instagram ativo
         if (channelResult.rows.length === 0) {
-          console.warn('[Instagram Webhook] Canal não encontrado para Instagram ID:', recipientId || instagramId);
+          console.log('[Instagram Webhook] Canal não encontrado por instagram_id, tentando fallback...');
+          channelResult = await query(
+            `SELECT * FROM channels WHERE type = 'instagram' AND status = 'active' ORDER BY created_at DESC LIMIT 1`
+          );
+        }
+
+        if (channelResult.rows.length === 0) {
+          console.warn('[Instagram Webhook] Nenhum canal Instagram ativo encontrado. ID:', recipientId || instagramId);
           continue;
         }
 
