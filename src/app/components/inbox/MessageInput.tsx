@@ -93,11 +93,18 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream, {
-                mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-                    ? 'audio/webm;codecs=opus' 
-                    : 'audio/webm'
-            });
+
+            // Preferir OGG Opus (suportado pelo WhatsApp Cloud API), fallback para WebM
+            let mimeType = 'audio/webm';
+            if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+                mimeType = 'audio/ogg;codecs=opus';
+            } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+                mimeType = 'audio/ogg';
+            } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                mimeType = 'audio/webm;codecs=opus';
+            }
+
+            const mediaRecorder = new MediaRecorder(stream, { mimeType });
             
             mediaRecorderRef.current = mediaRecorder;
             audioChunksRef.current = [];
@@ -109,7 +116,8 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
             };
 
             mediaRecorder.onstop = () => {
-                const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                const actualMime = mediaRecorder.mimeType || mimeType;
+                const blob = new Blob(audioChunksRef.current, { type: actualMime });
                 setAudioBlob(blob);
                 stream.getTracks().forEach(track => track.stop());
             };

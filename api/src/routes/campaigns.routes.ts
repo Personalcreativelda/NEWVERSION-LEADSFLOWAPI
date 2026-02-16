@@ -490,10 +490,21 @@ router.post('/:id/execute', async (req, res, next) => {
       : campaign.settings || {};
 
     let channel: any = null;
+    const channelId = settings.channelId;
+    const channelType = settings.channelType || 'whatsapp';
     const instanceId = settings.instanceId || settings.instance_id || settings.instanceName;
 
-    if (instanceId) {
-      // Buscar pelo instanceId especificado na campanha
+    // Primeiro: tentar buscar por channelId salvo nas settings
+    if (channelId) {
+      const channelResult = await query(
+        `SELECT * FROM channels WHERE id = $1 AND user_id = $2 LIMIT 1`,
+        [channelId, user.id]
+      );
+      channel = channelResult.rows[0];
+    }
+
+    // Segundo: buscar pelo instanceId (Evolution API)
+    if (!channel && instanceId) {
       const channelResult = await query(
         `SELECT * FROM channels
          WHERE user_id = $1
@@ -505,10 +516,14 @@ router.post('/:id/execute', async (req, res, next) => {
       channel = channelResult.rows[0];
     }
 
+    // Terceiro: buscar primeiro canal WhatsApp ou WhatsApp Cloud ativo
     if (!channel) {
-      // Buscar primeiro canal WhatsApp ativo
       const channels = await channelsService.findByType('whatsapp', user.id);
       channel = channels.find(c => c.status === 'active');
+    }
+    if (!channel) {
+      const cloudChannels = await channelsService.findByType('whatsapp_cloud', user.id);
+      channel = cloudChannels.find(c => c.status === 'active');
     }
 
     if (!channel) {
@@ -517,15 +532,20 @@ router.post('/:id/execute', async (req, res, next) => {
       });
     }
 
-    const whatsappInstanceId = channel.credentials?.instance_id || channel.credentials?.instance_name;
+    const isWhatsAppCloud = channel.type === 'whatsapp_cloud';
+    const whatsappInstanceId = isWhatsAppCloud
+      ? channel.credentials?.phone_number_id
+      : (channel.credentials?.instance_id || channel.credentials?.instance_name);
 
     if (!whatsappInstanceId) {
       return res.status(400).json({
-        error: 'Canal WhatsApp não tem instância configurada'
+        error: isWhatsAppCloud
+          ? 'Canal WhatsApp Cloud não tem phone_number_id configurado'
+          : 'Canal WhatsApp não tem instância configurada'
       });
     }
 
-    console.log(`[Campaigns Execute] Canal WhatsApp: ${channel.id}, Instance: ${whatsappInstanceId}`);
+    console.log(`[Campaigns Execute] Canal ${channel.type}: ${channel.id}, ${isWhatsAppCloud ? 'PhoneNumberId' : 'Instance'}: ${whatsappInstanceId}`);
 
     // 3. Buscar leads destinatários
     let leadsQuery = 'SELECT * FROM leads WHERE user_id = $1';
@@ -617,6 +637,9 @@ async function executeCampaignMessages(
   instanceId: string,
   userId: string
 ) {
+  const isWhatsAppCloud = channel.type === 'whatsapp_cloud';
+  const cloudAccessToken = isWhatsAppCloud ? channel.credentials?.access_token : null;
+  const cloudPhoneNumberId = isWhatsAppCloud ? instanceId : null;
   const stats = {
     total: leads.length,
     sent: 0,
@@ -669,32 +692,86 @@ async function executeCampaignMessages(
       let messageStatus = 'sent';
 
       try {
-        // Enviar texto
-        sendResult = await whatsappService.sendMessage({
-          instanceId: instanceId,
-          number: cleanPhone,
-          text: messageContent
-        });
+        if (isWhatsAppCloud && cloudPhoneNumberId && cloudAccessToken) {
+          // ===== WhatsApp Cloud (Graph API) =====
+          const textPayload = {
+            messaging_product: 'whatsapp',
+            to: cleanPhone,
+            type: 'text',
+            text: { body: messageContent }
+          };
 
-        // Enviar mídia se houver
-        if (campaign.media_urls && campaign.media_urls.length > 0) {
-          for (const mediaUrl of campaign.media_urls) {
-            try {
-              // Detectar tipo de mídia
-              const mediaType = mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) ? 'image' :
-                               mediaUrl.match(/\.(mp4|mpeg|mov|avi)/i) ? 'video' :
-                               mediaUrl.match(/\.(pdf|doc|docx|xls|xlsx)/i) ? 'document' :
-                               mediaUrl.match(/\.(mp3|ogg|wav)/i) ? 'audio' : 'document';
+          const textResponse = await fetch(`https://graph.facebook.com/v21.0/${cloudPhoneNumberId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${cloudAccessToken}`
+            },
+            body: JSON.stringify(textPayload)
+          });
 
-              await whatsappService.sendMedia({
-                instanceId: instanceId,
-                number: cleanPhone,
-                mediaUrl: mediaUrl,
-                mediaType: mediaType,
-                caption: ''
-              });
-            } catch (mediaError: any) {
-              console.warn(`[Campaigns Execute] Erro ao enviar mídia: ${mediaError.message}`);
+          const textResult = await textResponse.json();
+          if (!textResponse.ok) {
+            throw new Error(`WhatsApp Cloud API error: ${textResult?.error?.message || JSON.stringify(textResult)}`);
+          }
+          sendResult = textResult;
+
+          // Enviar mídia via Graph API se houver
+          if (campaign.media_urls && campaign.media_urls.length > 0) {
+            for (const mediaUrl of campaign.media_urls) {
+              try {
+                const mediaType = mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) ? 'image' :
+                                 mediaUrl.match(/\.(mp4|mpeg|mov|avi)/i) ? 'video' :
+                                 mediaUrl.match(/\.(pdf|doc|docx|xls|xlsx)/i) ? 'document' :
+                                 mediaUrl.match(/\.(mp3|ogg|wav)/i) ? 'audio' : 'document';
+
+                const mediaPayload: any = {
+                  messaging_product: 'whatsapp',
+                  to: cleanPhone,
+                  type: mediaType,
+                  [mediaType]: { link: mediaUrl }
+                };
+
+                await fetch(`https://graph.facebook.com/v21.0/${cloudPhoneNumberId}/messages`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${cloudAccessToken}`
+                  },
+                  body: JSON.stringify(mediaPayload)
+                });
+              } catch (mediaError: any) {
+                console.warn(`[Campaigns Execute] Erro ao enviar mídia via Cloud: ${mediaError.message}`);
+              }
+            }
+          }
+        } else {
+          // ===== WhatsApp Evolution API =====
+          sendResult = await whatsappService.sendMessage({
+            instanceId: instanceId,
+            number: cleanPhone,
+            text: messageContent
+          });
+
+          // Enviar mídia via Evolution API se houver
+          if (campaign.media_urls && campaign.media_urls.length > 0) {
+            for (const mediaUrl of campaign.media_urls) {
+              try {
+                const mediaType = mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) ? 'image' :
+                                 mediaUrl.match(/\.(mp4|mpeg|mov|avi)/i) ? 'video' :
+                                 mediaUrl.match(/\.(pdf|doc|docx|xls|xlsx)/i) ? 'document' :
+                                 mediaUrl.match(/\.(mp3|ogg|wav)/i) ? 'audio' : 'document';
+
+                await whatsappService.sendMedia({
+                  instanceId: instanceId,
+                  number: cleanPhone,
+                  mediaUrl: mediaUrl,
+                  mediaType: mediaType,
+                  caption: ''
+                });
+              } catch (mediaError: any) {
+                console.warn(`[Campaigns Execute] Erro ao enviar mídia: ${mediaError.message}`);
+              }
             }
           }
         }
@@ -724,27 +801,30 @@ async function executeCampaignMessages(
         );
 
         // Salvar mensagem no inbox
+        const msgChannel = isWhatsAppCloud ? 'whatsapp_cloud' : 'whatsapp';
         const messageResult = await query(
           `INSERT INTO messages (
             user_id, conversation_id, lead_id, campaign_id, direction, channel,
             content, media_url, media_type, status, external_id, metadata, sent_at
           )
-           VALUES ($1, $2, $3, $4, 'out', 'whatsapp', $5, $6, $7, $8, $9, $10, NOW())
+           VALUES ($1, $2, $3, $4, 'out', $5, $6, $7, $8, $9, $10, $11, NOW())
            RETURNING *`,
           [
             userId,
             conversation.id,
             lead.id,
             campaign.id,
+            msgChannel,
             messageContent,
             campaign.media_urls?.[0] || null,
             campaign.media_urls?.[0] ? 'image' : null,
             messageStatus,
-            sendResult?.key?.id || null,
+            sendResult?.key?.id || sendResult?.messages?.[0]?.id || null,
             JSON.stringify({
               campaign_id: campaign.id,
               campaign_name: campaign.name,
               instance_id: instanceId,
+              channel_type: msgChannel,
               phone: cleanPhone,
               lead_name: contactName,
               source: 'dashboard_campaign'

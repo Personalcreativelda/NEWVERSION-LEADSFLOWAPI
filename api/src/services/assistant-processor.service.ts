@@ -188,7 +188,11 @@ export class AssistantProcessorService {
      * Envia resposta pelo canal correto
      */
     private async sendReply(ctx: IncomingMessageContext, text: string): Promise<void> {
-        const credentials = ctx.credentials || {};
+        let credentials = ctx.credentials || {};
+        // Safe-parse se credentials vier como string
+        if (typeof credentials === 'string') {
+            try { credentials = JSON.parse(credentials); } catch (e) { credentials = {}; }
+        }
 
         switch (ctx.channelType) {
             case 'whatsapp': {
@@ -280,7 +284,7 @@ export class AssistantProcessorService {
      * Envia mensagem via WhatsApp Cloud API
      */
     private async sendWhatsAppCloudMessage(phoneNumberId: string, accessToken: string, to: string, text: string): Promise<void> {
-        const response = await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
+        const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -113,6 +113,29 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         }
     };
 
+    // Detectar se um "document" é na verdade uma imagem pelo URL ou metadata
+    const isDocumentImage = useMemo(() => {
+        if (message.media_type !== 'document' || !message.media_url) return false;
+        const url = message.media_url.toLowerCase();
+        // Verificar extensão na URL
+        if (/\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(url)) return true;
+        // Verificar data URI de imagem
+        if (url.startsWith('data:image/')) return true;
+        // Verificar mimetype nos metadados
+        const mimetype = (message.metadata as any)?.mimetype || '';
+        if (typeof mimetype === 'string' && mimetype.startsWith('image/')) return true;
+        return false;
+    }, [message.media_type, message.media_url, message.metadata]);
+
+    // Tipo efetivo de mídia (document que é imagem → tratar como image)
+    const effectiveMediaType = isDocumentImage ? 'image' : message.media_type;
+
+    // Extrair nome do arquivo dos metadados
+    const fileName = useMemo(() => {
+        const meta = message.metadata as any;
+        return meta?.fileName || meta?.original_name || null;
+    }, [message.metadata]);
+
     // Placeholders de mídia
     const mediaPlaceholders = ['[Mídia]', '[Imagem]', '[Vídeo]', '[Áudio]', '[Documento]', '[Sticker]', '[image]', '[video]', '[audio]', '[document]', '[sticker]'];
     const isMediaPlaceholder = mediaPlaceholders.includes(message.content || '');
@@ -135,7 +158,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 {/* Media Content */}
                 {hasValidMedia && (
                     <div className="mb-2">
-                        {(message.media_type === 'image' || message.media_type === 'sticker') && !imageError ? (
+                        {(effectiveMediaType === 'image' || effectiveMediaType === 'sticker') && !imageError ? (
                             <img
                                 src={imageUrl}
                                 alt="Mídia"
@@ -143,7 +166,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                                 onClick={() => window.open(imageUrl, '_blank')}
                                 onError={handleImageError}
                             />
-                        ) : (message.media_type === 'image' || message.media_type === 'sticker') && imageError ? (
+                        ) : (effectiveMediaType === 'image' || effectiveMediaType === 'sticker') && imageError ? (
                             <a
                                 href={message.media_url}
                                 target="_blank"
@@ -158,7 +181,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                 </svg>
                             </a>
-                        ) : message.media_type === 'audio' ? (
+                        ) : effectiveMediaType === 'audio' ? (
                             <audio
                                 controls
                                 src={message.media_url}
@@ -169,7 +192,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                                     Ouvir áudio
                                 </a>
                             </audio>
-                        ) : message.media_type === 'video' ? (
+                        ) : effectiveMediaType === 'video' ? (
                             <video
                                 controls
                                 src={message.media_url}
@@ -181,12 +204,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                                 href={message.media_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                download={fileName || undefined}
                                 className={`flex items-center gap-2 p-2 rounded ${isOut ? 'bg-teal-700 text-white' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}
                             >
                                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                 </svg>
-                                <span className="truncate text-sm">Documento ({message.media_type})</span>
+                                <span className="truncate text-sm">{fileName || 'Documento'}</span>
                                 <svg className="w-4 h-4 flex-shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>

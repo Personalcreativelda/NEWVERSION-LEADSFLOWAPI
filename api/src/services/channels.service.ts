@@ -122,6 +122,12 @@ export class ChannelsService {
      * Cria novo canal
      */
     async create(data: Partial<Channel>, userId: string): Promise<Channel> {
+        // Garantir que credentials e settings são objetos antes de stringify
+        let creds = data.credentials || {};
+        if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch (e) { creds = {}; } }
+        let settings = data.settings || {};
+        if (typeof settings === 'string') { try { settings = JSON.parse(settings); } catch (e) { settings = {}; } }
+
         const result = await query(
             `INSERT INTO channels (user_id, type, name, status, credentials, settings)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -131,8 +137,8 @@ export class ChannelsService {
                 data.type,
                 data.name,
                 data.status || 'inactive',
-                JSON.stringify(data.credentials || {}),
-                JSON.stringify(data.settings || {})
+                JSON.stringify(creds),
+                JSON.stringify(settings)
             ]
         );
         return result.rows[0];
@@ -157,13 +163,17 @@ export class ChannelsService {
         }
 
         if (data.credentials !== undefined) {
+            let creds = data.credentials;
+            if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch (e) { /* keep as-is */ } }
             fields.push(`credentials = $${paramIndex++}`);
-            values.push(JSON.stringify(data.credentials));
+            values.push(JSON.stringify(creds));
         }
 
         if (data.settings !== undefined) {
+            let settings = data.settings;
+            if (typeof settings === 'string') { try { settings = JSON.parse(settings); } catch (e) { /* keep as-is */ } }
             fields.push(`settings = $${paramIndex++}`);
-            values.push(JSON.stringify(data.settings));
+            values.push(JSON.stringify(settings));
         }
 
         if (data.last_sync_at !== undefined) {

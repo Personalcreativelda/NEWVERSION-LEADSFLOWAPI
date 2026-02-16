@@ -28,7 +28,8 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
     const tokenType = useMemo(() => {
         const token = accessToken.trim();
         if (token.startsWith('IGAA') || token.startsWith('IGA')) return 'instagram';
-        if (token.startsWith('EAA')) return 'facebook';
+        // EAA = Page/App Token, EAF = System User Token (permanente - ideal para SaaS)
+        if (token.startsWith('EAA') || token.startsWith('EAF')) return 'facebook';
         return null;
     }, [accessToken]);
 
@@ -98,30 +99,179 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                 console.log('[Instagram] Conta encontrada:', igAccount);
 
             } else {
-                // Token do Facebook - buscar Instagram Business Account via Pages
-                console.log('[Instagram] Detectado token do Facebook (EAA), usando Facebook Graph API');
+                // Token do Facebook/Meta - buscar Instagram Business Account via Pages
+                const isSystemUserToken = token.startsWith('EAF');
+                console.log(`[Instagram] Detectado token ${isSystemUserToken ? 'System User (EAF)' : 'Page (EAA)'}, usando Facebook Graph API`);
 
-                const pageResponse = await fetch(
-                    `https://graph.facebook.com/v18.0/me/accounts?fields=instagram_business_account{id,username,name,profile_picture_url}&access_token=${token}`
-                );
-                const pageData = await pageResponse.json();
+                let pages: any[] = [];
+                let igAccountDirect: any = null; // Para busca direta via business
 
-                if (pageData.error) {
-                    console.error('[Instagram] Error:', pageData.error);
-                    throw new Error(pageData.error.message || 'Token inválido');
+                // 1. Tentar /me/accounts primeiro (funciona para Page tokens e System User com pages_show_list)
+                try {
+                    const pageResponse = await fetch(
+                        `https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}&access_token=${token}`
+                    );
+                    const pageData = await pageResponse.json();
+
+                    if (!pageData.error) {
+                        pages = pageData.data || [];
+                        console.log('[Instagram] /me/accounts - Páginas encontradas:', pages.length);
+                    } else {
+                        console.warn('[Instagram] /me/accounts erro:', pageData.error.message);
+                    }
+                } catch (err) {
+                    console.warn('[Instagram] /me/accounts falhou:', err);
                 }
 
-                // Find the Instagram business account
-                for (const page of pageData.data || []) {
+                // 2. Se 0 páginas e é System User token, tentar via Business Manager
+                if (pages.length === 0 && isSystemUserToken) {
+                    console.log('[Instagram] System User token sem páginas em /me/accounts, tentando via Business Manager...');
+
+                    // 2a. Buscar business ID do System User
+                    let businessId = null;
+                    try {
+                        const bizResponse = await fetch(
+                            `https://graph.facebook.com/v21.0/me?fields=id,name,business&access_token=${token}`
+                        );
+                        const bizData = await bizResponse.json();
+                        console.log('[Instagram] System User info:', JSON.stringify(bizData));
+                        businessId = bizData?.business?.id;
+                    } catch (err) {
+                        console.warn('[Instagram] /me?fields=business falhou:', err);
+                    }
+
+                    // 2b. Se não encontrou business via /me, tentar /me/businesses
+                    if (!businessId) {
+                        try {
+                            const bizsResponse = await fetch(
+                                `https://graph.facebook.com/v21.0/me/businesses?fields=id,name&access_token=${token}`
+                            );
+                            const bizsData = await bizsResponse.json();
+                            console.log('[Instagram] /me/businesses:', JSON.stringify(bizsData));
+                            if (bizsData.data && bizsData.data.length > 0) {
+                                businessId = bizsData.data[0].id;
+                            }
+                        } catch (err) {
+                            console.warn('[Instagram] /me/businesses falhou:', err);
+                        }
+                    }
+
+                    console.log('[Instagram] Business ID encontrado:', businessId || 'nenhum');
+
+                    if (businessId) {
+                        // 2c. Tentar owned_pages do business
+                        try {
+                            const bizPagesResponse = await fetch(
+                                `https://graph.facebook.com/v21.0/${businessId}/owned_pages?fields=id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}&access_token=${token}`
+                            );
+                            const bizPagesData = await bizPagesResponse.json();
+                            console.log('[Instagram] owned_pages:', bizPagesData.data?.length || 0, 'páginas');
+
+                            if (bizPagesData.data && bizPagesData.data.length > 0) {
+                                pages = bizPagesData.data;
+                            }
+                        } catch (err) {
+                            console.warn('[Instagram] owned_pages falhou:', err);
+                        }
+
+                        // 2d. Se ainda 0, tentar client_pages
+                        if (pages.length === 0) {
+                            try {
+                                const clientPagesResponse = await fetch(
+                                    `https://graph.facebook.com/v21.0/${businessId}/client_pages?fields=id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}&access_token=${token}`
+                                );
+                                const clientPagesData = await clientPagesResponse.json();
+                                console.log('[Instagram] client_pages:', clientPagesData.data?.length || 0, 'páginas');
+
+                                if (clientPagesData.data && clientPagesData.data.length > 0) {
+                                    pages = clientPagesData.data;
+                                }
+                            } catch (err) {
+                                console.warn('[Instagram] client_pages falhou:', err);
+                            }
+                        }
+
+                        // 2e. Se ainda sem páginas com IG, tentar buscar IG accounts diretamente do business
+                        if (pages.length === 0 || !pages.some((p: any) => p.instagram_business_account)) {
+                            try {
+                                const igAccResponse = await fetch(
+                                    `https://graph.facebook.com/v21.0/${businessId}/instagram_accounts?fields=id,username,name,profile_picture_url&access_token=${token}`
+                                );
+                                const igAccData = await igAccResponse.json();
+                                console.log('[Instagram] business/instagram_accounts:', JSON.stringify(igAccData));
+
+                                if (igAccData.data && igAccData.data.length > 0) {
+                                    igAccountDirect = igAccData.data[0];
+                                    console.log('[Instagram] IG account encontrada via business:', igAccountDirect.username);
+                                }
+                            } catch (err) {
+                                console.warn('[Instagram] instagram_accounts falhou:', err);
+                            }
+                        }
+                    }
+
+                    // 2f. Última tentativa: buscar pages atribuídas ao System User via /me/assigned_pages
+                    if (pages.length === 0 && !igAccountDirect) {
+                        try {
+                            const assignedResponse = await fetch(
+                                `https://graph.facebook.com/v21.0/me/assigned_pages?fields=id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}&access_token=${token}`
+                            );
+                            const assignedData = await assignedResponse.json();
+                            console.log('[Instagram] assigned_pages:', JSON.stringify(assignedData));
+
+                            if (assignedData.data && assignedData.data.length > 0) {
+                                pages = assignedData.data;
+                            }
+                        } catch (err) {
+                            console.warn('[Instagram] assigned_pages falhou:', err);
+                        }
+                    }
+                }
+
+                // 3. Encontrar a página com Instagram Business Account
+                let selectedPage = null;
+                for (const page of pages) {
+                    console.log('[Instagram] Verificando página:', page.name, 'IG Account:', !!page.instagram_business_account);
                     if (page.instagram_business_account) {
                         igAccount = page.instagram_business_account;
+                        selectedPage = page;
                         break;
                     }
                 }
 
-                if (!igAccount) {
-                    throw new Error('Nenhuma conta Instagram Business encontrada. Verifique se sua página do Facebook está vinculada a uma conta profissional do Instagram.');
+                // 4. Se não encontrou via páginas mas encontrou IG account direta
+                if (!igAccount && igAccountDirect) {
+                    console.log('[Instagram] Usando IG account encontrada diretamente via business');
+                    igAccount = igAccountDirect;
+
+                    // Tentar pegar a primeira página disponível para o page_id
+                    if (pages.length > 0) {
+                        selectedPage = pages[0];
+                    }
                 }
+
+                if (!igAccount) {
+                    const permissionHint = isSystemUserToken
+                        ? '\n\nVerifique no Meta Business Suite:\n1. Usuários do Sistema > seu System User > Adicionar Ativos\n2. Atribua a Página E a Conta do Instagram\n3. Ao gerar o token, inclua as permissões: pages_show_list, pages_read_engagement, instagram_manage_messages'
+                        : '\nGere o token a partir de uma Página do Facebook que esteja vinculada ao Instagram.';
+
+                    throw new Error(
+                        (pages.length === 0
+                            ? 'Nenhuma página encontrada.'
+                            : 'Páginas encontradas, mas nenhuma tem Instagram Business vinculado.')
+                        + permissionHint
+                    );
+                }
+
+                console.log('[Instagram] Conta Instagram encontrada:', igAccount.username || igAccount.id);
+                if (selectedPage) {
+                    console.log('[Instagram] Página Facebook:', selectedPage.name, 'ID:', selectedPage.id);
+                }
+
+                // Salvar informações da página
+                igAccount.page_id = selectedPage?.id;
+                igAccount.page_name = selectedPage?.name;
+                igAccount.page_access_token = selectedPage?.access_token || token;
             }
 
             setAccountInfo({
@@ -140,7 +290,11 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                     instagram_id: igAccount.id,
                     access_token: token,
                     username: igAccount.username,
-                    token_type: isInstagramToken ? 'instagram' : 'facebook'
+                    token_type: isInstagramToken ? 'instagram' : 'facebook',
+                    // Informações da página do Facebook (necessário para webhooks)
+                    page_id: igAccount.page_id,
+                    page_name: igAccount.page_name,
+                    page_access_token: igAccount.page_access_token
                 }
             });
 
@@ -295,7 +449,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                                             <li>Selecione seu app e vá em <strong>Messenger &gt; Configurações</strong></li>
                                             <li>Em <strong>Webhooks</strong>, adicione a URL acima</li>
                                             <li>Conecte sua <strong>Página do Facebook</strong> vinculada ao Instagram</li>
-                                            <li>Gere um <strong>Page Access Token</strong> (começa com EAA...)</li>
+                                            <li>Gere um <strong>Page Access Token</strong> (EAA...) ou <strong>System User Token</strong> (EAF... - permanente)</li>
                                         </ol>
                                     </div>
                                 </div>
@@ -312,7 +466,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                                 <textarea
                                     value={accessToken}
                                     onChange={(e) => setAccessToken(e.target.value)}
-                                    placeholder="EAAxxxxxx..."
+                                    placeholder="EAAxxxxxx... ou EAFxxxxxx..."
                                     rows={3}
                                     className="w-full px-4 py-3 rounded-lg border text-sm font-mono resize-none"
                                     style={{
@@ -323,7 +477,13 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                                 />
 
                                 {/* Token Type Indicator */}
-                                {tokenType === 'facebook' && (
+                                {tokenType === 'facebook' && accessToken.trim().startsWith('EAF') && (
+                                    <div className="flex items-center gap-2 mt-2 text-xs text-green-400">
+                                        <CheckCircle className="w-3 h-3" />
+                                        System User Token (EAF) - Permanente, ideal para integração
+                                    </div>
+                                )}
+                                {tokenType === 'facebook' && accessToken.trim().startsWith('EAA') && (
                                     <div className="flex items-center gap-2 mt-2 text-xs text-green-400">
                                         <CheckCircle className="w-3 h-3" />
                                         Token de Página Facebook (EAA) - Suporta receber mensagens DM
@@ -362,7 +522,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
 
                                 {!tokenType && accessToken.trim() && (
                                     <p className="text-xs mt-1 text-orange-400">
-                                        Token não reconhecido. Use EAA... (Facebook) ou IGAA... (Instagram)
+                                        Token não reconhecido. Use EAA... (Page Token), EAF... (System User Token) ou IGAA... (Instagram)
                                     </p>
                                 )}
                             </div>

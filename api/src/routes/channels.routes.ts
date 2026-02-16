@@ -204,11 +204,52 @@ router.post('/', async (req, res, next) => {
             return res.status(201).json(channel);
         }
 
-        // Para Telegram, configurar webhook automaticamente
+        // Para Telegram, verificar duplicata e configurar webhook automaticamente
         if (type === 'telegram' && credentials?.bot_token) {
+            // Verificar se já existe canal com esse bot_token
+            const existingTelegram = await channelsService.findByCredentialField('bot_token', credentials.bot_token, user.id);
+            if (existingTelegram) {
+                // Atualizar canal existente
+                const updated = await channelsService.update(existingTelegram.id, {
+                    status: requestedStatus || 'active',
+                    name,
+                    credentials
+                }, user.id);
+
+                // Re-configurar webhook com bot_token na URL
+                const webhookUrl = process.env.WEBHOOK_URL || process.env.API_URL || process.env.SERVICE_URL_API;
+                if (webhookUrl) {
+                    const telegramWebhookUrl = `${webhookUrl.replace(/\/$/, '')}/api/webhooks/telegram/${credentials.bot_token}`;
+                    try {
+                        await fetch(`https://api.telegram.org/bot${credentials.bot_token}/setWebhook?url=${encodeURIComponent(telegramWebhookUrl)}`);
+                        console.log(`[Channels] ✅ Telegram webhook re-configured: ${telegramWebhookUrl}`);
+                    } catch (err: any) {
+                        console.error(`[Channels] ❌ Error configuring Telegram webhook:`, err.message);
+                    }
+                }
+
+                return res.status(200).json(updated);
+            }
+
+            // Criar novo canal Telegram
+            const telegramChannel = await channelsService.create({
+                type: 'telegram',
+                name,
+                status: requestedStatus || 'active',
+                credentials: {
+                    bot_token: credentials.bot_token,
+                    bot_username: credentials.bot_username,
+                    bot_id: credentials.bot_id
+                },
+                settings: settings || {}
+            }, user.id);
+
+            console.log(`[Channels] Telegram channel created: ${telegramChannel.id}`);
+
+            // Configurar webhook com bot_token na URL para roteamento correto
             const webhookUrl = process.env.WEBHOOK_URL || process.env.API_URL || process.env.SERVICE_URL_API;
             if (webhookUrl) {
-                const telegramWebhookUrl = `${webhookUrl.replace(/\/$/, '')}/api/webhooks/telegram`;
+                const telegramWebhookUrl = `${webhookUrl.replace(/\/$/, '')}/api/webhooks/telegram/${credentials.bot_token}`;
                 try {
                     const telegramResponse = await fetch(
                         `https://api.telegram.org/bot${credentials.bot_token}/setWebhook?url=${encodeURIComponent(telegramWebhookUrl)}`
@@ -223,6 +264,8 @@ router.post('/', async (req, res, next) => {
                     console.error(`[Channels] ❌ Error configuring Telegram webhook:`, err.message);
                 }
             }
+
+            return res.status(201).json(telegramChannel);
         }
 
         // Para Facebook Messenger, verificar duplicata e auto-subscribe à página
@@ -286,7 +329,44 @@ router.post('/', async (req, res, next) => {
             return res.status(201).json(channel);
         }
 
-        // Para outros canais (Instagram, etc.), usar o status enviado ou 'active'
+        // Para Instagram, auto-subscribe à conta para receber webhooks
+        if (type === 'instagram' && credentials?.instagram_id) {
+            const igToken = credentials.access_token;
+            const pageToken = credentials.page_access_token || igToken;
+            const igId = credentials.instagram_id;
+            const pageId = credentials.page_id;
+
+            // Verificar duplicata
+            const existing = await channelsService.findByCredentialField('instagram_id', igId, user.id);
+            if (existing) {
+                const updated = await channelsService.update(existing.id, {
+                    status: requestedStatus || 'active',
+                    credentials: { ...existing.credentials, ...credentials }
+                }, user.id);
+
+                // Re-subscribe usando Page ID e Page Access Token
+                if (pageToken && pageId) {
+                    try {
+                        const subUrl = `https://graph.facebook.com/v21.0/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,messaging_seen,messaging_reads&access_token=${encodeURIComponent(pageToken)}`;
+                        const subRes = await fetch(subUrl, { method: 'POST' });
+                        const subData = await subRes.json();
+                        console.log(`[Channels] Instagram subscribe via Page result:`, JSON.stringify(subData));
+
+                        if (subData.error) {
+                            console.error(`[Channels] Instagram subscribe error:`, subData.error);
+                        }
+                    } catch (err: any) {
+                        console.warn(`[Channels] Instagram subscribe error:`, err.message);
+                    }
+                } else {
+                    console.warn(`[Channels] Instagram: Missing page_id or page_access_token for webhook subscription`);
+                }
+
+                return res.status(200).json(updated);
+            }
+        }
+
+        // Para outros canais, usar o status enviado ou 'active'
         const channel = await channelsService.create({
             type,
             name,
@@ -294,6 +374,32 @@ router.post('/', async (req, res, next) => {
             credentials: credentials || {},
             settings: settings || {}
         }, user.id);
+
+        // Auto-subscribe Instagram após criação usando Page ID
+        if (type === 'instagram' && credentials?.instagram_id) {
+            const pageToken = credentials.page_access_token || credentials.access_token;
+            const pageId = credentials.page_id;
+
+            if (pageToken && pageId) {
+                try {
+                    const subUrl = `https://graph.facebook.com/v21.0/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,messaging_seen,messaging_reads&access_token=${encodeURIComponent(pageToken)}`;
+                    const subRes = await fetch(subUrl, { method: 'POST' });
+                    const subData = await subRes.json();
+                    console.log(`[Channels] Instagram subscribe after create via Page:`, JSON.stringify(subData));
+
+                    if (subData.error) {
+                        console.error(`[Channels] Instagram subscribe error:`, subData.error);
+                    } else if (subData.success) {
+                        console.log(`[Channels] ✅ Instagram webhook subscribed successfully for page ${pageId}`);
+                    }
+                } catch (err: any) {
+                    console.warn(`[Channels] Instagram subscribe error:`, err.message);
+                }
+            } else {
+                console.warn(`[Channels] Instagram: Missing page_id or page_access_token. Cannot subscribe to webhooks.`);
+                console.warn(`[Channels] Credentials:`, { has_page_id: !!pageId, has_page_token: !!pageToken });
+            }
+        }
 
         console.log(`[Channels] ${type} channel created: ${channel.id} with status: ${channel.status}`);
 
@@ -472,6 +578,53 @@ router.post('/:id/sync', async (req, res, next) => {
                 console.error('[Channels] Error syncing Facebook:', error);
                 await channelsService.updateStatus(channel.id, 'error', user.id);
                 return res.status(500).json({ error: 'Failed to sync Facebook channel: ' + error.message });
+            }
+        }
+
+        // Para Instagram, verificar token e re-subscribe
+        if (channel.type === 'instagram') {
+            const igToken = channel.credentials?.access_token;
+            const igId = channel.credentials?.instagram_id;
+
+            if (!igToken || !igId) {
+                return res.status(400).json({ error: 'Instagram channel missing instagram_id or access_token' });
+            }
+
+            try {
+                // Verificar token
+                const tokenCheck = await fetch(
+                    `https://graph.facebook.com/v21.0/${igId}?fields=id,username,name&access_token=${igToken}`
+                );
+                const tokenData = await tokenCheck.json();
+
+                if (tokenData.error) {
+                    await channelsService.updateStatus(channel.id, 'error', user.id);
+                    return res.json({
+                        success: false,
+                        status: 'error',
+                        error: tokenData.error.message || 'Token inválido ou expirado'
+                    });
+                }
+
+                // Re-subscribe
+                const subUrl = `https://graph.facebook.com/v21.0/${igId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks&access_token=${encodeURIComponent(igToken)}`;
+                const subRes = await fetch(subUrl, { method: 'POST' });
+                const subData = await subRes.json();
+
+                await channelsService.updateStatus(channel.id, 'active', user.id);
+                await channelsService.updateLastSync(channel.id, user.id);
+
+                return res.json({
+                    success: true,
+                    status: 'active',
+                    username: tokenData.username,
+                    instagram_id: tokenData.id,
+                    subscribed: subData.success === true,
+                    synced_at: new Date().toISOString()
+                });
+            } catch (error: any) {
+                console.error('[Channels] Error syncing Instagram:', error);
+                return res.status(500).json({ error: 'Failed to sync Instagram: ' + error.message });
             }
         }
 

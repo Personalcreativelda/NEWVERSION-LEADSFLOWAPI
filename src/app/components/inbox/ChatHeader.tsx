@@ -11,6 +11,7 @@ import {
     CheckCircle2,
     MessageCircle,
     Edit2,
+    Trash2,
     X
 } from 'lucide-react';
 
@@ -18,10 +19,11 @@ interface ChatHeaderProps {
     conversation: ConversationWithDetails;
     onBack?: () => void;
     onEditLead?: () => void;
+    onDeleteConversation?: () => void;
     onSearchInChat?: (query: string) => void;
 }
 
-export function ChatHeader({ conversation, onBack, onEditLead, onSearchInChat }: ChatHeaderProps) {
+export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat }: ChatHeaderProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -204,6 +206,19 @@ export function ChatHeader({ conversation, onBack, onEditLead, onSearchInChat }:
                             >
                                 <Edit2 className="w-4 h-4" />
                                 Editar Lead
+                            </button>
+                            <div className="border-t" style={{ borderColor: 'hsl(var(--border))' }} />
+                            <button
+                                onClick={() => {
+                                    if (window.confirm('Tem certeza que deseja apagar esta conversa? Todas as mensagens serão removidas.')) {
+                                        onDeleteConversation?.();
+                                    }
+                                    setShowMenu(false);
+                                }}
+                                className="w-full px-4 py-3 flex items-center gap-3 text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-600 dark:text-red-400"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Apagar conversa
                             </button>
                         </div>
                     )}

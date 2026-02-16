@@ -497,11 +497,28 @@ router.post('/evolution/messages', async (req, res) => {
 
     // Extrair conteúdo da mensagem - suporta múltiplos formatos
     const msg = messageData.message || messageData;
+
+    // Desempacotar mensagens com caption wrapper do WhatsApp
+    // Quando um documento/imagem/vídeo é enviado com legenda, o WhatsApp encapsula em *WithCaptionMessage
+    if (msg?.documentWithCaptionMessage?.message?.documentMessage) {
+      console.log('[Evolution Webhook] Desempacotando documentWithCaptionMessage');
+      msg.documentMessage = msg.documentWithCaptionMessage.message.documentMessage;
+    }
+    if (msg?.imageWithCaptionMessage?.message?.imageMessage) {
+      console.log('[Evolution Webhook] Desempacotando imageWithCaptionMessage');
+      msg.imageMessage = msg.imageWithCaptionMessage.message.imageMessage;
+    }
+    if (msg?.videoWithCaptionMessage?.message?.videoMessage) {
+      console.log('[Evolution Webhook] Desempacotando videoWithCaptionMessage');
+      msg.videoMessage = msg.videoWithCaptionMessage.message.videoMessage;
+    }
+
     const messageContent = msg?.conversation ||
       msg?.extendedTextMessage?.text ||
       msg?.imageMessage?.caption ||
       msg?.videoMessage?.caption ||
       msg?.documentMessage?.caption ||
+      msg?.documentWithCaptionMessage?.message?.documentMessage?.caption ||
       msg?.text ||
       msg?.body ||
       msg?.content ||
@@ -532,10 +549,21 @@ router.post('/evolution/messages', async (req, res) => {
       mediaBase64 = msg.audioMessage.base64 || null;
       mediaUrl = msg.audioMessage.url || null;
     } else if (msg?.documentMessage) {
-      mediaType = 'document';
       mediaMimetype = msg.documentMessage.mimetype || 'application/octet-stream';
+      // Arquivos enviados pela opção "Documento" do WhatsApp podem ser imagens, vídeos, etc.
+      // Classificar pelo mimetype real em vez de sempre marcar como 'document'
+      if (mediaMimetype.startsWith('image/')) {
+        mediaType = 'image';
+      } else if (mediaMimetype.startsWith('video/')) {
+        mediaType = 'video';
+      } else if (mediaMimetype.startsWith('audio/')) {
+        mediaType = 'audio';
+      } else {
+        mediaType = 'document';
+      }
       mediaBase64 = msg.documentMessage.base64 || null;
       mediaUrl = msg.documentMessage.url || null;
+      console.log('[Evolution Webhook] documentMessage detectado - mimetype:', mediaMimetype, 'mediaType classificado:', mediaType, 'fileName:', msg.documentMessage.fileName || msg.documentMessage.title);
     } else if (msg?.stickerMessage) {
       mediaType = 'sticker';
       mediaMimetype = msg.stickerMessage.mimetype || 'image/webp';
@@ -633,10 +661,16 @@ router.post('/evolution/messages', async (req, res) => {
       }
     }
 
-    // Se só temos directPath (não acessível diretamente via HTTP), limpar para tentar fallback
-    if (mediaUrl && !mediaUrl.startsWith('http') && !mediaUrl.startsWith('data:')) {
-      console.warn('[Evolution Webhook] URL de mídia não acessível (directPath):', mediaUrl?.substring(0, 100));
-      mediaUrl = null;
+    // Se só temos directPath ou URL do CDN do WhatsApp (não acessível diretamente), limpar para tentar fallback
+    if (mediaUrl && !mediaUrl.startsWith('data:')) {
+      // URLs do CDN do WhatsApp (mmg.whatsapp.net, pps.whatsapp.net) são criptografadas e não funcionam diretamente
+      // directPaths (/v/t62/...) também não são acessíveis
+      const isWhatsAppCdnUrl = mediaUrl.includes('mmg.whatsapp.net') || mediaUrl.includes('pps.whatsapp.net') || mediaUrl.includes('.whatsapp.net/');
+      const isDirectPath = !mediaUrl.startsWith('http');
+      if (isDirectPath || isWhatsAppCdnUrl) {
+        console.warn('[Evolution Webhook] URL de mídia não acessível (CDN/directPath):', mediaUrl?.substring(0, 100));
+        mediaUrl = null;
+      }
     }
 
     // Se não temos URL válida mas temos mediaType, tentar baixar da Evolution API
@@ -660,7 +694,13 @@ router.post('/evolution/messages', async (req, res) => {
               const storageService = getStorageService();
               const cleanB64 = fetchedBase64.replace(/^data:[^;]+;base64,/, '');
               const buffer = Buffer.from(cleanB64, 'base64');
-              const ext = mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'bin';
+              const extMap2: Record<string, string> = {
+                'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+                'video/mp4': 'mp4', 'video/webm': 'webm',
+                'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/webm': 'webm',
+                'application/pdf': 'pdf',
+              };
+              const ext = extMap2[mediaMimetype || ''] || (mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'bin');
               const filename = `whatsapp_${mediaType}_${Date.now()}.${ext}`;
               mediaUrl = await storageService.uploadBuffer(buffer, filename, mediaMimetype || 'application/octet-stream', 'inbox-media', channel.user_id);
               console.log('[Evolution Webhook] Mídia (via API) uploaded:', mediaUrl?.substring(0, 100));
@@ -669,6 +709,13 @@ router.post('/evolution/messages', async (req, res) => {
         } catch (dlErr: any) {
           console.warn('[Evolution Webhook] Falha ao baixar mídia via Evolution API:', dlErr.message);
         }
+      }
+
+      // Último fallback: se ainda não temos URL, guardar referência para o documento
+      // com informações do arquivo no metadata para exibição no frontend
+      if (!mediaUrl && msg?.documentMessage) {
+        const docFileName = msg.documentMessage.fileName || msg.documentMessage.title || 'arquivo';
+        console.log('[Evolution Webhook] Mídia não disponível, salvando referência do documento:', docFileName);
       }
     }
 
@@ -679,6 +726,20 @@ router.post('/evolution/messages', async (req, res) => {
     const contactName = messageData.pushName || messageData.senderName || messageData.notifyName || phone;
 
     console.log('[Evolution Webhook] Telefone:', phone, 'Nome:', contactName);
+
+    // Buscar foto de perfil via Evolution API
+    let waProfilePic: string | null = null;
+    try {
+      const instanceName = instance;
+      if (instanceName) {
+        waProfilePic = await whatsappService.fetchProfilePicture(instanceName, remoteJid);
+        if (waProfilePic) {
+          console.log('[Evolution Webhook] ✅ Foto de perfil encontrada');
+        }
+      }
+    } catch (e) {
+      console.log('[Evolution Webhook] Não foi possível obter foto de perfil:', e);
+    }
 
     // Buscar ou criar lead
     let lead = await query(
@@ -692,14 +753,21 @@ router.post('/evolution/messages', async (req, res) => {
       // Criar lead automaticamente
       console.log('[Evolution Webhook] Criando novo lead:', contactName, phone);
       const leadResult = await query(
-        `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
-         VALUES ($1, $2, $3, $3, 'whatsapp', 'new')
+        `INSERT INTO leads (user_id, name, phone, whatsapp, source, status, avatar_url)
+         VALUES ($1, $2, $3, $3, 'whatsapp', 'new', $4)
          RETURNING *`,
-        [channel.user_id, contactName, phone]
+        [channel.user_id, contactName, phone, waProfilePic]
       );
       leadId = leadResult.rows[0].id;
     } else {
       leadId = lead.rows[0].id;
+      // Atualizar avatar se mudou ou não existia
+      if (waProfilePic && lead.rows[0].avatar_url !== waProfilePic) {
+        await query(
+          `UPDATE leads SET avatar_url = $1 WHERE id = $2`,
+          [waProfilePic, leadId]
+        );
+      }
     }
 
     // Buscar ou criar conversa
@@ -710,7 +778,8 @@ router.post('/evolution/messages', async (req, res) => {
       leadId,
       {
         contact_name: contactName,
-        phone: phone
+        phone: phone,
+        profile_picture: waProfilePic
       }
     );
 
@@ -742,6 +811,8 @@ router.post('/evolution/messages', async (req, res) => {
           pushName: messageData.pushName || contactName,
           fromMe: isFromMe,
           source: isFromMe ? 'phone' : 'contact',
+          fileName: msg?.documentMessage?.fileName || msg?.documentMessage?.title || undefined,
+          mimetype: mediaMimetype || undefined,
           rawPayload: JSON.stringify(req.body).substring(0, 500)
         })
       ]
@@ -909,37 +980,47 @@ router.post('/telegram/:botToken?', async (req, res) => {
       channelResult = await query(
         `SELECT * FROM channels
          WHERE type = 'telegram'
-         AND status = 'active'
+         AND status IN ('active', 'connected')
          AND credentials->>'bot_token' = $1`,
         [botTokenParam]
       );
       if (channelResult.rows.length > 0) {
-        console.log('[Telegram Webhook] Canal encontrado pelo bot_token da URL');
+        console.log('[Telegram Webhook] Canal encontrado pelo bot_token da URL:', channelResult.rows[0].id);
       }
     }
 
-    // 2. Senão, tentar encontrar por conversa existente
+    // 2. Senão, tentar encontrar por conversa existente (com esse chatId)
     if (!channelResult || channelResult.rows.length === 0) {
       channelResult = await query(
         `SELECT DISTINCT c.* FROM channels c
          INNER JOIN conversations conv ON conv.channel_id = c.id
          WHERE c.type = 'telegram'
-         AND c.status = 'active'
+         AND c.status IN ('active', 'connected')
          AND conv.remote_jid = $1`,
         [chatId]
       );
+      if (channelResult.rows.length > 0) {
+        console.log('[Telegram Webhook] Canal encontrado por conversa existente:', channelResult.rows[0].id);
+      }
     }
 
-    // 3. Fallback: buscar qualquer canal Telegram ativo
+    // 3. Fallback: buscar qualquer canal Telegram ativo (só se houver apenas 1)
     if (channelResult.rows.length === 0) {
       console.log('[Telegram Webhook] Nenhuma conversa existente, buscando canal Telegram ativo...');
       channelResult = await query(
         `SELECT * FROM channels
          WHERE type = 'telegram'
-         AND status = 'active'
-         ORDER BY created_at DESC
-         LIMIT 1`
+         AND status IN ('active', 'connected')
+         ORDER BY created_at DESC`
       );
+      // Se houver múltiplos canais e nenhum match, logar aviso
+      if (channelResult.rows.length > 1) {
+        console.warn('[Telegram Webhook] Múltiplos canais Telegram ativos encontrados sem match de bot_token. Usando o mais recente. Canais:', channelResult.rows.map((r: any) => r.id));
+      }
+      // Usar apenas o primeiro (mais recente)
+      if (channelResult.rows.length > 0) {
+        channelResult.rows = [channelResult.rows[0]];
+      }
     }
 
     if (channelResult.rows.length === 0) {
@@ -948,7 +1029,40 @@ router.post('/telegram/:botToken?', async (req, res) => {
     }
 
     const channel = channelResult.rows[0];
+    // Safe-parse credentials
+    if (channel.credentials && typeof channel.credentials === 'string') {
+      try { channel.credentials = JSON.parse(channel.credentials); } catch (e) { /* ignore */ }
+    }
     console.log('[Telegram Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
+
+    // Buscar foto de perfil do Telegram
+    let tgProfilePic: string | null = null;
+    try {
+      const botToken = channel.credentials?.bot_token || channel.credentials?.token;
+      if (botToken && fromUser.id) {
+        const photosResponse = await fetch(
+          `https://api.telegram.org/bot${botToken}/getUserProfilePhotos?user_id=${fromUser.id}&limit=1`
+        );
+        const photosData = await photosResponse.json();
+        if (photosData.ok && photosData.result?.photos?.length > 0) {
+          // Pegar a menor foto (última no array do primeiro photo set)
+          const photoSizes = photosData.result.photos[0];
+          const smallPhoto = photoSizes[photoSizes.length > 1 ? 1 : 0]; // Tamanho médio
+          if (smallPhoto?.file_id) {
+            const fileResponse = await fetch(
+              `https://api.telegram.org/bot${botToken}/getFile?file_id=${smallPhoto.file_id}`
+            );
+            const fileData = await fileResponse.json();
+            if (fileData.ok && fileData.result?.file_path) {
+              tgProfilePic = `https://api.telegram.org/file/bot${botToken}/${fileData.result.file_path}`;
+              console.log('[Telegram Webhook] ✅ Foto de perfil encontrada');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.log('[Telegram Webhook] Não foi possível obter foto de perfil:', e);
+    }
 
     // Buscar ou criar lead pelo chatId (com fallback se coluna telegram_id não existe)
     let leadId: string;
@@ -961,14 +1075,21 @@ router.post('/telegram/:botToken?', async (req, res) => {
       if (lead.rows.length === 0) {
         console.log('[Telegram Webhook] Criando novo lead:', contactName);
         const leadResult = await query(
-          `INSERT INTO leads (user_id, name, telegram_id, source, status)
-           VALUES ($1, $2, $3, 'telegram', 'new')
+          `INSERT INTO leads (user_id, name, telegram_id, source, status, avatar_url)
+           VALUES ($1, $2, $3, 'telegram', 'new', $4)
            RETURNING *`,
-          [channel.user_id, contactName, chatId]
+          [channel.user_id, contactName, chatId, tgProfilePic]
         );
         leadId = leadResult.rows[0].id;
       } else {
         leadId = lead.rows[0].id;
+        // Atualizar nome e avatar
+        if (lead.rows[0].name !== contactName || (tgProfilePic && lead.rows[0].avatar_url !== tgProfilePic)) {
+          await query(
+            `UPDATE leads SET name = $1, avatar_url = COALESCE($3, avatar_url) WHERE id = $2`,
+            [contactName, leadId, tgProfilePic]
+          );
+        }
       }
     } catch (colErr: any) {
       console.warn('[Telegram Webhook] telegram_id column not available, using fallback');
@@ -978,10 +1099,10 @@ router.post('/telegram/:botToken?', async (req, res) => {
       );
       if (lead.rows.length === 0) {
         const leadResult = await query(
-          `INSERT INTO leads (user_id, name, source, status)
-           VALUES ($1, $2, 'telegram', 'new')
+          `INSERT INTO leads (user_id, name, source, status, avatar_url)
+           VALUES ($1, $2, 'telegram', 'new', $3)
            RETURNING *`,
-          [channel.user_id, contactName]
+          [channel.user_id, contactName, tgProfilePic]
         );
         leadId = leadResult.rows[0].id;
       } else {
@@ -997,7 +1118,8 @@ router.post('/telegram/:botToken?', async (req, res) => {
       leadId,
       {
         contact_name: contactName,
-        telegram_username: fromUser.username || null
+        telegram_username: fromUser.username || null,
+        profile_picture: tgProfilePic
       }
     );
 
@@ -1497,8 +1619,9 @@ router.post('/facebook', async (req, res) => {
           }
         }
 
-        // Buscar nome do remetente via Graph API
+        // Buscar nome e foto do remetente via Graph API
         let contactName = senderId;
+        let fbProfilePic: string | null = null;
         try {
           const accessToken = channel.credentials?.page_access_token || channel.credentials?.access_token;
           if (accessToken) {
@@ -1510,6 +1633,9 @@ router.post('/facebook', async (req, res) => {
               contactName = userData.name;
             } else if (userData.first_name) {
               contactName = [userData.first_name, userData.last_name].filter(Boolean).join(' ');
+            }
+            if (userData.profile_pic) {
+              fbProfilePic = userData.profile_pic;
             }
           }
         } catch (e) {
@@ -1527,29 +1653,34 @@ router.post('/facebook', async (req, res) => {
           if (lead.rows.length === 0) {
             console.log('[Facebook Webhook] Criando novo lead:', contactName);
             const leadResult = await query(
-              `INSERT INTO leads (user_id, name, facebook_id, source, status)
-               VALUES ($1, $2, $3, 'facebook', 'new')
+              `INSERT INTO leads (user_id, name, facebook_id, source, status, avatar_url)
+               VALUES ($1, $2, $3, 'facebook', 'new', $4)
                RETURNING *`,
-              [channel.user_id, contactName, senderId]
+              [channel.user_id, contactName, senderId, fbProfilePic]
             );
             leadId = leadResult.rows[0].id;
           } else {
             leadId = lead.rows[0].id;
+            // Atualizar nome e avatar se mudaram
+            if (lead.rows[0].name !== contactName || (fbProfilePic && lead.rows[0].avatar_url !== fbProfilePic)) {
+              await query(
+                `UPDATE leads SET name = COALESCE(NULLIF($1, $4), name), avatar_url = COALESCE($3, avatar_url) WHERE id = $2`,
+                [contactName, leadId, fbProfilePic, senderId]
+              );
+            }
           }
         } catch (colErr: any) {
-          // Fallback: coluna facebook_id não existe ainda, criar lead sem ela
           console.warn('[Facebook Webhook] facebook_id column not available, using fallback');
-          // Buscar por nome + source
           let lead = await query(
             `SELECT * FROM leads WHERE user_id = $1 AND name = $2 AND source = 'facebook' LIMIT 1`,
             [channel.user_id, contactName]
           );
           if (lead.rows.length === 0) {
             const leadResult = await query(
-              `INSERT INTO leads (user_id, name, source, status)
-               VALUES ($1, $2, 'facebook', 'new')
+              `INSERT INTO leads (user_id, name, source, status, avatar_url)
+               VALUES ($1, $2, 'facebook', 'new', $3)
                RETURNING *`,
-              [channel.user_id, contactName]
+              [channel.user_id, contactName, fbProfilePic]
             );
             leadId = leadResult.rows[0].id;
           } else {
@@ -1565,7 +1696,8 @@ router.post('/facebook', async (req, res) => {
           leadId,
           {
             contact_name: contactName,
-            facebook_psid: senderId
+            facebook_psid: senderId,
+            profile_picture: fbProfilePic
           }
         );
 
@@ -1718,6 +1850,134 @@ router.get('/instagram', async (req, res) => {
   });
 });
 
+// ✅ Diagnóstico do webhook do Instagram
+router.get('/instagram/debug', async (req, res) => {
+  try {
+    const channelsResult = await query(
+      `SELECT id, name, status, credentials, created_at FROM channels WHERE type = 'instagram' ORDER BY created_at DESC`
+    );
+    const channels = channelsResult.rows.map((ch: any) => ({
+      id: ch.id,
+      name: ch.name,
+      status: ch.status,
+      instagram_id: ch.credentials?.instagram_id || 'N/A',
+      username: ch.credentials?.username || 'N/A',
+      has_token: !!(ch.credentials?.access_token),
+      token_type: ch.credentials?.token_type || 'N/A',
+      created_at: ch.created_at
+    }));
+
+    const convsResult = await query(
+      `SELECT c.id, c.remote_jid, c.status, c.channel_id, c.created_at,
+              ch.type as channel_type FROM conversations c
+       LEFT JOIN channels ch ON c.channel_id = ch.id
+       WHERE ch.type = 'instagram' ORDER BY c.created_at DESC LIMIT 10`
+    );
+
+    const msgsResult = await query(
+      `SELECT id, conversation_id, direction, channel, content, created_at
+       FROM messages WHERE channel = 'instagram' ORDER BY created_at DESC LIMIT 10`
+    );
+
+    res.json({
+      success: true,
+      instagram_channels: channels,
+      instagram_conversations: convsResult.rows,
+      instagram_messages: msgsResult.rows,
+      total_channels: channels.length,
+      total_conversations: convsResult.rows.length,
+      total_messages: msgsResult.rows.length,
+      webhook_url: '/api/webhooks/instagram',
+      verify_token: process.env.INSTAGRAM_VERIFY_TOKEN || process.env.META_VERIFY_TOKEN || 'leadsflow_verify_token'
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Endpoint de teste: simula uma mensagem do Instagram
+router.post('/instagram/test', async (req, res) => {
+  try {
+    const channelResult = await query(
+      `SELECT * FROM channels WHERE type = 'instagram' AND status = 'active' ORDER BY created_at DESC LIMIT 1`
+    );
+    if (channelResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Nenhum canal Instagram ativo encontrado.' });
+    }
+
+    const channel = channelResult.rows[0];
+    const testSenderId = req.body.sender_id || 'ig_test_user_' + Date.now();
+    const testMessage = req.body.message || 'Mensagem de teste do Instagram';
+
+    let leadId: string;
+    try {
+      let lead = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND instagram_id = $2`,
+        [channel.user_id, testSenderId]
+      );
+      if (lead.rows.length === 0) {
+        const leadResult = await query(
+          `INSERT INTO leads (user_id, name, instagram_id, source, status)
+           VALUES ($1, $2, $3, 'instagram', 'new') RETURNING *`,
+          [channel.user_id, 'Teste Instagram', testSenderId]
+        );
+        leadId = leadResult.rows[0].id;
+      } else {
+        leadId = lead.rows[0].id;
+      }
+    } catch {
+      const leadResult = await query(
+        `INSERT INTO leads (user_id, name, source, status)
+         VALUES ($1, $2, 'instagram', 'new') RETURNING *`,
+        [channel.user_id, 'Teste Instagram']
+      );
+      leadId = leadResult.rows[0].id;
+    }
+
+    const conversation = await conversationsService.findOrCreate(
+      channel.user_id, channel.id, testSenderId, leadId,
+      { contact_name: 'Teste Instagram', instagram_id: testSenderId }
+    );
+
+    const messageResult = await query(
+      `INSERT INTO messages (user_id, conversation_id, lead_id, direction, channel, content, status, external_id, metadata)
+       VALUES ($1, $2, $3, 'in', 'instagram', $4, 'delivered', $5, $6) RETURNING *`,
+      [channel.user_id, conversation.id, leadId, testMessage, `ig_test_${Date.now()}`,
+       JSON.stringify({ test: true, sender_id: testSenderId })]
+    );
+
+    await conversationsService.updateUnreadCount(conversation.id, 1);
+    await query(
+      `UPDATE conversations SET last_message_at = NOW(), status = CASE WHEN status = 'closed' THEN 'open' ELSE status END, updated_at = NOW() WHERE id = $1`,
+      [conversation.id]
+    );
+
+    const wsService = getWebSocketService();
+    if (wsService) {
+      const updatedConv = await query(
+        `SELECT c.*, ch.name as channel_name, l.name as lead_name FROM conversations c
+         LEFT JOIN channels ch ON c.channel_id = ch.id LEFT JOIN leads l ON c.lead_id = l.id WHERE c.id = $1`,
+        [conversation.id]
+      );
+      wsService.emitNewMessage(channel.user_id, {
+        conversationId: conversation.id,
+        message: messageResult.rows[0],
+        conversation: updatedConv.rows[0] || conversation
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Mensagem de teste Instagram criada!',
+      channel_id: channel.id,
+      conversation_id: conversation.id,
+      message_id: messageResult.rows[0].id
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ✅ Webhook para receber mensagens do Instagram (Meta Graph API)
 router.post('/instagram', async (req, res) => {
   try {
@@ -1753,25 +2013,62 @@ router.post('/instagram', async (req, res) => {
         }
 
         console.log('[Instagram Webhook] Mensagem de:', senderId);
-        console.log('[Instagram Webhook] Para:', recipientId);
+        console.log('[Instagram Webhook] Para (recipient):', recipientId);
+        console.log('[Instagram Webhook] Instagram ID da conta:', instagramId);
         console.log('[Instagram Webhook] Conteúdo:', message.text?.substring(0, 100));
+        console.log('[Instagram Webhook] Anexos:', message.attachments?.length || 0);
 
         // Encontrar canal pelo instagram_id nas credentials
-        const channelResult = await query(
+        // Primeiro tenta pelo recipient_id (ID da conta que recebe)
+        let channelResult = await query(
           `SELECT * FROM channels
            WHERE type = 'instagram'
            AND status = 'active'
-           AND (credentials->>'instagram_id' = $1 OR credentials->>'instagram_id' = $2)`,
-          [recipientId, instagramId]
+           AND credentials->>'instagram_id' = $1`,
+          [recipientId]
         );
 
+        // Se não encontrou, tenta pelo instagram_id do entry
         if (channelResult.rows.length === 0) {
-          console.warn('[Instagram Webhook] Canal não encontrado para Instagram ID:', recipientId || instagramId);
+          console.log('[Instagram Webhook] Canal não encontrado por recipient_id, tentando por entry.id...');
+          channelResult = await query(
+            `SELECT * FROM channels
+             WHERE type = 'instagram'
+             AND status = 'active'
+             AND credentials->>'instagram_id' = $1`,
+            [instagramId]
+          );
+        }
+
+        // Fallback: buscar por page_id (se disponível no webhook)
+        if (channelResult.rows.length === 0 && entry.id) {
+          console.log('[Instagram Webhook] Tentando buscar por page_id...');
+          channelResult = await query(
+            `SELECT * FROM channels
+             WHERE type = 'instagram'
+             AND status = 'active'
+             AND credentials->>'page_id' = $1`,
+            [entry.id]
+          );
+        }
+
+        if (channelResult.rows.length === 0) {
+          console.error('[Instagram Webhook] ❌ Nenhum canal Instagram ativo encontrado!');
+          console.error('[Instagram Webhook] Recipient ID:', recipientId);
+          console.error('[Instagram Webhook] Entry Instagram ID:', instagramId);
+          console.error('[Instagram Webhook] Entry ID:', entry.id);
+
+          // Listar canais existentes para debug
+          const allChannels = await query(
+            `SELECT id, name, credentials->>'instagram_id' as ig_id, credentials->>'page_id' as page_id
+             FROM channels WHERE type = 'instagram' AND status = 'active'`
+          );
+          console.error('[Instagram Webhook] Canais Instagram ativos:', JSON.stringify(allChannels.rows));
           continue;
         }
 
         const channel = channelResult.rows[0];
-        console.log('[Instagram Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
+        console.log('[Instagram Webhook] ✅ Canal encontrado:', channel.id, 'User:', channel.user_id, 'Name:', channel.name);
 
         // Extrair conteúdo da mensagem
         let messageContent = message.text || '';
@@ -1805,18 +2102,32 @@ router.post('/instagram', async (req, res) => {
           }
         }
 
-        // Buscar informações do remetente via Graph API (opcional)
+        // Buscar informações do remetente via Graph API
         let contactName = senderId;
+        let profilePic = null;
         try {
           const credentials = channel.credentials;
-          if (credentials?.access_token) {
+          // Preferir page_access_token para Instagram
+          const accessToken = credentials?.page_access_token || credentials?.access_token;
+
+          if (accessToken) {
+            // Buscar perfil do remetente (IGSID - Instagram Scoped ID)
             const userResponse = await fetch(
-              `https://graph.facebook.com/v18.0/${senderId}?fields=username,name&access_token=${credentials.access_token}`
+              `https://graph.facebook.com/v21.0/${senderId}?fields=name,username,profile_pic&access_token=${accessToken}`
             );
             const userData = await userResponse.json();
-            if (userData.username || userData.name) {
-              contactName = userData.username || userData.name;
+
+            console.log('[Instagram Webhook] User info response:', JSON.stringify(userData));
+
+            if (!userData.error) {
+              contactName = userData.username || userData.name || senderId;
+              profilePic = userData.profile_pic;
+              console.log('[Instagram Webhook] ✅ Nome do contato:', contactName);
+            } else {
+              console.warn('[Instagram Webhook] Erro ao buscar info do usuário:', userData.error.message);
             }
+          } else {
+            console.warn('[Instagram Webhook] Sem access_token para buscar info do usuário');
           }
         } catch (e) {
           console.log('[Instagram Webhook] Não foi possível obter info do usuário:', e);
@@ -1831,16 +2142,32 @@ router.post('/instagram', async (req, res) => {
           );
 
           if (lead.rows.length === 0) {
-            console.log('[Instagram Webhook] Criando novo lead:', contactName);
+            console.log('[Instagram Webhook] Criando novo lead:', contactName, 'avatar:', !!profilePic);
             const leadResult = await query(
-              `INSERT INTO leads (user_id, name, instagram_id, source, status)
-               VALUES ($1, $2, $3, 'instagram', 'new')
+              `INSERT INTO leads (user_id, name, instagram_id, source, status, avatar_url)
+               VALUES ($1, $2, $3, 'instagram', 'new', $4)
                RETURNING *`,
-              [channel.user_id, contactName, senderId]
+              [channel.user_id, contactName, senderId, profilePic]
             );
             leadId = leadResult.rows[0].id;
           } else {
             leadId = lead.rows[0].id;
+            // Atualizar nome e avatar do lead caso tenham mudado
+            const nameChanged = contactName !== senderId && lead.rows[0].name !== contactName;
+            const avatarChanged = profilePic && lead.rows[0].avatar_url !== profilePic;
+            if (nameChanged || avatarChanged) {
+              console.log('[Instagram Webhook] Atualizando lead:', {
+                name: nameChanged ? `${lead.rows[0].name} -> ${contactName}` : 'sem mudança',
+                avatar: avatarChanged ? 'atualizado' : 'sem mudança'
+              });
+              await query(
+                `UPDATE leads SET
+                  name = CASE WHEN $1 != $4 THEN $1 ELSE name END,
+                  avatar_url = COALESCE($3, avatar_url)
+                 WHERE id = $2`,
+                [contactName, leadId, profilePic, senderId]
+              );
+            }
           }
         } catch (colErr: any) {
           console.warn('[Instagram Webhook] instagram_id column not available, using fallback');
@@ -1869,7 +2196,8 @@ router.post('/instagram', async (req, res) => {
           leadId,
           {
             contact_name: contactName,
-            instagram_id: senderId
+            instagram_id: senderId,
+            profile_picture: profilePic
           }
         );
 
@@ -2002,6 +2330,49 @@ router.post('/instagram', async (req, res) => {
 // WHATSAPP CLOUD API WEBHOOKS (API Oficial da Meta)
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ✅ Debug endpoint para WhatsApp Cloud (DEVE ficar antes da rota com :channelId)
+router.get('/whatsapp-cloud/debug', async (req, res) => {
+  try {
+    const channels = await query(
+      `SELECT id, name, type, status,
+              credentials->>'phone_number_id' as phone_number_id,
+              credentials->>'waba_id' as waba_id,
+              credentials->>'verify_token' as verify_token,
+              created_at, updated_at
+       FROM channels WHERE type = 'whatsapp_cloud'`
+    );
+
+    const conversations = await query(
+      `SELECT c.id, c.remote_jid, c.status, c.unread_count, c.last_message_at,
+              ch.name as channel_name, ch.status as channel_status
+       FROM conversations c
+       JOIN channels ch ON c.channel_id = ch.id
+       WHERE ch.type = 'whatsapp_cloud'
+       ORDER BY c.last_message_at DESC NULLS LAST
+       LIMIT 20`
+    );
+
+    const messages = await query(
+      `SELECT m.id, m.direction, m.channel, m.content, m.status, m.created_at, m.conversation_id
+       FROM messages m
+       WHERE m.channel = 'whatsapp_cloud'
+       ORDER BY m.created_at DESC
+       LIMIT 20`
+    );
+
+    res.json({
+      channels: channels.rows,
+      conversations: conversations.rows,
+      recentMessages: messages.rows,
+      webhookUrl: `/api/webhooks/whatsapp-cloud`,
+      channelSpecificUrl: channels.rows.length > 0 ? `/api/webhooks/whatsapp-cloud/${channels.rows[0].id}` : null,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ✅ Verificação de webhook do WhatsApp Cloud (GET para validação do Facebook)
 router.get('/whatsapp-cloud/:channelId?', async (req, res) => {
   console.log('[WhatsApp Cloud Webhook] GET request - webhook verification');
@@ -2019,8 +2390,12 @@ router.get('/whatsapp-cloud/:channelId?', async (req, res) => {
         `SELECT credentials FROM channels WHERE id = $1`,
         [req.params.channelId]
       );
-      if (channelResult.rows[0]?.credentials?.verify_token) {
-        expectedToken = channelResult.rows[0].credentials.verify_token;
+      if (channelResult.rows[0]) {
+        let creds = channelResult.rows[0].credentials;
+        if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch (e) { /* ignore */ } }
+        if (creds?.verify_token) {
+          expectedToken = creds.verify_token;
+        }
       }
     } catch (e) {
       console.log('[WhatsApp Cloud Webhook] Could not fetch channel verify token');
@@ -2127,27 +2502,50 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
           // Encontrar canal pelo phone_number_id
           let channelResult;
           if (req.params.channelId) {
+            // Buscar por ID do canal (aceitar active ou connected)
             channelResult = await query(
-              `SELECT * FROM channels WHERE id = $1 AND status = 'active'`,
+              `SELECT * FROM channels WHERE id = $1 AND status IN ('active', 'connected')`,
               [req.params.channelId]
             );
-          } else {
+          }
+
+          if (!channelResult || channelResult.rows.length === 0) {
+            // Buscar por phone_number_id nas credenciais
             channelResult = await query(
               `SELECT * FROM channels
                WHERE type = 'whatsapp_cloud'
-               AND status = 'active'
+               AND status IN ('active', 'connected')
                AND credentials->>'phone_number_id' = $1`,
               [phoneNumberId]
             );
           }
 
+          // Fallback: buscar qualquer canal whatsapp_cloud ativo
           if (channelResult.rows.length === 0) {
-            console.warn('[WhatsApp Cloud Webhook] Canal não encontrado para phone_number_id:', phoneNumberId);
+            console.warn('[WhatsApp Cloud Webhook] Canal não encontrado por phone_number_id:', phoneNumberId, '- tentando fallback...');
+            channelResult = await query(
+              `SELECT * FROM channels
+               WHERE type = 'whatsapp_cloud'
+               AND status IN ('active', 'connected')
+               ORDER BY updated_at DESC
+               LIMIT 1`
+            );
+          }
+
+          if (channelResult.rows.length === 0) {
+            console.warn('[WhatsApp Cloud Webhook] Nenhum canal whatsapp_cloud encontrado! phone_number_id:', phoneNumberId);
+            // Listar todos os canais para debug
+            const allChannels = await query(`SELECT id, type, status, credentials->>'phone_number_id' as pnid FROM channels WHERE type = 'whatsapp_cloud'`);
+            console.warn('[WhatsApp Cloud Webhook] Canais whatsapp_cloud existentes:', JSON.stringify(allChannels.rows));
             continue;
           }
 
           const channel = channelResult.rows[0];
-          console.log('[WhatsApp Cloud Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id);
+          // Safe-parse credentials se vier como string
+          if (channel.credentials && typeof channel.credentials === 'string') {
+            try { channel.credentials = JSON.parse(channel.credentials); } catch (e) { /* ignore */ }
+          }
+          console.log('[WhatsApp Cloud Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id, 'Status:', channel.status, 'HasCredentials:', !!channel.credentials?.access_token);
 
           // Baixar mídia via Graph API se tiver mediaId
           if (mediaId && mediaType) {
@@ -2230,6 +2628,13 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
             leadId = leadResult.rows[0].id;
           } else {
             leadId = lead.rows[0].id;
+            // Atualizar nome se mudou
+            if (contactName !== senderId && lead.rows[0].name !== contactName) {
+              await query(
+                `UPDATE leads SET name = $1 WHERE id = $2`,
+                [contactName, leadId]
+              );
+            }
           }
 
           // Buscar ou criar conversa

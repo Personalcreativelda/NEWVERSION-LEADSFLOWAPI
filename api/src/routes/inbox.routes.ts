@@ -67,9 +67,12 @@ const getActiveWhatsAppInstance = async (userId: string): Promise<string | null>
 // Get the active WhatsApp channel object (with ID and credentials)
 const getActiveWhatsAppChannel = async (userId: string): Promise<any | null> => {
   try {
+    // Buscar tanto whatsapp quanto whatsapp_cloud
     const channels = await channelsService.findByType('whatsapp', userId);
-    const activeChannel = channels.find(ch => ch.status === 'active');
-    return activeChannel || (channels.length > 0 ? channels[0] : null);
+    const cloudChannels = await channelsService.findByType('whatsapp_cloud', userId);
+    const allChannels = [...channels, ...cloudChannels];
+    const activeChannel = allChannels.find(ch => ch.status === 'active' || (ch.status as string) === 'connected');
+    return activeChannel || (allChannels.length > 0 ? allChannels[0] : null);
   } catch (error) {
     console.error('[Inbox] Error getting active WhatsApp channel:', error);
     return null;
@@ -415,16 +418,26 @@ router.post('/conversations/create', async (req, res, next) => {
     
     // Get or create channel
     let channel;
-    console.log('[Inbox] Searching for channel with type:', channelType || 'whatsapp', 'user_id:', user.id, 'status: active');
-    const channelsResult = await dbQuery(
-      'SELECT * FROM channels WHERE type = $1 AND user_id = $2 AND status = $3 ORDER BY created_at DESC LIMIT 1',
-      [channelType || 'whatsapp', user.id, 'active']
+    const searchType = channelType || 'whatsapp';
+    console.log('[Inbox] Searching for channel with type:', searchType, 'user_id:', user.id);
+    let channelsResult = await dbQuery(
+      `SELECT * FROM channels WHERE type = $1 AND user_id = $2 AND status IN ('active', 'connected') ORDER BY created_at DESC LIMIT 1`,
+      [searchType, user.id]
     );
+
+    // Se não encontrar e não especificou tipo, tentar whatsapp_cloud
+    if (channelsResult.rows.length === 0 && !channelType) {
+      channelsResult = await dbQuery(
+        `SELECT * FROM channels WHERE type = 'whatsapp_cloud' AND user_id = $1 AND status IN ('active', 'connected') ORDER BY created_at DESC LIMIT 1`,
+        [user.id]
+      );
+    }
+
     console.log('[Inbox] Channels found:', channelsResult.rows.length);
 
     if (channelsResult.rows.length > 0) {
       channel = channelsResult.rows[0];
-      console.log('[Inbox] Using channel:', channel.id, channel.name);
+      console.log('[Inbox] Using channel:', channel.id, channel.name, 'type:', channel.type);
     } else {
       // Log all channels for this user to debug
       const allChannelsResult = await dbQuery(
@@ -819,6 +832,10 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
             messageChannel = convResult.rows[0].channel_type;
           }
           channelCredentials = convResult.rows[0].channel_credentials;
+          // Safe-parse credentials
+          if (channelCredentials && typeof channelCredentials === 'string') {
+            try { channelCredentials = JSON.parse(channelCredentials); } catch (e) { /* ignore */ }
+          }
         }
       } catch (e) {
         console.warn('[Inbox] Could not find conversation by remote_jid:', e);
@@ -850,7 +867,11 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
             messageChannel = convResult.rows[0].channel_type;
           }
           channelCredentials = convResult.rows[0].channel_credentials;
-          console.log('[Inbox Send] Found conversation:', conversationId, 'channel_type:', messageChannel, 'lead:', leadId, 'phone:', phone);
+          // Safe-parse credentials
+          if (channelCredentials && typeof channelCredentials === 'string') {
+            try { channelCredentials = JSON.parse(channelCredentials); } catch (e) { /* ignore */ }
+          }
+          console.log('[Inbox Send] Found conversation:', conversationId, 'channel_type:', messageChannel, 'lead:', leadId, 'phone:', phone, 'hasCredentials:', !!channelCredentials);
         }
       } catch (e) {
         console.warn('[Inbox] Error finding conversation by ID:', e);
@@ -908,6 +929,15 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       }
     }
 
+    // Safe-parse credentials se vier como string (proteção contra double-stringify)
+    if (channelCredentials && typeof channelCredentials === 'string') {
+      try {
+        channelCredentials = JSON.parse(channelCredentials);
+      } catch (e) {
+        console.warn('[Inbox] Failed to parse channel credentials string:', e);
+      }
+    }
+
     // For @lid JIDs, we need to send using the remoteJid directly
     const isLidFormat = remoteJid?.endsWith('@lid');
     const isGroupFormat = remoteJid?.endsWith('@g.us');
@@ -917,13 +947,13 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
     // Send via the appropriate channel
     let externalResult: any = null;
 
-    if ((messageChannel === 'whatsapp' || messageChannel === 'whatsapp_cloud') && (phone || remoteJid)) {
-      // ===== WHATSAPP SENDING =====
+    if (messageChannel === 'whatsapp' && (phone || remoteJid)) {
+      // ===== WHATSAPP (Evolution API) SENDING =====
       if (!phone && !remoteJid) {
         return res.status(400).json({ error: 'No phone number available' });
       }
       try {
-        console.log('[Inbox] Sending WhatsApp message:', { instanceId, phone, remoteJid, isLidFormat, isGroupFormat });
+        console.log('[Inbox] Sending WhatsApp message via Evolution:', { instanceId, phone, remoteJid, isLidFormat, isGroupFormat });
 
         const numberToSend = isLidFormat || isGroupFormat ? remoteJid : phone;
 
@@ -947,6 +977,87 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         return res.status(500).json({ error: 'Failed to send WhatsApp message' });
       }
 
+    } else if (messageChannel === 'whatsapp_cloud' && (phone || remoteJid)) {
+      // ===== WHATSAPP CLOUD (Graph API) SENDING =====
+      const phoneNumberId = channelCredentials?.phone_number_id;
+      const accessToken = channelCredentials?.access_token;
+
+      if (!phoneNumberId || !accessToken) {
+        console.error('[Inbox] WhatsApp Cloud channel missing credentials:', channelId);
+        return res.status(500).json({ error: 'WhatsApp Cloud channel not properly configured (missing phone_number_id or access_token)' });
+      }
+
+      const recipientPhone = phone?.replace(/\D/g, '') || remoteJid?.replace('@s.whatsapp.net', '');
+      if (!recipientPhone) {
+        return res.status(400).json({ error: 'No phone number available for WhatsApp Cloud' });
+      }
+
+      try {
+        console.log('[Inbox] Sending WhatsApp Cloud message via Graph API:', { phoneNumberId, recipientPhone });
+
+        if (media_url && media_type) {
+          // Send media via WhatsApp Cloud API
+          let waMediaType = 'document';
+          if (media_type === 'image' || media_type?.startsWith('image')) waMediaType = 'image';
+          else if (media_type === 'video' || media_type?.startsWith('video')) waMediaType = 'video';
+          else if (media_type === 'audio' || media_type?.startsWith('audio')) waMediaType = 'audio';
+
+          const mediaPayload: any = {
+            messaging_product: 'whatsapp',
+            to: recipientPhone,
+            type: waMediaType,
+            [waMediaType]: {
+              link: media_url,
+              ...(messageContent && waMediaType !== 'audio' ? { caption: messageContent } : {})
+            }
+          };
+
+          const mediaResponse = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify(mediaPayload)
+          });
+
+          const mediaResult = await mediaResponse.json();
+          if (!mediaResponse.ok) {
+            console.error('[Inbox] WhatsApp Cloud media send error:', mediaResult);
+            return res.status(500).json({ error: 'Failed to send media via WhatsApp Cloud', details: mediaResult?.error?.message });
+          }
+          externalResult = mediaResult;
+        } else {
+          // Send text message via WhatsApp Cloud API
+          const textPayload = {
+            messaging_product: 'whatsapp',
+            to: recipientPhone,
+            type: 'text',
+            text: { body: messageContent }
+          };
+
+          const textResponse = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify(textPayload)
+          });
+
+          const textResult = await textResponse.json();
+          if (!textResponse.ok) {
+            console.error('[Inbox] WhatsApp Cloud text send error:', textResult);
+            return res.status(500).json({ error: 'Failed to send message via WhatsApp Cloud', details: textResult?.error?.message });
+          }
+          externalResult = textResult;
+        }
+        console.log('[Inbox] WhatsApp Cloud send result:', externalResult);
+      } catch (whatsappCloudError) {
+        console.error('[Inbox] WhatsApp Cloud send error:', whatsappCloudError);
+        return res.status(500).json({ error: 'Failed to send WhatsApp Cloud message' });
+      }
+
     } else if (messageChannel === 'instagram' || messageChannel === 'facebook') {
       // ===== INSTAGRAM / FACEBOOK SENDING via Graph API =====
       const recipientId = remoteJid; // Instagram/Facebook uses PSID or IGSID as remote_jid
@@ -954,14 +1065,82 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         return res.status(400).json({ error: 'No recipient ID available for Instagram/Facebook' });
       }
 
-      const accessToken = channelCredentials?.access_token || channelCredentials?.page_access_token;
+      // Preferir page_access_token (mais confiável para Instagram/Facebook)
+      const accessToken = channelCredentials?.page_access_token || channelCredentials?.access_token;
       if (!accessToken) {
         console.error('[Inbox] No access token for Instagram/Facebook channel:', channelId);
-        return res.status(500).json({ error: 'Instagram/Facebook channel not properly configured (missing access_token)' });
+        console.error('[Inbox] Credentials available:', Object.keys(channelCredentials || {}));
+        return res.status(500).json({ error: 'Canal Instagram/Facebook sem token configurado. Reconecte o canal.' });
       }
 
+      console.log('[Inbox] Using token type:', channelCredentials?.page_access_token ? 'page_access_token' : 'access_token');
+      console.log('[Inbox] Credentials keys:', Object.keys(channelCredentials || {}));
+
       try {
-        const graphApiUrl = 'https://graph.facebook.com/v21.0/me/messages';
+        // Resolver page_id - necessário para System User tokens (EAF)
+        let pageId = channelCredentials?.page_id;
+
+        // Se page_id não existe nas credenciais, buscar dinamicamente via Graph API
+        if (!pageId) {
+          console.log('[Inbox] page_id não encontrado nas credenciais, buscando via Graph API...');
+          try {
+            const pagesResponse = await fetch(
+              `https://graph.facebook.com/v21.0/me/accounts?fields=id,name&access_token=${accessToken}`
+            );
+            const pagesData = await pagesResponse.json();
+
+            if (pagesData.data && pagesData.data.length > 0) {
+              pageId = pagesData.data[0].id;
+              console.log('[Inbox] page_id encontrado via /me/accounts:', pageId);
+
+              // Salvar page_id nas credenciais para não precisar buscar novamente
+              if (channelId) {
+                const updatedCreds = { ...channelCredentials, page_id: pageId };
+                await dbQuery(
+                  'UPDATE channels SET credentials = $1 WHERE id = $2',
+                  [JSON.stringify(updatedCreds), channelId]
+                );
+                console.log('[Inbox] page_id salvo nas credenciais do canal');
+              }
+            } else {
+              // Tentar via /me?fields=business para System User tokens
+              const bizResponse = await fetch(
+                `https://graph.facebook.com/v21.0/me?fields=id,name,business&access_token=${accessToken}`
+              );
+              const bizData = await bizResponse.json();
+              const businessId = bizData?.business?.id;
+
+              if (businessId) {
+                const bizPagesResponse = await fetch(
+                  `https://graph.facebook.com/v21.0/${businessId}/owned_pages?fields=id,name&access_token=${accessToken}`
+                );
+                const bizPagesData = await bizPagesResponse.json();
+                if (bizPagesData.data && bizPagesData.data.length > 0) {
+                  pageId = bizPagesData.data[0].id;
+                  console.log('[Inbox] page_id encontrado via business/owned_pages:', pageId);
+
+                  // Salvar
+                  if (channelId) {
+                    const updatedCreds = { ...channelCredentials, page_id: pageId };
+                    await dbQuery(
+                      'UPDATE channels SET credentials = $1 WHERE id = $2',
+                      [JSON.stringify(updatedCreds), channelId]
+                    );
+                  }
+                }
+              }
+            }
+          } catch (pageErr) {
+            console.warn('[Inbox] Erro ao buscar page_id dinamicamente:', pageErr);
+          }
+        }
+
+        // Construir URL da Graph API
+        const graphApiUrl = pageId
+          ? `https://graph.facebook.com/v21.0/${pageId}/messages`
+          : 'https://graph.facebook.com/v21.0/me/messages';
+
+        console.log('[Inbox] Graph API URL:', graphApiUrl, pageId ? `(page_id: ${pageId})` : '(fallback /me)');
 
         if (media_url && media_type) {
           // Send media via Graph API
@@ -1032,9 +1211,12 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         }
 
         console.log('[Inbox] Instagram/Facebook message sent:', externalResult);
-      } catch (igError) {
+      } catch (igError: any) {
         console.error('[Inbox] Instagram/Facebook send error:', igError);
-        return res.status(500).json({ error: 'Failed to send Instagram/Facebook message' });
+        return res.status(500).json({
+          error: 'Erro ao enviar mensagem via Instagram/Facebook',
+          details: igError?.message || String(igError)
+        });
       }
 
     } else if (messageChannel === 'telegram') {
@@ -1158,7 +1340,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         content: messageContent || (media_type ? `[${media_type}]` : ''),
         status: 'sent',
         sent_at: new Date().toISOString(),
-        external_id: externalResult?.key?.id || externalResult?.message_id || externalResult?.message_id?.toString() || null,
+        external_id: externalResult?.key?.id || externalResult?.messages?.[0]?.id || externalResult?.message_id || externalResult?.message_id?.toString() || null,
         media_url: media_url || null,
         media_type: media_type || null,
         metadata: {
@@ -1190,6 +1372,45 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       media_type: media_type || null,
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+// ✅ Delete a conversation and its messages
+router.delete('/conversations/:conversationId', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { query: dbQuery } = require('../database/connection');
+    const { conversationId } = req.params;
+
+    // Verificar se a conversa pertence ao usuário
+    const conv = await dbQuery(
+      'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
+      [conversationId, user.id]
+    );
+
+    if (conv.rows.length === 0) {
+      return res.status(404).json({ error: 'Conversa não encontrada' });
+    }
+
+    // Deletar mensagens da conversa primeiro (FK constraint)
+    await dbQuery(
+      'DELETE FROM messages WHERE conversation_id = $1 AND user_id = $2',
+      [conversationId, user.id]
+    );
+
+    // Deletar a conversa
+    await dbQuery(
+      'DELETE FROM conversations WHERE id = $1 AND user_id = $2',
+      [conversationId, user.id]
+    );
+
+    console.log('[Inbox] Conversa deletada:', conversationId);
+    res.json({ success: true, message: 'Conversa deletada com sucesso' });
+  } catch (error) {
+    console.error('[Inbox] Erro ao deletar conversa:', error);
     next(error);
   }
 });
@@ -1275,6 +1496,11 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
       return res.status(400).json({ error: 'Invalid conversation or phone number' });
     }
 
+    // Safe-parse credentials se vier como string
+    if (channelCredentials && typeof channelCredentials === 'string') {
+      try { channelCredentials = JSON.parse(channelCredentials); } catch (e) { /* ignore */ }
+    }
+
     console.log('[Inbox Audio] Channel type:', channelType);
 
     // Upload audio to MinIO first
@@ -1310,8 +1536,8 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
     const finalAudioUrl = audioUrl || req.body.audio_url;
     let result: any = null;
 
-    if (channelType === 'whatsapp' || channelType === 'whatsapp_cloud') {
-      // ===== WhatsApp audio =====
+    if (channelType === 'whatsapp') {
+      // ===== WhatsApp audio (Evolution API) =====
       const savedInstance = await getActiveWhatsAppInstance(user.id);
       const instanceId = savedInstance || getUserInstanceName(user.id);
       if (!instanceId) {
@@ -1324,14 +1550,113 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
       });
       console.log('[Inbox Audio] WhatsApp result:', result);
 
+    } else if (channelType === 'whatsapp_cloud') {
+      // ===== WhatsApp Cloud audio (Graph API) =====
+      const phoneNumberId = channelCredentials?.phone_number_id;
+      const accessToken = channelCredentials?.access_token;
+      if (!phoneNumberId || !accessToken) {
+        return res.status(500).json({ error: 'WhatsApp Cloud channel not properly configured' });
+      }
+      const recipientPhone = (phone || remoteJid?.replace('@s.whatsapp.net', ''))?.replace(/\D/g, '');
+      if (!recipientPhone) {
+        return res.status(400).json({ error: 'No phone number available for WhatsApp Cloud audio' });
+      }
+
+      // Determinar mime type do áudio (preferir OGG que é suportado pelo WhatsApp Cloud)
+      let audioMimeType = req.file?.mimetype || 'audio/ogg';
+      // WhatsApp Cloud suporta: audio/aac, audio/mp4, audio/mpeg, audio/amr, audio/ogg
+      // Se recebemos WebM, tentar enviar como OGG (opus codec é compatível)
+      if (audioMimeType.includes('webm')) {
+        audioMimeType = 'audio/ogg';
+      }
+      const audioExtension = audioMimeType.includes('ogg') ? 'ogg' : audioMimeType.includes('mp4') ? 'm4a' : audioMimeType.includes('mpeg') ? 'mp3' : 'ogg';
+
+      // Estratégia: Upload para WhatsApp Media API primeiro, depois enviar com media_id
+      // Isso resolve problemas de URL inacessível e formato de arquivo
+      let audioPayload: any;
+
+      if (req.file?.buffer) {
+        try {
+          // Upload direto para WhatsApp Media API
+          const mediaFormData = new FormData();
+          mediaFormData.append('messaging_product', 'whatsapp');
+          mediaFormData.append('type', audioMimeType);
+          const audioBytes = new Uint8Array(req.file.buffer);
+          mediaFormData.append('file', new Blob([audioBytes], { type: audioMimeType }), `audio.${audioExtension}`);
+
+          console.log('[Inbox Audio] Uploading to WhatsApp Media API...', { mime: audioMimeType, size: req.file.buffer.length });
+          const uploadResponse = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/media`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}` },
+            body: mediaFormData
+          });
+          const uploadResult = await uploadResponse.json();
+          console.log('[Inbox Audio] Media upload result:', uploadResult);
+
+          if (uploadResult.id) {
+            // Enviar usando media_id (mais confiável)
+            audioPayload = {
+              messaging_product: 'whatsapp',
+              to: recipientPhone,
+              type: 'audio',
+              audio: { id: uploadResult.id }
+            };
+            console.log('[Inbox Audio] Using media_id:', uploadResult.id);
+          } else {
+            console.warn('[Inbox Audio] Media upload failed, falling back to link:', uploadResult);
+            // Fallback para link se upload falhar
+            audioPayload = {
+              messaging_product: 'whatsapp',
+              to: recipientPhone,
+              type: 'audio',
+              audio: { link: finalAudioUrl }
+            };
+          }
+        } catch (uploadErr: any) {
+          console.warn('[Inbox Audio] Media upload error, falling back to link:', uploadErr.message);
+          audioPayload = {
+            messaging_product: 'whatsapp',
+            to: recipientPhone,
+            type: 'audio',
+            audio: { link: finalAudioUrl }
+          };
+        }
+      } else {
+        // Sem buffer disponível, usar link direto
+        audioPayload = {
+          messaging_product: 'whatsapp',
+          to: recipientPhone,
+          type: 'audio',
+          audio: { link: finalAudioUrl }
+        };
+      }
+
+      const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(audioPayload)
+      });
+      result = await response.json();
+      if (!response.ok) {
+        console.error('[Inbox Audio] WhatsApp Cloud error:', result);
+        return res.status(500).json({ error: 'Failed to send audio via WhatsApp Cloud', details: result?.error?.message });
+      }
+      console.log('[Inbox Audio] WhatsApp Cloud result:', result);
+
     } else if (channelType === 'instagram' || channelType === 'facebook') {
       // ===== Instagram/Facebook audio =====
       const recipientId = remoteJid;
-      const accessToken = channelCredentials?.access_token || channelCredentials?.page_access_token;
+      const accessToken = channelCredentials?.page_access_token || channelCredentials?.access_token;
       if (!accessToken || !recipientId) {
         return res.status(500).json({ error: 'Instagram/Facebook channel not properly configured' });
       }
-      const graphApiUrl = 'https://graph.facebook.com/v21.0/me/messages';
+      const pageId = channelCredentials?.page_id;
+      const graphApiUrl = pageId
+        ? `https://graph.facebook.com/v21.0/${pageId}/messages`
+        : 'https://graph.facebook.com/v21.0/me/messages';
       const audioPayload = {
         recipient: { id: recipientId },
         message: {
@@ -1378,7 +1703,7 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
 
     // Save to database
     const messageConversationId = conversationId || (!isJid ? conversationIdOrJid : null);
-    const externalId = (result as any)?.key?.id || (result as any)?.message_id?.toString() || (result as any)?.message?.id || null;
+    const externalId = (result as any)?.key?.id || (result as any)?.messages?.[0]?.id || (result as any)?.message_id?.toString() || (result as any)?.message?.id || null;
 
     const message = await messagesService.create({
       conversation_id: messageConversationId,

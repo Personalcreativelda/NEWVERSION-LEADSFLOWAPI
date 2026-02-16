@@ -79,6 +79,18 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
         setIsEditingLead(true);
     };
 
+    const handleDeleteConversation = async () => {
+        if (!selectedConversation) return;
+        try {
+            await conversationsApi.delete(selectedConversation.id);
+            selectConversation(null as any);
+            await refreshConversations();
+        } catch (error) {
+            console.error('Erro ao deletar conversa:', error);
+            alert('Erro ao apagar conversa. Tente novamente.');
+        }
+    };
+
     const handleSelectLead = async (lead: any) => {
         // Find existing conversation or create a real one
         const existingConv = conversations.find(conv => {
@@ -355,6 +367,7 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
                         conversation={selectedConversation}
                         onBack={handleBack}
                         onEditLead={handleEditLead}
+                        onDeleteConversation={handleDeleteConversation}
                         messages={messages}
                         messagesLoading={messagesLoading}
                         messagesError={messagesError}

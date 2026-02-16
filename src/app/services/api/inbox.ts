@@ -162,6 +162,14 @@ export const conversationsApi = {
     async getUnreadCount(): Promise<number> {
         const { data } = await api.get<{ count: number }>('/inbox/unread-count');
         return data.count;
+    },
+
+    /**
+     * Deleta uma conversa e todas as suas mensagens
+     */
+    async delete(conversationId: string): Promise<{ success: boolean }> {
+        const { data } = await api.delete(`/inbox/conversations/${conversationId}`);
+        return data;
     }
 };
 

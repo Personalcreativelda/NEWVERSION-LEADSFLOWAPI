@@ -43,6 +43,30 @@ export class ConversationsService {
         );
 
         if (result.rows.length > 0) {
+            // Atualizar metadata se fornecida (contact_name, profile_picture, etc.)
+            if (metadata && Object.keys(metadata).length > 0) {
+                const existing = result.rows[0];
+                const existingMeta = typeof existing.metadata === 'string'
+                    ? JSON.parse(existing.metadata)
+                    : (existing.metadata || {});
+
+                // Merge metadata (novos valores sobrescrevem antigos, exceto se null)
+                const merged: any = { ...existingMeta };
+                for (const [key, value] of Object.entries(metadata)) {
+                    if (value !== null && value !== undefined) {
+                        merged[key] = value;
+                    }
+                }
+
+                // Só atualiza se houve mudança
+                if (JSON.stringify(merged) !== JSON.stringify(existingMeta)) {
+                    await query(
+                        `UPDATE conversations SET metadata = $1, updated_at = NOW() WHERE id = $2`,
+                        [JSON.stringify(merged), existing.id]
+                    );
+                    existing.metadata = merged;
+                }
+            }
             return result.rows[0];
         }
 
