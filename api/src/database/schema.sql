@@ -35,7 +35,7 @@ CREATE TABLE leads (
     company VARCHAR(255),
     position VARCHAR(255),
     source VARCHAR(100),
-    status VARCHAR(50) DEFAULT 'new',
+    status VARCHAR(50) DEFAULT 'novo',
     score INTEGER DEFAULT 0,
     tags TEXT[],
     notes TEXT,

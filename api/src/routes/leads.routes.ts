@@ -18,6 +18,65 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 router.use(authMiddleware);
 
 // ============================================
+// STATUS NORMALIZATION
+// ============================================
+
+/**
+ * POST /api/leads/normalize-statuses
+ * Normalize all lead statuses: lowercase, trim, map English→Portuguese
+ * This cleans up duplicates like 'New', 'new', 'Novo', 'Novos' → 'novo'
+ */
+router.post('/normalize-statuses', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Map of known variants to canonical status
+    const normalizations = [
+      { from: 'new', to: 'novo' },
+      { from: 'novos', to: 'novo' },
+      { from: 'contacted', to: 'contatado' },
+      { from: 'contatados', to: 'contatado' },
+      { from: 'qualified', to: 'qualificado' },
+      { from: 'qualificados', to: 'qualificado' },
+      { from: 'qualificacao', to: 'qualificado' },
+      { from: 'negotiation', to: 'negociacao' },
+      { from: 'in_negotiation', to: 'negociacao' },
+      { from: 'converted', to: 'convertido' },
+      { from: 'convertidos', to: 'convertido' },
+      { from: 'lost', to: 'perdido' },
+      { from: 'perdidos', to: 'perdido' },
+      { from: 'rejected', to: 'perdido' },
+      { from: 'discarded', to: 'perdido' },
+    ];
+
+    let totalUpdated = 0;
+
+    // First: lowercase + trim all statuses
+    const trimResult = await dbQuery(
+      `UPDATE leads SET status = LOWER(TRIM(status))
+       WHERE user_id = $1 AND status IS NOT NULL AND status != LOWER(TRIM(status))`,
+      [user.id]
+    );
+    totalUpdated += trimResult.rowCount || 0;
+
+    // Then: apply normalization map
+    for (const { from, to } of normalizations) {
+      const r = await dbQuery(
+        `UPDATE leads SET status = $1 WHERE user_id = $2 AND LOWER(TRIM(status)) = $3`,
+        [to, user.id, from]
+      );
+      totalUpdated += r.rowCount || 0;
+    }
+
+    console.log(`[LeadsAPI] ✅ Normalized ${totalUpdated} lead statuses for user ${user.id}`);
+    res.json({ success: true, updated: totalUpdated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
 // FUNNEL STAGE MANAGEMENT
 // ============================================
 

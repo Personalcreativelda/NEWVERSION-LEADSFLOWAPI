@@ -74,6 +74,8 @@ class ApiClient {
     update: (id: string, data: any) =>
       this.request(`/api/leads/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => this.request(`/api/leads/${id}`, { method: 'DELETE' }),
+    normalizeStatuses: () =>
+      this.request('/api/leads/normalize-statuses', { method: 'POST' }),
     searchSimple: (q: string, limit = 20) =>
       this.request(`/api/leads/search-simple?q=${encodeURIComponent(q)}&limit=${limit}`),
     renameFunnelStage: (oldStatus: string, newStatus: string) =>

@@ -48,7 +48,7 @@ router.post('/n8n/leads', async (req, res) => {
         telefone || null,
         email || null,
         empresa || null,
-        status || 'new',
+        (status || 'novo').toLowerCase().trim() === 'new' ? 'novo' : (status || 'novo').toLowerCase().trim(),
         origem || 'n8n',
         observacoes || null
       ]
@@ -768,7 +768,7 @@ router.post('/evolution/messages', async (req, res) => {
       console.log('[Evolution Webhook] Criando novo lead:', contactName, phone);
       const leadResult = await query(
         `INSERT INTO leads (user_id, name, phone, whatsapp, source, status, avatar_url)
-         VALUES ($1, $2, $3, $3, 'whatsapp', 'new', $4)
+         VALUES ($1, $2, $3, $3, 'whatsapp', 'novo', $4)
          RETURNING *`,
         [channel.user_id, contactName, phone, waProfilePic]
       );
@@ -1132,7 +1132,7 @@ router.post('/telegram/:botToken?', async (req, res) => {
         console.log('[Telegram Webhook] Criando novo lead:', contactName);
         const leadResult = await query(
           `INSERT INTO leads (user_id, name, telegram_id, source, status, avatar_url)
-           VALUES ($1, $2, $3, 'telegram', 'new', $4)
+           VALUES ($1, $2, $3, 'telegram', 'novo', $4)
            RETURNING *`,
           [channel.user_id, contactName, chatId, tgProfilePic]
         );
@@ -1167,7 +1167,7 @@ router.post('/telegram/:botToken?', async (req, res) => {
       if (lead.rows.length === 0) {
         const leadResult = await query(
           `INSERT INTO leads (user_id, name, source, status, avatar_url)
-           VALUES ($1, $2, 'telegram', 'new', $3)
+           VALUES ($1, $2, 'telegram', 'novo', $3)
            RETURNING *`,
           [channel.user_id, contactName, tgProfilePic]
         );
@@ -1500,7 +1500,7 @@ router.post('/facebook/test', async (req, res) => {
       if (lead.rows.length === 0) {
         const leadResult = await query(
           `INSERT INTO leads (user_id, name, facebook_id, source, status)
-           VALUES ($1, $2, $3, 'facebook', 'new')
+           VALUES ($1, $2, $3, 'facebook', 'novo')
            RETURNING *`,
           [channel.user_id, 'Teste Facebook', testSenderId]
         );
@@ -1523,7 +1523,7 @@ router.post('/facebook/test', async (req, res) => {
       console.log('[Facebook Test] facebook_id column not found, using fallback');
       const leadResult = await query(
         `INSERT INTO leads (user_id, name, source, status)
-         VALUES ($1, $2, 'facebook', 'new')
+         VALUES ($1, $2, 'facebook', 'novo')
          RETURNING *`,
         [channel.user_id, 'Teste Facebook']
       );
@@ -1763,7 +1763,7 @@ router.post('/facebook', async (req, res) => {
             console.log('[Facebook Webhook] Criando novo lead:', contactName);
             const leadResult = await query(
               `INSERT INTO leads (user_id, name, facebook_id, source, status, avatar_url)
-               VALUES ($1, $2, $3, 'facebook', 'new', $4)
+               VALUES ($1, $2, $3, 'facebook', 'novo', $4)
                RETURNING *`,
               [channel.user_id, contactName, senderId, fbProfilePic]
             );
@@ -1798,7 +1798,7 @@ router.post('/facebook', async (req, res) => {
           if (lead.rows.length === 0) {
             const leadResult = await query(
               `INSERT INTO leads (user_id, name, source, status, avatar_url)
-               VALUES ($1, $2, 'facebook', 'new', $3)
+               VALUES ($1, $2, 'facebook', 'novo', $3)
                RETURNING *`,
               [channel.user_id, contactName, fbProfilePic]
             );
@@ -2049,7 +2049,7 @@ router.post('/instagram/test', async (req, res) => {
       if (lead.rows.length === 0) {
         const leadResult = await query(
           `INSERT INTO leads (user_id, name, instagram_id, source, status)
-           VALUES ($1, $2, $3, 'instagram', 'new') RETURNING *`,
+           VALUES ($1, $2, $3, 'instagram', 'novo') RETURNING *`,
           [channel.user_id, 'Teste Instagram', testSenderId]
         );
         leadId = leadResult.rows[0].id;
@@ -2069,7 +2069,7 @@ router.post('/instagram/test', async (req, res) => {
     } catch {
       const leadResult = await query(
         `INSERT INTO leads (user_id, name, source, status)
-         VALUES ($1, $2, 'instagram', 'new') RETURNING *`,
+         VALUES ($1, $2, 'instagram', 'novo') RETURNING *`,
         [channel.user_id, 'Teste Instagram']
       );
       leadId = leadResult.rows[0].id;
@@ -2302,7 +2302,7 @@ router.post('/instagram', async (req, res) => {
             console.log('[Instagram Webhook] Criando novo lead:', contactName, 'avatar:', !!profilePic);
             const leadResult = await query(
               `INSERT INTO leads (user_id, name, instagram_id, source, status, avatar_url)
-               VALUES ($1, $2, $3, 'instagram', 'new', $4)
+               VALUES ($1, $2, $3, 'instagram', 'novo', $4)
                RETURNING *`,
               [channel.user_id, contactName, senderId, profilePic]
             );
@@ -2346,7 +2346,7 @@ router.post('/instagram', async (req, res) => {
           if (lead.rows.length === 0) {
             const leadResult = await query(
               `INSERT INTO leads (user_id, name, source, status)
-               VALUES ($1, $2, 'instagram', 'new')
+               VALUES ($1, $2, 'instagram', 'novo')
                RETURNING *`,
               [channel.user_id, contactName]
             );
@@ -2800,7 +2800,7 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
             console.log('[WhatsApp Cloud Webhook] Criando novo lead:', contactName);
             const leadResult = await query(
               `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
-               VALUES ($1, $2, $3, $3, 'whatsapp_cloud', 'new')
+               VALUES ($1, $2, $3, $3, 'whatsapp_cloud', 'novo')
                RETURNING *`,
               [channel.user_id, contactName, phone]
             );
@@ -3022,7 +3022,7 @@ router.post('/website/:channelId', async (req, res) => {
       const contactName = visitorName || visitorEmail || `Visitante ${visitorId?.substring(0, 8) || 'Anônimo'}`;
       const leadResult = await query(
         `INSERT INTO leads (user_id, name, email, source, status, metadata)
-         VALUES ($1, $2, $3, 'website', 'new', $4)
+         VALUES ($1, $2, $3, 'website', 'novo', $4)
          RETURNING *`,
         [
           channel.user_id,
@@ -3217,7 +3217,7 @@ router.post('/email/:channelId', async (req, res) => {
     if (lead.rows.length === 0) {
       const leadResult = await query(
         `INSERT INTO leads (user_id, name, email, source, status)
-         VALUES ($1, $2, $3, 'email', 'new')
+         VALUES ($1, $2, $3, 'email', 'novo')
          RETURNING *`,
         [channel.user_id, senderName, senderEmail]
       );
@@ -3630,7 +3630,7 @@ router.post('/n8n/campaign-message', async (req, res) => {
         console.log('[N8N Campaign] Criando lead para:', cleanPhone);
         const newLeadResult = await query(
           `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
-           VALUES ($1, $2, $3, $3, 'campaign', 'contacted')
+           VALUES ($1, $2, $3, $3, 'campaign', 'contatado')
            RETURNING *`,
           [userId, contactName, cleanPhone]
         );
@@ -3885,7 +3885,7 @@ router.post('/n8n/campaign-messages-batch', async (req, res) => {
           } else {
             const newLeadResult = await query(
               `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
-               VALUES ($1, $2, $3, $3, 'campaign', 'contacted')
+               VALUES ($1, $2, $3, $3, 'campaign', 'contatado')
                RETURNING *`,
               [userId, contactName, cleanPhone]
             );
@@ -4072,7 +4072,7 @@ router.post('/telegram/messages', async (req, res) => {
       // Criar novo lead
       const newLeadResult = await query(
         `INSERT INTO leads (user_id, name, source, status)
-         VALUES ($1, $2, 'telegram', 'new')
+         VALUES ($1, $2, 'telegram', 'novo')
          RETURNING *`,
         [internalUserId, contactName]
       );
@@ -4214,7 +4214,7 @@ router.post('/instagram/messages', async (req, res) => {
     if (leadResult.rows.length === 0) {
       const newLeadResult = await query(
         `INSERT INTO leads (user_id, name, source, status)
-         VALUES ($1, $2, 'instagram', 'new')
+         VALUES ($1, $2, 'instagram', 'novo')
          RETURNING *`,
         [internalUserId, senderName]
       );
@@ -4354,7 +4354,7 @@ router.post('/whatsapp-cloud/messages', async (req, res) => {
     if (leadResult.rows.length === 0) {
       const newLeadResult = await query(
         `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
-         VALUES ($1, $2, $3, $3, 'whatsapp_cloud', 'new')
+         VALUES ($1, $2, $3, $3, 'whatsapp_cloud', 'novo')
          RETURNING *`,
         [internalUserId, contactName, senderPhone]
       );

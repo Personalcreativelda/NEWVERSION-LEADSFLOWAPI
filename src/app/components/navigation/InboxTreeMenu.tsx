@@ -127,9 +127,22 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
         }
     };
 
+    // Track if we've already normalized statuses this session
+    const [hasNormalized, setHasNormalized] = useState(false);
+
     const loadTags = async () => {
         setLoadingTags(true);
         try {
+            // Auto-normalize statuses once per session to clean up duplicates
+            if (!hasNormalized) {
+                try {
+                    await apiInstance.leads.normalizeStatuses();
+                    setHasNormalized(true);
+                } catch (normErr) {
+                    console.warn('Status normalization skipped:', normErr);
+                }
+            }
+
             const combined = await conversationTagsApi.getCombinedTags();
             const allTags: TagItem[] = [
                 ...combined.funnel_stages.map((t: any) => ({ ...t, type: 'funnel' })),

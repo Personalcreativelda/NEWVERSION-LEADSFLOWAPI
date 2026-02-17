@@ -45,26 +45,48 @@ router.get('/combined', async (req, res, next) => {
     const conversationTags = await conversationTagsService.getUserTags(user.id);
 
     // 2. Etapas do funil (statuses únicos dos leads com contagem)
+    // Fetch raw status counts, then normalize in JS to avoid complex SQL
     const funnelResult = await dbQuery(
-      `SELECT status, COUNT(*)::int as count
+      `SELECT LOWER(TRIM(status)) as status, COUNT(*)::int as count
        FROM leads
-       WHERE user_id = $1 AND status IS NOT NULL AND status != ''
-       GROUP BY status
-       ORDER BY 
-         CASE status
-           WHEN 'novo' THEN 1 WHEN 'new' THEN 1
-           WHEN 'contatado' THEN 2
-           WHEN 'qualificado' THEN 3
-           WHEN 'negociacao' THEN 4
-           WHEN 'convertido' THEN 5
-           WHEN 'perdido' THEN 6
-           ELSE 7
-         END`,
+       WHERE user_id = $1 AND status IS NOT NULL AND TRIM(status) != ''
+       GROUP BY LOWER(TRIM(status))`,
       [user.id]
     );
 
+    // Status normalization map (English → Portuguese, variants → canonical)
+    const statusNormalize: Record<string, string> = {
+      'new': 'novo',
+      'novos': 'novo',
+      'contacted': 'contatado',
+      'contatados': 'contatado',
+      'qualified': 'qualificado',
+      'qualificados': 'qualificado',
+      'qualificacao': 'qualificado',
+      'negotiation': 'negociacao',
+      'in_negotiation': 'negociacao',
+      'converted': 'convertido',
+      'convertidos': 'convertido',
+      'lost': 'perdido',
+      'perdidos': 'perdido',
+      'rejected': 'perdido',
+      'discarded': 'perdido',
+    };
+
+    // Group/merge counts by normalized status
+    const statusCounts = new Map<string, number>();
+    for (const row of funnelResult.rows) {
+      const normalized = statusNormalize[row.status] || row.status;
+      statusCounts.set(normalized, (statusCounts.get(normalized) || 0) + row.count);
+    }
+
+    // Define display order
+    const statusOrder: Record<string, number> = {
+      novo: 1, contatado: 2, qualificado: 3, negociacao: 4, convertido: 5, perdido: 6,
+    };
+
     const funnelStageColors: Record<string, string> = {
-      novo: '#06B6D4', new: '#06B6D4',
+      novo: '#06B6D4',
       contatado: '#A855F7',
       qualificado: '#EAB308',
       negociacao: '#F97316',
@@ -73,7 +95,7 @@ router.get('/combined', async (req, res, next) => {
     };
 
     const funnelStageLabels: Record<string, string> = {
-      novo: 'Novos', new: 'Novos',
+      novo: 'Novos',
       contatado: 'Contatados',
       qualificado: 'Qualificados',
       negociacao: 'Negociação',
@@ -81,14 +103,16 @@ router.get('/combined', async (req, res, next) => {
       perdido: 'Perdidos',
     };
 
-    const funnelTags = funnelResult.rows.map((row: any) => ({
-      id: `funnel:${row.status}`,
-      name: funnelStageLabels[row.status] || row.status,
-      color: funnelStageColors[row.status] || '#6B7280',
-      icon: null,
-      type: 'funnel',
-      count: row.count,
-    }));
+    const funnelTags = Array.from(statusCounts.entries())
+      .sort(([a], [b]) => (statusOrder[a] || 99) - (statusOrder[b] || 99))
+      .map(([status, count]) => ({
+        id: `funnel:${status}`,
+        name: funnelStageLabels[status] || status,
+        color: funnelStageColors[status] || '#6B7280',
+        icon: null,
+        type: 'funnel',
+        count,
+      }));
 
     // 3. Tags dos leads (array tags[] no lead)
     let leadTags: any[] = [];
