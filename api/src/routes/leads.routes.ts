@@ -7,6 +7,7 @@ import { getStorageService } from '../services/storage.service';
 import { WhatsAppService } from '../services/whatsapp.service';
 import { ChannelsService } from '../services/channels.service';
 import { leadTrackingService } from '../services/lead-tracking.service';
+import { query as dbQuery } from '../database/connection';
 
 const router = Router();
 const leadsService = new LeadsService();
@@ -15,6 +16,191 @@ const channelsService = new ChannelsService();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.use(authMiddleware);
+
+// ============================================
+// FUNNEL STAGE MANAGEMENT
+// ============================================
+
+/**
+ * PUT /api/leads/funnel-stage/rename
+ * Rename a funnel stage (updates all leads with old status to new status)
+ */
+router.put('/funnel-stage/rename', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { oldStatus, newStatus } = req.body;
+    if (!oldStatus || !newStatus) {
+      return res.status(400).json({ error: 'oldStatus and newStatus are required' });
+    }
+
+    const result = await dbQuery(
+      'UPDATE leads SET status = $1 WHERE user_id = $2 AND LOWER(status) = LOWER($3)',
+      [newStatus, user.id, oldStatus]
+    );
+
+    console.log(`[LeadsAPI] ✅ Funnel stage renamed: "${oldStatus}" → "${newStatus}" (${result.rowCount} leads updated)`);
+
+    res.json({ success: true, updated: result.rowCount });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/leads/funnel-stage/add-leads
+ * Add specific leads to a funnel stage (set their status)
+ */
+router.put('/funnel-stage/add-leads', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { status, leadIds } = req.body;
+    if (!status || !leadIds?.length) {
+      return res.status(400).json({ error: 'status and leadIds are required' });
+    }
+
+    const result = await dbQuery(
+      'UPDATE leads SET status = $1 WHERE user_id = $2 AND id = ANY($3::uuid[])',
+      [status, user.id, leadIds]
+    );
+
+    console.log(`[LeadsAPI] ✅ ${result.rowCount} leads added to funnel stage "${status}"`);
+    res.json({ success: true, updated: result.rowCount });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// LEAD TAG MANAGEMENT
+// ============================================
+
+/**
+ * PUT /api/leads/lead-tag/rename
+ * Rename a lead tag across all leads
+ */
+router.put('/lead-tag/rename', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { oldTag, newTag } = req.body;
+    if (!oldTag || !newTag) {
+      return res.status(400).json({ error: 'oldTag and newTag are required' });
+    }
+
+    const result = await dbQuery(
+      `UPDATE leads
+       SET tags = array_replace(tags, $1, $2)
+       WHERE user_id = $3 AND $1 = ANY(tags)`,
+      [oldTag, newTag, user.id]
+    );
+
+    console.log(`[LeadsAPI] ✅ Lead tag renamed: "${oldTag}" → "${newTag}" (${result.rowCount} leads updated)`);
+    res.json({ success: true, updated: result.rowCount });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * DELETE /api/leads/lead-tag/:tagName
+ * Remove a lead tag from all leads (without affecting the leads themselves)
+ */
+router.delete('/lead-tag/:tagName', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const tagName = decodeURIComponent(req.params.tagName);
+
+    const result = await dbQuery(
+      `UPDATE leads
+       SET tags = array_remove(tags, $1)
+       WHERE user_id = $2 AND $1 = ANY(tags)`,
+      [tagName, user.id]
+    );
+
+    console.log(`[LeadsAPI] ✅ Lead tag "${tagName}" removed from ${result.rowCount} leads`);
+    res.json({ success: true, updated: result.rowCount });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUT /api/leads/lead-tag/add-leads
+ * Add a lead tag to specific leads
+ */
+router.put('/lead-tag/add-leads', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { tag, leadIds } = req.body;
+    if (!tag || !leadIds?.length) {
+      return res.status(400).json({ error: 'tag and leadIds are required' });
+    }
+
+    const result = await dbQuery(
+      `UPDATE leads
+       SET tags = CASE
+         WHEN tags IS NULL THEN ARRAY[$1]
+         WHEN NOT ($1 = ANY(tags)) THEN array_append(tags, $1)
+         ELSE tags
+       END
+       WHERE user_id = $2 AND id = ANY($3::uuid[])`,
+      [tag, user.id, leadIds]
+    );
+
+    console.log(`[LeadsAPI] ✅ Tag "${tag}" added to ${result.rowCount} leads`);
+    res.json({ success: true, updated: result.rowCount });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// SEARCH LEADS (for add-leads modal)
+// ============================================
+
+/**
+ * GET /api/leads/search-simple?q=text&limit=20
+ * Simple lead search for the add-leads modal
+ */
+router.get('/search-simple', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const search = (req.query.q as string) || '';
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+
+    const result = await dbQuery(
+      `SELECT id, name, email, phone, status, tags
+       FROM leads
+       WHERE user_id = $1
+       AND (
+         name ILIKE $2 OR email ILIKE $2 OR phone ILIKE $2
+         OR COALESCE(name,'') || ' ' || COALESCE(email,'') || ' ' || COALESCE(phone,'') ILIKE $2
+       )
+       ORDER BY name ASC
+       LIMIT $3`,
+      [user.id, `%${search}%`, limit]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// STANDARD CRUD ROUTES
+// ============================================
 
 router.get('/', async (req, res, next) => {
   try {

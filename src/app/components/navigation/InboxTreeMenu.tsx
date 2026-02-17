@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     ChevronRight, ChevronDown, Inbox, Hash, Tag, AtSign, Bell, Settings, Bot, Zap,
-    MessageCircle, Instagram, Facebook, Send, Mail, Cloud, Globe, Plus
+    MessageCircle, Instagram, Facebook, Send, Mail, Cloud, Globe, Plus,
+    Edit2, Trash2, UserPlus, ArrowRightLeft
 } from 'lucide-react';
 import { channelsApi, conversationTagsApi } from '../../services/api/inbox';
 import { useInboxFilters, type InboxFilterType } from '../../hooks/useInboxFilters';
+import { api as apiInstance } from '../../../lib/api';
+import TagEditModal from '../inbox/tags/TagEditModal';
+import AddLeadsToTagModal from '../inbox/tags/AddLeadsToTagModal';
 
 interface InboxTreeMenuProps {
     currentPage: string;
@@ -31,6 +35,17 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
     const [tags, setTags] = useState<TagItem[]>([]);
     const [loadingChannels, setLoadingChannels] = useState(false);
     const [loadingTags, setLoadingTags] = useState(false);
+
+    // Tag management state
+    const [editingTag, setEditingTag] = useState<TagItem | null>(null);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [addLeadsTag, setAddLeadsTag] = useState<TagItem | null>(null);
+    const [showAddLeadsModal, setShowAddLeadsModal] = useState(false);
+
+    // Right-click context menu state
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; tag: TagItem } | null>(null);
+    const [showMoveSubmenu, setShowMoveSubmenu] = useState(false);
+    const contextMenuRef = useRef<HTMLDivElement>(null);
     
     // Usar hook centralizado de filtros
     const { filters, setFilterType, setChannelFilter, setTagFilter, clearFilters } = useInboxFilters();
@@ -155,6 +170,177 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
         // Definir filtro de tag (mantém outros filtros)
         setTagFilter(tagId);
         onNavigate('inbox', { tag: tagId });
+    };
+
+    // ===========================================
+    // RIGHT-CLICK CONTEXT MENU
+    // ===========================================
+
+    const handleTagContextMenu = useCallback((e: React.MouseEvent, tag: TagItem) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowMoveSubmenu(false);
+        setContextMenu({ x: e.clientX, y: e.clientY, tag });
+    }, []);
+
+    // Close context menu on outside click or Escape
+    useEffect(() => {
+        if (!contextMenu) return;
+        const handleClick = (e: MouseEvent) => {
+            if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+                setContextMenu(null);
+                setShowMoveSubmenu(false);
+            }
+        };
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setContextMenu(null);
+                setShowMoveSubmenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        document.addEventListener('keydown', handleKey);
+        return () => {
+            document.removeEventListener('mousedown', handleClick);
+            document.removeEventListener('keydown', handleKey);
+        };
+    }, [contextMenu]);
+
+    // ===========================================
+    // TAG MANAGEMENT ACTIONS
+    // ===========================================
+
+    const handleEditTag = () => {
+        if (!contextMenu) return;
+        setEditingTag(contextMenu.tag);
+        setShowEditModal(true);
+        setContextMenu(null);
+    };
+
+    const handleDeleteTag = async () => {
+        if (!contextMenu) return;
+        const tag = contextMenu.tag;
+        setContextMenu(null);
+
+        const typeLabel = tag.type === 'funnel' ? 'etapa do funil' : tag.type === 'lead_tag' ? 'tag' : 'etiqueta';
+        const confirmMsg = `Tem certeza que deseja remover a ${typeLabel} "${tag.name}"?\n\nOs leads não serão afetados.`;
+        
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            if (tag.type === 'funnel') {
+                const statusValue = tag.id.replace('funnel:', '');
+                const storedStages = localStorage.getItem('funnelStages');
+                if (storedStages) {
+                    try {
+                        const stages = JSON.parse(storedStages);
+                        const updated = stages.filter((s: any) =>
+                            s.id?.toLowerCase() !== statusValue.toLowerCase() &&
+                            s.label?.toLowerCase() !== statusValue.toLowerCase()
+                        );
+                        localStorage.setItem('funnelStages', JSON.stringify(updated));
+                    } catch (err) {
+                        console.error('Error updating localStorage funnelStages:', err);
+                    }
+                }
+            } else if (tag.type === 'lead_tag') {
+                const tagName = tag.id.replace('lead_tag:', '');
+                await apiInstance.leads.deleteLeadTag(tagName);
+            } else if (tag.type === 'conversation') {
+                await conversationTagsApi.deleteTag(tag.id);
+            }
+            await loadTags();
+        } catch (err) {
+            console.error('Error deleting tag:', err);
+            alert('Erro ao remover etiqueta. Tente novamente.');
+        }
+    };
+
+    const handleAddLeads = () => {
+        if (!contextMenu) return;
+        setAddLeadsTag(contextMenu.tag);
+        setShowAddLeadsModal(true);
+        setContextMenu(null);
+    };
+
+    const handleMoveLeadsTo = async (targetTag: TagItem) => {
+        if (!contextMenu) return;
+        const sourceTag = contextMenu.tag;
+        setContextMenu(null);
+        setShowMoveSubmenu(false);
+
+        try {
+            if (sourceTag.type === 'funnel' && targetTag.type === 'funnel') {
+                // Move all leads from one funnel stage to another
+                const oldStatus = sourceTag.id.replace('funnel:', '');
+                const newStatus = targetTag.id.replace('funnel:', '');
+                await apiInstance.leads.renameFunnelStage(oldStatus, newStatus);
+            } else if (sourceTag.type === 'lead_tag' && targetTag.type === 'lead_tag') {
+                // Rename tag (replace old with new across all leads)
+                const oldTag = sourceTag.id.replace('lead_tag:', '');
+                const newTag = targetTag.id.replace('lead_tag:', '');
+                await apiInstance.leads.renameLeadTag(oldTag, newTag);
+            }
+            await loadTags();
+        } catch (err) {
+            console.error('Error moving leads:', err);
+            alert('Erro ao mover leads. Tente novamente.');
+        }
+    };
+
+    const handleTagUpdate = async (tagData: { name?: string; color?: string; icon?: string; description?: string }) => {
+        if (!editingTag) return;
+
+        try {
+            if (editingTag.type === 'funnel') {
+                const oldStatus = editingTag.id.replace('funnel:', '');
+                const newStatus = tagData.name || oldStatus;
+
+                if (newStatus !== editingTag.name) {
+                    await apiInstance.leads.renameFunnelStage(oldStatus, newStatus.toLowerCase());
+                }
+
+                const storedStages = localStorage.getItem('funnelStages');
+                if (storedStages) {
+                    try {
+                        const stages = JSON.parse(storedStages);
+                        const updated = stages.map((s: any) => {
+                            if (s.id?.toLowerCase() === oldStatus.toLowerCase() || s.label?.toLowerCase() === oldStatus.toLowerCase()) {
+                                return { ...s, id: newStatus.toLowerCase(), label: tagData.name || s.label };
+                            }
+                            return s;
+                        });
+                        localStorage.setItem('funnelStages', JSON.stringify(updated));
+                    } catch (err) {
+                        console.error('Error updating localStorage funnelStages:', err);
+                    }
+                }
+            } else if (editingTag.type === 'lead_tag') {
+                const oldTag = editingTag.id.replace('lead_tag:', '');
+                const newTag = tagData.name || oldTag;
+                if (newTag !== oldTag) {
+                    await apiInstance.leads.renameLeadTag(oldTag, newTag);
+                }
+            } else if (editingTag.type === 'conversation') {
+                await conversationTagsApi.updateTag(editingTag.id, tagData);
+            }
+
+            setShowEditModal(false);
+            setEditingTag(null);
+            await loadTags();
+        } catch (err) {
+            console.error('Error updating tag:', err);
+            alert('Erro ao atualizar etiqueta. Tente novamente.');
+        }
+    };
+
+    const handleLeadsAdded = async () => {
+        await loadTags();
+    };
+
+    // Get available targets for "move to" (same type, excluding self)
+    const getMoveTargets = (sourceTag: TagItem): TagItem[] => {
+        return tags.filter(t => t.type === sourceTag.type && t.id !== sourceTag.id);
     };
 
     if (!isExpanded) return null;
@@ -318,6 +504,7 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                                                     <div className="absolute left-[7px] w-[8px] h-[1px] opacity-20" style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }} />
                                                     <button
                                                         onClick={() => handleTagClick(tag.id)}
+                                                        onContextMenu={(e) => handleTagContextMenu(e, tag)}
                                                         className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
                                                             isTagActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'hover:bg-white/10'
                                                         }`}
@@ -350,6 +537,7 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                                                     <div className="absolute left-[7px] w-[8px] h-[1px] opacity-20" style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }} />
                                                     <button
                                                         onClick={() => handleTagClick(tag.id)}
+                                                        onContextMenu={(e) => handleTagContextMenu(e, tag)}
                                                         className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
                                                             isTagActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'hover:bg-white/10'
                                                         }`}
@@ -377,6 +565,7 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                                                     <div className="absolute left-[7px] w-[8px] h-[1px] opacity-20" style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }} />
                                                     <button
                                                         onClick={() => handleTagClick(tag.id)}
+                                                        onContextMenu={(e) => handleTagContextMenu(e, tag)}
                                                         className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
                                                             isTagActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'hover:bg-white/10'
                                                         }`}
@@ -453,6 +642,143 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                 <Zap className="w-5 h-5" />
                 <span className="flex-1 text-left font-medium">{t.automations || 'Automação'}</span>
             </button>
+
+            {/* ====== RIGHT-CLICK CONTEXT MENU ====== */}
+            {contextMenu && (
+                <div
+                    ref={contextMenuRef}
+                    className="fixed z-[9999] min-w-[200px] rounded-lg shadow-xl border overflow-hidden"
+                    style={{
+                        top: contextMenu.y,
+                        left: contextMenu.x,
+                        backgroundColor: 'hsl(var(--popover))',
+                        borderColor: 'hsl(var(--border))',
+                        color: 'hsl(var(--popover-foreground))',
+                    }}
+                >
+                    {/* Header - tag name */}
+                    <div className="px-3 py-2 text-xs font-semibold border-b truncate" style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--muted-foreground))' }}>
+                        <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: contextMenu.tag.color || '#6B7280' }} />
+                            {contextMenu.tag.name}
+                        </div>
+                    </div>
+
+                    {/* Edit */}
+                    <button
+                        onClick={handleEditTag}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/10 transition-colors"
+                        style={{ color: 'hsl(var(--popover-foreground))' }}
+                    >
+                        <Edit2 className="w-4 h-4" />
+                        Editar
+                    </button>
+
+                    {/* Add Leads - only for funnel and lead_tag */}
+                    {(contextMenu.tag.type === 'funnel' || contextMenu.tag.type === 'lead_tag') && (
+                        <button
+                            onClick={handleAddLeads}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/10 transition-colors"
+                            style={{ color: 'hsl(var(--popover-foreground))' }}
+                        >
+                            <UserPlus className="w-4 h-4" />
+                            Adicionar Leads
+                        </button>
+                    )}
+
+                    {/* Move Leads To - only for funnel and lead_tag with available targets */}
+                    {(contextMenu.tag.type === 'funnel' || contextMenu.tag.type === 'lead_tag') && getMoveTargets(contextMenu.tag).length > 0 && (
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowMoveSubmenu(!showMoveSubmenu)}
+                                className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/10 transition-colors"
+                                style={{ color: 'hsl(var(--popover-foreground))' }}
+                            >
+                                <ArrowRightLeft className="w-4 h-4" />
+                                <span className="flex-1 text-left">Mover Leads Para...</span>
+                                <ChevronRight className="w-3 h-3 ml-auto" />
+                            </button>
+
+                            {/* Submenu with target tags */}
+                            {showMoveSubmenu && (
+                                <div
+                                    className="mt-1 mx-1 mb-1 rounded-md border overflow-hidden"
+                                    style={{
+                                        backgroundColor: 'hsl(var(--popover))',
+                                        borderColor: 'hsl(var(--border))',
+                                    }}
+                                >
+                                    {getMoveTargets(contextMenu.tag).map((target) => (
+                                        <button
+                                            key={target.id}
+                                            onClick={() => handleMoveLeadsTo(target)}
+                                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-white/10 transition-colors"
+                                            style={{ color: 'hsl(var(--popover-foreground))' }}
+                                        >
+                                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: target.color || '#6B7280' }} />
+                                            <span className="truncate">{target.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Separator */}
+                    <div className="h-px mx-2" style={{ backgroundColor: 'hsl(var(--border))' }} />
+
+                    {/* Delete */}
+                    <button
+                        onClick={handleDeleteTag}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-red-500/10 transition-colors text-red-500"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        Apagar Etiqueta
+                    </button>
+                </div>
+            )}
+
+            {/* ====== MODALS ====== */}
+
+            {/* Edit Tag Modal */}
+            {showEditModal && editingTag && (
+                <TagEditModal
+                    tag={{
+                        id: editingTag.id,
+                        name: editingTag.type === 'funnel'
+                            ? editingTag.id.replace('funnel:', '')
+                            : editingTag.type === 'lead_tag'
+                            ? editingTag.id.replace('lead_tag:', '')
+                            : editingTag.name,
+                        color: editingTag.color,
+                        icon: editingTag.icon,
+                    }}
+                    onClose={() => {
+                        setShowEditModal(false);
+                        setEditingTag(null);
+                    }}
+                    onUpdate={handleTagUpdate}
+                />
+            )}
+
+            {/* Add Leads Modal - only for funnel stages and lead tags */}
+            {showAddLeadsModal && addLeadsTag && (addLeadsTag.type === 'funnel' || addLeadsTag.type === 'lead_tag') && (
+                <AddLeadsToTagModal
+                    tagName={addLeadsTag.type === 'lead_tag'
+                        ? addLeadsTag.id.replace('lead_tag:', '')
+                        : addLeadsTag.name}
+                    tagType={addLeadsTag.type as 'funnel' | 'lead_tag'}
+                    tagColor={addLeadsTag.color}
+                    statusValue={addLeadsTag.type === 'funnel'
+                        ? addLeadsTag.id.replace('funnel:', '')
+                        : undefined}
+                    onClose={() => {
+                        setShowAddLeadsModal(false);
+                        setAddLeadsTag(null);
+                    }}
+                    onLeadsAdded={handleLeadsAdded}
+                />
+            )}
         </div>
     );
 }

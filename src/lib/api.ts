@@ -72,6 +72,26 @@ class ApiClient {
     update: (id: string, data: any) =>
       this.request(`/api/leads/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => this.request(`/api/leads/${id}`, { method: 'DELETE' }),
+    searchSimple: (q: string, limit = 20) =>
+      this.request(`/api/leads/search-simple?q=${encodeURIComponent(q)}&limit=${limit}`),
+    renameFunnelStage: (oldStatus: string, newStatus: string) =>
+      this.request('/api/leads/funnel-stage/rename', {
+        method: 'PUT', body: JSON.stringify({ oldStatus, newStatus })
+      }),
+    addLeadsToFunnelStage: (status: string, leadIds: string[]) =>
+      this.request('/api/leads/funnel-stage/add-leads', {
+        method: 'PUT', body: JSON.stringify({ status, leadIds })
+      }),
+    renameLeadTag: (oldTag: string, newTag: string) =>
+      this.request('/api/leads/lead-tag/rename', {
+        method: 'PUT', body: JSON.stringify({ oldTag, newTag })
+      }),
+    deleteLeadTag: (tagName: string) =>
+      this.request(`/api/leads/lead-tag/${encodeURIComponent(tagName)}`, { method: 'DELETE' }),
+    addLeadsToTag: (tag: string, leadIds: string[]) =>
+      this.request('/api/leads/lead-tag/add-leads', {
+        method: 'PUT', body: JSON.stringify({ tag, leadIds })
+      }),
   };
 
   contacts = {
