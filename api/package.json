@@ -11,6 +11,7 @@
   "dependencies": {
     "@types/minio": "^7.1.0",
     "@types/multer": "^2.0.0",
+    "@types/twilio": "^3.19.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -26,7 +27,8 @@
     "pg": "^8.11.3",
     "qrcode": "^1.5.3",
     "socket.io": "^4.8.3",
-    "speakeasy": "^2.0.0"
+    "speakeasy": "^2.0.0",
+    "twilio": "^5.12.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

@@ -4,7 +4,7 @@ import { query } from '../database/connection';
 export interface Channel {
     id: string;
     user_id: string;
-    type: 'whatsapp' | 'whatsapp_cloud' | 'facebook' | 'instagram' | 'telegram' | 'email' | 'website';
+    type: 'whatsapp' | 'whatsapp_cloud' | 'facebook' | 'instagram' | 'telegram' | 'email' | 'website' | 'twilio_sms';
     name: string;
     status: 'active' | 'inactive' | 'error' | 'connecting';
     credentials: any;

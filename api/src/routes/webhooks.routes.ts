@@ -4651,7 +4651,7 @@ router.post('/twilio/sms', async (req, res) => {
     // 7. Notificar via WebSocket
     const wsService = getWebSocketService();
     if (wsService) {
-      wsService.notifyNewMessage(userId, {
+      wsService.emitNewMessage(userId, {
         conversationId: conversation.id,
         message: {
           id: savedMessage.id,
@@ -4685,12 +4685,16 @@ router.post('/twilio/sms', async (req, res) => {
 
     // 9. Processar com IA (se configurado)
     try {
-      await assistantProcessor.processIncomingMessage(
-        conversation.id,
-        savedMessage.id,
-        Body,
-        'sms'
-      );
+      await assistantProcessor.processIncomingMessage({
+        channelId: channel.id,
+        channelType: 'twilio_sms',
+        conversationId: conversation.id,
+        userId: channel.user_id,
+        contactPhone: From,
+        contactName: lead.name,
+        messageContent: Body,
+        credentials: channel.credentials
+      });
     } catch (err) {
       console.error('[Twilio SMS] Error processing with AI:', err);
     }
@@ -4769,20 +4773,21 @@ router.post('/twilio/status', async (req, res) => {
         );
 
         if (convResult.rows.length > 0) {
-          wsService.notifyMessageStatusUpdate(
-            convResult.rows[0].user_id,
-            {
-              conversationId: message.conversation_id,
-              messageId: message.id,
-              status: MessageStatus
-            }
-          );
+          const userId = convResult.rows[0].user_id;
+          wsService.emitMessageStatusUpdate(userId, {
+            conversationId: message.conversation_id,
+            messageId: message.id,
+            status: MessageStatus
+          });
         }
       }
+    } else {
+      console.log('[Twilio Status] Message not found:', MessageSid);
     }
 
+    // Responder com TwiML vazio
     res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Twilio Status] Error:', error);
     res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
   }
