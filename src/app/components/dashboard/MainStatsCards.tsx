@@ -12,19 +12,26 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
   const taxaConversao = totalLeads > 0 ? ((leadsFechados / totalLeads) * 100).toFixed(1) : '0';
 
   // Calcular progresso baseado no limite do plano (100% = limite do plano)
-  // Para Total de Leads
+  // Para Total de Leads - progresso em relação ao limite
   const progressTotalLeads = limiteLeads > 0 ? Math.min((totalLeads / limiteLeads) * 100, 100) : 0;
   
-  // Para Leads Captados Hoje - mostrar como porcentagem do limite do plano
-  const progressLeadsHoje = limiteLeads > 0 ? Math.min((leadsNovosHoje / limiteLeads) * 100, 100) : 0;
+  // Para Leads Captados Hoje - mostrar como porcentagem do total de leads (mais significativo)
+  const progressLeadsHoje = totalLeads > 0 ? (leadsNovosHoje / totalLeads) * 100 : 0;
   
   // Para Leads Convertidos - mostrar como porcentagem do total de leads
   const progressConvertidos = totalLeads > 0 ? (leadsFechados / totalLeads) * 100 : 0;
   
-  // Badges mostram a mesma porcentagem que o progresso
-  const badgeTotalLeads = `${Math.round(progressTotalLeads)}%`;
-  const badgeLeadsHoje = `${Math.round(progressLeadsHoje)}%`;
-  const badgeConvertidos = `${Math.round(progressConvertidos)}%`;
+  // Badges com formatação inteligente (mostrar decimal se < 10%)
+  const formatPercentage = (value: number): string => {
+    if (value === 0) return '0%';
+    if (value < 0.1) return '<0.1%';
+    if (value < 10) return `${value.toFixed(1)}%`;
+    return `${Math.round(value)}%`;
+  };
+
+  const badgeTotalLeads = formatPercentage(progressTotalLeads);
+  const badgeLeadsHoje = formatPercentage(progressLeadsHoje);
+  const badgeConvertidos = formatPercentage(progressConvertidos);
   const badgeTaxaConversao = `${taxaConversao}%`;
 
   const stats = [

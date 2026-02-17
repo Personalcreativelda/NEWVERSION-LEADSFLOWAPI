@@ -44,11 +44,14 @@ router.post('/normalize-statuses', async (req, res, next) => {
       { from: 'in_negotiation', to: 'negociacao' },
       { from: 'converted', to: 'convertido' },
       { from: 'convertidos', to: 'convertido' },
+      { from: 'ganho', to: 'convertido' },
       { from: 'lost', to: 'perdido' },
       { from: 'perdidos', to: 'perdido' },
       { from: 'rejected', to: 'perdido' },
       { from: 'discarded', to: 'perdido' },
     ];
+
+    const validStatuses = ['novo', 'contatado', 'qualificado', 'negociacao', 'convertido', 'perdido'];
 
     let totalUpdated = 0;
 
@@ -69,7 +72,30 @@ router.post('/normalize-statuses', async (req, res, next) => {
       totalUpdated += r.rowCount || 0;
     }
 
-    console.log(`[LeadsAPI] ✅ Normalized ${totalUpdated} lead statuses for user ${user.id}`);
+    // Finally: reset any unknown/garbage statuses to 'novo'
+    const unknownResult = await dbQuery(
+      `UPDATE leads SET status = 'novo'
+       WHERE user_id = $1 AND status IS NOT NULL
+       AND LOWER(TRIM(status)) NOT IN (${validStatuses.map((_, i) => `$${i + 2}`).join(', ')})`,
+      [user.id, ...validStatuses]
+    );
+    totalUpdated += unknownResult.rowCount || 0;
+
+    // Also clean up common garbage/system tags from tags[] array
+    const garbageTags = ['grupo de whatsapp', 'grudo de whatsapp', 'group', 'bot', 'system', 'auto'];
+    for (const badTag of garbageTags) {
+      const cleanResult = await dbQuery(
+        `UPDATE leads SET tags = array_remove(tags, $1)
+         WHERE user_id = $2 AND $1 = ANY(tags)`,
+        [badTag, user.id]
+      );
+      if (cleanResult.rowCount && cleanResult.rowCount > 0) {
+        console.log(`[LeadsAPI] 🧹 Removed garbage tag "${badTag}" from ${cleanResult.rowCount} leads`);
+        totalUpdated += cleanResult.rowCount;
+      }
+    }
+
+    console.log(`[LeadsAPI] ✅ Normalized ${totalUpdated} lead statuses/tags for user ${user.id}`);
     res.json({ success: true, updated: totalUpdated });
   } catch (error) {
     next(error);
@@ -175,6 +201,7 @@ router.delete('/lead-tag/:tagName', async (req, res, next) => {
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
     const tagName = decodeURIComponent(req.params.tagName);
+    console.log(`[LeadsAPI] DELETE /lead-tag/${tagName} - User: ${user.id}`);
 
     const result = await dbQuery(
       `UPDATE leads

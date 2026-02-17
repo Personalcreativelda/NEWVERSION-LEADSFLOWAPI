@@ -134,17 +134,47 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
 
   // ✅ Processar dados para gráfico de status com useMemo
   const statusChartData = useMemo(() => {
-    const statusData = leads.reduce((acc: Record<string, number>, lead) => {
-      if (lead.status) {
-        acc[lead.status] = (acc[lead.status] || 0) + 1;
-      }
-      return acc;
-    }, {});
+    // Status normalization map (same as backend)
+    const statusNormalize: Record<string, string> = {
+      'new': 'novo', 'novos': 'novo',
+      'contacted': 'contatado', 'contatados': 'contatado',
+      'qualified': 'qualificado', 'qualificados': 'qualificado', 'qualificacao': 'qualificado',
+      'negotiation': 'negociacao', 'in_negotiation': 'negociacao',
+      'converted': 'convertido', 'convertidos': 'convertido',
+      'lost': 'perdido', 'perdidos': 'perdido', 'rejected': 'perdido', 'discarded': 'perdido',
+      'ganho': 'convertido',
+    };
 
-    return Object.entries(statusData).map(([name, value]) => ({
-      name,
-      value,
-    }));
+    const statusLabels: Record<string, string> = {
+      novo: 'Novos', contatado: 'Contatados', qualificado: 'Qualificados',
+      negociacao: 'Negociação', convertido: 'Convertidos', perdido: 'Perdidos',
+    };
+
+    const statusColors: Record<string, string> = {
+      novo: '#06B6D4', contatado: '#A855F7', qualificado: '#EAB308',
+      negociacao: '#F97316', convertido: '#22C55E', perdido: '#EF4444',
+    };
+
+    const statusOrder: Record<string, number> = {
+      novo: 1, contatado: 2, qualificado: 3, negociacao: 4, convertido: 5, perdido: 6,
+    };
+
+    const statusData: Record<string, number> = {};
+    leads.forEach(lead => {
+      if (lead.status) {
+        const raw = lead.status.toLowerCase().trim();
+        const normalized = statusNormalize[raw] || raw;
+        statusData[normalized] = (statusData[normalized] || 0) + 1;
+      }
+    });
+
+    return Object.entries(statusData)
+      .sort(([a], [b]) => (statusOrder[a] || 99) - (statusOrder[b] || 99))
+      .map(([name, value]) => ({
+        name: statusLabels[name] || name,
+        value,
+        color: statusColors[name] || '#6B7280',
+      }));
   }, [leads]);
 
   // ✅ Dados para evolução de leads (últimos 7 dias) com useMemo
@@ -434,7 +464,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
                     {statusChartData.map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`} 
-                        fill={pieColors[index % pieColors.length]}
+                        fill={entry.color}
                       />
                     ))}
                   </Pie>
@@ -457,7 +487,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
                     <div key={`legend-${index}`} className="flex items-center gap-2">
                       <div 
                         className="w-3 h-3 rounded-full flex-shrink-0" 
-                        style={{ backgroundColor: pieColors[index % pieColors.length] }}
+                        style={{ backgroundColor: entry.color }}
                       />
                       <span className="text-sm text-muted-foreground truncate">
                         {entry.name} <span className="text-muted-foreground/70">({entry.value})</span>

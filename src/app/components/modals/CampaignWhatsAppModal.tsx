@@ -1,5 +1,5 @@
 // Campaign WhatsApp Modal - Versão Completa com Drag & Drop e Preview
-import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useMemo } from 'react';
 import {
   X, MessageSquare, Users, Send, Clock, Settings,
   Paperclip, Image as ImageIcon, ChevronDown, ChevronUp,
@@ -303,25 +303,54 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
     fetchWhatsAppChannels();
   }, [isOpen]);
 
+  // ✅ Status normalization + dynamic funnel stages
+  const statusNormalize: Record<string, string> = {
+    'new': 'novo', 'novos': 'novo',
+    'contacted': 'contatado', 'contatados': 'contatado',
+    'qualified': 'qualificado', 'qualificados': 'qualificado', 'qualificacao': 'qualificado',
+    'negotiation': 'negociacao', 'in_negotiation': 'negociacao',
+    'converted': 'convertido', 'convertidos': 'convertido',
+    'lost': 'perdido', 'perdidos': 'perdido', 'rejected': 'perdido', 'discarded': 'perdido',
+    'ganho': 'convertido',
+  };
+
+  const statusLabels: Record<string, string> = {
+    novo: 'Novos', contatado: 'Contatados', qualificado: 'Qualificados',
+    negociacao: 'Negociação', convertido: 'Convertidos', perdido: 'Perdidos',
+  };
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    // Initialize with standard funnel stages
+    ['novo', 'contatado', 'qualificado', 'negociacao', 'convertido', 'perdido'].forEach(s => { counts[s] = 0; });
+    leads.forEach(l => {
+      const raw = (l.status || 'novo').toLowerCase().trim();
+      const normalized = statusNormalize[raw] || raw;
+      // Only count known funnel stages
+      if (counts[normalized] !== undefined) {
+        counts[normalized]++;
+      } else {
+        // Unknown statuses go to 'novo'
+        counts['novo']++;
+      }
+    });
+    return counts;
+  }, [leads]);
+
   const getRecipientCount = () => {
     if (recipientMode === 'all') return leads.length;
     if (recipientMode === 'segments') {
-      return leads.filter(lead => selectedStatuses.includes(lead.status || 'novo')).length;
+      return leads.filter(lead => {
+        const raw = (lead.status || 'novo').toLowerCase().trim();
+        const normalized = statusNormalize[raw] || raw;
+        return selectedStatuses.includes(normalized);
+      }).length;
     }
     const numbers = customNumbers.split(',').map(n => n.trim()).filter(n => n.length > 0);
     return numbers.length;
   };
 
   const recipientCount = getRecipientCount();
-
-  const statusCounts = {
-    novo: leads.filter(l => l.status === 'novo').length,
-    contatado: leads.filter(l => l.status === 'contatado').length,
-    qualificado: leads.filter(l => l.status === 'qualificado').length,
-    negociacao: leads.filter(l => l.status === 'negociacao').length,
-    ganho: leads.filter(l => l.status === 'ganho').length,
-    perdido: leads.filter(l => l.status === 'perdido').length,
-  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []) as File[];
@@ -752,7 +781,12 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         }));
       } else if (recipientMode === 'segments') {
         recipients = leads
-          .filter(l => l.telefone && selectedStatuses.includes(l.status || 'novo'))
+          .filter(l => {
+            if (!l.telefone) return false;
+            const raw = (l.status || 'novo').toLowerCase().trim();
+            const normalized = statusNormalize[raw] || raw;
+            return selectedStatuses.includes(normalized);
+          })
           .map(l => ({
             phone: l.telefone,
             name: l.nome,
@@ -1956,8 +1990,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               }}
                               className="w-3 h-3 text-[#25D366] focus:ring-[#25D366] rounded"
                             />
-                            <span className="text-xs text-gray-700 dark:text-gray-300 capitalize">
-                              {status} ({count})
+                            <span className="text-xs text-gray-700 dark:text-gray-300">
+                              {statusLabels[status] || status} ({count})
                             </span>
                           </label>
                         ))}

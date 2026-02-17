@@ -67,16 +67,24 @@ router.get('/combined', async (req, res, next) => {
       'in_negotiation': 'negociacao',
       'converted': 'convertido',
       'convertidos': 'convertido',
+      'ganho': 'convertido',
       'lost': 'perdido',
       'perdidos': 'perdido',
       'rejected': 'perdido',
       'discarded': 'perdido',
     };
 
+    // Known valid funnel statuses
+    const validStatuses = new Set(['novo', 'contatado', 'qualificado', 'negociacao', 'convertido', 'perdido']);
+
     // Group/merge counts by normalized status
     const statusCounts = new Map<string, number>();
     for (const row of funnelResult.rows) {
-      const normalized = statusNormalize[row.status] || row.status;
+      let normalized = statusNormalize[row.status] || row.status;
+      // Unknown/garbage statuses → 'novo'
+      if (!validStatuses.has(normalized)) {
+        normalized = 'novo';
+      }
       statusCounts.set(normalized, (statusCounts.get(normalized) || 0) + row.count);
     }
 
@@ -132,11 +140,13 @@ router.get('/combined', async (req, res, next) => {
         icon: null,
         type: 'lead_tag',
       }));
+      console.log(`[ConvTags] Combined - Found ${leadTags.length} lead_tags:`, leadTags.map(t => t.name));
     } catch (err) {
       // Se a coluna tags não existe, ignorar silenciosamente
       console.log('[ConvTags] Tags column not available:', (err as any)?.message);
     }
 
+    console.log(`[ConvTags] Combined response - Conversation: ${conversationTags.length}, Funnel: ${funnelTags.length}, LeadTags: ${leadTags.length}`);
     res.json({
       success: true,
       data: {
@@ -305,7 +315,9 @@ router.delete('/:tagId', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    console.log(`[ConvTagsAPI] DELETE /:tagId - TagId: ${req.params.tagId}, User: ${user.id}`);
     await conversationTagsService.deleteTag(user.id, req.params.tagId);
+    console.log(`[ConvTagsAPI] ✅ Conversation tag ${req.params.tagId} deleted successfully`);
 
     res.json({
       success: true,

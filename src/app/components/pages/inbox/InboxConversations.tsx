@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ConversationList } from '../../inbox/ConversationList';
 import { useInbox } from '../../../hooks/useInbox';
 import { useInboxFilters } from '../../../hooks/useInboxFilters';
@@ -11,9 +11,15 @@ import { NewConversationModal } from '../../inbox/NewConversationModal';
 
 interface InboxConversationsProps {
     onNavigate?: (page: string) => void;
+    conversationIdToOpen?: string | null;
+    onConversationOpened?: () => void;
 }
 
-export default function InboxConversations({ onNavigate }: InboxConversationsProps) {
+export default function InboxConversations({ 
+    onNavigate,
+    conversationIdToOpen,
+    onConversationOpened
+}: InboxConversationsProps) {
     const {
         conversations,
         selectedConversation,
@@ -41,6 +47,21 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
     const [showNewConversationModal, setShowNewConversationModal] = useState(false);
     const [isCreatingConversation, setIsCreatingConversation] = useState(false);
     const [isEditingLead, setIsEditingLead] = useState(false);
+
+    // Auto-select conversation when conversationIdToOpen is provided
+    useEffect(() => {
+        if (conversationIdToOpen && conversations.length > 0) {
+            console.log('[InboxConversations] Auto-selecting conversation:', conversationIdToOpen);
+            const convToOpen = conversations.find((c: any) => c.id === conversationIdToOpen);
+            if (convToOpen) {
+                selectConversation(convToOpen);
+                onConversationOpened?.(); // Notify parent that conversation was opened
+                console.log('[InboxConversations] Conversation auto-selected:', convToOpen.id);
+            } else {
+                console.warn('[InboxConversations] Conversation not found:', conversationIdToOpen);
+            }
+        }
+    }, [conversationIdToOpen, conversations, selectConversation, onConversationOpened]);
 
     // Handle conversation creation from phone number
     const handleCreateConversation = async (phone: string, name: string) => {

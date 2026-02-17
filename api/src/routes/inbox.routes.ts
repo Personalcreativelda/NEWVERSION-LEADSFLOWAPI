@@ -401,47 +401,88 @@ router.post('/conversations/create', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { contactId, channelType } = req.body;
+    const { contactId, leadId, channelType } = req.body;
     const { query: dbQuery } = require('../database/connection');
 
     console.log('[Inbox] ========== CREATE CONVERSATION ==========');
     console.log('[Inbox] Request body:', JSON.stringify(req.body, null, 2));
-    console.log('[Inbox] Creating conversation with contactId:', contactId, 'type:', typeof contactId);
-    console.log('[Inbox] channelType:', channelType);
+    console.log('[Inbox] contactId:', contactId, 'leadId:', leadId, 'channelType:', channelType);
     console.log('[Inbox] user.id:', user.id);
 
-    if (!contactId) {
-      console.error('[Inbox] contactId is missing from request body');
-      return res.status(400).json({ error: 'contactId is required' });
+    if (!contactId && !leadId) {
+      console.error('[Inbox] Neither contactId nor leadId provided');
+      return res.status(400).json({ error: 'contactId or leadId is required' });
     }
 
-    // Get contact details
-    console.log('[Inbox] Searching for contact with id:', contactId, 'and user_id:', user.id);
-    const contactResult = await dbQuery(
-      'SELECT * FROM contacts WHERE id = $1 AND user_id = $2',
-      [contactId, user.id]
-    );
-    console.log('[Inbox] Contact query result rows:', contactResult.rows.length);
-    if (contactResult.rows.length > 0) {
-      console.log('[Inbox] Found contact:', JSON.stringify(contactResult.rows[0], null, 2));
-    }
+    let contact;
+    let finalContactId = contactId;
 
-    if (contactResult.rows.length === 0) {
-      console.error('[Inbox] Contact NOT found for id:', contactId);
-      // Try to find contact without user_id filter to debug
-      const debugResult = await dbQuery('SELECT id, user_id FROM contacts WHERE id = $1', [contactId]);
-      console.log('[Inbox] Debug - contact exists?:', debugResult.rows.length > 0);
-      if (debugResult.rows.length > 0) {
-        console.log('[Inbox] Debug - contact belongs to user:', debugResult.rows[0].user_id, 'but request from:', user.id);
+    // If leadId is provided, try to find or create contact for that lead
+    if (leadId) {
+      console.log('[Inbox] Looking for contact with lead_id:', leadId);
+      
+      // First, try to find existing contact for this lead
+      const existingContactResult = await dbQuery(
+        'SELECT * FROM contacts WHERE lead_id = $1 AND user_id = $2',
+        [leadId, user.id]
+      );
+
+      if (existingContactResult.rows.length > 0) {
+        contact = existingContactResult.rows[0];
+        finalContactId = contact.id;
+        console.log('[Inbox] Found existing contact for lead:', finalContactId);
+      } else {
+        // No contact exists, create one from the lead
+        console.log('[Inbox] No contact found for lead, creating one...');
+        
+        const leadResult = await dbQuery(
+          'SELECT * FROM leads WHERE id = $1 AND user_id = $2',
+          [leadId, user.id]
+        );
+
+        if (leadResult.rows.length === 0) {
+          return res.status(404).json({ error: 'Lead not found' });
+        }
+
+        const lead = leadResult.rows[0];
+        const phone = lead.telefone || lead.phone || lead.whatsapp || '';
+        const name = lead.nome || lead.name || 'Sem nome';
+
+        // Create contact from lead
+        const newContactResult = await dbQuery(
+          `INSERT INTO contacts (user_id, lead_id, name, phone, whatsapp, email)
+           VALUES ($1, $2, $3, $4, $4, $5)
+           RETURNING *`,
+          [user.id, leadId, name, phone, lead.email]
+        );
+
+        contact = newContactResult.rows[0];
+        finalContactId = contact.id;
+        console.log('[Inbox] Created new contact from lead:', finalContactId);
       }
-      return res.status(404).json({ error: 'Contact not found' });
-    }
+    } else {
+      // Get contact details using contactId
+      console.log('[Inbox] Searching for contact with id:', contactId, 'and user_id:', user.id);
+      const contactResult = await dbQuery(
+        'SELECT * FROM contacts WHERE id = $1 AND user_id = $2',
+        [contactId, user.id]
+      );
+      console.log('[Inbox] Contact query result rows:', contactResult.rows.length);
 
-    const contact = contactResult.rows[0];
+      if (contactResult.rows.length === 0) {
+        console.error('[Inbox] Contact NOT found for id:', contactId);
+        return res.status(404).json({ error: 'Contact not found' });
+      }
+
+      contact = contactResult.rows[0];
+    }
     
-    // Validate if contact has WhatsApp number
+    // Validate contact has required info based on channel type
+    const searchType = channelType || 'whatsapp';
     const whatsappNumber = contact.whatsapp || contact.phone;
-    if (!whatsappNumber || whatsappNumber.trim() === '') {
+    
+    // Only require phone number for WhatsApp channels
+    if ((searchType.includes('whatsapp') || searchType === 'whatsapp_cloud') && (!whatsappNumber || whatsappNumber.trim() === '')) {
       return res.status(400).json({ 
         error: 'Este contato não possui número de WhatsApp configurado. Por favor, adicione um número de WhatsApp ao contato primeiro.' 
       });
@@ -476,17 +517,36 @@ router.post('/conversations/create', async (req, res, next) => {
         [user.id]
       );
       console.log('[Inbox] All channels for user:', JSON.stringify(allChannelsResult.rows, null, 2));
-      console.error('[Inbox] ERROR: No active channel found!');
-      return res.status(400).json({ error: 'No active channel found. Please configure WhatsApp first.' });
+      console.error('[Inbox] ERROR: No active channel found for type:', searchType);
+      return res.status(400).json({ 
+        error: `Nenhum canal ativo do tipo ${searchType} encontrado. Por favor, configure o canal primeiro.` 
+      });
     }
 
-    // Create remote JID from phone/whatsapp
-    const phone = whatsappNumber;
-    if (!phone) {
-      return res.status(400).json({ error: 'Contact has no phone number' });
-    }
+    // Create remote JID based on channel type
+    let remoteJid: string;
+    let phone: string | undefined;
 
-    const remoteJid = normalizePhoneToJid(phone);
+    if (searchType === 'whatsapp' || searchType === 'whatsapp_cloud') {
+      // For WhatsApp, use phone number
+      phone = contact.whatsapp || contact.phone;
+      if (!phone) {
+        return res.status(400).json({ error: 'Contact has no phone number for WhatsApp' });
+      }
+      remoteJid = normalizePhoneToJid(phone);
+    } else if (searchType === 'instagram') {
+      // For Instagram, use instagram handle or fallback to contact id
+      remoteJid = contact.instagram_handle || `ig_${finalContactId}`;
+    } else if (searchType === 'facebook') {
+      // For Facebook, use facebook id or fallback to contact id
+      remoteJid = contact.facebook_id || `fb_${finalContactId}`;
+    } else if (searchType === 'telegram') {
+      // For Telegram, use telegram username or fallback to contact id
+      remoteJid = contact.telegram_username || `tg_${finalContactId}`;
+    } else {
+      // Generic fallback
+      remoteJid = `${searchType}_${finalContactId}`;
+    }
 
     // Check if conversation already exists
     const existingConvResult = await dbQuery(
@@ -524,9 +584,9 @@ router.post('/conversations/create', async (req, res, next) => {
       });
     }
 
-    // Try to find associated lead by phone/whatsapp
-    let leadId = contact.lead_id || null;
-    if (!leadId) {
+    // Try to find associated lead by phone/whatsapp or by contact's lead_id
+    let associatedLeadId = contact.lead_id || null;
+    if (!associatedLeadId && phone) {
       const leadResult = await dbQuery(
         `SELECT id FROM leads 
          WHERE user_id = $1 
@@ -535,7 +595,7 @@ router.post('/conversations/create', async (req, res, next) => {
         [user.id, phone, normalizePhoneToJid(phone)]
       );
       if (leadResult.rows.length > 0) {
-        leadId = leadResult.rows[0].id;
+        associatedLeadId = leadResult.rows[0].id;
       }
     }
 
@@ -546,16 +606,17 @@ router.post('/conversations/create', async (req, res, next) => {
        RETURNING *`,
       [
         user.id,
-        leadId,
+        associatedLeadId,
         channel.id,
         remoteJid,
         'open',
         JSON.stringify({
-          contact_id: contactId,
+          contact_id: finalContactId,
           contact_name: contact.name,
-          phone: phone,
+          phone: phone || null,
           jid: remoteJid,
-          is_group: false
+          is_group: false,
+          channel_type: searchType
         })
       ]
     );

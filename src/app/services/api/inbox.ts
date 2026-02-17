@@ -142,7 +142,7 @@ export const conversationsApi = {
     /**
      * Cria nova conversa para um contato
      */
-    async create(payload: { contactId: string; channelType?: string }): Promise<ConversationWithDetails> {
+    async create(payload: { contactId?: string; leadId?: string; channelType?: string }): Promise<ConversationWithDetails> {
         console.log('[API] Creating conversation with payload:', JSON.stringify(payload));
         try {
             const { data } = await api.post<ConversationWithDetails>('/inbox/conversations/create', payload);

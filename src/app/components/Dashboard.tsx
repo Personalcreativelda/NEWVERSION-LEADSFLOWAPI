@@ -57,6 +57,7 @@ import { notifyTourAvailable } from '../utils/notificationHelpers';
 
 // Utils and Hooks
 import { leadsApi, userApi, integrationsApi } from '../utils/api';
+import { conversationsApi } from '../services/api/inbox';
 import { useLeadsAutoRefresh } from '../hooks/useLeadsAutoRefresh';
 import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
 
@@ -108,6 +109,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   });
   const [language, setLanguage] = useState<Language>(() => loadLanguage());
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [conversationIdToOpen, setConversationIdToOpen] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     // Carregar estado da sidebar do localStorage
     const saved = localStorage.getItem('sidebar_open');
@@ -1211,15 +1213,61 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     }
   };
 
-  const handleChat = (leadId: string) => {
+  const handleChat = async (leadId: string) => {
     if (!podeExecutar('mensagens')) {
       triggerPlanLimitMessage('mensagens');
       return;
     }
     const lead = leads.find(l => l.id === leadId);
-    if (lead) {
-      setSelectedLeadsForMessage([lead.id]);
-      setModalSendMessage(true);
+    if (!lead) return;
+
+    try {
+      // Get channel type from lead's origin or channelSource
+      const origemLower = ((lead as any).channelSource || lead.origem || 'whatsapp').toLowerCase();
+      
+      // Map origin to proper channel type
+      let channelType = 'whatsapp'; // default
+      if (origemLower.includes('telegram')) {
+        channelType = 'telegram';
+      } else if (origemLower.includes('instagram')) {
+        channelType = 'instagram';
+      } else if (origemLower.includes('facebook') || origemLower.includes('messenger')) {
+        channelType = 'facebook';
+      } else if (origemLower.includes('email') || origemLower.includes('mail')) {
+        channelType = 'email';
+      }
+      
+      console.log('[handleChat] Lead origin:', lead.origem, 'channelSource:', (lead as any).channelSource, '-> mapped to:', channelType);
+      
+      // Try to find existing conversation for this lead
+      const conversations = await conversationsApi.getAll();
+      let conversationId: string | undefined;
+      
+      const existingConv = conversations.find((c: any) => c.lead_id === leadId);
+      
+      if (existingConv) {
+        // Use existing conversation
+        conversationId = existingConv.id;
+        console.log('[handleChat] Found existing conversation:', conversationId);
+      } else {
+        // Create new conversation passing leadId directly
+        console.log('[handleChat] Creating new conversation for lead:', leadId, 'channel:', channelType);
+        const newConv = await conversationsApi.create({ 
+          leadId: leadId,  // Pass leadId instead of contactId
+          channelType: channelType
+        });
+        conversationId = newConv.id;
+        console.log('[handleChat] Created new conversation:', conversationId);
+      }
+
+      // Navigate to inbox with conversation pre-selected
+      if (conversationId) {
+        setConversationIdToOpen(conversationId);
+        setCurrentPage('inbox');
+      }
+    } catch (error) {
+      console.error('[handleChat] Error opening conversation:', error);
+      toast.error('Erro ao abrir conversa. Verifique se há um canal ativo configurado.');
     }
   };
 
@@ -1313,11 +1361,11 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   };
 
   const handleImport = () => {
-    // Definir limites de importação por plano
-    const importLimits: Record<string, number> = {
-      free: 50,          // Free: 50 leads por importação
-      business: 250,     // Business: 250 leads por importação
-      enterprise: -1,    // Enterprise: ILIMITADO ✅
+    // Buscar limites de importação do plano do usuário
+    const importLimits = {
+      free: 500,         // Free: 500 contatos
+      business: 3000,    // Business: 3000 contatos
+      enterprise: -1,    // Enterprise: ILIMITADO
     };
 
     const currentPlan = user?.plan || 'free';
@@ -1997,6 +2045,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                 leads={leads}
                 currentSubPage={currentPage}
                 onNavigate={setCurrentPage}
+                conversationIdToOpen={conversationIdToOpen}
+                onConversationOpened={() => setConversationIdToOpen(null)}
               />
             )}
 
@@ -2228,6 +2278,11 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         onClose={() => setModalImportarLeads(false)}
         onSuccess={carregarLeads}
         userPlan={user?.plan || 'free'}
+        importLimits={{
+          free: 500,
+          business: 3000,
+          enterprise: -1
+        }}
       />
 
       <ImportandoWhatsAppModal

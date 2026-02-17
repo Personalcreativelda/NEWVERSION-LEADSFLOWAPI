@@ -9,9 +9,18 @@ interface InboxPageProps {
     leads: any[];
     currentSubPage?: string;
     onNavigate?: (page: string) => void;
+    conversationIdToOpen?: string | null;
+    onConversationOpened?: () => void;
 }
 
-export default function InboxPage({ isDark, leads, currentSubPage = 'conversations', onNavigate }: InboxPageProps) {
+export default function InboxPage({ 
+    isDark, 
+    leads, 
+    currentSubPage = 'conversations', 
+    onNavigate,
+    conversationIdToOpen,
+    onConversationOpened
+}: InboxPageProps) {
     // Renderiza a subpágina baseada no currentSubPage
     const renderContent = () => {
         switch (currentSubPage) {
@@ -26,7 +35,13 @@ export default function InboxPage({ isDark, leads, currentSubPage = 'conversatio
             case 'inbox':
             case 'conversations':
             default:
-                return <InboxConversations onNavigate={onNavigate} />;
+                return (
+                    <InboxConversations 
+                        onNavigate={onNavigate}
+                        conversationIdToOpen={conversationIdToOpen}
+                        onConversationOpened={onConversationOpened}
+                    />
+                );
         }
     };
 

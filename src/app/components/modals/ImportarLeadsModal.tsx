@@ -13,9 +13,20 @@ interface ImportarLeadsModalProps {
   onClose: () => void;
   onSuccess: () => void;
   userPlan?: string;
+  importLimits?: {
+    free: number;
+    business: number;
+    enterprise: number;
+  };
 }
 
-export default function ImportarLeadsModal({ isOpen, onClose, onSuccess, userPlan = 'free' }: ImportarLeadsModalProps) {
+export default function ImportarLeadsModal({ 
+  isOpen, 
+  onClose, 
+  onSuccess, 
+  userPlan = 'free',
+  importLimits = { free: 500, business: 3000, enterprise: -1 }
+}: ImportarLeadsModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -414,7 +425,7 @@ export default function ImportarLeadsModal({ isOpen, onClose, onSuccess, userPla
       <DialogContent className="bg-white rounded-2xl max-w-xl w-full max-h-[85vh] flex flex-col shadow-lg animate-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <DialogHeader className="px-5 py-4 border-b border-gray-200 flex justify-between items-center shrink-0">
+        <DialogHeader className="px-5 py-4 border-b border-gray-200 shrink-0 relative">
           <div className="flex items-center gap-3">
             <FileSpreadsheet className="w-5 h-5 text-blue-600" />
             <DialogTitle className="text-lg text-gray-900">Importar Leads</DialogTitle>
@@ -424,7 +435,7 @@ export default function ImportarLeadsModal({ isOpen, onClose, onSuccess, userPla
           </DialogDescription>
           <button
             onClick={handleClose}
-            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
+            className="absolute top-4 right-5 w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
             disabled={loading}
           >
             <X className="w-5 h-5 text-gray-700 dark:text-gray-300" />
@@ -466,7 +477,7 @@ export default function ImportarLeadsModal({ isOpen, onClose, onSuccess, userPla
                 </div>
               </div>
               <div className="mt-3">
-                <p className="text-2xl font-bold text-gray-900">50</p>
+                <p className="text-2xl font-bold text-gray-900">{importLimits.free.toLocaleString()}</p>
                 <p className="text-xs text-gray-700 dark:text-gray-300">leads por importação</p>
               </div>
             </div>
@@ -489,7 +500,7 @@ export default function ImportarLeadsModal({ isOpen, onClose, onSuccess, userPla
                 </div>
               </div>
               <div className="mt-3">
-                <p className="text-2xl font-bold text-gray-900">250</p>
+                <p className="text-2xl font-bold text-gray-900">{importLimits.business.toLocaleString()}</p>
                 <p className="text-xs text-gray-700 dark:text-gray-300">leads por importação</p>
               </div>
               {userPlan === 'free' && (

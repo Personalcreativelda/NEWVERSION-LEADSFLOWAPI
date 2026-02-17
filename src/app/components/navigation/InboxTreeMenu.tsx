@@ -235,13 +235,21 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
         const tag = contextMenu.tag;
         setContextMenu(null);
 
+        console.log('[InboxTreeMenu] Delete tag initiated:', { tag });
+
         const typeLabel = tag.type === 'funnel' ? 'etapa do funil' : tag.type === 'lead_tag' ? 'tag' : 'etiqueta';
         const confirmMsg = `Tem certeza que deseja remover a ${typeLabel} "${tag.name}"?\n\nOs leads não serão afetados.`;
         
-        if (!window.confirm(confirmMsg)) return;
+        if (!window.confirm(confirmMsg)) {
+            console.log('[InboxTreeMenu] Delete cancelled by user');
+            return;
+        }
+
+        console.log('[InboxTreeMenu] Delete confirmed, proceeding...', { type: tag.type, id: tag.id, name: tag.name });
 
         try {
             if (tag.type === 'funnel') {
+                console.log('[InboxTreeMenu] Deleting funnel stage from localStorage');
                 const statusValue = tag.id.replace('funnel:', '');
                 const storedStages = localStorage.getItem('funnelStages');
                 if (storedStages) {
@@ -252,19 +260,26 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                             s.label?.toLowerCase() !== statusValue.toLowerCase()
                         );
                         localStorage.setItem('funnelStages', JSON.stringify(updated));
+                        console.log('[InboxTreeMenu] Funnel stage removed from localStorage');
                     } catch (err) {
                         console.error('Error updating localStorage funnelStages:', err);
                     }
                 }
             } else if (tag.type === 'lead_tag') {
                 const tagName = tag.id.replace('lead_tag:', '');
-                await apiInstance.leads.deleteLeadTag(tagName);
+                console.log('[InboxTreeMenu] Deleting lead_tag via API:', tagName);
+                const result = await apiInstance.leads.deleteLeadTag(tagName);
+                console.log('[InboxTreeMenu] Lead tag deleted successfully:', result);
             } else if (tag.type === 'conversation') {
-                await conversationTagsApi.deleteTag(tag.id);
+                console.log('[InboxTreeMenu] Deleting conversation tag via API:', tag.id);
+                const result = await conversationTagsApi.deleteTag(tag.id);
+                console.log('[InboxTreeMenu] Conversation tag deleted successfully:', result);
             }
+            console.log('[InboxTreeMenu] Reloading tags...');
             await loadTags();
+            console.log('[InboxTreeMenu] Tags reloaded successfully');
         } catch (err) {
-            console.error('Error deleting tag:', err);
+            console.error('[InboxTreeMenu] Error deleting tag:', err);
             alert('Erro ao remover etiqueta. Tente novamente.');
         }
     };
