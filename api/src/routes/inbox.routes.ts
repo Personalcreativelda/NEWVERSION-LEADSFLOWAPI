@@ -490,7 +490,6 @@ router.post('/conversations/create', async (req, res, next) => {
     
     // Get or create channel
     let channel;
-    const searchType = channelType || 'whatsapp';
     console.log('[Inbox] Searching for channel with type:', searchType, 'user_id:', user.id);
     let channelsResult = await dbQuery(
       `SELECT * FROM channels WHERE type = $1 AND user_id = $2 AND status IN ('active', 'connected') ORDER BY created_at DESC LIMIT 1`,
