@@ -48,6 +48,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     'website': 'Site',
     'site': 'Site',
     'twilio': 'Twilio (SMS)',
+    'twilio_sms': 'Twilio (SMS)',
     'sms': 'Twilio (SMS)',
     'indicacao': 'Indicação',
     'campaign': 'Campanha',
@@ -69,6 +70,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     'website': Globe,
     'site': Globe,
     'twilio': Smartphone,
+    'twilio_sms': Smartphone,
     'sms': Smartphone,
     'indicacao': Users,
     'campaign': Megaphone,
@@ -89,6 +91,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     'website': '#8B5CF6',      // Roxo
     'site': '#8B5CF6',         // Roxo
     'twilio': '#F22F46',       // Vermelho Twilio
+    'twilio_sms': '#F22F46',   // Vermelho Twilio
     'sms': '#F22F46',          // Vermelho Twilio
     'indicacao': '#FFA26B',    // Laranja
     'campaign': '#F59E0B',     // Amarelo/Laranja

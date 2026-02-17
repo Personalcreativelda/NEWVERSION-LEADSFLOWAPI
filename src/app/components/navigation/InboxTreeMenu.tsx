@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     ChevronRight, ChevronDown, Inbox, Hash, Tag, AtSign, Bell, Settings, Bot, Zap,
     MessageCircle, Instagram, Facebook, Send, Mail, Cloud, Globe, Plus,
-    Edit2, Trash2, UserPlus, ArrowRightLeft
+    Edit2, Trash2, UserPlus, ArrowRightLeft, Smartphone
 } from 'lucide-react';
 import { channelsApi, conversationTagsApi } from '../../services/api/inbox';
 import { useInboxFilters, type InboxFilterType } from '../../hooks/useInboxFilters';
@@ -74,6 +74,10 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                 return Mail;
             case 'website':
                 return Globe;
+            case 'twilio_sms':
+            case 'sms':
+            case 'twilio':
+                return Smartphone;
             default:
                 return Hash;
         }
@@ -97,6 +101,10 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                 return 'text-cyan-500';
             case 'website':
                 return 'text-purple-500';
+            case 'twilio_sms':
+            case 'sms':
+            case 'twilio':
+                return 'text-teal-500';
             default:
                 return 'text-gray-500';
         }

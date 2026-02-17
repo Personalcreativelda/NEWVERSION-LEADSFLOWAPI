@@ -69,6 +69,9 @@ export default function LeadsTrackingDashboard() {
       campaign: '📢',
       n8n: '🔗',
       manual: '✏️',
+      twilio: '📲',
+      twilio_sms: '📲',
+      sms: '📲',
       default: '💬'
     };
     return icons[channel?.toLowerCase()] || icons.default;

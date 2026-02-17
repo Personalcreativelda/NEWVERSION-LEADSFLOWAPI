@@ -13,6 +13,7 @@ import {
     CheckCheck,
     Mail,
     Globe,
+    Smartphone,
     Cloud,
     Tag
 } from 'lucide-react';
@@ -128,6 +129,15 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
                         <Globe size={10} />
                         Website
+                    </span>
+                );
+            case 'twilio_sms':
+            case 'sms':
+            case 'twilio':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400">
+                        <Smartphone size={10} />
+                        SMS
                     </span>
                 );
             default:

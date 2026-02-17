@@ -5,7 +5,7 @@ import {
   Zap, X, Check, Loader2,
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash,
-  Key, Brain, Eye, EyeOff
+  Key, Brain, Eye, EyeOff, Smartphone
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -65,6 +65,9 @@ const CHANNEL_ICONS: Record<string, React.ComponentType<any>> = {
   'messenger': Facebook,
   'telegram': Send,
   'email': Mail,
+  'twilio_sms': Smartphone,
+  'sms': Smartphone,
+  'twilio': Smartphone,
 };
 
 const CHANNEL_COLORS: Record<string, string> = {
@@ -74,6 +77,9 @@ const CHANNEL_COLORS: Record<string, string> = {
   'messenger': 'text-blue-600',
   'telegram': 'text-sky-500',
   'email': 'text-gray-500',
+  'twilio_sms': 'text-teal-500',
+  'sms': 'text-teal-500',
+  'twilio': 'text-teal-500',
 };
 
 export default function AssistantsPage({ isDark }: AssistantsPageProps) {

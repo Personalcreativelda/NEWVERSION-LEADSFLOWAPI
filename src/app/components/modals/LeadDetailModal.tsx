@@ -616,6 +616,8 @@ function HistoricoTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
       case 'whatsapp': return 'WhatsApp';
       case 'email': return 'Email';
       case 'sms': return 'SMS';
+      case 'twilio_sms': return 'SMS';
+      case 'twilio': return 'SMS';
       case 'instagram': return 'Instagram';
       case 'facebook': return 'Facebook';
       default: return channel || 'Desconhecido';
