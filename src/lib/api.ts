@@ -12,9 +12,11 @@ class ApiClient {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    // Auto-read token from localStorage (same key used by the rest of the app)
+    const authToken = this.token || localStorage.getItem('leadflow_access_token');
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      ...(this.token && { Authorization: `Bearer ${this.token}` }),
+      ...(authToken && { Authorization: `Bearer ${authToken}` }),
       ...options.headers,
     };
 
