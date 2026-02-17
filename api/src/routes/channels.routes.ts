@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { ChannelsService } from '../services/channels.service';
 import { WhatsAppService } from '../services/whatsapp.service';
+import { isValidE164, formatE164ForDisplay } from '../utils/phone-validation';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -373,6 +374,14 @@ router.post('/', async (req, res, next) => {
             if (!accountSid || !authToken || !phoneNumber) {
                 return res.status(400).json({ 
                     error: 'accountSid, authToken, and phoneNumber are required for Twilio SMS' 
+                });
+            }
+
+            // Validar formato E.164 internacional: +[código do país][número]
+            // Suporta qualquer país (1-3 dígitos código país + até 15 dígitos)
+            if (!isValidE164(phoneNumber)) {
+                return res.status(400).json({ 
+                    error: 'phoneNumber must be in E.164 format (e.g., +12566241358 for US, +5511999999999 for Brazil, +4915123456789 for Germany, +351912345678 for Portugal)' 
                 });
             }
 
