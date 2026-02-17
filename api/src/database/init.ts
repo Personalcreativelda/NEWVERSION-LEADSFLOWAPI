@@ -28,13 +28,13 @@ const runPendingMigrations = async () => {
         ALTER TABLE channels DROP CONSTRAINT IF EXISTS channels_type_check1;
         -- Adicionar constraint atualizado
         ALTER TABLE channels ADD CONSTRAINT channels_type_check
-          CHECK (type IN ('whatsapp', 'whatsapp_cloud', 'facebook', 'instagram', 'telegram', 'email', 'website', 'sms'));
+          CHECK (type IN ('whatsapp', 'whatsapp_cloud', 'facebook', 'instagram', 'telegram', 'email', 'website', 'twilio_sms'));
       EXCEPTION
         WHEN others THEN
           RAISE NOTICE 'Channels type constraint migration: %', SQLERRM;
       END $$;
     `);
-    console.log('[DB] Channel type constraint updated (email, website, sms added)');
+    console.log('[DB] Channel type constraint updated (email, website, twilio_sms added)');
   } catch (error: any) {
     console.warn('[DB] Migration warning:', error.message);
   }
