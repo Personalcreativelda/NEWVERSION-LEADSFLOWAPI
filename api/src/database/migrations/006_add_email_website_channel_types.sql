@@ -10,7 +10,7 @@ BEGIN
 
     -- Adicionar novo constraint com todos os tipos suportados
     ALTER TABLE channels ADD CONSTRAINT channels_type_check
-        CHECK (type IN ('whatsapp', 'whatsapp_cloud', 'facebook', 'instagram', 'telegram', 'email', 'website'));
+        CHECK (type IN ('whatsapp', 'whatsapp_cloud', 'facebook', 'instagram', 'telegram', 'email', 'website', 'twilio_sms'));
 
     RAISE NOTICE 'CHECK constraint atualizado com sucesso para incluir email e website';
 EXCEPTION
@@ -28,7 +28,7 @@ EXCEPTION
                 LIMIT 1
             );
             ALTER TABLE channels ADD CONSTRAINT channels_type_check
-                CHECK (type IN ('whatsapp', 'whatsapp_cloud', 'facebook', 'instagram', 'telegram', 'email', 'website'));
+                CHECK (type IN ('whatsapp', 'whatsapp_cloud', 'facebook', 'instagram', 'telegram', 'email', 'website', 'twilio_sms'));
             RAISE NOTICE 'Constraint recriado com sucesso';
         EXCEPTION
             WHEN others THEN
