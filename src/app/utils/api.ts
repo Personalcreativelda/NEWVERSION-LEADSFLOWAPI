@@ -950,7 +950,7 @@ const mapLeadFromApi = (lead: any): Lead => {
     telefone: lead.phone || lead.whatsapp || lead.telefone || '',
     email: lead.email || '',
     interesse: custom.interesse ?? lead.interesse ?? '',
-    origem: lead.source || lead.origem || '',
+    origem: lead.channel_source || lead.source || lead.origem || '',
     status: normalizeStatus(lead.status),
     data: custom.data || lead.data || lead.created_at,
     agente_atual: custom.agente_atual ?? lead.agente_atual ?? '',
@@ -961,6 +961,8 @@ const mapLeadFromApi = (lead: any): Lead => {
     avatarUrl: lead.avatar_url ?? null,
     empresa: lead.company || lead.empresa || '',
     createdAt: lead.created_at,
+    capturedAt: lead.captured_at || lead.created_at,
+    channelSource: lead.channel_source || lead.source || '',
     updatedAt: lead.updated_at,
     convertedAt: lead.converted_at,
   };

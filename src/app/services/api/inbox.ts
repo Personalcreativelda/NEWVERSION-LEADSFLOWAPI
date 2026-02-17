@@ -319,10 +319,142 @@ export const contactsApi = {
     }
 };
 
+// ============================================
+// CONVERSATION TAGS
+// ============================================
+
+interface Tag {
+    id: string;
+    name: string;
+    color?: string;
+    icon?: string;
+    order_index?: number;
+    description?: string;
+    conversation_count?: number;
+}
+
+export const conversationTagsApi = {
+    /**
+     * Lista todas as etiquetas do usuário
+     */
+    async getAllTags(): Promise<Tag[]> {
+        try {
+            const { data } = await api.get<{ success: boolean; count: number; data: Tag[] }>('/inbox/conversation-tags');
+            return data.data || [];
+        } catch (err) {
+            console.error('Error fetching tags:', err);
+            return [];
+        }
+    },
+
+    /**
+     * Lista todas as etiquetas combinadas: conversation_tags + funil + tags do lead
+     */
+    async getCombinedTags(): Promise<{
+        conversation_tags: (Tag & { type: string })[];
+        funnel_stages: { id: string; name: string; color: string; icon: string | null; type: string; count: number }[];
+        lead_tags: { id: string; name: string; color: string; icon: string | null; type: string }[];
+    }> {
+        try {
+            const { data } = await api.get<{ success: boolean; data: any }>('/inbox/conversation-tags/combined');
+            return data.data || { conversation_tags: [], funnel_stages: [], lead_tags: [] };
+        } catch (err) {
+            console.error('Error fetching combined tags:', err);
+            return { conversation_tags: [], funnel_stages: [], lead_tags: [] };
+        }
+    },
+
+    /**
+     * Obter estatísticas de uso de etiquetas
+     */
+    async getTagStats(): Promise<any> {
+        try {
+            const { data } = await api.get<{ success: boolean; data: any }>('/inbox/conversation-tags/stats');
+            return data.data;
+        } catch (err) {
+            console.error('Error fetching tag stats:', err);
+            return [];
+        }
+    },
+
+    /**
+     * Cria nova etiqueta
+     */
+    async createTag(tag: { name: string; color?: string; icon?: string; description?: string }): Promise<Tag> {
+        const { data } = await api.post<{ success: boolean; data: Tag }>('/inbox/conversation-tags', tag);
+        return data.data;
+    },
+
+    /**
+     * Atualiza etiqueta
+     */
+    async updateTag(tagId: string, updates: Partial<Tag>): Promise<Tag> {
+        const { data } = await api.put<{ success: boolean; data: Tag }>(`/inbox/conversation-tags/${tagId}`, updates);
+        return data.data;
+    },
+
+    /**
+     * Reordena etiquetas (drag-drop)
+     */
+    async reorderTags(tagIds: string[]): Promise<{ success: boolean }> {
+        const { data } = await api.put<{ success: boolean }>('/inbox/conversation-tags/reorder', { tag_ids: tagIds });
+        return data;
+    },
+
+    /**
+     * Deleta etiqueta
+     */
+    async deleteTag(tagId: string): Promise<{ success: boolean }> {
+        const { data } = await api.delete<{ success: boolean }>(`/inbox/conversation-tags/${tagId}`);
+        return data;
+    },
+
+    /**
+     * Obtém conversas com uma etiqueta específica
+     */
+    async getConversationsByTag(tagId: string): Promise<Conversation[]> {
+        const { data } = await api.get<{ success: boolean; count: number; data: Conversation[] }>(`/inbox/conversation-tags/${tagId}/conversations`);
+        return data.data || [];
+    },
+
+    /**
+     * Obtém todas as etiquetas de uma conversa
+     */
+    async getConversationTags(conversationId: string): Promise<Tag[]> {
+        const { data } = await api.get<{ success: boolean; data: Tag[] }>(`/inbox/conversation-tags/conversation/${conversationId}`);
+        return data.data || [];
+    },
+
+    /**
+     * Atribui etiqueta para conversa
+     */
+    async addTagToConversation(conversationId: string, tagId: string): Promise<{ success: boolean }> {
+        const { data } = await api.post<{ success: boolean }>(`/inbox/conversation-tags/assign/${conversationId}/${tagId}`);
+        return data;
+    },
+
+    /**
+     * Remove etiqueta de uma conversa
+     */
+    async removeTagFromConversation(conversationId: string, tagId: string): Promise<{ success: boolean }> {
+        const { data } = await api.delete<{ success: boolean }>(`/inbox/conversation-tags/assign/${conversationId}/${tagId}`);
+        return data;
+    },
+
+    /**
+     * Define todas as etiquetas de uma conversa (substitui as anteriores)
+     */
+    async setConversationTags(conversationId: string, tagIds: string[]): Promise<{ success: boolean }> {
+        const { data } = await api.post<{ success: boolean }>(`/inbox/conversation-tags/conversation/${conversationId}/set`, { tag_ids: tagIds });
+        return data;
+    }
+};
+
 export default {
     channels: channelsApi,
     conversations: conversationsApi,
     aiAssistants: aiAssistantsApi,
     inbox: inboxApi,
-    contacts: contactsApi
+    contacts: contactsApi,
+    conversationTags: conversationTagsApi
 };

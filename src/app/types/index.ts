@@ -10,6 +10,8 @@ export interface Lead {
   status: string;
   data?: string;
   createdAt?: string;
+  capturedAt?: string;
+  channelSource?: string;
   agente_atual?: string;
   observacao?: string;
   observacoes?: string;

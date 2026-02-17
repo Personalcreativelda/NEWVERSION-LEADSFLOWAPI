@@ -83,7 +83,8 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
         if (!selectedConversation) return;
         try {
             await conversationsApi.delete(selectedConversation.id);
-            selectConversation(null as any);
+            // Limpar conversa selecionada primeiro para fechar o painel de chat
+            selectConversation(null);
             await refreshConversations();
         } catch (error) {
             console.error('Erro ao deletar conversa:', error);
@@ -179,10 +180,24 @@ export default function InboxConversations({ onNavigate }: InboxConversationsPro
                 if (convChannelId !== filters.channel) return false;
             }
             
-            // Filtrar por status do lead
-            if (filters.status) {
-                const convStatus = conv.contact?.status?.toLowerCase() || '';
-                if (convStatus !== filters.status.toLowerCase()) return false;
+            // Filtrar por etiqueta (suporta funnel:status, lead_tag:tag, ou conversation tag ID)
+            if (filters.tag) {
+                if (filters.tag.startsWith('funnel:')) {
+                    // Filtrar por status do lead (etapa do funil)
+                    const funnelStatus = filters.tag.replace('funnel:', '');
+                    const leadStatus = (conv.contact as any)?.status || conv.metadata?.lead_status;
+                    if (leadStatus !== funnelStatus) return false;
+                } else if (filters.tag.startsWith('lead_tag:')) {
+                    // Filtrar por tag do lead
+                    const tagName = filters.tag.replace('lead_tag:', '');
+                    const leadTags: string[] = (conv.contact as any)?.tags || conv.metadata?.tags || [];
+                    if (!leadTags.includes(tagName)) return false;
+                } else {
+                    // Filtrar por conversation tag (UUID)
+                    const convTags = (conv as any).conversation_tags || [];
+                    const hasConvTag = convTags.some((t: any) => t.id === filters.tag);
+                    if (!hasConvTag) return false;
+                }
             }
             
             // Filtrar por busca

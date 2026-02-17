@@ -1,6 +1,28 @@
 import { User, Edit, Trash2, MessageCircle, Mail } from 'lucide-react';
 import type { Lead } from '../../types';
 
+// Mapeamento de nomes de canal para exibição amigável
+const channelLabels: Record<string, string> = {
+  'whatsapp': 'WhatsApp',
+  'whatsapp_cloud': 'WhatsApp Cloud',
+  'facebook': 'Facebook',
+  'instagram': 'Instagram',
+  'telegram': 'Telegram',
+  'email': 'Email',
+  'website': 'Site',
+  'site': 'Site',
+  'campaign': 'Campanha',
+  'n8n': 'Automação',
+  'manual': 'Manual',
+  'inbox': 'WhatsApp',
+  'unknown': 'Desconhecido',
+};
+
+const getChannelLabel = (source: string): string => {
+  if (!source) return 'Sem origem';
+  return channelLabels[source.toLowerCase()] || source;
+};
+
 interface RecentLeadsSectionProps {
   leads: Lead[];
   onEdit?: (leadId: string) => void;
@@ -140,7 +162,7 @@ export default function RecentLeadsSection({
                     {lead.name || (lead as any).nome || lead.email || lead.phone || 'Lead sem nome'}
                   </p>
                   <p className="text-sm text-muted-foreground dark:text-muted-foreground truncate">
-                    {lead.origem || (lead as any).source || lead.status || 'Sem origem'} • {formatTempo(lead.data || (lead as any).created_at)}
+                    {getChannelLabel(lead.origem || (lead as any).source || '')} • {formatTempo(lead.data || (lead as any).created_at)}
                   </p>
                 </div>
               </div>

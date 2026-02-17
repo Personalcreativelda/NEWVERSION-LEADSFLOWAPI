@@ -124,6 +124,13 @@ export interface AIAssistant {
     updated_at: string;
 }
 
+export interface ConversationTagInfo {
+    id: string;
+    name: string;
+    color: string;
+    icon?: string;
+}
+
 // Extended types com dados relacionados
 export interface ConversationWithDetails extends Conversation {
     is_group?: boolean;
@@ -134,6 +141,10 @@ export interface ConversationWithDetails extends Conversation {
         phone?: string;
         avatar_url?: string;
         is_group?: boolean;
+        status?: string;
+        company?: string;
+        source?: string;
+        tags?: string[];
     };
     lead?: {
         id: string;
@@ -157,6 +168,7 @@ export interface ConversationWithDetails extends Conversation {
         media_url?: string;
         media_type?: string;
     };
+    conversation_tags?: ConversationTagInfo[];
 }
 
 export interface MessageWithSender extends Message {

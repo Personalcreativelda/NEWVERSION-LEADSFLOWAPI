@@ -23,11 +23,17 @@ import aiAssistantsRoutes from './ai-assistants.routes';
 import assistantsRoutes from './assistants.routes';
 import userWebhooksRoutes from './user-webhooks.routes';
 import versionRoutes from './version.routes';
+// Lead Tracking: Importar rotas de rastreamento de leads
+import leadsTrackingRoutes from './leads-tracking.routes';
+// Conversation Tags: Importar rotas de etiquetas de conversas
+import conversationTagsRoutes from './conversation-tags.routes';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/leads', leadsRoutes);
+router.use('/leads-tracking', leadsTrackingRoutes);
+router.use('/inbox/conversation-tags', conversationTagsRoutes);
 router.use('/contacts', contactsRoutes);
 router.use('/campaigns', campaignsRoutes);
 router.use('/messages', messagesRoutes);

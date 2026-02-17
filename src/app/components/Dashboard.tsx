@@ -1665,8 +1665,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     const calculatedStats = {
       total: leadsFiltradosPorFiltros.length,
       novosHoje: leadsFiltradosPorFiltros.filter((l) => {
-        // Comparar usando startsWith para suportar tanto "2026-02-11" quanto "2026-02-11T10:30:00.000Z"
-        const leadDate = l.data || l.createdAt || '';
+        // Usar capturedAt (quando disponível) ou fallback para data/createdAt
+        const leadDate = l.capturedAt || l.data || l.createdAt || '';
         return leadDate.startsWith(hoje);
       }).length,
       convertidos: leadsFiltradosPorFiltros.filter((l) => {

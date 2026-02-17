@@ -1,17 +1,19 @@
 import React from 'react';
-import { ChannelsList } from '../../inbox/channels/ChannelsList'; // Adjust import path if needed
+import TagsList from '../../inbox/tags/TagsList';
 
 export default function InboxSettings() {
     return (
-        <div className="h-full p-4 md:p-6 overflow-hidden flex flex-col">
-            <div className="mb-6 flex-shrink-0">
-                <h1 className="text-2xl font-bold mb-2" style={{ color: 'hsl(var(--foreground))' }}>Configurações do Inbox</h1>
-                <p style={{ color: 'hsl(var(--muted-foreground))' }}>Gerencie seus canais de comunicação e preferências.</p>
+        <div className="h-full p-4 md:p-6 overflow-auto">
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold mb-2" style={{ color: 'hsl(var(--foreground))' }}>
+                    Gerenciar Etiquetas
+                </h1>
+                <p style={{ color: 'hsl(var(--muted-foreground))' }}>
+                    Crie e organize etiquetas para categorizar suas conversas.
+                </p>
             </div>
 
-            <div className="flex-1 min-h-0">
-                <ChannelsList />
-            </div>
+            <TagsList />
         </div>
     );
 }

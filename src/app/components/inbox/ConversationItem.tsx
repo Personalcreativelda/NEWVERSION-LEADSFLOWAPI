@@ -1,6 +1,6 @@
 // INBOX: Item da lista de conversas modernizado
 import React from 'react';
-import type { ConversationWithDetails } from '../../types/inbox';
+import type { ConversationWithDetails, ConversationTagInfo } from '../../types/inbox';
 import {
     MessageCircle,
     Facebook,
@@ -13,7 +13,8 @@ import {
     CheckCheck,
     Mail,
     Globe,
-    Cloud
+    Cloud,
+    Tag
 } from 'lucide-react';
 
 interface ConversationItemProps {
@@ -22,11 +23,32 @@ interface ConversationItemProps {
     onClick: () => void;
 }
 
+// Mapa de cores para etiquetas do funil de vendas
+const FUNNEL_STAGE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+    novo: { bg: 'bg-cyan-100 dark:bg-cyan-900/30', text: 'text-cyan-700 dark:text-cyan-400', border: 'border-cyan-300 dark:border-cyan-700' },
+    new: { bg: 'bg-cyan-100 dark:bg-cyan-900/30', text: 'text-cyan-700 dark:text-cyan-400', border: 'border-cyan-300 dark:border-cyan-700' },
+    contatado: { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-400', border: 'border-purple-300 dark:border-purple-700' },
+    qualificado: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', border: 'border-yellow-300 dark:border-yellow-700' },
+    negociacao: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', border: 'border-orange-300 dark:border-orange-700' },
+    convertido: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', border: 'border-green-300 dark:border-green-700' },
+    perdido: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', border: 'border-red-300 dark:border-red-700' },
+};
+
+const FUNNEL_STAGE_LABELS: Record<string, string> = {
+    novo: 'Novo', new: 'Novo', contatado: 'Contatado', qualificado: 'Qualificado',
+    negociacao: 'Negociação', convertido: 'Convertido', perdido: 'Perdido',
+};
+
 export function ConversationItem({ conversation, isSelected, onClick }: ConversationItemProps) {
     const contact = conversation.contact;
     const lastMessage = conversation.last_message;
     const channel = conversation.channel;
     const isGroup = (conversation as any).is_group || conversation.metadata?.is_group || contact?.is_group;
+
+    // Coletar todas as etiquetas para exibição
+    const leadStatus = (contact as any)?.status || conversation.metadata?.lead_status;
+    const leadTags: string[] = (contact as any)?.tags || conversation.metadata?.tags || [];
+    const conversationTags: ConversationTagInfo[] = (conversation as any).conversation_tags || [];
 
     // Formatar data
     const formatDate = (dateString?: string) => {
@@ -179,11 +201,56 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
                     </span>
                 </div>
 
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                     <ChannelBadge />
                     {isGroup && (
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-medium">
                             Grupo
+                        </span>
+                    )}
+                    {/* Etiqueta do funil de vendas (status do lead) */}
+                    {leadStatus && leadStatus !== 'novo' && leadStatus !== 'new' && (
+                        <span 
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium border ${
+                                FUNNEL_STAGE_COLORS[leadStatus]?.bg || 'bg-gray-100 dark:bg-gray-800'
+                            } ${
+                                FUNNEL_STAGE_COLORS[leadStatus]?.text || 'text-gray-600 dark:text-gray-400'
+                            } ${
+                                FUNNEL_STAGE_COLORS[leadStatus]?.border || 'border-gray-300 dark:border-gray-600'
+                            }`}
+                        >
+                            {FUNNEL_STAGE_LABELS[leadStatus] || leadStatus}
+                        </span>
+                    )}
+                    {/* Etiquetas do lead (tags criadas na dashboard) */}
+                    {leadTags.slice(0, 2).map((tag, idx) => (
+                        <span 
+                            key={`lt-${idx}`}
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
+                        >
+                            <Tag size={8} />
+                            {tag}
+                        </span>
+                    ))}
+                    {/* Etiquetas da conversa (conversation_tags) */}
+                    {conversationTags.slice(0, 2).map((tag) => (
+                        <span 
+                            key={`ct-${tag.id}`}
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium border"
+                            style={{
+                                backgroundColor: `${tag.color}15`,
+                                color: tag.color,
+                                borderColor: `${tag.color}40`,
+                            }}
+                        >
+                            {tag.icon && <span className="text-[8px]">{tag.icon}</span>}
+                            {tag.name}
+                        </span>
+                    ))}
+                    {/* Indicador de mais etiquetas */}
+                    {(leadTags.length + conversationTags.length) > 4 && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                            +{(leadTags.length + conversationTags.length) - 4}
                         </span>
                     )}
                 </div>

@@ -122,7 +122,13 @@ export function useInbox(options: UseInboxOptions = {}) {
         }, [])
     });
 
-    const selectConversation = useCallback(async (conversation: ConversationWithDetails) => {
+    const selectConversation = useCallback(async (conversation: ConversationWithDetails | null) => {
+        // Se null, limpar a conversa selecionada (ex: ao deletar)
+        if (!conversation) {
+            setSelectedConversation(null);
+            return;
+        }
+
         // Atualizar conversa selecionada imediatamente com unread_count zerado
         const updatedConversation = conversation.unread_count > 0 
             ? { ...conversation, unread_count: 0 }

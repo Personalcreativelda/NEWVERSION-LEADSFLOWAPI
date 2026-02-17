@@ -51,9 +51,19 @@ export class ConversationsService {
                     : (existing.metadata || {});
 
                 // Merge metadata (novos valores sobrescrevem antigos, exceto se null)
+                // Proteção: não sobrescrever contact_name real com ID numérico
                 const merged: any = { ...existingMeta };
                 for (const [key, value] of Object.entries(metadata)) {
                     if (value !== null && value !== undefined) {
+                        // Se já existe um contact_name real, não sobrescrever com ID numérico
+                        if (key === 'contact_name' && existingMeta.contact_name && typeof value === 'string') {
+                            const isNewValueNumericId = /^\d{6,}$/.test(value);
+                            const isExistingRealName = !/^\d{6,}$/.test(existingMeta.contact_name);
+                            if (isNewValueNumericId && isExistingRealName) {
+                                // Não sobrescrever nome real com ID numérico
+                                continue;
+                            }
+                        }
                         merged[key] = value;
                     }
                 }

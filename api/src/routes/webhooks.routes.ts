@@ -5,6 +5,8 @@ import { ChannelsService } from '../services/channels.service';
 import { ConversationsService } from '../services/conversations.service';
 import { LeadsService } from '../services/leads.service';
 import { WhatsAppService } from '../services/whatsapp.service';
+// Lead Tracking: Importar serviço de rastreamento de leads
+import { leadTrackingService } from '../services/lead-tracking.service';
 // INBOX: Importar WebSocket service para notificações em tempo real
 import { getWebSocketService } from '../services/websocket.service';
 // IA: Importar processador de assistentes
@@ -54,6 +56,17 @@ router.post('/n8n/leads', async (req, res) => {
 
     const newLead = result.rows[0];
     console.log('[N8N Webhook] Lead criado com sucesso:', newLead.id);
+
+    // 🎯 Registrar captura de lead via N8N
+    try {
+      await leadTrackingService.recordLeadCapture(
+        userId, newLead.id, null as any, origem || 'n8n',
+        { contact_name: nome, phone: telefone, email: email, source: 'n8n' }
+      );
+      console.log('[N8N Webhook] ✅ Captura de lead registrada');
+    } catch (trackErr) {
+      console.error('[N8N Webhook] ⚠️ Erro ao registrar captura:', trackErr);
+    }
 
     res.status(201).json({
       success: true,
@@ -748,6 +761,7 @@ router.post('/evolution/messages', async (req, res) => {
     );
 
     let leadId: string;
+    let isNewLead = false;
 
     if (lead.rows.length === 0) {
       // Criar lead automaticamente
@@ -759,6 +773,25 @@ router.post('/evolution/messages', async (req, res) => {
         [channel.user_id, contactName, phone, waProfilePic]
       );
       leadId = leadResult.rows[0].id;
+      isNewLead = true;
+
+      // 🎯 Registrar captura de lead
+      try {
+        await leadTrackingService.recordLeadCapture(
+          channel.user_id,
+          leadId,
+          channel.id,
+          'whatsapp',
+          {
+            contact_name: contactName,
+            phone: phone,
+            initial_message: messageContent.substring(0, 100)
+          }
+        );
+        console.log('[Evolution Webhook] ✅ Captura de lead registrada');
+      } catch (trackErr) {
+        console.error('[Evolution Webhook] ⚠️ Erro ao registrar captura:', trackErr);
+      }
     } else {
       leadId = lead.rows[0].id;
       // Atualizar avatar se mudou ou não existia
@@ -821,6 +854,29 @@ router.post('/evolution/messages', async (req, res) => {
     const message = messageResult.rows[0];
 
     console.log('[Evolution Webhook] Mensagem salva com sucesso:', message.id, 'direction:', messageDirection);
+
+    // 💬 Registrar interação do lead
+    try {
+      await leadTrackingService.recordInteraction(
+        channel.user_id,
+        leadId,
+        messageDirection === 'in' ? 'message_received' : 'message_sent',
+        {
+          conversationId: conversation.id,
+          channelId: channel.id,
+          direction: messageDirection,
+          content: messageContent.substring(0, 200),
+          details: {
+            media_type: mediaType || null,
+            has_media: !!mediaUrl,
+            message_id: message.id,
+            from: messageDirection === 'in' ? 'contact' : 'user'
+          }
+        }
+      );
+    } catch (trackErr) {
+      console.error('[Evolution Webhook] ⚠️ Erro ao registrar interação:', trackErr);
+    }
 
     // Atualizar last_message_at e unread_count (só incrementa se for mensagem recebida, não enviada)
     if (!isFromMe) {
@@ -1081,6 +1137,17 @@ router.post('/telegram/:botToken?', async (req, res) => {
           [channel.user_id, contactName, chatId, tgProfilePic]
         );
         leadId = leadResult.rows[0].id;
+
+        // 🎯 Registrar captura de lead via Telegram
+        try {
+          await leadTrackingService.recordLeadCapture(
+            channel.user_id, leadId, channel.id, 'telegram',
+            { contact_name: contactName, chat_id: chatId, initial_message: 'Nova conversa Telegram' }
+          );
+          console.log('[Telegram Webhook] ✅ Captura de lead registrada');
+        } catch (trackErr) {
+          console.error('[Telegram Webhook] ⚠️ Erro ao registrar captura:', trackErr);
+        }
       } else {
         leadId = lead.rows[0].id;
         // Atualizar nome e avatar
@@ -1105,6 +1172,17 @@ router.post('/telegram/:botToken?', async (req, res) => {
           [channel.user_id, contactName, tgProfilePic]
         );
         leadId = leadResult.rows[0].id;
+
+        // 🎯 Registrar captura de lead via Telegram (fallback)
+        try {
+          await leadTrackingService.recordLeadCapture(
+            channel.user_id, leadId, channel.id, 'telegram',
+            { contact_name: contactName, initial_message: 'Nova conversa Telegram' }
+          );
+          console.log('[Telegram Webhook] ✅ Captura de lead registrada (fallback)');
+        } catch (trackErr) {
+          console.error('[Telegram Webhook] ⚠️ Erro ao registrar captura:', trackErr);
+        }
       } else {
         leadId = lead.rows[0].id;
       }
@@ -1427,6 +1505,16 @@ router.post('/facebook/test', async (req, res) => {
           [channel.user_id, 'Teste Facebook', testSenderId]
         );
         leadId = leadResult.rows[0].id;
+
+        // 🎯 Registrar captura de lead via Facebook (teste)
+        try {
+          await leadTrackingService.recordLeadCapture(
+            channel.user_id, leadId, channel.id, 'facebook',
+            { contact_name: 'Teste Facebook', facebook_psid: testSenderId, test: true }
+          );
+        } catch (trackErr) {
+          console.error('[Facebook Test] ⚠️ Erro ao registrar captura:', trackErr);
+        }
       } else {
         leadId = lead.rows[0].id;
       }
@@ -1440,6 +1528,16 @@ router.post('/facebook/test', async (req, res) => {
         [channel.user_id, 'Teste Facebook']
       );
       leadId = leadResult.rows[0].id;
+
+      // 🎯 Registrar captura de lead via Facebook (teste fallback)
+      try {
+        await leadTrackingService.recordLeadCapture(
+          channel.user_id, leadId, channel.id, 'facebook',
+          { contact_name: 'Teste Facebook', test: true }
+        );
+      } catch (trackErr) {
+        console.error('[Facebook Test] ⚠️ Erro ao registrar captura:', trackErr);
+      }
     }
 
     // Criar conversa
@@ -1629,7 +1727,10 @@ router.post('/facebook', async (req, res) => {
               `https://graph.facebook.com/v21.0/${senderId}?fields=first_name,last_name,name,profile_pic&access_token=${accessToken}`
             );
             const userData: any = await userResponse.json();
-            if (userData.name) {
+            console.log('[Facebook Webhook] Graph API response for', senderId, ':', JSON.stringify(userData));
+            if (userData.error) {
+              console.warn('[Facebook Webhook] ⚠️ Graph API error:', userData.error.message, '| Type:', userData.error.type, '| Code:', userData.error.code);
+            } else if (userData.name) {
               contactName = userData.name;
             } else if (userData.first_name) {
               contactName = [userData.first_name, userData.last_name].filter(Boolean).join(' ');
@@ -1637,9 +1738,17 @@ router.post('/facebook', async (req, res) => {
             if (userData.profile_pic) {
               fbProfilePic = userData.profile_pic;
             }
+          } else {
+            console.warn('[Facebook Webhook] ⚠️ Sem access_token disponível para buscar perfil do usuário');
           }
         } catch (e) {
           console.log('[Facebook Webhook] Não foi possível obter info do usuário:', e);
+        }
+
+        // Se o contactName ainda é o ID numérico, usar nome amigável
+        if (contactName === senderId) {
+          contactName = `Visitante Facebook #${senderId.slice(-4)}`;
+          console.log('[Facebook Webhook] ⚠️ Usando nome fallback:', contactName, '(Graph API não retornou nome)');
         }
 
         // Buscar ou criar lead pelo facebook_id (com fallback se coluna não existe)
@@ -1659,6 +1768,17 @@ router.post('/facebook', async (req, res) => {
               [channel.user_id, contactName, senderId, fbProfilePic]
             );
             leadId = leadResult.rows[0].id;
+
+            // 🎯 Registrar captura de lead via Facebook
+            try {
+              await leadTrackingService.recordLeadCapture(
+                channel.user_id, leadId, channel.id, 'facebook',
+                { contact_name: contactName, facebook_psid: senderId }
+              );
+              console.log('[Facebook Webhook] ✅ Captura de lead registrada');
+            } catch (trackErr) {
+              console.error('[Facebook Webhook] ⚠️ Erro ao registrar captura:', trackErr);
+            }
           } else {
             leadId = lead.rows[0].id;
             // Atualizar nome e avatar se mudaram
@@ -1683,6 +1803,17 @@ router.post('/facebook', async (req, res) => {
               [channel.user_id, contactName, fbProfilePic]
             );
             leadId = leadResult.rows[0].id;
+
+            // 🎯 Registrar captura de lead via Facebook (fallback)
+            try {
+              await leadTrackingService.recordLeadCapture(
+                channel.user_id, leadId, channel.id, 'facebook',
+                { contact_name: contactName }
+              );
+              console.log('[Facebook Webhook] ✅ Captura de lead registrada (fallback)');
+            } catch (trackErr) {
+              console.error('[Facebook Webhook] ⚠️ Erro ao registrar captura:', trackErr);
+            }
           } else {
             leadId = lead.rows[0].id;
           }
@@ -1922,6 +2053,16 @@ router.post('/instagram/test', async (req, res) => {
           [channel.user_id, 'Teste Instagram', testSenderId]
         );
         leadId = leadResult.rows[0].id;
+
+        // 🎯 Registrar captura de lead via Instagram (teste)
+        try {
+          await leadTrackingService.recordLeadCapture(
+            channel.user_id, leadId, channel.id, 'instagram',
+            { contact_name: 'Teste Instagram', instagram_id: testSenderId, test: true }
+          );
+        } catch (trackErr) {
+          console.error('[Instagram Test] ⚠️ Erro ao registrar captura:', trackErr);
+        }
       } else {
         leadId = lead.rows[0].id;
       }
@@ -1932,6 +2073,16 @@ router.post('/instagram/test', async (req, res) => {
         [channel.user_id, 'Teste Instagram']
       );
       leadId = leadResult.rows[0].id;
+
+      // 🎯 Registrar captura de lead via Instagram (teste fallback)
+      try {
+        await leadTrackingService.recordLeadCapture(
+          channel.user_id, leadId, channel.id, 'instagram',
+          { contact_name: 'Teste Instagram', test: true }
+        );
+      } catch (trackErr) {
+        console.error('[Instagram Test] ⚠️ Erro ao registrar captura:', trackErr);
+      }
     }
 
     const conversation = await conversationsService.findOrCreate(
@@ -2124,13 +2275,19 @@ router.post('/instagram', async (req, res) => {
               profilePic = userData.profile_pic;
               console.log('[Instagram Webhook] ✅ Nome do contato:', contactName);
             } else {
-              console.warn('[Instagram Webhook] Erro ao buscar info do usuário:', userData.error.message);
+              console.warn('[Instagram Webhook] ⚠️ Erro ao buscar info do usuário:', userData.error.message, '| Type:', userData.error.type, '| Code:', userData.error.code);
             }
           } else {
-            console.warn('[Instagram Webhook] Sem access_token para buscar info do usuário');
+            console.warn('[Instagram Webhook] ⚠️ Sem access_token para buscar info do usuário');
           }
         } catch (e) {
           console.log('[Instagram Webhook] Não foi possível obter info do usuário:', e);
+        }
+
+        // Se o contactName ainda é o ID numérico, usar nome amigável
+        if (contactName === senderId) {
+          contactName = `Visitante Instagram #${senderId.slice(-4)}`;
+          console.log('[Instagram Webhook] ⚠️ Usando nome fallback:', contactName, '(Graph API não retornou nome)');
         }
 
         // Buscar ou criar lead pelo instagram_id (com fallback se coluna não existe)
@@ -2150,6 +2307,17 @@ router.post('/instagram', async (req, res) => {
               [channel.user_id, contactName, senderId, profilePic]
             );
             leadId = leadResult.rows[0].id;
+
+            // 🎯 Registrar captura de lead via Instagram
+            try {
+              await leadTrackingService.recordLeadCapture(
+                channel.user_id, leadId, channel.id, 'instagram',
+                { contact_name: contactName, instagram_id: senderId }
+              );
+              console.log('[Instagram Webhook] ✅ Captura de lead registrada');
+            } catch (trackErr) {
+              console.error('[Instagram Webhook] ⚠️ Erro ao registrar captura:', trackErr);
+            }
           } else {
             leadId = lead.rows[0].id;
             // Atualizar nome e avatar do lead caso tenham mudado
@@ -2183,6 +2351,17 @@ router.post('/instagram', async (req, res) => {
               [channel.user_id, contactName]
             );
             leadId = leadResult.rows[0].id;
+
+            // 🎯 Registrar captura de lead via Instagram (fallback)
+            try {
+              await leadTrackingService.recordLeadCapture(
+                channel.user_id, leadId, channel.id, 'instagram',
+                { contact_name: contactName }
+              );
+              console.log('[Instagram Webhook] ✅ Captura de lead registrada (fallback)');
+            } catch (trackErr) {
+              console.error('[Instagram Webhook] ⚠️ Erro ao registrar captura:', trackErr);
+            }
           } else {
             leadId = lead.rows[0].id;
           }
@@ -2626,6 +2805,17 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
               [channel.user_id, contactName, phone]
             );
             leadId = leadResult.rows[0].id;
+
+            // 🎯 Registrar captura de lead via WhatsApp Cloud
+            try {
+              await leadTrackingService.recordLeadCapture(
+                channel.user_id, leadId, channel.id, 'whatsapp_cloud',
+                { contact_name: contactName, phone: phone, initial_message: messageContent?.substring(0, 100) }
+              );
+              console.log('[WhatsApp Cloud Webhook] ✅ Captura de lead registrada');
+            } catch (trackErr) {
+              console.error('[WhatsApp Cloud Webhook] ⚠️ Erro ao registrar captura:', trackErr);
+            }
           } else {
             leadId = lead.rows[0].id;
             // Atualizar nome se mudou
@@ -2842,6 +3032,17 @@ router.post('/website/:channelId', async (req, res) => {
         ]
       );
       leadId = leadResult.rows[0].id;
+
+      // 🎯 Registrar captura de lead via Website
+      try {
+        await leadTrackingService.recordLeadCapture(
+          channel.user_id, leadId, channel.id, 'website',
+          { contact_name: contactName, email: visitorEmail, page_url: pageUrl }
+        );
+        console.log('[Website Widget Webhook] ✅ Captura de lead registrada');
+      } catch (trackErr) {
+        console.error('[Website Widget Webhook] ⚠️ Erro ao registrar captura:', trackErr);
+      }
     } else {
       leadId = lead.id;
     }
@@ -3021,6 +3222,17 @@ router.post('/email/:channelId', async (req, res) => {
         [channel.user_id, senderName, senderEmail]
       );
       leadId = leadResult.rows[0].id;
+
+      // 🎯 Registrar captura de lead via Email
+      try {
+        await leadTrackingService.recordLeadCapture(
+          channel.user_id, leadId, channel.id, 'email',
+          { contact_name: senderName, email: senderEmail, subject: subject }
+        );
+        console.log('[Email Webhook] ✅ Captura de lead registrada');
+      } catch (trackErr) {
+        console.error('[Email Webhook] ⚠️ Erro ao registrar captura:', trackErr);
+      }
     } else {
       leadId = lead.rows[0].id;
     }
@@ -3423,6 +3635,17 @@ router.post('/n8n/campaign-message', async (req, res) => {
           [userId, contactName, cleanPhone]
         );
         finalLeadId = newLeadResult.rows[0].id;
+
+        // 🎯 Registrar captura de lead via Campanha
+        try {
+          await leadTrackingService.recordLeadCapture(
+            userId, finalLeadId, channel.id, 'campaign',
+            { contact_name: contactName, phone: cleanPhone, campaign_id: campaignId, campaign_name: campaignName }
+          );
+          console.log('[N8N Campaign] ✅ Captura de lead registrada');
+        } catch (trackErr) {
+          console.error('[N8N Campaign] ⚠️ Erro ao registrar captura:', trackErr);
+        }
       }
     }
 
@@ -3667,6 +3890,16 @@ router.post('/n8n/campaign-messages-batch', async (req, res) => {
               [userId, contactName, cleanPhone]
             );
             leadId = newLeadResult.rows[0].id;
+
+            // 🎯 Registrar captura de lead via Campanha (batch)
+            try {
+              await leadTrackingService.recordLeadCapture(
+                userId, leadId, channel.id, 'campaign',
+                { contact_name: contactName, phone: cleanPhone, campaign_id: campaignId }
+              );
+            } catch (trackErr) {
+              console.error('[N8N Campaign Batch] ⚠️ Erro ao registrar captura:', trackErr);
+            }
           }
         }
 
@@ -3774,6 +4007,441 @@ router.post('/n8n/campaign-messages-batch', async (req, res) => {
       error: 'Erro ao processar lote de mensagens',
       message: error.message
     });
+  }
+});
+
+// ✅ Webhook para Telegram Bot
+router.post('/telegram/messages', async (req, res) => {
+  try {
+    console.log('[Telegram Webhook] Received message:', JSON.stringify(req.body).substring(0, 200));
+    
+    const update = req.body;
+    
+    // Verificar se é uma mensagem de texto
+    if (!update.message || !update.message.text) {
+      console.log('[Telegram Webhook] Skipping non-text message');
+      return res.json({ ok: true });
+    }
+
+    const message = update.message;
+    const chatId = message.chat?.id;
+    const userId = message.from?.id;
+    const firstName = message.from?.first_name || 'User';
+    const lastName = message.from?.last_name || '';
+    const contactName = `${firstName} ${lastName}`.trim();
+    const messageText = message.text;
+
+    if (!chatId || !userId) {
+      console.warn('[Telegram Webhook] Missing chatId or userId');
+      return res.json({ ok: true });
+    }
+
+    // Buscar canal Telegram ativo do usuário (precisamos de informação do usuário da app)
+    // Para isso, você precisará passar o userId da aplicação via metadata ou token
+    const internalUserId = req.body.internal_user_id || req.headers['x-internal-user-id'];
+    
+    if (!internalUserId) {
+      console.warn('[Telegram Webhook] Missing internal_user_id');
+      return res.json({ ok: true });
+    }
+
+    // Buscar canal Telegram
+    const channelResult = await query(
+      `SELECT * FROM channels WHERE type = 'telegram' AND user_id = $1`,
+      [internalUserId]
+    );
+
+    if (channelResult.rows.length === 0) {
+      console.warn('[Telegram Webhook] No Telegram channel found for user:', internalUserId);
+      return res.json({ ok: true });
+    }
+
+    const channel = channelResult.rows[0];
+
+    // Buscar ou criar lead
+    let leadResult = await query(
+      `SELECT * FROM leads WHERE user_id = $1 AND (name = $2 OR source = 'telegram')
+       LIMIT 1`,
+      [internalUserId, contactName]
+    );
+
+    let leadId: string;
+    let isNewLead = false;
+
+    if (leadResult.rows.length === 0) {
+      // Criar novo lead
+      const newLeadResult = await query(
+        `INSERT INTO leads (user_id, name, source, status)
+         VALUES ($1, $2, 'telegram', 'new')
+         RETURNING *`,
+        [internalUserId, contactName]
+      );
+      leadId = newLeadResult.rows[0].id;
+      isNewLead = true;
+
+      // Registrar captura
+      await leadTrackingService.recordLeadCapture(
+        internalUserId,
+        leadId,
+        channel.id,
+        'telegram',
+        {
+          contact_name: contactName,
+          chat_id: chatId,
+          initial_message: messageText.substring(0, 100)
+        }
+      ).catch(err => console.error('[Telegram] Error recording capture:', err));
+    } else {
+      leadId = leadResult.rows[0].id;
+    }
+
+    // Buscar ou criar conversa
+    const remoteJid = `${chatId}@telegram`;
+    const convResult = await conversationsService.findOrCreate(
+      internalUserId,
+      channel.id,
+      remoteJid,
+      leadId,
+      {
+        contact_name: contactName,
+        chat_id: chatId,
+        platform: 'telegram'
+      }
+    );
+
+    // Salvar mensagem
+    const msgResult = await query(
+      `INSERT INTO messages (
+        user_id, conversation_id, lead_id, direction, channel,
+        content, status, external_id, metadata
+      )
+       VALUES ($1, $2, $3, 'in', 'telegram', $4, 'delivered', $5, $6)
+       RETURNING *`,
+      [
+        internalUserId,
+        convResult.id,
+        leadId,
+        messageText,
+        `${chatId}_${message.message_id}`,
+        JSON.stringify({
+          chat_id: chatId,
+          user_id: userId,
+          message_id: message.message_id,
+          timestamp: message.date,
+          platform: 'telegram'
+        })
+      ]
+    );
+
+    // Registrar interação
+    await leadTrackingService.recordInteraction(
+      internalUserId,
+      leadId,
+      'message_received',
+      {
+        conversationId: convResult.id,
+        channelId: channel.id,
+        direction: 'in',
+        content: messageText.substring(0, 200),
+        details: {
+          platform: 'telegram',
+          chat_id: chatId,
+          message_id: message.message_id
+        }
+      }
+    ).catch(err => console.error('[Telegram] Error recording interaction:', err));
+
+    // Atualizar conversa
+    await query(
+      `UPDATE conversations SET last_message_at = NOW(), updated_at = NOW() WHERE id = $1`,
+      [convResult.id]
+    );
+
+    console.log('[Telegram Webhook] ✅ Message processed successfully');
+    res.json({ ok: true });
+  } catch (error: any) {
+    console.error('[Telegram Webhook] Error:', error);
+    res.json({ ok: true }); // Return ok to prevent retry
+  }
+});
+
+// ✅ Webhook para Instagram Direct Messages
+router.post('/instagram/messages', async (req, res) => {
+  try {
+    console.log('[Instagram Webhook] Received message:', JSON.stringify(req.body).substring(0, 200));
+
+    const update = req.body;
+    const internalUserId = update.internal_user_id || req.headers['x-internal-user-id'];
+
+    if (!internalUserId) {
+      console.warn('[Instagram Webhook] Missing internal_user_id');
+      return res.json({ ok: true });
+    }
+
+    // Buscar canal Instagram
+    const channelResult = await query(
+      `SELECT * FROM channels WHERE type = 'instagram' AND user_id = $1`,
+      [internalUserId]
+    );
+
+    if (channelResult.rows.length === 0) {
+      console.warn('[Instagram Webhook] No Instagram channel found');
+      return res.json({ ok: true });
+    }
+
+    const channel = channelResult.rows[0];
+
+    // Extrair dados da mensagem (formato pode variar)
+    const senderId = update.sender?.id || update.from_id;
+    const senderName = update.sender?.name || update.from_name || 'Instagram User';
+    const messageText = update.message?.text || update.text || '';
+    const messageId = update.message?.id || update.id;
+
+    if (!senderId || !messageText) {
+      console.log('[Instagram Webhook] Skipping non-text message');
+      return res.json({ ok: true });
+    }
+
+    // Buscar ou criar lead
+    let leadResult = await query(
+      `SELECT * FROM leads WHERE user_id = $1 AND (name ILIKE $2 OR source = 'instagram')
+       LIMIT 1`,
+      [internalUserId, `%${senderName}%`]
+    );
+
+    let leadId: string;
+
+    if (leadResult.rows.length === 0) {
+      const newLeadResult = await query(
+        `INSERT INTO leads (user_id, name, source, status)
+         VALUES ($1, $2, 'instagram', 'new')
+         RETURNING *`,
+        [internalUserId, senderName]
+      );
+      leadId = newLeadResult.rows[0].id;
+
+      // Registrar captura
+      await leadTrackingService.recordLeadCapture(
+        internalUserId,
+        leadId,
+        channel.id,
+        'instagram',
+        {
+          contact_name: senderName,
+          sender_id: senderId,
+          initial_message: messageText.substring(0, 100)
+        }
+      ).catch(err => console.error('[Instagram] Error recording capture:', err));
+    } else {
+      leadId = leadResult.rows[0].id;
+    }
+
+    // Buscar ou criar conversa
+    const remoteJid = `${senderId}@instagram`;
+    const convResult = await conversationsService.findOrCreate(
+      internalUserId,
+      channel.id,
+      remoteJid,
+      leadId,
+      {
+        contact_name: senderName,
+        sender_id: senderId,
+        platform: 'instagram'
+      }
+    );
+
+    // Salvar mensagem
+    await query(
+      `INSERT INTO messages (
+        user_id, conversation_id, lead_id, direction, channel,
+        content, status, external_id, metadata
+      )
+       VALUES ($1, $2, $3, 'in', 'instagram', $4, 'delivered', $5, $6)
+       RETURNING *`,
+      [
+        internalUserId,
+        convResult.id,
+        leadId,
+        messageText,
+        messageId,
+        JSON.stringify({
+          sender_id: senderId,
+          message_id: messageId,
+          platform: 'instagram',
+          received_at: new Date().toISOString()
+        })
+      ]
+    );
+
+    // Registrar interação
+    await leadTrackingService.recordInteraction(
+      internalUserId,
+      leadId,
+      'message_received',
+      {
+        conversationId: convResult.id,
+        channelId: channel.id,
+        direction: 'in',
+        content: messageText.substring(0, 200),
+        details: {
+          platform: 'instagram',
+          sender_id: senderId
+        }
+      }
+    ).catch(err => console.error('[Instagram] Error recording interaction:', err));
+
+    // Atualizar conversa
+    await query(
+      `UPDATE conversations SET last_message_at = NOW(), updated_at = NOW() WHERE id = $1`,
+      [convResult.id]
+    );
+
+    console.log('[Instagram Webhook] ✅ Message processed successfully');
+    res.json({ ok: true });
+  } catch (error: any) {
+    console.error('[Instagram Webhook] Error:', error);
+    res.json({ ok: true });
+  }
+});
+
+// ✅ Webhook para WhatsApp Cloud API
+router.post('/whatsapp-cloud/messages', async (req, res) => {
+  try {
+    console.log('[WhatsApp Cloud Webhook] Received message');
+
+    const update = req.body.entry?.[0]?.changes?.[0]?.value;
+    
+    if (!update?.messages || update.messages.length === 0) {
+      console.log('[WhatsApp Cloud] No messages in webhook');
+      return res.json({ received: true });
+    }
+
+    const message = update.messages[0];
+    const contactInfo = update.contacts?.[0];
+    const businessPhoneNumberId = update.metadata?.phone_number_id;
+    const internalUserId = req.body.internal_user_id || req.headers['x-internal-user-id'];
+
+    if (!internalUserId) {
+      console.warn('[WhatsApp Cloud] Missing internal_user_id');
+      return res.json({ received: true });
+    }
+
+    // Buscar canal WhatsApp Cloud
+    const channelResult = await query(
+      `SELECT * FROM channels WHERE type = 'whatsapp_cloud' AND user_id = $1`,
+      [internalUserId]
+    );
+
+    if (channelResult.rows.length === 0) {
+      console.warn('[WhatsApp Cloud] No channel found');
+      return res.json({ received: true });
+    }
+
+    const channel = channelResult.rows[0];
+
+    const senderPhone = message.from;
+    const contactName = contactInfo?.profile?.name || senderPhone;
+    const messageText = message.text?.body || message.image?.caption || message.document?.caption || '[Mídia]';
+
+    // Buscar ou criar lead
+    let leadResult = await query(
+      `SELECT * FROM leads WHERE user_id = $1 AND (phone = $2 OR whatsapp = $2)`,
+      [internalUserId, senderPhone]
+    );
+
+    let leadId: string;
+
+    if (leadResult.rows.length === 0) {
+      const newLeadResult = await query(
+        `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
+         VALUES ($1, $2, $3, $3, 'whatsapp_cloud', 'new')
+         RETURNING *`,
+        [internalUserId, contactName, senderPhone]
+      );
+      leadId = newLeadResult.rows[0].id;
+
+      // Registrar captura
+      await leadTrackingService.recordLeadCapture(
+        internalUserId,
+        leadId,
+        channel.id,
+        'whatsapp_cloud',
+        {
+          contact_name: contactName,
+          phone: senderPhone,
+          initial_message: messageText.substring(0, 100)
+        }
+      ).catch(err => console.error('[WhatsApp Cloud] Error recording capture:', err));
+    } else {
+      leadId = leadResult.rows[0].id;
+    }
+
+    // Buscar ou criar conversa
+    const remoteJid = `${senderPhone}@s.whatsapp.net`;
+    const convResult = await conversationsService.findOrCreate(
+      internalUserId,
+      channel.id,
+      remoteJid,
+      leadId,
+      {
+        contact_name: contactName,
+        phone: senderPhone,
+        platform: 'whatsapp_cloud'
+      }
+    );
+
+    // Salvar mensagem
+    await query(
+      `INSERT INTO messages (
+        user_id, conversation_id, lead_id, direction, channel,
+        content, status, external_id, metadata
+      )
+       VALUES ($1, $2, $3, 'in', 'whatsapp_cloud', $4, 'delivered', $5, $6)
+       RETURNING *`,
+      [
+        internalUserId,
+        convResult.id,
+        leadId,
+        messageText,
+        message.id,
+        JSON.stringify({
+          phone: senderPhone,
+          message_type: message.type,
+          timestamp: message.timestamp,
+          platform: 'whatsapp_cloud'
+        })
+      ]
+    );
+
+    // Registrar interação
+    await leadTrackingService.recordInteraction(
+      internalUserId,
+      leadId,
+      'message_received',
+      {
+        conversationId: convResult.id,
+        channelId: channel.id,
+        direction: 'in',
+        content: messageText.substring(0, 200),
+        details: {
+          platform: 'whatsapp_cloud',
+          phone: senderPhone,
+          message_type: message.type
+        }
+      }
+    ).catch(err => console.error('[WhatsApp Cloud] Error recording interaction:', err));
+
+    // Atualizar conversa
+    await query(
+      `UPDATE conversations SET last_message_at = NOW(), updated_at = NOW() WHERE id = $1`,
+      [convResult.id]
+    );
+
+    console.log('[WhatsApp Cloud] ✅ Message processed successfully');
+    res.json({ received: true });
+  } catch (error: any) {
+    console.error('[WhatsApp Cloud Webhook] Error:', error);
+    res.json({ received: true });
   }
 });
 

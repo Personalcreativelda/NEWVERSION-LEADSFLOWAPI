@@ -7,14 +7,14 @@ export type InboxFilterType = 'all' | 'mentions' | 'unattended';
 export interface InboxFilters {
     type: InboxFilterType;
     channel?: string;
-    status?: string;
+    tag?: string; // Mudado de 'status' para 'tag' - etiquetas customizáveis
 }
 
 // Estado padrão (sem filtros)
 const DEFAULT_FILTERS: InboxFilters = {
     type: 'all',
     channel: undefined,
-    status: undefined,
+    tag: undefined,
 };
 
 // Store global para filtros - usando class para melhor encapsulamento
@@ -35,7 +35,7 @@ class InboxFiltersStore {
         return {
             type: (params.get('filter') as InboxFilterType) || 'all',
             channel: params.get('channel') || undefined,
-            status: params.get('status') || undefined,
+            tag: params.get('tag') || undefined,
         };
     }
 
@@ -50,8 +50,8 @@ class InboxFiltersStore {
         if (this.filters.channel) {
             params.set('channel', this.filters.channel);
         }
-        if (this.filters.status) {
-            params.set('status', this.filters.status);
+        if (this.filters.tag) {
+            params.set('tag', this.filters.tag);
         }
         
         const queryString = params.toString();
@@ -97,8 +97,8 @@ class InboxFiltersStore {
         this.emitChange();
     }
 
-    setStatusFilter(status?: string): void {
-        this.filters = { ...this.filters, status };
+    setTagFilter(tag?: string): void {
+        this.filters = { ...this.filters, tag };
         this.emitChange();
     }
 
@@ -135,14 +135,14 @@ export function useInboxFilters() {
         filtersStore.setChannelFilter(channel);
     }, []);
     
-    const setStatusFilter = useCallback((status?: string) => {
-        filtersStore.setStatusFilter(status);
+    const setTagFilter = useCallback((tag?: string) => {
+        filtersStore.setTagFilter(tag);
     }, []);
     
     const hasActiveFilters = useMemo(() => {
         return filters.type !== 'all' || 
                !!filters.channel || 
-               !!filters.status;
+               !!filters.tag;
     }, [filters]);
     
     const getActiveFiltersDescription = useCallback(() => {
@@ -158,9 +158,8 @@ export function useInboxFilters() {
             parts.push('Canal selecionado');
         }
         
-        if (filters.status) {
-            const statusLabel = filters.status.charAt(0).toUpperCase() + filters.status.slice(1);
-            parts.push(statusLabel);
+        if (filters.tag) {
+            parts.push('Etiqueta selecionada');
         }
         
         return parts.length > 0 ? parts.join(' • ') : 'Todas as conversas';
@@ -172,7 +171,7 @@ export function useInboxFilters() {
         clearFilters,
         setFilterType,
         setChannelFilter,
-        setStatusFilter,
+        setTagFilter,
         hasActiveFilters,
         getActiveFiltersDescription,
     };

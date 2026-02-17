@@ -6,6 +6,7 @@ import { notificationsService } from '../services/notifications.service';
 import { getStorageService } from '../services/storage.service';
 import { WhatsAppService } from '../services/whatsapp.service';
 import { ChannelsService } from '../services/channels.service';
+import { leadTrackingService } from '../services/lead-tracking.service';
 
 const router = Router();
 const leadsService = new LeadsService();
@@ -109,6 +110,24 @@ router.put('/:id', async (req, res, next) => {
         'arrow-right',
         { leadId: lead.id, leadName, email: lead.email, oldStatus: oldLead.status, newStatus: req.body.status }
       );
+
+      // 📊 Registrar mudança de status no tracking
+      try {
+        await leadTrackingService.recordStatusChange(
+          user.id,
+          req.params.id,
+          req.body.status,
+          req.body.statusChangeReason || 'Manual update via API',
+          {
+            updated_fields: Object.keys(req.body).filter(k => k !== 'status'),
+            source: 'api',
+            timestamp: new Date().toISOString()
+          }
+        );
+        console.log('[LeadsAPI] ✅ Status change recorded for lead:', req.params.id);
+      } catch (trackErr) {
+        console.error('[LeadsAPI] ⚠️ Error recording status change:', trackErr);
+      }
     }
 
     res.json(lead);

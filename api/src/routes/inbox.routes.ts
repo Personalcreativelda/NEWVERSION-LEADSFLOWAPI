@@ -221,6 +221,7 @@ router.get('/conversations', async (req, res, next) => {
         l.status as lead_status,
         l.company as lead_company,
         l.source as lead_source,
+        l.tags as lead_tags,
         ch.type as channel_type,
         ch.name as channel_name,
         ch.status as channel_status,
@@ -243,7 +244,20 @@ router.get('/conversations', async (req, res, next) => {
           SELECT COUNT(*)::int 
           FROM messages m 
           WHERE m.conversation_id = c.id
-        ) as message_count
+        ) as message_count,
+        (
+          SELECT COALESCE(json_agg(
+            json_build_object(
+              'id', ct.id,
+              'name', ct.name,
+              'color', ct.color,
+              'icon', ct.icon
+            ) ORDER BY ct.order_index
+          ) FILTER (WHERE ct.id IS NOT NULL), '[]'::json)
+          FROM conversation_tag_assignments cta
+          JOIN conversation_tags ct ON cta.tag_id = ct.id
+          WHERE cta.conversation_id = c.id
+        ) as conversation_tags
       FROM conversations c
       LEFT JOIN leads l ON c.lead_id = l.id
       LEFT JOIN channels ch ON c.channel_id = ch.id
@@ -293,7 +307,21 @@ router.get('/conversations', async (req, res, next) => {
 
     // Transform to frontend format
     const conversations = dbConversations.map((conv: any) => {
-      const displayName = conv.lead_name || conv.metadata?.contact_name || conv.remote_jid?.split('@')[0] || 'Desconhecido';
+      let displayName = conv.lead_name || conv.metadata?.contact_name || conv.remote_jid?.split('@')[0] || 'Desconhecido';
+      
+      // Se o displayName é um ID numérico longo (PSID do Facebook/Instagram), usar nome amigável
+      if (/^\d{6,}$/.test(displayName)) {
+        const channelType = conv.channel_type || '';
+        const shortId = displayName.slice(-4);
+        if (channelType === 'facebook' || channelType === 'messenger') {
+          displayName = `Visitante Facebook #${shortId}`;
+        } else if (channelType === 'instagram') {
+          displayName = `Visitante Instagram #${shortId}`;
+        } else if (channelType === 'telegram') {
+          displayName = `Visitante Telegram #${shortId}`;
+        }
+      }
+      
       const phone = conv.lead_phone || conv.lead_whatsapp || conv.metadata?.phone || conv.remote_jid?.split('@')[0];
       const profilePic = conv.lead_avatar || conv.metadata?.profile_picture || null;
       
@@ -318,6 +346,7 @@ router.get('/conversations', async (req, res, next) => {
           is_group: conv.is_group || false,
           jid: conv.remote_jid,
           lead_status: conv.lead_status,
+          tags: conv.lead_tags || [],
         },
         created_at: conv.created_at,
         updated_at: conv.updated_at,
@@ -331,7 +360,9 @@ router.get('/conversations', async (req, res, next) => {
           email: conv.lead_email,
           company: conv.lead_company,
           source: conv.lead_source,
+          tags: conv.lead_tags || [],
         },
+        conversation_tags: conv.conversation_tags || [],
         channel: {
           id: conv.channel_id,
           type: conv.channel_type || 'whatsapp',

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
     ChevronRight, ChevronDown, Inbox, Hash, Tag, AtSign, Bell, Settings, Bot, Zap,
-    MessageCircle, Instagram, Facebook, Send, Mail, Cloud, Globe
+    MessageCircle, Instagram, Facebook, Send, Mail, Cloud, Globe, Plus
 } from 'lucide-react';
-import { channelsApi } from '../../services/api/inbox';
+import { channelsApi, conversationTagsApi } from '../../services/api/inbox';
 import { useInboxFilters, type InboxFilterType } from '../../hooks/useInboxFilters';
 
 interface InboxTreeMenuProps {
@@ -13,28 +13,31 @@ interface InboxTreeMenuProps {
     translations: any;
 }
 
-// Status fixos da aplicação
-const STATUS_OPTIONS = [
-    { value: 'novo', label: 'Novo', color: 'text-cyan-500' },
-    { value: 'contatado', label: 'Contactado', color: 'text-purple-500' },
-    { value: 'qualificado', label: 'Qualificado', color: 'text-yellow-500' },
-    { value: 'negociacao', label: 'Negociação', color: 'text-orange-500' },
-    { value: 'convertido', label: 'Convertido', color: 'text-green-500' },
-    { value: 'perdido', label: 'Perdido', color: 'text-red-500' },
-];
+// Interface para tipos de tags
+interface TagItem {
+    id: string;
+    name: string;
+    color?: string;
+    icon?: string;
+    order_index?: number;
+    type?: string; // 'conversation' | 'funnel' | 'lead_tag'
+    count?: number;
+}
 
 export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, translations: t }: InboxTreeMenuProps) {
     const [showChannels, setShowChannels] = useState(false);
-    const [showStatus, setShowStatus] = useState(false);
+    const [showTags, setShowTags] = useState(false);
     const [channels, setChannels] = useState<any[]>([]);
+    const [tags, setTags] = useState<TagItem[]>([]);
     const [loadingChannels, setLoadingChannels] = useState(false);
+    const [loadingTags, setLoadingTags] = useState(false);
     
     // Usar hook centralizado de filtros
-    const { filters, setFilterType, setChannelFilter, setStatusFilter, clearFilters } = useInboxFilters();
+    const { filters, setFilterType, setChannelFilter, setTagFilter, clearFilters } = useInboxFilters();
     
     // Determinar estado ativo baseado nos filtros
     const isInboxActive = currentPage === 'inbox' || currentPage === 'inbox-conversations';
-    const isAllConversationsActive = isInboxActive && filters.type === 'all' && !filters.channel && !filters.status;
+    const isAllConversationsActive = isInboxActive && filters.type === 'all' && !filters.channel && !filters.tag;
     const isMentionsActive = isInboxActive && filters.type === 'mentions';
     const isUnattendedActive = isInboxActive && filters.type === 'unattended';
 
@@ -84,12 +87,18 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
         }
     };
 
-    // Fetch channels when expanding
+    // Fetch channels and tags when expanding
     useEffect(() => {
         if (showChannels && channels.length === 0) {
             loadChannels();
         }
     }, [showChannels]);
+
+    useEffect(() => {
+        if (showTags) {
+            loadTags();
+        }
+    }, [showTags]);
 
     const loadChannels = async () => {
         setLoadingChannels(true);
@@ -100,6 +109,23 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
             console.error('Error loading channels:', err);
         } finally {
             setLoadingChannels(false);
+        }
+    };
+
+    const loadTags = async () => {
+        setLoadingTags(true);
+        try {
+            const combined = await conversationTagsApi.getCombinedTags();
+            const allTags: TagItem[] = [
+                ...combined.funnel_stages.map((t: any) => ({ ...t, type: 'funnel' })),
+                ...combined.lead_tags.map((t: any) => ({ ...t, type: 'lead_tag' })),
+                ...combined.conversation_tags.map((t: any) => ({ ...t, type: 'conversation' })),
+            ];
+            setTags(allTags);
+        } catch (err) {
+            console.error('Error loading tags:', err);
+        } finally {
+            setLoadingTags(false);
         }
     };
 
@@ -125,10 +151,10 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
         onNavigate('inbox', { channel: channelId });
     };
 
-    const handleStatusClick = (status: string) => {
-        // Definir filtro de status (mantém outros filtros)
-        setStatusFilter(status);
-        onNavigate('inbox', { status });
+    const handleTagClick = (tagId: string) => {
+        // Definir filtro de tag (mantém outros filtros)
+        setTagFilter(tagId);
+        onNavigate('inbox', { tag: tagId });
     };
 
     if (!isExpanded) return null;
@@ -243,54 +269,145 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                 )}
             </div>
 
-            {/* 5. Status - Dropdown */}
+            {/* 5. Etiquetas - Dropdown */}
             <div>
                 <button
-                    onClick={() => setShowStatus(!showStatus)}
+                    onClick={() => setShowTags(!showTags)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                        filters.status ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+                        filters.tag ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
                     } hover:bg-white/10`}
                     style={{ color: 'hsl(var(--sidebar-foreground) / 0.8)' }}
                 >
-                    {showStatus ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {showTags ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     <Tag className="w-5 h-5" />
-                    <span className="flex-1 text-left font-medium">{t.status || 'Status'}</span>
-                    {filters.status && (
+                    <span className="flex-1 text-left font-medium">{t.tags || 'Etiquetas'}</span>
+                    {filters.tag && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-500">1</span>
                     )}
                 </button>
 
-                {showStatus && (
+                {showTags && (
                     <div className="ml-6 mt-1 space-y-0.5 relative">
-                        {/* Linha vertical para os itens do dropdown Status */}
-                        <div 
-                            className="absolute left-[7px] top-0 bottom-0 w-[1px] opacity-20"
-                            style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
-                        />
-                        {STATUS_OPTIONS.map((status) => {
-                            const isStatusActive = filters.status === status.value;
-                            return (
-                                <div key={status.value} className="relative flex items-center">
-                                    {/* Linha horizontal conectando ao item */}
-                                    <div
-                                        className="absolute left-[7px] w-[8px] h-[1px] opacity-20"
-                                        style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
-                                    />
-                                    <button
-                                        onClick={() => handleStatusClick(status.value)}
-                                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
-                                            isStatusActive
-                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                                                : 'hover:bg-white/10'
-                                        }`}
-                                        style={!isStatusActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
-                                    >
-                                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${status.color.replace('text-', 'bg-')}`} />
-                                        <span className="truncate">{status.label}</span>
-                                    </button>
-                                </div>
-                            );
-                        })}
+                        {/* Linha vertical para os itens do dropdown Etiquetas */}
+                        {tags.length > 0 && (
+                            <div 
+                                className="absolute left-[7px] top-0 bottom-0 w-[1px] opacity-20"
+                                style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
+                            />
+                        )}
+                        {loadingTags ? (
+                            <div className="px-3 py-2 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                Carregando...
+                            </div>
+                        ) : tags.length === 0 ? (
+                            <div className="px-3 py-2 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                Nenhuma etiqueta criada
+                            </div>
+                        ) : (
+                            <>
+                                {/* Etapas do Funil */}
+                                {tags.filter(t => t.type === 'funnel').length > 0 && (
+                                    <>
+                                        <div className="px-3 pt-1 pb-0.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                            Funil de Vendas
+                                        </div>
+                                        {tags.filter(t => t.type === 'funnel').map((tag) => {
+                                            const isTagActive = filters.tag === tag.id;
+                                            return (
+                                                <div key={tag.id} className="relative flex items-center">
+                                                    <div className="absolute left-[7px] w-[8px] h-[1px] opacity-20" style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }} />
+                                                    <button
+                                                        onClick={() => handleTagClick(tag.id)}
+                                                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
+                                                            isTagActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'hover:bg-white/10'
+                                                        }`}
+                                                        style={!isTagActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
+                                                    >
+                                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#6B7280' }} />
+                                                        <span className="truncate">{tag.name}</span>
+                                                        {tag.count !== undefined && (
+                                                            <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${tag.color || '#6B7280'}20`, color: tag.color || '#6B7280' }}>
+                                                                {tag.count}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </>
+                                )}
+
+                                {/* Tags dos Leads */}
+                                {tags.filter(t => t.type === 'lead_tag').length > 0 && (
+                                    <>
+                                        <div className="px-3 pt-2 pb-0.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                            Tags dos Leads
+                                        </div>
+                                        {tags.filter(t => t.type === 'lead_tag').map((tag) => {
+                                            const isTagActive = filters.tag === tag.id;
+                                            return (
+                                                <div key={tag.id} className="relative flex items-center">
+                                                    <div className="absolute left-[7px] w-[8px] h-[1px] opacity-20" style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }} />
+                                                    <button
+                                                        onClick={() => handleTagClick(tag.id)}
+                                                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
+                                                            isTagActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'hover:bg-white/10'
+                                                        }`}
+                                                        style={!isTagActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
+                                                    >
+                                                        <Tag className="w-3 h-3 flex-shrink-0" style={{ color: tag.color || '#3B82F6' }} />
+                                                        <span className="truncate">{tag.name}</span>
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </>
+                                )}
+
+                                {/* Etiquetas da Conversa */}
+                                {tags.filter(t => t.type === 'conversation').length > 0 && (
+                                    <>
+                                        <div className="px-3 pt-2 pb-0.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                            Etiquetas de Conversa
+                                        </div>
+                                        {tags.filter(t => t.type === 'conversation').map((tag) => {
+                                            const isTagActive = filters.tag === tag.id;
+                                            return (
+                                                <div key={tag.id} className="relative flex items-center">
+                                                    <div className="absolute left-[7px] w-[8px] h-[1px] opacity-20" style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }} />
+                                                    <button
+                                                        onClick={() => handleTagClick(tag.id)}
+                                                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
+                                                            isTagActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'hover:bg-white/10'
+                                                        }`}
+                                                        style={!isTagActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
+                                                    >
+                                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#3B82F6' }} />
+                                                        {tag.icon && <span className="text-xs">{tag.icon}</span>}
+                                                        <span className="truncate">{tag.name}</span>
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </>
+                                )}
+                            </>
+                        )}
+                        {/* Botão para criar nova etiqueta */}
+                        <div className="relative flex items-center px-1 pt-1">
+                            {/* Linha horizontal conectando ao item */}
+                            <div
+                                className="absolute left-[7px] w-[8px] h-[1px] opacity-20"
+                                style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
+                            />
+                            <button
+                                onClick={() => onNavigate('inbox-settings')}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 hover:bg-white/10 text-blue-500"
+                            >
+                                <Plus className="w-4 h-4 flex-shrink-0" />
+                                <span className="truncate text-xs">{t.newTag || 'Nova Etiqueta'}</span>
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
