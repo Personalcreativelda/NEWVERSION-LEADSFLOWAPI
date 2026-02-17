@@ -1,4 +1,4 @@
-import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, CheckSquare, Search, Plus, Megaphone, Square, Instagram, Facebook, Send } from 'lucide-react';
+import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, CheckSquare, Search, Plus, Megaphone, Square, Instagram, Facebook, Send, Smartphone } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { Lead } from '../../types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -46,6 +46,10 @@ const renderOriginWithIcon = (origem: string | undefined, channelSource?: string
     icon = <Send className="w-4 h-4" />;
     colorClass = 'text-sky-600 dark:text-sky-400';
     label = 'Telegram';
+  } else if (channel.includes('sms') || channel.includes('twilio')) {
+    icon = <Smartphone className="w-4 h-4" />;
+    colorClass = 'text-teal-600 dark:text-teal-400';
+    label = 'SMS';
   } else if (channel.includes('email') || channel.includes('mail') || channel.includes('@')) {
     icon = <Mail className="w-4 h-4" />;
     colorClass = 'text-purple-600 dark:text-purple-400';

@@ -9,6 +9,7 @@ import { FacebookConnect } from './FacebookConnect';
 import { InstagramConnect } from './InstagramConnect';
 import { WebsiteWidgetConnect } from './WebsiteWidgetConnect';
 import { EmailConnect } from './EmailConnect';
+import { TwilioSMSConnect } from './TwilioSMSConnect';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import {
@@ -95,8 +96,8 @@ const AVAILABLE_CHANNELS = [
         name: 'SMS',
         description: 'Integrar canal SMS (Twilio)',
         icon: Smartphone,
-        color: 'text-purple-500',
-        available: false
+        color: 'text-teal-500',
+        available: true
     },
     {
         id: 'api',
@@ -118,6 +119,7 @@ export function ChannelsList() {
     const [instagramModalOpen, setInstagramModalOpen] = useState(false);
     const [websiteModalOpen, setWebsiteModalOpen] = useState(false);
     const [emailModalOpen, setEmailModalOpen] = useState(false);
+    const [smsModalOpen, setSmsModalOpen] = useState(false);
     const [activeStep, setActiveStep] = useState(1);
     const [sidebarExpanded, setSidebarExpanded] = useState(true);
     const [channelsExpanded, setChannelsExpanded] = useState(true);
@@ -132,6 +134,7 @@ export function ChannelsList() {
             case 'instagram': setInstagramModalOpen(true); break;
             case 'website': setWebsiteModalOpen(true); break;
             case 'email': setEmailModalOpen(true); break;
+            case 'sms': setSmsModalOpen(true); break;
         }
     };
 
@@ -166,6 +169,8 @@ export function ChannelsList() {
             setWebsiteModalOpen(true);
         } else if (channelId === 'email') {
             setEmailModalOpen(true);
+        } else if (channelId === 'sms') {
+            setSmsModalOpen(true);
         } else {
             toast.info('Integração em breve!', {
                 description: 'Estamos finalizando os últimos ajustes deste canal.'
@@ -446,6 +451,14 @@ export function ChannelsList() {
                     toast.success('Canal de email criado!');
                 }}
             />
-        </div>
+            <TwilioSMSConnect
+                isOpen={smsModalOpen}
+                onClose={() => setSmsModalOpen(false)}
+                onSuccess={() => {
+                    setSmsModalOpen(false);
+                    loadChannels();
+                    toast.success('Canal SMS configurado!');
+                }}
+            />        </div>
     );
 }

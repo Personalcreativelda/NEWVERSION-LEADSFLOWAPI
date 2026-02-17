@@ -4445,4 +4445,347 @@ router.post('/whatsapp-cloud/messages', async (req, res) => {
   }
 });
 
+// ============================================
+// TWILIO SMS WEBHOOK
+// ============================================
+/**
+ * POST /api/webhooks/twilio/sms
+ * Webhook para receber mensagens SMS do Twilio
+ * 
+ * Twilio envia:
+ * - MessageSid: ID único da mensagem
+ * - From: Número do remetente (formato E.164)
+ * - To: Seu número Twilio
+ * - Body: Conteúdo da mensagem
+ * - NumMedia: Número de arquivos de mídia (MMS)
+ * - MediaUrl0, MediaUrl1, etc: URLs de mídia
+ */
+router.post('/twilio/sms', async (req, res) => {
+  try {
+    console.log('[Twilio SMS Webhook] ========== RECEIVED ==========');
+    console.log('[Twilio SMS Webhook] Body:', JSON.stringify(req.body, null, 2));
+
+    const {
+      MessageSid,
+      From,
+      To,
+      Body,
+      NumMedia,
+      MediaUrl0,
+      MediaContentType0,
+      AccountSid,
+      MessagingServiceSid
+    } = req.body;
+
+    // Validar campos obrigatórios
+    if (!MessageSid || !From || !Body) {
+      console.error('[Twilio SMS] Missing required fields');
+      return res.status(400).send('Missing required fields');
+    }
+
+    // Limpar número do remetente (remover +)
+    const senderPhone = From.replace(/\D/g, '');
+    const recipientPhone = To; // Manter formato completo (+55...)
+
+    console.log('[Twilio SMS] From:', senderPhone, 'To:', recipientPhone);
+    console.log('[Twilio SMS] Message:', Body);
+    console.log('[Twilio SMS] Has media:', NumMedia > 0);
+
+    // 1. Buscar canal Twilio do usuário pelo número nas credenciais
+    const channelResult = await query(
+      `SELECT c.*, c.user_id 
+       FROM channels c
+       WHERE c.type = 'twilio_sms' 
+       AND c.status IN ('active', 'connected')
+       AND c.credentials->>'phoneNumber' = $1
+       LIMIT 1`,
+      [recipientPhone]
+    );
+
+    if (channelResult.rows.length === 0) {
+      console.error('[Twilio SMS] No active Twilio SMS channel found for phone:', recipientPhone);
+      // Responder com TwiML vazio para evitar erro no Twilio
+      return res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
+
+    const channel = channelResult.rows[0];
+    const userId = channel.user_id;
+
+    console.log('[Twilio SMS] Found channel:', channel.id, 'for user:', userId);
+
+    // 2. Validar assinatura do webhook (segurança)
+    const twilioSignature = req.headers['x-twilio-signature'];
+    if (twilioSignature && channel.credentials?.authToken) {
+      const { TwilioSMSService } = await import('../services/twilio-sms.service');
+      try {
+        const twilioService = new TwilioSMSService({
+          accountSid: channel.credentials.accountSid,
+          authToken: channel.credentials.authToken,
+          phoneNumber: channel.credentials.phoneNumber
+        });
+        
+        const url = `${process.env.WEBHOOK_URL || process.env.API_URL || 'https://yourdomain.com'}/api/webhooks/twilio/sms`;
+        const isValid = twilioService.validateWebhookSignature(
+          twilioSignature as string,
+          url,
+          req.body
+        );
+        
+        if (!isValid) {
+          console.error('[Twilio SMS] Invalid webhook signature');
+          return res.status(403).send('Invalid signature');
+        }
+        console.log('[Twilio SMS] ✅ Webhook signature validated');
+      } catch (err) {
+        console.warn('[Twilio SMS] Error validating signature:', err);
+        // Continuar mesmo com erro na validação (para não bloquear mensagens)
+      }
+    }
+
+    // 3. Buscar ou criar lead
+    let lead;
+    const leadResult = await query(
+      `SELECT * FROM leads 
+       WHERE user_id = $1 
+       AND (phone = $2 OR whatsapp = $2)
+       LIMIT 1`,
+      [userId, senderPhone]
+    );
+
+    if (leadResult.rows.length > 0) {
+      lead = leadResult.rows[0];
+      console.log('[Twilio SMS] Found existing lead:', lead.id);
+    } else {
+      // Criar novo lead
+      const newLeadResult = await query(
+        `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
+         VALUES ($1, $2, $3, $3, 'sms', 'novo')
+         RETURNING *`,
+        [userId, `SMS ${senderPhone}`, senderPhone]
+      );
+      lead = newLeadResult.rows[0];
+      console.log('[Twilio SMS] Created new lead:', lead.id);
+    }
+
+    // 4. Buscar ou criar conversa
+    const remoteJid = `sms_${senderPhone}`;
+    let conversation;
+
+    const convSearchResult = await query(
+      `SELECT * FROM conversations 
+       WHERE user_id = $1 
+       AND remote_jid = $2
+       LIMIT 1`,
+      [userId, remoteJid]
+    );
+
+    if (convSearchResult.rows.length > 0) {
+      conversation = convSearchResult.rows[0];
+      console.log('[Twilio SMS] Found existing conversation:', conversation.id);
+    } else {
+      // Criar nova conversa
+      const newConvResult = await query(
+        `INSERT INTO conversations (user_id, lead_id, channel_id, remote_jid, status, metadata)
+         VALUES ($1, $2, $3, $4, 'open', $5)
+         RETURNING *`,
+        [
+          userId,
+          lead.id,
+          channel.id,
+          remoteJid,
+          JSON.stringify({
+            phone: senderPhone,
+            platform: 'twilio_sms',
+            channel_type: 'sms'
+          })
+        ]
+      );
+      conversation = newConvResult.rows[0];
+      console.log('[Twilio SMS] Created new conversation:', conversation.id);
+    }
+
+    // 5. Processar mídia (se houver)
+    let mediaUrl = null;
+    let mediaType = null;
+
+    if (NumMedia && parseInt(NumMedia) > 0 && MediaUrl0) {
+      mediaUrl = MediaUrl0;
+      mediaType = MediaContentType0 || 'image/jpeg';
+      console.log('[Twilio SMS] Media detected:', mediaUrl, 'type:', mediaType);
+    }
+
+    // 6. Salvar mensagem no banco
+    const messageResult = await query(
+      `INSERT INTO messages (
+        conversation_id, 
+        external_id, 
+        direction, 
+        content, 
+        media_url, 
+        media_type,
+        status,
+        metadata,
+        created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+      RETURNING *`,
+      [
+        conversation.id,
+        MessageSid,
+        'in',
+        Body || '',
+        mediaUrl,
+        mediaType,
+        'delivered',
+        JSON.stringify({
+          from: From,
+          to: To,
+          platform: 'twilio_sms',
+          twilioMessageSid: MessageSid
+        })
+      ]
+    );
+
+    const savedMessage = messageResult.rows[0];
+    console.log('[Twilio SMS] Message saved:', savedMessage.id);
+
+    // 7. Notificar via WebSocket
+    const wsService = getWebSocketService();
+    if (wsService) {
+      wsService.notifyNewMessage(userId, {
+        conversationId: conversation.id,
+        message: {
+          id: savedMessage.id,
+          conversation_id: conversation.id,
+          external_id: MessageSid,
+          direction: 'in',
+          content: Body,
+          media_url: mediaUrl,
+          media_type: mediaType,
+          status: 'delivered',
+          created_at: savedMessage.created_at,
+          sender: {
+            id: lead.id,
+            name: lead.name,
+            phone: senderPhone,
+            type: 'contact'
+          }
+        }
+      });
+    }
+
+    // 8. Atualizar conversa
+    await query(
+      `UPDATE conversations 
+       SET last_message_at = NOW(), 
+           unread_count = unread_count + 1,
+           updated_at = NOW() 
+       WHERE id = $1`,
+      [conversation.id]
+    );
+
+    // 9. Processar com IA (se configurado)
+    try {
+      await assistantProcessor.processIncomingMessage(
+        conversation.id,
+        savedMessage.id,
+        Body,
+        'sms'
+      );
+    } catch (err) {
+      console.error('[Twilio SMS] Error processing with AI:', err);
+    }
+
+    // 10. Registrar interação no tracking
+    leadTrackingService.recordInteraction(
+      lead.id,
+      userId,
+      'message_received',
+      {
+        conversationId: conversation.id,
+        channelId: channel.id,
+        direction: 'in',
+        content: Body.substring(0, 200),
+        details: {
+          platform: 'twilio_sms',
+          phone: senderPhone,
+          message_type: 'sms',
+          has_media: NumMedia > 0
+        }
+      }
+    ).catch(err => console.error('[Twilio SMS] Error recording interaction:', err));
+
+    console.log('[Twilio SMS] ✅ Message processed successfully');
+
+    // Responder com TwiML vazio (200 OK)
+    res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+  } catch (error: any) {
+    console.error('[Twilio SMS Webhook] Error:', error);
+    // Sempre responder 200 OK para evitar retry do Twilio
+    res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+  }
+});
+
+/**
+ * POST /api/webhooks/twilio/status
+ * Webhook para receber status de mensagens enviadas
+ */
+router.post('/twilio/status', async (req, res) => {
+  try {
+    console.log('[Twilio Status] Received:', JSON.stringify(req.body, null, 2));
+
+    const { MessageSid, MessageStatus, ErrorCode, ErrorMessage } = req.body;
+
+    if (!MessageSid) {
+      return res.status(400).send('Missing MessageSid');
+    }
+
+    // Atualizar status da mensagem no banco
+    const updateResult = await query(
+      `UPDATE messages 
+       SET status = $1, 
+           metadata = jsonb_set(
+             COALESCE(metadata, '{}'::jsonb),
+             '{twilioStatus}',
+             to_jsonb($2::text)
+           ),
+           updated_at = NOW()
+       WHERE external_id = $3
+       RETURNING *`,
+      [MessageStatus || 'unknown', MessageStatus, MessageSid]
+    );
+
+    if (updateResult.rows.length > 0) {
+      console.log('[Twilio Status] Updated message:', updateResult.rows[0].id, 'to status:', MessageStatus);
+
+      // Notificar via WebSocket
+      const message = updateResult.rows[0];
+      const wsService = getWebSocketService();
+      
+      if (wsService) {
+        // Buscar user_id da conversa
+        const convResult = await query(
+          `SELECT user_id FROM conversations WHERE id = $1`,
+          [message.conversation_id]
+        );
+
+        if (convResult.rows.length > 0) {
+          wsService.notifyMessageStatusUpdate(
+            convResult.rows[0].user_id,
+            {
+              conversationId: message.conversation_id,
+              messageId: message.id,
+              status: MessageStatus
+            }
+          );
+        }
+      }
+    }
+
+    res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+  } catch (error) {
+    console.error('[Twilio Status] Error:', error);
+    res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+  }
+});
+
 export default router;

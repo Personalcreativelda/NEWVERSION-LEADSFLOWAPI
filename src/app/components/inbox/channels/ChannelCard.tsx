@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import type { Channel } from '../../../types/inbox';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
-import { RefreshCw, Trash2, CheckCircle2, XCircle, Loader2, MessageCircle, Pencil, X, Check, Send, Facebook, Instagram, Mail, Globe, Cloud } from 'lucide-react';
+import { RefreshCw, Trash2, CheckCircle2, XCircle, Loader2, MessageCircle, Pencil, X, Check, Send, Facebook, Instagram, Mail, Globe, Cloud, Smartphone } from 'lucide-react';
 
 interface ChannelCardProps {
     channel: Channel;
@@ -40,6 +40,8 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                 return <Mail className="w-5 h-5" />;
             case 'website':
                 return <Globe className="w-5 h-5" />;
+            case 'twilio_sms':
+                return <Smartphone className="w-5 h-5" />;
             default:
                 return <MessageCircle className="w-5 h-5" />;
         }
@@ -60,6 +62,7 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                 return 'Email (SMTP/IMAP)';
             }
             case 'website': return 'Chat Widget';
+            case 'twilio_sms': return 'Twilio SMS';
             default: return null;
         }
     };
@@ -78,8 +81,8 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
             case 'email':
                 return 'bg-cyan-500 text-white';
             case 'website':
-                return 'bg-purple-500 text-white';
-            default:
+                return 'bg-purple-500 text-white';            case 'twilio_sms':
+                return 'bg-teal-500 text-white';            default:
                 return 'bg-gray-500 text-white';
         }
     };
@@ -310,6 +313,28 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                                     <div className="text-xs" style={{ color: 'hsl(var(--foreground))' }}>
                                         <span style={{ color: 'hsl(var(--muted-foreground))' }}>IMAP: </span>
                                         <code className="font-mono">{channel.credentials.imap.host}:{channel.credentials.imap.port}</code>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {/* Twilio SMS */}
+                        {channel.type === 'twilio_sms' && (
+                            <>
+                                <div className="flex items-center gap-2 text-sm">
+                                    <Smartphone className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />
+                                    <span style={{ color: 'hsl(var(--muted-foreground))' }}>Twilio SMS/MMS</span>
+                                </div>
+                                {channel.credentials?.phoneNumber && (
+                                    <div className="text-xs" style={{ color: 'hsl(var(--foreground))' }}>
+                                        <span style={{ color: 'hsl(var(--muted-foreground))' }}>Número: </span>
+                                        <code className="font-mono">{channel.credentials.phoneNumber}</code>
+                                    </div>
+                                )}
+                                {channel.credentials?.accountSid && (
+                                    <div className="text-xs" style={{ color: 'hsl(var(--foreground))' }}>
+                                        <span style={{ color: 'hsl(var(--muted-foreground))' }}>Account SID: </span>
+                                        <code className="font-mono">{channel.credentials.accountSid}</code>
                                     </div>
                                 )}
                             </>

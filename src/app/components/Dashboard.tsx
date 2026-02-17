@@ -1233,6 +1233,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         channelType = 'instagram';
       } else if (origemLower.includes('facebook') || origemLower.includes('messenger')) {
         channelType = 'facebook';
+      } else if (origemLower.includes('sms') || origemLower.includes('twilio')) {
+        channelType = 'twilio_sms';
       } else if (origemLower.includes('email') || origemLower.includes('mail')) {
         channelType = 'email';
       }

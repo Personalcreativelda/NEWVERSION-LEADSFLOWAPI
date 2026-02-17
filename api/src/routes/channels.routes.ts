@@ -366,6 +366,49 @@ router.post('/', async (req, res, next) => {
             }
         }
 
+        // Para Twilio SMS
+        if (type === 'twilio_sms' && credentials?.phoneNumber) {
+            const { accountSid, authToken, phoneNumber } = credentials;
+
+            if (!accountSid || !authToken || !phoneNumber) {
+                return res.status(400).json({ 
+                    error: 'accountSid, authToken, and phoneNumber are required for Twilio SMS' 
+                });
+            }
+
+            // Verificar se já existe canal com esse número
+            const existing = await channelsService.findByCredentialField('phoneNumber', phoneNumber, user.id);
+            if (existing) {
+                const updated = await channelsService.update(existing.id, {
+                    status: requestedStatus || 'active',
+                    name,
+                    credentials: {
+                        accountSid,
+                        authToken,
+                        phoneNumber
+                    }
+                }, user.id);
+                console.log(`[Channels] Twilio SMS channel updated: ${updated.id}`);
+                return res.status(200).json(updated);
+            }
+
+            // Criar novo canal SMS
+            const channel = await channelsService.create({
+                type: 'twilio_sms',
+                name,
+                status: requestedStatus || 'active',
+                credentials: {
+                    accountSid,
+                    authToken,
+                    phoneNumber
+                },
+                settings: settings || {}
+            }, user.id);
+
+            console.log(`[Channels] Twilio SMS channel created: ${channel.id} with phone: ${phoneNumber}`);
+            return res.status(201).json(channel);
+        }
+
         // Para outros canais, usar o status enviado ou 'active'
         const channel = await channelsService.create({
             type,

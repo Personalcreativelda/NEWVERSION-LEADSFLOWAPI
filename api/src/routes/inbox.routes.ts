@@ -8,6 +8,7 @@ import { ChannelsService } from '../services/channels.service';
 import { LeadsService } from '../services/leads.service';
 import { ConversationsService } from '../services/conversations.service';
 import { getStorageService } from '../services/storage.service';
+import { TwilioSMSService } from '../services/twilio-sms.service';
 
 const router = Router();
 
@@ -1391,6 +1392,75 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       } catch (tgError) {
         console.error('[Inbox] Telegram send error:', tgError);
         return res.status(500).json({ error: 'Failed to send Telegram message' });
+      }
+    } else if (messageChannel === 'twilio_sms') {
+      // Send via Twilio SMS
+      try {
+        if (!phone) {
+          return res.status(400).json({ error: 'Phone number is required for SMS' });
+        }
+
+        // Buscar canal SMS ativo do usuário
+        const smsChannels = await channelsService.findByType('twilio_sms', user.id);
+        const activeSMSChannel = smsChannels.find((ch: any) => ch.status === 'active');
+
+        if (!activeSMSChannel) {
+          return res.status(400).json({ 
+            error: 'No active Twilio SMS channel found. Please configure a Twilio SMS channel first.' 
+          });
+        }
+
+        // Extrair credenciais do canal
+        const { accountSid, authToken, phoneNumber } = activeSMSChannel.credentials || {};
+        
+        if (!accountSid || !authToken || !phoneNumber) {
+          return res.status(400).json({ 
+            error: 'Twilio SMS channel credentials are incomplete' 
+          });
+        }
+
+        // Instanciar serviço Twilio com credenciais do usuário
+        const userTwilioService = new TwilioSMSService({
+          accountSid,
+          authToken,
+          phoneNumber
+        });
+
+        console.log('[Inbox] Sending SMS via Twilio:', { phone, hasMedia: !!media_url, channel: activeSMSChannel.id });
+
+        // Send SMS or MMS based on whether media is present
+        if (media_url) {
+          // Send MMS with media
+          externalResult = await userTwilioService.sendMMS(
+            phone,
+            messageContent || '',
+            media_url
+          );
+          console.log('[Inbox] MMS sent via Twilio:', externalResult?.sid);
+        } else {
+          // Send regular SMS text message
+          if (!messageContent) {
+            return res.status(400).json({ error: 'Message content is required for SMS' });
+          }
+          externalResult = await userTwilioService.sendSMS(phone, messageContent);
+          console.log('[Inbox] SMS sent via Twilio:', externalResult?.sid);
+        }
+
+        // Check if send was successful
+        if (!externalResult || externalResult.error || externalResult.status === 'failed') {
+          console.error('[Inbox] Twilio send failed:', externalResult);
+          return res.status(500).json({ 
+            error: 'Failed to send SMS via Twilio',
+            details: externalResult?.error || 'Unknown error'
+          });
+        }
+
+      } catch (twilioError: any) {
+        console.error('[Inbox] Twilio send error:', twilioError);
+        return res.status(500).json({ 
+          error: 'Failed to send SMS via Twilio',
+          details: twilioError.message || 'Unknown error'
+        });
       }
     } else if (!messageChannel || messageChannel === 'whatsapp') {
       // Fallback: WhatsApp without phone/remoteJid
