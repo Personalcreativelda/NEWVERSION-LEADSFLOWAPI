@@ -328,7 +328,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
 
             {/* Modal */}
             <div 
-                className="relative w-full max-w-lg mx-4 rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+                className="relative w-[95vw] max-w-3xl mx-2 sm:mx-4 rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
                 style={{ 
                     backgroundColor: 'hsl(var(--card))',
                     borderColor: 'hsl(var(--border))'
@@ -336,7 +336,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
             >
                 {/* Header */}
                 <div 
-                    className="px-6 py-4 border-b flex items-center justify-between"
+                    className="px-4 sm:px-6 py-3 sm:py-4 border-b flex items-center justify-between flex-shrink-0"
                     style={{ borderColor: 'hsl(var(--border))' }}
                 >
                     <div className="flex items-center gap-3">
@@ -361,7 +361,11 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                 </div>
 
                 {/* Content */}
-                <div className="p-6">
+                <div className="p-4 sm:p-6 overflow-y-auto flex-1"
+                    style={{
+                        maxHeight: 'calc(90vh - 80px)'
+                    }}
+                >
                     {step === 'form' && (
                         <div className="space-y-6">
                             {/* Requirements Notice */}
@@ -570,10 +574,10 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                             )}
 
                             {/* Actions */}
-                            <div className="flex gap-3">
+                            <div className="flex flex-col sm:flex-row gap-3">
                                 <button
                                     onClick={onClose}
-                                    className="flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
                                     style={{ borderColor: 'hsl(var(--border))' }}
                                 >
                                     Cancelar
@@ -581,7 +585,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                                 <button
                                     onClick={validateToken}
                                     disabled={loading || !accessToken.trim()}
-                                    className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <>

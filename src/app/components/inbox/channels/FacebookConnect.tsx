@@ -116,7 +116,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
 
             {/* Modal */}
             <div
-                className="relative w-full max-w-lg mx-4 rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
+                className="relative w-[95vw] max-w-2xl mx-2 sm:mx-4 rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
                 style={{
                     backgroundColor: 'hsl(var(--card))',
                     borderColor: 'hsl(var(--border))'
@@ -124,7 +124,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
             >
                 {/* Header */}
                 <div
-                    className="px-6 py-4 border-b flex items-center justify-between flex-shrink-0"
+                    className="px-4 sm:px-6 py-3 sm:py-4 border-b flex items-center justify-between flex-shrink-0"
                     style={{ borderColor: 'hsl(var(--border))' }}
                 >
                     <div className="flex items-center gap-3">
@@ -172,7 +172,11 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
                 )}
 
                 {/* Content */}
-                <div className="p-6 overflow-y-auto">
+                <div className="p-4 sm:p-6 overflow-y-auto flex-1"
+                    style={{
+                        maxHeight: 'calc(90vh - 160px)'
+                    }}
+                >
                     {/* ═══ STEP 1: WEBHOOK CONFIGURATION ═══ */}
                     {step === 'webhook' && (
                         <div className="space-y-5">
@@ -287,17 +291,17 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
                             </div>
 
                             {/* Actions */}
-                            <div className="flex gap-3">
+                            <div className="flex flex-col sm:flex-row gap-3">
                                 <button
                                     onClick={onClose}
-                                    className="flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
                                     style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     onClick={() => setStep('token')}
-                                    className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                                 >
                                     Webhook Configurado
                                     <ChevronRight className="w-4 h-4" />
@@ -399,13 +403,13 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
                             )}
 
                             {/* Actions */}
-                            <div className="flex gap-3">
+                            <div className="flex flex-col sm:flex-row gap-3">
                                 <button
                                     onClick={() => {
                                         setStep('webhook');
                                         setError(null);
                                     }}
-                                    className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
+                                    className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center gap-2"
                                     style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
                                 >
                                     <ArrowLeft className="w-4 h-4" />
@@ -414,7 +418,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
                                 <button
                                     onClick={validateAndConnect}
                                     disabled={loading || !pageAccessToken.trim()}
-                                    className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <>
