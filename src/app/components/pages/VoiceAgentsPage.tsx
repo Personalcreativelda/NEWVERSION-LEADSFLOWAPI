@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Phone, Search, Plus, Power, PowerOff, Trash2, Edit3,
-  Loader2, X, Check, Eye, EyeOff, Mic, PhoneCall
+  Loader2, X, Check, Eye, EyeOff, Mic, PhoneCall, Settings
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -22,9 +22,16 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<VoiceAgent | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showSettingsApiKey, setShowSettingsApiKey] = useState(false);
+  const [elevenLabsConfigured, setElevenLabsConfigured] = useState(false);
+
+  const [settingsForm, setSettingsForm] = useState({
+    elevenlabs_api_key: ''
+  });
 
   const [form, setForm] = useState<CreateVoiceAgentInput>({
     name: '',
@@ -50,13 +57,25 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     try {
       console.log('[VoiceAgentsPage] Starting to load data...');
       setLoading(true);
-      const [agents, voices] = await Promise.all([
+      const [agents, voicesResponse, settings] = await Promise.all([
         voiceAgentsApi.getAll(),
-        voiceAgentsApi.getElevenLabsVoices().catch(() => []),
+        voiceAgentsApi.getElevenLabsVoices().catch(() => ({ voices: [], configured: false })),
+        voiceAgentsApi.getSettings().catch(() => ({ elevenlabs_configured: false, elevenlabs_api_key_preview: null, voice_settings: {} })),
       ]);
-      console.log('[VoiceAgentsPage] Loaded:', { agents, voices });
+      console.log('[VoiceAgentsPage] Loaded:', { agents, voicesResponse, settings });
+      
       setVoiceAgents(agents);
-      setElevenLabsVoices(voices);
+      
+      // Handle voices response (can be old format array or new format object)
+      if (Array.isArray(voicesResponse)) {
+        setElevenLabsVoices(voicesResponse);
+        setElevenLabsConfigured(false);
+      } else {
+        setElevenLabsVoices(voicesResponse.voices || []);
+        setElevenLabsConfigured(voicesResponse.configured || false);
+      }
+      
+      setElevenLabsConfigured(settings.elevenlabs_configured);
     } catch (error) {
       console.error('[VoiceAgentsPage] Error loading data:', error);
       toast.error('Erro ao carregar agentes de voz');
@@ -177,6 +196,23 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     }
   };
 
+  const handleSaveSettings = async () => {
+    try {
+      setActionLoading(true);
+      await voiceAgentsApi.updateSettings({
+        elevenlabs_api_key: settingsForm.elevenlabs_api_key || undefined
+      });
+      toast.success('Configurações salvas com sucesso!');
+      setSettingsModalOpen(false);
+      loadData(); // Reload to get updated voices
+    } catch (error) {
+      console.error('[VoiceAgentsPage] Error saving settings:', error);
+      toast.error('Erro ao salvar configurações');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className={`w-full h-full flex flex-col ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
       {/* Header */}
@@ -186,15 +222,30 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
             <h1 className={`text-2xl font-bold flex items-center gap-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>
               <PhoneCall className="w-7 h-7 text-purple-500" />
               Agentes de Voz
+              {!elevenLabsConfigured && (
+                <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                  Configure API
+                </Badge>
+              )}
             </h1>
             <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               Crie agentes de voz usando ElevenLabs para gerar vozes realistas e Wavoip para efetuar chamadas automáticas
             </p>
           </div>
-          <Button onClick={handleCreate} className="bg-purple-600 hover:bg-purple-700">
-            <Plus className="w-4 h-4 mr-2" />
-            Criar Agente
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => setSettingsModalOpen(true)} 
+              variant="outline"
+              className={isDark ? 'border-slate-600 hover:bg-slate-700' : ''}
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Configurações
+            </Button>
+            <Button onClick={handleCreate} className="bg-purple-600 hover:bg-purple-700">
+              <Plus className="w-4 h-4 mr-2" />
+              Criar Agente
+            </Button>
+          </div>
         </div>
 
         {/* Search */}
@@ -490,6 +541,95 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   </>
                 )}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {settingsModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => setSettingsModalOpen(false)}></div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div className={`inline-block align-bottom rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-[calc(100%-2rem)] max-w-lg ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+              
+              {/* Header */}
+              <div className={`px-4 py-3 sm:px-6 sm:py-4 border-b ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+                <div className="flex items-center justify-between">
+                  <h3 className={`text-base sm:text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    Configurações de API
+                  </h3>
+                  <button
+                    onClick={() => setSettingsModalOpen(false)}
+                    className={`p-1.5 rounded-md transition-colors w-6 h-6 flex items-center justify-center ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}
+                  >
+                    <X className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="px-4 py-4 sm:px-6 sm:py-5 space-y-4">
+                <div>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    ElevenLabs API Key
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showSettingsApiKey ? 'text' : 'password'}
+                      value={settingsForm.elevenlabs_api_key}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, elevenlabs_api_key: e.target.value })}
+                      placeholder="sk_..."
+                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSettingsApiKey(!showSettingsApiKey)}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${isDark ? 'hover:bg-slate-600' : 'hover:bg-gray-100'}`}
+                    >
+                      {showSettingsApiKey ? (
+                        <EyeOff className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                      ) : (
+                        <Eye className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                      )}
+                    </button>
+                  </div>
+                  <p className={`mt-1.5 text-[10px] sm:text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Obtenha sua chave em <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">elevenlabs.io</a>
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  onClick={() => setSettingsModalOpen(false)} 
+                  className="w-full sm:w-auto text-sm sm:text-base"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  onClick={handleSaveSettings} 
+                  disabled={actionLoading} 
+                  className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-sm sm:text-base"
+                >
+                  {actionLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Salvar Configurações
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

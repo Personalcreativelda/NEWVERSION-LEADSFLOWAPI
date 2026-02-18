@@ -30,6 +30,29 @@ api.interceptors.request.use((config) => {
 
 export const voiceAgentsApi = {
   /**
+   * Get user's voice agent settings
+   */
+  async getSettings(): Promise<{
+    elevenlabs_configured: boolean;
+    elevenlabs_api_key_preview: string | null;
+    voice_settings: Record<string, any>;
+  }> {
+    const response = await api.get('/voice-agents/settings');
+    return response.data;
+  },
+
+  /**
+   * Update user's voice agent settings
+   */
+  async updateSettings(data: {
+    elevenlabs_api_key?: string;
+    voice_settings?: Record<string, any>;
+  }): Promise<{ success: boolean; message: string }> {
+    const response = await api.put('/voice-agents/settings', data);
+    return response.data;
+  },
+
+  /**
    * Get all voice agents
    */
   async getAll(): Promise<VoiceAgent[]> {
