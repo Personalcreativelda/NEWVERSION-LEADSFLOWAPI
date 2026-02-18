@@ -62,19 +62,29 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         voiceAgentsApi.getElevenLabsVoices().catch(() => ({ voices: [], configured: false })),
         voiceAgentsApi.getSettings().catch(() => ({ elevenlabs_configured: false, elevenlabs_api_key_preview: null, voice_settings: {} })),
       ]);
-      console.log('[VoiceAgentsPage] Loaded:', { agents, voicesResponse, settings });
+      console.log('[VoiceAgentsPage] Data loaded:', { 
+        agentsCount: agents.length, 
+        voicesResponse, 
+        settings 
+      });
       
       setVoiceAgents(agents);
       
       // Handle voices response (can be old format array or new format object)
       if (Array.isArray(voicesResponse)) {
+        console.log('[VoiceAgentsPage] Using old voices format (array)');
         setElevenLabsVoices(voicesResponse);
         setElevenLabsConfigured(false);
       } else {
+        console.log('[VoiceAgentsPage] Using new voices format:', {
+          configured: voicesResponse.configured,
+          voicesCount: voicesResponse.voices?.length || 0
+        });
         setElevenLabsVoices(voicesResponse.voices || []);
         setElevenLabsConfigured(voicesResponse.configured || false);
       }
       
+      console.log('[VoiceAgentsPage] ElevenLabs configured:', settings.elevenlabs_configured);
       setElevenLabsConfigured(settings.elevenlabs_configured);
     } catch (error) {
       console.error('[VoiceAgentsPage] Error loading data:', error);
@@ -196,18 +206,36 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     }
   };
 
+  const handleOpenSettings = () => {
+    // Reset form to empty when opening
+    setSettingsForm({ elevenlabs_api_key: '' });
+    setShowSettingsApiKey(false);
+    setSettingsModalOpen(true);
+  };
+
   const handleSaveSettings = async () => {
+    if (!settingsForm.elevenlabs_api_key || settingsForm.elevenlabs_api_key.trim() === '') {
+      toast.error('Digite uma API key válida');
+      return;
+    }
+
     try {
       setActionLoading(true);
+      console.log('[VoiceAgentsPage] Saving API key:', settingsForm.elevenlabs_api_key.substring(0, 10) + '...');
+      
       await voiceAgentsApi.updateSettings({
-        elevenlabs_api_key: settingsForm.elevenlabs_api_key || undefined
+        elevenlabs_api_key: settingsForm.elevenlabs_api_key
       });
+      
+      console.log('[VoiceAgentsPage] Settings saved successfully, reloading data...');
       toast.success('Configurações salvas com sucesso!');
       setSettingsModalOpen(false);
-      loadData(); // Reload to get updated voices
-    } catch (error) {
+      
+      // Reload to get updated voices
+      await loadData();
+    } catch (error: any) {
       console.error('[VoiceAgentsPage] Error saving settings:', error);
-      toast.error('Erro ao salvar configurações');
+      toast.error(error.response?.data?.error || 'Erro ao salvar configurações');
     } finally {
       setActionLoading(false);
     }
@@ -234,7 +262,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
           </div>
           <div className="flex gap-2">
             <Button 
-              onClick={() => setSettingsModalOpen(true)} 
+              onClick={handleOpenSettings} 
               variant="outline"
               className={isDark ? 'border-slate-600 hover:bg-slate-700' : ''}
             >
@@ -548,13 +576,17 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
 
       {/* Settings Modal */}
       {settingsModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => setSettingsModalOpen(false)}></div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div className={`inline-block align-bottom rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-[calc(100%-2rem)] max-w-lg ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
-              
-              {/* Header */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Overlay */}
+          <div 
+            className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+            onClick={() => setSettingsModalOpen(false)}
+          ></div>
+          
+          {/* Modal Content */}
+          <div className={`relative rounded-lg shadow-xl w-full max-w-lg z-10 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+            
+            {/* Header */}
               <div className={`px-4 py-3 sm:px-6 sm:py-4 border-b ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
                 <div className="flex items-center justify-between">
                   <h3 className={`text-base sm:text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -581,7 +613,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       value={settingsForm.elevenlabs_api_key}
                       onChange={(e) => setSettingsForm({ ...settingsForm, elevenlabs_api_key: e.target.value })}
                       placeholder="sk_..."
-                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
+                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder:text-gray-500' : 'border-gray-300'}`}
                     />
                     <button
                       type="button"
@@ -632,7 +664,6 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
               </div>
             </div>
           </div>
-        </div>
       )}
     </div>
   );
