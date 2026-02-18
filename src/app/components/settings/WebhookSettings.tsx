@@ -65,13 +65,13 @@ export function WebhookSettings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 max-w-full px-2 sm:px-0">
       {/* WhatsApp Connection */}
       <WhatsAppConnection />
 
       {/* N8N Webhook Configuration */}
-      <Card>
-        <CardHeader>
+      <Card className="max-w-full overflow-hidden">
+        <CardHeader className="px-4 sm:px-6">
           <div className="flex items-center gap-2">
             <Webhook className="h-5 w-5" />
             <CardTitle>Integração N8N</CardTitle>
@@ -80,44 +80,48 @@ export function WebhookSettings() {
             Configure webhooks para automatizar importação de leads e tracking de mensagens
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 px-4 sm:px-6">
           <div className="space-y-2">
-            <Label htmlFor="n8n-webhook">URL do Webhook N8N (Notificações)</Label>
+            <Label htmlFor="n8n-webhook" className="text-sm sm:text-base">URL do Webhook N8N (Notificações)</Label>
             <Input
               id="n8n-webhook"
-              placeholder="https://sua-instancia.n8n.cloud/webhook/..."
+              placeholder="https://sua-instancia.n8n.cloud/webhook..."
               value={n8nWebhookUrl}
               onChange={(e) => setN8nWebhookUrl(e.target.value)}
+              className="text-sm sm:text-base"
             />
             <p className="text-sm text-muted-foreground">
               Esta URL será chamada quando eventos importantes ocorrerem (leads importados, limites atingidos, etc.)
             </p>
           </div>
 
-          <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
-            <h4 className="font-medium flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              URLs dos Webhooks LeadFlow
+          <div className="rounded-lg border bg-muted/50 p-3 sm:p-4 space-y-3">
+            <h4 className="font-medium flex items-center gap-2 text-sm sm:text-base">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>URLs dos Webhooks LeadFlow</span>
             </h4>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Use estas URLs em suas automações N8N:
             </p>
             
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div>
-                <Label className="text-xs">Importação de Leads (POST)</Label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    value={`${window.location.origin}/functions/v1/make-server-4be966ab/webhooks/n8n/leads`}
-                    readOnly
-                    className="font-mono text-xs"
-                  />
+                <Label className="text-xs sm:text-sm">Importação de Leads (POST)</Label>
+                <div className="flex gap-2 mt-1.5">
+                  <div className="flex-1 min-w-0 relative">
+                    <Input
+                      value={`${window.location.origin}/functions/v1/make-server-4be966ab/webhooks/n8n/leads`}
+                      readOnly
+                      className="font-mono text-[10px] sm:text-xs w-full pr-2 overflow-x-auto"
+                    />
+                  </div>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => copyWebhookUrl('leads')}
+                    className="flex-shrink-0"
                   >
-                    <Copy className="h-4 w-4" />
+                    <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -126,19 +130,22 @@ export function WebhookSettings() {
               </div>
 
               <div>
-                <Label className="text-xs">Tracking de Mensagens (POST)</Label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    value={`${window.location.origin}/functions/v1/make-server-4be966ab/webhooks/n8n/messages`}
-                    readOnly
-                    className="font-mono text-xs"
-                  />
+                <Label className="text-xs sm:text-sm">Tracking de Mensagens (POST)</Label>
+                <div className="flex gap-2 mt-1.5">
+                  <div className="flex-1 min-w-0 relative">
+                    <Input
+                      value={`${window.location.origin}/functions/v1/make-server-4be966ab/webhooks/n8n/messages`}
+                      readOnly
+                      className="font-mono text-[10px] sm:text-xs w-full pr-2 overflow-x-auto"
+                    />
+                  </div>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => copyWebhookUrl('messages')}
+                    className="flex-shrink-0"
                   >
-                    <Copy className="h-4 w-4" />
+                    <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -151,21 +158,22 @@ export function WebhookSettings() {
       </Card>
 
       {/* Meta Pixel Configuration */}
-      <Card>
-        <CardHeader>
+      <Card className="max-w-full overflow-hidden">
+        <CardHeader className="px-4 sm:px-6">
           <CardTitle>Meta Pixel</CardTitle>
           <CardDescription>
             Configure o ID do seu Meta Pixel para rastreamento de eventos
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 px-4 sm:px-6">
           <div className="space-y-2">
-            <Label htmlFor="meta-pixel">Meta Pixel ID</Label>
+            <Label htmlFor="meta-pixel" className="text-sm sm:text-base">Meta Pixel ID</Label>
             <Input
               id="meta-pixel"
               placeholder="123456789012345"
               value={metaPixelId}
               onChange={(e) => setMetaPixelId(e.target.value)}
+              className="text-sm sm:text-base"
             />
             <p className="text-sm text-muted-foreground">
               Encontre seu Pixel ID no Gerenciador de Eventos do Facebook
@@ -190,8 +198,8 @@ export function WebhookSettings() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving}>
+      <div className="flex justify-end px-2 sm:px-0">
+        <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto text-sm sm:text-base">
           {saving ? 'Salvando...' : 'Salvar Configurações'}
         </Button>
       </div>

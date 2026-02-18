@@ -415,43 +415,43 @@ export function WhatsAppConnection() {
 
   return (
     <div className="space-y-4">
-      <Card className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-4">
-            <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
-              <Smartphone className="w-6 h-6 text-green-600 dark:text-green-500" />
+      <Card className="p-4 sm:p-6 max-w-full overflow-hidden">
+        <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+          <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
+            <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/20 rounded-lg flex-shrink-0">
+              <Smartphone className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-500" />
             </div>
-            <div className="flex-1">
-              <h3 className="font-semibold mb-1">WhatsApp</h3>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold mb-1 text-sm sm:text-base">WhatsApp</h3>
               <div className="flex items-center gap-2 mb-2">
                 {status.connected ? (
                   <>
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                    <span className="text-green-600">Conectado</span>
+                    <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 flex-shrink-0" />
+                    <span className="text-green-600 text-xs sm:text-sm">Conectado</span>
                   </>
                 ) : status.status === 'connecting' ? (
                   <>
-                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                    <span className="text-blue-600">Conectando...</span>
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 animate-spin flex-shrink-0" />
+                    <span className="text-blue-600 text-xs sm:text-sm">Conectando...</span>
                   </>
                 ) : status.status === 'pending' ? (
                   <>
-                    <Loader2 className="w-4 h-4 text-yellow-600 animate-spin" />
-                    <span className="text-yellow-600">Aguardando QR Code...</span>
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-600 animate-spin flex-shrink-0" />
+                    <span className="text-yellow-600 text-xs sm:text-sm">Aguardando QR Code...</span>
                   </>
                 ) : (
                   <>
-                    <XCircle className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                    <span className="text-gray-600 dark:text-gray-400">Desconectado</span>
+                    <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                    <span className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">Desconectado</span>
                   </>
                 )}
               </div>
               {status.profileName && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">
                   Conta: {status.profileName}
                 </p>
               )}
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                 {status.connected
                   ? 'Seu WhatsApp está conectado e pronto para enviar mensagens.'
                   : status.status === 'connecting'
@@ -462,16 +462,17 @@ export function WhatsAppConnection() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-shrink-0">
             {status.connected ? (
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={disconnectWhatsApp}
                 disabled={loading}
+                className="flex-1 sm:flex-initial text-xs sm:text-sm"
               >
                 {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
                 ) : (
                   'Desconectar'
                 )}
@@ -481,13 +482,15 @@ export function WhatsAppConnection() {
                 size="sm"
                 onClick={connectWhatsApp}
                 disabled={loading || status.status === 'connecting'}
+                className="flex-1 sm:flex-initial text-xs sm:text-sm"
               >
                 {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
                 ) : (
                   <>
-                    <QrCode className="w-4 h-4 mr-2" />
-                    Conectar WhatsApp
+                    <QrCode className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                    <span className="hidden sm:inline">Conectar WhatsApp</span>
+                    <span className="sm:hidden">Conectar</span>
                   </>
                 )}
               </Button>
@@ -497,8 +500,9 @@ export function WhatsAppConnection() {
               size="sm"
               onClick={checkStatus}
               disabled={polling}
+              className="flex-shrink-0"
             >
-              <RefreshCw className={`w-4 h-4 ${polling ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${polling ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>

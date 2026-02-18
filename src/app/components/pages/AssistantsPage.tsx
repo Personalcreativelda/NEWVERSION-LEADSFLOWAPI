@@ -5,17 +5,15 @@ import {
   Zap, X, Check, Loader2,
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash,
-  Key, Brain, Eye, EyeOff, Smartphone, Phone, PhoneCall, Mic
+  Key, Brain, Eye, EyeOff, Smartphone
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { assistantsApi, type Assistant, type UserAssistant, type CreateAssistantInput } from '../../services/api/assistants';
-import { voiceAgentsApi } from '../../services/api/voice-agents';
 import { channelsApi } from '../../services/api/inbox';
 import type { Channel } from '../../types/inbox';
-import type { VoiceAgent, CreateVoiceAgentInput, ElevenLabsVoice } from '../../types/voice-agents';
 
 interface AssistantsPageProps {
   isDark: boolean;
@@ -85,11 +83,9 @@ const CHANNEL_COLORS: Record<string, string> = {
 };
 
 export default function AssistantsPage({ isDark }: AssistantsPageProps) {
-  const [activeTab, setActiveTab] = useState<'marketplace' | 'connected' | 'voice-agents'>('marketplace');
+  const [activeTab, setActiveTab] = useState<'marketplace' | 'connected'>('marketplace');
   const [availableAssistants, setAvailableAssistants] = useState<Assistant[]>([]);
   const [userAssistants, setUserAssistants] = useState<UserAssistant[]>([]);
-  const [voiceAgents, setVoiceAgents] = useState<VoiceAgent[]>([]);
-  const [elevenLabsVoices, setElevenLabsVoices] = useState<ElevenLabsVoice[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -99,37 +95,14 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [voiceAgentModalOpen, setVoiceAgentModalOpen] = useState(false);
   const [selectedAssistant, setSelectedAssistant] = useState<Assistant | null>(null);
   const [selectedUserAssistant, setSelectedUserAssistant] = useState<UserAssistant | null>(null);
-  const [selectedVoiceAgent, setSelectedVoiceAgent] = useState<VoiceAgent | null>(null);
   const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([]);
   const [configValues, setConfigValues] = useState<Record<string, any>>({});
   const [actionLoading, setActionLoading] = useState(false);
 
   // Create modal state
   const [showApiKey, setShowApiKey] = useState(false);
-
-  // Voice agent form state
-  const [voiceAgentForm, setVoiceAgentForm] = useState<CreateVoiceAgentInput>({
-    name: '',
-    description: '',
-    voice_provider: 'elevenlabs',
-    voice_config: {
-      voice_id: '',
-      model: 'eleven_monolingual_v1',
-      stability: 0.5,
-      similarity_boost: 0.75,
-    },
-    call_provider: 'wavoip',
-    call_config: {
-      api_key: '',
-      from_number: '',
-    },
-    greeting_message: '',
-    instructions: '',
-    language: 'pt-BR',
-  });
 
   const [createForm, setCreateForm] = useState<CreateAssistantInput>({
     name: '',
@@ -149,18 +122,14 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [assistants, userAssists, channelsList, voiceAgentsList, elevenVoices] = await Promise.all([
+      const [assistants, userAssists, channelsList] = await Promise.all([
         assistantsApi.getAvailable(),
         assistantsApi.getUserAssistants(),
         channelsApi.getAll(),
-        voiceAgentsApi.getAll(),
-        voiceAgentsApi.getElevenLabsVoices().catch(() => []), // Graceful fallback
       ]);
       setAvailableAssistants(assistants);
       setUserAssistants(userAssists);
       setChannels(channelsList);
-      setVoiceAgents(voiceAgentsList);
-      setElevenLabsVoices(elevenVoices);
     } catch (error) {
       console.error('[AssistantsPage] Error loading data:', error);
       toast.error('Erro ao carregar assistentes');
@@ -375,126 +344,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       ...prev,
       features: (prev.features || []).filter((_, i) => i !== idx)
     }));
-  };
-
-  // ========== VOICE AGENTS HANDLERS ==========
-
-  const handleCreateVoiceAgent = async () => {
-    if (!voiceAgentForm.name.trim()) {
-      toast.error('Nome é obrigatório');
-      return;
-    }
-    if (!voiceAgentForm.voice_config.voice_id) {
-      toast.error('Selecione uma voz do ElevenLabs');
-      return;
-    }
-    if (!voiceAgentForm.call_config.api_key) {
-      toast.error('API Key do Wavoip é obrigatória');
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-
-      if (selectedVoiceAgent) {
-        await voiceAgentsApi.update(selectedVoiceAgent.id, voiceAgentForm);
-        toast.success('Agente de voz atualizado!');
-      } else {
-        await voiceAgentsApi.create(voiceAgentForm);
-        toast.success('Agente de voz criado!');
-      }
-
-      setVoiceAgentModalOpen(false);
-      resetVoiceAgentForm();
-      loadData();
-    } catch (error: any) {
-      console.error('[AssistantsPage] Error creating/updating voice agent:', error);
-      toast.error(error.response?.data?.error || 'Erro ao salvar agente de voz');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDeleteVoiceAgent = async (agent: VoiceAgent) => {
-    if (!confirm(`Deseja realmente deletar o agente "${agent.name}"?`)) return;
-
-    try {
-      setActionLoading(true);
-      await voiceAgentsApi.delete(agent.id);
-      toast.success('Agente de voz deletado');
-      loadData();
-    } catch (error) {
-      console.error('[AssistantsPage] Error deleting voice agent:', error);
-      toast.error('Erro ao deletar agente de voz');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleToggleVoiceAgent = async (agent: VoiceAgent) => {
-    try {
-      await voiceAgentsApi.toggle(agent.id, !agent.is_active);
-      toast.success(agent.is_active ? 'Agente desativado' : 'Agente ativado');
-      loadData();
-    } catch (error) {
-      console.error('[AssistantsPage] Error toggling voice agent:', error);
-      toast.error('Erro ao alterar status');
-    }
-  };
-
-  const handleTestCall = async (agent: VoiceAgent) => {
-    const phoneNumber = prompt('Digite o número de telefone para teste (incluindo código do país):');
-    if (!phoneNumber) return;
-
-    try {
-      setActionLoading(true);
-      await voiceAgentsApi.testCall(agent.id, { phone_number: phoneNumber });
-      toast.success('Chamada de teste iniciada!');
-    } catch (error: any) {
-      console.error('[AssistantsPage] Error testing call:', error);
-      toast.error(error.response?.data?.error || 'Erro ao iniciar chamada de teste');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const openEditVoiceAgentModal = (agent: VoiceAgent) => {
-    setSelectedVoiceAgent(agent);
-    setVoiceAgentForm({
-      name: agent.name,
-      description: agent.description || '',
-      voice_provider: agent.voice_provider,
-      voice_config: agent.voice_config,
-      call_provider: agent.call_provider,
-      call_config: agent.call_config,
-      greeting_message: agent.greeting_message || '',
-      instructions: agent.instructions || '',
-      language: agent.language,
-    });
-    setVoiceAgentModalOpen(true);
-  };
-
-  const resetVoiceAgentForm = () => {
-    setVoiceAgentForm({
-      name: '',
-      description: '',
-      voice_provider: 'elevenlabs',
-      voice_config: {
-        voice_id: '',
-        model: 'eleven_monolingual_v1',
-        stability: 0.5,
-        similarity_boost: 0.75,
-      },
-      call_provider: 'wavoip',
-      call_config: {
-        api_key: '',
-        from_number: '',
-      },
-      greeting_message: '',
-      instructions: '',
-      language: 'pt-BR',
-    });
-    setSelectedVoiceAgent(null);
   };
 
   // ========== RENDER HELPERS ==========
@@ -829,26 +678,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             </Badge>
           )}
         </button>
-        <button
-          onClick={() => setActiveTab('voice-agents')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'voice-agents'
-              ? isDark
-                ? 'bg-slate-700 text-white'
-                : 'bg-white text-gray-900 shadow-sm'
-              : isDark
-                ? 'text-gray-400 hover:text-white'
-                : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <PhoneCall className="w-4 h-4 inline-block mr-1.5" />
-          Agentes de Voz
-          {voiceAgents.length > 0 && (
-            <Badge variant="secondary" className="ml-2 h-5 min-w-[20px]">
-              {voiceAgents.length}
-            </Badge>
-          )}
-        </button>
       </div>
 
       {/* Category filter (only in marketplace) */}
@@ -887,7 +716,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             </div>
           )}
         </div>
-      ) : activeTab === 'connected' ? (
+      ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {userAssistants.map(ua => ua.assistant && renderAssistantCard(ua.assistant, false))}
           {userAssistants.length === 0 && (
@@ -898,108 +727,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 <Sparkles className="w-4 h-4 mr-2" />
                 Explorar Marketplace
               </Button>
-            </div>
-          )}
-        </div>
-      ) : (
-        // Voice Agents Tab
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Agentes de Voz (ElevenLabs + Wavoip)
-            </h3>
-            <Button onClick={() => { resetVoiceAgentForm(); setVoiceAgentModalOpen(true); }}>
-              <Plus className="w-4 h-4 mr-2" />
-              Criar Agente
-            </Button>
-          </div>
-
-          {voiceAgents.length === 0 ? (
-            <div className={`text-center py-12 rounded-xl border-2 border-dashed ${isDark ? 'border-slate-700 bg-slate-800/50' : 'border-gray-300 bg-gray-50'}`}>
-              <PhoneCall className={`w-16 h-16 mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
-              <h4 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                Nenhum agente de voz configurado
-              </h4>
-              <p className={`mb-6 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                Crie agentes de voz usando ElevenLabs para gerar vozes realistas e Wavoip para efetuar chamadas automáticas
-              </p>
-              <Button onClick={() => setVoiceAgentModalOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Criar Primeiro Agente
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {voiceAgents.map(agent => (
-                <div
-                  key={agent.id}
-                  className={`p-4 rounded-xl border transition-all ${
-                    isDark ? 'bg-slate-800 border-slate-700 hover:border-slate-600' : 'bg-white border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${agent.is_active ? 'bg-blue-500/20' : 'bg-gray-500/20'}`}>
-                        <Mic className={`w-5 h-5 ${agent.is_active ? 'text-blue-500' : 'text-gray-500'}`} />
-                      </div>
-                      <div>
-                        <h4 className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{agent.name}</h4>
-                        <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{agent.description || 'Sem descrição'}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleToggleVoiceAgent(agent)}
-                      className={`p-1.5 rounded-lg transition-colors ${
-                        agent.is_active
-                          ? 'bg-green-500/20 text-green-500 hover:bg-green-500/30'
-                          : 'bg-gray-500/20 text-gray-500 hover:bg-gray-500/30'
-                      }`}
-                      title={agent.is_active ? 'Ativo' : 'Inativo'}
-                    >
-                      {agent.is_active ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  <div className={`space-y-2 text-xs mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    <div className="flex items-center gap-2">
-                      <Mic className="w-3.5 h-3.5" />
-                      <span>Voz: {agent.voice_config.voice_id || 'Não configurada'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-3.5 h-3.5" />
-                      <span>Idioma: {agent.language}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleTestCall(agent)}
-                      disabled={!agent.is_active}
-                    >
-                      <PhoneCall className="w-3.5 h-3.5 mr-1" />
-                      Testar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditVoiceAgentModal(agent)}
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteVoiceAgent(agent)}
-                      className="text-red-500 hover:text-red-600"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
             </div>
           )}
         </div>
@@ -1601,195 +1328,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   <Plus className="w-4 h-4 mr-2" />
                 )}
                 {editingAssistantId ? 'Salvar' : 'Criar Assistente'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Voice Agent Modal - ElevenLabs + Wavoip */}
-      {voiceAgentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
-            <div className={`sticky top-0 flex items-center justify-between p-4 border-b ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'} z-10`}>
-              <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {selectedVoiceAgent ? 'Editar Agente de Voz' : 'Criar Agente de Voz'}
-              </h3>
-              <button
-                onClick={() => { setVoiceAgentModalOpen(false); resetVoiceAgentForm(); }}
-                className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {/* Basic Info */}
-              <div className="space-y-3">
-                <h4 className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Informações Básicas</h4>
-                <Input
-                  placeholder="Nome do agente"
-                  value={voiceAgentForm.name}
-                  onChange={(e) => setVoiceAgentForm({ ...voiceAgentForm, name: e.target.value })}
-                  className={isDark ? 'bg-slate-800 border-slate-700' : ''}
-                />
-                <textarea
-                  placeholder="Descrição (opcional)"
-                  value={voiceAgentForm.description}
-                  onChange={(e) => setVoiceAgentForm({ ...voiceAgentForm, description: e.target.value })}
-                  className={`w-full px-3 py-2 rounded-lg border resize-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'border-gray-300'}`}
-                  rows={2}
-                />
-              </div>
-
-              {/* ElevenLabs Voice Config */}
-              <div className={`p-4 rounded-lg space-y-3 ${isDark ? 'bg-slate-800/50' : 'bg-blue-50'}`}>
-                <div className="flex items-center gap-2">
-                  <Mic className="w-5 h-5 text-blue-500" />
-                  <h4 className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Configuração de Voz (ElevenLabs)</h4>
-                </div>
-                <div>
-                  <label className={`text-sm mb-1 block ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Selecione a Voz</label>
-                  <select
-                    value={voiceAgentForm.voice_config.voice_id}
-                    onChange={(e) => setVoiceAgentForm({
-                      ...voiceAgentForm,
-                      voice_config: { ...voiceAgentForm.voice_config, voice_id: e.target.value }
-                    })}
-                    className={`w-full px-3 py-2 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'border-gray-300'}`}
-                  >
-                    <option value="">Selecione uma voz...</option>
-                    {elevenLabsVoices.map(voice => (
-                      <option key={voice.voice_id} value={voice.voice_id}>
-                        {voice.name} ({voice.language})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={`text-sm mb-1 block ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Estabilidade: {voiceAgentForm.voice_config.stability}
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={voiceAgentForm.voice_config.stability}
-                      onChange={(e) => setVoiceAgentForm({
-                        ...voiceAgentForm,
-                        voice_config: { ...voiceAgentForm.voice_config, stability: parseFloat(e.target.value) }
-                      })}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className={`text-sm mb-1 block ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Similaridade: {voiceAgentForm.voice_config.similarity_boost}
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={voiceAgentForm.voice_config.similarity_boost}
-                      onChange={(e) => setVoiceAgentForm({
-                        ...voiceAgentForm,
-                        voice_config: { ...voiceAgentForm.voice_config, similarity_boost: parseFloat(e.target.value) }
-                      })}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Wavoip Call Config */}
-              <div className={`p-4 rounded-lg space-y-3 ${isDark ? 'bg-slate-800/50' : 'bg-green-50'}`}>
-                <div className="flex items-center gap-2">
-                  <Phone className="w-5 h-5 text-green-500" />
-                  <h4 className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Configuração de Chamadas (Wavoip)</h4>
-                </div>
-                <Input
-                  placeholder="API Key do Wavoip"
-                  type="password"
-                  value={voiceAgentForm.call_config.api_key}
-                  onChange={(e) => setVoiceAgentForm({
-                    ...voiceAgentForm,
-                    call_config: { ...voiceAgentForm.call_config, api_key: e.target.value }
-                  })}
-                  className={isDark ? 'bg-slate-800 border-slate-700' : ''}
-                />
-                <Input
-                  placeholder="Número de origem (ex: +5511999999999)"
-                  value={voiceAgentForm.call_config.from_number}
-                  onChange={(e) => setVoiceAgentForm({
-                    ...voiceAgentForm,
-                    call_config: { ...voiceAgentForm.call_config, from_number: e.target.value }
-                  })}
-                  className={isDark ? 'bg-slate-800 border-slate-700' : ''}
-                />
-              </div>
-
-              {/* Agent Behavior */}
-              <div className="space-y-3">
-                <h4 className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Comportamento do Agente</h4>
-                <div>
-                  <label className={`text-sm mb-1 block ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Mensagem de Saudação</label>
-                  <textarea
-                    placeholder="Olá! Como posso ajudá-lo hoje?"
-                    value={voiceAgentForm.greeting_message}
-                    onChange={(e) => setVoiceAgentForm({ ...voiceAgentForm, greeting_message: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-lg border resize-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'border-gray-300'}`}
-                    rows={2}
-                  />
-                </div>
-                <div>
-                  <label className={`text-sm mb-1 block ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Instruções do Sistema</label>
-                  <textarea
-                    placeholder="Você é um assistente virtual. Seja educado e prestativo..."
-                    value={voiceAgentForm.instructions}
-                    onChange={(e) => setVoiceAgentForm({ ...voiceAgentForm, instructions: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-lg border resize-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'border-gray-300'}`}
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <label className={`text-sm mb-1 block ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Idioma</label>
-                  <select
-                    value={voiceAgentForm.language}
-                    onChange={(e) => setVoiceAgentForm({ ...voiceAgentForm, language: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'border-gray-300'}`}
-                  >
-                    <option value="pt-BR">Português (Brasil)</option>
-                    <option value="pt-PT">Português (Portugal)</option>
-                    <option value="en-US">English (US)</option>
-                    <option value="es-ES">Español</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className={`sticky bottom-0 flex items-center justify-end gap-2 p-4 border-t ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
-              <Button
-                variant="outline"
-                onClick={() => { setVoiceAgentModalOpen(false); resetVoiceAgentForm(); }}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleCreateVoiceAgent}
-                disabled={actionLoading || !voiceAgentForm.name.trim() || !voiceAgentForm.voice_config.voice_id || !voiceAgentForm.call_config.api_key}
-                className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white"
-              >
-                {actionLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : selectedVoiceAgent ? (
-                  <Check className="w-4 h-4 mr-2" />
-                ) : (
-                  <Plus className="w-4 h-4 mr-2" />
-                )}
-                {selectedVoiceAgent ? 'Salvar' : 'Criar Agente'}
               </Button>
             </div>
           </div>

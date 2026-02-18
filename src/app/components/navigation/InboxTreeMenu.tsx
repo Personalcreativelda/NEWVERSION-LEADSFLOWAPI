@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-    ChevronRight, ChevronDown, Inbox, Hash, Tag, AtSign, Bell, Settings, Bot, Zap,
+    ChevronRight, ChevronDown, Inbox, Hash, Tag, AtSign, Bell, Settings, Bot, PhoneCall, Zap,
     MessageCircle, Instagram, Facebook, Send, Mail, Cloud, Globe, Plus,
     Edit2, Trash2, UserPlus, ArrowRightLeft, Smartphone
 } from 'lucide-react';
@@ -663,6 +663,20 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
             >
                 <Bot className="w-5 h-5" />
                 <span className="flex-1 text-left font-medium">{t.aiAssistants || 'Assistentes IA'}</span>
+            </button>
+
+            {/* 7.5. Agentes de Voz */}
+            <button
+                onClick={() => onNavigate('voice-agents')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                    currentPage === 'voice-agents'
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : 'hover:bg-white/10'
+                }`}
+                style={currentPage !== 'voice-agents' ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
+            >
+                <PhoneCall className="w-5 h-5" />
+                <span className="flex-1 text-left font-medium">{t.voiceAgents || 'Agentes de Voz'}</span>
             </button>
 
             {/* 8. Automação */}
