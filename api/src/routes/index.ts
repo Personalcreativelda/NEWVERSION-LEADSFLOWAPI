@@ -21,6 +21,7 @@ import emailCampaignsRoutes from './email-campaigns';
 import channelsRoutes from './channels.routes';
 import aiAssistantsRoutes from './ai-assistants.routes';
 import assistantsRoutes from './assistants.routes';
+import voiceAgentsRoutes from './voice-agents.routes';
 import userWebhooksRoutes from './user-webhooks.routes';
 import versionRoutes from './version.routes';
 // Lead Tracking: Importar rotas de rastreamento de leads
@@ -55,6 +56,7 @@ router.use('/email-campaigns', emailCampaignsRoutes);
 router.use('/channels', channelsRoutes);
 router.use('/ai-assistants', aiAssistantsRoutes);
 router.use('/assistants', assistantsRoutes);
+router.use('/voice-agents', voiceAgentsRoutes);
 router.use('/user-webhooks', userWebhooksRoutes);
 router.use('/version', versionRoutes);
 
