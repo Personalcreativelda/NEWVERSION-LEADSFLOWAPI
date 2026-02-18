@@ -35,6 +35,13 @@ export const voiceAgentsApi = {
   async getSettings(): Promise<{
     elevenlabs_configured: boolean;
     elevenlabs_api_key_preview: string | null;
+    openai_configured: boolean;
+    openai_api_key_preview: string | null;
+    anthropic_configured: boolean;
+    anthropic_api_key_preview: string | null;
+    google_configured: boolean;
+    google_api_key_preview: string | null;
+    preferred_ai_model: string;
     voice_settings: Record<string, any>;
   }> {
     const response = await api.get('/voice-agents/settings');
@@ -45,7 +52,11 @@ export const voiceAgentsApi = {
    * Update user's voice agent settings
    */
   async updateSettings(data: {
-    elevenlabs_api_key?: string;
+    elevenlabs_api_key?: string | null;
+    openai_api_key?: string | null;
+    anthropic_api_key?: string | null;
+    google_api_key?: string | null;
+    preferred_ai_model?: string;
     voice_settings?: Record<string, any>;
   }): Promise<{ success: boolean; message: string }> {
     const response = await api.put('/voice-agents/settings', data);

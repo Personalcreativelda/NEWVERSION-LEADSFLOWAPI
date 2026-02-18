@@ -20,6 +20,13 @@ CREATE TABLE users (
     plan_limits JSONB DEFAULT '{"leads": 100, "messages": 100, "massMessages": 200}',
     plan_expires_at TIMESTAMP WITH TIME ZONE,
     trial_ends_at TIMESTAMP WITH TIME ZONE,
+    -- Voice Agents & AI Models API Keys
+    elevenlabs_api_key TEXT,
+    openai_api_key TEXT,
+    anthropic_api_key TEXT,
+    google_api_key TEXT,
+    preferred_ai_model VARCHAR(50) DEFAULT 'elevenlabs',
+    voice_settings JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -1,14 +1,13 @@
-import { Database, TrendingUp, CheckCircle2, Target, PhoneCall } from 'lucide-react';
+import { Database, TrendingUp, CheckCircle2, Target } from 'lucide-react';
 
 interface MainStatsCardsProps {
   totalLeads: number;
   leadsNovosHoje: number;
   leadsFechados: number;
   limiteLeads?: number; // Limite do plano
-  voiceAgents?: number; // Quantidade de agentes de voz ativos
 }
 
-export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechados, limiteLeads = 100, voiceAgents = 0 }: MainStatsCardsProps) {
+export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechados, limiteLeads = 100 }: MainStatsCardsProps) {
   // Calcular taxa de conversão
   const taxaConversao = totalLeads > 0 ? ((leadsFechados / totalLeads) * 100).toFixed(1) : '0';
 
@@ -34,7 +33,6 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
   const badgeLeadsHoje = formatPercentage(progressLeadsHoje);
   const badgeConvertidos = formatPercentage(progressConvertidos);
   const badgeTaxaConversao = `${taxaConversao}%`;
-  const badgeVoiceAgents = voiceAgents > 0 ? 'Ativos' : 'Nenhum';
 
   const stats = [
     {
@@ -81,21 +79,10 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
       progressColor: '#FFA26B',
       progress: parseFloat(taxaConversao),
     },
-    {
-      id: 'voice-agents-card',
-      value: voiceAgents.toLocaleString(),
-      label: 'Agentes de Voz',
-      icon: PhoneCall,
-      iconColor: '#8B5CF6', // Roxo vibrante
-      bgColor: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
-      badge: badgeVoiceAgents,
-      progressColor: '#8B5CF6',
-      progress: voiceAgents > 0 ? 100 : 0,
-    },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5 lg:gap-5 xl:gap-6">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 lg:gap-5 xl:gap-6">
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (

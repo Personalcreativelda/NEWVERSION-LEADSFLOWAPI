@@ -26,11 +26,31 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   const [selectedAgent, setSelectedAgent] = useState<VoiceAgent | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
-  const [showSettingsApiKey, setShowSettingsApiKey] = useState(false);
+  const [showSettingsApiKey, setShowSettingsApiKey] = useState<Record<string, boolean>>({
+    elevenlabs: false,
+    openai: false,
+    anthropic: false,
+    google: false,
+  });
   const [elevenLabsConfigured, setElevenLabsConfigured] = useState(false);
+  const [savedApiKeys, setSavedApiKeys] = useState<{
+    elevenlabs: boolean;
+    openai: boolean;
+    anthropic: boolean;
+    google: boolean;
+  }>({
+    elevenlabs: false,
+    openai: false,
+    anthropic: false,
+    google: false,
+  });
 
   const [settingsForm, setSettingsForm] = useState({
-    elevenlabs_api_key: ''
+    elevenlabs_api_key: '',
+    openai_api_key: '',
+    anthropic_api_key: '',
+    google_api_key: '',
+    preferred_ai_model: 'elevenlabs', // elevenlabs | openai | anthropic | google
   });
 
   const [form, setForm] = useState<CreateVoiceAgentInput>({
@@ -57,38 +77,79 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     try {
       console.log('[VoiceAgentsPage] Starting to load data...');
       setLoading(true);
-      const [agents, voicesResponse, settings] = await Promise.all([
-        voiceAgentsApi.getAll(),
-        voiceAgentsApi.getElevenLabsVoices().catch(() => ({ voices: [], configured: false })),
-        voiceAgentsApi.getSettings().catch(() => ({ elevenlabs_configured: false, elevenlabs_api_key_preview: null, voice_settings: {} })),
+      
+      // Load settings first to know if ElevenLabs is configured
+      let settings: any = { elevenlabs_configured: false, elevenlabs_api_key_preview: null, voice_settings: {} };
+      try {
+        settings = await voiceAgentsApi.getSettings();
+        console.log('[VoiceAgentsPage] Settings loaded:', {
+          elevenlabs_configured: settings.elevenlabs_configured,
+          openai_configured: settings.openai_configured,
+          anthropic_configured: settings.anthropic_configured,
+          google_configured: settings.google_configured,
+          preferred_ai_model: settings.preferred_ai_model,
+        });
+      } catch (settingsError) {
+        console.error('[VoiceAgentsPage] Error loading settings:', settingsError);
+        // Continue even if settings fail to load
+      }
+
+      // Load agents and voices in parallel
+      const [agents, voicesResponse] = await Promise.all([
+        voiceAgentsApi.getAll().catch((error) => {
+          console.error('[VoiceAgentsPage] Error loading agents:', error);
+          return [];
+        }),
+        // Only load voices if ElevenLabs is configured
+        settings.elevenlabs_configured 
+          ? voiceAgentsApi.getElevenLabsVoices().catch((error) => {
+              console.error('[VoiceAgentsPage] Error loading voices:', error);
+              return { voices: [], configured: false };
+            })
+          : Promise.resolve({ voices: [], configured: settings.elevenlabs_configured })
       ]);
+
       console.log('[VoiceAgentsPage] Data loaded:', { 
         agentsCount: agents.length, 
-        voicesResponse, 
-        settings 
+        voicesCount: Array.isArray(voicesResponse) ? voicesResponse.length : voicesResponse.voices?.length || 0,
+        elevenLabsConfigured: settings.elevenlabs_configured
       });
       
+      // Update agents
       setVoiceAgents(agents);
       
       // Handle voices response (can be old format array or new format object)
       if (Array.isArray(voicesResponse)) {
         console.log('[VoiceAgentsPage] Using old voices format (array)');
         setElevenLabsVoices(voicesResponse);
-        setElevenLabsConfigured(false);
       } else {
         console.log('[VoiceAgentsPage] Using new voices format:', {
           configured: voicesResponse.configured,
           voicesCount: voicesResponse.voices?.length || 0
         });
         setElevenLabsVoices(voicesResponse.voices || []);
-        setElevenLabsConfigured(voicesResponse.configured || false);
       }
       
-      console.log('[VoiceAgentsPage] ElevenLabs configured:', settings.elevenlabs_configured);
-      setElevenLabsConfigured(settings.elevenlabs_configured);
+      // Update ElevenLabs configured status
+      const configuredStatus = settings.elevenlabs_configured || (Array.isArray(voicesResponse) ? false : voicesResponse.configured);
+      setElevenLabsConfigured(configuredStatus);
+      
+      // Save which APIs are configured for UI indicators
+      setSavedApiKeys({
+        elevenlabs: settings.elevenlabs_configured || false,
+        openai: settings.openai_configured || false,
+        anthropic: settings.anthropic_configured || false,
+        google: settings.google_configured || false,
+      });
+      
+      console.log('[VoiceAgentsPage] Configuration Status:', {
+        elevenLabsConfigured: configuredStatus,
+        agentsLoaded: agents.length,
+        voicesAvailable: Array.isArray(voicesResponse) ? voicesResponse.length : voicesResponse.voices?.length || 0
+      });
     } catch (error) {
-      console.error('[VoiceAgentsPage] Error loading data:', error);
-      toast.error('Erro ao carregar agentes de voz');
+      console.error('[VoiceAgentsPage] Error in loadData:', error);
+      toast.error('Erro ao carregar agentes de voz. Tente atualizar a página.');
     } finally {
       setLoading(false);
     }
@@ -145,7 +206,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   };
 
   const handleSubmit = async () => {
-    if (!form.name || !form.voice_config.voice_id || !form.call_config.api_key) {
+    if (!form.name || !form.voice_config.voice_id || !form.call_config.api_key || !form.call_config.from_number) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
@@ -206,36 +267,168 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     }
   };
 
-  const handleOpenSettings = () => {
-    // Reset form to empty when opening
-    setSettingsForm({ elevenlabs_api_key: '' });
-    setShowSettingsApiKey(false);
-    setSettingsModalOpen(true);
+  const handleOpenSettings = async () => {
+    try {
+      console.log('[VoiceAgentsPage] 🔧 Opening settings modal...');
+      
+      // Load current settings from server
+      const currentSettings = await voiceAgentsApi.getSettings();
+      console.log('[VoiceAgentsPage] Current settings from server:', {
+        elevenlabs: currentSettings.elevenlabs_configured,
+        openai: currentSettings.openai_configured,
+        anthropic: currentSettings.anthropic_configured,
+        google: currentSettings.google_configured,
+      });
+      
+      // Update saved API keys status
+      setSavedApiKeys({
+        elevenlabs: currentSettings.elevenlabs_configured || false,
+        openai: currentSettings.openai_configured || false,
+        anthropic: currentSettings.anthropic_configured || false,
+        google: currentSettings.google_configured || false,
+      });
+      
+      // Keep fields empty to allow overwriting, but track what's configured
+      setSettingsForm({
+        elevenlabs_api_key: '',
+        openai_api_key: '',
+        anthropic_api_key: '',
+        google_api_key: '',
+        preferred_ai_model: currentSettings.preferred_ai_model || 'elevenlabs',
+      });
+      
+      setShowSettingsApiKey({
+        elevenlabs: false,
+        openai: false,
+        anthropic: false,
+        google: false,
+      });
+      
+      setSettingsModalOpen(true);
+      console.log('[VoiceAgentsPage] Settings modal opened with saved status:', currentSettings);
+    } catch (error) {
+      console.error('[VoiceAgentsPage] Error loading settings for modal:', error);
+      // If error, start with empty form
+      setSettingsForm({ 
+        elevenlabs_api_key: '',
+        openai_api_key: '',
+        anthropic_api_key: '',
+        google_api_key: '',
+        preferred_ai_model: 'elevenlabs',
+      });
+      setShowSettingsApiKey({
+        elevenlabs: false,
+        openai: false,
+        anthropic: false,
+        google: false,
+      });
+      setSettingsModalOpen(true);
+      toast.error('Erro ao carregar configurações atuais');
+    }
   };
 
   const handleSaveSettings = async () => {
-    if (!settingsForm.elevenlabs_api_key || settingsForm.elevenlabs_api_key.trim() === '') {
-      toast.error('Digite uma API key válida');
+    // Validações: pelo menos uma chave de API deve ser fornecida
+    const hasAnyKey = 
+      settingsForm.elevenlabs_api_key?.trim() ||
+      settingsForm.openai_api_key?.trim() ||
+      settingsForm.anthropic_api_key?.trim() ||
+      settingsForm.google_api_key?.trim();
+
+    if (!hasAnyKey) {
+      toast.error('Forneça pelo menos uma API key válida');
       return;
     }
 
     try {
       setActionLoading(true);
-      console.log('[VoiceAgentsPage] Saving API key:', settingsForm.elevenlabs_api_key.substring(0, 10) + '...');
+      console.log('[VoiceAgentsPage] 🔄 Saving API keys...');
       
-      await voiceAgentsApi.updateSettings({
-        elevenlabs_api_key: settingsForm.elevenlabs_api_key
+      // Prepare data to save
+      const dataToSave = {
+        elevenlabs_api_key: settingsForm.elevenlabs_api_key || null,
+        openai_api_key: settingsForm.openai_api_key || null,
+        anthropic_api_key: settingsForm.anthropic_api_key || null,
+        google_api_key: settingsForm.google_api_key || null,
+        preferred_ai_model: settingsForm.preferred_ai_model,
+      };
+      
+      console.log('[VoiceAgentsPage] Submitting:', {
+        hasElevenLabs: !!dataToSave.elevenlabs_api_key,
+        hasOpenAI: !!dataToSave.openai_api_key,
+        hasAnthropic: !!dataToSave.anthropic_api_key,
+        hasGoogle: !!dataToSave.google_api_key,
       });
       
-      console.log('[VoiceAgentsPage] Settings saved successfully, reloading data...');
-      toast.success('Configurações salvas com sucesso!');
+      const response = await voiceAgentsApi.updateSettings(dataToSave);
+      
+      console.log('[VoiceAgentsPage] ✅ Settings saved:', response);
+      
+      // Update saved API keys status immediately
+      setSavedApiKeys({
+        elevenlabs: !!dataToSave.elevenlabs_api_key,
+        openai: !!dataToSave.openai_api_key,
+        anthropic: !!dataToSave.anthropic_api_key,
+        google: !!dataToSave.google_api_key,
+      });
+      
+      toast.success('Configurações salvas com sucesso! Recarregando...');
+      
+      // Keep modal open for a moment while showing loading state
+      // This prevents UI flicker
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Close modal
       setSettingsModalOpen(false);
       
-      // Reload to get updated voices
-      await loadData();
+      // Wait a bit more for cleanup
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Reload ALL data including agents and voices
+      console.log('[VoiceAgentsPage] 🔄 Reloading all data after settings save...');
+      setLoading(true);
+      
+      // Load fresh data with explicit error handling
+      try {
+        const [agents, settings] = await Promise.all([
+          voiceAgentsApi.getAll(),
+          voiceAgentsApi.getSettings(),
+        ]);
+        
+        console.log('[VoiceAgentsPage] ✅ Fresh data loaded:', {
+          agentsCount: agents.length,
+          elevenLabsConfigured: settings.elevenlabs_configured,
+          openAIConfigured: settings.openai_configured,
+        });
+        
+        // Update state with fresh data
+        setVoiceAgents(agents);
+        setElevenLabsConfigured(settings.elevenlabs_configured);
+        
+        // Load voices if ElevenLabs is configured
+        if (settings.elevenlabs_configured) {
+          try {
+            const voicesData = await voiceAgentsApi.getElevenLabsVoices();
+            console.log('[VoiceAgentsPage] Voices loaded:', voicesData);
+            const voiceList = Array.isArray(voicesData) ? voicesData : (voicesData as any).voices || [];
+            setElevenLabsVoices(voiceList);
+          } catch (voiceError) {
+            console.warn('[VoiceAgentsPage] Could not load voices:', voiceError);
+          }
+        }
+        
+        console.log('[VoiceAgentsPage] ✅ All data refreshed successfully');
+      } catch (reloadError) {
+        console.error('[VoiceAgentsPage] Error reloading data:', reloadError);
+        toast.error('Configurações salvas, mas houve erro ao recarregar. Atualize a página.');
+      } finally {
+        setLoading(false);
+      }
+      
     } catch (error: any) {
-      console.error('[VoiceAgentsPage] Error saving settings:', error);
-      toast.error(error.response?.data?.error || 'Erro ao salvar configurações');
+      console.error('[VoiceAgentsPage] ❌ Error saving settings:', error);
+      const errorMsg = error.response?.data?.error || error.message || 'Erro ao salvar configurações';
+      toast.error(errorMsg);
     } finally {
       setActionLoading(false);
     }
@@ -486,7 +679,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
               {/* Número de Origem */}
               <div>
                 <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Número de Origem
+                  Número de Origem (Wavoip)
                 </label>
                 <Input
                   value={form.call_config.from_number}
@@ -494,9 +687,12 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     ...form,
                     call_config: { ...form.call_config, from_number: e.target.value }
                   })}
-                  placeholder="+55 11 99999-9999"
+                  placeholder="+5511999999999"
                   className={`text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
                 />
+                <p className={`mt-1.5 text-[10px] sm:text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Formato E.164 obrigatório: +CCNNNNNNNNN (ex: +5511999999999 para Brasil)
+                </p>
               </div>
 
               {/* Mensagem de Saudação */}
@@ -602,25 +798,49 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
               </div>
 
               {/* Body */}
-              <div className="px-4 py-4 sm:px-6 sm:py-5 space-y-4">
+              <div className="px-4 py-4 sm:px-6 sm:py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+                
+                {/* Model Selector */}
                 <div>
-                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    ElevenLabs API Key
+                  <label className={`block text-xs sm:text-sm font-medium mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    Modelo de IA Preferido
                   </label>
-                  <div className="relative">
+                  <select
+                    value={settingsForm.preferred_ai_model}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, preferred_ai_model: e.target.value })}
+                    className={`w-full px-3 py-2 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
+                  >
+                    <option value="elevenlabs">ElevenLabs (Voz)</option>
+                    <option value="openai">OpenAI (GPT-4, GPT-3.5)</option>
+                    <option value="anthropic">Anthropic (Claude)</option>
+                    <option value="google">Google (Gemini)</option>
+                  </select>
+                </div>
+
+                {/* ElevenLabs API Key */}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <label className={`block text-xs sm:text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      ElevenLabs API Key
+                    </label>
+                    {savedApiKeys.elevenlabs && (
+                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Salvo</span>
+                    )}
+                  </div>
+                  <div className="relative mt-1.5 sm:mt-2">
                     <input
-                      type={showSettingsApiKey ? 'text' : 'password'}
+                      type={showSettingsApiKey.elevenlabs ? 'text' : 'password'}
                       value={settingsForm.elevenlabs_api_key}
                       onChange={(e) => setSettingsForm({ ...settingsForm, elevenlabs_api_key: e.target.value })}
-                      placeholder="sk_..."
+                      placeholder={savedApiKeys.elevenlabs ? "Digite uma nova chave para atualizar..." : "sk_..."}
                       className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder:text-gray-500' : 'border-gray-300'}`}
                     />
                     <button
                       type="button"
-                      onClick={() => setShowSettingsApiKey(!showSettingsApiKey)}
+                      onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, elevenlabs: !showSettingsApiKey.elevenlabs })}
                       className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${isDark ? 'hover:bg-slate-600' : 'hover:bg-gray-100'}`}
                     >
-                      {showSettingsApiKey ? (
+                      {showSettingsApiKey.elevenlabs ? (
                         <EyeOff className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
                       ) : (
                         <Eye className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
@@ -631,6 +851,112 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     Obtenha sua chave em <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">elevenlabs.io</a>
                   </p>
                 </div>
+
+                {/* OpenAI API Key */}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <label className={`block text-xs sm:text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      OpenAI API Key
+                    </label>
+                    {savedApiKeys.openai && (
+                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Salvo</span>
+                    )}
+                  </div>
+                  <div className="relative mt-1.5 sm:mt-2">
+                    <input
+                      type={showSettingsApiKey.openai ? 'text' : 'password'}
+                      value={settingsForm.openai_api_key}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, openai_api_key: e.target.value })}
+                      placeholder={savedApiKeys.openai ? "Digite uma nova chave para atualizar..." : "sk-..."}
+                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder:text-gray-500' : 'border-gray-300'}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, openai: !showSettingsApiKey.openai })}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${isDark ? 'hover:bg-slate-600' : 'hover:bg-gray-100'}`}
+                    >
+                      {showSettingsApiKey.openai ? (
+                        <EyeOff className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                      ) : (
+                        <Eye className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                      )}
+                    </button>
+                  </div>
+                  <p className={`mt-1.5 text-[10px] sm:text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Obtenha sua chave em <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-cyan-500 hover:underline">platform.openai.com</a>
+                  </p>
+                </div>
+
+                {/* Anthropic API Key */}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <label className={`block text-xs sm:text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      Anthropic API Key (Claude)
+                    </label>
+                    {savedApiKeys.anthropic && (
+                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Salvo</span>
+                    )}
+                  </div>
+                  <div className="relative mt-1.5 sm:mt-2">
+                    <input
+                      type={showSettingsApiKey.anthropic ? 'text' : 'password'}
+                      value={settingsForm.anthropic_api_key}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, anthropic_api_key: e.target.value })}
+                      placeholder={savedApiKeys.anthropic ? "Digite uma nova chave para atualizar..." : "sk-ant-..."}
+                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder:text-gray-500' : 'border-gray-300'}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, anthropic: !showSettingsApiKey.anthropic })}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${isDark ? 'hover:bg-slate-600' : 'hover:bg-gray-100'}`}
+                    >
+                      {showSettingsApiKey.anthropic ? (
+                        <EyeOff className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                      ) : (
+                        <Eye className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                      )}
+                    </button>
+                  </div>
+                  <p className={`mt-1.5 text-[10px] sm:text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Obtenha sua chave em <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">console.anthropic.com</a>
+                  </p>
+                </div>
+
+                {/* Google API Key */}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <label className={`block text-xs sm:text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      Google API Key (Gemini)
+                    </label>
+                    {savedApiKeys.google && (
+                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Salvo</span>
+                    )}
+                  </div>
+                  <div className="relative mt-1.5 sm:mt-2">
+                    <input
+                      type={showSettingsApiKey.google ? 'text' : 'password'}
+                      value={settingsForm.google_api_key}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, google_api_key: e.target.value })}
+                      placeholder={savedApiKeys.google ? "Digite uma nova chave para atualizar..." : "AIza..."}
+                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder:text-gray-500' : 'border-gray-300'}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, google: !showSettingsApiKey.google })}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${isDark ? 'hover:bg-slate-600' : 'hover:bg-gray-100'}`}
+                    >
+                      {showSettingsApiKey.google ? (
+                        <EyeOff className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                      ) : (
+                        <Eye className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                      )}
+                    </button>
+                  </div>
+                  <p className={`mt-1.5 text-[10px] sm:text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Obtenha sua chave em <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-red-500 hover:underline">aistudio.google.com</a>
+                  </p>
+                </div>
+
               </div>
 
               {/* Footer */}

@@ -58,7 +58,6 @@ import { notifyTourAvailable } from '../utils/notificationHelpers';
 // Utils and Hooks
 import { leadsApi, userApi, integrationsApi } from '../utils/api';
 import { conversationsApi } from '../services/api/inbox';
-import { voiceAgentsApi } from '../services/api/voice-agents';
 import { useLeadsAutoRefresh } from '../hooks/useLeadsAutoRefresh';
 import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
 
@@ -123,7 +122,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   const [loading, setLoading] = useState(true);
   const [isDeletingLeads, setIsDeletingLeads] = useState(false); // ✅ Bloquear auto-refresh durante deleção
   const [isBackendOffline, setIsBackendOffline] = useState(false); // ✅ Detectar backend offline
-  const [voiceAgentsCount, setVoiceAgentsCount] = useState(0); // Quantidade de agentes de voz
 
   // Estados dos modais
   const [modalNovoLead, setModalNovoLead] = useState(false);
@@ -179,7 +177,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     const token = localStorage.getItem('leadflow_access_token');
     if (token) {
       carregarLeads();
-      carregarVoiceAgents(); // Carregar agentes de voz
     }
     // Check if user should see onboarding tour
     const tourCompleted = localStorage.getItem('leadsflow_tour_completed');
@@ -241,16 +238,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   useEffect(() => {
     console.log('[Dashboard] 📄 Page changed to:', currentPage);
   }, [currentPage]);
-
-  const carregarVoiceAgents = async () => {
-    try {
-      const agents = await voiceAgentsApi.getAll();
-      setVoiceAgentsCount(agents.filter(a => a.is_active).length);
-    } catch (error) {
-      console.error('[Dashboard] Error loading voice agents:', error);
-      setVoiceAgentsCount(0);
-    }
-  };
 
   const carregarLeads = async () => {
     // ✅ BLOQUEAR se estiver deletando para evitar recarregar leads que acabaram de ser deletados
@@ -1918,7 +1905,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   leadsNovosHoje={stats.novosHoje}
                   leadsFechados={stats.convertidos}
                   limiteLeads={limites.leads === -1 ? 999999 : limites.leads}
-                  voiceAgents={voiceAgentsCount}
                 />
 
                 {/* Cards Secundários */}
@@ -1997,7 +1983,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   leadsNovosHoje={stats.novosHoje}
                   leadsFechados={stats.convertidos}
                   limiteLeads={limites.leads === -1 ? 999999 : limites.leads}
-                  voiceAgents={voiceAgentsCount}
                 />
 
                 {/* Cards Secundários */}

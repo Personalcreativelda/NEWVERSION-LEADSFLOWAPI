@@ -11,7 +11,7 @@ router.use(authMiddleware);
 
 /**
  * GET /api/voice-agents/settings
- * Get user's voice agent settings (API keys, etc)
+ * Get user's voice agent settings (API keys, preferences, etc)
  */
 router.get('/settings', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -19,18 +19,31 @@ router.get('/settings', async (req: Request, res: Response, next: NextFunction) 
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
     const result = await query(
-      'SELECT elevenlabs_api_key, voice_settings FROM users WHERE id = $1',
+      'SELECT elevenlabs_api_key, openai_api_key, anthropic_api_key, google_api_key, preferred_ai_model, voice_settings FROM users WHERE id = $1',
       [user.id]
     );
 
     const settings = result.rows[0] || {};
 
-    // Don't expose the full API key for security
+    // Don't expose the full API keys for security
     res.json({
       elevenlabs_configured: !!settings.elevenlabs_api_key,
       elevenlabs_api_key_preview: settings.elevenlabs_api_key 
         ? `${settings.elevenlabs_api_key.substring(0, 8)}...` 
         : null,
+      openai_configured: !!settings.openai_api_key,
+      openai_api_key_preview: settings.openai_api_key
+        ? `${settings.openai_api_key.substring(0, 8)}...`
+        : null,
+      anthropic_configured: !!settings.anthropic_api_key,
+      anthropic_api_key_preview: settings.anthropic_api_key
+        ? `${settings.anthropic_api_key.substring(0, 8)}...`
+        : null,
+      google_configured: !!settings.google_api_key,
+      google_api_key_preview: settings.google_api_key
+        ? `${settings.google_api_key.substring(0, 8)}...`
+        : null,
+      preferred_ai_model: settings.preferred_ai_model || 'elevenlabs',
       voice_settings: settings.voice_settings || {}
     });
   } catch (error) {
@@ -40,14 +53,21 @@ router.get('/settings', async (req: Request, res: Response, next: NextFunction) 
 
 /**
  * PUT /api/voice-agents/settings
- * Update user's voice agent settings
+ * Update user's voice agent settings (API keys for multiple AI models)
  */
 router.put('/settings', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = req.user;
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { elevenlabs_api_key, voice_settings } = req.body;
+    const { 
+      elevenlabs_api_key, 
+      openai_api_key,
+      anthropic_api_key,
+      google_api_key,
+      preferred_ai_model,
+      voice_settings 
+    } = req.body;
 
     const updates: string[] = [];
     const values: any[] = [];
@@ -56,6 +76,26 @@ router.put('/settings', async (req: Request, res: Response, next: NextFunction) 
     if (elevenlabs_api_key !== undefined) {
       updates.push(`elevenlabs_api_key = $${paramIndex++}`);
       values.push(elevenlabs_api_key || null);
+    }
+
+    if (openai_api_key !== undefined) {
+      updates.push(`openai_api_key = $${paramIndex++}`);
+      values.push(openai_api_key || null);
+    }
+
+    if (anthropic_api_key !== undefined) {
+      updates.push(`anthropic_api_key = $${paramIndex++}`);
+      values.push(anthropic_api_key || null);
+    }
+
+    if (google_api_key !== undefined) {
+      updates.push(`google_api_key = $${paramIndex++}`);
+      values.push(google_api_key || null);
+    }
+
+    if (preferred_ai_model !== undefined) {
+      updates.push(`preferred_ai_model = $${paramIndex++}`);
+      values.push(preferred_ai_model || 'elevenlabs');
     }
 
     if (voice_settings !== undefined) {
@@ -75,10 +115,19 @@ router.put('/settings', async (req: Request, res: Response, next: NextFunction) 
     );
 
     console.log(`[VoiceAgents] ✅ Settings updated for user ${user.id}`);
+    console.log(`[VoiceAgents] Preferences: ElevenLabs=${!!elevenlabs_api_key}, OpenAI=${!!openai_api_key}, Anthropic=${!!anthropic_api_key}, Google=${!!google_api_key}`);
 
+    // Return confirmation with updated settings
     res.json({ 
       success: true,
-      message: 'Configurações atualizadas com sucesso'
+      message: 'Configurações atualizadas com sucesso',
+      settings: {
+        elevenlabs_configured: elevenlabs_api_key !== undefined ? !!elevenlabs_api_key : undefined,
+        openai_configured: openai_api_key !== undefined ? !!openai_api_key : undefined,
+        anthropic_configured: anthropic_api_key !== undefined ? !!anthropic_api_key : undefined,
+        google_configured: google_api_key !== undefined ? !!google_api_key : undefined,
+        preferred_ai_model: preferred_ai_model || 'elevenlabs'
+      }
     });
   } catch (error) {
     next(error);
@@ -358,6 +407,14 @@ router.post('/:id/test-call', async (req: Request, res: Response, next: NextFunc
       return res.status(400).json({ error: 'Phone number is required' });
     }
 
+    // Validate phone number format (E.164)
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+    if (!e164Regex.test(phone_number)) {
+      return res.status(400).json({ 
+        error: `Invalid phone number format. Use E.164 format: +CCNNNNNNNNN (e.g., +5511999999999). Got: ${phone_number}` 
+      });
+    }
+
     // Get voice agent
     const agentResult = await query(
       'SELECT * FROM voice_agents WHERE id = $1 AND user_id = $2',
@@ -380,7 +437,7 @@ router.post('/:id/test-call', async (req: Request, res: Response, next: NextFunc
       });
     }
 
-    if (!callConfig.phone_number) {
+    if (!callConfig.from_number) {
       return res.status(400).json({ 
         error: 'Origin phone number not configured for this agent' 
       });
@@ -394,10 +451,10 @@ router.post('/:id/test-call', async (req: Request, res: Response, next: NextFunc
       `Olá! Este é um teste do agente de voz ${agent.name}. Esta chamada foi iniciada automaticamente.`;
 
     console.log(`[VoiceAgents] 🧪 Initiating test call for agent ${agent.name} (${id})`);
-    console.log(`[VoiceAgents] 📞 From: ${callConfig.phone_number} To: ${phone_number}`);
+    console.log(`[VoiceAgents] 📞 From: ${callConfig.from_number} To: ${phone_number}`);
 
     const callResult = await wavoipService.makeTestCall(
-      callConfig.phone_number,
+      callConfig.from_number,
       phone_number,
       greeting
     );

@@ -1,19 +1,29 @@
 /**
  * Wavoip API Service
  * Handles integration with Wavoip for making phone calls
+ * 
+ * Wavoip Documentation: https://docs.wavoip.co
+ * 
+ * Note: Wavoip requires:
+ * - Valid API Key (configured per agent in call_config)
+ * - From number (origin phone) in E.164 format: +CCNNNNNNNNN
+ * - To number (destination) in E.164 format: +CCNNNNNNNNN
  */
 
 import axios from 'axios';
 
+// Note: Wavoip API endpoint may vary, check your Wavoip dashboard for correct URL
 const WAVOIP_API_URL = process.env.WAVOIP_API_URL || 'https://api.wavoip.com/v1';
+const WAVOIP_TIMEOUT = 30000; // 30 seconds timeout
 
 export interface WavoipCallOptions {
-  from: string; // Número de origem
-  to: string; // Número de destino
-  voice_url?: string; // URL com áudio da voz
-  voice_text?: string; // Texto para ser falado (TTS)
-  webhook_url?: string; // URL para receber callbacks
-  max_duration?: number; // Duração máxima em segundos
+  from: string; // Origin phone number (E.164 format: +5511999999999)
+  to: string; // Destination phone number (E.164 format: +5511999999999)
+  voice_url?: string; // URL with audio voice file
+  voice_text?: string; // Text for TTS (Text-To-Speech)
+  webhook_url?: string; // URL to receive call callbacks
+  max_duration?: number; // Max duration in seconds
+  language?: string; // Language code (e.g., 'pt-BR', 'en-US')
 }
 
 export interface WavoipCallResponse {
@@ -37,6 +47,16 @@ export class WavoipService {
   }
 
   /**
+   * Validate phone number format (E.164)
+   * E.164 format: +CCNNNNNNNNN (e.g., +5511999999999)
+   */
+  private validatePhoneNumber(phone: string): boolean {
+    // Check if starts with + and has 10-15 digits
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+    return e164Regex.test(phone);
+  }
+
+  /**
    * Make a phone call using Wavoip
    */
   async makeCall(options: WavoipCallOptions): Promise<WavoipCallResponse> {
@@ -45,11 +65,20 @@ export class WavoipService {
         throw new Error('Wavoip API key not configured');
       }
 
-      const { from, to, voice_url, voice_text, webhook_url, max_duration = 300 } = options;
+      const { from, to, voice_url, voice_text, webhook_url, max_duration = 300, language = 'pt-BR' } = options;
 
       // Validate required fields
       if (!from || !to) {
         throw new Error('Missing required fields: from and to phone numbers');
+      }
+
+      // Validate phone number format
+      if (!this.validatePhoneNumber(from)) {
+        throw new Error(`Invalid "from" phone number format. Use E.164 format: +CCNNNNNNNNN (e.g., +5511999999999). Got: ${from}`);
+      }
+
+      if (!this.validatePhoneNumber(to)) {
+        throw new Error(`Invalid "to" phone number format. Use E.164 format: +CCNNNNNNNNN (e.g., +5511999999999). Got: ${to}`);
       }
 
       if (!voice_url && !voice_text) {
@@ -57,26 +86,45 @@ export class WavoipService {
       }
 
       console.log(`[Wavoip] 📞 Initiating call from ${from} to ${to}`);
+      console.log(`[Wavoip] 🔐 API URL: ${this.baseURL}/calls`);
+
+      // Prepare request payload
+      const payload: any = {
+        from,
+        to,
+        max_duration,
+      };
+
+      if (voice_url) {
+        payload.voice_url = voice_url;
+      }
+
+      if (voice_text) {
+        payload.voice_text = voice_text;
+        payload.language = language;
+      }
+
+      if (webhook_url) {
+        payload.webhook_url = webhook_url;
+      }
+
+      console.log(`[Wavoip] 📤 Request payload:`, JSON.stringify(payload, null, 2));
 
       const response = await axios.post(
         `${this.baseURL}/calls`,
+        payload,
         {
-          from,
-          to,
-          voice_url,
-          voice_text,
-          webhook_url,
-          max_duration,
-        },
-        {
+          timeout: WAVOIP_TIMEOUT,
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
+            'User-Agent': 'LeadFlowAPI/1.0',
           },
         }
       );
 
-      console.log(`[Wavoip] ✅ Call initiated: ${response.data.call_id}`);
+      console.log(`[Wavoip] ✅ Call initiated successfully: ${response.data.call_id}`);
+      console.log(`[Wavoip] 📊 Response:`, JSON.stringify(response.data, null, 2));
 
       return {
         call_id: response.data.call_id || response.data.id,
@@ -86,7 +134,14 @@ export class WavoipService {
         started_at: response.data.started_at || new Date().toISOString(),
       };
     } catch (error: any) {
-      console.error('[Wavoip] ❌ Error making call:', error.message);
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message;
+      const statusCode = error.response?.status;
+      
+      console.error(`[Wavoip] ❌ Error making call (Status: ${statusCode}):`, errorMessage);
+      
+      if (error.response?.data) {
+        console.error(`[Wavoip] 📋 Error details:`, JSON.stringify(error.response.data, null, 2));
+      }
       
       // Return error response
       return {
@@ -94,7 +149,7 @@ export class WavoipService {
         status: 'failed',
         from: options.from,
         to: options.to,
-        error: error.response?.data?.message || error.message,
+        error: `[${statusCode || 'ERROR'}] ${errorMessage}`,
       };
     }
   }
