@@ -1,6 +1,7 @@
 // INBOX: Modal de Conexão Email com SMTP/IMAP
 import React, { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
+import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Mail, Check, AlertCircle, Loader2, Info, CheckCircle, Eye, EyeOff, ChevronRight } from 'lucide-react';
 
@@ -8,6 +9,7 @@ interface EmailConnectProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    editingChannel?: Channel;
 }
 
 // Presets de provedores populares
@@ -50,8 +52,9 @@ const EMAIL_PROVIDERS = [
     }
 ];
 
-export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) {
-    const [step, setStep] = useState<'provider' | 'config' | 'success'>('provider');
+export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: EmailConnectProps) {
+    const isEditing = !!editingChannel;
+    const [step, setStep] = useState<'provider' | 'config' | 'success'>(isEditing ? 'config' : 'provider');
     const [selectedProvider, setSelectedProvider] = useState<typeof EMAIL_PROVIDERS[0] | null>(null);
     const [loading, setLoading] = useState(false);
     const [testingConnection, setTestingConnection] = useState(false);
@@ -71,21 +74,44 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
         from_name: ''
     });
 
+    // Preencher dados quando for edição
+    useEffect(() => {
+        if (isEditing && editingChannel) {
+            const provider = EMAIL_PROVIDERS.find(p => p.id === editingChannel.credentials?.provider);
+            setSelectedProvider(provider || null);
+            setFormData({
+                name: editingChannel.name || '',
+                email: editingChannel.credentials?.email || '',
+                password: editingChannel.credentials?.password || '',
+                smtp_host: editingChannel.credentials?.smtp?.host || '',
+                smtp_port: String(editingChannel.credentials?.smtp?.port || '587'),
+                smtp_secure: editingChannel.credentials?.smtp?.secure || false,
+                imap_host: editingChannel.credentials?.imap?.host || '',
+                imap_port: String(editingChannel.credentials?.imap?.port || '993'),
+                imap_secure: editingChannel.credentials?.imap?.secure || true,
+                from_name: editingChannel.credentials?.from_name || ''
+            });
+            setStep('config');
+        }
+    }, [isEditing, editingChannel]);
+
     useEffect(() => {
         if (!isOpen) {
-            setStep('provider');
-            setSelectedProvider(null);
-            setFormData({
-                name: '', email: '', password: '',
-                smtp_host: '', smtp_port: '587', smtp_secure: false,
-                imap_host: '', imap_port: '993', imap_secure: true,
-                from_name: ''
-            });
+            if (!isEditing) {
+                setStep('provider');
+                setSelectedProvider(null);
+                setFormData({
+                    name: '', email: '', password: '',
+                    smtp_host: '', smtp_port: '587', smtp_secure: false,
+                    imap_host: '', imap_port: '993', imap_secure: true,
+                    from_name: ''
+                });
+            }
             setError(null);
             setLoading(false);
             setShowPassword(false);
         }
-    }, [isOpen]);
+    }, [isOpen, isEditing]);
 
     const handleSelectProvider = (provider: typeof EMAIL_PROVIDERS[0]) => {
         setSelectedProvider(provider);
@@ -115,10 +141,10 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
             setLoading(true);
             setError(null);
 
-            const channel = await channelsApi.create({
-                type: 'email',
+            const channelData = {
+                type: 'email' as const,
                 name: formData.name,
-                status: 'active',
+                status: 'active' as const,
                 credentials: {
                     email: formData.email,
                     password: formData.password,
@@ -143,15 +169,23 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
                         }
                     }
                 }
-            });
+            };
+
+            let channel;
+            if (isEditing && editingChannel) {
+                channel = await channelsApi.update(editingChannel.id, channelData);
+                toast.success('Canal de email atualizado com sucesso!');
+            } else {
+                channel = await channelsApi.create(channelData);
+                toast.success('Canal de email conectado!');
+            }
 
             if (channel) {
                 setStep('success');
-                toast.success('Canal de email conectado!');
             }
         } catch (err: any) {
-            console.error('Failed to create email channel:', err);
-            setError(err.message || 'Erro ao criar canal de email.');
+            console.error('Failed to save email channel:', err);
+            setError(err.message || `Erro ao ${isEditing ? 'atualizar' : 'criar'} canal de email.`);
         } finally {
             setLoading(false);
         }
@@ -160,7 +194,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
             <div
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={onClose}
@@ -184,10 +218,10 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                {step === 'provider' ? 'Conectar Email' : step === 'config' ? (selectedProvider?.name || 'Configurar Email') : 'Sucesso!'}
+                                {isEditing ? 'Editar Canal Email' : step === 'provider' ? 'Conectar Email' : step === 'config' ? (selectedProvider?.name || 'Configurar Email') : 'Sucesso!'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                {step === 'provider' ? 'Escolha seu provedor de email' : step === 'config' ? 'Configure SMTP e IMAP' : 'Canal criado com sucesso'}
+                                {isEditing ? 'Atualize as configurações do canal' : step === 'provider' ? 'Escolha seu provedor de email' : step === 'config' ? 'Configure SMTP e IMAP' : 'Canal criado com sucesso'}
                             </p>
                         </div>
                     </div>
@@ -429,13 +463,15 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
                             )}
 
                             <div className="flex gap-3 pt-2">
-                                <button
-                                    onClick={() => { setStep('provider'); setError(null); }}
-                                    className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
-                                    style={{ borderColor: 'hsl(var(--border))' }}
-                                >
-                                    Voltar
-                                </button>
+                                {!isEditing && (
+                                    <button
+                                        onClick={() => { setStep('provider'); setError(null); }}
+                                        className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                        style={{ borderColor: 'hsl(var(--border))' }}
+                                    >
+                                        Voltar
+                                    </button>
+                                )}
                                 <button
                                     onClick={handleSubmit}
                                     disabled={loading || !formData.name.trim() || !formData.email.trim() || !formData.password.trim() || !formData.smtp_host.trim()}
@@ -444,12 +480,12 @@ export function EmailConnect({ isOpen, onClose, onSuccess }: EmailConnectProps) 
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            Conectando...
+                                            {isEditing ? 'Atualizando...' : 'Conectando...'}
                                         </>
                                     ) : (
                                         <>
                                             <Check className="w-4 h-4" />
-                                            Conectar Email
+                                            {isEditing ? 'Atualizar Canal' : 'Conectar Email'}
                                         </>
                                     )}
                                 </button>

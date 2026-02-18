@@ -1,6 +1,7 @@
 // INBOX: Modal de Conexão Telegram via Bot Token
 import React, { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
+import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Send, Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle } from 'lucide-react';
 
@@ -8,11 +9,14 @@ interface TelegramConnectProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    editingChannel?: Channel;
 }
 
 type ConnectionStatus = 'idle' | 'validating' | 'connected' | 'error';
 
-export function TelegramConnect({ isOpen, onClose, onSuccess }: TelegramConnectProps) {
+export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: TelegramConnectProps) {
+    const isEditing = !!editingChannel;
+    
     const [step, setStep] = useState<'form' | 'success'>('form');
     const [botToken, setBotToken] = useState('');
     const [botName, setBotName] = useState('');
@@ -21,18 +25,31 @@ export function TelegramConnect({ isOpen, onClose, onSuccess }: TelegramConnectP
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
     const [botInfo, setBotInfo] = useState<{ username?: string; first_name?: string } | null>(null);
 
+    // Preencher dados quando for edição
+    useEffect(() => {
+        if (isEditing && editingChannel) {
+            setBotName(editingChannel.name || '');
+            setBotToken(editingChannel.credentials?.bot_token || '');
+            setBotInfo({
+                username: editingChannel.credentials?.bot_username,
+                first_name: editingChannel.credentials?.bot_name
+            });
+        }
+    }, [isEditing, editingChannel]);
+
     // Reset state when modal closes
     useEffect(() => {
         if (!isOpen) {
-            setStep('form');
-            setBotToken('');
-            setBotName('');
+            if (!isEditing) {
+                setStep('form');
+                setBotToken('');
+                setBotName('');
+            }
             setError(null);
             setLoading(false);
             setConnectionStatus('idle');
-            setBotInfo(null);
         }
-    }, [isOpen]);
+    }, [isOpen, isEditing]);
 
     // Validate bot token
     const validateToken = async () => {
@@ -55,28 +72,43 @@ export function TelegramConnect({ isOpen, onClose, onSuccess }: TelegramConnectP
             }
 
             setBotInfo(data.result);
-            setBotName(data.result.first_name || data.result.username);
+            const channelName = botName || data.result.first_name || data.result.username || 'Telegram Bot';
 
-            // Create channel in our system using channelsApi
-            await channelsApi.create({
-                type: 'telegram',
-                name: data.result.first_name || data.result.username || 'Telegram Bot',
-                status: 'active',
-                credentials: {
-                    bot_token: botToken,
-                    bot_username: data.result.username,
-                    bot_id: data.result.id
-                }
-            });
+            if (isEditing && editingChannel) {
+                // Atualizar canal existente
+                await channelsApi.update(editingChannel.id, {
+                    name: channelName,
+                    credentials: {
+                        bot_token: botToken,
+                        bot_username: data.result.username,
+                        bot_id: data.result.id,
+                        bot_name: data.result.first_name
+                    }
+                });
+                toast.success('Canal Telegram atualizado!');
+            } else {
+                // Criar novo canal
+                await channelsApi.create({
+                    type: 'telegram',
+                    name: channelName,
+                    status: 'active',
+                    credentials: {
+                        bot_token: botToken,
+                        bot_username: data.result.username,
+                        bot_id: data.result.id,
+                        bot_name: data.result.first_name
+                    }
+                });
+                toast.success('Telegram conectado com sucesso!');
+            }
 
             setConnectionStatus('connected');
             setStep('success');
-            toast.success('Telegram conectado com sucesso!');
             
             setTimeout(() => {
                 onSuccess();
                 onClose();
-            }, 2000);
+            }, 1500);
 
         } catch (err: any) {
             console.error('[Telegram] Error:', err);
@@ -90,7 +122,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess }: TelegramConnectP
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
             {/* Backdrop */}
             <div 
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -116,10 +148,10 @@ export function TelegramConnect({ isOpen, onClose, onSuccess }: TelegramConnectP
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                Conectar Telegram
+                                {isEditing ? 'Editar Canal Telegram' : 'Conectar Telegram'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Configure seu bot do Telegram
+                                {isEditing ? 'Atualize as configurações do bot' : 'Configure seu bot do Telegram'}
                             </p>
                         </div>
                     </div>
@@ -230,12 +262,12 @@ export function TelegramConnect({ isOpen, onClose, onSuccess }: TelegramConnectP
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            Validando...
+                                            {isEditing ? 'Atualizando...' : 'Validando...'}
                                         </>
                                     ) : (
                                         <>
                                             <Check className="w-4 h-4" />
-                                            Conectar
+                                            {isEditing ? 'Atualizar Canal' : 'Conectar'}
                                         </>
                                     )}
                                 </button>

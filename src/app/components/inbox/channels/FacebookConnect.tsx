@@ -3,6 +3,7 @@
 // Passo 2: Colar o Page Access Token gerado após webhook configurado
 import React, { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
+import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Facebook, Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, ChevronRight, ArrowLeft } from 'lucide-react';
 
@@ -12,13 +13,15 @@ interface FacebookConnectProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    editingChannel?: Channel;
 }
 
 type Step = 'webhook' | 'token' | 'success';
 type ConnectionStatus = 'idle' | 'validating' | 'connected' | 'error';
 
-export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectProps) {
-    const [step, setStep] = useState<Step>('webhook');
+export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: FacebookConnectProps) {
+    const isEditing = !!editingChannel;
+    const [step, setStep] = useState<Step>(isEditing ? 'token' : 'webhook');
     const [pageAccessToken, setPageAccessToken] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -34,17 +37,32 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
         toast.success(`${label} copiado!`);
     };
 
+    // Preencher dados quando for edição
+    useEffect(() => {
+        if (isEditing && editingChannel) {
+            setPageAccessToken(editingChannel.credentials?.page_access_token || '');
+            setPageInfo({
+                name: editingChannel.credentials?.page_name || editingChannel.name,
+                id: editingChannel.credentials?.page_id,
+                picture: editingChannel.credentials?.page_picture
+            });
+            setStep('token');
+        }
+    }, [isEditing, editingChannel]);
+
     // Reset state when modal closes
     useEffect(() => {
         if (!isOpen) {
-            setStep('webhook');
-            setPageAccessToken('');
+            if (!isEditing) {
+                setStep('webhook');
+                setPageAccessToken('');
+                setPageInfo(null);
+            }
             setError(null);
             setLoading(false);
             setConnectionStatus('idle');
-            setPageInfo(null);
         }
-    }, [isOpen]);
+    }, [isOpen, isEditing]);
 
     // Validate token and create channel
     const validateAndConnect = async () => {
@@ -74,21 +92,38 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
                 picture: data.picture?.data?.url
             });
 
-            // Criar canal no sistema (backend auto-subscribe à página)
-            await channelsApi.create({
-                type: 'facebook',
-                name: data.name || 'Facebook Messenger',
-                status: 'active',
-                credentials: {
-                    page_id: data.id,
-                    page_access_token: pageAccessToken,
-                    page_name: data.name
-                }
-            });
+            // Criar ou atualizar canal no sistema
+            let channel;
+            if (isEditing && editingChannel) {
+                channel = await channelsApi.update(editingChannel.id, {
+                    type: 'facebook',
+                    name: data.name || 'Facebook Messenger',
+                    status: 'active',
+                    credentials: {
+                        page_id: data.id,
+                        page_access_token: pageAccessToken,
+                        page_name: data.name,
+                        page_picture: data.picture?.data?.url
+                    }
+                });
+                toast.success('Canal Facebook atualizado com sucesso!');
+            } else {
+                channel = await channelsApi.create({
+                    type: 'facebook',
+                    name: data.name || 'Facebook Messenger',
+                    status: 'active',
+                    credentials: {
+                        page_id: data.id,
+                        page_access_token: pageAccessToken,
+                        page_name: data.name,
+                        page_picture: data.picture?.data?.url
+                    }
+                });
+                toast.success('Facebook Messenger conectado com sucesso!');
+            }
 
             setConnectionStatus('connected');
             setStep('success');
-            toast.success('Facebook Messenger conectado com sucesso!');
 
             setTimeout(() => {
                 onSuccess();
@@ -107,7 +142,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -133,12 +168,10 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                Conectar Facebook Messenger
+                                {isEditing ? 'Editar Canal Facebook' : 'Conectar Facebook Messenger'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                {step === 'webhook' && 'Passo 1 de 2 — Configurar Webhook'}
-                                {step === 'token' && 'Passo 2 de 2 — Token de Acesso'}
-                                {step === 'success' && 'Conectado!'}
+                                {isEditing ? 'Atualize o token de acesso' : step === 'webhook' ? 'Passo 1 de 2 — Configurar Webhook' : step === 'token' ? 'Passo 2 de 2 — Token de Acesso' : 'Conectado!'}
                             </p>
                         </div>
                     </div>
@@ -404,17 +437,19 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
 
                             {/* Actions */}
                             <div className="flex flex-col sm:flex-row gap-3">
-                                <button
-                                    onClick={() => {
-                                        setStep('webhook');
-                                        setError(null);
-                                    }}
-                                    className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center gap-2"
-                                    style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
-                                >
-                                    <ArrowLeft className="w-4 h-4" />
-                                    Voltar
-                                </button>
+                                {!isEditing && (
+                                    <button
+                                        onClick={() => {
+                                            setStep('webhook');
+                                            setError(null);
+                                        }}
+                                        className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center gap-2"
+                                        style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                    >
+                                        <ArrowLeft className="w-4 h-4" />
+                                        Voltar
+                                    </button>
+                                )}
                                 <button
                                     onClick={validateAndConnect}
                                     disabled={loading || !pageAccessToken.trim()}
@@ -423,12 +458,12 @@ export function FacebookConnect({ isOpen, onClose, onSuccess }: FacebookConnectP
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            Validando...
+                                            {isEditing ? 'Atualizando...' : 'Validando...'}
                                         </>
                                     ) : (
                                         <>
                                             <Check className="w-4 h-4" />
-                                            Conectar
+                                            {isEditing ? 'Atualizar Canal' : 'Conectar'}
                                         </>
                                     )}
                                 </button>

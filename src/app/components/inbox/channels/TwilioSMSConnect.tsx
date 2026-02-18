@@ -1,6 +1,7 @@
 // INBOX: Modal de Configuração Twilio SMS
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
+import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Smartphone, AlertCircle, CheckCircle, ExternalLink, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../ui/dialog';
@@ -13,9 +14,12 @@ interface TwilioSMSConnectProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    editingChannel?: Channel;
 }
 
-export function TwilioSMSConnect({ isOpen, onClose, onSuccess }: TwilioSMSConnectProps) {
+export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }: TwilioSMSConnectProps) {
+    const isEditing = !!editingChannel;
+    
     const [formData, setFormData] = useState({
         name: 'Meu SMS Twilio',
         accountSid: '',
@@ -26,6 +30,25 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess }: TwilioSMSConnec
     const [error, setError] = useState<string | null>(null);
     const [showAuthToken, setShowAuthToken] = useState(false);
     const [success, setSuccess] = useState(false);
+
+    // Preencher dados quando for edição
+    useEffect(() => {
+        if (isEditing && editingChannel) {
+            setFormData({
+                name: editingChannel.name || 'Meu SMS Twilio',
+                accountSid: editingChannel.credentials?.accountSid || '',
+                authToken: editingChannel.credentials?.authToken || '',
+                phoneNumber: editingChannel.credentials?.phoneNumber || ''
+            });
+        } else {
+            setFormData({
+                name: 'Meu SMS Twilio',
+                accountSid: '',
+                authToken: '',
+                phoneNumber: ''
+            });
+        }
+    }, [isEditing, editingChannel]);
 
     const handleClose = () => {
         if (!loading) {
@@ -81,27 +104,41 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess }: TwilioSMSConnec
         setLoading(true);
 
         try {
-            await channelsApi.create({
-                type: 'twilio_sms',
-                name: formData.name,
-                status: 'active',
-                credentials: {
-                    accountSid: formData.accountSid,
-                    authToken: formData.authToken,
-                    phoneNumber: formData.phoneNumber
-                }
-            });
+            if (isEditing && editingChannel) {
+                // Atualizar canal existente
+                await channelsApi.update(editingChannel.id, {
+                    name: formData.name,
+                    credentials: {
+                        accountSid: formData.accountSid,
+                        authToken: formData.authToken,
+                        phoneNumber: formData.phoneNumber
+                    }
+                });
+                toast.success('Canal SMS atualizado com sucesso!');
+            } else {
+                // Criar novo canal
+                await channelsApi.create({
+                    type: 'twilio_sms',
+                    name: formData.name,
+                    status: 'active',
+                    credentials: {
+                        accountSid: formData.accountSid,
+                        authToken: formData.authToken,
+                        phoneNumber: formData.phoneNumber
+                    }
+                });
+                toast.success('Canal SMS criado com sucesso!');
+            }
 
             setSuccess(true);
-            toast.success('Canal SMS criado com sucesso!');
             
             setTimeout(() => {
                 handleClose();
                 onSuccess();
-            }, 2000);
+            }, 1500);
         } catch (err: any) {
-            console.error('[TwilioSMS] Error creating channel:', err);
-            setError(err.response?.data?.error || 'Erro ao criar canal SMS. Verifique as credenciais.');
+            console.error('[TwilioSMS] Error creating/updating channel:', err);
+            setError(err.response?.data?.error || 'Erro ao salvar canal SMS. Verifique as credenciais.');
         } finally {
             setLoading(false);
         }
@@ -109,16 +146,18 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess }: TwilioSMSConnec
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
-            <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+            <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2 text-xl">
+                    <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl pr-8">
                         <div className="bg-teal-100 dark:bg-teal-900/30 p-2 rounded-lg">
-                            <Smartphone className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                            <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 text-teal-600 dark:text-teal-400" />
                         </div>
-                        Configurar Twilio SMS
+                        <span className="text-base sm:text-xl">{isEditing ? 'Editar Canal Twilio SMS' : 'Configurar Twilio SMS'}</span>
                     </DialogTitle>
-                    <DialogDescription>
-                        Configure suas credenciais Twilio para enviar e receber SMS
+                    <DialogDescription className="text-xs sm:text-sm">
+                        {isEditing 
+                            ? 'Atualize as configurações do seu canal SMS' 
+                            : 'Configure suas credenciais Twilio para enviar e receber SMS'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -272,12 +311,12 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess }: TwilioSMSConnec
                                 {loading ? (
                                     <>
                                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Criando Canal...
+                                        {isEditing ? 'Atualizando...' : 'Criando Canal...'}
                                     </>
                                 ) : (
                                     <>
                                         <Smartphone className="w-4 h-4 mr-2" />
-                                        Criar Canal SMS
+                                        {isEditing ? 'Atualizar Canal' : 'Criar Canal SMS'}
                                     </>
                                 )}
                             </Button>

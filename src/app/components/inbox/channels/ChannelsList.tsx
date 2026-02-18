@@ -120,13 +120,15 @@ export function ChannelsList() {
     const [websiteModalOpen, setWebsiteModalOpen] = useState(false);
     const [emailModalOpen, setEmailModalOpen] = useState(false);
     const [smsModalOpen, setSmsModalOpen] = useState(false);
+    const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
     const [activeStep, setActiveStep] = useState(1);
     const [sidebarExpanded, setSidebarExpanded] = useState(true);
     const [channelsExpanded, setChannelsExpanded] = useState(true);
 
     // Abrir modal de edição para qualquer tipo de canal
-    const openEditModal = (channelType: string) => {
-        switch (channelType) {
+    const openEditModal = (channel: Channel) => {
+        setEditingChannel(channel);
+        switch (channel.type) {
             case 'whatsapp': setModalOpen(true); break;
             case 'whatsapp_cloud': setCloudModalOpen(true); break;
             case 'telegram': setTelegramModalOpen(true); break;
@@ -134,8 +136,14 @@ export function ChannelsList() {
             case 'instagram': setInstagramModalOpen(true); break;
             case 'website': setWebsiteModalOpen(true); break;
             case 'email': setEmailModalOpen(true); break;
+            case 'twilio_sms': setSmsModalOpen(true); break;
             case 'sms': setSmsModalOpen(true); break;
         }
+    };
+
+    const closeModalAndResetEditing = (setModalFn: (value: boolean) => void) => {
+        setModalFn(false);
+        setEditingChannel(null);
     };
 
     useEffect(() => {
@@ -155,6 +163,7 @@ export function ChannelsList() {
     };
 
     const handleConnect = (channelId: string) => {
+        setEditingChannel(null); // Criar novo, não editar
         if (channelId === 'whatsapp') {
             setModalOpen(true);
         } else if (channelId === 'whatsapp_cloud') {
@@ -281,13 +290,16 @@ export function ChannelsList() {
                                         <ChannelIcon className={`w-4 h-4 flex-shrink-0 ${iconColor}`} />
                                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${c.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
                                         <span className="truncate flex-1">{c.name}</span>
-                                        <button
-                                            onClick={() => openEditModal(c.type)}
-                                            className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
-                                            title="Configurações do canal"
-                                        >
-                                            <Settings className="w-3.5 h-3.5" style={{ color: 'hsl(var(--muted-foreground))' }} />
-                                        </button>
+                                        {/* WhatsApp Evolution API não permite edição (precisa reconectar via QR) */}
+                                        {c.type !== 'whatsapp' && (
+                                            <button
+                                                onClick={() => openEditModal(c)}
+                                                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+                                                title="Configurações do canal"
+                                            >
+                                                <Settings className="w-3.5 h-3.5" style={{ color: 'hsl(var(--muted-foreground))' }} />
+                                            </button>
+                                        )}
                                     </div>
                                 );
                             }) : (
@@ -315,7 +327,7 @@ export function ChannelsList() {
                                     channel={channel}
                                     onDelete={handleDelete}
                                     onRename={handleRename}
-                                    onEdit={(ch) => openEditModal(ch.type)}
+                                    onEdit={openEditModal}
                                     onSync={() => loadChannels()}
                                 />
                             ))}
@@ -384,81 +396,89 @@ export function ChannelsList() {
 
             <WhatsAppConnect
                 isOpen={modalOpen}
-                onClose={() => setModalOpen(false)}
+                onClose={() => closeModalAndResetEditing(setModalOpen)}
                 onSuccess={() => {
-                    setModalOpen(false);
+                    closeModalAndResetEditing(setModalOpen);
                     loadChannels();
                     toast.success('Canal conectado!');
                 }}
+                editingChannel={editingChannel?.type === 'whatsapp' ? editingChannel : undefined}
             />
 
             <WhatsAppCloudConnect
                 isOpen={cloudModalOpen}
-                onClose={() => setCloudModalOpen(false)}
+                onClose={() => closeModalAndResetEditing(setCloudModalOpen)}
                 onSuccess={() => {
-                    setCloudModalOpen(false);
+                    closeModalAndResetEditing(setCloudModalOpen);
                     loadChannels();
                     toast.success('WhatsApp Cloud API conectada!');
                 }}
+                editingChannel={editingChannel?.type === 'whatsapp_cloud' ? editingChannel : undefined}
             />
 
             <TelegramConnect
                 isOpen={telegramModalOpen}
-                onClose={() => setTelegramModalOpen(false)}
+                onClose={() => closeModalAndResetEditing(setTelegramModalOpen)}
                 onSuccess={() => {
-                    setTelegramModalOpen(false);
+                    closeModalAndResetEditing(setTelegramModalOpen);
                     loadChannels();
                     toast.success('Telegram conectado!');
                 }}
+                editingChannel={editingChannel?.type === 'telegram' ? editingChannel : undefined}
             />
 
             <FacebookConnect
                 isOpen={facebookModalOpen}
-                onClose={() => setFacebookModalOpen(false)}
+                onClose={() => closeModalAndResetEditing(setFacebookModalOpen)}
                 onSuccess={() => {
-                    setFacebookModalOpen(false);
+                    closeModalAndResetEditing(setFacebookModalOpen);
                     loadChannels();
                     toast.success('Facebook Messenger conectado!');
                 }}
+                editingChannel={editingChannel?.type === 'facebook' ? editingChannel : undefined}
             />
 
             <InstagramConnect
                 isOpen={instagramModalOpen}
-                onClose={() => setInstagramModalOpen(false)}
+                onClose={() => closeModalAndResetEditing(setInstagramModalOpen)}
                 onSuccess={() => {
-                    setInstagramModalOpen(false);
+                    closeModalAndResetEditing(setInstagramModalOpen);
                     loadChannels();
                     toast.success('Instagram conectado!');
                 }}
+                editingChannel={editingChannel?.type === 'instagram' ? editingChannel : undefined}
             />
 
             <WebsiteWidgetConnect
                 isOpen={websiteModalOpen}
-                onClose={() => setWebsiteModalOpen(false)}
+                onClose={() => closeModalAndResetEditing(setWebsiteModalOpen)}
                 onSuccess={() => {
-                    setWebsiteModalOpen(false);
+                    closeModalAndResetEditing(setWebsiteModalOpen);
                     loadChannels();
                     toast.success('Chat do site configurado!');
                 }}
+                editingChannel={editingChannel?.type === 'website' ? editingChannel : undefined}
             />
 
             <EmailConnect
                 isOpen={emailModalOpen}
-                onClose={() => setEmailModalOpen(false)}
+                onClose={() => closeModalAndResetEditing(setEmailModalOpen)}
                 onSuccess={() => {
-                    setEmailModalOpen(false);
+                    closeModalAndResetEditing(setEmailModalOpen);
                     loadChannels();
                     toast.success('Canal de email criado!');
                 }}
+                editingChannel={editingChannel?.type === 'email' ? editingChannel : undefined}
             />
             <TwilioSMSConnect
                 isOpen={smsModalOpen}
-                onClose={() => setSmsModalOpen(false)}
+                onClose={() => closeModalAndResetEditing(setSmsModalOpen)}
                 onSuccess={() => {
-                    setSmsModalOpen(false);
+                    closeModalAndResetEditing(setSmsModalOpen);
                     loadChannels();
                     toast.success('Canal SMS configurado!');
                 }}
+                editingChannel={editingChannel?.type === 'twilio_sms' ? editingChannel : undefined}
             />        </div>
     );
 }

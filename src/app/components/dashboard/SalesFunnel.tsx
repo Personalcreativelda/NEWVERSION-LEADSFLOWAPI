@@ -3,7 +3,7 @@ import type { UIEvent } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Phone, Mail, MessageCircle, Trash2, Edit2, MoreVertical, ChevronDown, BarChart3, Clock, CheckCircle2, TrendingUp, GripVertical, DollarSign, StickyNote, Calendar, MessageSquare, Settings, Plus, X, RotateCcw, Globe, Flag, AlertTriangle, AlertCircle, Minus, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, Instagram, Send, Megaphone, type LucideIcon } from 'lucide-react';
+import { Phone, Mail, MessageCircle, Trash2, Edit2, MoreVertical, ChevronDown, BarChart3, Clock, CheckCircle2, TrendingUp, GripVertical, DollarSign, StickyNote, Calendar, MessageSquare, Settings, Plus, X, RotateCcw, Globe, Flag, AlertTriangle, AlertCircle, Minus, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, Instagram, Send, Megaphone, MoveRight, type LucideIcon } from 'lucide-react';
 import type { TabKey } from '../modals/LeadDetailModal';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -218,7 +218,7 @@ interface SalesFunnelProps {
 }
 
 // Card do Lead - design limpo e moderno
-const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial, onEmail, onWhatsApp, onCall, onViewDetails, currency = 'USD' as CurrencyCode }: any) => {
+const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial, onEmail, onWhatsApp, onCall, onViewDetails, currency = 'USD' as CurrencyCode, stages = [], onMoveToStage }: any) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: lead.id,
     data: { lead }
@@ -433,6 +433,37 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
           <DollarSign className="h-3.5 w-3.5" />
         </button>
       </div>
+
+      {/* Mobile Dropdown - Mover para outro estágio */}
+      {stages.length > 0 && onMoveToStage && (
+        <div className="md:hidden mt-3 pt-2 border-t border-dashed" style={{borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}}>
+          <div className="flex items-center gap-2">
+            <MoveRight className={`h-3.5 w-3.5 flex-shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            <select
+              value={stage.id}
+              onChange={(e) => {
+                e.stopPropagation();
+                const newStageId = e.target.value;
+                if (newStageId !== stage.id) {
+                  onMoveToStage(lead.id, newStageId);
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className={`flex-1 text-xs px-2 py-1 rounded-lg border transition-colors ${
+                isDark 
+                  ? 'bg-slate-800 border-slate-600 text-white hover:border-slate-500' 
+                  : 'bg-white border-gray-300 text-gray-900 hover:border-gray-400'
+              }`}
+            >
+              {stages.map((s: FunnelStage) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
     </div>
   );
 });
@@ -459,6 +490,8 @@ const FunnelColumn = memo(({
   visibleCount,
   onLoadMore,
   currency = 'USD' as CurrencyCode,
+  stages = [],
+  onMoveToStage,
 }: any) => {
   const { setNodeRef: setDroppableRef } = useDroppable({ id: stage.id });
   const {
@@ -617,6 +650,8 @@ const FunnelColumn = memo(({
                     onWhatsApp={onWhatsApp}
                     onViewDetails={onViewDetails}
                     currency={currency}
+                    stages={stages}
+                    onMoveToStage={onMoveToStage}
                   />
                 ))
               ) : (
@@ -1396,6 +1431,22 @@ export default function SalesFunnel({
                           visibleCount={visibleCounts[stage.id] ?? DEFAULT_VISIBLE_PER_STAGE}
                           onLoadMore={handleLoadMore}
                           currency={currency}
+                          stages={stages}
+                          onMoveToStage={(leadId: string, newStageId: string) => {
+                            const lead = localLeads.find(l => l.id === leadId);
+                            const newStage = stages.find(s => s.id === newStageId);
+                            if (lead && newStage) {
+                              // Atualização otimista
+                              setLocalLeads(prev => 
+                                prev.map(l => l.id === leadId ? { ...l, status: newStage.label } : l)
+                              );
+                              // Chamar API
+                              onUpdateLeadStatus(leadId, newStage.label).catch(() => {
+                                // Reverter em caso de erro
+                                setLocalLeads(leads);
+                              });
+                            }
+                          }}
                         />
                       </div>
                     ))}

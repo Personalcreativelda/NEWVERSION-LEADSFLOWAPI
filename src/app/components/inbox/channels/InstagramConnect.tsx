@@ -1,6 +1,7 @@
 // INBOX: Modal de Conexão Instagram via Instagram Business API
 import React, { useState, useEffect, useMemo } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
+import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Instagram, Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
 
@@ -11,11 +12,13 @@ interface InstagramConnectProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    editingChannel?: Channel;
 }
 
 type ConnectionStatus = 'idle' | 'validating' | 'connected' | 'error';
 
-export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnectProps) {
+export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }: InstagramConnectProps) {
+    const isEditing = !!editingChannel;
     const [step, setStep] = useState<'form' | 'success'>('form');
     const [accessToken, setAccessToken] = useState('');
     const [instagramId, setInstagramId] = useState('');
@@ -43,18 +46,33 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
         toast.success(`${label} copiado!`);
     };
 
+    // Preencher dados quando for edição
+    useEffect(() => {
+        if (isEditing && editingChannel) {
+            setAccessToken(editingChannel.credentials?.access_token || '');
+            setInstagramId(editingChannel.credentials?.instagram_id || '');
+            setAccountInfo({
+                username: editingChannel.credentials?.username || editingChannel.name,
+                name: editingChannel.credentials?.name,
+                profile_picture_url: editingChannel.credentials?.profile_picture_url
+            });
+        }
+    }, [isEditing, editingChannel]);
+
     // Reset state when modal closes
     useEffect(() => {
         if (!isOpen) {
-            setStep('form');
-            setAccessToken('');
-            setInstagramId('');
+            if (!isEditing) {
+                setStep('form');
+                setAccessToken('');
+                setInstagramId('');
+                setAccountInfo(null);
+            }
             setError(null);
             setLoading(false);
             setConnectionStatus('idle');
-            setAccountInfo(null);
         }
-    }, [isOpen]);
+    }, [isOpen, isEditing]);
 
     // Validate access token
     const validateToken = async () => {
@@ -281,26 +299,48 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
             });
             setInstagramId(igAccount.id);
 
-            // Create channel in our system using channelsApi
-            await channelsApi.create({
-                type: 'instagram',
-                name: igAccount.username || igAccount.name || 'Instagram',
-                status: 'active',
-                credentials: {
-                    instagram_id: igAccount.id,
-                    access_token: token,
-                    username: igAccount.username,
-                    token_type: isInstagramToken ? 'instagram' : 'facebook',
-                    // Informações da página do Facebook (necessário para webhooks)
-                    page_id: igAccount.page_id,
-                    page_name: igAccount.page_name,
-                    page_access_token: igAccount.page_access_token
-                }
-            });
+            // Criar ou atualizar canal
+            let channel;
+            if (isEditing && editingChannel) {
+                channel = await channelsApi.update(editingChannel.id, {
+                    type: 'instagram',
+                    name: igAccount.username || igAccount.name || 'Instagram',
+                    status: 'active',
+                    credentials: {
+                        instagram_id: igAccount.id,
+                        access_token: token,
+                        username: igAccount.username,
+                        name: igAccount.name,
+                        profile_picture_url: igAccount.profile_picture_url,
+                        token_type: isInstagramToken ? 'instagram' : 'facebook',
+                        page_id: igAccount.page_id,
+                        page_name: igAccount.page_name,
+                        page_access_token: igAccount.page_access_token
+                    }
+                });
+                toast.success('Canal Instagram atualizado com sucesso!');
+            } else {
+                channel = await channelsApi.create({
+                    type: 'instagram',
+                    name: igAccount.username || igAccount.name || 'Instagram',
+                    status: 'active',
+                    credentials: {
+                        instagram_id: igAccount.id,
+                        access_token: token,
+                        username: igAccount.username,
+                        name: igAccount.name,
+                        profile_picture_url: igAccount.profile_picture_url,
+                        token_type: isInstagramToken ? 'instagram' : 'facebook',
+                        page_id: igAccount.page_id,
+                        page_name: igAccount.page_name,
+                        page_access_token: igAccount.page_access_token
+                    }
+                });
+                toast.success('Instagram conectado com sucesso!');
+            }
 
             setConnectionStatus('connected');
             setStep('success');
-            toast.success('Instagram conectado com sucesso!');
 
             setTimeout(() => {
                 onSuccess();
@@ -319,7 +359,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
             {/* Backdrop */}
             <div 
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -345,10 +385,10 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                Conectar Instagram
+                                {isEditing ? 'Editar Canal Instagram' : 'Conectar Instagram'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Configure sua conta profissional do Instagram
+                                {isEditing ? 'Atualize o token de acesso' : 'Configure sua conta profissional do Instagram'}
                             </p>
                         </div>
                     </div>
@@ -590,12 +630,12 @@ export function InstagramConnect({ isOpen, onClose, onSuccess }: InstagramConnec
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            Validando...
+                                            {isEditing ? 'Atualizando...' : 'Validando...'}
                                         </>
                                     ) : (
                                         <>
                                             <Check className="w-4 h-4" />
-                                            Conectar
+                                            {isEditing ? 'Atualizar Canal' : 'Conectar'}
                                         </>
                                     )}
                                 </button>

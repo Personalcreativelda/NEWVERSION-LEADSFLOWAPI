@@ -1,6 +1,7 @@
 // INBOX: Modal de Conexão Website Widget (Chat embed para sites)
 import React, { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
+import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Globe, Check, AlertCircle, Loader2, Copy, Code, ExternalLink, CheckCircle } from 'lucide-react';
 
@@ -10,10 +11,12 @@ interface WebsiteWidgetConnectProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    editingChannel?: Channel;
 }
 
-export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess }: WebsiteWidgetConnectProps) {
-    const [step, setStep] = useState<'form' | 'code' | 'success'>('form');
+export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChannel }: WebsiteWidgetConnectProps) {
+    const isEditing = !!editingChannel;
+    const [step, setStep] = useState<'form' | 'code' | 'success'>(isEditing ? 'form' : 'form');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [channelId, setChannelId] = useState('');
@@ -26,21 +29,37 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess }: WebsiteWidg
         position: 'bottom-right' as 'bottom-right' | 'bottom-left'
     });
 
+    // Preencher dados quando for edição
+    useEffect(() => {
+        if (isEditing && editingChannel) {
+            setChannelId(editingChannel.id);
+            setFormData({
+                name: editingChannel.name || '',
+                websiteUrl: editingChannel.credentials?.website_url || '',
+                primaryColor: editingChannel.settings?.primary_color || '#8B5CF6',
+                welcomeMessage: editingChannel.settings?.welcome_message || 'Olá! Como posso ajudar?',
+                position: (editingChannel.settings?.position as 'bottom-right' | 'bottom-left') || 'bottom-right'
+            });
+        }
+    }, [isEditing, editingChannel]);
+
     useEffect(() => {
         if (!isOpen) {
-            setStep('form');
-            setFormData({
-                name: '',
-                websiteUrl: '',
-                primaryColor: '#8B5CF6',
-                welcomeMessage: 'Olá! Como posso ajudar?',
-                position: 'bottom-right'
-            });
+            if (!isEditing) {
+                setStep('form');
+                setFormData({
+                    name: '',
+                    websiteUrl: '',
+                    primaryColor: '#8B5CF6',
+                    welcomeMessage: 'Olá! Como posso ajudar?',
+                    position: 'bottom-right'
+                });
+                setChannelId('');
+            }
             setError(null);
             setLoading(false);
-            setChannelId('');
         }
-    }, [isOpen]);
+    }, [isOpen, isEditing]);
 
     const handleSubmit = async () => {
         if (!formData.name.trim()) {
@@ -52,10 +71,10 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess }: WebsiteWidg
             setLoading(true);
             setError(null);
 
-            const channel = await channelsApi.create({
-                type: 'website',
+            const channelData = {
+                type: 'website' as const,
                 name: formData.name,
-                status: 'active',
+                status: 'active' as const,
                 credentials: {
                     website_url: formData.websiteUrl
                 },
@@ -64,16 +83,25 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess }: WebsiteWidg
                     welcome_message: formData.welcomeMessage,
                     position: formData.position
                 }
-            });
+            };
 
-            if (channel) {
-                setChannelId(channel.id);
-                setStep('code');
-                toast.success('Canal criado com sucesso!');
+            let channel;
+            if (isEditing && editingChannel) {
+                channel = await channelsApi.update(editingChannel.id, channelData);
+                toast.success('Canal Website atualizado com sucesso!');
+                onSuccess();
+                onClose();
+            } else {
+                channel = await channelsApi.create(channelData);
+                if (channel) {
+                    setChannelId(channel.id);
+                    setStep('code');
+                    toast.success('Canal criado com sucesso!');
+                }
             }
         } catch (err: any) {
-            console.error('Failed to create website channel:', err);
-            setError(err.message || 'Erro ao criar canal.');
+            console.error('Failed to save website channel:', err);
+            setError(err.message || `Erro ao ${isEditing ? 'atualizar' : 'criar'} canal.`);
         } finally {
             setLoading(false);
         }
@@ -104,7 +132,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess }: WebsiteWidg
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
             <div
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={onClose}
@@ -128,10 +156,10 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess }: WebsiteWidg
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                Chat do Site
+                                {isEditing ? 'Editar Canal Website' : 'Chat do Site'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Widget de chat para seu website
+                                {isEditing ? 'Atualize as configurações do widget' : 'Widget de chat para seu website'}
                             </p>
                         </div>
                     </div>
@@ -279,12 +307,12 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess }: WebsiteWidg
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            Criando...
+                                            {isEditing ? 'Atualizando...' : 'Criando...'}
                                         </>
                                     ) : (
                                         <>
                                             <Check className="w-4 h-4" />
-                                            Criar Canal
+                                            {isEditing ? 'Atualizar Canal' : 'Criar Canal'}
                                         </>
                                     )}
                                 </button>

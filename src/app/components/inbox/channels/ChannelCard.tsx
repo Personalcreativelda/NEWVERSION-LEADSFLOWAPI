@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import type { Channel } from '../../../types/inbox';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
-import { RefreshCw, Trash2, CheckCircle2, XCircle, Loader2, MessageCircle, Pencil, X, Check, Send, Facebook, Instagram, Mail, Globe, Cloud, Smartphone } from 'lucide-react';
+import { RefreshCw, Trash2, CheckCircle2, XCircle, Loader2, MessageCircle, Pencil, X, Check, Send, Facebook, Instagram, Mail, Globe, Cloud, Smartphone, Settings } from 'lucide-react';
 
 interface ChannelCardProps {
     channel: Channel;
@@ -158,11 +158,13 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
         >
             {/* Header */}
             <div
-                className="px-5 py-4 flex items-center justify-between cursor-pointer"
-                onClick={() => setExpanded(!expanded)}
+                className="px-5 py-4 flex items-center justify-between"
                 style={{ backgroundColor: 'hsl(var(--card))' }}
             >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div 
+                    className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                    onClick={() => setExpanded(!expanded)}
+                >
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getIconBgColor(channel.type)}`}>
                         {getIcon(channel.type)}
                     </div>
@@ -180,6 +182,20 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Botão de Configurações - SEMPRE VISÍVEL (exceto WhatsApp Evolution API) */}
+                    {channel.type !== 'whatsapp' && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit(channel);
+                            }}
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            title="Configurações do canal"
+                        >
+                            <Settings className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />
+                        </button>
+                    )}
+
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs whitespace-nowrap" style={{
                         backgroundColor: channel.status === 'active' ? `${activeBorderColor}1A` : 'hsl(var(--muted))',
                         color: channel.status === 'active' ? activeBorderColor : 'hsl(var(--muted-foreground))'
@@ -187,15 +203,21 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                         <div className={`w-2 h-2 rounded-full ${getStatusColor(channel.status)}`} />
                         <span>{getStatusText(channel.status)}</span>
                     </div>
-                    <svg
-                        className={`w-5 h-5 transition-transform flex-shrink-0 ${expanded ? 'rotate-180' : ''}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        style={{ color: 'hsl(var(--muted-foreground))' }}
+                    
+                    <button
+                        onClick={() => setExpanded(!expanded)}
+                        className="p-1"
                     >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                        <svg
+                            className={`w-5 h-5 transition-transform flex-shrink-0 ${expanded ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            style={{ color: 'hsl(var(--muted-foreground))' }}
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
                 </div>
             </div>
 
