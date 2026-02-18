@@ -447,3 +447,87 @@ ON CONFLICT (slug) DO NOTHING;
 ALTER TABLE assistants ADD COLUMN IF NOT EXISTS is_custom BOOLEAN DEFAULT false;
 ALTER TABLE assistants ADD COLUMN IF NOT EXISTS created_by UUID;
 ALTER TABLE user_assistants ADD COLUMN IF NOT EXISTS channel_ids UUID[] DEFAULT '{}';
+
+-- =====================================================
+-- VOICE AGENTS (ElevenLabs + Wavoip Integration)
+-- =====================================================
+
+-- Voice Agents table
+CREATE TABLE IF NOT EXISTS voice_agents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Agent info
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    
+    -- Voice provider (ElevenLabs)
+    voice_provider VARCHAR(50) NOT NULL DEFAULT 'elevenlabs',
+    voice_config JSONB DEFAULT '{}'::jsonb,
+    
+    -- Call provider (Wavoip)
+    call_provider VARCHAR(50) NOT NULL DEFAULT 'wavoip',
+    call_config JSONB DEFAULT '{}'::jsonb,
+    
+    -- Agent behavior
+    greeting_message TEXT,
+    instructions TEXT,
+    language VARCHAR(10) DEFAULT 'pt-BR',
+    
+    -- Status
+    is_active BOOLEAN DEFAULT true,
+    
+    -- Metadata
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Voice Agent Calls table
+CREATE TABLE IF NOT EXISTS voice_agent_calls (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    voice_agent_id UUID NOT NULL REFERENCES voice_agents(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Call info
+    phone_number VARCHAR(50) NOT NULL,
+    direction VARCHAR(20) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    duration_seconds INTEGER DEFAULT 0,
+    
+    -- Context
+    lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
+    conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+    
+    -- Recording & transcript
+    recording_url TEXT,
+    transcript TEXT,
+    
+    -- Provider IDs
+    call_provider_id VARCHAR(255),
+    voice_provider_id VARCHAR(255),
+    
+    -- Metadata
+    metadata JSONB DEFAULT '{}'::jsonb,
+    started_at TIMESTAMP WITH TIME ZONE,
+    ended_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for voice agents
+CREATE INDEX IF NOT EXISTS idx_voice_agents_user_id ON voice_agents(user_id);
+CREATE INDEX IF NOT EXISTS idx_voice_agents_is_active ON voice_agents(is_active);
+CREATE INDEX IF NOT EXISTS idx_voice_agents_created_at ON voice_agents(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_voice_agent_calls_agent_id ON voice_agent_calls(voice_agent_id);
+CREATE INDEX IF NOT EXISTS idx_voice_agent_calls_user_id ON voice_agent_calls(user_id);
+CREATE INDEX IF NOT EXISTS idx_voice_agent_calls_lead_id ON voice_agent_calls(lead_id);
+CREATE INDEX IF NOT EXISTS idx_voice_agent_calls_status ON voice_agent_calls(status);
+CREATE INDEX IF NOT EXISTS idx_voice_agent_calls_created_at ON voice_agent_calls(created_at DESC);
+
+-- Triggers for voice agents
+DO $$ BEGIN
+  CREATE TRIGGER update_voice_agents_updated_at BEFORE UPDATE ON voice_agents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Comments
+COMMENT ON TABLE voice_agents IS 'Voice AI agents for automated calling using ElevenLabs voice + Wavoip calls';
+COMMENT ON TABLE voice_agent_calls IS 'Log of all calls made/received by voice agents';
