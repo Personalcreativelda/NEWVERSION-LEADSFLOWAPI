@@ -10,6 +10,60 @@ const router = Router();
 router.use(authMiddleware);
 
 /**
+ * GET /api/voice-agents/diagnose
+ * Diagnostic endpoint to check database schema and configuration
+ */
+router.get('/diagnose', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    console.log(`[VoiceAgents] 🔍 Diagnosis check requested by user ${user.id}`);
+
+    // Check if columns exist
+    const columnCheckQuery = `
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' 
+      AND column_name IN ('elevenlabs_api_key', 'openai_api_key', 'anthropic_api_key', 'google_api_key', 'preferred_ai_model', 'voice_settings')
+      ORDER BY column_name;
+    `;
+
+    const columnResult = await query(columnCheckQuery, []);
+    const existingColumns = columnResult.rows.map(row => row.column_name);
+    console.log(`[VoiceAgents] Found columns:`, existingColumns);
+
+    // Expected columns
+    const expectedColumns = ['elevenlabs_api_key', 'openai_api_key', 'anthropic_api_key', 'google_api_key', 'preferred_ai_model', 'voice_settings'];
+    const missingColumns = expectedColumns.filter(col => !existingColumns.includes(col));
+
+    res.json({
+      status: 'ok',
+      diagnosis: {
+        allColumnsExist: missingColumns.length === 0,
+        existingColumns: existingColumns,
+        missingColumns: missingColumns,
+        message: missingColumns.length === 0 
+          ? '✅ All required columns exist in the database!'
+          : `❌ Missing columns: ${missingColumns.join(', ')}. Run migration 014_add_ai_models_support.sql`
+      },
+      migration: {
+        required: missingColumns.length > 0,
+        scriptFile: '014_add_ai_models_support.sql',
+        location: 'api/src/database/migrations/'
+      }
+    });
+  } catch (error) {
+    console.error(`[VoiceAgents] Diagnosis error:`, error);
+    res.status(500).json({
+      status: 'error',
+      error: 'Failed to run diagnosis',
+      details: (error as any).message
+    });
+  }
+});
+
+/**
  * GET /api/voice-agents/settings
  * Get user's voice agent settings (API keys, preferences, etc)
  */
@@ -60,6 +114,9 @@ router.put('/settings', async (req: Request, res: Response, next: NextFunction) 
     const user = req.user;
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
+    console.log(`[VoiceAgents] 🔧 PUT /settings called for user ${user.id}`);
+    console.log(`[VoiceAgents] Request body received:`, JSON.stringify(req.body, null, 2));
+
     const { 
       elevenlabs_api_key, 
       openai_api_key,
@@ -69,6 +126,15 @@ router.put('/settings', async (req: Request, res: Response, next: NextFunction) 
       voice_settings 
     } = req.body;
 
+    console.log(`[VoiceAgents] Parsed fields:`, {
+      hasElevenLabs: elevenlabs_api_key !== undefined,
+      hasOpenAI: openai_api_key !== undefined,
+      hasAnthropic: anthropic_api_key !== undefined,
+      hasGoogle: google_api_key !== undefined,
+      hasModel: preferred_ai_model !== undefined,
+      hasVoiceSettings: voice_settings !== undefined,
+    });
+
     const updates: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
@@ -76,46 +142,85 @@ router.put('/settings', async (req: Request, res: Response, next: NextFunction) 
     if (elevenlabs_api_key !== undefined) {
       updates.push(`elevenlabs_api_key = $${paramIndex++}`);
       values.push(elevenlabs_api_key || null);
+      console.log(`[VoiceAgents] Adding elevenlabs_api_key update`);
     }
 
     if (openai_api_key !== undefined) {
       updates.push(`openai_api_key = $${paramIndex++}`);
       values.push(openai_api_key || null);
+      console.log(`[VoiceAgents] Adding openai_api_key update`);
     }
 
     if (anthropic_api_key !== undefined) {
       updates.push(`anthropic_api_key = $${paramIndex++}`);
       values.push(anthropic_api_key || null);
+      console.log(`[VoiceAgents] Adding anthropic_api_key update`);
     }
 
     if (google_api_key !== undefined) {
       updates.push(`google_api_key = $${paramIndex++}`);
       values.push(google_api_key || null);
+      console.log(`[VoiceAgents] Adding google_api_key update`);
     }
 
     if (preferred_ai_model !== undefined) {
       updates.push(`preferred_ai_model = $${paramIndex++}`);
       values.push(preferred_ai_model || 'elevenlabs');
+      console.log(`[VoiceAgents] Adding preferred_ai_model update`);
     }
 
     if (voice_settings !== undefined) {
       updates.push(`voice_settings = $${paramIndex++}`);
       values.push(JSON.stringify(voice_settings));
+      console.log(`[VoiceAgents] Adding voice_settings update`);
     }
 
+    console.log(`[VoiceAgents] Total updates to apply: ${updates.length}`);
+    
     if (updates.length === 0) {
-      return res.status(400).json({ error: 'No settings to update' });
+      console.warn(`[VoiceAgents] ⚠️ No settings fields provided in request body. Sending 400 error.`);
+      return res.status(400).json({ 
+        error: 'No settings to update',
+        receivedFields: {
+          elevenlabs_api_key: elevenlabs_api_key !== undefined ? 'defined' : 'undefined',
+          openai_api_key: openai_api_key !== undefined ? 'defined' : 'undefined',
+          anthropic_api_key: anthropic_api_key !== undefined ? 'defined' : 'undefined',
+          google_api_key: google_api_key !== undefined ? 'defined' : 'undefined',
+          preferred_ai_model: preferred_ai_model !== undefined ? 'defined' : 'undefined',
+          voice_settings: voice_settings !== undefined ? 'defined' : 'undefined',
+        }
+      });
     }
 
     values.push(user.id);
 
-    await query(
-      `UPDATE users SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${paramIndex}`,
-      values
-    );
+    const sqlQuery = `UPDATE users SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${paramIndex}`;
+    console.log(`[VoiceAgents] Executing query:`, sqlQuery);
+    console.log(`[VoiceAgents] With parameters:`, values.length, 'values');
+
+    try {
+      const result = await query(sqlQuery, values);
+      console.log(`[VoiceAgents] ✅ Query executed successfully. Rows affected:`, result.rowCount);
+    } catch (queryError: any) {
+      console.error(`[VoiceAgents] ❌ Database query error:`, queryError.message);
+      console.error(`[VoiceAgents] Error code:`, queryError.code);
+      console.error(`[VoiceAgents] Error detail:`, queryError.detail);
+      
+      // Check if columns don't exist
+      if (queryError.code === '42703') {
+        console.error(`[VoiceAgents] ERROR: Column not found. Migration 014 may not have been applied.`);
+        return res.status(500).json({ 
+          error: 'Database schema not updated',
+          message: 'Migration 014 (add_ai_models_support) has not been applied. Please run the migration.',
+          details: queryError.message
+        });
+      }
+      
+      throw queryError;
+    }
 
     console.log(`[VoiceAgents] ✅ Settings updated for user ${user.id}`);
-    console.log(`[VoiceAgents] Preferences: ElevenLabs=${!!elevenlabs_api_key}, OpenAI=${!!openai_api_key}, Anthropic=${!!anthropic_api_key}, Google=${!!google_api_key}`);
+    console.log(`[VoiceAgents] Updated values: ElevenLabs=${!!elevenlabs_api_key}, OpenAI=${!!openai_api_key}, Anthropic=${!!anthropic_api_key}, Google=${!!google_api_key}`);
 
     // Return confirmation with updated settings
     res.json({ 

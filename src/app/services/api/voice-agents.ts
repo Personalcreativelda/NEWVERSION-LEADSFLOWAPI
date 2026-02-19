@@ -133,5 +133,13 @@ export const voiceAgentsApi = {
     // TODO: Implement this endpoint in the backend
     const response = await api.get(`/voice-agents/${agentId}/calls`);
     return response.data;
+  },
+
+  /**
+   * Run diagnosis check to verify database schema
+   */
+  async diagnose(): Promise<any> {
+    const response = await api.get('/voice-agents/diagnose');
+    return response.data;
   }
 };

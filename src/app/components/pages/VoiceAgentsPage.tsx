@@ -427,8 +427,58 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       
     } catch (error: any) {
       console.error('[VoiceAgentsPage] ❌ Error saving settings:', error);
-      const errorMsg = error.response?.data?.error || error.message || 'Erro ao salvar configurações';
-      toast.error(errorMsg);
+      
+      // Improved error handling with diagnostics
+      const status = error.response?.status;
+      const data = error.response?.data;
+      const errorMsg = data?.error || error.message || 'Erro ao salvar configurações';
+      
+      // Log detailed error information
+      console.error('[VoiceAgentsPage] Error details:', {
+        status,
+        statusText: error.response?.statusText,
+        errorMessage: errorMsg,
+        receivedFields: data?.receivedFields,
+        schemaError: data?.error?.includes('schema'),
+      });
+      
+      // If it's a 400 or 500 error related to schema/database
+      if ((status === 400 || status === 500) && errorMsg.includes('schema')) {
+        console.warn('[VoiceAgentsPage] ⚠️ Appears to be a database schema issue');
+        toast.error(
+          'Erro de schema do banco de dados\n\n' +
+          'Possível solução:\n' +
+          '1. Abra o console (F12) e procure por logs de erro\n' +
+          '2. Verifique se a migração 014 foi aplicada\n' +
+          '3. Contate o administrador do sistema'
+        );
+        
+        // Attempt to run diagnosis
+        try {
+          console.log('[VoiceAgentsPage] 🔍 Running diagnosis...');
+          const diagResponse = await voiceAgentsApi.diagnose();
+          console.log('[VoiceAgentsPage] Diagnosis result:', diagResponse);
+          if (diagResponse.diagnosis?.missingColumns?.length > 0) {
+            toast.error(
+              `❌ Colunas faltando no banco:\n${diagResponse.diagnosis.missingColumns.join(', ')}\n\n` +
+              `Execute a migração 014_add_ai_models_support.sql`
+            );
+          }
+        } catch (diagError) {
+          console.error('[VoiceAgentsPage] Diagnosis failed:', diagError);
+        }
+      } else if (status === 400 && data?.receivedFields) {
+        // Debug info for empty fields
+        console.warn('[VoiceAgentsPage] Empty request body?', data.receivedFields);
+        toast.error(
+          'Nenhum campo de API foi enviado.\n\n' +
+          'Verifique:\n' +
+          '- Você preencheu alguma chave de API?\n' +
+          '- Clicou em "Salvar Configurações"?'
+        );
+      } else {
+        toast.error(errorMsg);
+      }
     } finally {
       setActionLoading(false);
     }
