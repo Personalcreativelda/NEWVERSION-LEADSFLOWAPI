@@ -5,7 +5,7 @@ import {
   Zap, X, Check, Loader2,
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash,
-  Key, Brain, Eye, EyeOff, Smartphone
+  Key, Brain, Eye, EyeOff, Smartphone, Cloud
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -60,6 +60,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CHANNEL_ICONS: Record<string, React.ComponentType<any>> = {
   'whatsapp': MessageCircle,
+  'whatsapp_cloud': Cloud,
   'instagram': Instagram,
   'facebook': Facebook,
   'messenger': Facebook,
@@ -72,6 +73,7 @@ const CHANNEL_ICONS: Record<string, React.ComponentType<any>> = {
 
 const CHANNEL_COLORS: Record<string, string> = {
   'whatsapp': 'text-green-500',
+  'whatsapp_cloud': 'text-green-500',
   'instagram': 'text-pink-500',
   'facebook': 'text-blue-600',
   'messenger': 'text-blue-600',
