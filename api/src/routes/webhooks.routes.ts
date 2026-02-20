@@ -395,7 +395,9 @@ router.post('/evolution/setup-all', async (req, res) => {
 // INBOX: ✅ Webhook para Evolution API receber mensagens do WhatsApp
 router.post('/evolution/messages', async (req, res) => {
   try {
-    console.log('[Evolution Webhook] ===== WEBHOOK RECEBIDO =====');
+    console.log('\n' + '='.repeat(80));
+    console.log('[Evolution Webhook] ===== WEBHOOK RECEBIDO EM:', new Date().toISOString(), '=====');
+    console.log('='.repeat(80));
     console.log('[Evolution Webhook] Headers:', JSON.stringify(req.headers).substring(0, 500));
     console.log('[Evolution Webhook] Body completo:', JSON.stringify(req.body).substring(0, 2000));
 
@@ -816,6 +818,11 @@ router.post('/evolution/messages', async (req, res) => {
       }
     );
 
+    console.log('[Evolution Webhook] 💬 Conversa processada:');
+    console.log('[Evolution Webhook]   - ID:', conversation.id);
+    console.log('[Evolution Webhook]   - Lead:', leadId);
+    console.log('[Evolution Webhook]   - Nova:', isNewLead);
+
     // Determinar direção da mensagem: fromMe = 'out' (resposta pelo celular), caso contrário = 'in'
     const messageDirection = isFromMe ? 'out' : 'in';
     const messageStatus = isFromMe ? 'sent' : 'delivered';
@@ -853,7 +860,15 @@ router.post('/evolution/messages', async (req, res) => {
 
     const message = messageResult.rows[0];
 
-    console.log('[Evolution Webhook] Mensagem salva com sucesso:', message.id, 'direction:', messageDirection);
+    console.log('[Evolution Webhook] ✅✅✅ MENSAGEM SALVA COM SUCESSO ✅✅✅');
+    console.log('[Evolution Webhook] ID:', message.id);
+    console.log('[Evolution Webhook] Conversa ID:', conversation.id);
+    console.log('[Evolution Webhook] Direção:', messageDirection);
+    console.log('[Evolution Webhook] Conteúdo:', messageContent.substring(0, 50));
+    console.log('[Evolution Webhook] Status:', message.status);
+    console.log('[Evolution Webhook] Lead ID:', leadId);
+    console.log('[Evolution Webhook] Channel:', message.channel);
+    console.log('='.repeat(80));
 
     // 💬 Registrar interação do lead
     try {
@@ -909,7 +924,7 @@ router.post('/evolution/messages', async (req, res) => {
     // Emitir evento WebSocket para atualização em tempo real
     const wsService = getWebSocketService();
     if (wsService) {
-      console.log('[Evolution Webhook] Emitindo WebSocket para usuário:', channel.user_id);
+      console.log('[Evolution Webhook] 📡 Emitindo WebSocket para usuário:', channel.user_id);
 
       // Emitir nova mensagem
       wsService.emitNewMessage(channel.user_id, {
@@ -931,9 +946,13 @@ router.post('/evolution/messages', async (req, res) => {
         unreadCount: (updatedConversation.rows[0]?.unread_count || 0) + 1
       });
 
-      console.log('[Evolution Webhook] WebSocket emitido com sucesso!');
+      console.log('[Evolution Webhook] ✅ WebSocket emitido com sucesso!');
+      console.log('[Evolution Webhook]   - Evento: newMessage');
+      console.log('[Evolution Webhook]   - Para usuário:', channel.user_id);
+      console.log('[Evolution Webhook]   - Conversa:', conversation.id);
+      console.log('[Evolution Webhook]   - Unread total:', totalUnread);
     } else {
-      console.warn('[Evolution Webhook] WebSocket service não disponível');
+      console.error('[Evolution Webhook] ❌ WebSocket service NÃO DISPONÍVEL - MENSAGENS NÃO CHEGAM NA DASHBOARD!');
     }
 
     // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)

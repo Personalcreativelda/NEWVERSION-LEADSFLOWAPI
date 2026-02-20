@@ -142,6 +142,118 @@ router.get('/status', async (req, res, next) => {
   }
 });
 
+// 🔍 DIAGNÓSTICO: Verificar webhook configuration e últimas mensagens
+router.get('/diagnosis', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { query: dbQuery } = require('../database/connection');
+
+    console.log('\n' + '='.repeat(80));
+    console.log('[Inbox Diagnosis] Iniciando diagnóstico...');
+    console.log('='.repeat(80));
+
+    // 1. Verificar canais WhatsApp
+    const channelsResult = await dbQuery(
+      `SELECT id, name, type, status, credentials FROM channels WHERE user_id = $1 AND type IN ('whatsapp', 'whatsapp_cloud')`,
+      [user.id]
+    );
+
+    const channels = channelsResult.rows.map((ch: any) => ({
+      id: ch.id,
+      name: ch.name,
+      type: ch.type,
+      status: ch.status,
+      has_credentials: !!ch.credentials
+    }));
+
+    // 2. Verificar últimas mensagens (últimas 10)
+    const messagesResult = await dbQuery(
+      `SELECT 
+        m.id, m.created_at, m.content, m.direction, m.channel, 
+        m.status, l.name as lead_name, c.id as conversation_id
+       FROM messages m
+       LEFT JOIN conversations c ON m.conversation_id = c.id
+       LEFT JOIN leads l ON m.lead_id = l.id
+       WHERE c.user_id = $1
+       ORDER BY m.created_at DESC
+       LIMIT 10`,
+      [user.id]
+    );
+
+    const messages = messagesResult.rows.map((m: any) => ({
+      id: m.id,
+      timestamp: m.created_at,
+      content: m.content?.substring(0, 50) || '[sem conteúdo]',
+      direction: m.direction,
+      channel: m.channel,
+      status: m.status,
+      lead: m.lead_name,
+      conversation: m.conversation_id
+    }));
+
+    // 3. Verificar últimas conversas
+    const conversationsResult = await dbQuery(
+      `SELECT id, status, last_message_at, unread_count, channel_id FROM conversations WHERE user_id = $1 ORDER BY last_message_at DESC LIMIT 5`,
+      [user.id]
+    );
+
+    const conversations = conversationsResult.rows;
+
+    // 4. Contar mensagens por tipo
+    const countResult = await dbQuery(
+      `SELECT channel, COUNT(*) as total FROM messages WHERE user_id = $1 GROUP BY channel`,
+      [user.id]
+    );
+
+    const messageCounts = countResult.rows;
+
+    const diagnosis = {
+      timestamp: new Date().toISOString(),
+      user_id: user.id,
+      webhook_status: {
+        evolution_api_configured: whatsappService.isReady(),
+        webhook_url: `${process.env.WEBHOOK_URL || process.env.API_URL || 'NÃO CONFIGURADO'}/api/webhooks/evolution/messages`
+      },
+      channels: {
+        total: channels.length,
+        list: channels
+      },
+      recent_messages: {
+        total_in_system: messageCounts.reduce((sum: number, row: any) => sum + row.total, 0),
+        message_counts_by_channel: messageCounts,
+        last_10: messages
+      },
+      recent_conversations: {
+        total: conversations.length,
+        list: conversations
+      },
+      diagnostics: {
+        has_whatsapp_channels: channels.length > 0,
+        has_recent_messages: messages.length > 0,
+        has_conversations: conversations.length > 0,
+        webhook_should_work: whatsappService.isReady() && channels.filter((ch: any) => ch.status === 'active' || ch.status === 'connected').length > 0,
+        issues: {
+          no_channels: channels.length === 0 ? '❌ Nenhum canal WhatsApp conectado' : '✅ Canais conectados',
+          no_messages: messages.length === 0 ? '⚠️ Nenhuma mensagem nos últimos registros' : '✅ Mensagens recebidas',
+          evolution_not_configured: !whatsappService.isReady() ? '❌ Evolution API não configurada' : '✅ Evolution API configurada',
+        }
+      }
+    };
+
+    console.log('[Inbox Diagnosis] Resultado:', JSON.stringify(diagnosis, null, 2));
+    console.log('='.repeat(80) + '\n');
+
+    res.json(diagnosis);
+  } catch (error: any) {
+    console.error('[Inbox Diagnosis] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Upload file for inbox messages (images, videos, documents, audio)
 router.post('/upload', upload.single('file'), async (req, res, next) => {
   try {
