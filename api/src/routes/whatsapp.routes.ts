@@ -232,7 +232,7 @@ router.post('/send-mass', async (req, res, next) => {
         summary.errors.push(`Lead ${leadId}: ${error.message || 'Unknown error'}`);
         // If the instance doesn't exist, abort the entire batch and mark channel as error
         const errMsg: string = error?.message || '';
-        if (errMsg.includes('does not exist') || errMsg === 'Not Found') {
+        if (errMsg.includes('does not exist') || errMsg.includes('Not Found')) {
           console.error(`[WhatsApp Routes] Instance "${instanceId}" does not exist in Evolution API. Aborting mass send and marking remaining leads as failed.`);
           const remaining = leadIds.length - leadIds.indexOf(leadId) - 1;
           summary.failed += remaining;
