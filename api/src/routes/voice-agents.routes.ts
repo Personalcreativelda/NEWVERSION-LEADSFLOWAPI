@@ -594,34 +594,23 @@ router.post('/:id/test-call', async (req: Request, res: Response, next: NextFunc
       ? JSON.parse(agent.call_config) 
       : agent.call_config;
 
-    // Validate configuration
+    // Validate that the Wavoip token is configured
     if (!callConfig.api_key) {
-      return res.status(400).json({ 
-        error: 'Wavoip API key not configured for this agent' 
+      return res.status(400).json({
+        error: 'Token Wavoip não configurado para este agente. Configure o campo "API Key / Token" nas configurações do agente.'
       });
     }
 
-    if (!callConfig.from_number) {
-      return res.status(400).json({ 
-        error: 'Origin phone number not configured for this agent' 
-      });
-    }
-
-    // Create Wavoip service with agent's API key
+    // Create Wavoip service with agent's token
     const wavoipService = createWavoipService(callConfig.api_key);
 
-    // Make the call
-    const greeting = agent.greeting_message || 
-      `Olá! Este é um teste do agente de voz ${agent.name}. Esta chamada foi iniciada automaticamente.`;
+    const contactName = `Teste — ${agent.name}`;
 
-    console.log(`[VoiceAgents] 🧪 Initiating test call for agent ${agent.name} (${id})`);
-    console.log(`[VoiceAgents] 📞 From: ${callConfig.from_number} To: ${phone_number}`);
+    console.log(`[VoiceAgents] 🔗 Generating Wavoip Click to Call URL for agent ${agent.name} (${id})`);
+    console.log(`[VoiceAgents] 📞 Destination: ${phone_number}`);
 
-    const callResult = await wavoipService.makeTestCall(
-      callConfig.from_number,
-      phone_number,
-      greeting
-    );
+    // Generate Click to Call URL (no server-side HTTP call — Wavoip uses browser webphone)
+    const callResult = wavoipService.generateClickToCallUrl(phone_number, contactName);
 
     // Save call record to database
     try {
@@ -641,38 +630,29 @@ router.post('/:id/test-call', async (req: Request, res: Response, next: NextFunc
           user.id,
           phone_number,
           'outbound',
-          callResult.status,
-          callResult.call_id,
+          'initiated',
+          `click_to_call_${Date.now()}`,
           JSON.stringify({
             test_call: true,
-            greeting_message: greeting,
-            wavoip_response: callResult
+            type: 'click_to_call',
+            call_url: callResult.call_url,
           }),
-          callResult.started_at || new Date().toISOString()
+          new Date().toISOString()
         ]
       );
     } catch (dbError) {
       console.error('[VoiceAgents] ❌ Error saving call record:', dbError);
     }
 
-    if (callResult.status === 'failed') {
-      return res.status(500).json({ 
-        success: false,
-        error: callResult.error || 'Failed to initiate call',
-        agent_id: id,
-        phone_number 
-      });
-    }
+    console.log(`[VoiceAgents] ✅ Click to Call URL generated: ${callResult.call_url}`);
 
-    console.log(`[VoiceAgents] ✅ Test call initiated: ${callResult.call_id}`);
-
-    res.json({ 
-      success: true, 
-      message: 'Test call initiated successfully',
+    res.json({
+      success: true,
+      type: 'click_to_call',
+      call_url: callResult.call_url,
+      message: 'URL de chamada gerada. Abrindo webphone Wavoip...',
       agent_id: id,
       phone_number,
-      call_id: callResult.call_id,
-      status: callResult.status
     });
   } catch (error) {
     console.error('[VoiceAgents] ❌ Error in test call:', error);

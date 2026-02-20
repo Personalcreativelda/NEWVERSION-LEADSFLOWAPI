@@ -113,7 +113,7 @@ export const voiceAgentsApi = {
   /**
    * Make a test call with a voice agent
    */
-  async testCall(id: string, data: TestCallInput): Promise<{ success: boolean; message: string }> {
+  async testCall(id: string, data: TestCallInput): Promise<{ success: boolean; message: string; type?: string; call_url?: string }> {
     const response = await api.post(`/voice-agents/${id}/test-call`, data);
     return response.data;
   },

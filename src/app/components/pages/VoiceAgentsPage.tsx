@@ -280,8 +280,21 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     if (!phone) return;
 
     try {
-      await voiceAgentsApi.testCall(id, { phone_number: phone });
-      toast.success('Chamada de teste iniciada!');
+      const result = await voiceAgentsApi.testCall(id, { phone_number: phone });
+
+      if (result.type === 'click_to_call' && result.call_url) {
+        // Open Wavoip webphone popup
+        const popup = window.open(result.call_url, 'wavoip_call', 'width=520,height=700,resizable=yes,scrollbars=yes');
+        if (!popup) {
+          // Browser blocked the popup — fallback: copy URL and inform the user
+          navigator.clipboard?.writeText(result.call_url).catch(() => {});
+          toast.error('O popup foi bloqueado pelo browser. Permita popups para este site e tente novamente.', { duration: 8000 });
+        } else {
+          toast.success('Webphone Wavoip aberto! Clique em "Pronto" para iniciar a chamada.');
+        }
+      } else {
+        toast.success('Chamada de teste iniciada!');
+      }
     } catch (error: any) {
       console.error('[VoiceAgentsPage] Error testing call:', error);
       const msg = error.response?.data?.error || error.message || 'Erro ao iniciar chamada de teste';
