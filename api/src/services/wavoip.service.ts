@@ -12,8 +12,8 @@
 
 import axios from 'axios';
 
-// Note: Wavoip API endpoint may vary, check your Wavoip dashboard for correct URL
-const WAVOIP_API_URL = process.env.WAVOIP_API_URL || 'https://api.wavoip.com/v1';
+// Wavoip API endpoint — domain is .co (not .com), see https://docs.wavoip.co
+const WAVOIP_API_URL = process.env.WAVOIP_API_URL || 'https://api.wavoip.co/v1';
 const WAVOIP_TIMEOUT = 30000; // 30 seconds timeout
 
 export interface WavoipCallOptions {

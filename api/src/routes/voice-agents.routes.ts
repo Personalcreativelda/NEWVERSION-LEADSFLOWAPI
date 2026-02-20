@@ -277,6 +277,65 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
+ * GET /api/voice-agents/providers/elevenlabs/voices
+ * Get available ElevenLabs voices using user's API key
+ * NOTE: This route MUST be declared before GET /:id to avoid being shadowed
+ */
+router.get('/providers/elevenlabs/voices', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    console.log('[VoiceAgents] 🎤 Fetching ElevenLabs voices for user:', user.id);
+
+    // Get user's ElevenLabs API key from database
+    const userResult = await query(
+      'SELECT elevenlabs_api_key FROM users WHERE id = $1',
+      [user.id]
+    );
+
+    const userApiKey = userResult.rows[0]?.elevenlabs_api_key;
+
+    if (!userApiKey) {
+      console.log('[VoiceAgents] ⚠️ User has no ElevenLabs API key configured - returning default voices');
+
+      // Return default voices when no API key is configured
+      const defaultVoices = [
+        { voice_id: 'ErXwobaYiN019PkySvjV', name: 'Antoni', category: 'premade', description: 'Mature and well-rounded voice' },
+        { voice_id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', category: 'premade', description: 'Calm and pleasant voice' },
+        { voice_id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi', category: 'premade', description: 'Strong and confident voice' },
+        { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', category: 'premade', description: 'Soft and gentle voice' },
+        { voice_id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli', category: 'premade', description: 'Young and energetic voice' },
+        { voice_id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', category: 'premade', description: 'Deep and authoritative voice' },
+        { voice_id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold', category: 'premade', description: 'Crisp and clear voice' },
+        { voice_id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', category: 'premade', description: 'Deep and resonant voice' },
+        { voice_id: 'yoZ06aMxZJJ28mfd3POQ', name: 'Sam', category: 'premade', description: 'Energetic and dynamic voice' },
+      ];
+
+      return res.json({
+        voices: defaultVoices,
+        configured: false,
+        message: 'Configure sua API key do ElevenLabs para acessar todas as vozes disponíveis.'
+      });
+    }
+
+    // Fetch voices from ElevenLabs API using user's key
+    const elevenLabsService = new (await import('../services/elevenlabs.service')).ElevenLabsService(userApiKey);
+    const voices = await elevenLabsService.getVoices();
+
+    console.log(`[VoiceAgents] ✅ Returned ${voices.length} voices for user ${user.id}`);
+
+    res.json({
+      voices,
+      configured: true
+    });
+  } catch (error) {
+    console.error('[VoiceAgents] ❌ Error fetching ElevenLabs voices:', error);
+    next(error);
+  }
+});
+
+/**
  * GET /api/voice-agents/:id
  * Get a specific voice agent by ID
  */
@@ -617,64 +676,6 @@ router.post('/:id/test-call', async (req: Request, res: Response, next: NextFunc
     });
   } catch (error) {
     console.error('[VoiceAgents] ❌ Error in test call:', error);
-    next(error);
-  }
-});
-
-/**
- * GET /api/voice-agents/providers/elevenlabs/voices
- * Get available ElevenLabs voices using user's API key
- */
-router.get('/providers/elevenlabs/voices', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const user = req.user;
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-    console.log('[VoiceAgents] 🎤 Fetching ElevenLabs voices for user:', user.id);
-
-    // Get user's ElevenLabs API key from database
-    const userResult = await query(
-      'SELECT elevenlabs_api_key FROM users WHERE id = $1',
-      [user.id]
-    );
-
-    const userApiKey = userResult.rows[0]?.elevenlabs_api_key;
-
-    if (!userApiKey) {
-      console.log('[VoiceAgents] ⚠️ User has no ElevenLabs API key configured - returning default voices');
-      
-      // Return default voices when no API key is configured
-      const defaultVoices = [
-        { voice_id: 'ErXwobaYiN019PkySvjV', name: 'Antoni', category: 'premade', description: 'Mature and well-rounded voice' },
-        { voice_id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', category: 'premade', description: 'Calm and pleasant voice' },
-        { voice_id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi', category: 'premade', description: 'Strong and confident voice' },
-        { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', category: 'premade', description: 'Soft and gentle voice' },
-        { voice_id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli', category: 'premade', description: 'Young and energetic voice' },
-        { voice_id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', category: 'premade', description: 'Deep and authoritative voice' },
-        { voice_id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold', category: 'premade', description: 'Crisp and clear voice' },
-        { voice_id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', category: 'premade', description: 'Deep and resonant voice' },
-        { voice_id: 'yoZ06aMxZJJ28mfd3POQ', name: 'Sam', category: 'premade', description: 'Energetic and dynamic voice' },
-      ];
-
-      return res.json({
-        voices: defaultVoices,
-        configured: false,
-        message: 'Configure sua API key do ElevenLabs para acessar todas as vozes disponíveis.'
-      });
-    }
-
-    // Fetch voices from ElevenLabs API using user's key
-    const elevenLabsService = new (await import('../services/elevenlabs.service')).ElevenLabsService(userApiKey);
-    const voices = await elevenLabsService.getVoices();
-
-    console.log(`[VoiceAgents] ✅ Returned ${voices.length} voices for user ${user.id}`);
-
-    res.json({
-      voices,
-      configured: true
-    });
-  } catch (error) {
-    console.error('[VoiceAgents] ❌ Error fetching ElevenLabs voices:', error);
     next(error);
   }
 });
