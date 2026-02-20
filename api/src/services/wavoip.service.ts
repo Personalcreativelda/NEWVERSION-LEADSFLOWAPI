@@ -212,18 +212,17 @@ export class WavoipService {
   }
 
   /**
-   * Make a test call (simulated for development)
+   * Make a test call — uses real Wavoip API when apiKey is set, otherwise simulates
    */
   async makeTestCall(from: string, to: string, message: string): Promise<WavoipCallResponse> {
     console.log(`[Wavoip] 🧪 TEST CALL from ${from} to ${to}`);
     console.log(`[Wavoip] 📝 Message: ${message}`);
 
-    // In development/test mode, return a simulated response
-    if (!this.apiKey || process.env.NODE_ENV === 'development') {
-      console.log('[Wavoip] ⚠️ Using simulated call (no API key or dev mode)');
-      
+    if (!this.apiKey) {
+      // No API key — return simulated response so devs can test the UI flow
+      console.log('[Wavoip] ⚠️ Simulating call — no Wavoip API key configured for this agent');
       return {
-        call_id: `test_${Date.now()}`,
+        call_id: `sim_${Date.now()}`,
         status: 'initiated',
         from,
         to,
@@ -231,7 +230,7 @@ export class WavoipService {
       };
     }
 
-    // Make real call
+    // API key present — always make a real call regardless of NODE_ENV
     return this.makeCall({
       from,
       to,

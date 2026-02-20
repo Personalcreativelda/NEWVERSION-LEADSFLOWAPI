@@ -276,15 +276,16 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   };
 
   const handleTestCall = async (id: string) => {
-    const phone = prompt('Digite o número de telefone para teste (com código do país):');
+    const phone = prompt('Digite o número de telefone para teste (com código do país, ex: +5511999999999):');
     if (!phone) return;
 
     try {
       await voiceAgentsApi.testCall(id, { phone_number: phone });
       toast.success('Chamada de teste iniciada!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('[VoiceAgentsPage] Error testing call:', error);
-      toast.error('Erro ao iniciar chamada de teste');
+      const msg = error.response?.data?.error || error.message || 'Erro ao iniciar chamada de teste';
+      toast.error(msg, { duration: 6000 });
     }
   };
 
