@@ -17,6 +17,27 @@ interface VoiceAgentsPageProps {
 export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   console.log('[VoiceAgentsPage] Render - isDark:', isDark);
   
+  // LocalStorage helper functions for API keys
+  const getStoredApiKey = (keyName: string): string | null => {
+    try {
+      return localStorage.getItem(`voice_agent_${keyName}`);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const setStoredApiKey = (keyName: string, value: string | null): void => {
+    try {
+      if (value) {
+        localStorage.setItem(`voice_agent_${keyName}`, value);
+      } else {
+        localStorage.removeItem(`voice_agent_${keyName}`);
+      }
+    } catch (e) {
+      console.warn(`Failed to store ${keyName} in localStorage:`, e);
+    }
+  };
+  
   const [voiceAgents, setVoiceAgents] = useState<VoiceAgent[]>([]);
   const [elevenLabsVoices, setElevenLabsVoices] = useState<ElevenLabsVoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -288,12 +309,18 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         google: currentSettings.google_configured || false,
       });
       
-      // Keep fields empty to allow overwriting, but track what's configured
+      // Try to load from localStorage first (full keys), fallback to preview from server
+      const storedElevenLabs = getStoredApiKey('elevenlabs_api_key');
+      const storedOpenAI = getStoredApiKey('openai_api_key');
+      const storedAnthropic = getStoredApiKey('anthropic_api_key');
+      const storedGoogle = getStoredApiKey('google_api_key');
+
+      // Pre-fill fields with stored values or previews
       setSettingsForm({
-        elevenlabs_api_key: '',
-        openai_api_key: '',
-        anthropic_api_key: '',
-        google_api_key: '',
+        elevenlabs_api_key: storedElevenLabs || currentSettings.elevenlabs_api_key_preview || '',
+        openai_api_key: storedOpenAI || currentSettings.openai_api_key_preview || '',
+        anthropic_api_key: storedAnthropic || currentSettings.anthropic_api_key_preview || '',
+        google_api_key: storedGoogle || currentSettings.google_api_key_preview || '',
         preferred_ai_model: currentSettings.preferred_ai_model || 'elevenlabs',
       });
       
@@ -328,14 +355,38 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   };
 
   const handleSaveSettings = async () => {
-    // Validações: pelo menos uma chave de API deve ser fornecida
-    const hasAnyKey = 
-      settingsForm.elevenlabs_api_key?.trim() ||
-      settingsForm.openai_api_key?.trim() ||
-      settingsForm.anthropic_api_key?.trim() ||
-      settingsForm.google_api_key?.trim();
+    // Helper function to determine if a value is a preview or actual key
+    const isPreview = (value: string | undefined): boolean => {
+      return !!value?.endsWith('...');
+    };
 
-    if (!hasAnyKey) {
+    // Prepare data - only send keys that were actually modified (not previews)
+    const dataToSave = {
+      elevenlabs_api_key: (settingsForm.elevenlabs_api_key && !isPreview(settingsForm.elevenlabs_api_key)) 
+        ? settingsForm.elevenlabs_api_key 
+        : null,
+      openai_api_key: (settingsForm.openai_api_key && !isPreview(settingsForm.openai_api_key)) 
+        ? settingsForm.openai_api_key 
+        : null,
+      anthropic_api_key: (settingsForm.anthropic_api_key && !isPreview(settingsForm.anthropic_api_key)) 
+        ? settingsForm.anthropic_api_key 
+        : null,
+      google_api_key: (settingsForm.google_api_key && !isPreview(settingsForm.google_api_key)) 
+        ? settingsForm.google_api_key 
+        : null,
+      preferred_ai_model: settingsForm.preferred_ai_model,
+    };
+
+    // Validations: at least one key must be provided (either already saved or newly provided)
+    const hasAnySavedKey = 
+      savedApiKeys.elevenlabs || savedApiKeys.openai || savedApiKeys.anthropic || savedApiKeys.google;
+    const hasAnyNewKey = 
+      dataToSave.elevenlabs_api_key || 
+      dataToSave.openai_api_key || 
+      dataToSave.anthropic_api_key || 
+      dataToSave.google_api_key;
+
+    if (!hasAnySavedKey && !hasAnyNewKey) {
       toast.error('Forneça pelo menos uma API key válida');
       return;
     }
@@ -344,32 +395,43 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       setActionLoading(true);
       console.log('[VoiceAgentsPage] 🔄 Saving API keys...');
       
-      // Prepare data to save
-      const dataToSave = {
-        elevenlabs_api_key: settingsForm.elevenlabs_api_key || null,
-        openai_api_key: settingsForm.openai_api_key || null,
-        anthropic_api_key: settingsForm.anthropic_api_key || null,
-        google_api_key: settingsForm.google_api_key || null,
-        preferred_ai_model: settingsForm.preferred_ai_model,
-      };
-      
       console.log('[VoiceAgentsPage] Submitting:', {
         hasElevenLabs: !!dataToSave.elevenlabs_api_key,
         hasOpenAI: !!dataToSave.openai_api_key,
         hasAnthropic: !!dataToSave.anthropic_api_key,
         hasGoogle: !!dataToSave.google_api_key,
+        keepingExisting: `${[
+          savedApiKeys.elevenlabs && !dataToSave.elevenlabs_api_key ? 'ElevenLabs' : '',
+          savedApiKeys.openai && !dataToSave.openai_api_key ? 'OpenAI' : '',
+          savedApiKeys.anthropic && !dataToSave.anthropic_api_key ? 'Anthropic' : '',
+          savedApiKeys.google && !dataToSave.google_api_key ? 'Google' : '',
+        ].filter(Boolean).join(', ')}`,
       });
       
       const response = await voiceAgentsApi.updateSettings(dataToSave);
       
       console.log('[VoiceAgentsPage] ✅ Settings saved:', response);
       
+      // Store new/updated keys in localStorage for future reference
+      if (dataToSave.elevenlabs_api_key) {
+        setStoredApiKey('elevenlabs_api_key', dataToSave.elevenlabs_api_key);
+      }
+      if (dataToSave.openai_api_key) {
+        setStoredApiKey('openai_api_key', dataToSave.openai_api_key);
+      }
+      if (dataToSave.anthropic_api_key) {
+        setStoredApiKey('anthropic_api_key', dataToSave.anthropic_api_key);
+      }
+      if (dataToSave.google_api_key) {
+        setStoredApiKey('google_api_key', dataToSave.google_api_key);
+      }
+      
       // Update saved API keys status immediately
       setSavedApiKeys({
-        elevenlabs: !!dataToSave.elevenlabs_api_key,
-        openai: !!dataToSave.openai_api_key,
-        anthropic: !!dataToSave.anthropic_api_key,
-        google: !!dataToSave.google_api_key,
+        elevenlabs: savedApiKeys.elevenlabs || !!dataToSave.elevenlabs_api_key,
+        openai: savedApiKeys.openai || !!dataToSave.openai_api_key,
+        anthropic: savedApiKeys.anthropic || !!dataToSave.anthropic_api_key,
+        google: savedApiKeys.google || !!dataToSave.google_api_key,
       });
       
       toast.success('Configurações salvas com sucesso! Recarregando...');
