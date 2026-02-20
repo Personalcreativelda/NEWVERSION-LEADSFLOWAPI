@@ -27,9 +27,10 @@ async function configureWebhookForInstance(instanceId: string): Promise<void> {
 
     try {
         const webhookConfig = {
+            enabled: true,
             url: fullWebhookUrl,
-            webhook_by_events: false,
-            webhook_base64: true,
+            webhookByEvents: false,
+            webhookBase64: true,
             events: [
                 'MESSAGES_UPSERT',
                 'MESSAGES_UPDATE',

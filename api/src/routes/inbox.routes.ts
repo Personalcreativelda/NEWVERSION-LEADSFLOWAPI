@@ -9,6 +9,7 @@ import { LeadsService } from '../services/leads.service';
 import { ConversationsService } from '../services/conversations.service';
 import { getStorageService } from '../services/storage.service';
 import { TwilioSMSService } from '../services/twilio-sms.service';
+import { getWebSocketService } from '../services/websocket.service';
 
 const router = Router();
 
@@ -50,15 +51,19 @@ const getUserInstanceName = (userId: string): string => {
 };
 
 // Get the active WhatsApp instance from saved channels
+// Prefer 'active'/'connected', fallback to any whatsapp channel (consistent with getActiveWhatsAppChannel)
 const getActiveWhatsAppInstance = async (userId: string): Promise<string | null> => {
   try {
     const channels = await channelsService.findByType('whatsapp', userId);
-    const activeChannel = channels.find(ch => ch.status === 'active');
-    if (activeChannel && activeChannel.credentials) {
-      // Return instance_id or instance_name from credentials
-      return activeChannel.credentials.instance_id || activeChannel.credentials.instance_name || null;
-    }
-    return null;
+    if (channels.length === 0) return null;
+    // Prefer active or connected, fall back to first available channel
+    const preferred = channels.find(ch => ch.status === 'active' || (ch.status as string) === 'connected');
+    const ch = preferred || channels[0];
+    const creds = ch?.credentials;
+    if (!creds) return null;
+    const instanceId = creds.instance_id || creds.instance_name || null;
+    console.log(`[Inbox] getActiveWhatsAppInstance → channel=${ch.id} status=${ch.status} instance=${instanceId}`);
+    return instanceId;
   } catch (error) {
     console.error('[Inbox] Error getting active WhatsApp instance:', error);
     return null;
@@ -1176,8 +1181,24 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
             text: messageContent,
           });
         }
-      } catch (whatsappError) {
+      } catch (whatsappError: any) {
         console.error('[Inbox] WhatsApp send error:', whatsappError);
+        // If Evolution API says the instance does not exist, mark the channel as error in DB
+        const errMsg: string = whatsappError?.message || '';
+        const isInstanceNotFound = errMsg.includes('does not exist') || errMsg.includes('Not Found') || errMsg === 'Not Found';
+        if (isInstanceNotFound && channelId) {
+          try {
+            const { query: dbQ } = require('../database/connection');
+            await dbQ(
+              `UPDATE channels SET status = 'error', updated_at = NOW() WHERE id = $1`,
+              [channelId]
+            );
+            console.warn(`[Inbox] Marked channel ${channelId} as error because instance "${instanceId}" does not exist in Evolution API`);
+          } catch (dbErr) {
+            console.error('[Inbox] Failed to update channel status:', dbErr);
+          }
+          return res.status(503).json({ error: `WhatsApp instance "${instanceId}" does not exist. Please reconnect your WhatsApp channel.` });
+        }
         return res.status(500).json({ error: 'Failed to send WhatsApp message' });
       }
 
@@ -1628,6 +1649,20 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       // Update lead's last_contact_at if we have a lead
       if (leadId) {
         await dbQuery('UPDATE leads SET last_contact_at = NOW() WHERE id = $1', [leadId]);
+      }
+
+      // Emit WebSocket event so all connected tabs/clients update in real-time
+      try {
+        const wsService = getWebSocketService();
+        if (wsService && conversationId) {
+          wsService.emitNewMessage(user.id, {
+            conversationId,
+            message,
+          });
+          console.log('[Inbox] WebSocket emitted for outgoing message:', message.id);
+        }
+      } catch (wsErr) {
+        console.warn('[Inbox] WebSocket emit failed (non-critical):', wsErr);
       }
     } catch (dbError) {
       console.warn('[Inbox] Failed to save message to database:', dbError);

@@ -32,6 +32,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     const wasConnectedRef = useRef(false);
     const reconnectAttemptsRef = useRef(0);
     const connectingRef = useRef(false);
+    // Keep callbacks in a ref so they're always current without causing reconnects
+    const callbacksRef = useRef(options);
+    useEffect(() => { callbacksRef.current = options; });
 
     const connect = useCallback(() => {
         // Prevent multiple simultaneous connection attempts
@@ -78,7 +81,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
                 // Se estava conectado antes e reconectou, chamar callback
                 if (wasConnectedRef.current && reconnectAttemptsRef.current > 0) {
                     console.log('[WebSocket] Reconnected - triggering refresh');
-                    options.onReconnect?.();
+                    callbacksRef.current.onReconnect?.();
                 }
 
                 wasConnectedRef.current = true;
@@ -111,34 +114,18 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
                 connectingRef.current = false;
             });
 
-            // Event listeners
+            // Route all events through refs so callbacks are always current
+            // and the socket does not need to be recreated when they change
             socket.on('connected', (data: WebSocketEvents['connected']) => {
                 console.log('[WebSocket] Server confirmed connection:', data);
             });
 
-            if (options.onNewMessage) {
-                socket.on('new_message', options.onNewMessage);
-            }
-
-            if (options.onMessageStatusUpdate) {
-                socket.on('message_status_update', options.onMessageStatusUpdate);
-            }
-
-            if (options.onConversationUpdate) {
-                socket.on('conversation_update', options.onConversationUpdate);
-            }
-
-            if (options.onUnreadCountUpdate) {
-                socket.on('unread_count_update', options.onUnreadCountUpdate);
-            }
-
-            if (options.onConversationRead) {
-                socket.on('conversation_read', options.onConversationRead);
-            }
-
-            if (options.onUserTyping) {
-                socket.on('user_typing', options.onUserTyping);
-            }
+            socket.on('new_message', (data) => callbacksRef.current.onNewMessage?.(data));
+            socket.on('message_status_update', (data) => callbacksRef.current.onMessageStatusUpdate?.(data));
+            socket.on('conversation_update', (data) => callbacksRef.current.onConversationUpdate?.(data));
+            socket.on('unread_count_update', (data) => callbacksRef.current.onUnreadCountUpdate?.(data));
+            socket.on('conversation_read', (data) => callbacksRef.current.onConversationRead?.(data));
+            socket.on('user_typing', (data) => callbacksRef.current.onUserTyping?.(data));
 
             socketRef.current = socket;
         } catch (err) {
@@ -146,7 +133,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             setError('Failed to initialize WebSocket');
             connectingRef.current = false;
         }
-    }, [options]);
+    }, []); // stable — no options dependency, callbacks accessed via ref
 
     const disconnect = useCallback(() => {
         console.log('[WebSocket] Disconnecting...');

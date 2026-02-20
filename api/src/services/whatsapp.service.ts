@@ -68,8 +68,22 @@ export class WhatsAppService {
 
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({}));
-        console.error('[WhatsAppService] Error response:', errorBody);
-        const errorMessage = errorBody.message || errorBody.error || `Evolution API Error: ${response.status} ${response.statusText}`;
+        // Evolution API sometimes wraps NestJS errors: { status, error, response: { message: [...] } }
+        // Normalize message from all known locations
+        const nestedMsg = errorBody.response?.message ?? errorBody.response?.error;
+        const topMsg = errorBody.message;
+        const rawMsgSource = nestedMsg ?? topMsg;
+        const rawMsg = Array.isArray(rawMsgSource)
+          ? rawMsgSource.flat().join(', ')
+          : rawMsgSource;
+        console.error('[WhatsAppService] Error response:', {
+          status: response.status,
+          error: errorBody.error || response.statusText,
+          detail: rawMsg,
+          body: JSON.stringify(errorBody).substring(0, 300),
+        });
+        // Always include HTTP status so callers can detect 4xx reliably
+        const errorMessage = `${response.status} ${response.statusText}: ${rawMsg || errorBody.error || response.statusText}`;
         throw new Error(errorMessage);
       }
 
@@ -94,23 +108,36 @@ export class WhatsAppService {
   }
 
   async sendMessage(data: { instanceId: string; number: string; text: string }) {
+    // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
+    const cleanNumber = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
+
+    if (!cleanNumber) {
+      throw new Error('sendMessage: número de telefone inválido ou vazio');
+    }
+    if (!data.text || !data.text.trim()) {
+      throw new Error('sendMessage: texto da mensagem não pode ser vazio');
+    }
+
+    // Evolution API expects { number, text } at root level
+    const body = JSON.stringify({ number: cleanNumber, text: data.text });
+    console.log(`[WhatsAppService] sendMessage → instance=${data.instanceId} number=${cleanNumber} textLen=${data.text.length}`);
+
     return this.request(`/message/sendText/${data.instanceId}`, {
       method: 'POST',
-      body: JSON.stringify({
-        number: data.number,
-        text: data.text,
-      }),
+      body,
     });
   }
 
-  async sendMedia(data: { 
-    instanceId: string; 
-    number: string; 
-    mediaUrl: string; 
+  async sendMedia(data: {
+    instanceId: string;
+    number: string;
+    mediaUrl: string;
     mediaType: string;
     caption?: string;
   }) {
-    const { instanceId, number, mediaUrl, mediaType, caption } = data;
+    const { instanceId, mediaUrl, mediaType, caption } = data;
+    // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
+    const number = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
     
     // Determine the endpoint based on media type
     let endpoint = '/message/sendMedia';
@@ -169,11 +196,9 @@ export class WhatsAppService {
           url: fullWebhookUrl,
           byEvents: false, // Send all events to same URL
           base64: true, // Include media as base64
-          headers: {
-            'Content-Type': 'application/json',
-          },
           events: [
             'MESSAGES_UPSERT',
+            'MESSAGES_UPDATE',
             'CONNECTION_UPDATE',
             'QRCODE_UPDATED',
           ],
@@ -221,11 +246,13 @@ export class WhatsAppService {
       const result = await this.request(`/webhook/set/${instanceName}`, {
         method: 'POST',
         body: JSON.stringify({
+          enabled: true,
           url: webhookUrl,
-          webhook_by_events: false,
-          webhook_base64: true,
+          webhookByEvents: false,
+          webhookBase64: true,
           events: [
             'MESSAGES_UPSERT',
+            'MESSAGES_UPDATE',
             'CONNECTION_UPDATE',
             'QRCODE_UPDATED',
           ],
@@ -650,13 +677,15 @@ export class WhatsAppService {
    * Send WhatsApp Audio (voice message)
    * Uses the sendWhatsAppAudio endpoint for PTT audio messages
    */
-  async sendAudio(data: { 
-    instanceId: string; 
-    number: string; 
+  async sendAudio(data: {
+    instanceId: string;
+    number: string;
     audioUrl?: string;
     audioBase64?: string;
   }) {
-    const { instanceId, number, audioUrl, audioBase64 } = data;
+    const { instanceId, audioUrl, audioBase64 } = data;
+    // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
+    const number = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
     
     console.log('[WhatsAppService] Sending audio to:', number, 'URL:', audioUrl);
     
@@ -704,13 +733,15 @@ export class WhatsAppService {
    * Send Sticker
    * Accepts either a sticker URL or base64
    */
-  async sendSticker(data: { 
-    instanceId: string; 
-    number: string; 
+  async sendSticker(data: {
+    instanceId: string;
+    number: string;
     stickerUrl?: string;
     stickerBase64?: string;
   }) {
-    const { instanceId, number, stickerUrl, stickerBase64 } = data;
+    const { instanceId, stickerUrl, stickerBase64 } = data;
+    // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
+    const number = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
     
     console.log('[WhatsAppService] Sending sticker to:', number);
     
