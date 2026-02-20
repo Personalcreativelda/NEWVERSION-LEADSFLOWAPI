@@ -111,37 +111,21 @@ export class WhatsAppService {
     // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
     const cleanNumber = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
 
-    // Try Evolution API v2 format first (textMessage.text)
-    // Falls back to v1 format (text) on 4xx errors for compatibility
-    try {
-      return await this.request(`/message/sendText/${data.instanceId}`, {
-        method: 'POST',
-        body: JSON.stringify({
-          number: cleanNumber,
-          textMessage: {
-            text: data.text,
-          },
-        }),
-      });
-    } catch (v2Error: any) {
-      const errorMsg = v2Error.message || '';
-      const is4xxError = /\b(400|422|415|4\d\d)\b/.test(errorMsg) ||
-        /bad request|unprocessable|unsupported|invalid|format/i.test(errorMsg);
-
-      if (!is4xxError) {
-        // Network error, auth error, etc — don't retry with different format
-        throw v2Error;
-      }
-
-      console.log('[WhatsAppService] v2 textMessage format rejected, retrying with v1 text format');
-      return this.request(`/message/sendText/${data.instanceId}`, {
-        method: 'POST',
-        body: JSON.stringify({
-          number: cleanNumber,
-          text: data.text,
-        }),
-      });
+    if (!cleanNumber) {
+      throw new Error('sendMessage: número de telefone inválido ou vazio');
     }
+    if (!data.text || !data.text.trim()) {
+      throw new Error('sendMessage: texto da mensagem não pode ser vazio');
+    }
+
+    // Evolution API expects { number, text } at root level
+    const body = JSON.stringify({ number: cleanNumber, text: data.text });
+    console.log(`[WhatsAppService] sendMessage → instance=${data.instanceId} number=${cleanNumber} textLen=${data.text.length}`);
+
+    return this.request(`/message/sendText/${data.instanceId}`, {
+      method: 'POST',
+      body,
+    });
   }
 
   async sendMedia(data: {

@@ -51,15 +51,19 @@ const getUserInstanceName = (userId: string): string => {
 };
 
 // Get the active WhatsApp instance from saved channels
+// Prefer 'active'/'connected', fallback to any whatsapp channel (consistent with getActiveWhatsAppChannel)
 const getActiveWhatsAppInstance = async (userId: string): Promise<string | null> => {
   try {
     const channels = await channelsService.findByType('whatsapp', userId);
-    const activeChannel = channels.find(ch => ch.status === 'active');
-    if (activeChannel && activeChannel.credentials) {
-      // Return instance_id or instance_name from credentials
-      return activeChannel.credentials.instance_id || activeChannel.credentials.instance_name || null;
-    }
-    return null;
+    if (channels.length === 0) return null;
+    // Prefer active or connected, fall back to first available channel
+    const preferred = channels.find(ch => ch.status === 'active' || (ch.status as string) === 'connected');
+    const ch = preferred || channels[0];
+    const creds = ch?.credentials;
+    if (!creds) return null;
+    const instanceId = creds.instance_id || creds.instance_name || null;
+    console.log(`[Inbox] getActiveWhatsAppInstance → channel=${ch.id} status=${ch.status} instance=${instanceId}`);
+    return instanceId;
   } catch (error) {
     console.error('[Inbox] Error getting active WhatsApp instance:', error);
     return null;
