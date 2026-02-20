@@ -68,15 +68,20 @@ export class WhatsAppService {
 
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({}));
+        // Evolution API sometimes wraps NestJS errors: { status, error, response: { message: [...] } }
+        // Normalize message from all known locations
+        const nestedMsg = errorBody.response?.message ?? errorBody.response?.error;
+        const topMsg = errorBody.message;
+        const rawMsgSource = nestedMsg ?? topMsg;
+        const rawMsg = Array.isArray(rawMsgSource)
+          ? rawMsgSource.flat().join(', ')
+          : rawMsgSource;
         console.error('[WhatsAppService] Error response:', {
           status: response.status,
           error: errorBody.error || response.statusText,
-          response: errorBody,
+          detail: rawMsg,
+          body: JSON.stringify(errorBody).substring(0, 300),
         });
-        // Normalize message: Evolution API may return arrays (e.g. NestJS validation errors)
-        const rawMsg = Array.isArray(errorBody.message)
-          ? errorBody.message.flat().join(', ')
-          : errorBody.message;
         // Always include HTTP status so callers can detect 4xx reliably
         const errorMessage = `${response.status} ${response.statusText}: ${rawMsg || errorBody.error || response.statusText}`;
         throw new Error(errorMessage);

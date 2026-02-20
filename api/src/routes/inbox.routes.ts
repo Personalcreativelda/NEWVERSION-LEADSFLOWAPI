@@ -9,6 +9,7 @@ import { LeadsService } from '../services/leads.service';
 import { ConversationsService } from '../services/conversations.service';
 import { getStorageService } from '../services/storage.service';
 import { TwilioSMSService } from '../services/twilio-sms.service';
+import { getWebSocketService } from '../services/websocket.service';
 
 const router = Router();
 
@@ -1644,6 +1645,20 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       // Update lead's last_contact_at if we have a lead
       if (leadId) {
         await dbQuery('UPDATE leads SET last_contact_at = NOW() WHERE id = $1', [leadId]);
+      }
+
+      // Emit WebSocket event so all connected tabs/clients update in real-time
+      try {
+        const wsService = getWebSocketService();
+        if (wsService && conversationId) {
+          wsService.emitNewMessage(user.id, {
+            conversationId,
+            message,
+          });
+          console.log('[Inbox] WebSocket emitted for outgoing message:', message.id);
+        }
+      } catch (wsErr) {
+        console.warn('[Inbox] WebSocket emit failed (non-critical):', wsErr);
       }
     } catch (dbError) {
       console.warn('[Inbox] Failed to save message to database:', dbError);
