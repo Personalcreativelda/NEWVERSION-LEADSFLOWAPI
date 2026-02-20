@@ -94,23 +94,52 @@ export class WhatsAppService {
   }
 
   async sendMessage(data: { instanceId: string; number: string; text: string }) {
-    return this.request(`/message/sendText/${data.instanceId}`, {
-      method: 'POST',
-      body: JSON.stringify({
-        number: data.number,
-        text: data.text,
-      }),
-    });
+    // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
+    const cleanNumber = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
+
+    // Try Evolution API v2 format first (textMessage.text)
+    // Falls back to v1 format (text) on 4xx errors for compatibility
+    try {
+      return await this.request(`/message/sendText/${data.instanceId}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          number: cleanNumber,
+          textMessage: {
+            text: data.text,
+          },
+        }),
+      });
+    } catch (v2Error: any) {
+      const errorMsg = v2Error.message || '';
+      const is4xxError = /\b(400|422|415|4\d\d)\b/.test(errorMsg) ||
+        /bad request|unprocessable|unsupported|invalid|format/i.test(errorMsg);
+
+      if (!is4xxError) {
+        // Network error, auth error, etc — don't retry with different format
+        throw v2Error;
+      }
+
+      console.log('[WhatsAppService] v2 textMessage format rejected, retrying with v1 text format');
+      return this.request(`/message/sendText/${data.instanceId}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          number: cleanNumber,
+          text: data.text,
+        }),
+      });
+    }
   }
 
-  async sendMedia(data: { 
-    instanceId: string; 
-    number: string; 
-    mediaUrl: string; 
+  async sendMedia(data: {
+    instanceId: string;
+    number: string;
+    mediaUrl: string;
     mediaType: string;
     caption?: string;
   }) {
-    const { instanceId, number, mediaUrl, mediaType, caption } = data;
+    const { instanceId, mediaUrl, mediaType, caption } = data;
+    // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
+    const number = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
     
     // Determine the endpoint based on media type
     let endpoint = '/message/sendMedia';
@@ -169,11 +198,9 @@ export class WhatsAppService {
           url: fullWebhookUrl,
           byEvents: false, // Send all events to same URL
           base64: true, // Include media as base64
-          headers: {
-            'Content-Type': 'application/json',
-          },
           events: [
             'MESSAGES_UPSERT',
+            'MESSAGES_UPDATE',
             'CONNECTION_UPDATE',
             'QRCODE_UPDATED',
           ],
@@ -226,6 +253,7 @@ export class WhatsAppService {
           webhook_base64: true,
           events: [
             'MESSAGES_UPSERT',
+            'MESSAGES_UPDATE',
             'CONNECTION_UPDATE',
             'QRCODE_UPDATED',
           ],
@@ -650,13 +678,15 @@ export class WhatsAppService {
    * Send WhatsApp Audio (voice message)
    * Uses the sendWhatsAppAudio endpoint for PTT audio messages
    */
-  async sendAudio(data: { 
-    instanceId: string; 
-    number: string; 
+  async sendAudio(data: {
+    instanceId: string;
+    number: string;
     audioUrl?: string;
     audioBase64?: string;
   }) {
-    const { instanceId, number, audioUrl, audioBase64 } = data;
+    const { instanceId, audioUrl, audioBase64 } = data;
+    // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
+    const number = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
     
     console.log('[WhatsAppService] Sending audio to:', number, 'URL:', audioUrl);
     
@@ -704,13 +734,15 @@ export class WhatsAppService {
    * Send Sticker
    * Accepts either a sticker URL or base64
    */
-  async sendSticker(data: { 
-    instanceId: string; 
-    number: string; 
+  async sendSticker(data: {
+    instanceId: string;
+    number: string;
     stickerUrl?: string;
     stickerBase64?: string;
   }) {
-    const { instanceId, number, stickerUrl, stickerBase64 } = data;
+    const { instanceId, stickerUrl, stickerBase64 } = data;
+    // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
+    const number = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
     
     console.log('[WhatsAppService] Sending sticker to:', number);
     
