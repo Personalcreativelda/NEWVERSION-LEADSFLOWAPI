@@ -1176,8 +1176,24 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
             text: messageContent,
           });
         }
-      } catch (whatsappError) {
+      } catch (whatsappError: any) {
         console.error('[Inbox] WhatsApp send error:', whatsappError);
+        // If Evolution API says the instance does not exist, mark the channel as error in DB
+        const errMsg: string = whatsappError?.message || '';
+        const isInstanceNotFound = errMsg.includes('does not exist') || errMsg.includes('Not Found') || errMsg === 'Not Found';
+        if (isInstanceNotFound && channelId) {
+          try {
+            const { query: dbQ } = require('../database/connection');
+            await dbQ(
+              `UPDATE channels SET status = 'error', updated_at = NOW() WHERE id = $1`,
+              [channelId]
+            );
+            console.warn(`[Inbox] Marked channel ${channelId} as error because instance "${instanceId}" does not exist in Evolution API`);
+          } catch (dbErr) {
+            console.error('[Inbox] Failed to update channel status:', dbErr);
+          }
+          return res.status(503).json({ error: `WhatsApp instance "${instanceId}" does not exist. Please reconnect your WhatsApp channel.` });
+        }
         return res.status(500).json({ error: 'Failed to send WhatsApp message' });
       }
 

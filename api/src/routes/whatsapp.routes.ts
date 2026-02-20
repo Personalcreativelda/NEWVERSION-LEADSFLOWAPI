@@ -230,6 +230,25 @@ router.post('/send-mass', async (req, res, next) => {
         console.error(`[WhatsApp Routes] Error sending to lead ${leadId}:`, error);
         summary.failed++;
         summary.errors.push(`Lead ${leadId}: ${error.message || 'Unknown error'}`);
+        // If the instance doesn't exist, abort the entire batch and mark channel as error
+        const errMsg: string = error?.message || '';
+        if (errMsg.includes('does not exist') || errMsg === 'Not Found') {
+          console.error(`[WhatsApp Routes] Instance "${instanceId}" does not exist in Evolution API. Aborting mass send and marking remaining leads as failed.`);
+          const remaining = leadIds.length - leadIds.indexOf(leadId) - 1;
+          summary.failed += remaining;
+          // Mark the active channel as error so it's no longer selected
+          try {
+            const channels = await channelsService.findByType('whatsapp', user.id);
+            const ch = channels.find((c: any) => c.credentials?.instance_id === instanceId || c.credentials?.instance_name === instanceId);
+            if (ch) {
+              await query(`UPDATE channels SET status = 'error', updated_at = NOW() WHERE id = $1`, [ch.id]);
+              console.warn(`[WhatsApp Routes] Marked channel ${ch.id} as error`);
+            }
+          } catch (dbErr) {
+            console.error('[WhatsApp Routes] Failed to update channel status:', dbErr);
+          }
+          break;
+        }
       }
     }
 
