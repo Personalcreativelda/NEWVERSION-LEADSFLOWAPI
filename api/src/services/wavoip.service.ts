@@ -50,6 +50,8 @@ export class WavoipService {
       token: this.token,
       phone: digits,
       ...(name ? { name } : {}),
+      start_if_ready: 'true',      // start call automatically without clicking button
+      available_after_call: 'true', // allow another call after this one ends
     });
 
     const call_url = `${WAVOIP_WEBPHONE_URL}?${params.toString()}`;
