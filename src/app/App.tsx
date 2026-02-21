@@ -612,7 +612,11 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
           if (userData && userData.id) {
             localStorage.setItem('leadflow_user', JSON.stringify(userData));
           }
-          setCurrentPage('dashboard');
+          // Don't redirect if we're on a standalone page like agent-call
+          const pageFromUrl = getPageFromPath();
+          if (pageFromUrl !== 'agent-call') {
+            setCurrentPage('dashboard');
+          }
           return;
         } catch (backendError) {
           console.error('[Auth] Failed to hydrate user from backend:', backendError);
@@ -809,6 +813,11 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       throw error;
     }
   };
+
+  // Agent call page is standalone - render it immediately without auth loading
+  if (currentPage === 'agent-call') {
+    return <AgentCallPage />;
+  }
 
   if (loading) {
     return (
