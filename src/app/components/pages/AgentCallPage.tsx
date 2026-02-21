@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Phone, PhoneOff, Mic, MicOff, Loader2, MessageSquare } from 'lucide-react';
 import { Button } from '../ui/button';
+import { getApiBaseUrl } from '../../utils/api-client';
 
 // --- Types -------------------------------------------------------------------
 
@@ -43,7 +44,7 @@ interface TranscriptEntry {
 const SILENCE_THRESHOLD_RMS = 400;   // Int16 RMS below this = silence
 const SILENCE_DURATION_MS   = 1800;  // silence duration before processing
 const MIN_SPEECH_BYTES       = 3200; // ignore segments shorter than ~200ms @ 8kHz
-const API_BASE               = '/api';
+const API_BASE               = `${getApiBaseUrl()}/api`;
 
 // --- WAV builder -------------------------------------------------------------
 
