@@ -285,16 +285,30 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       return;
     }
 
-    // Open our AI agent call popup directly (no backend call needed to get the URL)
-    const params = new URLSearchParams({ agentId: id, phone });
-    const popupUrl = `/agent-call?${params.toString()}`;
-    const popup = window.open(popupUrl, `agent_call_${id}`, 'width=480,height=680,resizable=yes,scrollbars=no');
+    try {
+      setActionLoading(true);
+      // Ask the backend to generate the Wavoip Click to Call URL
+      const result = await voiceAgentsApi.testCall(id, { phone_number: phone });
 
-    if (!popup) {
-      toast.error('O popup foi bloqueado pelo browser. Permita popups para este site e tente novamente.', { duration: 8000 });
-    } else {
-      popup.focus();
-      toast.success('Agente de voz aberto em nova janela!', { duration: 3000 });
+      if (!result.call_url) {
+        toast.error('Não foi possível gerar a URL de chamada. Verifique o Token Wavoip do agente.', { duration: 6000 });
+        return;
+      }
+
+      // Open the Wavoip webphone in a popup — the call happens inside Wavoip's own UI
+      const popup = window.open(result.call_url, `wavoip_call_${id}`, 'width=480,height=680,resizable=yes,scrollbars=no');
+
+      if (!popup) {
+        toast.error('O popup foi bloqueado pelo browser. Permita popups para este site e tente novamente.', { duration: 8000 });
+      } else {
+        popup.focus();
+        toast.success('Chamada iniciada! Acompanhe na janela que abriu.', { duration: 4000 });
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Erro ao iniciar chamada';
+      toast.error(msg, { duration: 6000 });
+    } finally {
+      setActionLoading(false);
     }
   };
 
