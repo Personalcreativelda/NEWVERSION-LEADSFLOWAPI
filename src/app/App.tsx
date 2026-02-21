@@ -16,6 +16,7 @@ import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
 import SettingsPage from './components/settings/SettingsPage';
 import AdminPage from './components/settings/AdminPage';
 import SetupTestUser from './components/SetupTestUser';
+import AgentCallPage from './components/pages/AgentCallPage';
 import UpgradeModal from './components/modals/UpgradeModal';
 import { MetaPixel } from './components/MetaPixel';
 import { authApi, apiRequest, isSessionExpired, startSessionExpiryTimer } from './utils/api';
@@ -79,7 +80,7 @@ declare global {
 }
 
 // LeadsFlow SAAS - Main App Component
-type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'settings' | 'admin' | 'setup' | 'reset-password' | 'forgot-password';
+type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'settings' | 'admin' | 'setup' | 'reset-password' | 'forgot-password' | 'agent-call';
 
 interface AppProps {
   initialPage?: Page;
@@ -99,6 +100,7 @@ const getPageFromPath = (): Page | null => {
     '/settings': 'settings',
     '/admin': 'admin',
     '/setup': 'setup',
+    '/agent-call': 'agent-call',
   };
 
   return pageMap[cleanPath] || null;
@@ -121,6 +123,7 @@ const setPagePath = (page: Page) => {
     'settings': '/settings',
     'admin': '/admin',
     'setup': '/setup',
+    'agent-call': '/agent-call',
     'landing': '/',
     'dashboard': '/',
   };
@@ -912,6 +915,11 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
           onBack={() => setCurrentPage('login')}
           onSuccess={handleLoginSuccess}
         />
+      )}
+
+      {/* Agent Call Popup Page */}
+      {currentPage === 'agent-call' && (
+        <AgentCallPage />
       )}
 
       {/* Upgrade Modal */}

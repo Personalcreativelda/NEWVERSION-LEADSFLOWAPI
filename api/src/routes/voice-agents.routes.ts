@@ -2,7 +2,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { query } from '../database/connection';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { elevenLabsService } from '../services/elevenlabs.service';
+import { ElevenLabsService } from '../services/elevenlabs.service';
 import { createWavoipService } from '../services/wavoip.service';
+import { AIService } from '../services/ai.service';
 
 const router = Router();
 
@@ -656,6 +658,268 @@ router.post('/:id/test-call', async (req: Request, res: Response, next: NextFunc
     });
   } catch (error) {
     console.error('[VoiceAgents] ❌ Error in test call:', error);
+    next(error);
+  }
+});
+
+/**
+ * GET /api/voice-agents/:id/call-config
+ * Returns agent config needed for the AI call popup (token, voice, greeting, instructions)
+ */
+router.get('/:id/call-config', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+
+    const agentResult = await query(
+      'SELECT * FROM voice_agents WHERE id = $1 AND user_id = $2',
+      [id, user.id]
+    );
+
+    if (agentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Voice agent not found' });
+    }
+
+    const agent = agentResult.rows[0];
+    const callConfig = typeof agent.call_config === 'string'
+      ? JSON.parse(agent.call_config) : agent.call_config || {};
+    const voiceConfig = typeof agent.voice_config === 'string'
+      ? JSON.parse(agent.voice_config) : agent.voice_config || {};
+
+    // Get user's API keys (needed by popup for TTS/STT/AI calls)
+    const userResult = await query(
+      'SELECT elevenlabs_api_key, openai_api_key, anthropic_api_key, google_api_key, preferred_ai_model FROM users WHERE id = $1',
+      [user.id]
+    );
+    const userSettings = userResult.rows[0] || {};
+
+    res.json({
+      agent_id: agent.id,
+      name: agent.name,
+      wavoip_token: callConfig.api_key || '',
+      voice_provider: agent.voice_provider,
+      voice_config: voiceConfig,
+      greeting_message: agent.greeting_message || '',
+      instructions: agent.instructions || '',
+      language: agent.language || 'pt-BR',
+      elevenlabs_configured: !!userSettings.elevenlabs_api_key,
+      openai_configured: !!userSettings.openai_api_key,
+      preferred_ai_model: userSettings.preferred_ai_model || 'openai',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/voice-agents/:id/tts
+ * Generate TTS audio using ElevenLabs (returns base64 mp3)
+ * Body: { text: string }
+ */
+router.post('/:id/tts', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { text } = req.body;
+
+    if (!text?.trim()) {
+      return res.status(400).json({ error: 'text is required' });
+    }
+
+    // Get agent voice config
+    const agentResult = await query(
+      'SELECT voice_config FROM voice_agents WHERE id = $1 AND user_id = $2',
+      [id, user.id]
+    );
+
+    if (agentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Voice agent not found' });
+    }
+
+    const voiceConfig = typeof agentResult.rows[0].voice_config === 'string'
+      ? JSON.parse(agentResult.rows[0].voice_config)
+      : agentResult.rows[0].voice_config || {};
+
+    // Get user's ElevenLabs API key
+    const userResult = await query(
+      'SELECT elevenlabs_api_key FROM users WHERE id = $1',
+      [user.id]
+    );
+    const elevenLabsApiKey = userResult.rows[0]?.elevenlabs_api_key;
+
+    if (!elevenLabsApiKey) {
+      return res.status(400).json({ error: 'ElevenLabs API key not configured' });
+    }
+
+    const ttsService = new ElevenLabsService(elevenLabsApiKey);
+    const audioBuffer = await ttsService.textToSpeech({
+      text,
+      voice_id: voiceConfig.voice_id || 'ErXwobaYiN019PkySvjV',
+      model_id: voiceConfig.model || 'eleven_monolingual_v1',
+      voice_settings: voiceConfig.stability != null ? {
+        stability: voiceConfig.stability,
+        similarity_boost: voiceConfig.similarity_boost ?? 0.75,
+      } : undefined,
+    });
+
+    if (!audioBuffer) {
+      return res.status(500).json({ error: 'Failed to generate TTS audio' });
+    }
+
+    res.json({
+      audio_base64: audioBuffer.toString('base64'),
+      content_type: 'audio/mpeg',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/voice-agents/:id/stt
+ * Transcribe audio using OpenAI Whisper
+ * Body: { audio_base64: string, sample_rate: number }
+ */
+router.post('/:id/stt', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { audio_base64, sample_rate = 8000 } = req.body;
+
+    if (!audio_base64) {
+      return res.status(400).json({ error: 'audio_base64 is required' });
+    }
+
+    // Get agent language and user's OpenAI key
+    const agentResult = await query(
+      'SELECT language FROM voice_agents WHERE id = $1 AND user_id = $2',
+      [id, user.id]
+    );
+
+    if (agentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Voice agent not found' });
+    }
+
+    const language = (agentResult.rows[0].language || 'pt-BR').split('-')[0]; // 'pt-BR' -> 'pt'
+
+    const userResult = await query(
+      'SELECT openai_api_key FROM users WHERE id = $1',
+      [user.id]
+    );
+    const openaiApiKey = userResult.rows[0]?.openai_api_key;
+
+    if (!openaiApiKey) {
+      return res.status(400).json({ error: 'OpenAI API key not configured for STT' });
+    }
+
+    // Decode base64 WAV audio
+    const wavBuffer = Buffer.from(audio_base64, 'base64');
+
+    // Send to OpenAI Whisper
+    const formData = new FormData();
+    formData.append('file', new Blob([wavBuffer], { type: 'audio/wav' }), 'audio.wav');
+    formData.append('model', 'whisper-1');
+    formData.append('language', language);
+
+    const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${openaiApiKey}` },
+      body: formData,
+    });
+
+    if (!whisperRes.ok) {
+      const errText = await whisperRes.text();
+      console.error('[VoiceAgents] Whisper error:', errText);
+      return res.status(500).json({ error: 'STT failed', details: errText });
+    }
+
+    const whisperData = await whisperRes.json() as { text: string };
+    console.log(`[VoiceAgents] 🎙️ STT result: "${whisperData.text}"`);
+
+    res.json({ text: whisperData.text || '' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/voice-agents/:id/ai-respond
+ * Get AI response for the voice agent conversation
+ * Body: { history: [{role: string, content: string}][] }
+ */
+router.post('/:id/ai-respond', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { history } = req.body;
+
+    if (!Array.isArray(history)) {
+      return res.status(400).json({ error: 'history array is required' });
+    }
+
+    // Get agent instructions and user's AI keys
+    const agentResult = await query(
+      'SELECT instructions, language FROM voice_agents WHERE id = $1 AND user_id = $2',
+      [id, user.id]
+    );
+
+    if (agentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Voice agent not found' });
+    }
+
+    const agent = agentResult.rows[0];
+
+    const userResult = await query(
+      'SELECT openai_api_key, anthropic_api_key, google_api_key, preferred_ai_model FROM users WHERE id = $1',
+      [user.id]
+    );
+    const userSettings = userResult.rows[0] || {};
+
+    // Pick the best available AI provider
+    let apiKey: string | null = null;
+    let provider: 'openai' | 'gemini' = 'openai';
+
+    if (userSettings.openai_api_key) {
+      apiKey = userSettings.openai_api_key;
+      provider = 'openai';
+    } else if (userSettings.google_api_key) {
+      apiKey = userSettings.google_api_key;
+      provider = 'gemini';
+    }
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'No AI API key configured (OpenAI or Google)' });
+    }
+
+    const aiService = new AIService();
+
+    // Build messages: system prompt + conversation history
+    const systemPrompt = agent.instructions
+      ? `${agent.instructions}\n\nResponda de forma concisa e natural, como em uma conversa por telefone. Língua: ${agent.language || 'pt-BR'}.`
+      : `Você é um assistente de voz prestativo. Responda de forma concisa e natural, como em uma conversa por telefone. Língua: ${agent.language || 'pt-BR'}.`;
+
+    const messages = [
+      { role: 'system' as const, content: systemPrompt },
+      ...history.map((m: any) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
+    ];
+
+    const aiResponse = await aiService.generateResponse(messages, provider, apiKey);
+
+    console.log(`[VoiceAgents] 🤖 AI response: "${aiResponse.content.substring(0, 80)}..."`);
+
+    res.json({ text: aiResponse.content });
+  } catch (error) {
     next(error);
   }
 });

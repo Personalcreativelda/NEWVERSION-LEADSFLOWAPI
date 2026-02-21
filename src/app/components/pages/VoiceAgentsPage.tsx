@@ -279,26 +279,21 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     const phone = prompt('Digite o número de telefone para teste (com código do país, ex: +5511999999999):');
     if (!phone) return;
 
-    try {
-      const result = await voiceAgentsApi.testCall(id, { phone_number: phone });
+    // Validate E.164 format minimally
+    if (!/^\+[1-9]\d{6,14}$/.test(phone)) {
+      toast.error('Formato inválido. Use +5511999999999 (com código do país).', { duration: 6000 });
+      return;
+    }
 
-      if (result.type === 'click_to_call' && result.call_url) {
-        // Open Wavoip webphone popup
-        const popup = window.open(result.call_url, 'wavoip_call', 'width=520,height=700,resizable=yes,scrollbars=yes');
-        if (!popup) {
-          // Browser blocked the popup — fallback: copy URL and inform the user
-          navigator.clipboard?.writeText(result.call_url).catch(() => {});
-          toast.error('O popup foi bloqueado pelo browser. Permita popups para este site e tente novamente.', { duration: 8000 });
-        } else {
-          toast.success('Webphone Wavoip aberto! Clique em "Pronto" para iniciar a chamada.');
-        }
-      } else {
-        toast.success('Chamada de teste iniciada!');
-      }
-    } catch (error: any) {
-      console.error('[VoiceAgentsPage] Error testing call:', error);
-      const msg = error.response?.data?.error || error.message || 'Erro ao iniciar chamada de teste';
-      toast.error(msg, { duration: 6000 });
+    // Open our AI agent call popup directly (no backend call needed to get the URL)
+    const params = new URLSearchParams({ agentId: id, phone });
+    const popupUrl = `/agent-call?${params.toString()}`;
+    const popup = window.open(popupUrl, `agent_call_${id}`, 'width=480,height=680,resizable=yes,scrollbars=no');
+
+    if (!popup) {
+      toast.error('O popup foi bloqueado pelo browser. Permita popups para este site e tente novamente.', { duration: 8000 });
+    } else {
+      toast.success('Abrindo agente de voz IA...', { duration: 3000 });
     }
   };
 
