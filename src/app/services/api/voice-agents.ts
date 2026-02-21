@@ -1,11 +1,15 @@
 import axios from 'axios';
-import type { 
-  VoiceAgent, 
-  CreateVoiceAgentInput, 
+import type {
+  VoiceAgent,
+  CreateVoiceAgentInput,
   UpdateVoiceAgentInput,
   VoiceAgentCall,
   ElevenLabsVoice,
-  TestCallInput
+  ElevenLabsConvAIAgent,
+  ElevenLabsPhoneNumber,
+  AICallResult,
+  ConvAIConversation,
+  TestCallInput,
 } from '../../types/voice-agents';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -141,5 +145,62 @@ export const voiceAgentsApi = {
   async diagnose(): Promise<any> {
     const response = await api.get('/voice-agents/diagnose');
     return response.data;
-  }
+  },
+
+  // ─── ElevenLabs Conversational AI (ConvAI) ──────────────────────────────────
+
+  /**
+   * List all Conversational AI agents in the user's ElevenLabs account.
+   */
+  async listConvAIAgents(): Promise<ElevenLabsConvAIAgent[]> {
+    const response = await api.get('/voice-agents/elevenlabs/agents');
+    return response.data.agents || [];
+  },
+
+  /**
+   * List all registered SIP phone numbers in the user's ElevenLabs account.
+   */
+  async listPhoneNumbers(): Promise<ElevenLabsPhoneNumber[]> {
+    const response = await api.get('/voice-agents/elevenlabs/phone-numbers');
+    return response.data.phone_numbers || [];
+  },
+
+  /**
+   * Register a Wavoip SIP trunk as a phone number in ElevenLabs.
+   * ElevenLabs will use this to make outbound WhatsApp calls.
+   */
+  async registerSipTrunk(data: {
+    label?: string;
+    phone_number: string;
+    sip_host: string;
+    sip_username: string;
+    sip_password: string;
+  }): Promise<{ success: boolean; phone_number: ElevenLabsPhoneNumber }> {
+    const response = await api.post('/voice-agents/elevenlabs/phone-numbers', data);
+    return response.data;
+  },
+
+  /**
+   * Delete a registered SIP phone number from ElevenLabs.
+   */
+  async deletePhoneNumber(phoneNumberId: string): Promise<void> {
+    await api.delete(`/voice-agents/elevenlabs/phone-numbers/${phoneNumberId}`);
+  },
+
+  /**
+   * Start an outbound AI call via ElevenLabs ConvAI + Wavoip SIP.
+   * The agent must have elevenlabs_agent_id and phone_number_id configured.
+   */
+  async startAICall(agentId: string, data: { phone_number: string }): Promise<AICallResult> {
+    const response = await api.post(`/voice-agents/${agentId}/call`, data);
+    return response.data;
+  },
+
+  /**
+   * Get the current status and transcript of an AI conversation.
+   */
+  async getConversation(conversationId: string): Promise<ConvAIConversation> {
+    const response = await api.get(`/voice-agents/conversations/${conversationId}`);
+    return response.data;
+  },
 };

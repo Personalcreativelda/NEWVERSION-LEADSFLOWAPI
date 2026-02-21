@@ -5,6 +5,7 @@ import { elevenLabsService } from '../services/elevenlabs.service';
 import { ElevenLabsService } from '../services/elevenlabs.service';
 import { createWavoipService } from '../services/wavoip.service';
 import { AIService } from '../services/ai.service';
+import { createElevenLabsConvAIService } from '../services/elevenlabs-convai.service';
 
 const router = Router();
 
@@ -337,6 +338,168 @@ router.get('/providers/elevenlabs/voices', async (req: Request, res: Response, n
   }
 });
 
+// ─── ElevenLabs Conversational AI (ConvAI) routes ─────────────────────────────
+// IMPORTANT: These must be declared BEFORE /:id to avoid route shadowing
+
+/**
+ * GET /api/voice-agents/elevenlabs/agents
+ * List all Conversational AI agents in the user's ElevenLabs account.
+ * These are the AI agents configured in the ElevenLabs dashboard.
+ */
+router.get('/elevenlabs/agents', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const userResult = await query('SELECT elevenlabs_api_key FROM users WHERE id = $1', [user.id]);
+    const apiKey = userResult.rows[0]?.elevenlabs_api_key;
+
+    if (!apiKey) {
+      return res.status(400).json({
+        error: 'ElevenLabs API key not configured. Go to Settings to add your key.',
+        agents: [],
+      });
+    }
+
+    const convai = createElevenLabsConvAIService(apiKey);
+    const agents = await convai.listAgents();
+    console.log(`[VoiceAgents] 🤖 ElevenLabs ConvAI agents for user ${user.id}: ${agents.length} found`);
+    res.json({ agents });
+  } catch (error: any) {
+    console.error('[VoiceAgents] ❌ Error fetching ElevenLabs agents:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to fetch ElevenLabs agents', agents: [] });
+  }
+});
+
+/**
+ * GET /api/voice-agents/elevenlabs/phone-numbers
+ * List all registered SIP trunks / phone numbers in the user's ElevenLabs account.
+ */
+router.get('/elevenlabs/phone-numbers', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const userResult = await query('SELECT elevenlabs_api_key FROM users WHERE id = $1', [user.id]);
+    const apiKey = userResult.rows[0]?.elevenlabs_api_key;
+
+    if (!apiKey) {
+      return res.status(400).json({
+        error: 'ElevenLabs API key not configured.',
+        phone_numbers: [],
+      });
+    }
+
+    const convai = createElevenLabsConvAIService(apiKey);
+    const phone_numbers = await convai.listPhoneNumbers();
+    console.log(`[VoiceAgents] 📞 ElevenLabs phone numbers for user ${user.id}: ${phone_numbers.length} found`);
+    res.json({ phone_numbers });
+  } catch (error: any) {
+    console.error('[VoiceAgents] ❌ Error fetching ElevenLabs phone numbers:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to fetch phone numbers', phone_numbers: [] });
+  }
+});
+
+/**
+ * POST /api/voice-agents/elevenlabs/phone-numbers
+ * Register a Wavoip SIP trunk as a phone number in ElevenLabs.
+ *
+ * Body: { label, phone_number, sip_host, sip_username, sip_password }
+ */
+router.post('/elevenlabs/phone-numbers', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { label, phone_number, sip_host, sip_username, sip_password } = req.body;
+
+    if (!phone_number || !sip_host || !sip_username || !sip_password) {
+      return res.status(400).json({
+        error: 'Campos obrigatórios: phone_number, sip_host, sip_username, sip_password',
+      });
+    }
+
+    const userResult = await query('SELECT elevenlabs_api_key FROM users WHERE id = $1', [user.id]);
+    const apiKey = userResult.rows[0]?.elevenlabs_api_key;
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'ElevenLabs API key not configured.' });
+    }
+
+    const convai = createElevenLabsConvAIService(apiKey);
+    const phoneLabel = label || `Wavoip ${phone_number}`;
+    const result = await convai.registerSipTrunk(phoneLabel, phone_number, {
+      host: sip_host,
+      username: sip_username,
+      password: sip_password,
+    });
+
+    console.log(`[VoiceAgents] ✅ SIP trunk registered for user ${user.id}: ${result.phone_number_id}`);
+    res.json({ success: true, phone_number: result });
+  } catch (error: any) {
+    console.error('[VoiceAgents] ❌ Error registering SIP trunk:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to register SIP trunk' });
+  }
+});
+
+/**
+ * DELETE /api/voice-agents/elevenlabs/phone-numbers/:phoneNumberId
+ * Remove a registered phone number / SIP trunk from ElevenLabs.
+ */
+router.delete('/elevenlabs/phone-numbers/:phoneNumberId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { phoneNumberId } = req.params;
+
+    const userResult = await query('SELECT elevenlabs_api_key FROM users WHERE id = $1', [user.id]);
+    const apiKey = userResult.rows[0]?.elevenlabs_api_key;
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'ElevenLabs API key not configured.' });
+    }
+
+    const convai = createElevenLabsConvAIService(apiKey);
+    await convai.deletePhoneNumber(phoneNumberId);
+
+    console.log(`[VoiceAgents] ✅ Phone number ${phoneNumberId} deleted for user ${user.id}`);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[VoiceAgents] ❌ Error deleting phone number:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to delete phone number' });
+  }
+});
+
+/**
+ * GET /api/voice-agents/conversations/:conversationId
+ * Get the status and transcript of an active or completed AI call.
+ */
+router.get('/conversations/:conversationId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { conversationId } = req.params;
+
+    const userResult = await query('SELECT elevenlabs_api_key FROM users WHERE id = $1', [user.id]);
+    const apiKey = userResult.rows[0]?.elevenlabs_api_key;
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'ElevenLabs API key not configured.' });
+    }
+
+    const convai = createElevenLabsConvAIService(apiKey);
+    const conversation = await convai.getConversation(conversationId);
+    res.json(conversation);
+  } catch (error: any) {
+    console.error('[VoiceAgents] ❌ Error fetching conversation:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to fetch conversation' });
+  }
+});
+
+// ─── End of ConvAI routes ──────────────────────────────────────────────────────
+
 /**
  * GET /api/voice-agents/:id
  * Get a specific voice agent by ID
@@ -659,6 +822,119 @@ router.post('/:id/test-call', async (req: Request, res: Response, next: NextFunc
   } catch (error) {
     console.error('[VoiceAgents] ❌ Error in test call:', error);
     next(error);
+  }
+});
+
+/**
+ * POST /api/voice-agents/:id/call
+ * Start an outbound AI call using ElevenLabs Conversational AI + Wavoip SIP.
+ *
+ * Requires the agent to have call_config.elevenlabs_agent_id and
+ * call_config.phone_number_id configured.
+ *
+ * Body: { phone_number }
+ */
+router.post('/:id/call', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { phone_number } = req.body;
+
+    if (!phone_number) {
+      return res.status(400).json({ error: 'phone_number is required' });
+    }
+
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+    if (!e164Regex.test(phone_number)) {
+      return res.status(400).json({
+        error: `Formato inválido. Use E.164: +5511999999999. Recebido: ${phone_number}`,
+      });
+    }
+
+    // Get agent and user's ElevenLabs key
+    const [agentResult, userResult] = await Promise.all([
+      query('SELECT * FROM voice_agents WHERE id = $1 AND user_id = $2', [id, user.id]),
+      query('SELECT elevenlabs_api_key FROM users WHERE id = $1', [user.id]),
+    ]);
+
+    if (agentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Voice agent not found' });
+    }
+
+    const agent = agentResult.rows[0];
+    const callConfig = typeof agent.call_config === 'string'
+      ? JSON.parse(agent.call_config)
+      : (agent.call_config || {});
+
+    const elevenlabsAgentId: string = callConfig.elevenlabs_agent_id;
+    const phoneNumberId: string = callConfig.phone_number_id;
+
+    if (!elevenlabsAgentId) {
+      return res.status(400).json({
+        error: 'Este agente não tem um ElevenLabs Agent ID configurado. Edite o agente e selecione um agente ConvAI.',
+      });
+    }
+    if (!phoneNumberId) {
+      return res.status(400).json({
+        error: 'Este agente não tem um número de saída configurado. Edite o agente e selecione o número SIP registrado.',
+      });
+    }
+
+    const apiKey = userResult.rows[0]?.elevenlabs_api_key;
+    if (!apiKey) {
+      return res.status(400).json({
+        error: 'ElevenLabs API key não configurada. Vá em Configurações e adicione sua chave.',
+      });
+    }
+
+    console.log(`[VoiceAgents] 📞 Starting AI call for agent ${agent.name} → ${phone_number}`);
+
+    const convai = createElevenLabsConvAIService(apiKey);
+    const callResult = await convai.initiateOutboundCall(elevenlabsAgentId, phoneNumberId, phone_number);
+
+    // Save call record
+    try {
+      await query(
+        `INSERT INTO voice_agent_calls (
+          voice_agent_id, user_id, phone_number, direction, status,
+          call_provider_id, voice_provider_id, metadata, started_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          id,
+          user.id,
+          phone_number,
+          'outbound',
+          'initiated',
+          callResult.conversation_id,
+          elevenlabsAgentId,
+          JSON.stringify({
+            type: 'elevenlabs_convai',
+            conversation_id: callResult.conversation_id,
+            elevenlabs_agent_id: elevenlabsAgentId,
+            phone_number_id: phoneNumberId,
+          }),
+          new Date().toISOString(),
+        ],
+      );
+    } catch (dbError) {
+      console.error('[VoiceAgents] ❌ Error saving call record:', dbError);
+    }
+
+    console.log(`[VoiceAgents] ✅ AI call initiated: conversation_id=${callResult.conversation_id}`);
+
+    res.json({
+      success: true,
+      type: 'elevenlabs_convai',
+      conversation_id: callResult.conversation_id,
+      message: 'Chamada AI iniciada com sucesso via ElevenLabs + Wavoip',
+      agent_id: id,
+      phone_number,
+    });
+  } catch (error: any) {
+    console.error('[VoiceAgents] ❌ Error starting AI call:', error.message);
+    res.status(500).json({ error: error.message || 'Erro ao iniciar chamada AI' });
   }
 });
 
