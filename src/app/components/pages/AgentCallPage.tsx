@@ -362,17 +362,35 @@ export default function AgentCallPage() {
     const WavoipClass = (window as any).Wavoip;
     if (!WavoipClass) {
       setCallState('error');
-      setErrorMsg('wavoip-api nao disponivel');
+      setErrorMsg('wavoip-api nao disponivel. Verifique se o arquivo wavoip-api.js esta na pasta public/.');
       return;
     }
 
-    const WAV      = new WavoipClass();
-    const instance = WAV.connect(token);
-    instanceRef.current = instance;
+    let WAV: any;
+    let instance: any;
+    try {
+      WAV      = new WavoipClass();
+      instance = WAV.connect(token);
+      instanceRef.current = instance;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setCallState('error');
+      setErrorMsg(`Erro ao inicializar Wavoip: ${msg}`);
+      return;
+    }
+
+    // Timeout: if socket doesn't connect within 20s, show error
+    const connectTimeout = setTimeout(() => {
+      if (cleanedUpRef.current) return;
+      setCallState('error');
+      setErrorMsg('Tempo limite: nao foi possivel conectar ao Wavoip. Verifique o token do agente.');
+    }, 20000);
 
     instance.socket.on('connect', () => {
+      clearTimeout(connectTimeout);
       setCallState('ringing');
       setStatusMsg(`Chamando ${phoneNum}...`);
+      console.log('[AgentCall] Socket connected, starting call to:', phoneNum);
       instance.callStart({ whatsappid: phoneNum.replace(/^\+/, '') });
     });
 
@@ -388,12 +406,16 @@ export default function AgentCallPage() {
     instance.socket.on('calls:end', () => endCall());
 
     instance.socket.on('connect_error', (err: Error) => {
+      clearTimeout(connectTimeout);
+      console.error('[AgentCall] Socket connect_error:', err);
       setCallState('error');
-      setErrorMsg(`Erro de conexao: ${err.message}`);
+      setErrorMsg(`Erro de conexao com Wavoip: ${err.message}. Verifique se o token do agente esta correto.`);
     });
 
     instance.socket.on('disconnect', (reason: string) => {
+      clearTimeout(connectTimeout);
       if (!cleanedUpRef.current) {
+        console.warn('[AgentCall] Socket disconnected:', reason);
         setCallState('error');
         setErrorMsg(`Desconectado: ${reason}`);
       }
@@ -420,23 +442,31 @@ export default function AgentCallPage() {
 
     (async () => {
       try {
+        console.log('[AgentCall] Step 1: Loading config for agent', agentId);
         setStatusMsg('Carregando configuracao...');
         const config: AgentConfig = await apiGet(`/voice-agents/${agentId}/call-config`);
         agentConfigRef.current = config;
+        console.log('[AgentCall] Step 1 OK: config loaded, wavoip_token:', config.wavoip_token ? '✓ present' : '✗ MISSING');
 
         if (!config.wavoip_token) {
           setCallState('error');
-          setErrorMsg('Token Wavoip nao configurado neste agente.');
+          setErrorMsg('Token Wavoip nao configurado neste agente. Edite o agente e preencha o campo "Token Wavoip".');
           return;
         }
 
+        console.log('[AgentCall] Step 2: Setting up virtual mic...');
         setStatusMsg('Preparando audio...');
         setupVirtualMic();
+        console.log('[AgentCall] Step 2 OK: virtual mic ready');
 
-        setStatusMsg('Conectando...');
+        console.log('[AgentCall] Step 3: Loading wavoip-api.js...');
+        setStatusMsg('Carregando SDK Wavoip...');
         await loadWavoipScript();
+        console.log('[AgentCall] Step 3 OK: wavoip script loaded, Wavoip class:', !!(window as any).Wavoip);
 
+        console.log('[AgentCall] Step 4: Connecting to Wavoip...');
         setCallState('connecting');
+        setStatusMsg('Conectando ao Wavoip...');
         connectAndCall(config.wavoip_token, phone);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Erro ao inicializar chamada';

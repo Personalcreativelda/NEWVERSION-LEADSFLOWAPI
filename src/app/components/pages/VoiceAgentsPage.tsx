@@ -293,7 +293,8 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     if (!popup) {
       toast.error('O popup foi bloqueado pelo browser. Permita popups para este site e tente novamente.', { duration: 8000 });
     } else {
-      toast.success('Abrindo agente de voz IA...', { duration: 3000 });
+      popup.focus();
+      toast.success('Agente de voz aberto em nova janela!', { duration: 3000 });
     }
   };
 
