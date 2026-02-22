@@ -92,8 +92,15 @@ export class ElevenLabsConvAIService {
     if (err instanceof AxiosError) {
       const status = err.response?.status;
       const data = err.response?.data;
-      console.error(`[ElevenLabsConvAI] ❌ ${context}: HTTP ${status}`, data);
-      const msg = data?.detail?.message || data?.detail || data?.error || err.message;
+      console.error(`[ElevenLabsConvAI] ❌ ${context}: HTTP ${status}`, JSON.stringify(data));
+      // Extract the most useful message from ElevenLabs response formats
+      const msg =
+        data?.detail?.message ||
+        data?.detail ||
+        (Array.isArray(data?.detail) ? data.detail.map((d: any) => d.msg).join('; ') : undefined) ||
+        data?.error ||
+        data?.message ||
+        err.message;
       throw new Error(`ElevenLabs ConvAI error (${context}): ${msg}`);
     }
     throw err;
@@ -133,11 +140,6 @@ export class ElevenLabsConvAIService {
       this.handleError(err, 'listPhoneNumbers');
     }
   }
-
-  /**
-   * List all Conversational AI agents in this ElevenLabs account.
-   * Handles both response formats: { agents: [...] } OR array root
-   */
 
   /**
    * Register a Wavoip SIP trunk as a phone number in ElevenLabs.

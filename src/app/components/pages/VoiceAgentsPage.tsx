@@ -376,8 +376,38 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       return;
     }
 
-    const hasAIConfig =
-      agent.call_config?.elevenlabs_agent_id && agent.call_config?.phone_number_id;
+    const hasAIAgent = !!agent.call_config?.elevenlabs_agent_id;
+    const hasAIPhone = !!agent.call_config?.phone_number_id;
+    const hasWavoipToken = !!agent.call_config?.api_key;
+    const hasAIConfig = hasAIAgent && hasAIPhone;
+
+    // Pre-call validation: detect partial AI config and show targeted message
+    if (hasAIAgent && !hasAIPhone) {
+      toast.error(
+        'Agente ElevenLabs configurado, mas falta o Número SIP de saída. ' +
+        'Edite o agente, selecione um número SIP registrado e salve.',
+        { duration: 8000 },
+      );
+      return;
+    }
+    if (!hasAIAgent && hasAIPhone) {
+      toast.error(
+        'Número SIP configurado, mas falta o Agente ElevenLabs. ' +
+        'Edite o agente, selecione um agente ConvAI e salve.',
+        { duration: 8000 },
+      );
+      return;
+    }
+    if (!hasAIConfig && !hasWavoipToken) {
+      toast.error(
+        'Agente sem configuração de chamadas.\n' +
+        'Edite o agente e configure:\n' +
+        '• Modo AI: selecione Agente ElevenLabs + Número SIP\n' +
+        '• Modo simples: preencha o Token Wavoip',
+        { duration: 9000 },
+      );
+      return;
+    }
 
     try {
       setActionLoading(true);
@@ -387,7 +417,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         const result = await voiceAgentsApi.startAICall(agent.id, { phone_number: phone });
 
         if (!result.conversation_id) {
-          toast.error('Chamada iniciada mas sem ID de conversa.', { duration: 5000 });
+          toast.error('Chamada iniciada mas sem ID de conversa retornado pelo ElevenLabs.', { duration: 5000 });
           return;
         }
 
@@ -857,9 +887,15 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                         <Badge variant={agent.is_active ? 'default' : 'secondary'} className="text-xs">
                           {agent.is_active ? 'Ativo' : 'Inativo'}
                         </Badge>
-                        {agent.call_config?.elevenlabs_agent_id && (
+                        {agent.call_config?.elevenlabs_agent_id && agent.call_config?.phone_number_id && (
                           <Badge variant="outline" className="text-[10px] text-purple-500 border-purple-400">
                             AI
+                          </Badge>
+                        )}
+                        {(agent.call_config?.elevenlabs_agent_id || agent.call_config?.phone_number_id) &&
+                          !(agent.call_config?.elevenlabs_agent_id && agent.call_config?.phone_number_id) && (
+                          <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-400">
+                            Config. incompleta
                           </Badge>
                         )}
                       </div>
@@ -953,7 +989,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 space-y-4">
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 space-y-4">
               {/* Nome */}
               <div>
                 <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -1253,21 +1289,21 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   <option value="es-ES">Español</option>
                 </select>
               </div>
-            </form>
+            </div>
 
             <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
-              <Button 
+              <Button
                 type="button"
-                variant="outline" 
-                onClick={() => setModalOpen(false)} 
+                variant="outline"
+                onClick={() => setModalOpen(false)}
                 className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Cancelar
               </Button>
-              <Button 
-                type="submit"
-                onClick={handleSubmit} 
-                disabled={actionLoading} 
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={actionLoading}
                 className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-sm sm:text-base"
               >
                 {actionLoading ? (
