@@ -101,13 +101,16 @@ export class ElevenLabsConvAIService {
 
   /**
    * List all Conversational AI agents in this ElevenLabs account.
+   * Handles both: { agents: [...] } and array root.
    */
   async listAgents(): Promise<ElevenLabsConvAIAgent[]> {
     try {
       const res = await axios.get(`${ELEVENLABS_API_URL}/convai/agents`, {
         headers: this.headers,
       });
-      return res.data.agents || [];
+      console.log('[ElevenLabsConvAI] listAgents raw response:', JSON.stringify(res.data));
+      if (Array.isArray(res.data)) return res.data;
+      return res.data.agents || res.data.items || [];
     } catch (err) {
       this.handleError(err, 'listAgents');
     }
@@ -115,17 +118,26 @@ export class ElevenLabsConvAIService {
 
   /**
    * List all registered phone numbers / SIP trunks in this ElevenLabs account.
+   * Handles both response formats: array root OR { phone_numbers: [...] }
    */
   async listPhoneNumbers(): Promise<ElevenLabsPhoneNumber[]> {
     try {
       const res = await axios.get(`${ELEVENLABS_API_URL}/convai/phone-numbers`, {
         headers: this.headers,
       });
-      return res.data.phone_numbers || [];
+      console.log('[ElevenLabsConvAI] listPhoneNumbers raw response:', JSON.stringify(res.data));
+      // ElevenLabs may return an array directly or wrap in { phone_numbers: [...] }
+      if (Array.isArray(res.data)) return res.data;
+      return res.data.phone_numbers || res.data.items || [];
     } catch (err) {
       this.handleError(err, 'listPhoneNumbers');
     }
   }
+
+  /**
+   * List all Conversational AI agents in this ElevenLabs account.
+   * Handles both response formats: { agents: [...] } OR array root
+   */
 
   /**
    * Register a Wavoip SIP trunk as a phone number in ElevenLabs.

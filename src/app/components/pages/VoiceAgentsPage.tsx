@@ -222,28 +222,42 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     loadData();
   }, [loadData]);
 
+  // Loading state for ConvAI dropdowns
+  const [convAILoading, setConvAILoading] = useState(false);
+
   // Refresh phone numbers and ConvAI agents every time the agent modal opens
   useEffect(() => {
-    if (modalOpen && elevenLabsConfigured) {
+    if (modalOpen) {
       voiceAgentsApi.listPhoneNumbers().then(setPhoneNumbers).catch(() => {});
       voiceAgentsApi.listConvAIAgents().then(setConvAIAgents).catch(() => {});
     }
-  }, [modalOpen, elevenLabsConfigured]);
+  }, [modalOpen]);
 
   const filteredAgents = voiceAgents.filter(agent =>
     agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (agent.description || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Refresh ConvAI data (agents + phone numbers) before opening the agent modal
+  // Refresh ConvAI data (agents + phone numbers) — no elevenLabsConfigured guard
   const refreshConvAIData = async () => {
-    if (!elevenLabsConfigured) return;
-    const [agents, numbers] = await Promise.all([
-      voiceAgentsApi.listConvAIAgents().catch(() => [] as ElevenLabsConvAIAgent[]),
-      voiceAgentsApi.listPhoneNumbers().catch(() => [] as ElevenLabsPhoneNumber[]),
-    ]);
-    setConvAIAgents(agents);
-    setPhoneNumbers(numbers);
+    setConvAILoading(true);
+    try {
+      const [agents, numbers] = await Promise.all([
+        voiceAgentsApi.listConvAIAgents().catch((e) => {
+          console.error('[VoiceAgentsPage] listConvAIAgents error:', e);
+          return [] as ElevenLabsConvAIAgent[];
+        }),
+        voiceAgentsApi.listPhoneNumbers().catch((e) => {
+          console.error('[VoiceAgentsPage] listPhoneNumbers error:', e);
+          return [] as ElevenLabsPhoneNumber[];
+        }),
+      ]);
+      console.log('[VoiceAgentsPage] refreshConvAIData:', { agents: agents.length, numbers: numbers.length });
+      setConvAIAgents(agents);
+      setPhoneNumbers(numbers);
+    } finally {
+      setConvAILoading(false);
+    }
   };
 
   const handleCreate = async () => {
@@ -987,9 +1001,10 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       Agente ElevenLabs (ConvAI)
                     </label>
                     <div className="flex items-center gap-1">
-                      <button type="button" title="Recarregar agentes"
-                        onClick={() => voiceAgentsApi.listConvAIAgents().then(setConvAIAgents).catch(() => {})}
-                        className={`p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-600 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <button type="button" title="Recarregar agentes e números"
+                        onClick={refreshConvAIData}
+                        disabled={convAILoading}
+                        className={`p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-600 ${isDark ? 'text-gray-400' : 'text-gray-500'} ${convAILoading ? 'opacity-50' : ''}`}>
                         <RefreshCw className="w-3 h-3" />
                       </button>
                       <button type="button"
@@ -1006,9 +1021,12 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   <select
                     value={form.call_config.elevenlabs_agent_id || ''}
                     onChange={(e) => setForm({ ...form, call_config: { ...form.call_config, elevenlabs_agent_id: e.target.value } })}
-                    className={`w-full px-3 py-2 border rounded-md text-sm ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
+                    disabled={convAILoading}
+                    className={`w-full px-3 py-2 border rounded-md text-sm ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'} ${convAILoading ? 'opacity-60' : ''}`}
                   >
-                    <option value="">— Selecione um agente ElevenLabs —</option>
+                    <option value="">
+                      {convAILoading ? '⏳ Carregando...' : '— Selecione um agente ElevenLabs —'}
+                    </option>
                     {convAIAgents.map((a) => (
                       <option key={a.agent_id} value={a.agent_id}>{a.name}</option>
                     ))}
@@ -1103,8 +1121,9 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     <button
                       type="button"
                       title="Recarregar números"
-                      onClick={() => voiceAgentsApi.listPhoneNumbers().then(setPhoneNumbers).catch(() => {})}
-                      className={`p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-600 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+                      onClick={refreshConvAIData}
+                      disabled={convAILoading}
+                      className={`p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-600 ${isDark ? 'text-gray-400' : 'text-gray-500'} ${convAILoading ? 'opacity-50' : ''}`}
                     >
                       <RefreshCw className="w-3 h-3" />
                     </button>
@@ -1112,18 +1131,21 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   <select
                     value={form.call_config.phone_number_id || ''}
                     onChange={(e) => setForm({ ...form, call_config: { ...form.call_config, phone_number_id: e.target.value } })}
-                    className={`w-full px-3 py-2 border rounded-md text-sm ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
+                    disabled={convAILoading}
+                    className={`w-full px-3 py-2 border rounded-md text-sm ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'} ${convAILoading ? 'opacity-60' : ''}`}
                   >
-                    <option value="">— Selecione um número —</option>
+                    <option value="">
+                      {convAILoading ? '⏳ Carregando...' : phoneNumbers.length === 0 ? '— Nenhum número SIP registrado —' : '— Selecione um número —'}
+                    </option>
                     {phoneNumbers.map((p) => (
                       <option key={p.phone_number_id} value={p.phone_number_id}>
                         {p.label || p.phone_number} ({p.phone_number})
                       </option>
                     ))}
                   </select>
-                  {phoneNumbers.length === 0 && (
+                  {!convAILoading && phoneNumbers.length === 0 && (
                     <p className={`mt-1 text-[10px] ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
-                      Nenhum número SIP registrado. Vá em Configurações → Integração SIP Wavoip.
+                      Nenhum número SIP encontrado. Registre em Configurações → SIP Wavoip ou clique ↺ para recarregar.
                     </p>
                   )}
                 </div>
