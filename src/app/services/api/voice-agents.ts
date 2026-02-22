@@ -158,6 +158,21 @@ export const voiceAgentsApi = {
   },
 
   /**
+   * Create a new Conversational AI agent in ElevenLabs directly from the platform.
+   */
+  async createConvAIAgent(data: {
+    name: string;
+    system_prompt: string;
+    first_message: string;
+    voice_id?: string;
+    language?: string;
+    llm?: string;
+  }): Promise<{ success: boolean; agent: ElevenLabsConvAIAgent }> {
+    const response = await api.post('/voice-agents/elevenlabs/agents', data);
+    return response.data;
+  },
+
+  /**
    * List all registered SIP phone numbers in the user's ElevenLabs account.
    */
   async listPhoneNumbers(): Promise<ElevenLabsPhoneNumber[]> {

@@ -209,6 +209,55 @@ export class ElevenLabsConvAIService {
   }
 
   /**
+   * Create a new Conversational AI agent in ElevenLabs.
+   *
+   * @param input - Agent configuration
+   */
+  async createAgent(input: {
+    name: string;
+    system_prompt: string;
+    first_message: string;
+    voice_id?: string;
+    language?: string;
+    llm?: string;
+  }): Promise<ElevenLabsConvAIAgent> {
+    try {
+      const body: any = {
+        name: input.name,
+        conversation_config: {
+          agent: {
+            prompt: {
+              prompt: input.system_prompt,
+              llm: input.llm || 'claude-3-5-sonnet',
+              temperature: 0.5,
+              max_tokens: 2000,
+            },
+            first_message: input.first_message,
+            language: input.language || 'pt',
+          },
+        },
+      };
+
+      if (input.voice_id) {
+        body.conversation_config.tts = {
+          voice_id: input.voice_id,
+          model_id: 'eleven_multilingual_v2',
+          stability: 0.5,
+          similarity_boost: 0.75,
+        };
+      }
+
+      const res = await axios.post(`${ELEVENLABS_API_URL}/convai/agents`, body, {
+        headers: this.headers,
+      });
+      console.log(`[ElevenLabsConvAI] ✅ Agent created: ${res.data.agent_id}`);
+      return { agent_id: res.data.agent_id, name: input.name };
+    } catch (err) {
+      this.handleError(err, 'createAgent');
+    }
+  }
+
+  /**
    * Get the current status and transcript of a conversation.
    */
   async getConversation(conversationId: string): Promise<ConvAIConversation> {

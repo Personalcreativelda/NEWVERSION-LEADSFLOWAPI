@@ -344,7 +344,6 @@ router.get('/providers/elevenlabs/voices', async (req: Request, res: Response, n
 /**
  * GET /api/voice-agents/elevenlabs/agents
  * List all Conversational AI agents in the user's ElevenLabs account.
- * These are the AI agents configured in the ElevenLabs dashboard.
  */
 router.get('/elevenlabs/agents', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -368,6 +367,50 @@ router.get('/elevenlabs/agents', async (req: Request, res: Response, next: NextF
   } catch (error: any) {
     console.error('[VoiceAgents] ❌ Error fetching ElevenLabs agents:', error.message);
     res.status(500).json({ error: error.message || 'Failed to fetch ElevenLabs agents', agents: [] });
+  }
+});
+
+/**
+ * POST /api/voice-agents/elevenlabs/agents
+ * Create a new Conversational AI agent in ElevenLabs directly from the platform.
+ *
+ * Body: { name, system_prompt, first_message, voice_id?, language?, llm? }
+ */
+router.post('/elevenlabs/agents', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { name, system_prompt, first_message, voice_id, language, llm } = req.body;
+
+    if (!name || !system_prompt || !first_message) {
+      return res.status(400).json({
+        error: 'Campos obrigatórios: name, system_prompt, first_message',
+      });
+    }
+
+    const userResult = await query('SELECT elevenlabs_api_key FROM users WHERE id = $1', [user.id]);
+    const apiKey = userResult.rows[0]?.elevenlabs_api_key;
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'ElevenLabs API key not configured.' });
+    }
+
+    const convai = createElevenLabsConvAIService(apiKey);
+    const agent = await convai.createAgent({
+      name,
+      system_prompt,
+      first_message,
+      voice_id,
+      language: language || 'pt',
+      llm,
+    });
+
+    console.log(`[VoiceAgents] ✅ ConvAI agent created for user ${user.id}: ${agent.agent_id}`);
+    res.json({ success: true, agent });
+  } catch (error: any) {
+    console.error('[VoiceAgents] ❌ Error creating ConvAI agent:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to create ConvAI agent' });
   }
 });
 
