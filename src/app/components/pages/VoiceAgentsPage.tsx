@@ -210,6 +210,14 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     loadData();
   }, [loadData]);
 
+  // Refresh phone numbers and ConvAI agents every time the agent modal opens
+  useEffect(() => {
+    if (modalOpen && elevenLabsConfigured) {
+      voiceAgentsApi.listPhoneNumbers().then(setPhoneNumbers).catch(() => {});
+      voiceAgentsApi.listConvAIAgents().then(setConvAIAgents).catch(() => {});
+    }
+  }, [modalOpen, elevenLabsConfigured]);
+
   const filteredAgents = voiceAgents.filter(agent =>
     agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (agent.description || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -938,9 +946,19 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
 
                 {/* Phone Number / SIP Trunk */}
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Número de Saída (SIP Wavoip registrado)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Número de Saída (SIP Wavoip registrado)
+                    </label>
+                    <button
+                      type="button"
+                      title="Recarregar números"
+                      onClick={() => voiceAgentsApi.listPhoneNumbers().then(setPhoneNumbers).catch(() => {})}
+                      className={`p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-600 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                    </button>
+                  </div>
                   <select
                     value={form.call_config.phone_number_id || ''}
                     onChange={(e) => setForm({ ...form, call_config: { ...form.call_config, phone_number_id: e.target.value } })}
