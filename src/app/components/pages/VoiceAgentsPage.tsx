@@ -56,7 +56,6 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<VoiceAgent | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
   const [showSettingsApiKey, setShowSettingsApiKey] = useState<Record<string, boolean>>({
     elevenlabs: false,
     openai: false,
@@ -975,7 +974,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-lg shadow-xl w-full max-w-[calc(100%-2rem)] sm:max-w-lg md:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+          <div className={`rounded-lg shadow-xl w-full max-w-[calc(100%-2rem)] sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
             <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3 border-b ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
               <h2 className={`text-base sm:text-lg md:text-xl font-bold flex-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                 {selectedAgent ? 'Editar Agente de Voz' : 'Criar Agente de Voz'}
@@ -1016,18 +1015,16 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 />
               </div>
 
-              {/* ── Seção: Agente AI (ElevenLabs ConvAI + Wavoip SIP) ── */}
-              <div className={`rounded-lg p-3 border ${isDark ? 'bg-slate-700/50 border-purple-800/40' : 'bg-purple-50 border-purple-200'}`}>
-                <div className="flex items-center gap-2 mb-3">
+              {/* ── Configuração ElevenLabs ConvAI + SIP ── */}
+              <div className={`rounded-lg p-4 border ${isDark ? 'bg-slate-700/50 border-purple-800/40' : 'bg-purple-50 border-purple-200'}`}>
+                <div className="flex items-center gap-2 mb-1">
                   <Bot className="w-4 h-4 text-purple-500" />
                   <span className={`text-sm font-semibold ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
-                    Agente AI (ElevenLabs ConvAI + Wavoip SIP)
+                    Configuração ElevenLabs + SIP
                   </span>
-                  <Badge variant="outline" className="text-[10px] text-purple-500 border-purple-400">Recomendado</Badge>
                 </div>
-                <p className={`text-[11px] mb-3 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  O ElevenLabs conduz a conversa AI via WhatsApp usando o SIP do Wavoip.
-                  Registre o SIP em <strong>Configurações → SIP Wavoip</strong> para ver os números disponíveis.
+                <p className={`text-[11px] mb-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Selecione o agente ConvAI e o número SIP registrado em <strong>Configurações</strong>.
                 </p>
 
                 {/* ElevenLabs ConvAI Agent selector + inline create */}
@@ -1185,109 +1182,6 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     </p>
                   )}
                 </div>
-              </div>
-
-              {/* ── Separador ── */}
-              <div className={`flex items-center gap-2 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                <div className="flex-1 border-t border-current opacity-30" />
-                <span>OU — Modo Simples (Click-to-Call)</span>
-                <div className="flex-1 border-t border-current opacity-30" />
-              </div>
-
-              {/* ── Seção: Click-to-Call Wavoip (simples/legado) ── */}
-              <div className={`rounded-lg p-3 border ${isDark ? 'bg-slate-700/30 border-slate-600' : 'bg-gray-50 border-gray-200'}`}>
-                <p className={`text-[11px] mb-3 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Abre o webphone do Wavoip em popup. Não usa AI — apenas discagem simples.
-                </p>
-                {/* API Key Wavoip */}
-                <div className="mb-3">
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Token Wavoip (Click-to-Call)
-                  </label>
-                  <div className="relative">
-                    <Input
-                      type={showApiKey ? 'text' : 'password'}
-                      value={form.call_config.api_key || ''}
-                      onChange={(e) => setForm({ ...form, call_config: { ...form.call_config, api_key: e.target.value } })}
-                      placeholder="Token Wavoip"
-                      className={`text-sm pr-10 ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
-                    />
-                    <button type="button" onClick={() => setShowApiKey(!showApiKey)}
-                      className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Número de Origem
-                  </label>
-                  <Input
-                    value={form.call_config.from_number || ''}
-                    onChange={(e) => setForm({ ...form, call_config: { ...form.call_config, from_number: e.target.value } })}
-                    placeholder="+5511999999999"
-                    className={`text-sm ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
-                  />
-                </div>
-              </div>
-
-              {/* Voz ElevenLabs TTS (opcional quando usando ConvAI) */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Voz ElevenLabs (TTS)
-                </label>
-                <select
-                  value={form.voice_config.voice_id || ''}
-                  onChange={(e) => setForm({ ...form, voice_config: { ...form.voice_config, voice_id: e.target.value } })}
-                  className={`w-full px-3 py-2 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
-                >
-                  <option value="">Selecione uma voz (opcional para ConvAI)</option>
-                  {elevenLabsVoices.map((voice) => (
-                    <option key={voice.voice_id} value={voice.voice_id}>{voice.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Mensagem de Saudação */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Mensagem de Saudação
-                </label>
-                <textarea
-                  value={form.greeting_message}
-                  onChange={(e) => setForm({ ...form, greeting_message: e.target.value })}
-                  placeholder="Olá! Sou o agente de voz da empresa..."
-                  className={`w-full px-3 py-2 border rounded-md min-h-[60px] sm:min-h-[80px] text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
-                />
-              </div>
-
-              {/* Instruções */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Instruções para o Agente
-                </label>
-                <textarea
-                  value={form.instructions}
-                  onChange={(e) => setForm({ ...form, instructions: e.target.value })}
-                  placeholder="Você é um assistente de vendas que deve..."
-                  className={`w-full px-3 py-2 border rounded-md min-h-[80px] sm:min-h-[100px] text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
-                />
-              </div>
-
-              {/* Idioma */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Idioma
-                </label>
-                <select
-                  value={form.language}
-                  onChange={(e) => setForm({ ...form, language: e.target.value })}
-                  className={`w-full px-3 py-2 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
-                >
-                  <option value="pt-BR">Português (Brasil)</option>
-                  <option value="en-US">English (US)</option>
-                  <option value="es-ES">Español</option>
-                </select>
               </div>
             </div>
 
