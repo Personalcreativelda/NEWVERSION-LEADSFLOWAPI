@@ -85,7 +85,7 @@ export class WhatsAppVoiceAgentService {
     } catch (err: any) {
       console.error('[VoiceAgent WA] ❌ Transcription failed:', err.message);
       // Send error message back as text
-      await whatsappService.sendText({
+      await whatsappService.sendMessage({
         instanceId,
         number: contactPhone,
         text: '⚠️ Não consegui transcrever o áudio. Por favor, tente enviar uma mensagem de texto.',
@@ -110,7 +110,7 @@ export class WhatsAppVoiceAgentService {
       console.log(`[VoiceAgent WA] 🤖 AI response: "${aiText.substring(0, 100)}"`);
     } catch (err: any) {
       console.error('[VoiceAgent WA] ❌ AI response failed:', err.message);
-      await whatsappService.sendText({
+      await whatsappService.sendMessage({
         instanceId,
         number: contactPhone,
         text: '⚠️ O agente de IA não conseguiu processar sua mensagem. Tente novamente.',
@@ -153,10 +153,10 @@ export class WhatsAppVoiceAgentService {
         console.log(`[VoiceAgent WA] ✅ Voice note sent to ${contactPhone}`);
       } catch (audioSendErr: any) {
         console.error('[VoiceAgent WA] ⚠️ Audio send failed, falling back to text:', audioSendErr.message);
-        await whatsappService.sendText({ instanceId, number: contactPhone, text: aiText });
+        await whatsappService.sendMessage({ instanceId, number: contactPhone, text: aiText });
       }
     } else {
-      await whatsappService.sendText({ instanceId, number: contactPhone, text: aiText });
+      await whatsappService.sendMessage({ instanceId, number: contactPhone, text: aiText });
     }
 
     return true;
