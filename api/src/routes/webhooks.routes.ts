@@ -421,6 +421,35 @@ router.post('/evolution/messages', async (req, res) => {
     // Verificar tipo de evento - só processar mensagens
     const messageEvents = ['MESSAGES_UPSERT', 'messages.upsert', 'message', 'MESSAGES_UPDATE'];
     if (event && !messageEvents.includes(event)) {
+      // Disparar webhooks de automação para eventos de conexão/QR do WhatsApp
+      const connectionEvents = ['CONNECTION_UPDATE', 'connection.update'];
+      const qrEvents = ['QRCODE_UPDATED', 'qrcode.updated'];
+      if ((connectionEvents.includes(event) || qrEvents.includes(event)) && instance) {
+        try {
+          const evtChannelResult = await query(
+            `SELECT * FROM channels WHERE type = 'whatsapp' AND (credentials->>'instance_id' = $1 OR credentials->>'instance_name' = $1)`,
+            [instance]
+          );
+          if (evtChannelResult.rows.length > 0) {
+            const evtChannel = evtChannelResult.rows[0];
+            if (connectionEvents.includes(event)) {
+              webhookDispatcher.dispatchWhatsAppEvent(evtChannel.user_id, 'whatsapp.connection.update', {
+                channelId: evtChannel.id,
+                instanceName: instance,
+                status: data?.state || data?.status || event,
+                rawPayload: req.body,
+              }).catch(e => console.warn('[Evolution Webhook] Webhook dispatch error (connection):', (e as any).message));
+            } else {
+              webhookDispatcher.dispatch(evtChannel.user_id, 'channel.qr_updated', {
+                channel: { id: evtChannel.id, type: 'whatsapp', name: evtChannel.name },
+                raw: req.body,
+              }, evtChannel.id).catch(e => console.warn('[Evolution Webhook] Webhook dispatch error (qr):', (e as any).message));
+            }
+          }
+        } catch (evtErr) {
+          console.warn('[Evolution Webhook] Error dispatching event webhook:', evtErr);
+        }
+      }
       console.log('[Evolution Webhook] Evento ignorado (não é mensagem):', event);
       return res.json({ success: true, message: `Event ${event} ignored` });
     }

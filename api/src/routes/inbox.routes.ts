@@ -10,6 +10,7 @@ import { ConversationsService } from '../services/conversations.service';
 import { getStorageService } from '../services/storage.service';
 import { TwilioSMSService } from '../services/twilio-sms.service';
 import { getWebSocketService } from '../services/websocket.service';
+import { webhookDispatcher } from '../services/webhook-dispatcher.service';
 
 const router = Router();
 
@@ -739,6 +740,14 @@ router.post('/conversations/create', async (req, res, next) => {
     );
 
     const newConv = newConvResult.rows[0];
+
+    // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+    webhookDispatcher.dispatchConversationCreated(user.id, {
+      channelId: channel.id,
+      conversationId: newConv.id,
+      contactName: contact.name,
+      contactPhone: phone || undefined,
+    }).catch(err => console.warn('[Inbox] Webhook dispatch (conversation.created) failed:', err.message));
 
     res.status(201).json({
       // CORREÇÃO: Usar sempre o UUID real da conversa
@@ -1664,6 +1673,18 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       } catch (wsErr) {
         console.warn('[Inbox] WebSocket emit failed (non-critical):', wsErr);
       }
+
+      // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+      if (message && conversationId && channelId) {
+        webhookDispatcher.dispatchMessageSent(user.id, {
+          channelId,
+          channelType: messageChannel,
+          conversationId,
+          messageId: message.id,
+          content: messageContent || (media_type ? `[${media_type}]` : ''),
+          contactPhone: phone || undefined,
+        }).catch(err => console.warn('[Inbox] Webhook dispatch (message.sent) failed:', err.message));
+      }
     } catch (dbError) {
       console.warn('[Inbox] Failed to save message to database:', dbError);
     }
@@ -1760,6 +1781,7 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
     let channelType = 'whatsapp';
     let channelCredentials: any = null;
     let conversationId: string | null = null;
+    let channelId: string | null = null;
 
     if (isJid) {
       phone = conversationIdOrJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '');
@@ -1773,6 +1795,7 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
         );
         if (convResult.rows.length > 0) {
           conversationId = convResult.rows[0].id;
+          channelId = convResult.rows[0].channel_id;
           if (convResult.rows[0].channel_type) channelType = convResult.rows[0].channel_type;
           channelCredentials = convResult.rows[0].channel_credentials;
         }
@@ -1790,6 +1813,7 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
         );
         if (convResult.rows.length > 0) {
           conversationId = convResult.rows[0].id;
+          channelId = convResult.rows[0].channel_id;
           remoteJid = convResult.rows[0].remote_jid;
           phone = remoteJid?.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '') || '';
           if (convResult.rows[0].channel_type) channelType = convResult.rows[0].channel_type;
@@ -2027,6 +2051,19 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
     }, user.id);
 
     console.log('[Inbox Audio] Message saved:', message?.id);
+
+    // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+    if (message && (conversationId || messageConversationId) && channelId) {
+      webhookDispatcher.dispatchMessageSent(user.id, {
+        channelId,
+        channelType,
+        conversationId: conversationId || messageConversationId || '',
+        messageId: message.id,
+        content: 'Mensagem de voz',
+        contactPhone: phone || undefined,
+      }).catch(err => console.warn('[Inbox Audio] Webhook dispatch (message.sent) failed:', err.message));
+    }
+
     res.json(message);
   } catch (error) {
     console.error('[Inbox Audio] Error:', error);
@@ -2102,6 +2139,17 @@ router.post('/conversations/:conversationIdOrJid/send-sticker', async (req, res,
     }, user.id);
 
     console.log('[Inbox Sticker] Sent successfully');
+
+    // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
+    if (message) {
+      const stickerConvId = isJid ? null : conversationIdOrJid;
+      webhookDispatcher.dispatch(user.id, 'message.sent', {
+        channel: { type: 'whatsapp' },
+        conversation: { id: stickerConvId },
+        message: { id: message.id, content: '🎨 Sticker', direction: 'out', media_type: 'sticker', media_url: sticker_url || null },
+      }).catch(err => console.warn('[Inbox Sticker] Webhook dispatch (message.sent) failed:', err.message));
+    }
+
     res.json(message);
   } catch (error) {
     console.error('[Inbox Sticker] Error:', error);
