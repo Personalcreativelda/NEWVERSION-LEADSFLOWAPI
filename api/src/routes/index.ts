@@ -10,6 +10,7 @@ import integrationsRoutes from './integrations.routes';
 import usersRoutes from './users.routes';
 import plansRoutes from './plans.routes';
 import adminPlansRoutes from './admin-plans.routes';
+import adminRoutes from './admin.routes';
 import notificationsRoutes from './notifications.routes';
 import securityRoutes from './security.routes';
 import webhooksRoutes from './webhooks.routes';
@@ -45,6 +46,7 @@ router.use('/users', usersRoutes);
 router.use('/user', usersRoutes); // Alias for compatibility
 router.use('/plans', plansRoutes);
 router.use('/admin/plans', adminPlansRoutes);
+router.use('/admin', adminRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/security', securityRoutes);
 router.use('/webhooks', webhooksRoutes);
