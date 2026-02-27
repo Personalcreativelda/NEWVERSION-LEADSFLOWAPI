@@ -407,6 +407,7 @@ export class AssistantsService {
 
     /**
      * Conecta um assistente ao usuário com múltiplos canais
+     * Se já existe, ATUALIZA os canais (UPSERT)
      */
     async connectAssistant(assistantId: string, userId: string, channelIds?: string[]): Promise<UserAssistant> {
         // Garantir que as colunas novas existem
@@ -424,29 +425,41 @@ export class AssistantsService {
             [userId, assistantId]
         );
 
-        if (existing.rows[0]) {
-            throw new Error('Assistente já está conectado');
-        }
-
         const channelIdsArray = channelIds && channelIds.length > 0 ? channelIds : [];
         const primaryChannelId = channelIdsArray.length > 0 ? channelIdsArray[0] : null;
 
-        console.log(`[Assistants] Conectando assistente ${assistantId} para usuário ${userId}`);
+        console.log(`[Assistants] ${existing.rows[0] ? 'Atualizando' : 'Conectando'} assistente ${assistantId} para usuário ${userId}`);
         console.log(`[Assistants]   - Canais selecionados: ${channelIdsArray.length}`);
         console.log(`[Assistants]   - Channel IDs: ${JSON.stringify(channelIdsArray)}`);
 
-        // Criar conexão
-        const result = await query(
-            `INSERT INTO user_assistants (user_id, assistant_id, config, channel_id, channel_ids, is_active, is_configured)
-             VALUES ($1, $2, $3, $4, $5, true, false)
-             RETURNING *`,
-            [userId, assistantId, JSON.stringify(assistant.default_config || {}), primaryChannelId, channelIdsArray]
-        );
+        let result;
+
+        if (existing.rows[0]) {
+            // JÁ EXISTE: Atualizar os canais
+            result = await query(
+                `UPDATE user_assistants
+                 SET channel_ids = $1, channel_id = $2, updated_at = NOW()
+                 WHERE id = $3 AND user_id = $4
+                 RETURNING *`,
+                [channelIdsArray, primaryChannelId, existing.rows[0].id, userId]
+            );
+            console.log(`[Assistants] ✅ Assistente atualizado com novos canais`);
+        } else {
+            // NÃO EXISTE: Criar conexão
+            result = await query(
+                `INSERT INTO user_assistants (user_id, assistant_id, config, channel_id, channel_ids, is_active, is_configured)
+                 VALUES ($1, $2, $3, $4, $5, true, false)
+                 RETURNING *`,
+                [userId, assistantId, JSON.stringify(assistant.default_config || {}), primaryChannelId, channelIdsArray]
+            );
+            console.log(`[Assistants] ✅ Assistente conectado com sucesso`);
+        }
 
         const userAssistant = result.rows[0];
 
         // Enviar webhook para n8n para criar/configurar o workflow (silenciosamente)
-        this.sendN8nWebhook(assistant, { ...userAssistant, channel_ids: channelIdsArray }, userId, 'connect').catch(err => {
+        const action = existing.rows[0] ? 'configure' : 'connect';
+        this.sendN8nWebhook(assistant, { ...userAssistant, channel_ids: channelIdsArray }, userId, action).catch(err => {
             console.error('[Assistants] Error sending n8n webhook:', err.message);
         });
 

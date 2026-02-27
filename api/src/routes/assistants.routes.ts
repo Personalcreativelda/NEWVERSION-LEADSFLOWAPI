@@ -163,7 +163,7 @@ router.get('/:id', async (req, res, next) => {
     }
 });
 
-// POST /api/assistants/connect - Conecta um assistente
+// POST /api/assistants/connect - Conecta um assistente (ou atualiza canais se já existe)
 router.post('/connect', async (req, res, next) => {
     try {
         const user = req.user;
@@ -194,9 +194,6 @@ router.post('/connect', async (req, res, next) => {
     } catch (error: any) {
         if (error.message === 'Assistente não encontrado') {
             return res.status(404).json({ error: error.message });
-        }
-        if (error.message === 'Assistente já está conectado') {
-            return res.status(409).json({ error: error.message });
         }
         next(error);
     }
