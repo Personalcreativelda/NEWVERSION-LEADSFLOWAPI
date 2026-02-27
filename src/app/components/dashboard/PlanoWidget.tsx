@@ -49,8 +49,15 @@ export default function PlanoWidget({ limites, diasRestantes, onUpgrade, userPla
   const percMensagens = limites.mensagens > 0 ? Math.min(100, (limites.usados.mensagens / limites.mensagens) * 100) : 0;
   const percEnvios = limites.envios > 0 ? Math.min(100, (limites.usados.envios / limites.envios) * 100) : 0;
 
+  // Verificar se algum limite está esgotado
+  const isLeadsEsgotado = limites.leads > 0 && limites.leads !== -1 && restantesLeads === 0;
+  const isMensagensEsgotado = limites.mensagens > 0 && limites.mensagens !== -1 && restantesMensagens === 0;
+  const isEnviosEsgotado = limites.envios > 0 && limites.envios !== -1 && restantesEnvios === 0;
+  const algumLimiteEsgotado = isLeadsEsgotado || isMensagensEsgotado || isEnviosEsgotado;
+
   // Determinar cor do círculo baseado no percentual
   const getCircleColor = (perc: number) => {
+    if (perc >= 100) return { stroke: '#ef4444', bg: '#fee2e2', text: 'text-red-500 dark:text-red-400' }; // red - esgotado
     if (perc >= 90) return { stroke: '#ef4444', bg: '#fee2e2', text: 'text-red-600' }; // red
     if (perc >= 75) return { stroke: '#f59e0b', bg: '#fef3c7', text: 'text-amber-600' }; // amber
     return { stroke: '#10b981', bg: '#d1fae5', text: 'text-emerald-600' }; // emerald
@@ -79,39 +86,42 @@ export default function PlanoWidget({ limites, diasRestantes, onUpgrade, userPla
   const limitCards = [
     {
       title: 'Leads',
-      label: 'Restantes',
+      label: isLeadsEsgotado ? '⚠️ Limite Esgotado' : 'Restantes',
       usado: limites.usados.leads,
       restante: restantesLeads,
       total: limites.leads,
       percentual: percLeads,
       icon: Users,
-      iconBg: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
-      iconColor: 'text-cyan-600 dark:text-cyan-300',
+      iconBg: isLeadsEsgotado ? 'bg-red-500/10 border border-red-500/30 shadow-sm dark:bg-red-500/20 dark:border-red-500/30 dark:shadow-none backdrop-blur-sm' : 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
+      iconColor: isLeadsEsgotado ? 'text-red-500 dark:text-red-400' : 'text-cyan-600 dark:text-cyan-300',
       colors: getCircleColor(percLeads),
+      esgotado: isLeadsEsgotado,
     },
     {
       title: 'Mensagens Individuais',
-      label: 'Restantes',
+      label: isMensagensEsgotado ? '⚠️ Limite Esgotado' : 'Restantes',
       usado: limites.usados.mensagens,
       restante: restantesMensagens,
       total: limites.mensagens,
       percentual: percMensagens,
       icon: MessageSquare,
-      iconBg: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
-      iconColor: 'text-amber-600 dark:text-amber-300',
+      iconBg: isMensagensEsgotado ? 'bg-red-500/10 border border-red-500/30 shadow-sm dark:bg-red-500/20 dark:border-red-500/30 dark:shadow-none backdrop-blur-sm' : 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
+      iconColor: isMensagensEsgotado ? 'text-red-500 dark:text-red-400' : 'text-amber-600 dark:text-amber-300',
       colors: getCircleColor(percMensagens),
+      esgotado: isMensagensEsgotado,
     },
     {
       title: 'Mensagens em Massa',
-      label: 'Restantes',
+      label: isEnviosEsgotado ? '⚠️ Limite Esgotado' : 'Restantes',
       usado: limites.usados.envios,
       restante: restantesEnvios,
       total: limites.envios,
       percentual: percEnvios,
       icon: Mail,
-      iconBg: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
-      iconColor: 'text-emerald-600 dark:text-emerald-300',
+      iconBg: isEnviosEsgotado ? 'bg-red-500/10 border border-red-500/30 shadow-sm dark:bg-red-500/20 dark:border-red-500/30 dark:shadow-none backdrop-blur-sm' : 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
+      iconColor: isEnviosEsgotado ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-300',
       colors: getCircleColor(percEnvios),
+      esgotado: isEnviosEsgotado,
     },
   ];
 
@@ -185,7 +195,11 @@ export default function PlanoWidget({ limites, diasRestantes, onUpgrade, userPla
           return (
             <div
               key={index}
-              className="bg-card dark:bg-card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-5 border border-border dark:border-border shadow-sm hover:shadow-lg hover:shadow-purple-500/10 dark:hover:border-purple-500/40 transition-all duration-300"
+              className={`bg-card dark:bg-card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-5 border shadow-sm transition-all duration-300 ${
+                card.esgotado 
+                  ? 'border-red-500/60 dark:border-red-500/50 shadow-red-500/20 hover:shadow-red-500/30 ring-1 ring-red-500/20' 
+                  : 'border-border dark:border-border hover:shadow-lg hover:shadow-purple-500/10 dark:hover:border-purple-500/40'
+              }`}
             >
               {/* Header com ícone */}
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
@@ -193,10 +207,10 @@ export default function PlanoWidget({ limites, diasRestantes, onUpgrade, userPla
                   <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${card.iconColor}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-xs sm:text-sm font-medium text-foreground dark:text-foreground truncate">
+                  <h4 className={`text-xs sm:text-sm font-medium truncate ${card.esgotado ? 'text-red-500 dark:text-red-400' : 'text-foreground dark:text-foreground'}`}>
                     {card.title}
                   </h4>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground dark:text-muted-foreground">
+                  <p className={`text-[10px] sm:text-xs ${card.esgotado ? 'text-red-400 dark:text-red-400 font-semibold' : 'text-muted-foreground dark:text-muted-foreground'}`}>
                     {card.label}
                   </p>
                 </div>
@@ -207,16 +221,26 @@ export default function PlanoWidget({ limites, diasRestantes, onUpgrade, userPla
                 {/* Valores */}
                 <div>
                   <div className="flex items-baseline gap-1 mb-0.5 sm:mb-1">
-                    <span className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground dark:text-foreground">
+                    <span className={`text-xl sm:text-2xl lg:text-3xl font-bold ${card.esgotado ? 'text-red-500 dark:text-red-400' : 'text-foreground dark:text-foreground'}`}>
                       {card.total === -1 ? '∞' : card.restante.toLocaleString()}
                     </span>
-                    <span className="text-xs sm:text-sm text-muted-foreground">
+                    <span className={`text-xs sm:text-sm ${card.esgotado ? 'text-red-400/70' : 'text-muted-foreground'}`}>
                       / {card.total === -1 ? '∞' : card.total.toLocaleString()}
                     </span>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">
-                    Restantes
-                  </p>
+                  {card.esgotado ? (
+                    <button
+                      onClick={onUpgrade}
+                      className="mt-1 px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-[10px] sm:text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 animate-pulse"
+                    >
+                      <Crown className="w-3 h-3" />
+                      Fazer Upgrade
+                    </button>
+                  ) : (
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
+                      Restantes
+                    </p>
+                  )}
                 </div>
 
                 {/* Círculo de Progresso */}
@@ -233,6 +257,32 @@ export default function PlanoWidget({ limites, diasRestantes, onUpgrade, userPla
           );
         })}
       </div>
+
+      {/* Banner de alerta quando algum limite está esgotado */}
+      {algumLimiteEsgotado && (
+        <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+              <Crown className="w-5 h-5 text-red-500" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-red-500 dark:text-red-400">
+                Limite do plano atingido!
+              </p>
+              <p className="text-xs text-red-400/80 dark:text-red-400/60">
+                Faça upgrade para continuar usando todos os recursos sem limitações.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onUpgrade}
+            className="w-full sm:w-auto px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
+          >
+            <Crown className="w-4 h-4" />
+            Upgrade Agora
+          </button>
+        </div>
+      )}
     </div>
   );
 }

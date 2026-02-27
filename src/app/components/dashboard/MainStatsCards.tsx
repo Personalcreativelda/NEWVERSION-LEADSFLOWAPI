@@ -15,9 +15,8 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
   // Para Total de Leads - progresso em relação ao limite
   const progressTotalLeads = limiteLeads > 0 ? Math.min((totalLeads / limiteLeads) * 100, 100) : 0;
   
-  // Para Leads Captados Hoje - mostrar como porcentagem do limite diário (limite do plano / 30)
-  const limiteDiario = Math.max(1, Math.ceil(limiteLeads / 30));
-  const progressLeadsHoje = limiteLeads > 0 ? Math.min(100, (leadsNovosHoje / limiteDiario) * 100) : 0;
+  // Para Leads Captados Hoje - progresso em relação ao limite do plano
+  const progressLeadsHoje = limiteLeads > 0 ? Math.min(100, (leadsNovosHoje / limiteLeads) * 100) : 0;
   
   // Para Leads Convertidos - mostrar como porcentagem do total de leads
   const progressConvertidos = totalLeads > 0 ? (leadsFechados / totalLeads) * 100 : 0;
