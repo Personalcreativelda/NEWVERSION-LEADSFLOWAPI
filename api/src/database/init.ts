@@ -56,6 +56,32 @@ const runPendingMigrations = async () => {
   } catch (error: any) {
     console.warn('[DB] Social IDs migration warning:', error.message);
   }
+
+  // Migração: Criar tabela lead_interactions (rastreamento de interações)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS lead_interactions (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+          conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+          channel_id UUID REFERENCES channels(id) ON DELETE SET NULL,
+          interaction_type VARCHAR(50) NOT NULL,
+          direction VARCHAR(10),
+          content VARCHAR(1000),
+          details JSONB DEFAULT '{}'::jsonb,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_lead_interactions_lead_id ON lead_interactions(lead_id);
+      CREATE INDEX IF NOT EXISTS idx_lead_interactions_user_id ON lead_interactions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_lead_interactions_created_at ON lead_interactions(created_at);
+      CREATE INDEX IF NOT EXISTS idx_lead_interactions_type ON lead_interactions(interaction_type);
+    `);
+    console.log('[DB] ✅ lead_interactions table created/verified');
+  } catch (error: any) {
+    console.warn('[DB] lead_interactions migration warning:', error.message);
+  }
 };
 
 export const initDatabase = async () => {

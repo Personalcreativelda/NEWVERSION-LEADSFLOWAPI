@@ -1014,7 +1014,8 @@ router.post('/evolution/messages', async (req, res) => {
         contactPhone: phone || remoteJid,
         contactName: contactName,
         messageContent: messageContent,
-        credentials: channel.credentials
+        credentials: channel.credentials,
+        remoteJid: remoteJid  // JID completo para fallback no envio
       }).then(replied => {
         if (replied) console.log('[Evolution Webhook] ✅ Assistente IA respondeu automaticamente');
         else console.log('[Evolution Webhook] ℹ️ Nenhum assistente ativo para este canal');

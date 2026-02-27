@@ -18,6 +18,7 @@ export interface IncomingMessageContext {
     contactName?: string;
     messageContent: string;
     credentials?: any;        // credenciais do canal (instance_id, etc.)
+    remoteJid?: string;       // JID completo do contato (ex: 5511999@s.whatsapp.net)
 }
 
 export class AssistantProcessorService {
@@ -230,11 +231,37 @@ export class AssistantProcessorService {
                 if (!instanceId || !ctx.contactPhone) {
                     throw new Error('Sem instanceId ou phone para enviar mensagem WhatsApp');
                 }
-                await whatsappService.sendMessage({
-                    instanceId,
-                    number: ctx.contactPhone,
-                    text
-                });
+
+                // Tentar múltiplos formatos de número para garantir compatibilidade
+                const numberFormats = [
+                    ctx.contactPhone,                                          // Número limpo (ex: 5511999999999)
+                    ctx.remoteJid || '',                                       // JID completo (ex: 5511999@s.whatsapp.net)
+                    ctx.contactPhone.includes('@') ? ctx.contactPhone : `${ctx.contactPhone}@s.whatsapp.net`,  // Forçar JID
+                ].filter(n => n && n.length > 0);
+
+                let lastError: any = null;
+                let sent = false;
+
+                for (const numberFormat of numberFormats) {
+                    try {
+                        console.log(`[AssistantProcessor] Tentando enviar para: ${numberFormat} (instance: ${instanceId})`);
+                        await whatsappService.sendMessage({
+                            instanceId,
+                            number: numberFormat,
+                            text
+                        });
+                        console.log(`[AssistantProcessor] ✅ Mensagem enviada com sucesso para: ${numberFormat}`);
+                        sent = true;
+                        break;
+                    } catch (err: any) {
+                        console.warn(`[AssistantProcessor] ⚠️ Falha ao enviar para ${numberFormat}: ${err.message}`);
+                        lastError = err;
+                    }
+                }
+
+                if (!sent) {
+                    throw lastError || new Error('Falha ao enviar mensagem WhatsApp em todos os formatos');
+                }
                 break;
             }
 
