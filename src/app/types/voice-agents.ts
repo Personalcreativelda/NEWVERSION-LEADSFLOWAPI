@@ -27,10 +27,24 @@ export interface VoiceConfig {
 }
 
 export interface CallConfig {
-  api_key?: string; // Wavoip API key
-  from_number?: string; // Source phone number
-  webhook_url?: string; // Webhook for call events
-  max_duration_seconds?: number; // Max call duration
+  /** Wavoip Click-to-Call token (simple/legacy mode) */
+  api_key?: string;
+  /** Source phone number for Click-to-Call */
+  from_number?: string;
+  /** Webhook for call events */
+  webhook_url?: string;
+  /** Max call duration in seconds */
+  max_duration_seconds?: number;
+  /**
+   * ElevenLabs Conversational AI agent ID.
+   * When set, calls use ElevenLabs ConvAI + Wavoip SIP (AI-powered).
+   */
+  elevenlabs_agent_id?: string;
+  /**
+   * ElevenLabs registered phone number / SIP trunk ID.
+   * Obtained after registering the Wavoip SIP credentials in ElevenLabs.
+   */
+  phone_number_id?: string;
 }
 
 export interface CreateVoiceAgentInput {
@@ -79,4 +93,49 @@ export interface ElevenLabsVoice {
 
 export interface TestCallInput {
   phone_number: string;
+}
+
+/** An ElevenLabs Conversational AI agent (created in ElevenLabs dashboard) */
+export interface ElevenLabsConvAIAgent {
+  agent_id: string;
+  name: string;
+  created_at_unix_secs?: number;
+}
+
+/** A SIP trunk / phone number registered in ElevenLabs */
+export interface ElevenLabsPhoneNumber {
+  phone_number_id: string;
+  phone_number: string;
+  provider: string;
+  label: string;
+  assigned_agent?: {
+    agent_id: string;
+    agent_name: string;
+  } | null;
+}
+
+/** Result of initiating an outbound call */
+export interface AICallResult {
+  success: boolean;
+  type: 'elevenlabs_convai' | 'click_to_call';
+  conversation_id?: string;
+  call_url?: string;
+  message: string;
+  agent_id: string;
+  phone_number: string;
+}
+
+/** Status of an active or completed AI conversation */
+export interface ConvAIConversation {
+  conversation_id: string;
+  agent_id: string;
+  status: 'initiated' | 'ringing' | 'in-progress' | 'completed' | 'failed';
+  start_time_unix_secs?: number;
+  end_time_unix_secs?: number;
+  transcript?: Array<{
+    role: 'user' | 'agent';
+    message: string;
+    time_in_call_secs: number;
+  }>;
+  metadata?: Record<string, any>;
 }

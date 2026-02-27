@@ -1,14 +1,22 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Phone, Search, Plus, Power, PowerOff, Trash2, Edit3,
-  Loader2, X, Check, Eye, EyeOff, Mic, PhoneCall, Settings
+  Loader2, X, Check, Eye, EyeOff, Mic, PhoneCall, Settings,
+  Bot, Link2, Unlink, RefreshCw, PhoneOutgoing, AlertCircle,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { voiceAgentsApi } from '../../services/api/voice-agents';
-import type { VoiceAgent, CreateVoiceAgentInput, ElevenLabsVoice } from '../../types/voice-agents';
+import type {
+  VoiceAgent,
+  CreateVoiceAgentInput,
+  ElevenLabsVoice,
+  ElevenLabsConvAIAgent,
+  ElevenLabsPhoneNumber,
+  ConvAIConversation,
+} from '../../types/voice-agents';
 
 interface VoiceAgentsPageProps {
   isDark: boolean;
@@ -40,18 +48,20 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   
   const [voiceAgents, setVoiceAgents] = useState<VoiceAgent[]>([]);
   const [elevenLabsVoices, setElevenLabsVoices] = useState<ElevenLabsVoice[]>([]);
+  const [convAIAgents, setConvAIAgents] = useState<ElevenLabsConvAIAgent[]>([]);
+  const [phoneNumbers, setPhoneNumbers] = useState<ElevenLabsPhoneNumber[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<VoiceAgent | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
   const [showSettingsApiKey, setShowSettingsApiKey] = useState<Record<string, boolean>>({
     elevenlabs: false,
     openai: false,
     anthropic: false,
     google: false,
+    sip_password: false,
   });
   const [elevenLabsConfigured, setElevenLabsConfigured] = useState(false);
   const [savedApiKeys, setSavedApiKeys] = useState<{
@@ -66,15 +76,47 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     google: false,
   });
 
+  // Active AI call tracking
+  const [activeCall, setActiveCall] = useState<{
+    conversationId: string;
+    agentName: string;
+    phone: string;
+    status: ConvAIConversation['status'];
+    transcript: ConvAIConversation['transcript'];
+  } | null>(null);
+  const callPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // SIP registration form (inside Settings modal)
+  const [sipForm, setSipForm] = useState({
+    phone_number: '',
+    sip_host: 'sipv2.wavoip.com',
+    sip_username: '',
+    sip_password: '',
+    label: '',
+  });
+  const [sipLoading, setSipLoading] = useState(false);
+
+  // ConvAI agent creation form (inline, inside the agent modal)
+  const [createAgentFormOpen, setCreateAgentFormOpen] = useState(false);
+  const [createAgentLoading, setCreateAgentLoading] = useState(false);
+  const [createAgentForm, setCreateAgentForm] = useState({
+    name: '',
+    system_prompt: '',
+    first_message: '',
+    voice_id: '',
+    language: 'pt',
+    llm: 'claude-3-5-sonnet',
+  });
+
   const [settingsForm, setSettingsForm] = useState({
     elevenlabs_api_key: '',
     openai_api_key: '',
     anthropic_api_key: '',
     google_api_key: '',
-    preferred_ai_model: 'elevenlabs', // elevenlabs | openai | anthropic | google
+    preferred_ai_model: 'elevenlabs',
   });
 
-  const [form, setForm] = useState<CreateVoiceAgentInput>({
+  const emptyForm: CreateVoiceAgentInput = {
     name: '',
     description: '',
     voice_provider: 'elevenlabs',
@@ -88,11 +130,15 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     call_config: {
       api_key: '',
       from_number: '',
+      elevenlabs_agent_id: '',
+      phone_number_id: '',
     },
     greeting_message: '',
     instructions: '',
     language: 'pt-BR',
-  });
+  };
+
+  const [form, setForm] = useState<CreateVoiceAgentInput>(emptyForm);
 
   const loadData = useCallback(async () => {
     try {
@@ -115,58 +161,52 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         // Continue even if settings fail to load
       }
 
-      // Load agents and voices in parallel
-      const [agents, voicesResponse] = await Promise.all([
-        voiceAgentsApi.getAll().catch((error) => {
-          console.error('[VoiceAgentsPage] Error loading agents:', error);
+      // Load agents, voices, ConvAI agents and phone numbers in parallel
+      const [agents, voicesResponse, convAIRes, phoneNumRes] = await Promise.all([
+        voiceAgentsApi.getAll().catch((err) => {
+          console.error('[VoiceAgentsPage] Error loading agents:', err);
           return [];
         }),
-        // Only load voices if ElevenLabs is configured
-        settings.elevenlabs_configured 
-          ? voiceAgentsApi.getElevenLabsVoices().catch((error) => {
-              console.error('[VoiceAgentsPage] Error loading voices:', error);
+        settings.elevenlabs_configured
+          ? voiceAgentsApi.getElevenLabsVoices().catch((err) => {
+              console.error('[VoiceAgentsPage] Error loading voices:', err);
               return { voices: [], configured: false };
             })
-          : Promise.resolve({ voices: [], configured: settings.elevenlabs_configured })
+          : Promise.resolve({ voices: [], configured: false }),
+        settings.elevenlabs_configured
+          ? voiceAgentsApi.listConvAIAgents().catch(() => [])
+          : Promise.resolve([]),
+        settings.elevenlabs_configured
+          ? voiceAgentsApi.listPhoneNumbers().catch(() => [])
+          : Promise.resolve([]),
       ]);
 
-      console.log('[VoiceAgentsPage] Data loaded:', { 
-        agentsCount: agents.length, 
-        voicesCount: Array.isArray(voicesResponse) ? voicesResponse.length : voicesResponse.voices?.length || 0,
-        elevenLabsConfigured: settings.elevenlabs_configured
-      });
-      
-      // Update agents
       setVoiceAgents(agents);
-      
-      // Handle voices response (can be old format array or new format object)
+
       if (Array.isArray(voicesResponse)) {
-        console.log('[VoiceAgentsPage] Using old voices format (array)');
         setElevenLabsVoices(voicesResponse);
       } else {
-        console.log('[VoiceAgentsPage] Using new voices format:', {
-          configured: voicesResponse.configured,
-          voicesCount: voicesResponse.voices?.length || 0
-        });
-        setElevenLabsVoices(voicesResponse.voices || []);
+        setElevenLabsVoices((voicesResponse as any).voices || []);
       }
-      
-      // Update ElevenLabs configured status
-      const configuredStatus = settings.elevenlabs_configured || (Array.isArray(voicesResponse) ? false : voicesResponse.configured);
+
+      setConvAIAgents(convAIRes);
+      setPhoneNumbers(phoneNumRes);
+
+      const configuredStatus = settings.elevenlabs_configured ||
+        (!Array.isArray(voicesResponse) && (voicesResponse as any).configured);
       setElevenLabsConfigured(configuredStatus);
-      
-      // Save which APIs are configured for UI indicators
+
       setSavedApiKeys({
         elevenlabs: settings.elevenlabs_configured || false,
         openai: settings.openai_configured || false,
         anthropic: settings.anthropic_configured || false,
         google: settings.google_configured || false,
       });
-      
-      console.log('[VoiceAgentsPage] Configuration Status:', {
-        elevenLabsConfigured: configuredStatus,
-        agentsLoaded: agents.length,
-        voicesAvailable: Array.isArray(voicesResponse) ? voicesResponse.length : voicesResponse.voices?.length || 0
+
+      console.log('[VoiceAgentsPage] Loaded:', {
+        agents: agents.length,
+        convAIAgents: convAIRes.length,
+        phoneNumbers: phoneNumRes.length,
       });
     } catch (error) {
       console.error('[VoiceAgentsPage] Error in loadData:', error);
@@ -181,36 +221,52 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     loadData();
   }, [loadData]);
 
+  // Loading state for ConvAI dropdowns
+  const [convAILoading, setConvAILoading] = useState(false);
+
+  // Refresh phone numbers and ConvAI agents every time the agent modal opens
+  useEffect(() => {
+    if (modalOpen) {
+      voiceAgentsApi.listPhoneNumbers().then(setPhoneNumbers).catch(() => {});
+      voiceAgentsApi.listConvAIAgents().then(setConvAIAgents).catch(() => {});
+    }
+  }, [modalOpen]);
+
   const filteredAgents = voiceAgents.filter(agent =>
     agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (agent.description || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleCreate = () => {
+  // Refresh ConvAI data (agents + phone numbers) — no elevenLabsConfigured guard
+  const refreshConvAIData = async () => {
+    setConvAILoading(true);
+    try {
+      const [agents, numbers] = await Promise.all([
+        voiceAgentsApi.listConvAIAgents().catch((e) => {
+          console.error('[VoiceAgentsPage] listConvAIAgents error:', e);
+          return [] as ElevenLabsConvAIAgent[];
+        }),
+        voiceAgentsApi.listPhoneNumbers().catch((e) => {
+          console.error('[VoiceAgentsPage] listPhoneNumbers error:', e);
+          return [] as ElevenLabsPhoneNumber[];
+        }),
+      ]);
+      console.log('[VoiceAgentsPage] refreshConvAIData:', { agents: agents.length, numbers: numbers.length });
+      setConvAIAgents(agents);
+      setPhoneNumbers(numbers);
+    } finally {
+      setConvAILoading(false);
+    }
+  };
+
+  const handleCreate = async () => {
     setSelectedAgent(null);
-    setForm({
-      name: '',
-      description: '',
-      voice_provider: 'elevenlabs',
-      voice_config: {
-        voice_id: '',
-        model: 'eleven_monolingual_v1',
-        stability: 0.5,
-        similarity_boost: 0.75,
-      },
-      call_provider: 'wavoip',
-      call_config: {
-        api_key: '',
-        from_number: '',
-      },
-      greeting_message: '',
-      instructions: '',
-      language: 'pt-BR',
-    });
+    setForm(emptyForm);
+    await refreshConvAIData();
     setModalOpen(true);
   };
 
-  const handleEdit = (agent: VoiceAgent) => {
+  const handleEdit = async (agent: VoiceAgent) => {
     setSelectedAgent(agent);
     setForm({
       name: agent.name,
@@ -218,17 +274,23 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       voice_provider: agent.voice_provider,
       voice_config: agent.voice_config,
       call_provider: agent.call_provider,
-      call_config: agent.call_config,
+      call_config: {
+        api_key: agent.call_config.api_key || '',
+        from_number: agent.call_config.from_number || '',
+        elevenlabs_agent_id: agent.call_config.elevenlabs_agent_id || '',
+        phone_number_id: agent.call_config.phone_number_id || '',
+      },
       greeting_message: agent.greeting_message || '',
       instructions: agent.instructions || '',
       language: agent.language,
     });
+    await refreshConvAIData();
     setModalOpen(true);
   };
 
   const handleSubmit = async () => {
-    if (!form.name || !form.voice_config.voice_id || !form.call_config.api_key || !form.call_config.from_number) {
-      toast.error('Preencha todos os campos obrigatórios');
+    if (!form.name) {
+      toast.error('Nome do agente é obrigatório');
       return;
     }
 
@@ -275,16 +337,194 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     }
   };
 
-  const handleTestCall = async (id: string) => {
-    const phone = prompt('Digite o número de telefone para teste (com código do país):');
+  const stopCallPolling = () => {
+    if (callPollRef.current) {
+      clearInterval(callPollRef.current);
+      callPollRef.current = null;
+    }
+  };
+
+  const startCallPolling = (conversationId: string, agentName: string, phone: string) => {
+    stopCallPolling();
+    callPollRef.current = setInterval(async () => {
+      try {
+        const conv = await voiceAgentsApi.getConversation(conversationId);
+        setActiveCall((prev) =>
+          prev ? { ...prev, status: conv.status, transcript: conv.transcript } : prev,
+        );
+        if (conv.status === 'completed' || conv.status === 'failed') {
+          stopCallPolling();
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 3000);
+  };
+
+  const handleTestCall = async (agentOrId: string | VoiceAgent) => {
+    const agent = typeof agentOrId === 'string'
+      ? voiceAgents.find((a) => a.id === agentOrId)
+      : agentOrId;
+    if (!agent) return;
+
+    const phone = prompt('Digite o número de telefone para teste (com código do país, ex: +5511999999999):');
     if (!phone) return;
 
+    if (!/^\+[1-9]\d{6,14}$/.test(phone)) {
+      toast.error('Formato inválido. Use +5511999999999 (com código do país).', { duration: 6000 });
+      return;
+    }
+
+    const hasAIAgent = !!agent.call_config?.elevenlabs_agent_id;
+    const hasAIPhone = !!agent.call_config?.phone_number_id;
+    const hasWavoipToken = !!agent.call_config?.api_key;
+    const hasAIConfig = hasAIAgent && hasAIPhone;
+
+    // Pre-call validation: detect partial AI config and show targeted message
+    if (hasAIAgent && !hasAIPhone) {
+      toast.error(
+        'Agente ElevenLabs configurado, mas falta o Número SIP de saída. ' +
+        'Edite o agente, selecione um número SIP registrado e salve.',
+        { duration: 8000 },
+      );
+      return;
+    }
+    if (!hasAIAgent && hasAIPhone) {
+      toast.error(
+        'Número SIP configurado, mas falta o Agente ElevenLabs. ' +
+        'Edite o agente, selecione um agente ConvAI e salve.',
+        { duration: 8000 },
+      );
+      return;
+    }
+    if (!hasAIConfig && !hasWavoipToken) {
+      toast.error(
+        'Agente sem configuração de chamadas.\n' +
+        'Edite o agente e configure:\n' +
+        '• Modo AI: selecione Agente ElevenLabs + Número SIP\n' +
+        '• Modo simples: preencha o Token Wavoip',
+        { duration: 9000 },
+      );
+      return;
+    }
+
     try {
-      await voiceAgentsApi.testCall(id, { phone_number: phone });
-      toast.success('Chamada de teste iniciada!');
-    } catch (error) {
-      console.error('[VoiceAgentsPage] Error testing call:', error);
-      toast.error('Erro ao iniciar chamada de teste');
+      setActionLoading(true);
+
+      if (hasAIConfig) {
+        // ── AI call via ElevenLabs ConvAI + Wavoip SIP ──────────────────────
+        const result = await voiceAgentsApi.startAICall(agent.id, { phone_number: phone });
+
+        if (!result.conversation_id) {
+          toast.error('Chamada iniciada mas sem ID de conversa retornado pelo ElevenLabs.', { duration: 5000 });
+          return;
+        }
+
+        setActiveCall({
+          conversationId: result.conversation_id,
+          agentName: agent.name,
+          phone,
+          status: 'initiated',
+          transcript: [],
+        });
+        startCallPolling(result.conversation_id, agent.name, phone);
+        toast.success(`Chamada AI iniciada para ${phone}! O agente "${agent.name}" está ligando...`, { duration: 5000 });
+      } else {
+        // ── Fallback: Wavoip Click-to-Call (simple mode) ────────────────────
+        const result = await voiceAgentsApi.testCall(agent.id, { phone_number: phone });
+
+        if (!result.call_url) {
+          toast.error(
+            'Não foi possível gerar a URL de chamada.\n' +
+            'Configure o Agente ElevenLabs e o Número SIP para usar chamadas com AI, ' +
+            'ou preencha o Token Wavoip para o modo simples.',
+            { duration: 8000 },
+          );
+          return;
+        }
+
+        const popup = window.open(result.call_url, `wavoip_call_${agent.id}`, 'width=480,height=680,resizable=yes,scrollbars=no');
+        if (!popup) {
+          toast.error('Popup bloqueado. Permita popups para este site.', { duration: 8000 });
+        } else {
+          popup.focus();
+          toast.success('Webphone Wavoip aberto na nova janela.', { duration: 4000 });
+        }
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Erro ao iniciar chamada';
+      toast.error(msg, { duration: 6000 });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRegisterSip = async () => {
+    if (!sipForm.phone_number || !sipForm.sip_host || !sipForm.sip_username || !sipForm.sip_password) {
+      toast.error('Preencha todos os campos SIP: número, host, usuário e senha.');
+      return;
+    }
+    try {
+      setSipLoading(true);
+      const result = await voiceAgentsApi.registerSipTrunk({
+        phone_number: sipForm.phone_number,
+        sip_host: sipForm.sip_host,
+        sip_username: sipForm.sip_username,
+        sip_password: sipForm.sip_password,
+        label: sipForm.label || `Wavoip ${sipForm.phone_number}`,
+      });
+      const registeredLabel = sipForm.label || `Wavoip ${sipForm.phone_number}`;
+      toast.success(`Número "${registeredLabel}" registrado com sucesso!`);
+      // Keep form data visible so user can see what was registered; refresh list
+      const updated = await voiceAgentsApi.listPhoneNumbers();
+      setPhoneNumbers(updated);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.message || 'Erro ao registrar SIP', { duration: 7000 });
+    } finally {
+      setSipLoading(false);
+    }
+  };
+
+  const handleCreateConvAIAgent = async () => {
+    if (!createAgentForm.name || !createAgentForm.system_prompt || !createAgentForm.first_message) {
+      toast.error('Preencha: nome, instruções e primeira mensagem.');
+      return;
+    }
+    try {
+      setCreateAgentLoading(true);
+      const result = await voiceAgentsApi.createConvAIAgent({
+        name: createAgentForm.name,
+        system_prompt: createAgentForm.system_prompt,
+        first_message: createAgentForm.first_message,
+        voice_id: createAgentForm.voice_id || undefined,
+        language: createAgentForm.language,
+        llm: createAgentForm.llm,
+      });
+      toast.success(`Agente "${result.agent.name}" criado com sucesso!`);
+      // Reload agents list and auto-select the new agent
+      const updatedAgents = await voiceAgentsApi.listConvAIAgents();
+      setConvAIAgents(updatedAgents);
+      setForm((prev) => ({
+        ...prev,
+        call_config: { ...prev.call_config, elevenlabs_agent_id: result.agent.agent_id },
+      }));
+      setCreateAgentFormOpen(false);
+      setCreateAgentForm({ name: '', system_prompt: '', first_message: '', voice_id: '', language: 'pt', llm: 'claude-3-5-sonnet' });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.message || 'Erro ao criar agente', { duration: 7000 });
+    } finally {
+      setCreateAgentLoading(false);
+    }
+  };
+
+  const handleDeletePhoneNumber = async (phoneNumberId: string) => {
+    if (!confirm('Remover este número do ElevenLabs?')) return;
+    try {
+      await voiceAgentsApi.deletePhoneNumber(phoneNumberId);
+      toast.success('Número removido.');
+      setPhoneNumbers((prev) => prev.filter((p) => p.phone_number_id !== phoneNumberId));
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Erro ao remover número', { duration: 5000 });
     }
   };
 
@@ -331,6 +571,12 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         google: false,
       });
       
+      // Also refresh ConvAI phone numbers list
+      if (currentSettings.elevenlabs_configured) {
+        voiceAgentsApi.listPhoneNumbers().then(setPhoneNumbers).catch(() => {});
+        voiceAgentsApi.listConvAIAgents().then(setConvAIAgents).catch(() => {});
+      }
+
       setSettingsModalOpen(true);
       console.log('[VoiceAgentsPage] Settings modal opened with saved status:', currentSettings);
     } catch (error) {
@@ -625,30 +871,57 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 key={agent.id}
                 className={`rounded-lg p-5 hover:shadow-lg transition-shadow ${isDark ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-gray-200'}`}
               >
+                {/* Card header */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
-                      <PhoneCall className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${agent.call_config?.elevenlabs_agent_id ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-gray-100 dark:bg-slate-700'}`}>
+                      {agent.call_config?.elevenlabs_agent_id
+                        ? <Bot className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                        : <PhoneCall className="w-5 h-5 text-gray-500" />
+                      }
                     </div>
                     <div>
                       <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{agent.name}</h3>
-                      <Badge variant={agent.is_active ? 'default' : 'secondary'} className="text-xs">
-                        {agent.is_active ? 'Ativo' : 'Inativo'}
-                      </Badge>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Badge variant={agent.is_active ? 'default' : 'secondary'} className="text-xs">
+                          {agent.is_active ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                        {agent.call_config?.elevenlabs_agent_id && agent.call_config?.phone_number_id && (
+                          <Badge variant="outline" className="text-[10px] text-purple-500 border-purple-400">
+                            AI
+                          </Badge>
+                        )}
+                        {(agent.call_config?.elevenlabs_agent_id || agent.call_config?.phone_number_id) &&
+                          !(agent.call_config?.elevenlabs_agent_id && agent.call_config?.phone_number_id) && (
+                          <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-400">
+                            Config. incompleta
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {agent.description && (
-                  <p className={`text-sm mb-4 line-clamp-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <p className={`text-sm mb-3 line-clamp-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                     {agent.description}
                   </p>
                 )}
 
                 <div className={`flex items-center gap-2 text-xs mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  <Mic className="w-3 h-3" />
-                  <span>{agent.voice_provider}</span>
-                  <span>•</span>
+                  {agent.call_config?.elevenlabs_agent_id ? (
+                    <>
+                      <Bot className="w-3 h-3 text-purple-500" />
+                      <span className="text-purple-500">ConvAI</span>
+                      <span>•</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-3 h-3" />
+                      <span>{agent.voice_provider}</span>
+                      <span>•</span>
+                    </>
+                  )}
                   <Phone className="w-3 h-3" />
                   <span>{agent.call_provider}</span>
                 </div>
@@ -668,18 +941,20 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     variant="outline"
                     onClick={() => handleToggle(agent.id, agent.is_active)}
                   >
-                    {agent.is_active ? (
-                      <PowerOff className="w-3 h-3" />
-                    ) : (
-                      <Power className="w-3 h-3" />
-                    )}
+                    {agent.is_active ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleTestCall(agent.id)}
+                    disabled={actionLoading}
+                    onClick={() => handleTestCall(agent)}
+                    title={agent.call_config?.elevenlabs_agent_id ? 'Iniciar chamada AI' : 'Ligar (Click-to-Call)'}
+                    className={agent.call_config?.elevenlabs_agent_id ? 'text-purple-600 border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20' : ''}
                   >
-                    <Phone className="w-3 h-3" />
+                    {agent.call_config?.elevenlabs_agent_id
+                      ? <PhoneOutgoing className="w-3 h-3" />
+                      : <Phone className="w-3 h-3" />
+                    }
                   </Button>
                   <Button
                     size="sm"
@@ -699,7 +974,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-lg shadow-xl w-full max-w-[calc(100%-2rem)] sm:max-w-lg md:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+          <div className={`rounded-lg shadow-xl w-full max-w-[calc(100%-2rem)] sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
             <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3 border-b ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
               <h2 className={`text-base sm:text-lg md:text-xl font-bold flex-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                 {selectedAgent ? 'Editar Agente de Voz' : 'Criar Agente de Voz'}
@@ -713,7 +988,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 space-y-4">
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 space-y-4">
               {/* Nome */}
               <div>
                 <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -740,129 +1015,189 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 />
               </div>
 
-              {/* Voz ElevenLabs */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Voz ElevenLabs *
-                </label>
-                <select
-                  value={form.voice_config.voice_id}
-                  onChange={(e) => setForm({
-                    ...form,
-                    voice_config: { ...form.voice_config, voice_id: e.target.value }
-                  })}
-                  className={`w-full px-3 py-2 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
-                >
-                  <option value="">Selecione uma voz</option>
-                  {elevenLabsVoices.map((voice) => (
-                    <option key={voice.voice_id} value={voice.voice_id}>
-                      {voice.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* ── Configuração ElevenLabs ConvAI + SIP ── */}
+              <div className={`rounded-lg p-4 border ${isDark ? 'bg-slate-700/50 border-purple-800/40' : 'bg-purple-50 border-purple-200'}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <Bot className="w-4 h-4 text-purple-500" />
+                  <span className={`text-sm font-semibold ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
+                    Configuração ElevenLabs + SIP
+                  </span>
+                </div>
+                <p className={`text-[11px] mb-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Selecione o agente ConvAI e o número SIP registrado em <strong>Configurações</strong>.
+                </p>
 
-              {/* API Key Wavoip */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  API Key Wavoip *
-                </label>
-                <div className="relative">
-                  <Input
-                    type={showApiKey ? 'text' : 'password'}
-                    value={form.call_config.api_key}
-                    onChange={(e) => setForm({
-                      ...form,
-                      call_config: { ...form.call_config, api_key: e.target.value }
-                    })}
-                    placeholder="Sua chave de API do Wavoip"
-                    className={`text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+                {/* ElevenLabs ConvAI Agent selector + inline create */}
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Agente ElevenLabs (ConvAI)
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <button type="button" title="Recarregar agentes e números"
+                        onClick={refreshConvAIData}
+                        disabled={convAILoading}
+                        className={`p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-600 ${isDark ? 'text-gray-400' : 'text-gray-500'} ${convAILoading ? 'opacity-50' : ''}`}>
+                        <RefreshCw className="w-3 h-3" />
+                      </button>
+                      <button type="button"
+                        onClick={() => setCreateAgentFormOpen((v) => !v)}
+                        title="Criar novo agente"
+                        className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${createAgentFormOpen
+                          ? isDark ? 'bg-purple-800 text-purple-200' : 'bg-purple-100 text-purple-700'
+                          : isDark ? 'bg-slate-600 text-gray-300 hover:bg-purple-800 hover:text-purple-200' : 'bg-gray-200 text-gray-600 hover:bg-purple-100 hover:text-purple-700'}`}>
+                        <Plus className="w-2.5 h-2.5" />
+                        Criar agente
+                      </button>
+                    </div>
+                  </div>
+                  <select
+                    value={form.call_config.elevenlabs_agent_id || ''}
+                    onChange={(e) => setForm({ ...form, call_config: { ...form.call_config, elevenlabs_agent_id: e.target.value } })}
+                    disabled={convAILoading}
+                    className={`w-full px-3 py-2 border rounded-md text-sm ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'} ${convAILoading ? 'opacity-60' : ''}`}
                   >
-                    {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                    <option value="">
+                      {convAILoading ? '⏳ Carregando...' : '— Selecione um agente ElevenLabs —'}
+                    </option>
+                    {convAIAgents.map((a) => (
+                      <option key={a.agent_id} value={a.agent_id}>{a.name}</option>
+                    ))}
+                  </select>
+
+                  {/* Inline Create Agent Form */}
+                  {createAgentFormOpen && (
+                    <div className={`mt-2 p-3 rounded-lg border space-y-2 ${isDark ? 'bg-slate-900/50 border-purple-700/50' : 'bg-white border-purple-200'}`}>
+                      <p className={`text-[11px] font-semibold mb-1 ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
+                        Criar novo agente ConvAI
+                      </p>
+                      <div>
+                        <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Nome *</label>
+                        <Input value={createAgentForm.name}
+                          onChange={(e) => setCreateAgentForm((p) => ({ ...p, name: e.target.value }))}
+                          placeholder="Ex: Atendente Sofia"
+                          className={`text-xs h-7 ${isDark ? 'bg-slate-800 border-slate-600 text-white' : ''}`} />
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Primeira mensagem *</label>
+                        <Input value={createAgentForm.first_message}
+                          onChange={(e) => setCreateAgentForm((p) => ({ ...p, first_message: e.target.value }))}
+                          placeholder="Olá! Como posso ajudar?"
+                          className={`text-xs h-7 ${isDark ? 'bg-slate-800 border-slate-600 text-white' : ''}`} />
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Instruções (system prompt) *</label>
+                        <textarea value={createAgentForm.system_prompt}
+                          onChange={(e) => setCreateAgentForm((p) => ({ ...p, system_prompt: e.target.value }))}
+                          placeholder="Você é um assistente de vendas da empresa X. Seja cordial e objetivo..."
+                          rows={3}
+                          className={`w-full px-2 py-1 border rounded text-xs resize-none ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'border-gray-300'}`} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Voz</label>
+                          <select value={createAgentForm.voice_id}
+                            onChange={(e) => setCreateAgentForm((p) => ({ ...p, voice_id: e.target.value }))}
+                            className={`w-full px-2 py-1 border rounded text-xs ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'border-gray-300'}`}>
+                            <option value="">Padrão</option>
+                            {elevenLabsVoices.map((v) => (
+                              <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Idioma</label>
+                          <select value={createAgentForm.language}
+                            onChange={(e) => setCreateAgentForm((p) => ({ ...p, language: e.target.value }))}
+                            className={`w-full px-2 py-1 border rounded text-xs ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'border-gray-300'}`}>
+                            <option value="pt">Português</option>
+                            <option value="en">English</option>
+                            <option value="es">Español</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Modelo LLM</label>
+                        <select value={createAgentForm.llm}
+                          onChange={(e) => setCreateAgentForm((p) => ({ ...p, llm: e.target.value }))}
+                          className={`w-full px-2 py-1 border rounded text-xs ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'border-gray-300'}`}>
+                          <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Recomendado)</option>
+                          <option value="gpt-4o-mini">GPT-4o Mini</option>
+                          <option value="gpt-4o">GPT-4o</option>
+                          <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <Button type="button" size="sm"
+                          onClick={handleCreateConvAIAgent}
+                          disabled={createAgentLoading}
+                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-xs h-7">
+                          {createAgentLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Check className="w-3 h-3 mr-1" />}
+                          Criar Agente
+                        </Button>
+                        <Button type="button" size="sm" variant="outline"
+                          onClick={() => setCreateAgentFormOpen(false)}
+                          className="text-xs h-7">
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Phone Number / SIP Trunk */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Número de Saída (SIP Wavoip registrado)
+                    </label>
+                    <button
+                      type="button"
+                      title="Recarregar números"
+                      onClick={refreshConvAIData}
+                      disabled={convAILoading}
+                      className={`p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-600 ${isDark ? 'text-gray-400' : 'text-gray-500'} ${convAILoading ? 'opacity-50' : ''}`}
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <select
+                    value={form.call_config.phone_number_id || ''}
+                    onChange={(e) => setForm({ ...form, call_config: { ...form.call_config, phone_number_id: e.target.value } })}
+                    disabled={convAILoading}
+                    className={`w-full px-3 py-2 border rounded-md text-sm ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'} ${convAILoading ? 'opacity-60' : ''}`}
+                  >
+                    <option value="">
+                      {convAILoading ? '⏳ Carregando...' : phoneNumbers.length === 0 ? '— Nenhum número SIP registrado —' : '— Selecione um número —'}
+                    </option>
+                    {phoneNumbers.map((p) => (
+                      <option key={p.phone_number_id} value={p.phone_number_id}>
+                        {p.label || p.phone_number} ({p.phone_number})
+                      </option>
+                    ))}
+                  </select>
+                  {!convAILoading && phoneNumbers.length === 0 && (
+                    <p className={`mt-1 text-[10px] ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                      Nenhum número SIP encontrado. Registre em Configurações → SIP Wavoip ou clique ↺ para recarregar.
+                    </p>
+                  )}
                 </div>
               </div>
-
-              {/* Número de Origem */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Número de Origem (Wavoip)
-                </label>
-                <Input
-                  value={form.call_config.from_number}
-                  onChange={(e) => setForm({
-                    ...form,
-                    call_config: { ...form.call_config, from_number: e.target.value }
-                  })}
-                  placeholder="+5511999999999"
-                  className={`text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
-                />
-                <p className={`mt-1.5 text-[10px] sm:text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Formato E.164 obrigatório: +CCNNNNNNNNN (ex: +5511999999999 para Brasil)
-                </p>
-              </div>
-
-              {/* Mensagem de Saudação */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Mensagem de Saudação
-                </label>
-                <textarea
-                  value={form.greeting_message}
-                  onChange={(e) => setForm({ ...form, greeting_message: e.target.value })}
-                  placeholder="Olá! Sou o agente de voz da empresa..."
-                  className={`w-full px-3 py-2 border rounded-md min-h-[60px] sm:min-h-[80px] text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
-                />
-              </div>
-
-              {/* Instruções */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Instruções para o Agente
-                </label>
-                <textarea
-                  value={form.instructions}
-                  onChange={(e) => setForm({ ...form, instructions: e.target.value })}
-                  placeholder="Você é um assistente de vendas que deve..."
-                  className={`w-full px-3 py-2 border rounded-md min-h-[80px] sm:min-h-[100px] text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
-                />
-              </div>
-
-              {/* Idioma */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Idioma
-                </label>
-                <select
-                  value={form.language}
-                  onChange={(e) => setForm({ ...form, language: e.target.value })}
-                  className={`w-full px-3 py-2 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
-                >
-                  <option value="pt-BR">Português (Brasil)</option>
-                  <option value="en-US">English (US)</option>
-                  <option value="es-ES">Español</option>
-                </select>
-              </div>
-            </form>
+            </div>
 
             <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
-              <Button 
+              <Button
                 type="button"
-                variant="outline" 
-                onClick={() => setModalOpen(false)} 
+                variant="outline"
+                onClick={() => setModalOpen(false)}
                 className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Cancelar
               </Button>
-              <Button 
-                type="submit"
-                onClick={handleSubmit} 
-                disabled={actionLoading} 
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={actionLoading}
                 className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-sm sm:text-base"
               >
                 {actionLoading ? (
@@ -1069,6 +1404,120 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   </p>
                 </div>
 
+                {/* ── Integração SIP Wavoip ── */}
+                <div className={`mt-2 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Link2 className="w-4 h-4 text-purple-500" />
+                    <h4 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      Integração SIP Wavoip → ElevenLabs
+                    </h4>
+                  </div>
+                  <p className={`text-xs mb-3 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Registre as credenciais SIP do Wavoip no ElevenLabs para que o agente AI possa fazer chamadas via WhatsApp.
+                    Encontre as credenciais em: <strong>Wavoip Dashboard → Dispositivos → SIP</strong>
+                  </p>
+
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Número WhatsApp</label>
+                        <Input
+                          value={sipForm.phone_number}
+                          onChange={(e) => setSipForm({ ...sipForm, phone_number: e.target.value })}
+                          placeholder="+5511999999999"
+                          className={`text-xs ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Label (opcional)</label>
+                        <Input
+                          value={sipForm.label}
+                          onChange={(e) => setSipForm({ ...sipForm, label: e.target.value })}
+                          placeholder="Ex: Vendas"
+                          className={`text-xs ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>SIP Host</label>
+                      <Input
+                        value={sipForm.sip_host}
+                        onChange={(e) => setSipForm({ ...sipForm, sip_host: e.target.value })}
+                        placeholder="sipv2.wavoip.com"
+                        className={`text-xs ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>SIP Usuário</label>
+                        <Input
+                          value={sipForm.sip_username}
+                          onChange={(e) => setSipForm({ ...sipForm, sip_username: e.target.value })}
+                          placeholder="UUID do Wavoip"
+                          className={`text-xs ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>SIP Senha</label>
+                        <div className="relative">
+                          <Input
+                            type={showSettingsApiKey.sip_password ? 'text' : 'password'}
+                            value={sipForm.sip_password}
+                            onChange={(e) => setSipForm({ ...sipForm, sip_password: e.target.value })}
+                            placeholder="Senha SIP"
+                            className={`text-xs pr-8 ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                          />
+                          <button type="button"
+                            onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, sip_password: !showSettingsApiKey.sip_password })}
+                            className={`absolute right-2 top-1/2 -translate-y-1/2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {showSettingsApiKey.sip_password ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleRegisterSip}
+                      disabled={sipLoading}
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-xs"
+                      size="sm"
+                    >
+                      {sipLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Link2 className="w-3 h-3 mr-1" />}
+                      Registrar SIP no ElevenLabs
+                    </Button>
+                  </div>
+
+                  {/* Registered phone numbers */}
+                  {phoneNumbers.length > 0 && (
+                    <div className="mt-3">
+                      <p className={`text-xs font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Números registrados ({phoneNumbers.length}):
+                      </p>
+                      <div className="space-y-1">
+                        {phoneNumbers.map((pn) => (
+                          <div key={pn.phone_number_id}
+                            className={`flex items-center justify-between px-2 py-1.5 rounded text-xs ${isDark ? 'bg-slate-700 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                            <div>
+                              <span className="font-medium">{pn.label || pn.phone_number}</span>
+                              <span className={`ml-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>({pn.phone_number})</span>
+                              {pn.assigned_agent && (
+                                <span className="ml-1 text-purple-500">→ {pn.assigned_agent.agent_name}</span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePhoneNumber(pn.phone_number_id)}
+                              className="text-red-400 hover:text-red-600 ml-2"
+                            >
+                              <Unlink className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
               </div>
 
               {/* Footer */}
@@ -1102,6 +1551,105 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
               </div>
             </div>
           </div>
+      )}
+
+      {/* ── Active AI Call Status Modal ───────────────────────────────────── */}
+      {activeCall && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className={`rounded-xl shadow-2xl w-full max-w-md ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+            {/* Header */}
+            <div className={`px-5 py-4 border-b ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${activeCall.status === 'completed' ? 'bg-green-100' : activeCall.status === 'failed' ? 'bg-red-100' : 'bg-purple-100 animate-pulse'}`}>
+                    {activeCall.status === 'completed'
+                      ? <Check className="w-4 h-4 text-green-600" />
+                      : activeCall.status === 'failed'
+                      ? <AlertCircle className="w-4 h-4 text-red-600" />
+                      : <PhoneOutgoing className="w-4 h-4 text-purple-600" />
+                    }
+                  </div>
+                  <div>
+                    <p className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      Chamada AI — {activeCall.agentName}
+                    </p>
+                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{activeCall.phone}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    activeCall.status === 'completed' ? 'bg-green-100 text-green-700' :
+                    activeCall.status === 'failed' ? 'bg-red-100 text-red-700' :
+                    activeCall.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                    'bg-purple-100 text-purple-700'
+                  }`}>
+                    {activeCall.status === 'initiated' ? 'Iniciando...' :
+                     activeCall.status === 'ringing' ? 'Chamando...' :
+                     activeCall.status === 'in-progress' ? 'Em andamento' :
+                     activeCall.status === 'completed' ? 'Concluída' : 'Falha'}
+                  </span>
+                  <button
+                    onClick={() => { stopCallPolling(); setActiveCall(null); }}
+                    className={`p-1 rounded ${isDark ? 'hover:bg-slate-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Transcript */}
+            <div className={`px-5 py-4 max-h-64 overflow-y-auto space-y-2 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+              {(!activeCall.transcript || activeCall.transcript.length === 0) ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  {activeCall.status !== 'completed' && activeCall.status !== 'failed' ? (
+                    <>
+                      <Loader2 className={`w-6 h-6 animate-spin mb-2 ${isDark ? 'text-purple-400' : 'text-purple-500'}`} />
+                      <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Aguardando início da conversa...
+                      </p>
+                    </>
+                  ) : (
+                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Sem transcrição disponível
+                    </p>
+                  )}
+                </div>
+              ) : (
+                activeCall.transcript.map((item, i) => (
+                  <div key={i} className={`flex gap-2 ${item.role === 'agent' ? '' : 'flex-row-reverse'}`}>
+                    <div className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${item.role === 'agent' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
+                      {item.role === 'agent' ? 'AI' : 'U'}
+                    </div>
+                    <div className={`max-w-[80%] px-3 py-1.5 rounded-lg text-xs ${item.role === 'agent'
+                      ? isDark ? 'bg-slate-700 text-gray-200' : 'bg-gray-100 text-gray-800'
+                      : isDark ? 'bg-purple-900/40 text-purple-200' : 'bg-purple-50 text-purple-900'
+                    }`}>
+                      {item.message}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className={`px-5 py-3 border-t flex justify-between items-center ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
+              {(activeCall.status !== 'completed' && activeCall.status !== 'failed') && (
+                <Button size="sm" variant="outline" onClick={() => {
+                  voiceAgentsApi.getConversation(activeCall.conversationId)
+                    .then((c) => setActiveCall((prev) => prev ? { ...prev, status: c.status, transcript: c.transcript } : prev))
+                    .catch(() => {});
+                }}>
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Atualizar
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => { stopCallPolling(); setActiveCall(null); }} className="ml-auto">
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
