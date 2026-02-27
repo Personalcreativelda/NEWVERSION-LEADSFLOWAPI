@@ -130,6 +130,8 @@ export class AssistantProcessorService {
      */
     private async findActiveAssistantForChannel(channelId: string, userId: string): Promise<any | null> {
         try {
+            console.log(`[AssistantProcessor] 🔍 Buscando assistente ativo para canal=${channelId}, userId=${userId}`);
+            
             const result = await query(
                 `SELECT ua.id as user_assistant_id, ua.config, ua.channel_ids, ua.assistant_id,
                         a.name as assistant_name, a.default_config
@@ -141,12 +143,40 @@ export class AssistantProcessorService {
                  LIMIT 1`,
                 [userId, channelId]
             );
+            
+            if (result.rows[0]) {
+                console.log(`[AssistantProcessor] ✅ Assistente encontrado: ${result.rows[0].assistant_name} (ID: ${result.rows[0].user_assistant_id})`);
+                console.log(`[AssistantProcessor]   - channel_ids: ${JSON.stringify(result.rows[0].channel_ids)}`);
+            } else {
+                console.warn(`[AssistantProcessor] ⚠️ Nenhum assistente encontrado para canal=${channelId}`);
+                
+                // Debug: listar todos os assistentes do usuário
+                const debugResult = await query(
+                    `SELECT ua.id, ua.is_active, ua.channel_id, ua.channel_ids, a.name
+                     FROM user_assistants ua
+                     LEFT JOIN assistants a ON ua.assistant_id = a.id
+                     WHERE ua.user_id = $1`,
+                    [userId]
+                );
+                
+                if (debugResult.rows.length > 0) {
+                    console.log(`[AssistantProcessor] DEBUG: Usuário tem ${debugResult.rows.length} assistente(s):`);
+                    debugResult.rows.forEach(row => {
+                        console.log(`[AssistantProcessor]   - ${row.name} (ativo=${row.is_active}, channel_ids=${JSON.stringify(row.channel_ids)}, channel_id=${row.channel_id})`);
+                    });
+                } else {
+                    console.log(`[AssistantProcessor] DEBUG: Usuário não tem nenhum assistente`);
+                }
+            }
+            
             return result.rows[0] || null;
         } catch (error: any) {
             // Se tabelas não existem, retornar null silenciosamente
             if (error.code === '42P01' || error.code === '42703') {
+                console.log('[AssistantProcessor] ℹ️ Tabelas de assistentes não existem ainda');
                 return null;
             }
+            console.error('[AssistantProcessor] ❌ Erro ao buscar assistente:', error.message);
             throw error;
         }
     }

@@ -177,10 +177,18 @@ router.post('/connect', async (req, res, next) => {
             return res.status(400).json({ error: 'assistantId é obrigatório' });
         }
 
+        // ✅ IMPORTANTE: Exigir seleção de pelo menos UM canal
+        if (!Array.isArray(channelIds) || channelIds.length === 0) {
+            return res.status(400).json({ 
+                error: 'Você deve selecionar pelo menos UM canal para conectar o assistente',
+                code: 'CHANNELS_REQUIRED'
+            });
+        }
+
         const userAssistant = await assistantsService.connectAssistant(
             assistantId,
             user.id,
-            Array.isArray(channelIds) ? channelIds : channelIds ? [channelIds] : undefined
+            channelIds
         );
         res.status(201).json(userAssistant);
     } catch (error: any) {

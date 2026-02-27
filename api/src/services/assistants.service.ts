@@ -431,6 +431,10 @@ export class AssistantsService {
         const channelIdsArray = channelIds && channelIds.length > 0 ? channelIds : [];
         const primaryChannelId = channelIdsArray.length > 0 ? channelIdsArray[0] : null;
 
+        console.log(`[Assistants] Conectando assistente ${assistantId} para usuário ${userId}`);
+        console.log(`[Assistants]   - Canais selecionados: ${channelIdsArray.length}`);
+        console.log(`[Assistants]   - Channel IDs: ${JSON.stringify(channelIdsArray)}`);
+
         // Criar conexão
         const result = await query(
             `INSERT INTO user_assistants (user_id, assistant_id, config, channel_id, channel_ids, is_active, is_configured)

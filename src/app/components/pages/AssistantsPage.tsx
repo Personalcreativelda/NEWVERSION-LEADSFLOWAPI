@@ -175,9 +175,15 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const handleConnect = async () => {
     if (!selectedAssistant) return;
 
+    // ✅ Validar seleção de canais
+    if (selectedChannelIds.length === 0) {
+      toast.error('❌ Selecione pelo menos UM canal para conectar o assistente');
+      return;
+    }
+
     try {
       setActionLoading(true);
-      await assistantsApi.connect(selectedAssistant.id, selectedChannelIds.length > 0 ? selectedChannelIds : undefined);
+      await assistantsApi.connect(selectedAssistant.id, selectedChannelIds);
       toast.success(`${selectedAssistant.name} conectado com sucesso!`);
       setConnectModalOpen(false);
       setSelectedAssistant(null);
@@ -783,6 +789,24 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                   Selecione os canais para conectar
                 </label>
+                
+                {/* ✅ Aviso obrigatório */}
+                <div className={`p-3 rounded-lg border mb-3 ${
+                  selectedChannelIds.length === 0
+                    ? isDark
+                      ? 'bg-red-900/20 border-red-700 text-red-300'
+                      : 'bg-red-50 border-red-300 text-red-700'
+                    : isDark
+                      ? 'bg-green-900/20 border-green-700 text-green-300'
+                      : 'bg-green-50 border-green-300 text-green-700'
+                }`}>
+                  {selectedChannelIds.length === 0 ? (
+                    <p className="text-xs font-medium">⚠️ Obrigatório selecionar pelo menos 1 canal</p>
+                  ) : (
+                    <p className="text-xs font-medium">✅ {selectedChannelIds.length} {selectedChannelIds.length === 1 ? 'canal' : 'canais'} selecionado(s)</p>
+                  )}
+                </div>
+                
                 {channels.length === 0 ? (
                   <div className={`text-center py-4 rounded-lg border-2 border-dashed ${isDark ? 'border-slate-700 text-gray-500' : 'border-gray-200 text-gray-400'}`}>
                     <Hash className="w-6 h-6 mx-auto mb-2 opacity-50" />
@@ -844,15 +868,19 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               </Button>
               <Button
                 onClick={handleConnect}
-                disabled={actionLoading}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                disabled={actionLoading || selectedChannelIds.length === 0}
+                className={`${
+                  selectedChannelIds.length === 0
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                } text-white`}
               >
                 {actionLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
                   <Link2 className="w-4 h-4 mr-2" />
                 )}
-                Conectar {selectedChannelIds.length > 0 ? `(${selectedChannelIds.length} ${selectedChannelIds.length === 1 ? 'canal' : 'canais'})` : ''}
+                Conectar {selectedChannelIds.length > 0 ? `(${selectedChannelIds.length} ${selectedChannelIds.length === 1 ? 'canal' : 'canais'})` : '(selecione canais)'}
               </Button>
             </div>
           </div>

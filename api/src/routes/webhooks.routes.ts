@@ -1001,6 +1001,11 @@ router.post('/evolution/messages', async (req, res) => {
 
     // Processar assistente de IA (assíncrono - não bloqueia a resposta)
     if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+      console.log('[Evolution Webhook] 🤖 Acionando processador de assistente IA...');
+      console.log('[Evolution Webhook]   - channelId:', channel.id);
+      console.log('[Evolution Webhook]   - userId:', channel.user_id);
+      console.log('[Evolution Webhook]   - conversationId:', conversation.id);
+      
       assistantProcessor.processIncomingMessage({
         channelId: channel.id,
         channelType: channel.type || 'whatsapp',
@@ -1011,9 +1016,10 @@ router.post('/evolution/messages', async (req, res) => {
         messageContent: messageContent,
         credentials: channel.credentials
       }).then(replied => {
-        if (replied) console.log('[Evolution Webhook] Assistente IA respondeu automaticamente');
+        if (replied) console.log('[Evolution Webhook] ✅ Assistente IA respondeu automaticamente');
+        else console.log('[Evolution Webhook] ℹ️ Nenhum assistente ativo para este canal');
       }).catch(err => {
-        console.error('[Evolution Webhook] Erro no assistente IA:', err.message);
+        console.error('[Evolution Webhook] ❌ Erro no assistente IA:', err.message);
       });
     }
 
