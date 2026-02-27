@@ -65,7 +65,7 @@ const fetchUsageCounts = async (userId: string): Promise<UsageCounts> => {
   try {
     const [leadsResult, messagesResult, campaignsResult] = await Promise.all([
       query('SELECT COUNT(*) FROM leads WHERE user_id = $1', [userId]),
-      query('SELECT COUNT(*) FROM messages WHERE user_id = $1', [userId]),
+      query("SELECT COUNT(*) FROM messages WHERE user_id = $1 AND direction = 'outgoing'", [userId]),
       query('SELECT COUNT(*) FROM campaigns WHERE user_id = $1', [userId]),
     ]);
 

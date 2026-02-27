@@ -1,7 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart } from 'recharts';
 import type { Lead } from '../../types';
 import FilterBar from './FilterBar';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { MessageCircle, Cloud, Mail, Instagram, Facebook, Send, Globe, Megaphone, Webhook, Phone, Search, Link, Hash, Smartphone, Users } from 'lucide-react';
 
 interface ChartsSectionProps {
@@ -180,19 +180,28 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
       }));
   }, [leads]);
 
-  // ✅ Dados para evolução de leads (últimos 7 dias) com useMemo
+  // Estado para alternar entre 7 e 30 dias
+  const [chartDays, setChartDays] = useState<7 | 30>(7);
+
+  // ✅ Dados para evolução de leads com useMemo
   const evolutionData = useMemo(() => {
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const today = new Date();
     const data = [];
     
-    for (let i = 6; i >= 0; i--) {
+    for (let i = chartDays - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      const dayName = days[date.getDay()];
+      const dayName = chartDays <= 7 
+        ? days[date.getDay()] 
+        : `${date.getDate()}/${months[date.getMonth()]}`;
       const dateStr = date.toISOString().split('T')[0];
       
-      const leadsCount = leads.filter(lead => lead.data === dateStr).length;
+      const leadsCount = leads.filter(lead => {
+        const leadDate = lead.capturedAt || lead.createdAt || lead.data || '';
+        return leadDate.startsWith(dateStr);
+      }).length;
       
       data.push({
         name: dayName,
@@ -202,7 +211,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     }
     
     return data;
-  }, [leads]);
+  }, [leads, chartDays]);
 
   // Dados simulados para engajamento em campanhas
   const engajamentoData = [
@@ -395,10 +404,16 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
               Evolução de Leads
             </h3>
             <div className="flex gap-1 sm:gap-2">
-              <button className="px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium bg-[#5B9FED]/10 text-[#5B9FED] rounded-lg">
+              <button 
+                onClick={() => setChartDays(7)}
+                className={`px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium rounded-lg transition-colors ${chartDays === 7 ? 'bg-[#5B9FED]/10 text-[#5B9FED]' : 'text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-muted'}`}
+              >
                 7 dias
               </button>
-              <button className="px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-muted rounded-lg">
+              <button 
+                onClick={() => setChartDays(30)}
+                className={`px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium rounded-lg transition-colors ${chartDays === 30 ? 'bg-[#5B9FED]/10 text-[#5B9FED]' : 'text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-muted'}`}
+              >
                 30 dias
               </button>
             </div>

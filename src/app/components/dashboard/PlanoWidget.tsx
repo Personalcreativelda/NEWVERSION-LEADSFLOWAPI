@@ -39,15 +39,15 @@ export default function PlanoWidget({ limites, diasRestantes, onUpgrade, userPla
     }
   };
 
-  // Calcular restantes ao invés de usados
-  const restantesLeads = limites.leads - limites.usados.leads;
-  const restantesMensagens = limites.mensagens - limites.usados.mensagens;
-  const restantesEnvios = limites.envios - limites.usados.envios;
+  // Calcular restantes ao invés de usados (nunca menor que 0)
+  const restantesLeads = Math.max(0, limites.leads - limites.usados.leads);
+  const restantesMensagens = Math.max(0, limites.mensagens - limites.usados.mensagens);
+  const restantesEnvios = Math.max(0, limites.envios - limites.usados.envios);
 
-  // Calcular percentuais
-  const percLeads = limites.leads > 0 ? (limites.usados.leads / limites.leads) * 100 : 0;
-  const percMensagens = limites.mensagens > 0 ? (limites.usados.mensagens / limites.mensagens) * 100 : 0;
-  const percEnvios = limites.envios > 0 ? (limites.usados.envios / limites.envios) * 100 : 0;
+  // Calcular percentuais (máximo 100%)
+  const percLeads = limites.leads > 0 ? Math.min(100, (limites.usados.leads / limites.leads) * 100) : 0;
+  const percMensagens = limites.mensagens > 0 ? Math.min(100, (limites.usados.mensagens / limites.mensagens) * 100) : 0;
+  const percEnvios = limites.envios > 0 ? Math.min(100, (limites.usados.envios / limites.envios) * 100) : 0;
 
   // Determinar cor do círculo baseado no percentual
   const getCircleColor = (perc: number) => {
