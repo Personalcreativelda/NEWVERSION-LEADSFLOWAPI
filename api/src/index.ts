@@ -12,6 +12,7 @@ import { campaignCleanupService } from './services/campaign-cleanup.service';
 // INBOX: Importar WebSocket service e Email Polling
 import { initializeWebSocket } from './services/websocket.service';
 import { emailPollingService } from './services/email-polling.service';
+import { planExpirationService } from './services/plan-expiration.service';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -91,6 +92,10 @@ initDatabase().then(() => {
   // ✅ Iniciar polling de emails IMAP
   emailPollingService.start();
   console.log('[Leadflow API] Email polling service iniciado ✅');
+
+  // ✅ Iniciar verificação de expiração de planos
+  planExpirationService.start();
+  console.log('[Leadflow API] Plan expiration service iniciado ✅');
 
   server.listen(port, () => {
     console.log(`[Leadflow API] Listening on port ${port}`);

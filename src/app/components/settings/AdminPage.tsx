@@ -1,8 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
-import { Crown, Rocket, Calendar, Users, Check, X, Search, DollarSign, TrendingUp, Bell, Settings, Ban, Trash2, AlertTriangle } from 'lucide-react';
+import { 
+  Crown, Rocket, Calendar, Users, Check, X, Search, DollarSign, TrendingUp, 
+  Bell, Ban, Trash2, RefreshCw, Shield, Mail, CreditCard, UserCheck, 
+  UserX, Clock, BarChart3, ArrowUpRight, AlertCircle, Eye, Timer,
+  BellRing, BellOff, Banknote, Receipt, Activity, ChevronDown, ChevronUp
+} from 'lucide-react';
 import { Input } from '../ui/input';
 import { Switch } from '../ui/switch';
 
@@ -15,6 +20,19 @@ interface User {
   planExpiresAt?: string;
   createdAt: string;
   status?: 'active' | 'suspended';
+  usage?: {
+    leads: number;
+    messages: number;
+    campaigns: number;
+    channels: number;
+  };
+}
+
+interface PlanPricing {
+  id: string;
+  name: string;
+  price: { monthly: number; annual: number };
+  limits: { leads: number; messages: number; massMessages: number };
 }
 
 export default function AdminPage() {
@@ -26,43 +44,38 @@ export default function AdminPage() {
   const [showActivateModal, setShowActivateModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string>('business');
   const [expirationDays, setExpirationDays] = useState<number>(30);
+  const [plansPricing, setPlansPricing] = useState<PlanPricing[]>([]);
   const [notificationSettings, setNotificationSettings] = useState({
     upgradeNotifications: true,
-    newUserNotifications: false,
+    newUserNotifications: true,
     paymentNotifications: true,
+    expirationNotifications: true,
+    suspensionNotifications: true,
   });
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
-
-  const cardClass = "rounded-xl border border-border bg-card text-card-foreground shadow-sm";
-  const statCardClass = `${cardClass} p-4`;
-  const revenueHighlightClass = `${cardClass} border-[hsl(var(--success)/0.35)] p-4`;
-  const mutedTextClass = "text-sm text-muted-foreground";
-  const tinyMutedTextClass = "text-xs text-muted-foreground";
-  const badgeBaseClass = "inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md";
-  const selectableCardBase = "p-3 rounded-lg border-2 transition";
-  const selectedPlanCardClass = "border-[hsl(var(--primary))] bg-[hsl(var(--accent))]";
-  const unselectedPlanCardClass = "border-border hover:border-[hsl(var(--primary))] hover:bg-muted";
-  const selectablePillBase = "p-2 rounded-lg border-2 text-sm font-medium transition";
-  const selectedPillClass = "border-[hsl(var(--primary))] bg-[hsl(var(--accent))] text-[hsl(var(--primary))]";
-  const unselectedPillClass = "border-border text-muted-foreground hover:border-[hsl(var(--primary))] hover:bg-muted";
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  const [filterPlan, setFilterPlan] = useState<string>('all');
 
   useEffect(() => {
     loadUsers();
+    loadPlansPricing();
     loadNotificationSettings();
   }, []);
 
   useEffect(() => {
+    let filtered = users;
+    if (filterPlan !== 'all') {
+      filtered = filtered.filter(u => u.plan === filterPlan);
+    }
     if (searchTerm) {
-      const filtered = users.filter(
+      filtered = filtered.filter(
         (user) =>
           user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
           user.name?.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      setFilteredUsers(filtered);
-    } else {
-      setFilteredUsers(users);
     }
-  }, [searchTerm, users]);
+    setFilteredUsers(filtered);
+  }, [searchTerm, users, filterPlan]);
 
   const loadUsers = async () => {
     setLoading(true);

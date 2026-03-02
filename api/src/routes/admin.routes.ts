@@ -2,6 +2,8 @@ import { Router } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { requireAuth } from '../middleware/auth.middleware';
 import { query } from '../database/connection';
+import { plansService } from '../services/plans.service';
+import { planExpirationService } from '../services/plan-expiration.service';
 
 const router = Router();
 
@@ -96,14 +98,26 @@ router.post('/activate-plan', requireAuth, requireAdmin, async (req: Authenticat
       return res.status(400).json({ error: 'userId and planId are required' });
     }
 
-    // Definir limites de acordo com o plano
-    const planLimits: Record<string, any> = {
-      free: { leads: 100, messages: 100, massMessages: 200 },
-      business: { leads: 500, messages: 500, massMessages: 1000 },
-      enterprise: { leads: -1, messages: -1, massMessages: -1 },
-    };
+    // Buscar limites do plano a partir do banco de dados
+    let limits: any;
+    try {
+      const plan = await plansService.getPlanById(planId);
+      if (plan) {
+        limits = plan.limits;
+      }
+    } catch (e) {
+      console.warn('[Admin] Could not fetch plan from DB, using fallback');
+    }
 
-    const limits = planLimits[planId] || planLimits.free;
+    // Fallback se não encontrou no banco
+    if (!limits) {
+      const fallbackLimits: Record<string, any> = {
+        free: { leads: 100, messages: 100, massMessages: 200 },
+        business: { leads: 500, messages: 500, massMessages: 1000 },
+        enterprise: { leads: -1, messages: -1, massMessages: -1 },
+      };
+      limits = fallbackLimits[planId] || fallbackLimits.free;
+    }
 
     const result = await query(
       `UPDATE users 
@@ -404,6 +418,40 @@ router.get('/stats', requireAuth, requireAdmin, async (req: AuthenticatedRequest
     });
   } catch (error) {
     console.error('[Admin] Error fetching stats:', error);
+    next(error);
+  }
+});
+
+// ==========================================
+// GET /admin/plans-pricing - Buscar planos com preços do banco
+// ==========================================
+router.get('/plans-pricing', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const plans = await plansService.getAllPlans();
+    res.json({ success: true, plans });
+  } catch (error) {
+    console.error('[Admin] Error fetching plans pricing:', error);
+    // Retornar fallback se a tabela plans não existir
+    res.json({ 
+      success: true, 
+      plans: [
+        { id: 'free', name: 'Free', price: { monthly: 0, annual: 0 }, limits: { leads: 100, messages: 100, massMessages: 200 } },
+        { id: 'business', name: 'Business', price: { monthly: 20, annual: 100 }, limits: { leads: 500, messages: 500, massMessages: 1000 } },
+        { id: 'enterprise', name: 'Enterprise', price: { monthly: 59, annual: 200 }, limits: { leads: -1, messages: -1, massMessages: -1 } },
+      ]
+    });
+  }
+});
+
+// ==========================================
+// POST /admin/check-expirations - Verificar planos expirados manualmente
+// ==========================================
+router.post('/check-expirations', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    await planExpirationService.checkNow();
+    res.json({ success: true, message: 'Verificação de expiração executada com sucesso' });
+  } catch (error) {
+    console.error('[Admin] Error checking expirations:', error);
     next(error);
   }
 });
