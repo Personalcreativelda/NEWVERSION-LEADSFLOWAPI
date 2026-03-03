@@ -4848,4 +4848,7 @@ router.post('/twilio/status', async (req, res) => {
   }
 });
 
+
+router.get('/settings', async (req, res) => { res.json({ provider: 'none', config: {} }); });
+router.put('/settings', async (req, res) => { res.json({ success: true, ...req.body }); });
 export default router;

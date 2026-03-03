@@ -538,3 +538,24 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- Comments
 COMMENT ON TABLE voice_agents IS 'Voice AI agents for automated calling using ElevenLabs voice + Wavoip calls';
 COMMENT ON TABLE voice_agent_calls IS 'Log of all calls made/received by voice agents';
+
+-- Version tables
+CREATE TABLE IF NOT EXISTS app_version (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    version VARCHAR(50) NOT NULL,
+    release_notes TEXT,
+    is_current BOOLEAN DEFAULT false,
+    notify_users BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+INSERT INTO app_version (version, is_current) VALUES ('1.0.0', true) ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS user_version_notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    version_id UUID REFERENCES app_version(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, version_id)
+);
+
