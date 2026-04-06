@@ -14,6 +14,7 @@ import {
   setupAdminAccount,
 } from '../services/auth.service';
 import { googleOAuthService } from '../services/google-oauth.service';
+import { activityService } from '../services/activity.service';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -101,6 +102,15 @@ router.get('/google/callback', async (req, res, next) => {
     const redirectUrl = `${frontendUrl}/#oauth_callback&${tokenData.toString()}`;
 
     console.log('[Auth Google] Redirecting to frontend:', frontendUrl);
+    
+    // 📝 Log activity
+    void activityService.logActivity({
+      userId: authResult.user.id,
+      type: 'login',
+      description: `Login via Google: ${userData.email}`,
+      metadata: { provider: 'google', ip: req.ip }
+    });
+
     return res.redirect(redirectUrl);
 
   } catch (error: any) {
@@ -127,6 +137,14 @@ router.post('/google/token', async (req, res, next) => {
     const authResult = await loginWithOAuth(userData);
 
     console.log('[Auth Google] User authenticated via token endpoint:', userData.email);
+
+    // 📝 Log activity
+    void activityService.logActivity({
+      userId: authResult.user.id,
+      type: 'login',
+      description: `Login via Google (Token): ${userData.email}`,
+      metadata: { provider: 'google', source: 'token_endpoint', ip: req.ip }
+    });
 
     return res.json(authResult);
   } catch (error) {
@@ -163,6 +181,15 @@ router.post('/login', async (req, res, next) => {
     }
 
     const data = await loginWithEmail(email, password);
+    
+    // 📝 Log activity
+    void activityService.logActivity({
+      userId: data.user.id,
+      type: 'login',
+      description: `Login via Email: ${email}`,
+      metadata: { ip: req.ip }
+    });
+
     return res.json(data);
   } catch (error) {
     return next(error);
@@ -180,6 +207,15 @@ router.post('/oauth/callback', async (req, res, next) => {
     console.log('[Auth OAuth] Processing OAuth callback:', { email, provider, name });
 
     const data = await loginWithOAuth({ email, name, avatar_url, provider });
+    
+    // 📝 Log activity
+    void activityService.logActivity({
+      userId: data.user.id,
+      type: 'login',
+      description: `Login via OAuth: ${email}`,
+      metadata: { provider, ip: req.ip }
+    });
+
     return res.json(data);
   } catch (error) {
     console.error('[Auth OAuth] Error processing OAuth callback:', error);
@@ -214,6 +250,15 @@ router.post('/register', async (req, res, next) => {
     }
 
     const data = await registerWithEmail(email, password, metadata);
+    
+    // 📝 Log activity
+    void activityService.logActivity({
+      userId: data.user.id,
+      type: 'registration',
+      description: `Novo cadastro: ${email}`,
+      metadata: { ip: req.ip, ...metadata }
+    });
+
     return res.json(data);
   } catch (error) {
     return next(error);

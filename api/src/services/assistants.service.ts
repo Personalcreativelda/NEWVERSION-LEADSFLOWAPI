@@ -73,6 +73,8 @@ export interface CreateAssistantInput {
     features?: string[];
     instructions?: string;
     greeting?: string;
+    memory_enabled?: boolean;
+    memory_window?: number;  // número de mensagens por sessão (5-50)
 }
 
 export class AssistantsService {
@@ -192,6 +194,23 @@ export class AssistantsService {
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 )
             `);
+
+            // Tabela de memória persistente por contato
+            await query(`
+                CREATE TABLE IF NOT EXISTS assistant_contact_memory (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    user_assistant_id UUID REFERENCES user_assistants(id) ON DELETE CASCADE,
+                    contact_phone VARCHAR(50) NOT NULL,
+                    contact_name VARCHAR(255),
+                    summary TEXT,
+                    preferences JSONB DEFAULT '{}',
+                    last_topics TEXT[] DEFAULT '{}',
+                    total_conversations INTEGER DEFAULT 0,
+                    first_contact_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    last_contact_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    UNIQUE(user_assistant_id, contact_phone)
+                )
+            `);
         } catch (err: any) {
             console.error('[Assistants] Table creation error:', err.message);
         }
@@ -201,6 +220,8 @@ export class AssistantsService {
             'ALTER TABLE assistants ADD COLUMN IF NOT EXISTS is_custom BOOLEAN DEFAULT false',
             'ALTER TABLE assistants ADD COLUMN IF NOT EXISTS created_by UUID',
             "ALTER TABLE user_assistants ADD COLUMN IF NOT EXISTS channel_ids UUID[] DEFAULT '{}'",
+            // Memória: flags de configuração no config do user_assistant
+            // (memory_enabled e memory_window ficam no JSONB config, não precisam de coluna nova)
         ];
         for (const sql of migrations) {
             try {

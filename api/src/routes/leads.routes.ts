@@ -7,6 +7,7 @@ import { getStorageService } from '../services/storage.service';
 import { WhatsAppService } from '../services/whatsapp.service';
 import { ChannelsService } from '../services/channels.service';
 import { leadTrackingService } from '../services/lead-tracking.service';
+import { activityService } from '../services/activity.service';
 import { query as dbQuery } from '../database/connection';
 
 const router = Router();
@@ -345,6 +346,15 @@ router.post('/', async (req, res, next) => {
       'user-plus',
       { leadId: lead.id, leadName, email: lead.email }
     );
+    
+    // 📝 Log activity for admin monitoring
+    void activityService.logActivity({
+      userId: user.id,
+      type: 'lead_created',
+      description: `Criou o lead: ${leadName}`,
+      leadId: lead.id,
+      metadata: { source: req.body.source }
+    });
 
     res.status(201).json(lead);
   } catch (error) {
@@ -400,6 +410,15 @@ router.put('/:id', async (req, res, next) => {
       } catch (trackErr) {
         console.error('[LeadsAPI] ⚠️ Error recording status change:', trackErr);
       }
+
+      // 📝 Log activity for admin monitoring
+      void activityService.logActivity({
+        userId: user.id,
+        type: 'lead_status_changed',
+        description: `Moveu o lead ${leadName} de ${oldLead.status} para ${req.body.status}`,
+        leadId: lead.id,
+        metadata: { oldStatus: oldLead.status, newStatus: req.body.status }
+      });
     }
 
     res.json(lead);
@@ -419,6 +438,14 @@ router.delete('/:id', async (req, res, next) => {
     if (!deleted) {
       return res.status(404).json({ error: 'Lead not found' });
     }
+
+    // 📝 Log activity for admin monitoring
+    void activityService.logActivity({
+      userId: user.id,
+      type: 'lead_deleted',
+      description: `Removeu o lead ID: ${req.params.id}`,
+      metadata: { leadId: req.params.id }
+    });
 
     res.json({ success: true });
   } catch (error) {

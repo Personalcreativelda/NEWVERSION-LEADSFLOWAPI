@@ -15,5 +15,7 @@ export default defineConfig({
   },
   server: {
     port: 3200,
+    host: true,
+    strictPort: true,
   },
 });

@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.middleware';
 import { query } from '../database/connection';
 import { plansService } from '../services/plans.service';
 import { planExpirationService } from '../services/plan-expiration.service';
+import { activityService } from '../services/activity.service';
 
 const router = Router();
 
@@ -47,6 +48,7 @@ router.get('/users', requireAuth, requireAdmin, async (req: AuthenticatedRequest
         u.subscription_plan,
         u.plan_expires_at,
         u.trial_ends_at,
+        u.last_active_at,
         u.created_at,
         u.updated_at,
         (SELECT COUNT(*) FROM leads WHERE user_id = u.id) as leads_count,
@@ -67,6 +69,7 @@ router.get('/users', requireAuth, requireAdmin, async (req: AuthenticatedRequest
       subscription_plan: row.subscription_plan || row.plan || 'free',
       planExpiresAt: row.plan_expires_at,
       trialEndsAt: row.trial_ends_at,
+      lastActiveAt: row.last_active_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       isActive: row.is_active !== false,
@@ -83,6 +86,35 @@ router.get('/users', requireAuth, requireAdmin, async (req: AuthenticatedRequest
     res.json({ success: true, users });
   } catch (error) {
     console.error('[Admin] Error fetching users:', error);
+    next(error);
+  }
+});
+
+// ==========================================
+// GET /admin/active-users - Usuários ativos nos últimos 15 minutos
+// ==========================================
+router.get('/active-users', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const minutes = parseInt(req.query.minutes as string) || 15;
+    const users = await activityService.getActiveUsers(minutes);
+    res.json({ success: true, users });
+  } catch (error) {
+    console.error('[Admin] Error fetching active users:', error);
+    next(error);
+  }
+});
+
+// ==========================================
+// GET /admin/user-activities - Log de atividades dos usuários
+// ==========================================
+router.get('/user-activities', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const activities = await activityService.getRecentActivities(limit, offset);
+    res.json({ success: true, activities });
+  } catch (error) {
+    console.error('[Admin] Error fetching user activities:', error);
     next(error);
   }
 });
@@ -452,6 +484,36 @@ router.post('/check-expirations', requireAuth, requireAdmin, async (req: Authent
     res.json({ success: true, message: 'Verificação de expiração executada com sucesso' });
   } catch (error) {
     console.error('[Admin] Error checking expirations:', error);
+    next(error);
+  }
+});
+
+
+// ==========================================
+// GET /admin/active-users - Listar usuários ativos agora
+// ==========================================
+router.get('/active-users', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const minutes = parseInt(req.query.minutes as string) || 15;
+    const activeUsers = await activityService.getActiveUsers(minutes);
+    res.json({ success: true, users: activeUsers });
+  } catch (error) {
+    console.error('[Admin] Error fetching active users:', error);
+    next(error);
+  }
+});
+
+// ==========================================
+// GET /admin/user-activities - Logs de atividades recentes
+// ==========================================
+router.get('/user-activities', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const activities = await activityService.getRecentActivities(limit, offset);
+    res.json({ success: true, activities });
+  } catch (error) {
+    console.error('[Admin] Error fetching user activities:', error);
     next(error);
   }
 });

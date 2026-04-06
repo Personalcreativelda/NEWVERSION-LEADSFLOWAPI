@@ -27,9 +27,13 @@ CREATE TABLE users (
     google_api_key TEXT,
     preferred_ai_model VARCHAR(50) DEFAULT 'elevenlabs',
     voice_settings JSONB DEFAULT '{}'::jsonb,
+    last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Index for active users
+CREATE INDEX IF NOT EXISTS idx_users_last_active_at ON users(last_active_at DESC);
 
 -- Leads table
 CREATE TABLE leads (
@@ -538,3 +542,29 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- Comments
 COMMENT ON TABLE voice_agents IS 'Voice AI agents for automated calling using ElevenLabs voice + Wavoip calls';
 COMMENT ON TABLE voice_agent_calls IS 'Log of all calls made/received by voice agents';
+
+-- =====================================================
+-- ASSISTANT MEMORY
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS assistant_contact_memory (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_assistant_id UUID NOT NULL REFERENCES user_assistants(id) ON DELETE CASCADE,
+    contact_phone VARCHAR(255) NOT NULL,
+    contact_name VARCHAR(255),
+    summary TEXT,
+    preferences JSONB DEFAULT '{}',
+    last_topics JSONB DEFAULT '[]',
+    total_conversations INTEGER DEFAULT 1,
+    first_contact_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_contact_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_assistant_id, contact_phone)
+);
+
+CREATE INDEX IF NOT EXISTS idx_assistant_memory_phone ON assistant_contact_memory(contact_phone);
+
+DO $$ BEGIN
+  CREATE TRIGGER update_assistant_contact_memory_updated_at BEFORE UPDATE ON assistant_contact_memory FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

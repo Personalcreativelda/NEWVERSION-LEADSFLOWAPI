@@ -1,0 +1,39 @@
+--- DATABASE STRUCTURE REPORT ---
+
+USERS TABLE COLUMNS:
+- id
+- email
+- password_hash
+- name
+- avatar_url
+- role
+- plan
+- subscription_plan
+- plan_expires_at
+- plan_limits
+- is_active
+- email_verified
+- created_at
+- updated_at
+- trial_ends_at
+- two_factor_enabled
+- two_factor_secret
+- two_factor_backup_codes
+- elevenlabs_api_key
+- voice_settings
+- preferred_ai_model
+- google_api_key
+- anthropic_api_key
+- openai_api_key
+
+ACTIVITIES TABLE EXISTS: YES
+
+ACTIVITIES TABLE COLUMNS:
+- id
+- user_id
+- lead_id
+- contact_id
+- type
+- description
+- metadata
+- created_at

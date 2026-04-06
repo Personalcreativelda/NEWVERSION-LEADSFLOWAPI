@@ -99,6 +99,23 @@ export class AssistantProcessorService {
                 console.error('[AssistantProcessor] Erro ao salvar log:', logErr.message);
             }
 
+            // 9. Atualizar memória de longo prazo do contato (assíncrono, não bloqueia)
+            const memoryEnabled = config.memory_enabled !== false;
+            if (memoryEnabled && ctx.contactPhone) {
+                const memoryApiKey = config.ai_api_key ||
+                    (provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.GEMINI_API_KEY) || '';
+                void aiService.updateContactMemory({
+                    userAssistantId: activeAssistant.user_assistant_id,
+                    contactPhone: ctx.contactPhone,
+                    contactName: ctx.contactName,
+                    messageIn: ctx.messageContent,
+                    messageOut: aiResponse.content,
+                    provider,
+                    apiKey: memoryApiKey,
+                    model: config.ai_model
+                });
+            }
+
             return true;
         } catch (error: any) {
             console.error('[AssistantProcessor] Erro ao processar mensagem:', error.message);
@@ -183,15 +200,17 @@ export class AssistantProcessorService {
     }
 
     /**
-     * Constrói array de mensagens para enviar à IA
+     * Constrói array de mensagens para enviar à IA,
+     * incorporando memória de curto e longo prazo
      */
     private async buildAIMessages(ctx: IncomingMessageContext, assistant: any): Promise<AIMessage[]> {
         const config = assistant.config || {};
         const defaultConfig = assistant.default_config || {};
         const instructions = config.instructions || defaultConfig.instructions || '';
         const greeting = config.greeting || defaultConfig.greeting || '';
+        const memoryEnabled = config.memory_enabled !== false; // padrão: ativado
 
-        // System prompt
+        // System prompt base
         let systemPrompt = instructions;
         if (!systemPrompt) {
             systemPrompt = `Você é ${assistant.assistant_name}, um assistente virtual inteligente. Responda de forma educada, profissional e útil.`;
@@ -201,12 +220,43 @@ export class AssistantProcessorService {
         }
         systemPrompt += '\n\nResponda sempre no mesmo idioma do cliente. Mantenha respostas concisas e diretas.';
 
+        // Injetar memória de longo prazo no system prompt
+        if (memoryEnabled && ctx.contactPhone) {
+            const memory = await aiService.getContactMemory(assistant.user_assistant_id, ctx.contactPhone);
+            if (memory && (memory.summary || memory.last_topics?.length > 0)) {
+                systemPrompt += '\n\n---\n[MEMÓRIA DO CONTATO]\n';
+
+                if (memory.contact_name || ctx.contactName) {
+                    systemPrompt += `Nome: ${memory.contact_name || ctx.contactName}\n`;
+                }
+                if (memory.total_conversations > 0) {
+                    systemPrompt += `Conversas anteriores: ${memory.total_conversations}\n`;
+                }
+                if (memory.last_topics && memory.last_topics.length > 0) {
+                    systemPrompt += `Assuntos recentes: ${memory.last_topics.slice(0, 5).join(', ')}\n`;
+                }
+                if (memory.summary) {
+                    systemPrompt += `Perfil do cliente: ${memory.summary}\n`;
+                }
+                if (memory.last_contact_at) {
+                    const lastContact = new Date(memory.last_contact_at);
+                    const diff = Math.floor((Date.now() - lastContact.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diff > 0) {
+                        systemPrompt += `Último contato: há ${diff} dia(s)\n`;
+                    }
+                }
+                systemPrompt += 'Use essas informações para personalizar sua resposta, sem mencioná-las explicitamente a menos que seja relevante.\n---';
+
+                console.log(`[AssistantProcessor] 🧠 Memória carregada para ${ctx.contactPhone} (${memory.total_conversations} conversas)`);
+            }
+        }
+
         const messages: AIMessage[] = [
             { role: 'system', content: systemPrompt }
         ];
 
-        // Buscar histórico da conversa para contexto
-        const history = await aiService.getConversationHistory(ctx.conversationId, 8);
+        // Buscar histórico da conversa atual (curto prazo - 20 mensagens)
+        const history = await aiService.getConversationHistory(ctx.conversationId, 20);
         messages.push(...history);
 
         // Mensagem atual
