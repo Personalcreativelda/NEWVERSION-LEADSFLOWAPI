@@ -47,6 +47,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
             color: colorMap[plan.id] || 'from-gray-500 to-gray-600',
             price: plan.price,
             paymentLinks: plan.paymentLinks || { monthly: null, annual: null },
+            stripe: plan.stripe || { productId: null, priceMonthlyId: null, priceAnnualId: null },
             features: plan.features,
             limits: plan.limits,
           }));
@@ -121,12 +122,34 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
     fetchPlans();
   }, []);
 
-  // Handle upgrade button click - opens PayPal payment link
-  const handleUpgradeClick = (plan: any) => {
-    const paymentLink = billingPeriod === 'monthly' 
-      ? plan.paymentLinks?.monthly 
+  // Handle upgrade button click - prefer Stripe if configured, otherwise fallback to payment link
+  const handleUpgradeClick = async (plan: any) => {
+    const stripePriceId = billingPeriod === 'monthly'
+      ? plan.stripe?.priceMonthlyId
+      : plan.stripe?.priceAnnualId;
+
+    if (stripePriceId) {
+      setLoading(true);
+      try {
+        const response = await plansApi.createStripeCheckoutSession(plan.id, billingPeriod);
+        if (response.success && response.sessionUrl) {
+          window.location.href = response.sessionUrl;
+          return;
+        }
+        toast.error('Falha ao iniciar checkout Stripe. Tente novamente.');
+      } catch (error: any) {
+        console.error('[PlanPage] Stripe checkout error:', error);
+        toast.error(error.message || 'Erro ao iniciar pagamento Stripe.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    const paymentLink = billingPeriod === 'monthly'
+      ? plan.paymentLinks?.monthly
       : plan.paymentLinks?.annual;
-    
+
     if (paymentLink) {
       window.open(paymentLink, '_blank', 'noopener,noreferrer');
     } else {
@@ -331,10 +354,15 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                     'Plano Atual'
                   ) : plan.id === 'free' ? (
                     'Plano Gratuito'
+                  ) : plan.stripe?.priceMonthlyId || plan.stripe?.priceAnnualId ? (
+                    <>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Pagar com Stripe
+                    </>
                   ) : (
                     <>
                       <ExternalLink className="w-4 h-4 mr-2" />
-                      Fazer Upgrade
+                      Ver Pagamento
                     </>
                   )}
                 </Button>

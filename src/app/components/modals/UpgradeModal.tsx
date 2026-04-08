@@ -48,7 +48,35 @@ export default function UpgradeModal({
       return;
     }
 
-    // Para planos pagos, mostrar botão PayPal
+    const selected = plans.find((plan) => plan.id === planId);
+    const stripePriceId = billingPeriod === 'annual'
+      ? selected?.stripe?.priceAnnualId
+      : selected?.stripe?.priceMonthlyId;
+
+    if (planId !== 'free' && stripePriceId) {
+      setLoading(true);
+      setSelectedPlan(planId);
+
+      try {
+        const response = await plansApi.createStripeCheckoutSession(planId, billingPeriod);
+        if (response.success && response.sessionUrl) {
+          window.location.href = response.sessionUrl;
+          return;
+        }
+
+        toast.error('Falha ao iniciar checkout Stripe. Tente novamente ou use outra forma de pagamento.');
+      } catch (error: any) {
+        console.error('Error creating Stripe checkout session:', error);
+        const errorMessage = error.message || 'Erro ao iniciar checkout Stripe.';
+        toast.error(errorMessage);
+      } finally {
+        setLoading(false);
+        setSelectedPlan(null);
+      }
+
+      return;
+    }
+
     if (planId !== 'free') {
       setShowPayPalButton(planId);
       return;

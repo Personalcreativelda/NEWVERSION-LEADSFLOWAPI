@@ -19,7 +19,15 @@ const port = Number(process.env.PORT || 4000);
 
 app.use(helmet());
 app.use(corsMiddleware);
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({
+  limit: '50mb',
+  verify: (req, _res, buf) => {
+    const signature = req.headers['stripe-signature'];
+    if (signature) {
+      (req as any).rawBody = buf;
+    }
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('tiny'));
 

@@ -40,7 +40,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const { id, name, description, priceMonthly, priceAnnual, features, limits } = req.body;
+    const { id, name, description, priceMonthly, priceAnnual, features, limits, stripeProductId, stripePriceMonthlyId, stripePriceAnnualId } = req.body;
 
     if (!id || !name) {
       return res.status(400).json({ error: 'ID and name are required' });
@@ -53,7 +53,10 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
       priceMonthly || 0,
       priceAnnual || 0,
       features || [],
-      limits || {}
+      limits || {},
+      stripeProductId || null,
+      stripePriceMonthlyId || null,
+      stripePriceAnnualId || null
     );
 
     console.log(`[Admin Plans] Created plan: ${id}`);
@@ -86,6 +89,9 @@ router.put('/:id', requireAuth, async (req: AuthenticatedRequest, res, next) => 
       description: updates.description,
       price_monthly: updates.priceMonthly,
       price_annual: updates.priceAnnual,
+      stripe_product_id: updates.stripeProductId,
+      stripe_price_monthly_id: updates.stripePriceMonthlyId,
+      stripe_price_annual_id: updates.stripePriceAnnualId,
       features: updates.features,
       limits: updates.limits,
     });

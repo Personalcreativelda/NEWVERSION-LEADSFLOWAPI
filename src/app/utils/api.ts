@@ -846,6 +846,13 @@ export const plansApi = {
       body: JSON.stringify({ planId }),
     }, true);
   },
+
+  createStripeCheckoutSession: async (planId: string, billingCycle: 'monthly' | 'annual') => {
+    return apiCall('/plans/stripe/checkout-session', {
+      method: 'POST',
+      body: JSON.stringify({ planId, billingCycle }),
+    }, true);
+  },
 };
 
 // ============================================

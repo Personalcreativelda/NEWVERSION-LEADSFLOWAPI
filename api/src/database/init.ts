@@ -57,6 +57,18 @@ const runPendingMigrations = async () => {
     console.warn('[DB] Social IDs migration warning:', error.message);
   }
 
+  // Migração: Adicionar colunas Stripe à tabela plans
+  try {
+    await pool.query(`
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS stripe_product_id VARCHAR(100);
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS stripe_price_monthly_id VARCHAR(100);
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS stripe_price_annual_id VARCHAR(100);
+    `);
+    console.log('[DB] Stripe columns added to plans (stripe_product_id, stripe_price_monthly_id, stripe_price_annual_id)');
+  } catch (error: any) {
+    console.warn('[DB] Stripe migration warning:', error.message);
+  }
+
   // Migração: Criar tabela lead_interactions (rastreamento de interações)
   try {
     await pool.query(`

@@ -12,6 +12,11 @@ export interface Plan {
     monthly: string | null;
     annual: string | null;
   };
+  stripe: {
+    productId: string | null;
+    priceMonthlyId: string | null;
+    priceAnnualId: string | null;
+  };
   features: string[];
   limits: {
     leads: number;
@@ -28,6 +33,9 @@ export interface PlanRow {
   price_annual: string;
   payment_link_monthly: string | null;
   payment_link_annual: string | null;
+  stripe_product_id: string | null;
+  stripe_price_monthly_id: string | null;
+  stripe_price_annual_id: string | null;
   features: string[];
   limits: {
     leads: number;
@@ -40,7 +48,8 @@ export interface PlanRow {
 export const plansService = {
   async getAllPlans(): Promise<Plan[]> {
     const result = await query(
-      `SELECT id, name, description, price_monthly, price_annual, payment_link_monthly, payment_link_annual, features, limits
+      `SELECT id, name, description, price_monthly, price_annual, payment_link_monthly, payment_link_annual,
+              stripe_product_id, stripe_price_monthly_id, stripe_price_annual_id, features, limits
        FROM plans
        WHERE is_active = true
        ORDER BY price_monthly ASC`
@@ -58,6 +67,11 @@ export const plansService = {
         monthly: row.payment_link_monthly,
         annual: row.payment_link_annual,
       },
+      stripe: {
+        productId: row.stripe_product_id,
+        priceMonthlyId: row.stripe_price_monthly_id,
+        priceAnnualId: row.stripe_price_annual_id,
+      },
       features: row.features,
       limits: row.limits,
     }));
@@ -65,7 +79,8 @@ export const plansService = {
 
   async getPlanById(planId: string): Promise<Plan | null> {
     const result = await query(
-      `SELECT id, name, description, price_monthly, price_annual, payment_link_monthly, payment_link_annual, features, limits
+      `SELECT id, name, description, price_monthly, price_annual, payment_link_monthly, payment_link_annual,
+              stripe_product_id, stripe_price_monthly_id, stripe_price_annual_id, features, limits
        FROM plans
        WHERE id = $1 AND is_active = true`,
       [planId]
@@ -88,6 +103,11 @@ export const plansService = {
         monthly: row.payment_link_monthly,
         annual: row.payment_link_annual,
       },
+      stripe: {
+        productId: row.stripe_product_id,
+        priceMonthlyId: row.stripe_price_monthly_id,
+        priceAnnualId: row.stripe_price_annual_id,
+      },
       features: row.features,
       limits: row.limits,
     };
@@ -100,13 +120,27 @@ export const plansService = {
     priceMonthly: number,
     priceAnnual: number,
     features: string[],
-    limits: Record<string, number>
+    limits: Record<string, number>,
+    stripeProductId: string | null = null,
+    stripePriceMonthlyId: string | null = null,
+    stripePriceAnnualId: string | null = null
   ): Promise<Plan> {
     const result = await query(
-      `INSERT INTO plans (id, name, description, price_monthly, price_annual, features, limits)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, name, description, price_monthly, price_annual, payment_link_monthly, payment_link_annual, features, limits`,
-      [id, name, description, priceMonthly, priceAnnual, JSON.stringify(features), JSON.stringify(limits)]
+      `INSERT INTO plans (id, name, description, price_monthly, price_annual, features, limits, stripe_product_id, stripe_price_monthly_id, stripe_price_annual_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, name, description, price_monthly, price_annual, payment_link_monthly, payment_link_annual, stripe_product_id, stripe_price_monthly_id, stripe_price_annual_id, features, limits`,
+      [
+        id,
+        name,
+        description,
+        priceMonthly,
+        priceAnnual,
+        JSON.stringify(features),
+        JSON.stringify(limits),
+        stripeProductId,
+        stripePriceMonthlyId,
+        stripePriceAnnualId,
+      ]
     );
 
     const row = result.rows[0] as PlanRow;
@@ -124,6 +158,11 @@ export const plansService = {
       },
       features: row.features,
       limits: row.limits,
+      stripe: {
+        productId: row.stripe_product_id,
+        priceMonthlyId: row.stripe_price_monthly_id,
+        priceAnnualId: row.stripe_price_annual_id,
+      },
     };
   },
 
@@ -134,6 +173,9 @@ export const plansService = {
       description: string;
       price_monthly: number;
       price_annual: number;
+      stripe_product_id: string | null;
+      stripe_price_monthly_id: string | null;
+      stripe_price_annual_id: string | null;
       features: string[];
       limits: Record<string, number>;
     }>
@@ -166,6 +208,18 @@ export const plansService = {
       fields.push(`limits = $${paramCount++}`);
       values.push(JSON.stringify(updates.limits));
     }
+    if (updates.stripe_product_id !== undefined) {
+      fields.push(`stripe_product_id = $${paramCount++}`);
+      values.push(updates.stripe_product_id);
+    }
+    if (updates.stripe_price_monthly_id !== undefined) {
+      fields.push(`stripe_price_monthly_id = $${paramCount++}`);
+      values.push(updates.stripe_price_monthly_id);
+    }
+    if (updates.stripe_price_annual_id !== undefined) {
+      fields.push(`stripe_price_annual_id = $${paramCount++}`);
+      values.push(updates.stripe_price_annual_id);
+    }
 
     if (fields.length === 0) {
       return this.getPlanById(id);
@@ -178,7 +232,8 @@ export const plansService = {
       `UPDATE plans
        SET ${fields.join(', ')}
        WHERE id = $${paramCount}
-       RETURNING id, name, description, price_monthly, price_annual, payment_link_monthly, payment_link_annual, features, limits`,
+       RETURNING id, name, description, price_monthly, price_annual, payment_link_monthly, payment_link_annual,
+                 stripe_product_id, stripe_price_monthly_id, stripe_price_annual_id, features, limits`,
       values
     );
 
@@ -198,6 +253,11 @@ export const plansService = {
       paymentLinks: {
         monthly: row.payment_link_monthly || null,
         annual: row.payment_link_annual || null,
+      },
+      stripe: {
+        productId: row.stripe_product_id,
+        priceMonthlyId: row.stripe_price_monthly_id,
+        priceAnnualId: row.stripe_price_annual_id,
       },
       features: row.features,
       limits: row.limits,
