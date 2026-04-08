@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './env';
 import express from 'express';
 import http from 'http'; // INBOX: Importar http para WebSocket
 import helmet from 'helmet';

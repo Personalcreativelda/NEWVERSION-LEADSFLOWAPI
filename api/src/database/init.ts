@@ -87,9 +87,18 @@ const runPendingMigrations = async () => {
       if (stripeConfig.productId || stripeConfig.priceMonthlyId || stripeConfig.priceAnnualId) {
         await pool.query(
           `UPDATE plans
-           SET stripe_product_id = COALESCE(stripe_product_id, $1),
-               stripe_price_monthly_id = COALESCE(stripe_price_monthly_id, $2),
-               stripe_price_annual_id = COALESCE(stripe_price_annual_id, $3)
+           SET stripe_product_id = CASE
+                 WHEN stripe_product_id IS NULL OR stripe_product_id = 'prod_XXXXXXXXXXXXXXXX' THEN COALESCE($1, stripe_product_id)
+                 ELSE stripe_product_id
+               END,
+               stripe_price_monthly_id = CASE
+                 WHEN stripe_price_monthly_id IS NULL OR stripe_price_monthly_id = 'price_XXXXXXXXXXXXXXXX' THEN COALESCE($2, stripe_price_monthly_id)
+                 ELSE stripe_price_monthly_id
+               END,
+               stripe_price_annual_id = CASE
+                 WHEN stripe_price_annual_id IS NULL OR stripe_price_annual_id = 'price_XXXXXXXXXXXXXXXX' THEN COALESCE($3, stripe_price_annual_id)
+                 ELSE stripe_price_annual_id
+               END
            WHERE id = $4;`,
           [stripeConfig.productId, stripeConfig.priceMonthlyId, stripeConfig.priceAnnualId, planId]
         );
