@@ -65,6 +65,36 @@ const runPendingMigrations = async () => {
       ALTER TABLE plans ADD COLUMN IF NOT EXISTS stripe_price_annual_id VARCHAR(100);
     `);
     console.log('[DB] Stripe columns added to plans (stripe_product_id, stripe_price_monthly_id, stripe_price_annual_id)');
+
+    const stripeDefaults: Record<string, {
+      productId: string | null;
+      priceMonthlyId: string | null;
+      priceAnnualId: string | null;
+    }> = {
+      business: {
+        productId: process.env.STRIPE_BUSINESS_PRODUCT_ID || null,
+        priceMonthlyId: process.env.STRIPE_BUSINESS_PRICE_MONTHLY_ID || null,
+        priceAnnualId: process.env.STRIPE_BUSINESS_PRICE_ANNUAL_ID || null,
+      },
+      enterprise: {
+        productId: process.env.STRIPE_ENTERPRISE_PRODUCT_ID || null,
+        priceMonthlyId: process.env.STRIPE_ENTERPRISE_PRICE_MONTHLY_ID || null,
+        priceAnnualId: process.env.STRIPE_ENTERPRISE_PRICE_ANNUAL_ID || null,
+      },
+    };
+
+    for (const [planId, stripeConfig] of Object.entries(stripeDefaults)) {
+      if (stripeConfig.productId || stripeConfig.priceMonthlyId || stripeConfig.priceAnnualId) {
+        await pool.query(
+          `UPDATE plans
+           SET stripe_product_id = COALESCE(stripe_product_id, $1),
+               stripe_price_monthly_id = COALESCE(stripe_price_monthly_id, $2),
+               stripe_price_annual_id = COALESCE(stripe_price_annual_id, $3)
+           WHERE id = $4;`,
+          [stripeConfig.productId, stripeConfig.priceMonthlyId, stripeConfig.priceAnnualId, planId]
+        );
+      }
+    }
   } catch (error: any) {
     console.warn('[DB] Stripe migration warning:', error.message);
   }

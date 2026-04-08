@@ -14,6 +14,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isStripeAvailable, setIsStripeAvailable] = useState(false);
   const currentPlan = user?.plan || 'free';
 
   // Icon mapping
@@ -52,8 +53,14 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
             limits: plan.limits,
           }));
           setPlans(mappedPlans);
+          setIsStripeAvailable(
+            mappedPlans.some(
+              (plan: any) => !!plan.stripe?.priceMonthlyId || !!plan.stripe?.priceAnnualId
+            )
+          );
         } else {
           console.error('[PlanPage] Invalid response format:', response);
+          setIsStripeAvailable(false);
         }
       } catch (error) {
         console.error('[PlanPage] Error fetching plans:', error);
@@ -167,6 +174,12 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
           Escolha o plano ideal para o seu negócio
         </p>
       </div>
+
+      {!loading && plans.length > 0 && !isStripeAvailable && (
+        <div className="mb-6 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
+          Stripe ainda não está configurado nos planos retornados pelo backend. O fluxo de upgrade usará o pagamento legado (PayPal) até que os IDs de preço Stripe sejam adicionados.
+        </div>
+      )}
 
       {/* Alerta de Expiração - Aparece apenas se houver diasRestantes */}
       {diasRestantes !== null && diasRestantes !== undefined && (

@@ -228,6 +228,13 @@ export default function UpgradeModal({
                   <p className="text-xs text-muted-foreground mt-1">
                     {billingPeriod === 'annual' ? '/year' : '/month'}
                   </p>
+                  {plan.id !== 'free' && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {plan.stripe?.priceMonthlyId || plan.stripe?.priceAnnualId
+                        ? 'Pagamento com Stripe disponível'
+                        : 'Stripe não configurado para este plano. Usando PayPal como fallback.'}
+                    </p>
+                  )}
                 </div>
 
                 {/* Button */}
@@ -262,8 +269,10 @@ export default function UpgradeModal({
                       </span>
                     ) : isCurrentPlan ? (
                       'Current Plan'
+                    ) : plan.stripe?.priceMonthlyId || plan.stripe?.priceAnnualId ? (
+                      'Pagar com Stripe'
                     ) : (
-                      'Select Plan'
+                      'Pagar com PayPal'
                     )}
                   </Button>
                 )}
@@ -367,8 +376,10 @@ export default function UpgradeModal({
                       </span>
                     ) : isCurrentPlan ? (
                       'Current Plan'
+                    ) : plan.stripe?.priceMonthlyId || plan.stripe?.priceAnnualId ? (
+                      'Pagar com Stripe'
                     ) : (
-                      'Select Plan'
+                      'Pagar com PayPal'
                     )}
                   </Button>
                 )}
