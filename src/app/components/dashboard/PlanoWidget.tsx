@@ -15,13 +15,14 @@ interface PlanoWidgetProps {
     };
   };
   diasRestantes: number | null;
+  planExpiresAt?: string | null;
   onUpgrade: () => void;
   userPlan?: string;
   isTrial?: boolean;
   onRefresh?: () => Promise<void>;
 }
 
-export default function PlanoWidget({ limites, diasRestantes, onUpgrade, userPlan = 'free', isTrial = false, onRefresh }: PlanoWidgetProps) {
+export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, onUpgrade, userPlan = 'free', isTrial = false, onRefresh }: PlanoWidgetProps) {
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -61,26 +62,6 @@ export default function PlanoWidget({ limites, diasRestantes, onUpgrade, userPla
     if (perc >= 90) return { stroke: '#ef4444', bg: '#fee2e2', text: 'text-red-600' }; // red
     if (perc >= 75) return { stroke: '#f59e0b', bg: '#fef3c7', text: 'text-amber-600' }; // amber
     return { stroke: '#10b981', bg: '#d1fae5', text: 'text-emerald-600' }; // emerald
-  };
-
-  // Mapear nome do plano
-  const getPlanName = () => {
-    switch(userPlan) {
-      case 'business':
-      case 'business_monthly':
-        return 'Plano Business';
-      case 'professional':
-      case 'professional_monthly':
-        return 'Plano Professional';
-      case 'enterprise':
-      case 'enterprise_monthly':
-        return 'Plano Enterprise';
-      case 'unlimited':
-      case 'unlimited_monthly':
-        return 'Plano Unlimited';
-      default:
-        return 'Plano Gratuito';
-    }
   };
 
   const limitCards = [
@@ -162,28 +143,27 @@ export default function PlanoWidget({ limites, diasRestantes, onUpgrade, userPla
 
   return (
     <div id="plan-limits-card" className="space-y-6">
-      {/* Header simplificado com botões lado a lado */}
+      {/* Header com botão de atualizar limites e botão de abrir modal de upgrade */}
       <div id="dashboard-welcome" className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4">
-        {/* Botão de Atualizar Limites - alinhado à esquerda */}
-        {onRefresh && (
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="w-full md:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-purple-500/20 dark:hover:bg-purple-500/30 text-gray-700 dark:text-purple-300 rounded-lg transition-colors text-sm font-medium flex items-center justify-center md:justify-start gap-2 disabled:opacity-50 border border-transparent dark:border-purple-500/30"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span>{refreshing ? 'Atualizando...' : 'Atualizar Limites'}</span>
-          </button>
-        )}
-        
-        {/* Botão de Upgrade - alinhado à direita */}
+        <div className="flex flex-wrap gap-3 items-center w-full md:w-auto">
+          {onRefresh && (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="w-full md:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-purple-500/20 dark:hover:bg-purple-500/30 text-gray-700 dark:text-purple-300 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 border border-transparent dark:border-purple-500/30"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>{refreshing ? 'Atualizando...' : 'Atualizar Limites'}</span>
+            </button>
+          )}
+        </div>
+
         <button
           onClick={onUpgrade}
-          data-upgrade-btn
-          className="w-full md:w-auto bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 py-2.5 rounded-xl transition-all duration-300 flex items-center justify-center md:justify-start gap-2 shadow-md hover:shadow-lg font-semibold text-sm md:ml-auto"
+          className="w-full md:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
         >
           <Crown className="w-4 h-4" />
-          <span>Upgrade</span>
+          Upgrade
         </button>
       </div>
 

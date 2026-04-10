@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Check, Crown, Zap, Rocket, Loader2, ExternalLink } from 'lucide-react';
+import { Check, Crown, Zap, Rocket, Loader2, CreditCard, Wallet } from 'lucide-react';
 import { Button } from '../ui/button';
 import { plansApi } from '../../utils/api';
 import { toast } from 'sonner';
@@ -16,6 +16,31 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
   const [loading, setLoading] = useState(true);
   const [isStripeAvailable, setIsStripeAvailable] = useState(false);
   const currentPlan = user?.plan || 'free';
+  const formattedPlanExpiry = user?.planExpiresAt
+    ? new Date(user.planExpiresAt).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+    : null;
+  const getPlanName = () => {
+    switch(currentPlan) {
+      case 'business':
+      case 'business_monthly':
+        return 'Plano Business';
+      case 'professional':
+      case 'professional_monthly':
+        return 'Plano Professional';
+      case 'enterprise':
+      case 'enterprise_monthly':
+        return 'Plano Enterprise';
+      case 'unlimited':
+      case 'unlimited_monthly':
+        return 'Plano Unlimited';
+      default:
+        return 'Plano Gratuito';
+    }
+  };
 
   // Icon mapping
   const iconMap: Record<string, any> = {
@@ -164,6 +189,45 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
     }
   };
 
+  const handleStripeCheckout = async (plan: any) => {
+    const stripePriceId = billingPeriod === 'monthly'
+      ? plan.stripe?.priceMonthlyId
+      : plan.stripe?.priceAnnualId;
+
+    if (!stripePriceId) {
+      toast.error('Stripe não está configurado para este período. Use PayPal abaixo.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await plansApi.createStripeCheckoutSession(plan.id, billingPeriod);
+      if (response.success && response.sessionUrl) {
+        window.location.href = response.sessionUrl;
+        return;
+      }
+      toast.error('Falha ao iniciar checkout Stripe. Tente novamente.');
+    } catch (error: any) {
+      console.error('[PlanPage] Stripe checkout error:', error);
+      toast.error(error.message || 'Erro ao iniciar pagamento Stripe.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePayPalCheckout = (plan: any) => {
+    const paymentLink = billingPeriod === 'monthly'
+      ? plan.paymentLinks?.monthly
+      : plan.paymentLinks?.annual;
+
+    if (paymentLink) {
+      window.open(paymentLink, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    toast.error('Link de pagamento PayPal não configurado para este plano.');
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-0">
       <div className="mb-8 text-center">
@@ -173,6 +237,54 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
         <p className="text-sm text-muted-foreground">
           Escolha o plano ideal para o seu negócio
         </p>
+      </div>
+
+      {/* Alerta do Plano Ativo com Status */}
+      <div className="mb-8 rounded-lg border-2 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border-purple-500/40 p-6">
+        <div className="flex items-center gap-4">
+          <div className="flex-shrink-0">
+            <div className="flex items-center justify-center h-12 w-12 rounded-md bg-purple-600 text-white">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-foreground">
+              {getPlanName()} - Plano Ativo
+            </h3>
+            <div className="mt-2 flex flex-col gap-2">
+              {diasRestantes !== null && (
+                <p className={`text-sm font-medium ${
+                  diasRestantes === 0
+                    ? 'text-red-500'
+                    : diasRestantes <= 7
+                    ? 'text-amber-500'
+                    : 'text-emerald-500'
+                }`}>
+                  {diasRestantes === 0
+                    ? '🚨 Plano expirado - Renove agora para continuar usando'
+                    : diasRestantes <= 7
+                    ? `⚠️ ${diasRestantes} dia${diasRestantes === 1 ? '' : 's'} restante${diasRestantes === 1 ? '' : 's'}`
+                    : `✅ ${diasRestantes} dias restantes`}
+                </p>
+              )}
+              {formattedPlanExpiry && (
+                <p className="text-xs text-muted-foreground">
+                  Data de renovação: <strong>{formattedPlanExpiry}</strong>
+                </p>
+              )}
+            </div>
+          </div>
+          {diasRestantes !== null && diasRestantes <= 7 && (
+            <button
+              onClick={onUpgrade}
+              className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-medium transition-all shadow-lg"
+            >
+              Renovar
+            </button>
+          )}
+        </div>
       </div>
 
       {!loading && plans.length > 0 && !isStripeAvailable && (
@@ -351,34 +463,60 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                   ))}
                 </ul>
 
-                {/* Button */}
-                <Button
-                  onClick={() => handleUpgradeClick(plan)}
-                  disabled={isCurrentPlan || plan.id === 'free'}
-                  className={`w-full ${
-                    isCurrentPlan
-                      ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                      : plan.id === 'free'
-                      ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
-                >
-                  {isCurrentPlan ? (
-                    'Plano Atual'
-                  ) : plan.id === 'free' ? (
-                    'Plano Gratuito'
-                  ) : plan.stripe?.priceMonthlyId || plan.stripe?.priceAnnualId ? (
-                    <>
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Pagar com Stripe
-                    </>
-                  ) : (
-                    <>
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Ver Pagamento
-                    </>
-                  )}
-                </Button>
+                {/* Payment buttons */}
+                {plan.id === 'free' ? (
+                  <Button
+                    disabled
+                    className="w-full bg-muted text-muted-foreground cursor-not-allowed"
+                  >
+                    Plano Gratuito
+                  </Button>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Button
+                      onClick={() => handleStripeCheckout(plan)}
+                      disabled={isCurrentPlan || loading || !(billingPeriod === 'monthly'
+                        ? plan.stripe?.priceMonthlyId
+                        : plan.stripe?.priceAnnualId)}
+                      className={`w-full ${
+                        isCurrentPlan || !(billingPeriod === 'monthly'
+                          ? plan.stripe?.priceMonthlyId
+                          : plan.stripe?.priceAnnualId)
+                          ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                    >
+                      {isCurrentPlan ? (
+                        'Plano Atual'
+                      ) : (
+                        <>
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          Pagar com Stripe
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={() => handlePayPalCheckout(plan)}
+                      disabled={isCurrentPlan || !(
+                        billingPeriod === 'monthly'
+                          ? plan.paymentLinks?.monthly
+                          : plan.paymentLinks?.annual
+                      )}
+                      className={`w-full ${
+                        isCurrentPlan || !(
+                          billingPeriod === 'monthly'
+                            ? plan.paymentLinks?.monthly
+                            : plan.paymentLinks?.annual
+                        )
+                          ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                          : 'bg-[#0070ba] hover:bg-[#005a9c] text-white'
+                      }`}
+                    >
+                      <Wallet className="w-4 h-4 mr-2" />
+                      Pagar com PayPal
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           );

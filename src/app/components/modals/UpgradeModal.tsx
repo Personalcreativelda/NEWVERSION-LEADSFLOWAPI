@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { plansApi, apiRequest } from '../../utils/api';
+import { plansApi } from '../../utils/api';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
-import { Check, Loader2, Zap, Rocket, Crown, X } from 'lucide-react';
-import PayPalButton from '../payment/PayPalButton';
+import { Check, Loader2, Zap, Rocket, CreditCard, Crown, X } from 'lucide-react';
+import PaymentMethodModal from './PaymentMethodModal';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 
@@ -24,7 +24,8 @@ export default function UpgradeModal({
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
-  const [showPayPalButton, setShowPayPalButton] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [planForPayment, setPlanForPayment] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -43,6 +44,43 @@ export default function UpgradeModal({
     }
   };
 
+  const handleSelectPlan = (planId: string) => {
+    if (planId === currentPlan) {
+      return;
+    }
+
+    if (planId !== 'free') {
+      // Abrir modal de pagamento para planos pagos
+      setPlanForPayment(planId);
+      setShowPaymentModal(true);
+      return;
+    }
+
+    // Para plano free, processar diretamente
+    handleFreeUpgrade(planId);
+  };
+
+  const handleFreeUpgrade = async (planId: string) => {
+    setLoading(true);
+    setSelectedPlan(planId);
+
+    try {
+      const response = await plansApi.upgrade(planId);
+      if (response.success) {
+        toast.success('Plano atualizado para Free!');
+        onUpgradeSuccess(response.user);
+        onClose();
+      }
+    } catch (error: any) {
+      console.error('Error upgrading plan:', error);
+      const errorMessage = error.message || 'Erro ao atualizar plano. Tente novamente.';
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+      setSelectedPlan(null);
+    }
+  };
+
   const handleUpgrade = async (planId: string) => {
     if (planId === currentPlan) {
       return;
@@ -53,7 +91,12 @@ export default function UpgradeModal({
       ? selected?.stripe?.priceAnnualId
       : selected?.stripe?.priceMonthlyId;
 
-    if (planId !== 'free' && stripePriceId) {
+    if (planId !== 'free') {
+      if (!stripePriceId) {
+        toast.error('Stripe não está configurado para este plano. Use PayPal para continuar.');
+        return;
+      }
+
       setLoading(true);
       setSelectedPlan(planId);
 
@@ -74,11 +117,6 @@ export default function UpgradeModal({
         setSelectedPlan(null);
       }
 
-      return;
-    }
-
-    if (planId !== 'free') {
-      setShowPayPalButton(planId);
       return;
     }
 
@@ -103,30 +141,6 @@ export default function UpgradeModal({
     }
   };
 
-  const handlePayPalSuccess = async (subscriptionId: string) => {
-    console.log('PayPal subscription successful:', subscriptionId);
-    setLoading(true);
-
-    try {
-      // Call backend to activate the subscription
-      const response = await apiRequest('/paypal/activate-subscription', 'POST', {
-        subscriptionId,
-        planId: showPayPalButton,
-        billingPeriod,
-      });
-
-      if (response.success) {
-        toast.success('Plano ativado com sucesso!');
-        onUpgradeSuccess(response.user);
-        onClose();
-      }
-    } catch (error: any) {
-      console.error('Error activating subscription:', error);
-      toast.error('Erro ao ativar assinatura. Entre em contato com o suporte.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const planConfig = {
     free: { icon: Zap, color: 'text-gray-500 dark:text-muted-foreground', bg: 'bg-gray-100 dark:bg-muted' },
@@ -137,8 +151,9 @@ export default function UpgradeModal({
   if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-5xl bg-card text-card-foreground border border-border shadow-xl max-h-[90vh] overflow-y-auto">
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-5xl bg-card text-card-foreground border border-border shadow-xl max-h-[90vh] overflow-y-auto animate-in fade-in slide-in-from-bottom-10 duration-300">
         <DialogHeader>
           <DialogTitle className="text-2xl text-center text-foreground mb-2">
             ✨ Escolha o Plano Ideal para Você
@@ -150,13 +165,13 @@ export default function UpgradeModal({
 
         {/* Toggle */}
         <div className="flex justify-center pb-6 px-4">
-          <div className="inline-flex gap-2 bg-gray-100 dark:bg-muted p-1 rounded-lg border border-gray-200 dark:border-border">
+          <div className="inline-flex gap-2 bg-gray-800 dark:bg-gray-700 p-1 rounded-lg border border-gray-700 dark:border-gray-600">
             <button
               onClick={() => setBillingPeriod('monthly')}
               className={`px-6 py-2 text-sm font-medium rounded-md transition ${
                 billingPeriod === 'monthly'
-                  ? 'bg-white dark:bg-primary text-gray-900 dark:text-primary-foreground shadow-sm'
-                  : 'text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground'
+                  ? 'bg-gray-600 dark:bg-gray-600 text-white dark:text-white shadow-sm'
+                  : 'text-gray-300 dark:text-gray-400 hover:text-gray-200 dark:hover:text-gray-300'
               }`}
             >
               Monthly
@@ -165,8 +180,8 @@ export default function UpgradeModal({
               onClick={() => setBillingPeriod('annual')}
               className={`px-6 py-2 text-sm font-medium rounded-md transition relative ${
                 billingPeriod === 'annual'
-                  ? 'bg-white dark:bg-primary text-gray-900 dark:text-primary-foreground shadow-sm'
-                  : 'text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground'
+                  ? 'bg-gray-600 dark:bg-gray-600 text-white dark:text-white shadow-sm'
+                  : 'text-gray-300 dark:text-gray-400 hover:text-gray-200 dark:hover:text-gray-300'
               }`}
             >
               Annual
@@ -188,10 +203,14 @@ export default function UpgradeModal({
             return (
               <div
                 key={plan.id}
-                className="relative bg-muted rounded-xl p-6 border border-border hover:border-muted-foreground/40 transition"
+                className={`relative rounded-xl p-6 border-2 transition ${
+                  isBestValue
+                    ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500/20'
+                    : 'bg-muted border-border hover:border-muted-foreground/40'
+                }`}
               >
                 {isBestValue && (
-                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full font-medium shadow-sm">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium shadow-md">
                     Popular
                   </div>
                 )}
@@ -237,24 +256,31 @@ export default function UpgradeModal({
                   )}
                 </div>
 
-                {/* Button */}
-                {showPayPalButton === plan.id ? (
-                  <div className="mb-6">
-                    <PayPalButton
-                      planId={`${plan.id}-${billingPeriod}`}
-                      onSuccess={handlePayPalSuccess}
-                      onError={() => setShowPayPalButton(null)}
-                    />
-                    <button
-                      onClick={() => setShowPayPalButton(null)}
-                      className="w-full mt-2 text-xs text-muted-foreground hover:text-foreground transition"
-                    >
-                      Voltar
-                    </button>
-                  </div>
+                {/* Select Plan Button */}
+                {plan.id !== 'free' ? (
+                  <Button
+                    onClick={() => handleSelectPlan(plan.id)}
+                    disabled={isCurrentPlan || loading}
+                    className={`w-full font-medium py-5 rounded-lg mb-6 transition-all duration-200 transform hover:shadow-lg hover:scale-105 ${
+                      isCurrentPlan
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                        : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/50'
+                    }`}
+                  >
+                    {loading && selectedPlan === plan.id ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Carregando...
+                      </span>
+                    ) : isCurrentPlan ? (
+                      'Plano Atual'
+                    ) : (
+                      'Selecionar Plano'
+                    )}
+                  </Button>
                 ) : (
                   <Button
-                    onClick={() => handleUpgrade(plan.id)}
+                    onClick={() => handleSelectPlan(plan.id)}
                     disabled={isCurrentPlan || loading}
                     className={`w-full font-medium py-5 rounded-lg mb-6 transition ${
                       isCurrentPlan
@@ -265,14 +291,12 @@ export default function UpgradeModal({
                     {loading && selectedPlan === plan.id ? (
                       <span className="flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Loading...
+                        Carregando...
                       </span>
                     ) : isCurrentPlan ? (
-                      'Current Plan'
-                    ) : plan.stripe?.priceMonthlyId || plan.stripe?.priceAnnualId ? (
-                      'Pagar com Stripe'
+                      'Plano Atual'
                     ) : (
-                      'Pagar com PayPal'
+                      'Fazer Upgrade'
                     )}
                   </Button>
                 )}
@@ -302,10 +326,14 @@ export default function UpgradeModal({
             return (
               <div
                 key={plan.id}
-                className="snap-center min-w-[85%] relative bg-neutral-900 rounded-xl p-6 border border-neutral-800 flex-shrink-0"
+                className={`snap-center min-w-[85%] relative rounded-xl p-6 border-2 flex-shrink-0 transition ${
+                  isBestValue
+                    ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20'
+                    : 'bg-neutral-900 border-neutral-800'
+                }`}
               >
                 {isBestValue && (
-                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-white text-black text-xs px-3 py-1 rounded-full font-medium">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium shadow-md">
                     Popular
                   </div>
                 )}
@@ -344,24 +372,31 @@ export default function UpgradeModal({
                   </p>
                 </div>
 
-                {/* Button */}
-                {showPayPalButton === plan.id ? (
-                  <div className="mb-6">
-                    <PayPalButton
-                      planId={`${plan.id}-${billingPeriod}`}
-                      onSuccess={handlePayPalSuccess}
-                      onError={() => setShowPayPalButton(null)}
-                    />
-                    <button
-                      onClick={() => setShowPayPalButton(null)}
-                      className="w-full mt-2 text-xs text-neutral-500 hover:text-neutral-300 transition"
-                    >
-                      Voltar
-                    </button>
-                  </div>
+                {/* Select Plan Button */}
+                {plan.id !== 'free' ? (
+                  <Button
+                    onClick={() => handleSelectPlan(plan.id)}
+                    disabled={isCurrentPlan || loading}
+                    className={`w-full font-medium py-5 rounded-lg mb-6 transition-all duration-200 transform hover:shadow-lg hover:scale-105 ${
+                      isCurrentPlan
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-50'
+                        : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/50'
+                    }`}
+                  >
+                    {loading && selectedPlan === plan.id ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Carregando...
+                      </span>
+                    ) : isCurrentPlan ? (
+                      'Plano Atual'
+                    ) : (
+                      'Selecionar Plano'
+                    )}
+                  </Button>
                 ) : (
                   <Button
-                    onClick={() => handleUpgrade(plan.id)}
+                    onClick={() => handleSelectPlan(plan.id)}
                     disabled={isCurrentPlan || loading}
                     className={`w-full font-medium py-5 rounded-lg mb-6 transition ${
                       isCurrentPlan
@@ -372,14 +407,12 @@ export default function UpgradeModal({
                     {loading && selectedPlan === plan.id ? (
                       <span className="flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Loading...
+                        Carregando...
                       </span>
                     ) : isCurrentPlan ? (
-                      'Current Plan'
-                    ) : plan.stripe?.priceMonthlyId || plan.stripe?.priceAnnualId ? (
-                      'Pagar com Stripe'
+                      'Plano Atual'
                     ) : (
-                      'Pagar com PayPal'
+                      'Fazer Upgrade'
                     )}
                   </Button>
                 )}
@@ -408,6 +441,18 @@ export default function UpgradeModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Payment Method Modal */}
+    <PaymentMethodModal
+      isOpen={showPaymentModal}
+      onClose={() => {
+        setShowPaymentModal(false);
+        setPlanForPayment(null);
+      }}
+      planId={planForPayment}
+      billingPeriod={billingPeriod}
+    />
+  </>
   );
 }
 
