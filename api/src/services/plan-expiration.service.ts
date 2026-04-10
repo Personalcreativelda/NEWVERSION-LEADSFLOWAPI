@@ -35,6 +35,7 @@ const checkExpiredPlans = async () => {
           `UPDATE users 
            SET plan = 'free', 
                subscription_plan = 'free',
+               subscription_status = 'expired',
                plan_limits = $1,
                plan_expires_at = NULL,
                updated_at = NOW()

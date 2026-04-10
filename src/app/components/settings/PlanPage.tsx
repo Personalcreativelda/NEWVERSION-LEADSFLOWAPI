@@ -342,6 +342,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                   <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Plano</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Ciclo</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Valor</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Cartão</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Método</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
                 </tr>
@@ -360,6 +361,18 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                       </td>
                       <td className="px-6 py-4 font-semibold text-foreground">
                         {fmtMoney(item.amount, item.currency)}
+                      </td>
+                      <td className="px-6 py-4">
+                        {item.card_brand && item.card_last4 ? (
+                          <span className="inline-flex items-center gap-1.5 text-sm text-foreground">
+                            <span className="inline-flex items-center justify-center bg-blue-600 text-white text-xs font-bold px-1.5 py-0.5 rounded uppercase tracking-wide">
+                              {item.card_brand}
+                            </span>
+                            •••• {item.card_last4}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">
                         {paymentProviderLabel[item.payment_provider] || item.payment_provider || '—'}

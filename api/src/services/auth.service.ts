@@ -39,9 +39,12 @@ interface DbUser {
   role?: string;
   is_active: boolean;
   email_verified: boolean;
+  plan?: string;
   subscription_plan?: string;
   subscription_status?: string;
   subscription_expires_at?: string;
+  plan_expires_at?: string;
+  plan_activated_at?: string;
 }
 
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
@@ -68,10 +71,13 @@ const sanitizeUser = (user: DbUser) => ({
   avatar_url: user.avatar_url,
   role: user.role,
   email_verified: user.email_verified,
-  subscription_plan: user.subscription_plan || 'free',
+  subscription_plan: user.subscription_plan || user.plan || 'free',
   subscription_status: user.subscription_status || 'active',
-  subscription_expires_at: user.subscription_expires_at || null,
-  plan: user.subscription_plan || 'free', // Alias for frontend compatibility
+  plan: user.subscription_plan || user.plan || 'free', // Alias for frontend compatibility
+  // Expose expiry under both naming conventions so all frontend code finds it
+  planExpiresAt: user.plan_expires_at || user.subscription_expires_at || null,
+  plan_expires_at: user.plan_expires_at || user.subscription_expires_at || null,
+  plan_activated_at: user.plan_activated_at || null,
 });
 
 const buildSessionResponse = (user: DbUser, session: { accessToken: string; refreshToken: string; expiresAt: Date }) => ({

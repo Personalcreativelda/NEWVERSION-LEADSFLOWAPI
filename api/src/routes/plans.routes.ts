@@ -82,6 +82,29 @@ router.post('/upgrade', requireAuth, async (req: AuthenticatedRequest, res, next
   }
 });
 
+// Get payment history for the authenticated user
+router.get('/payment-history', requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const result = await query(
+      `SELECT id, plan_id, amount, currency, billing_cycle, payment_method, payment_provider,
+              card_brand, card_last4, stripe_subscription_id,
+              status, provider_transaction_id, created_at
+       FROM payment_history
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [req.user.id]
+    );
+
+    res.json({ success: true, history: result.rows });
+  } catch (error) {
+    console.error('[Plans] Error fetching payment history:', error);
+    next(error);
+  }
+});
+
 // Create Stripe checkout session for a plan purchase
 router.post('/stripe/checkout-session', requireAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
@@ -171,17 +194,60 @@ router.post('/stripe/webhook', async (req, res) => {
 
     console.log('[Stripe Webhook] Event received:', event.type);
 
+    // ── checkout.session.completed → initial plan purchase ──
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as any;
       const userId = session.metadata?.userId;
       const planId = session.metadata?.planId;
+      const billingCycle = session.metadata?.billingCycle || 'monthly';
+      const amountTotal = session.amount_total ? session.amount_total / 100 : null;
+      const currency = session.currency?.toUpperCase() || 'USD';
+      const stripeCustomerId = session.customer as string | null;
+      const stripeSubscriptionId = session.subscription as string | null;
 
       if (userId && planId) {
+        // Retrieve card info from the subscription's payment method
+        let cardBrand: string | null = null;
+        let cardLast4: string | null = null;
+        if (stripeSubscriptionId) {
+          try {
+            const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
+              expand: ['default_payment_method'],
+            });
+            const pm = sub.default_payment_method as any;
+            if (pm?.card) {
+              cardBrand = pm.card.brand || null;
+              cardLast4 = pm.card.last4 || null;
+            }
+          } catch (err) {
+            console.warn('[Stripe Webhook] Could not retrieve payment method card info:', err);
+          }
+        }
+
+        const expiresAt = billingCycle === 'annual'
+          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
         await query(
           `UPDATE users
-           SET plan = $1, subscription_plan = $1, updated_at = NOW()
-           WHERE id = $2`,
-          [planId, userId]
+           SET plan = $1, subscription_plan = $1,
+               plan_activated_at = NOW(),
+               plan_expires_at = $2,
+               subscription_status = 'active',
+               stripe_customer_id = COALESCE($3, stripe_customer_id),
+               stripe_subscription_id = COALESCE($4, stripe_subscription_id),
+               updated_at = NOW()
+           WHERE id = $5`,
+          [planId, expiresAt, stripeCustomerId, stripeSubscriptionId, userId]
+        );
+
+        await query(
+          `INSERT INTO payment_history
+             (user_id, plan_id, amount, currency, billing_cycle, payment_method, payment_provider,
+              card_brand, card_last4, stripe_subscription_id, status, provider_transaction_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11)`,
+          [userId, planId, amountTotal, currency, billingCycle, 'card', 'stripe',
+           cardBrand, cardLast4, stripeSubscriptionId, session.id]
         );
 
         await notificationsService.createNotification(
@@ -193,9 +259,75 @@ router.post('/stripe/webhook', async (req, res) => {
           { planId }
         );
 
-        console.log(`[Stripe Webhook] User ${userId} upgraded to ${planId}`);
+        console.log(`[Stripe Webhook] User ${userId} upgraded to ${planId} (${billingCycle}) card: ${cardBrand} ****${cardLast4}`);
       } else {
         console.warn('[Stripe Webhook] Missing metadata for checkout.session.completed');
+      }
+    }
+
+    // ── invoice.payment_succeeded → subscription auto-renewal ──
+    if (event.type === 'invoice.payment_succeeded') {
+      const invoice = event.data.object as any;
+      // Only process subscription renewals, not initial checkout (handled above)
+      if (invoice.billing_reason === 'subscription_cycle' && invoice.subscription && invoice.customer) {
+        try {
+          const stripeSubscriptionId = invoice.subscription as string;
+          const stripeCustomerId = invoice.customer as string;
+          const amountPaid = invoice.amount_paid ? invoice.amount_paid / 100 : null;
+          const currency = invoice.currency?.toUpperCase() || 'USD';
+
+          // Find user by stripe_customer_id
+          const userResult = await query(
+            `SELECT id, plan FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+            [stripeCustomerId]
+          );
+          if (!userResult.rows.length) {
+            console.warn(`[Stripe Webhook] No user found for customer ${stripeCustomerId}`);
+          } else {
+            const user = userResult.rows[0];
+
+            // Get card info from subscription
+            let cardBrand: string | null = null;
+            let cardLast4: string | null = null;
+            let billingCycle = 'monthly';
+            try {
+              const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
+                expand: ['default_payment_method', 'items.data.price'],
+              });
+              const pm = sub.default_payment_method as any;
+              if (pm?.card) { cardBrand = pm.card.brand; cardLast4 = pm.card.last4; }
+              // Determine billing cycle from interval
+              const interval = (sub.items?.data?.[0]?.price as any)?.recurring?.interval;
+              if (interval === 'year') billingCycle = 'annual';
+            } catch (err) {
+              console.warn('[Stripe Webhook] Could not get subscription details on renewal:', err);
+            }
+
+            const expiresAt = billingCycle === 'annual'
+              ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+              : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+            await query(
+              `UPDATE users
+               SET plan_expires_at = $1, subscription_status = 'active', updated_at = NOW()
+               WHERE id = $2`,
+              [expiresAt, user.id]
+            );
+
+            await query(
+              `INSERT INTO payment_history
+                 (user_id, plan_id, amount, currency, billing_cycle, payment_method, payment_provider,
+                  card_brand, card_last4, stripe_subscription_id, status, provider_transaction_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11)`,
+              [user.id, user.plan, amountPaid, currency, billingCycle, 'card', 'stripe',
+               cardBrand, cardLast4, stripeSubscriptionId, invoice.id]
+            );
+
+            console.log(`[Stripe Webhook] Renewal for user ${user.id} plan=${user.plan} expires=${expiresAt.toISOString()}`);
+          }
+        } catch (renewErr) {
+          console.error('[Stripe Webhook] Error processing renewal:', renewErr);
+        }
       }
     }
 

@@ -18,6 +18,54 @@ const readSchemaFile = () => {
 
 // Executar migrações pendentes automaticamente
 const runPendingMigrations = async () => {
+  // Migração: plan_activated_at, subscription_status, stripe IDs e tabela payment_history
+  try {
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_activated_at TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50) DEFAULT 'free';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(100);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(100);
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payment_history (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        plan_id VARCHAR(50) NOT NULL,
+        amount DECIMAL(10,2),
+        currency VARCHAR(10) DEFAULT 'USD',
+        billing_cycle VARCHAR(20),
+        payment_method VARCHAR(50),
+        payment_provider VARCHAR(50),
+        card_brand VARCHAR(30),
+        card_last4 VARCHAR(10),
+        stripe_subscription_id VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'completed',
+        provider_transaction_id VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_payment_history_user_id ON payment_history(user_id);
+      CREATE INDEX IF NOT EXISTS idx_payment_history_created_at ON payment_history(created_at DESC);
+    `);
+    console.log('[DB] plan_activated_at, subscription_status, stripe IDs e payment_history prontos');
+  } catch (error: any) {
+    console.warn('[DB] Migration plan_activated_at/payment_history warning:', error.message);
+  }
+
+  // Migração: adicionar colunas de cartão e subscription ao payment_history (se já existir)
+  try {
+    await pool.query(`
+      ALTER TABLE payment_history ADD COLUMN IF NOT EXISTS card_brand VARCHAR(30);
+      ALTER TABLE payment_history ADD COLUMN IF NOT EXISTS card_last4 VARCHAR(10);
+      ALTER TABLE payment_history ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(100);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(100);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(100);
+    `);
+    console.log('[DB] card_brand, card_last4, stripe IDs adicionados');
+  } catch (error: any) {
+    console.warn('[DB] Migration card/stripe IDs warning:', error.message);
+  }
+
   try {
     // Migração: Atualizar CHECK constraint da tabela channels para incluir email e website
     await pool.query(`
