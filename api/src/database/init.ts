@@ -83,26 +83,63 @@ const runPendingMigrations = async () => {
       },
     };
 
-    for (const [planId, stripeConfig] of Object.entries(stripeDefaults)) {
-      if (stripeConfig.productId || stripeConfig.priceMonthlyId || stripeConfig.priceAnnualId) {
-        await pool.query(
-          `UPDATE plans
-           SET stripe_product_id = CASE
-                 WHEN stripe_product_id IS NULL OR stripe_product_id = 'prod_XXXXXXXXXXXXXXXX' THEN COALESCE($1, stripe_product_id)
-                 ELSE stripe_product_id
-               END,
-               stripe_price_monthly_id = CASE
-                 WHEN stripe_price_monthly_id IS NULL OR stripe_price_monthly_id = 'price_XXXXXXXXXXXXXXXX' THEN COALESCE($2, stripe_price_monthly_id)
-                 ELSE stripe_price_monthly_id
-               END,
-               stripe_price_annual_id = CASE
-                 WHEN stripe_price_annual_id IS NULL OR stripe_price_annual_id = 'price_XXXXXXXXXXXXXXXX' THEN COALESCE($3, stripe_price_annual_id)
-                 ELSE stripe_price_annual_id
-               END
-           WHERE id = $4;`,
-          [stripeConfig.productId, stripeConfig.priceMonthlyId, stripeConfig.priceAnnualId, planId]
-        );
+    // Buscar preços reais da API Stripe para manter a DB sempre sincronizada
+    let stripe: any = null;
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (stripeKey) {
+      try {
+        const StripeLib = (await import('stripe')).default;
+        stripe = new StripeLib(stripeKey, { apiVersion: '2026-03-25.dahlia' } as any);
+      } catch {
+        console.warn('[DB] Could not load Stripe SDK for price sync');
       }
+    }
+
+    for (const [planId, stripeConfig] of Object.entries(stripeDefaults)) {
+      if (!stripeConfig.priceMonthlyId && !stripeConfig.priceAnnualId) continue;
+
+      let priceMonthlyAmount: number | null = null;
+      let priceAnnualAmount: number | null = null;
+
+      // Buscar valor real do preço mensal no Stripe
+      if (stripe && stripeConfig.priceMonthlyId) {
+        try {
+          const p = await stripe.prices.retrieve(stripeConfig.priceMonthlyId);
+          if (p.unit_amount) priceMonthlyAmount = p.unit_amount / 100;
+        } catch (e: any) {
+          console.warn(`[DB] Could not fetch monthly price for ${planId}:`, e.message);
+        }
+      }
+
+      // Buscar valor real do preço anual no Stripe
+      if (stripe && stripeConfig.priceAnnualId) {
+        try {
+          const p = await stripe.prices.retrieve(stripeConfig.priceAnnualId);
+          if (p.unit_amount) priceAnnualAmount = p.unit_amount / 100;
+        } catch (e: any) {
+          console.warn(`[DB] Could not fetch annual price for ${planId}:`, e.message);
+        }
+      }
+
+      // Sempre sobrescrever IDs Stripe das variáveis de ambiente (fonte de verdade)
+      await pool.query(
+        `UPDATE plans
+         SET stripe_product_id = COALESCE($1, stripe_product_id),
+             stripe_price_monthly_id = COALESCE($2, stripe_price_monthly_id),
+             stripe_price_annual_id = COALESCE($3, stripe_price_annual_id),
+             price_monthly = CASE WHEN $4::numeric IS NOT NULL THEN $4::numeric ELSE price_monthly END,
+             price_annual  = CASE WHEN $5::numeric IS NOT NULL THEN $5::numeric ELSE price_annual  END
+         WHERE id = $6;`,
+        [
+          stripeConfig.productId,
+          stripeConfig.priceMonthlyId,
+          stripeConfig.priceAnnualId,
+          priceMonthlyAmount,
+          priceAnnualAmount,
+          planId,
+        ]
+      );
+      console.log(`[DB] Plan "${planId}" Stripe IDs synced from env. Prices: monthly=${priceMonthlyAmount ?? 'unchanged'}, annual=${priceAnnualAmount ?? 'unchanged'}`);
     }
   } catch (error: any) {
     console.warn('[DB] Stripe migration warning:', error.message);

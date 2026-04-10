@@ -111,7 +111,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
             name: 'Business',
             icon: Rocket,
             color: 'from-blue-500 to-blue-600',
-            price: { monthly: 30, annual: 100 },
+            price: { monthly: 20, annual: 100 },
             paymentLinks: { 
               monthly: 'https://www.paypal.com/ncp/payment/MJFXSMAZY9VPS', 
               annual: 'https://www.paypal.com/ncp/payment/ADJF2GY82HDCW' 

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Check, Zap, Star, Crown } from 'lucide-react';
 import { Button } from './ui/button';
 import { trackMetaEvent } from './MetaPixel';
@@ -83,6 +84,8 @@ const plans = [
 ];
 
 export default function Pricing({ onSelectPlan }: PricingProps) {
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
+
   return (
     <section id="planos" className="py-16 lg:py-24 bg-gradient-to-b from-[#0f0a1a] to-[#1a1625]">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -98,6 +101,35 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
           <p className="text-gray-400 max-w-2xl mx-auto text-base sm:text-lg">
             Comece grátis e faça upgrade quando precisar. Sem compromissos ou taxas escondidas.
           </p>
+
+          {/* Billing Period Toggle */}
+          <div className="flex justify-center mt-8">
+            <div className="inline-flex gap-2 bg-white/5 border border-white/10 p-1 rounded-xl">
+              <button
+                onClick={() => setBillingPeriod('monthly')}
+                className={`px-6 py-2 text-sm font-medium rounded-lg transition-all ${
+                  billingPeriod === 'monthly'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                Mensal
+              </button>
+              <button
+                onClick={() => setBillingPeriod('annual')}
+                className={`relative px-6 py-2 text-sm font-medium rounded-lg transition-all ${
+                  billingPeriod === 'annual'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                Anual
+                <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full shadow-sm">
+                  -20%
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Pricing Cards - Com scroll horizontal no mobile */}
@@ -149,13 +181,13 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
                         plan.highlighted ? 'text-white' : 'text-white'
                       }`}
                     >
-                      {plan.price}</span>
+                      {billingPeriod === 'annual' && plan.priceAnnual ? plan.priceAnnual : plan.price}</span>
                     <span
                       className={`text-sm ${
                         plan.highlighted ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
                       }`}
                     >
-                      {plan.period}
+                      {billingPeriod === 'annual' && plan.periodAnnual ? plan.periodAnnual : plan.period}
                     </span>
                   </div>
 
@@ -268,13 +300,13 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
                       plan.highlighted ? 'text-white' : 'text-white'
                     }`}
                   >
-                    {plan.price}</span>
+                    {billingPeriod === 'annual' && plan.priceAnnual ? plan.priceAnnual : plan.price}</span>
                   <span
                     className={`text-sm ${
                       plan.highlighted ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
                     }`}
                   >
-                    {plan.period}
+                    {billingPeriod === 'annual' && plan.periodAnnual ? plan.periodAnnual : plan.period}
                   </span>
                 </div>
 
