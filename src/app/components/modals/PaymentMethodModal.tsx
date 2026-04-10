@@ -25,11 +25,12 @@ export default function PaymentMethodModal({
   isOpen,
   onClose,
   planId,
-  billingPeriod,
+  billingPeriod: initialBillingPeriod,
   onPaymentSuccess,
 }: PaymentMethodModalProps) {
   const [loading, setLoading] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'paypal' | null>(null);
+  const billingPeriod = initialBillingPeriod;
 
   const handleStripePayment = async () => {
     if (!planId) return;
@@ -89,10 +90,10 @@ export default function PaymentMethodModal({
 
         {/* Período selecionado */}
         <div className="flex justify-center pb-2 px-4">
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-600/10 border border-blue-600/30 text-blue-400 text-sm font-medium">
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-muted border border-border text-foreground text-sm font-medium">
             {billingPeriod === 'monthly' ? '🗓 Plano Mensal' : '📅 Plano Anual'}
             {billingPeriod === 'annual' && (
-              <span className="bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">-20%</span>
+              <span className="bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded-full">-20%</span>
             )}
           </span>
         </div>

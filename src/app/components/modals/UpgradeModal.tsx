@@ -165,29 +165,27 @@ export default function UpgradeModal({
 
         {/* Toggle */}
         <div className="flex justify-center pb-6 px-4">
-          <div className="inline-flex gap-2 bg-gray-800 dark:bg-gray-700 p-1 rounded-lg border border-gray-700 dark:border-gray-600">
+          <div className="inline-flex items-center bg-muted/30 rounded-xl p-1 border border-border">
             <button
               onClick={() => setBillingPeriod('monthly')}
-              className={`px-6 py-2 text-sm font-medium rounded-md transition ${
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition-colors ${
                 billingPeriod === 'monthly'
-                  ? 'bg-gray-600 dark:bg-gray-600 text-white dark:text-white shadow-sm'
-                  : 'text-gray-300 dark:text-gray-400 hover:text-gray-200 dark:hover:text-gray-300'
+                  ? 'bg-card text-foreground shadow-sm border border-border'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Monthly
+              Mensal
             </button>
             <button
               onClick={() => setBillingPeriod('annual')}
-              className={`px-6 py-2 text-sm font-medium rounded-md transition relative ${
+              className={`relative px-6 py-2 rounded-lg text-sm font-medium transition-colors ${
                 billingPeriod === 'annual'
-                  ? 'bg-gray-600 dark:bg-gray-600 text-white dark:text-white shadow-sm'
-                  : 'text-gray-300 dark:text-gray-400 hover:text-gray-200 dark:hover:text-gray-300'
+                  ? 'bg-card text-foreground shadow-sm border border-border'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Annual
-              <span className="absolute -top-1.5 -right-1.5 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full shadow-sm">
-                -20%
-              </span>
+              Anual
+              <span className="ml-2 text-xs bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">-20%</span>
             </button>
           </div>
         </div>
@@ -245,7 +243,7 @@ export default function UpgradeModal({
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {billingPeriod === 'annual' ? '/year' : '/month'}
+                    {billingPeriod === 'annual' ? '/ano' : '/mês'}
                   </p>
                   {plan.id !== 'free' && (
                     <p className="text-xs text-muted-foreground mt-2">
@@ -329,7 +327,7 @@ export default function UpgradeModal({
                 className={`snap-center min-w-[85%] relative rounded-xl p-6 border-2 flex-shrink-0 transition ${
                   isBestValue
                     ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20'
-                    : 'bg-neutral-900 border-neutral-800'
+                    : 'bg-muted border-border'
                 }`}
               >
                 {isBestValue && (
@@ -340,8 +338,8 @@ export default function UpgradeModal({
 
                 {isCurrentPlan && (
                   <div className="absolute top-3 right-3">
-                    <span className="bg-green-500/10 text-green-400 px-2 py-1 rounded-md text-xs border border-green-500/20">
-                      Current
+                    <span className="bg-green-500/10 text-green-600 dark:text-green-300 px-2 py-1 rounded-md text-xs border border-green-500/20">
+                      Atual
                     </span>
                   </div>
                 )}
@@ -354,11 +352,11 @@ export default function UpgradeModal({
                 </div>
 
                 {/* Plan Name */}
-                <h3 className="text-xl font-bold text-white text-center mb-1">{plan.name}</h3>
+                <h3 className="text-xl font-bold text-foreground text-center mb-1">{plan.name}</h3>
 
                 {/* Price */}
                 <div className="text-center mb-6">
-                  <div className="text-3xl font-bold text-white">
+                  <div className="text-3xl font-bold text-foreground">
                     {plan.id === 'free' ? (
                       '$0'
                     ) : billingPeriod === 'annual' ? (
@@ -367,8 +365,8 @@ export default function UpgradeModal({
                       `$${plan.price?.monthly || 0}`
                     )}
                   </div>
-                  <p className="text-xs text-neutral-500 mt-1">
-                    {billingPeriod === 'annual' ? '/year' : '/month'}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {billingPeriod === 'annual' ? '/ano' : '/mês'}
                   </p>
                 </div>
 
@@ -379,7 +377,7 @@ export default function UpgradeModal({
                     disabled={isCurrentPlan || loading}
                     className={`w-full font-medium py-5 rounded-lg mb-6 transition-all duration-200 transform hover:shadow-lg hover:scale-105 ${
                       isCurrentPlan
-                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-50'
+                        ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
                         : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/50'
                     }`}
                   >
@@ -400,8 +398,8 @@ export default function UpgradeModal({
                     disabled={isCurrentPlan || loading}
                     className={`w-full font-medium py-5 rounded-lg mb-6 transition ${
                       isCurrentPlan
-                        ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
-                        : 'bg-white text-black hover:bg-neutral-200'
+                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
                     }`}
                   >
                     {loading && selectedPlan === plan.id ? (
@@ -418,11 +416,11 @@ export default function UpgradeModal({
                 )}
 
                 {/* Features */}
-                <div className="space-y-2 border-t border-neutral-800 pt-4">
+                <div className="space-y-2 border-t border-border pt-4">
                   {plan.features.slice(0, 5).map((feature: string, index: number) => (
                     <div key={index} className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-neutral-500 flex-shrink-0 mt-0.5" />
-                      <span className="text-xs text-neutral-400 leading-relaxed">{feature}</span>
+                      <Check className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                      <span className="text-xs text-muted-foreground leading-relaxed">{feature}</span>
                     </div>
                   ))}
                 </div>
@@ -432,8 +430,8 @@ export default function UpgradeModal({
         </div>
 
         {/* Footer */}
-        <div className="mt-6 text-center border-t border-neutral-800 pt-6 px-4">
-          <div className="flex flex-wrap items-center justify-center gap-4 text-neutral-500 text-xs">
+        <div className="mt-6 text-center border-t border-border pt-6 px-4">
+          <div className="flex flex-wrap items-center justify-center gap-4 text-muted-foreground text-xs">
             <span>✓ No hidden fees</span>
             <span>✓ Cancel anytime</span>
             <span>✓ Secure payments</span>

@@ -1749,21 +1749,14 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     },
   };
 
-  // Calcular dias restantes do trial
+  // Calcular dias restantes do plano
   const calcularDiasRestantes = () => {
-    // Verificar expiração do plano (30 dias)
-    if (user?.planExpiresAt) {
+    // Check all possible field names (backend may return either)
+    const expiresRaw = user?.planExpiresAt || user?.plan_expires_at || user?.trialEndsAt;
+    if (expiresRaw && user?.plan && user.plan !== 'free') {
       const agora = new Date();
-      const fimPlano = new Date(user.planExpiresAt);
+      const fimPlano = new Date(expiresRaw);
       const diffTime = fimPlano.getTime() - agora.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return Math.max(0, diffDays);
-    }
-    // Fallback para trial (caso ainda exista)
-    if (user?.trialEndsAt) {
-      const agora = new Date();
-      const fimTrial = new Date(user.trialEndsAt);
-      const diffTime = fimTrial.getTime() - agora.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return Math.max(0, diffDays);
     }

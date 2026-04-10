@@ -853,6 +853,10 @@ export const plansApi = {
       body: JSON.stringify({ planId, billingCycle }),
     }, true);
   },
+
+  getPaymentHistory: async () => {
+    return apiCall('/plans/payment-history', {}, true);
+  },
 };
 
 // ============================================
