@@ -12,8 +12,9 @@ interface Channel {
   id: string;
   name: string;
   type: string;
-  phone_number?: string;
+  provider?: string;
   status: string;
+  credentials?: Record<string, any>;
   created_at: string;
 }
 
@@ -78,9 +79,10 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
         setChannels(res.channels || []);
         setRecentActivities(res.recentActivities || []);
         // Pre-fill phone from first channel
-        const firstChannel = res.channels?.find((c: Channel) => c.phone_number);
+        const getPhone = (c: Channel) => c.credentials?.phone_number_id || c.credentials?.instance_id || '';
+        const firstChannel = res.channels?.find((c: Channel) => getPhone(c));
         if (firstChannel) {
-          setWaPhone(firstChannel.phone_number || '');
+          setWaPhone(getPhone(firstChannel));
           setSelectedChannelId(firstChannel.id);
         }
       }
@@ -246,9 +248,9 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${ch.status === 'connected' ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">{ch.name}</p>
-                          {ch.phone_number && (
+                          {(ch.credentials?.phone_number_id || ch.credentials?.instance_id || ch.provider) && (
                             <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Phone className="w-3 h-3" /> {ch.phone_number}
+                              <Phone className="w-3 h-3" /> {ch.credentials?.phone_number_id || ch.credentials?.instance_id || ch.provider}
                             </p>
                           )}
                         </div>
@@ -357,7 +359,7 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
                             className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                           >
                             {whatsappChannels.map(ch => (
-                              <option key={ch.id} value={ch.id}>{ch.name} {ch.phone_number ? `(${ch.phone_number})` : ''}</option>
+                              <option key={ch.id} value={ch.id}>{ch.name} {ch.credentials?.instance_id ? `(${ch.credentials.instance_id})` : ''}</option>
                             ))}
                           </select>
                         </div>

@@ -542,7 +542,7 @@ router.get('/users/:userId/details', requireAuth, requireAdmin, async (req: Auth
     }
 
     const channelsResult = await query(
-      `SELECT id, name, type, phone_number, status, created_at
+      `SELECT id, name, type, provider, status, credentials, created_at
        FROM channels WHERE user_id = $1 ORDER BY created_at DESC`,
       [userId]
     );
