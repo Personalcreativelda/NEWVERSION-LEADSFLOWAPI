@@ -29,38 +29,49 @@ import versionRoutes from './version.routes';
 import leadsTrackingRoutes from './leads-tracking.routes';
 // Conversation Tags: Importar rotas de etiquetas de conversas
 import conversationTagsRoutes from './conversation-tags.routes';
+// Plan enforcement middleware (blocks writes when plan is expired or lead limit reached)
+import { requireAuth } from '../middleware/auth.middleware';
+import { planEnforcement } from '../middleware/plan-enforcement.middleware';
 
 const router = Router();
 
+// Shorthand: auth + plan enforcement applied before route handler
+// (internal router.use(authMiddleware) inside each route file is a benign no-op re-run)
+const withPlan = [requireAuth, planEnforcement];
+
+// ── Public / exempt routes (no plan enforcement) ────────────────────────────
 router.use('/auth', authRoutes);
-router.use('/leads', leadsRoutes);
-router.use('/leads-tracking', leadsTrackingRoutes);
-router.use('/inbox/conversation-tags', conversationTagsRoutes);
-router.use('/contacts', contactsRoutes);
-router.use('/campaigns', campaignsRoutes);
-router.use('/messages', messagesRoutes);
-router.use('/analytics', analyticsRoutes);
-router.use('/whatsapp', whatsappRoutes);
-router.use('/integrations', integrationsRoutes);
+router.use('/plans', plansRoutes);        // must stay accessible so users can upgrade
+router.use('/webhooks', webhooksRoutes);  // external Stripe / provider webhooks
+router.use('/version', versionRoutes);
+
+// ── Routes with plan enforcement ────────────────────────────────────────────
+router.use('/leads', withPlan, leadsRoutes);
+router.use('/leads-tracking', withPlan, leadsTrackingRoutes);
+router.use('/inbox/conversation-tags', withPlan, conversationTagsRoutes);
+router.use('/contacts', withPlan, contactsRoutes);
+router.use('/campaigns', withPlan, campaignsRoutes);
+router.use('/messages', withPlan, messagesRoutes);
+router.use('/analytics', withPlan, analyticsRoutes);
+router.use('/whatsapp', withPlan, whatsappRoutes);
+router.use('/integrations', withPlan, integrationsRoutes);
+router.use('/inbox', withPlan, inboxRoutes);
+router.use('/email-campaigns', withPlan, emailCampaignsRoutes);
+router.use('/channels', withPlan, channelsRoutes);
+router.use('/ai-assistants', withPlan, aiAssistantsRoutes);
+router.use('/assistants', withPlan, assistantsRoutes);
+router.use('/voice-agents', withPlan, voiceAgentsRoutes);
+router.use('/user-webhooks', withPlan, userWebhooksRoutes);
+router.use('/lead-notes', withPlan, leadNotesRoutes);
+router.use('/scheduled-conversations', withPlan, scheduledConversationsRoutes);
+
+// ── Settings / admin (auth required, plan NOT enforced) ──────────────────────
 router.use('/users', usersRoutes);
-router.use('/user', usersRoutes); // Alias for compatibility
-router.use('/plans', plansRoutes);
+router.use('/user', usersRoutes);         // Alias for compatibility
 router.use('/admin/plans', adminPlansRoutes);
 router.use('/admin', adminRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/security', securityRoutes);
-router.use('/webhooks', webhooksRoutes);
-router.use('/lead-notes', leadNotesRoutes);
-router.use('/scheduled-conversations', scheduledConversationsRoutes);
-router.use('/inbox', inboxRoutes);
-router.use('/email-campaigns', emailCampaignsRoutes);
-// INBOX: Registrar rotas de canais e assistentes
-router.use('/channels', channelsRoutes);
-router.use('/ai-assistants', aiAssistantsRoutes);
-router.use('/assistants', assistantsRoutes);
-router.use('/voice-agents', voiceAgentsRoutes);
-router.use('/user-webhooks', userWebhooksRoutes);
-router.use('/version', versionRoutes);
 
 router.get('/health', (_req, res) => {
   res.json({ status: 'ok' });

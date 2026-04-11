@@ -233,6 +233,20 @@ async function apiCall(
         throw new Error('Sessão expirada. Faça login novamente.');
       }
 
+      // Plan enforcement: plan expired, payment overdue, or lead limit exceeded
+      const ENFORCEMENT_CODES = ['PLAN_EXPIRED', 'PAYMENT_OVERDUE', 'LEAD_LIMIT_EXCEEDED'];
+      if (response.status === 403 && data?.code && ENFORCEMENT_CODES.includes(data.code)) {
+        window.dispatchEvent(
+          new CustomEvent('plan-enforcement-blocked', {
+            detail: { code: data.code, message: data.message },
+          })
+        );
+        const err: any = new Error(data.message || 'Plano bloqueado');
+        err.isPlanEnforcement = true;
+        err.code = data.code;
+        throw err;
+      }
+
       throw new Error(errorMessage || errorDetails || `API error: ${response.status}`);
     }
 

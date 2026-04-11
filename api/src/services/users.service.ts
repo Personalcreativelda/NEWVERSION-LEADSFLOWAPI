@@ -23,7 +23,7 @@ const getPlanLimits = (plan: string) => {
       massMessages: 200,
     },
     business: {
-      leads: 500,
+      leads: 1000,
       messages: 500,
       massMessages: 1000,
     },
@@ -47,6 +47,7 @@ interface DbUserRow {
   subscription_status?: string | null;
   plan_expires_at?: string | null;
   plan_activated_at?: string | null;
+  plan_limits?: Record<string, number> | null;
 }
 
 interface UsageCounts {
@@ -103,14 +104,24 @@ const buildProfileResponse = (user: DbUserRow, usage?: UsageCounts) => {
     plan_activated_at: user.plan_activated_at || null,
     planActivatedAt: user.plan_activated_at || null,
     isTrial: false,
-    limits: getPlanLimits(plan),
+    // Prefer plan_limits stored on user row (set during subscription/sync), fall back to hardcoded map
+    limits: (user.plan_limits && typeof user.plan_limits === 'object' && Object.keys(user.plan_limits).length > 0)
+      ? {
+          leads: user.plan_limits.leads ?? 0,
+          messages: user.plan_limits.messages ?? 0,
+          massMessages: user.plan_limits.massMessages ?? 0,
+          // exportLeads and importBatch mirror leads limit (updatable in DB)
+          exportLeads: user.plan_limits.exportLeads ?? user.plan_limits.leads ?? 0,
+          importBatch: user.plan_limits.importBatch ?? user.plan_limits.leads ?? 0,
+        }
+      : (() => { const l = getPlanLimits(plan); return { ...l, exportLeads: l.leads, importBatch: l.leads }; })(),
     usage: { ...safeUsage },
   };
 };
 
 export const getUserProfile = async (userId: string) => {
   const result = await query(
-    'SELECT id, email, name, avatar_url, plan, subscription_plan, subscription_status, plan_expires_at, plan_activated_at FROM users WHERE id = $1',
+    'SELECT id, email, name, avatar_url, plan, subscription_plan, subscription_status, plan_expires_at, plan_activated_at, plan_limits FROM users WHERE id = $1',
     [userId]
   );
 

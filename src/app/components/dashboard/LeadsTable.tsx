@@ -124,6 +124,7 @@ interface LeadsTableProps {
   onDeleteMultiple?: (leadIds: string[]) => void; // ✅ MUDADO: Recebe IDs ao invés de índices
   userPlan?: 'free' | 'business' | 'enterprise';
   planExpired?: boolean;
+  limitReached?: boolean;
   loading?: boolean;
 }
 
@@ -143,6 +144,7 @@ export default function LeadsTable({
   onDeleteMultiple,
   userPlan,
   planExpired,
+  limitReached,
   loading
 }: LeadsTableProps) {
   const [busca, setBusca] = useState('');
@@ -302,6 +304,8 @@ export default function LeadsTable({
   // Verificar se pode importar - HABILITADO PARA TODOS OS PLANOS
   const canImport = true; // Todos os planos podem importar, o limite é controlado na importação
   const isExpired = planExpired === true;
+  // isBlocked covers expired plan AND limit exceeded (shows enforcement modal via callback)
+  const isBlocked = isExpired || (limitReached === true);
 
   return (
     <div className="bg-card dark:bg-card rounded-2xl border border-border dark:border-border shadow-[0_2px_8px_-4px_rgba(15,23,42,0.12)] dark:shadow-[0_2px_8px_-4px_rgba(15,23,42,0.4)] overflow-hidden">
@@ -330,13 +334,12 @@ export default function LeadsTable({
           <div className="flex gap-2 overflow-x-auto pb-1">
             {onNovoLead && (
               <button
-                onClick={isExpired ? () => alert('⚠️ Seu plano expirou!\n\nPara continuar usando o LeadsFlowAPI, você precisa renovar seu plano.\n\nClique em "Upgrade de Plano" para escolher um pacote.') : onNovoLead}
-                disabled={isExpired}
-                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isExpired
+                onClick={() => onNovoLead?.()}
+                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
                   }`}
-                title={isExpired ? "Plano expirado" : "Adicionar Leads"}
+                title={isBlocked ? 'Plano bloqueado' : 'Adicionar Leads'}
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -365,13 +368,12 @@ export default function LeadsTable({
 
             {onImport && (
               <button
-                onClick={isExpired ? () => alert('⚠️ Seu plano expirou!\n\nPara continuar usando o LeadsFlowAPI, você precisa renovar seu plano.\n\nClique em "Upgrade de Plano" para escolher um pacote.') : onImport}
-                disabled={isExpired}
-                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isExpired
+                onClick={() => onImport?.()}
+                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed border border-border dark:border-border'
                     : 'bg-card dark:bg-card border border-border dark:border-border hover:bg-muted dark:hover:bg-muted/50 hover:border-blue-500 text-foreground dark:text-foreground hover:text-blue-600 dark:hover:text-blue-400'
                   }`}
-                title={isExpired ? "Plano expirado" : "Importar"}
+                title={isBlocked ? 'Plano bloqueado' : 'Importar'}
               >
                 <Upload className="w-5 h-5" />
               </button>
@@ -379,13 +381,12 @@ export default function LeadsTable({
 
             {onImportWhatsApp && (
               <button
-                onClick={isExpired ? () => alert('⚠️ Seu plano expirou!\n\nPara continuar usando o LeadsFlowAPI, você precisa renovar seu plano.\n\nClique em "Upgrade de Plano" para escolher um pacote.') : onImportWhatsApp}
-                disabled={isExpired}
-                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isExpired
+                onClick={() => onImportWhatsApp?.()}
+                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed border border-border dark:border-border'
                     : 'bg-card dark:bg-card border border-border dark:border-border hover:bg-muted dark:hover:bg-muted/50 hover:border-green-500 text-foreground dark:text-foreground hover:text-green-600 dark:hover:text-green-400'
                   }`}
-                title={isExpired ? "Plano expirado" : "Importar do WhatsApp"}
+                title={isBlocked ? 'Plano bloqueado' : 'Importar do WhatsApp'}
               >
                 <WhatsAppIcon className="w-5 h-5" />
               </button>
@@ -393,13 +394,12 @@ export default function LeadsTable({
 
             {onCampaigns && (
               <button
-                onClick={isExpired ? () => alert('⚠️ Seu plano expirou!\n\nPara continuar usando o LeadsFlowAPI, você precisa renovar seu plano.\n\nClique em "Upgrade de Plano" para escolher um pacote.') : onCampaigns}
-                disabled={isExpired}
-                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isExpired
+                onClick={() => onCampaigns?.()}
+                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
                     : 'bg-purple-600 hover:bg-purple-700 text-white'
                   }`}
-                title={isExpired ? "Plano expirado" : "Campanhas"}
+                title={isBlocked ? 'Plano bloqueado' : 'Campanhas'}
               >
                 <Megaphone className="w-5 h-5" />
               </button>
@@ -429,9 +429,8 @@ export default function LeadsTable({
           <div className="flex flex-wrap gap-2">
             {onNovoLead && (
               <button
-                onClick={isExpired ? () => alert('⚠️ Seu plano expirou!\n\nPara continuar usando o LeadsFlowAPI, você precisa renovar seu plano.\n\nClique em "Upgrade de Plano" para escolher um pacote.') : onNovoLead}
-                disabled={isExpired}
-                className={`inline-flex items-center gap-2 px-4 py-2 ${isExpired
+                onClick={() => onNovoLead?.()}
+                className={`inline-flex items-center gap-2 px-4 py-2 ${isBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
                   } rounded-lg transition-colors shadow-sm`}
@@ -484,9 +483,8 @@ export default function LeadsTable({
 
             {onImport && (
               <button
-                onClick={isExpired ? () => alert('⚠️ Seu plano expirou!\n\nPara continuar usando o LeadsFlowAPI, você precisa renovar seu plano.\n\nClique em "Upgrade de Plano" para escolher um pacote.') : onImport}
-                disabled={isExpired}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-sm ${isExpired
+                onClick={() => onImport?.()}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-sm ${isBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed border border-border dark:border-border'
                     : 'bg-card dark:bg-card border border-border dark:border-border hover:bg-muted dark:hover:bg-muted/50 hover:border-blue-500 text-foreground dark:text-foreground hover:text-blue-600 dark:hover:text-blue-400'
                   }`}
@@ -498,9 +496,8 @@ export default function LeadsTable({
 
             {onImportWhatsApp && (
               <button
-                onClick={isExpired ? () => alert('⚠️ Seu plano expirou!\n\nPara continuar usando o LeadsFlowAPI, você precisa renovar seu plano.\n\nClique em "Upgrade de Plano" para escolher um pacote.') : onImportWhatsApp}
-                disabled={isExpired}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-sm ${isExpired
+                onClick={() => onImportWhatsApp?.()}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-sm ${isBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed border border-border dark:border-border'
                     : 'bg-card dark:bg-card border border-border dark:border-border hover:bg-muted dark:hover:bg-muted/50 hover:border-green-500 text-foreground dark:text-foreground hover:text-green-600 dark:hover:text-green-400'
                   }`}
@@ -512,9 +509,8 @@ export default function LeadsTable({
 
             {onCampaigns && (
               <button
-                onClick={isExpired ? () => alert('⚠️ Seu plano expirou!\n\nPara continuar usando o LeadsFlowAPI, você precisa renovar seu plano.\n\nClique em "Upgrade de Plano" para escolher um pacote.') : onCampaigns}
-                disabled={isExpired}
-                className={`inline-flex items-center gap-2 px-4 py-2 ${isExpired
+                onClick={() => onCampaigns?.()}
+                className={`inline-flex items-center gap-2 px-4 py-2 ${isBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
                     : 'bg-purple-600 hover:bg-purple-700 text-white'
                   } rounded-lg transition-colors shadow-sm`}

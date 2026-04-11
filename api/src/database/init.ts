@@ -66,6 +66,36 @@ const runPendingMigrations = async () => {
     console.warn('[DB] Migration card/stripe IDs warning:', error.message);
   }
 
+  // Migração: Deduplicar payment_history e adicionar índice único em provider_transaction_id
+  try {
+    await pool.query(`
+      DO $$
+      BEGIN
+        -- Remove duplicate payment_history rows keeping only the oldest per (user_id, stripe_subscription_id, status)
+        -- This fixes existing duplicates caused by both /sync-subscription and checkout.session.completed webhook running simultaneously
+        DELETE FROM payment_history ph1
+        USING payment_history ph2
+        WHERE ph1.user_id = ph2.user_id
+          AND ph1.stripe_subscription_id = ph2.stripe_subscription_id
+          AND ph1.stripe_subscription_id IS NOT NULL
+          AND ph1.status = ph2.status
+          AND ph1.status = 'completed'
+          AND ph1.created_at > ph2.created_at;
+
+        -- Add unique index on provider_transaction_id (non-NULL only) to prevent future duplicates at DB level
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_history_provider_tx_id
+          ON payment_history (provider_transaction_id)
+          WHERE provider_transaction_id IS NOT NULL;
+      EXCEPTION
+        WHEN others THEN
+          RAISE NOTICE 'payment_history dedup migration: %', SQLERRM;
+      END $$;
+    `);
+    console.log('[DB] payment_history deduplication and unique index applied');
+  } catch (error: any) {
+    console.warn('[DB] Migration payment_history dedup warning:', error.message);
+  }
+
   try {
     // Migração: Atualizar CHECK constraint da tabela channels para incluir email e website
     await pool.query(`

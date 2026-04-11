@@ -165,6 +165,7 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
   const envMetaPixelId = import.meta.env.VITE_META_PIXEL_ID as string | undefined;
   const [metaPixelId] = useState<string>(envMetaPixelId ? envMetaPixelId.trim() : '');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [planEnforcementBlock, setPlanEnforcementBlock] = useState<{ code: string; message: string } | null>(null);
   const isLoggingOutRef = useRef(false);
 
   // Sync currentPage with URL path
@@ -304,12 +305,24 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       setShowUpgradeModal(true);
     };
 
+    // Plan enforcement: backend returned 403 with enforcement code
+    const handlePlanEnforcement = (e: Event) => {
+      const detail = (e as CustomEvent<{ code: string; message: string }>).detail;
+      if (detail?.code) {
+        setPlanEnforcementBlock(detail);
+      }
+    };
+
     window.addEventListener('open-upgrade-modal', handleOpenUpgradeModal);
+    window.addEventListener('plan-enforcement-blocked', handlePlanEnforcement);
 
     return () => {
       window.removeEventListener('open-upgrade-modal', handleOpenUpgradeModal);
+      window.removeEventListener('plan-enforcement-blocked', handlePlanEnforcement);
     };
   }, []);
+
+
 
   // Handle Stripe redirect back with ?checkoutSuccess=true
   useEffect(() => {
@@ -991,6 +1004,8 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
           onAdmin={() => setCurrentPage('admin')}
           onUserUpdate={setUser}
           onRefreshUser={refreshUserData}
+          enforcementBlock={planEnforcementBlock}
+          onEnforcementBlockCleared={() => setPlanEnforcementBlock(null)}
         />
       )}
 
@@ -1019,6 +1034,8 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
           }}
         />
       )}
+
+
 
       {/* Version Notification Modal */}
       {versionNotification && (

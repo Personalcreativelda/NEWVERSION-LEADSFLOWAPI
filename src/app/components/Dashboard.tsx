@@ -38,6 +38,7 @@ import LeadDetailModal, { type TabKey as LeadDetailTabKey } from './modals/LeadD
 import ChatModal from './modals/ChatModal';
 import MassMessageModal from './modals/MassMessageModal';
 import UpgradeModal from './modals/UpgradeModal';
+import PlanEnforcementModal from './modals/PlanEnforcementModal';
 import { SendMessageModal } from './SendMessageModal';
 import ImportarLeadsModal from './modals/ImportarLeadsModal';
 import CampaignEmailModal from './modals/CampaignEmailModal';
@@ -85,9 +86,12 @@ interface DashboardProps {
   onAdmin?: () => void;
   onUserUpdate: (user: any) => void;
   onRefreshUser?: () => Promise<any>;
+  /** Enforcement block passed from App (triggered by backend 403 event) */
+  enforcementBlock?: { code: string; message: string } | null;
+  onEnforcementBlockCleared?: () => void;
 }
 
-export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserUpdate, onRefreshUser }: DashboardProps) {
+export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserUpdate, onRefreshUser, enforcementBlock, onEnforcementBlockCleared }: DashboardProps) {
   // Theme mode: 'light' | 'dark'
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
     const savedMode = localStorage.getItem('crm_tema_mode') as 'light' | 'dark' | null;
@@ -168,6 +172,9 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   const [modalChat, setModalChat] = useState(false);
   const [modalMassMessage, setModalMassMessage] = useState(false);
   const [modalUpgrade, setModalUpgrade] = useState(false);
+  // Plan enforcement: shown on-demand when user tries to access a restricted feature
+  const [showEnforcementModal, setShowEnforcementModal] = useState(false);
+  const [activeEnforcementBlock, setActiveEnforcementBlock] = useState<{ code: string; message: string } | null>(null);
   const [modalSendMessage, setModalSendMessage] = useState(false);
   const [modalImportarLeads, setModalImportarLeads] = useState(false);
   const [modalEmailMarketing, setModalEmailMarketing] = useState(false);
@@ -275,12 +282,47 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
   // Navigation handler: updates internal page state AND browser URL
   const handleNavigate = useCallback((pageId: string) => {
+    // Pages that require an active, non-expired plan with lead capacity
+    const RESTRICTED_PAGES = new Set([
+      'inbox', 'inbox-settings', 'ai-assistants', 'automations',
+      'funnel', 'campaigns', 'contacts',
+    ]);
+
+    if (RESTRICTED_PAGES.has(pageId)) {
+      // Compute block reason from current user state
+      const plan = (user?.plan || 'free').toLowerCase();
+      let block: { code: string; message: string } | null = null;
+
+      if (plan !== 'free' && user?.plan_expires_at && new Date(user.plan_expires_at) < new Date()) {
+        block = { code: 'PLAN_EXPIRED', message: 'Seu plano expirou. Renove sua assinatura para continuar.' };
+      } else if (plan !== 'free' && user?.subscription_status === 'past_due') {
+        block = { code: 'PAYMENT_OVERDUE', message: 'Pagamento em atraso. Regularize sua assinatura para continuar.' };
+      } else if (
+        (user?.limits?.leads ?? 0) > 0 &&
+        (user?.limits?.leads ?? 0) !== -1 &&
+        (user?.usage?.leads ?? 0) >= (user?.limits?.leads ?? 0)
+      ) {
+        block = {
+          code: 'LEAD_LIMIT_EXCEEDED',
+          message: `Você atingiu o limite de ${user.limits.leads} leads do seu plano. Faça upgrade para continuar.`,
+        };
+      }
+
+      // Also respect block passed from App (e.g. backend 403 event)
+      const resolvedBlock = block || enforcementBlock || null;
+      if (resolvedBlock) {
+        setActiveEnforcementBlock(resolvedBlock);
+        setShowEnforcementModal(true);
+        return; // Do NOT navigate
+      }
+    }
+
     setCurrentPage(pageId);
     const path = subPageToPath[pageId] ?? `/dashboard/${pageId}`;
     if (window.location.pathname !== path) {
       window.history.pushState({ dashboardPage: pageId }, '', path);
     }
-  }, [subPageToPath]);
+  }, [subPageToPath, user, enforcementBlock]);
 
   // Sync internal page with browser back/forward navigation
   useEffect(() => {
@@ -290,6 +332,14 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // When App passes an enforcement block (backend 403 event), show the modal
+  useEffect(() => {
+    if (enforcementBlock && !showEnforcementModal) {
+      setActiveEnforcementBlock(enforcementBlock);
+      setShowEnforcementModal(true);
+    }
+  }, [enforcementBlock]);
 
   // Log page changes for debugging
   useEffect(() => {
@@ -474,6 +524,11 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   // Check if user can perform action based on limits
   const podeExecutar = (acao: 'leads' | 'mensagens' | 'envios'): boolean => {
     if (!user) return false;
+
+    // Also block if plan is expired or payment overdue
+    const plan = (user.plan || 'free').toLowerCase();
+    if (plan !== 'free' && user.plan_expires_at && new Date(user.plan_expires_at) < new Date()) return false;
+    if (plan !== 'free' && user.subscription_status === 'past_due') return false;
     
     const limites = user.limits || {};
     const uso = user.usage || {};
@@ -487,6 +542,29 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     }
     
     return false;
+  };
+
+  /** Show plan enforcement modal for a blocked action */
+  const showPlanBlock = (code: string, message: string) => {
+    setActiveEnforcementBlock({ code, message });
+    setShowEnforcementModal(true);
+  };
+
+  /** Returns the current block reason (if any), or null */
+  const getBlockReason = (): { code: string; message: string } | null => {
+    const plan = (user?.plan || 'free').toLowerCase();
+    if (plan !== 'free' && user?.plan_expires_at && new Date(user.plan_expires_at) < new Date()) {
+      return { code: 'PLAN_EXPIRED', message: 'Seu plano expirou. Renove sua assinatura para continuar.' };
+    }
+    if (plan !== 'free' && user?.subscription_status === 'past_due') {
+      return { code: 'PAYMENT_OVERDUE', message: 'Pagamento em atraso. Regularize sua assinatura para continuar.' };
+    }
+    const leadLimit = user?.limits?.leads ?? 0;
+    const leadUsage = user?.usage?.leads ?? 0;
+    if (leadLimit > 0 && leadLimit !== -1 && leadUsage >= leadLimit) {
+      return { code: 'LEAD_LIMIT_EXCEEDED', message: `Você atingiu o limite de ${leadLimit} leads do seu plano. Faça upgrade para continuar.` };
+    }
+    return enforcementBlock || null;
   };
 
   const handleAdicionarLead = async (novoLead: Omit<Lead, 'id'>) => {
@@ -518,7 +596,9 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
       const errorMessage = (error?.message || '').toLowerCase();
 
       if (errorMessage.includes('limit reached') || errorMessage.includes('lead limit reached')) {
-        triggerPlanLimitMessage('leads');
+        const block = getBlockReason();
+        if (block) { showPlanBlock(block.code, block.message); }
+        else { triggerPlanLimitMessage('leads'); }
       } else if (errorMessage.includes('duplicate lead') || error?.isDuplicate) {
         triggerDuplicateLeadMessage();
       } else {
@@ -1214,6 +1294,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
   const handleNovoLead = () => {
     if (!podeExecutar('leads')) {
+      const block = getBlockReason();
+      if (block) { showPlanBlock(block.code, block.message); return; }
       triggerPlanLimitMessage('leads');
       return;
     }
@@ -1221,16 +1303,14 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   };
 
   const handleEnvioMassa = () => {
-    // Check if plan allows mass messages - POPUP ONLY FOR FREE PLAN
+    // Check if plan allows mass messages
+    const block = getBlockReason();
+    if (block) { showPlanBlock(block.code, block.message); return; }
     const currentPlan = user?.plan || 'free';
-    
-    // Only show popup for FREE plan, Business and Enterprise can use it
     if (currentPlan === 'free') {
       triggerPlanLimitMessage('envios');
       return;
     }
-    
-    // Business and Enterprise can use mass messages
     setModalMassMessage(true);
   };
 
@@ -1255,6 +1335,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     // O usuário pode ter emails manuais mesmo sem leads cadastrados
 
     if (!podeExecutar('mensagens')) {
+      const block = getBlockReason();
+      if (block) { showPlanBlock(block.code, block.message); return; }
       triggerPlanLimitMessage('mensagens');
       return;
     }
@@ -1272,6 +1354,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
   const handleChat = async (leadId: string) => {
     if (!podeExecutar('mensagens')) {
+      const block = getBlockReason();
+      if (block) { showPlanBlock(block.code, block.message); return; }
       triggerPlanLimitMessage('mensagens');
       return;
     }
@@ -1332,6 +1416,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
   const handleSendEmail = (leadId: string) => {
     if (!podeExecutar('mensagens')) {
+      const block = getBlockReason();
+      if (block) { showPlanBlock(block.code, block.message); return; }
       triggerPlanLimitMessage('mensagens');
       return;
     }
@@ -1402,14 +1488,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   };
 
   const handleExport = () => {
-    const exportLimits: Record<string, number> = {
-      free: 10,
-      business: 500,
-      enterprise: -1,
-    };
-
-    const currentPlan = user?.plan || 'free';
-    const maxExport = exportLimits[currentPlan] ?? exportLimits.free;
+    // Export limit comes from DB plan_limits.leads (already loaded in user.limits.leads)
+    const maxExport: number = (user?.limits?.leads ?? -1);
 
     if (maxExport !== -1 && leads.length > maxExport) {
       triggerExportLimitMessage(maxExport, leads.length, () => performExport(maxExport));
@@ -1420,39 +1500,31 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   };
 
   const handleImport = () => {
-    // Buscar limites de importação do plano do usuário
-    const importLimits = {
-      free: 500,         // Free: 500 contatos
-      business: 3000,    // Business: 3000 contatos
-      enterprise: -1,    // Enterprise: ILIMITADO
-    };
+    // Check plan enforcement first
+    const block = getBlockReason();
+    if (block) { showPlanBlock(block.code, block.message); return; }
 
-    const currentPlan = user?.plan || 'free';
-    const maxImport = importLimits[currentPlan] || importLimits.free;
-    
-    // Informar sobre os limites antes de abrir o modal
-    const confirmMessage = maxImport === -1 
-      ? `📥 Importação de Leads\n\n` +
-        `Seu plano ${currentPlan.toUpperCase()} tem importação ILIMITADA! 🚀\n\n` +
-        `Você pode importar quantos leads quiser sem restrições.\n\n` +
-        `Deseja continuar?`
-      : `📥 Importação de Leads\n\n` +
-        `Seu plano ${currentPlan.toUpperCase()} permite importar até ${maxImport} leads por vez.\n\n` +
-        `O sistema irá importar apenas os primeiros ${maxImport} leads da sua planilha.\n\n` +
-        `Deseja continuar?`;
-    
-    const confirmImport = confirm(confirmMessage);
-    
-    if (!confirmImport) {
-      return;
-    }
-    
+    // Import limit comes from DB plan_limits.leads (already loaded in user.limits.leads)
+    const maxImport: number = (user?.limits?.leads ?? -1);
+    const currentPlan = (user?.plan || 'free').toUpperCase();
+
+    // Inform about limits before opening modal
+    const confirmMessage = maxImport === -1
+      ? `📥 Importação de Leads\n\nSeu plano ${currentPlan} tem importação ILIMITADA! 🚀\n\nVocê pode importar quantos leads quiser.\n\nDeseja continuar?`
+      : `📥 Importação de Leads\n\nSeu plano ${currentPlan} permite importar até ${maxImport} leads.\n\nO sistema irá importar apenas os primeiros ${maxImport} leads da sua planilha.\n\nDeseja continuar?`;
+
+    if (!confirm(confirmMessage)) return;
+
     setModalImportarLeads(true);
   };
 
   // ✅ FUNÇÃO PRINCIPAL DE IMPORTAÇÃO DO WHATSAPP
   async function importarContatosWhatsApp() {
     console.log("[IMPORT WA] Disparando...");
+
+    // Check plan enforcement first
+    const block = getBlockReason();
+    if (block) { showPlanBlock(block.code, block.message); return; }
 
     // ✅ BUSCAR CONFIGURAÇÕES DO BACKEND (específicas por usuário)
     let userSettings: any = null;
@@ -2007,10 +2079,15 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   onToggleEmailMarketing={handleToggleEmailMarketing}
                   onSendEmail={handleSendEmail}
                   onNovoLead={handleNovoLead}
-                  onCampaigns={() => setChannelSelectorOpen(true)}
+                  onCampaigns={() => {
+                    const b = getBlockReason();
+                    if (b) { showPlanBlock(b.code, b.message); return; }
+                    setChannelSelectorOpen(true);
+                  }}
                   onDeleteMultiple={handleDeleteMultiple}
                   userPlan={user?.plan || 'free'}
                   planExpired={planExpired}
+                  limitReached={!!getBlockReason()}
                   loading={loading}
                 />
               </div>
@@ -2076,9 +2153,14 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   onToggleEmailMarketing={handleToggleEmailMarketing}
                   onSendEmail={handleSendEmail}
                   onNovoLead={handleNovoLead}
-                  onCampaigns={() => setChannelSelectorOpen(true)}
+                  onCampaigns={() => {
+                    const b = getBlockReason();
+                    if (b) { showPlanBlock(b.code, b.message); return; }
+                    setChannelSelectorOpen(true);
+                  }}
                   userPlan={user?.plan || 'free'}
                   planExpired={planExpired}
+                  limitReached={!!getBlockReason()}
                 />
               </div>
             )}
@@ -2306,6 +2388,26 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         currentPlan={user?.plan || 'free'}
         onUpgradeSuccess={handleUpgradeSuccess}
       />
+
+      {/* Plan enforcement — shown on-demand when user tries to access a blocked feature */}
+      {showEnforcementModal && activeEnforcementBlock && (
+        <PlanEnforcementModal
+          code={activeEnforcementBlock.code}
+          message={activeEnforcementBlock.message}
+          currentPlan={user?.plan || 'free'}
+          onClose={() => {
+            setShowEnforcementModal(false);
+            setActiveEnforcementBlock(null);
+            onEnforcementBlockCleared?.();
+          }}
+          onUpgradeSuccess={(updatedUser) => {
+            setShowEnforcementModal(false);
+            setActiveEnforcementBlock(null);
+            onEnforcementBlockCleared?.();
+            handleUpgradeSuccess(updatedUser);
+          }}
+        />
+      )}
 
       <SendMessageModal
         isOpen={modalSendMessage}

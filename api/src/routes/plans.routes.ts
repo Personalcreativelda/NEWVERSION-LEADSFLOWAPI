@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.middleware';
 import { query } from '../database/connection';
 import { plansService } from '../services/plans.service';
 import { notificationsService } from '../services/notifications.service';
+import { clearPlanEnforcementCache } from '../middleware/plan-enforcement.middleware';
 import Stripe from 'stripe';
 
 const router = Router();
@@ -48,7 +49,7 @@ router.post('/upgrade', requireAuth, async (req: AuthenticatedRequest, res, next
     if (!limits) {
       const fallback: Record<string, any> = {
         free: { leads: 100, messages: 100, massMessages: 200 },
-        business: { leads: 500, messages: 500, massMessages: 1000 },
+        business: { leads: 1000, messages: 500, massMessages: 1000 },
         enterprise: { leads: -1, messages: -1, massMessages: -1 },
       };
       limits = fallback[planId] || fallback.free;
@@ -69,6 +70,9 @@ router.post('/upgrade', requireAuth, async (req: AuthenticatedRequest, res, next
     }
 
     console.log(`[Plans] User ${user.email} upgraded to plan: ${planId}`);
+
+    // Clear plan enforcement cache so next request re-checks the new plan
+    clearPlanEnforcementCache(req.user.id);
 
     // Create notification for user
     await notificationsService.createNotification(
@@ -264,7 +268,7 @@ router.post('/stripe/webhook', async (req, res) => {
         if (!planLimits) {
           const fallback: Record<string, any> = {
             free: { leads: 100, messages: 100, massMessages: 200 },
-            business: { leads: 500, messages: 500, massMessages: 1000 },
+            business: { leads: 1000, messages: 500, massMessages: 1000 },
             enterprise: { leads: -1, messages: -1, massMessages: -1 },
           };
           planLimits = fallback[planId] || fallback.free;
@@ -313,14 +317,26 @@ router.post('/stripe/webhook', async (req, res) => {
           [planId, JSON.stringify(planLimits), expiresAt, stripeCustomerId, stripeSubscriptionId, userId]
         );
 
-        await query(
-          `INSERT INTO payment_history
-             (user_id, plan_id, amount, currency, billing_cycle, payment_method, payment_provider,
-              card_brand, card_last4, stripe_subscription_id, status, provider_transaction_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11)`,
-          [userId, planId, amountTotal, currency, billingCycle, 'card', 'stripe',
-           cardBrand, cardLast4, stripeSubscriptionId, session.id]
+        // Idempotency: only insert if no completed record exists for this subscription
+        // (prevents duplicate when both /sync-subscription and webhook run for the same checkout)
+        const chkExisting = await query(
+          `SELECT id FROM payment_history
+           WHERE stripe_subscription_id = $1 AND status = 'completed' AND user_id = $2 LIMIT 1`,
+          [stripeSubscriptionId, userId]
         );
+        if (!chkExisting.rows.length) {
+          await query(
+            `INSERT INTO payment_history
+               (user_id, plan_id, amount, currency, billing_cycle, payment_method, payment_provider,
+                card_brand, card_last4, stripe_subscription_id, status, provider_transaction_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11)`,
+            [userId, planId, amountTotal, currency, billingCycle, 'card', 'stripe',
+             cardBrand, cardLast4, stripeSubscriptionId, session.id]
+          );
+          console.log(`[Stripe Webhook] Payment history recorded for checkout session ${session.id}`);
+        } else {
+          console.log(`[Stripe Webhook] Payment history already exists for subscription ${stripeSubscriptionId} - skipping duplicate insert`);
+        }
 
         await notificationsService.createNotification(
           userId,
@@ -352,6 +368,7 @@ router.post('/stripe/webhook', async (req, res) => {
         );
 
         console.log(`[Stripe Webhook] User ${userId} upgraded to ${planId} (${billingCycle}) card: ${cardBrand} ****${cardLast4}`);
+        clearPlanEnforcementCache(userId);
       } else {
         console.warn('[Stripe Webhook] Missing metadata for checkout.session.completed');
       }
@@ -413,16 +430,27 @@ router.post('/stripe/webhook', async (req, res) => {
               [expiresAt, user.id]
             );
 
-            await query(
-              `INSERT INTO payment_history
-                 (user_id, plan_id, amount, currency, billing_cycle, payment_method, payment_provider,
-                  card_brand, card_last4, stripe_subscription_id, status, provider_transaction_id)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11)`,
-              [user.id, user.plan, amountPaid, currency, billingCycle, 'card', 'stripe',
-               cardBrand, cardLast4, stripeSubscriptionId, invoice.id]
+            // Idempotency: only insert if this specific invoice hasn't been recorded yet
+            const renewalExisting = await query(
+              `SELECT id FROM payment_history WHERE provider_transaction_id = $1 LIMIT 1`,
+              [invoice.id]
             );
+            if (!renewalExisting.rows.length) {
+              await query(
+                `INSERT INTO payment_history
+                   (user_id, plan_id, amount, currency, billing_cycle, payment_method, payment_provider,
+                    card_brand, card_last4, stripe_subscription_id, status, provider_transaction_id)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11)`,
+                [user.id, user.plan, amountPaid, currency, billingCycle, 'card', 'stripe',
+                 cardBrand, cardLast4, stripeSubscriptionId, invoice.id]
+              );
+              console.log(`[Stripe Webhook] Renewal payment history recorded for invoice ${invoice.id}`);
+            } else {
+              console.log(`[Stripe Webhook] Renewal payment history already exists for invoice ${invoice.id} - skipping duplicate`);
+            }
 
             console.log(`[Stripe Webhook] Renewal for user ${user.id} plan=${user.plan} expires=${expiresAt.toISOString()}`);
+            clearPlanEnforcementCache(user.id);
           }
         } catch (renewErr) {
           console.error('[Stripe Webhook] Error processing renewal:', renewErr);
@@ -472,6 +500,7 @@ router.post('/stripe/webhook', async (req, res) => {
               { userId: user.id, email: user.email, plan: user.plan }
             );
             console.log(`[Stripe Webhook] Subscription deleted for user ${user.id}, downgraded to free`);
+            clearPlanEnforcementCache(user.id);
           }
         }
       } catch (err) {
@@ -618,7 +647,7 @@ router.post('/sync-active-subscription', requireAuth, async (req: AuthenticatedR
     if (!planLimits) {
       const fallback: Record<string, any> = {
         free: { leads: 100, messages: 100, massMessages: 200 },
-        business: { leads: 500, messages: 500, massMessages: 1000 },
+        business: { leads: 1000, messages: 500, massMessages: 1000 },
         enterprise: { leads: -1, messages: -1, massMessages: -1 },
       };
       planLimits = fallback[resolvedPlanId] || fallback.free;
@@ -668,7 +697,8 @@ router.post('/sync-active-subscription', requireAuth, async (req: AuthenticatedR
           `INSERT INTO payment_history
              (user_id, plan_id, amount, currency, billing_cycle, payment_method, payment_provider,
               card_brand, card_last4, stripe_subscription_id, status, provider_transaction_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11)
+           ON CONFLICT (provider_transaction_id) DO NOTHING`,
           [user.id, resolvedPlanId, amountPaid, currency, billingCycle, 'card', 'stripe',
            cardBrand, cardLast4, sub.id, invoice.id]
         );

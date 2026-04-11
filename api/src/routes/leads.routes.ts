@@ -473,17 +473,17 @@ router.post('/import-bulk', async (req, res, next) => {
       [user.id]
     );
 
-    const userPlan = userResult.rows[0]?.plan || 'free';
+    const userPlan = (userResult.rows[0]?.plan || 'free').toLowerCase();
     const planLimits = userResult.rows[0]?.plan_limits || {};
 
-    // Define default import limits per plan
-    const importLimits: Record<string, number> = {
-      free: planLimits.importBatch || 50,
-      business: planLimits.importBatch || 250,
+    // Import limit comes from plan_limits.leads stored in DB (updatable via admin)
+    // Falls back to plan-based defaults if not set
+    const fallbackLimits: Record<string, number> = {
+      free: 100,
+      business: 1000,
       enterprise: -1, // Unlimited
     };
-
-    const maxImport = importLimits[userPlan] || importLimits.free;
+    const maxImport: number = planLimits.leads ?? fallbackLimits[userPlan] ?? fallbackLimits.free;
 
     // Apply import limit if not unlimited
     let leadsToImport = leads;
