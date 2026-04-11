@@ -19,9 +19,10 @@ import SetupTestUser from './components/SetupTestUser';
 import AgentCallPage from './components/pages/AgentCallPage';
 import UpgradeModal from './components/modals/UpgradeModal';
 import { MetaPixel } from './components/MetaPixel';
-import { authApi, apiRequest, isSessionExpired, startSessionExpiryTimer } from './utils/api';
+import { authApi, apiRequest, plansApi, isSessionExpired, startSessionExpiryTimer } from './utils/api';
 import { mockAuth } from './utils/auth-mock';
 import { Toaster } from './components/ui/sonner';
+import { toast } from 'sonner';
 import { getSupabaseClient } from './utils/supabase/client';
 
 // ============================================
@@ -298,6 +299,43 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     };
   }, []);
 
+  // Handle Stripe redirect back with ?checkoutSuccess=true
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkoutSuccess = params.get('checkoutSuccess');
+    const checkoutCanceled = params.get('checkoutCanceled');
+
+    if (checkoutSuccess === 'true') {
+      // Clean the URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Sync subscription directly from Stripe (safety net independent of webhook)
+      // Then refresh user profile to reflect the new plan
+      const timer = setTimeout(async () => {
+        if (user) {
+          try {
+            const syncResult = await plansApi.syncActiveSubscription();
+            await refreshUserData();
+            if (syncResult?.synced) {
+              toast.success(`🎉 Plano ${syncResult.plan?.toUpperCase()} ativado com sucesso!`, { duration: 6000 });
+            } else {
+              toast.success('🎉 Pagamento confirmado! Seu plano foi atualizado.', { duration: 5000 });
+            }
+          } catch (e) {
+            console.warn('[Stripe] Could not auto-refresh after checkout:', e);
+            toast.success('🎉 Pagamento confirmado! Seu plano foi atualizado.', { duration: 5000 });
+          }
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+
+    if (checkoutCanceled === 'true') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      toast.info('Pagamento cancelado. Você pode tentar novamente quando quiser.');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   // Fetch app version from database
   useEffect(() => {
     const fetchVersion = async () => {
@@ -548,6 +586,12 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
         email: authUser.email,
         name: profile?.name || authUser.name || '',
         avatar_url: profile?.avatar_url || authUser.avatar_url || null,
+        // Pull subscription fields from both sources (profile from DB is authoritative if present)
+        subscription_status: profile?.subscription_status || authUser.subscription_status || 'active',
+        plan_expires_at: profile?.plan_expires_at || authUser.plan_expires_at || authUser.planExpiresAt || null,
+        planExpiresAt: profile?.planExpiresAt || profile?.plan_expires_at || authUser.planExpiresAt || authUser.plan_expires_at || null,
+        plan_activated_at: profile?.plan_activated_at || authUser.plan_activated_at || authUser.planActivatedAt || null,
+        planActivatedAt: profile?.planActivatedAt || profile?.plan_activated_at || authUser.planActivatedAt || authUser.plan_activated_at || null,
       };
 
       if (!userData.plan) {

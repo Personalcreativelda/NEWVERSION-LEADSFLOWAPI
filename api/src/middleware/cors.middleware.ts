@@ -15,6 +15,7 @@ if (allowedOrigins.length === 0) {
 // Rotas que não precisam de Origin header (webhooks, APIs externas, OAuth callbacks, admin)
 const noOriginRequiredPaths = [
   '/api/webhooks/',
+  '/api/plans/stripe/webhook',  // Stripe webhook — server-to-server, sem Origin header
   '/api/whatsapp/config',
   '/api/whatsapp/validate-numbers',  // N8N validation
   '/api/whatsapp/validate-leads',    // N8N validation

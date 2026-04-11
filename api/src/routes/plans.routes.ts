@@ -26,7 +26,8 @@ router.post('/upgrade', requireAuth, async (req: AuthenticatedRequest, res, next
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { planId } = req.body;
+    const { planId: rawPlanId } = req.body;
+    const planId = rawPlanId?.toLowerCase?.() || rawPlanId;
 
     if (!planId) {
       return res.status(400).json({ error: 'Plan ID is required' });
@@ -38,13 +39,28 @@ router.post('/upgrade', requireAuth, async (req: AuthenticatedRequest, res, next
       return res.status(400).json({ error: 'Invalid plan ID' });
     }
 
+    // Fetch plan limits from DB
+    let limits: any = null;
+    try {
+      const plan = await plansService.getPlanById(planId);
+      if (plan?.limits) limits = plan.limits;
+    } catch (e) { /* fallback below */ }
+    if (!limits) {
+      const fallback: Record<string, any> = {
+        free: { leads: 100, messages: 100, massMessages: 200 },
+        business: { leads: 500, messages: 500, massMessages: 1000 },
+        enterprise: { leads: -1, messages: -1, massMessages: -1 },
+      };
+      limits = fallback[planId] || fallback.free;
+    }
+
     // Update user's plan in database
     const result = await query(
       `UPDATE users
-       SET plan = $1, subscription_plan = $1, updated_at = NOW()
-       WHERE id = $2
+       SET plan = $1, subscription_plan = $1, plan_limits = $2, updated_at = NOW()
+       WHERE id = $3
        RETURNING id, email, name, avatar_url, plan, subscription_plan`,
-      [planId, req.user.id]
+      [planId, JSON.stringify(limits), req.user.id]
     );
 
     const user = result.rows[0];
@@ -161,8 +177,10 @@ router.post('/stripe/checkout-session', requireAuth, async (req: AuthenticatedRe
       mode: 'subscription',
       success_url: successUrl,
       cancel_url: cancelUrl,
+      customer_email: req.user.email,
       metadata: {
         userId: req.user.id,
+        userEmail: req.user.email,
         planId,
         billingCycle,
       },
@@ -207,15 +225,50 @@ router.post('/stripe/webhook', async (req, res) => {
     // ── checkout.session.completed → initial plan purchase ──
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as any;
-      const userId = session.metadata?.userId;
-      const planId = session.metadata?.planId;
+      let userId: string | null = session.metadata?.userId || null;
+      const planId = (session.metadata?.planId?.toLowerCase?.() || session.metadata?.planId) as string | null;
       const billingCycle = session.metadata?.billingCycle || 'monthly';
       const amountTotal = session.amount_total ? session.amount_total / 100 : null;
       const currency = session.currency?.toUpperCase() || 'USD';
       const stripeCustomerId = session.customer as string | null;
       const stripeSubscriptionId = session.subscription as string | null;
 
+      // ── Fallback: resolve userId by email or stripe_customer_id ──
+      if (!userId) {
+        const customerEmail = session.customer_email ||
+          session.metadata?.userEmail ||
+          (session.customer_details?.email as string | undefined);
+        if (customerEmail) {
+          try {
+            const r = await query('SELECT id FROM users WHERE email = $1 LIMIT 1', [customerEmail.toLowerCase().trim()]);
+            if (r.rows[0]) userId = r.rows[0].id;
+            console.log(`[Stripe Webhook] Resolved userId by email fallback: ${userId}`);
+          } catch (e) { console.warn('[Stripe Webhook] Email fallback lookup failed:', e); }
+        }
+        if (!userId && stripeCustomerId) {
+          try {
+            const r = await query('SELECT id FROM users WHERE stripe_customer_id = $1 LIMIT 1', [stripeCustomerId]);
+            if (r.rows[0]) userId = r.rows[0].id;
+            console.log(`[Stripe Webhook] Resolved userId by stripe_customer_id fallback: ${userId}`);
+          } catch (e) { console.warn('[Stripe Webhook] Customer ID fallback lookup failed:', e); }
+        }
+      }
+
       if (userId && planId) {
+        // Fetch plan limits
+        let planLimits: any = null;
+        try {
+          const planData = await plansService.getPlanById(planId);
+          if (planData?.limits) planLimits = planData.limits;
+        } catch (e) { /* ignore */ }
+        if (!planLimits) {
+          const fallback: Record<string, any> = {
+            free: { leads: 100, messages: 100, massMessages: 200 },
+            business: { leads: 500, messages: 500, massMessages: 1000 },
+            enterprise: { leads: -1, messages: -1, massMessages: -1 },
+          };
+          planLimits = fallback[planId] || fallback.free;
+        }
         // Retrieve card info from the subscription's payment method
         let cardBrand: string | null = null;
         let cardLast4: string | null = null;
@@ -241,14 +294,15 @@ router.post('/stripe/webhook', async (req, res) => {
         await query(
           `UPDATE users
            SET plan = $1, subscription_plan = $1,
+               plan_limits = $2,
                plan_activated_at = NOW(),
-               plan_expires_at = $2,
+               plan_expires_at = $3,
                subscription_status = 'active',
-               stripe_customer_id = COALESCE($3, stripe_customer_id),
-               stripe_subscription_id = COALESCE($4, stripe_subscription_id),
+               stripe_customer_id = COALESCE($4, stripe_customer_id),
+               stripe_subscription_id = COALESCE($5, stripe_subscription_id),
                updated_at = NOW()
-           WHERE id = $5`,
-          [planId, expiresAt, stripeCustomerId, stripeSubscriptionId, userId]
+           WHERE id = $6`,
+          [planId, JSON.stringify(planLimits), expiresAt, stripeCustomerId, stripeSubscriptionId, userId]
         );
 
         await query(
@@ -274,7 +328,7 @@ router.post('/stripe/webhook', async (req, res) => {
           'paymentNotifications',
           'admin_payment_received',
           'Pagamento Recebido',
-          `Pagamento de ${currency} ${(amountTotal / 100).toFixed(2)} recebido para o plano ${planId} (${billingCycle}).`,
+          `Pagamento de ${currency} ${amountTotal?.toFixed(2) ?? '0.00'} recebido para o plano ${planId} (${billingCycle}).`,
           'credit-card',
           { userId, planId, billingCycle, amount: amountTotal, currency, cardBrand, cardLast4 }
         );
@@ -365,6 +419,299 @@ router.post('/stripe/webhook', async (req, res) => {
   } catch (error) {
     console.error('[Stripe Webhook] Error handling webhook:', error);
     res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
+// Sync plan from active Stripe subscription — called after checkout redirect as safety net
+// Works independently of webhook: queries Stripe directly for the user's active subscription
+router.post('/sync-active-subscription', requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) {
+      return res.status(400).json({ synced: false, reason: 'Stripe not configured' });
+    }
+
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-03-25.dahlia' });
+
+    // Get current user row to find stripe identifiers
+    const userResult = await query(
+      'SELECT id, email, plan, stripe_customer_id, stripe_subscription_id FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    const user = userResult.rows[0];
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    let stripeCustomerId: string | null = user.stripe_customer_id || null;
+
+    // Look up Stripe customer by email if we don't have an ID yet
+    if (!stripeCustomerId) {
+      try {
+        const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+        if (customers.data.length > 0) {
+          stripeCustomerId = customers.data[0].id;
+          await query('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [stripeCustomerId, user.id]);
+        }
+      } catch (e) {
+        console.warn('[Sync] Customer lookup by email failed:', e);
+      }
+    }
+
+    if (!stripeCustomerId) {
+      return res.json({ synced: false, reason: 'No Stripe customer found for this account' });
+    }
+
+    // Get all active/trialing subscriptions for this customer
+    const subscriptions = await stripe.subscriptions.list({
+      customer: stripeCustomerId,
+      status: 'active',
+      limit: 5,
+      expand: ['data.items.data.price', 'data.default_payment_method'],
+    });
+
+    if (!subscriptions.data.length) {
+      return res.json({ synced: false, reason: 'No active Stripe subscriptions found' });
+    }
+
+    const sub = subscriptions.data[0];
+    const priceId = sub.items.data[0]?.price?.id;
+    if (!priceId) {
+      return res.json({ synced: false, reason: 'Could not determine price from subscription' });
+    }
+
+    // Resolve planId from Stripe price ID using DB-configured plans
+    const allPlans = await plansService.getAllPlans();
+    let resolvedPlanId: string | null = null;
+    let billingCycle: 'monthly' | 'annual' = 'monthly';
+    for (const plan of allPlans) {
+      if (plan.stripe?.priceMonthlyId === priceId) { resolvedPlanId = plan.id; billingCycle = 'monthly'; break; }
+      if (plan.stripe?.priceAnnualId === priceId) { resolvedPlanId = plan.id; billingCycle = 'annual'; break; }
+    }
+
+    if (!resolvedPlanId) {
+      // Fallback: match by product ID
+      const productId = (sub.items.data[0]?.price as any)?.product as string | undefined;
+      for (const plan of allPlans) {
+        if (plan.stripe?.productId === productId) { resolvedPlanId = plan.id; break; }
+      }
+    }
+
+    if (!resolvedPlanId) {
+      return res.json({ synced: false, reason: `Could not map price ${priceId} to a plan` });
+    }
+
+    // Get plan limits
+    let planLimits: any = null;
+    try {
+      const planData = await plansService.getPlanById(resolvedPlanId);
+      if (planData?.limits) planLimits = planData.limits;
+    } catch (e) { /* ignore */ }
+    if (!planLimits) {
+      const fallback: Record<string, any> = {
+        free: { leads: 100, messages: 100, massMessages: 200 },
+        business: { leads: 500, messages: 500, massMessages: 1000 },
+        enterprise: { leads: -1, messages: -1, massMessages: -1 },
+      };
+      planLimits = fallback[resolvedPlanId] || fallback.free;
+    }
+
+    // Get card info
+    const pm = sub.default_payment_method as any;
+    const cardBrand: string | null = pm?.card?.brand || null;
+    const cardLast4: string | null = pm?.card?.last4 || null;
+
+    // Calculate expiry from Stripe's current period end
+    const expiresAt = sub.current_period_end
+      ? new Date(sub.current_period_end * 1000)
+      : billingCycle === 'annual'
+        ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    await query(
+      `UPDATE users
+       SET plan = $1, subscription_plan = $1,
+           plan_limits = $2,
+           plan_activated_at = COALESCE(plan_activated_at, NOW()),
+           plan_expires_at = $3,
+           subscription_status = 'active',
+           stripe_customer_id = $4,
+           stripe_subscription_id = $5,
+           updated_at = NOW()
+       WHERE id = $6`,
+      [resolvedPlanId, JSON.stringify(planLimits), expiresAt, stripeCustomerId, sub.id, user.id]
+    );
+
+    // Record in payment history only if not already recorded (idempotent by subscription ID)
+    const existing = await query(
+      'SELECT id FROM payment_history WHERE stripe_subscription_id = $1 AND status = $2 LIMIT 1',
+      [sub.id, 'completed']
+    );
+    if (!existing.rows.length) {
+      const latestInvoice = await stripe.invoices.list({ subscription: sub.id, limit: 1 });
+      const invoice = latestInvoice.data[0];
+      if (invoice) {
+        const amountPaid = invoice.amount_paid ? invoice.amount_paid / 100 : null;
+        const currency = invoice.currency?.toUpperCase() || 'USD';
+        await query(
+          `INSERT INTO payment_history
+             (user_id, plan_id, amount, currency, billing_cycle, payment_method, payment_provider,
+              card_brand, card_last4, stripe_subscription_id, status, provider_transaction_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'completed', $11)`,
+          [user.id, resolvedPlanId, amountPaid, currency, billingCycle, 'card', 'stripe',
+           cardBrand, cardLast4, sub.id, invoice.id]
+        );
+      }
+    }
+
+    console.log(`[Sync] User ${user.id} synced to plan=${resolvedPlanId} via Stripe subscription ${sub.id}`);
+
+    return res.json({
+      synced: true,
+      plan: resolvedPlanId,
+      billingCycle,
+      expiresAt: expiresAt.toISOString(),
+    });
+  } catch (error) {
+    console.error('[Plans] Error syncing subscription:', error);
+    next(error);
+  }
+});
+
+// Cancel plan and optionally issue same-day refund via Stripe
+router.post('/cancel', requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Fetch current user data including Stripe fields
+    const userResult = await query(
+      `SELECT id, email, name, plan, subscription_plan, subscription_status,
+              stripe_customer_id, stripe_subscription_id, plan_activated_at
+       FROM users WHERE id = $1`,
+      [req.user.id]
+    );
+
+    const user = userResult.rows[0];
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (!user.plan || user.plan === 'free') {
+      return res.status(400).json({ error: 'Você já está no plano gratuito.' });
+    }
+
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    let refundIssued = false;
+    let refundAmount: number | null = null;
+    let refundCurrency = 'USD';
+
+    // Check if plan was activated today (same calendar day) — eligible for refund
+    const isEligibleForRefund = (() => {
+      if (!user.plan_activated_at) return false;
+      const activatedAt = new Date(user.plan_activated_at);
+      const now = new Date();
+      return (
+        activatedAt.getUTCFullYear() === now.getUTCFullYear() &&
+        activatedAt.getUTCMonth() === now.getUTCMonth() &&
+        activatedAt.getUTCDate() === now.getUTCDate()
+      );
+    })();
+
+    // Cancel Stripe subscription and optionally refund
+    if (stripeSecretKey && user.stripe_subscription_id) {
+      const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-03-25.dahlia' });
+
+      // If eligible for same-day refund, get payment intent from latest invoice
+      if (isEligibleForRefund) {
+        try {
+          const sub = await stripe.subscriptions.retrieve(user.stripe_subscription_id, {
+            expand: ['latest_invoice.payment_intent'],
+          });
+
+          const invoice = sub.latest_invoice as any;
+          const paymentIntent = invoice?.payment_intent as any;
+
+          if (paymentIntent?.id && paymentIntent?.status === 'succeeded') {
+            const refund = await stripe.refunds.create({
+              payment_intent: paymentIntent.id,
+              reason: 'requested_by_customer',
+            });
+            refundIssued = true;
+            refundAmount = refund.amount ? refund.amount / 100 : null;
+            refundCurrency = (refund.currency || 'usd').toUpperCase();
+            console.log(`[Plans Cancel] Refund issued: ${refundCurrency} ${refundAmount} for user ${user.id}`);
+          }
+        } catch (refundErr: any) {
+          // Non-blocking — log but continue with cancellation
+          console.warn('[Plans Cancel] Refund attempt failed:', refundErr?.message);
+        }
+      }
+
+      // Cancel the Stripe subscription immediately
+      try {
+        await stripe.subscriptions.cancel(user.stripe_subscription_id);
+        console.log(`[Plans Cancel] Stripe subscription ${user.stripe_subscription_id} cancelled for user ${user.id}`);
+      } catch (cancelErr: any) {
+        console.warn('[Plans Cancel] Stripe subscription cancel failed:', cancelErr?.message);
+      }
+    }
+
+    // Downgrade user to free in database
+    await query(
+      `UPDATE users
+       SET plan = 'free', subscription_plan = 'free',
+           subscription_status = 'cancelled',
+           stripe_subscription_id = NULL,
+           plan_expires_at = NULL,
+           plan_activated_at = NULL,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [user.id]
+    );
+
+    // Record cancellation (and refund if applicable) in payment history
+    if (refundIssued && refundAmount !== null) {
+      await query(
+        `INSERT INTO payment_history
+           (user_id, plan_id, amount, currency, billing_cycle, payment_method,
+            payment_provider, status, provider_transaction_id)
+         VALUES ($1, $2, $3, $4, 'monthly', 'card', 'stripe', 'refunded', $5)`,
+        [user.id, user.plan, -refundAmount, refundCurrency, `refund-${Date.now()}`]
+      );
+    }
+
+    // Notify the user
+    await notificationsService.createNotification(
+      user.id,
+      'plan_upgraded',
+      refundIssued ? 'Plano Cancelado com Reembolso' : 'Plano Cancelado',
+      refundIssued
+        ? `Seu plano foi cancelado e um reembolso de ${refundCurrency} ${refundAmount?.toFixed(2)} foi solicitado.`
+        : 'Seu plano foi cancelado. Você voltou ao plano gratuito.',
+      'zap',
+      { planId: user.plan, refundIssued, refundAmount }
+    );
+
+    // Notify admins
+    void notificationsService.sendAdminNotification(
+      'upgradeNotifications',
+      'admin_plan_upgrade',
+      'Plano Cancelado',
+      `${user.name || user.email} cancelou o plano ${user.plan.toUpperCase()}${refundIssued ? ` — reembolso de ${refundCurrency} ${refundAmount?.toFixed(2)} emitido` : ''}.`,
+      'trending-up',
+      { userId: user.id, email: user.email, plan: user.plan, refundIssued, refundAmount }
+    );
+
+    return res.json({
+      success: true,
+      refundIssued,
+      refundAmount,
+      refundCurrency,
+      message: refundIssued
+        ? `Plano cancelado. Reembolso de ${refundCurrency} ${refundAmount?.toFixed(2)} solicitado ao Stripe.`
+        : 'Plano cancelado. Você foi movido para o plano gratuito.',
+    });
+  } catch (error) {
+    console.error('[Plans] Error cancelling plan:', error);
+    next(error);
   }
 });
 

@@ -34,7 +34,7 @@ const getPlanLimits = (plan: string) => {
     },
   };
 
-  return limitsMap[plan] || limitsMap.free;
+  return limitsMap[plan?.toLowerCase()] || limitsMap.free;
 };
 
 interface DbUserRow {
@@ -44,6 +44,9 @@ interface DbUserRow {
   avatar_url: string | null;
   plan?: string | null;
   subscription_plan?: string | null;
+  subscription_status?: string | null;
+  plan_expires_at?: string | null;
+  plan_activated_at?: string | null;
 }
 
 interface UsageCounts {
@@ -94,6 +97,11 @@ const buildProfileResponse = (user: DbUserRow, usage?: UsageCounts) => {
     avatar_url: user.avatar_url,
     plan,
     subscription_plan: user.subscription_plan || plan,
+    subscription_status: user.subscription_status || 'active',
+    plan_expires_at: user.plan_expires_at || null,
+    planExpiresAt: user.plan_expires_at || null,
+    plan_activated_at: user.plan_activated_at || null,
+    planActivatedAt: user.plan_activated_at || null,
     isTrial: false,
     limits: getPlanLimits(plan),
     usage: { ...safeUsage },
@@ -102,7 +110,7 @@ const buildProfileResponse = (user: DbUserRow, usage?: UsageCounts) => {
 
 export const getUserProfile = async (userId: string) => {
   const result = await query(
-    'SELECT id, email, name, avatar_url, plan, subscription_plan FROM users WHERE id = $1',
+    'SELECT id, email, name, avatar_url, plan, subscription_plan, subscription_status, plan_expires_at, plan_activated_at FROM users WHERE id = $1',
     [userId]
   );
 

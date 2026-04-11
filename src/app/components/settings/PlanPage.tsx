@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Check, Crown, Zap, Rocket, Loader2, Calendar, Clock, History, ShieldCheck, AlertTriangle, XCircle } from 'lucide-react';
+import { Check, Crown, Zap, Rocket, Loader2, Calendar, Clock, History, ShieldCheck, AlertTriangle, XCircle, X, RotateCcw } from 'lucide-react';
 import { Button } from '../ui/button';
 import { plansApi } from '../../utils/api';
 import { toast } from 'sonner';
@@ -12,12 +12,12 @@ interface PlanPageProps {
 }
 
 // Maps plan status to display info
-function getStatusInfo(status: string | undefined, diasRestantes: number | null) {
-  if (!status || status === 'free') return { label: 'Gratuito', color: 'bg-gray-500/15 text-gray-400 border-gray-500/30', icon: Zap };
+function getStatusInfo(status: string | undefined, diasRestantes: number | null, plan = 'free') {
+  // Only show "Gratuito" when the actual plan is free
+  if (plan === 'free') return { label: 'Gratuito', color: 'bg-gray-500/15 text-gray-400 border-gray-500/30', icon: Zap };
   if (diasRestantes === 0 || status === 'expired') return { label: 'Expirado', color: 'bg-red-500/15 text-red-400 border-red-500/30', icon: XCircle };
   if (status === 'pending') return { label: 'Pendente', color: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30', icon: Clock };
   if (status === 'overdue' || (diasRestantes !== null && diasRestantes <= 7 && diasRestantes > 0)) return { label: 'Atenção', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30', icon: AlertTriangle };
-  if (status === 'active') return { label: 'Ativo', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', icon: ShieldCheck };
   return { label: 'Ativo', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', icon: ShieldCheck };
 }
 
@@ -39,6 +39,8 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
   const [historyLoading, setHistoryLoading] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [planForPayment, setPlanForPayment] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const currentPlan = user?.plan || 'free';
   const subscriptionStatus = user?.subscriptionStatus || user?.subscription_status;
@@ -66,7 +68,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
     enterprise: 'from-purple-500/10 to-purple-600/5',
   };
 
-  const statusInfo = getStatusInfo(subscriptionStatus, diasRestantes);
+  const statusInfo = getStatusInfo(subscriptionStatus, diasRestantes, currentPlan);
   const StatusIcon = statusInfo.icon;
   const CurrentPlanIcon = iconMap[currentPlan] || Zap;
 
@@ -111,6 +113,36 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
   const handleSelectPlan = (planId: string) => {
     setPlanForPayment(planId);
     setShowPaymentModal(true);
+  };
+
+  // Check if plan was activated today (eligible for same-day refund)
+  const activatedToday = (() => {
+    const raw = user?.plan_activated_at || user?.planActivatedAt;
+    if (!raw) return false;
+    const d = new Date(raw);
+    const now = new Date();
+    return d.getUTCFullYear() === now.getUTCFullYear() &&
+      d.getUTCMonth() === now.getUTCMonth() &&
+      d.getUTCDate() === now.getUTCDate();
+  })();
+
+  const handleCancelPlan = async () => {
+    setCancelling(true);
+    try {
+      const res = await plansApi.cancelPlan();
+      setShowCancelModal(false);
+      if (res.refundIssued) {
+        toast.success(`Plano cancelado! Reembolso de ${res.refundCurrency} ${Number(res.refundAmount).toFixed(2)} solicitado ao Stripe.`);
+      } else {
+        toast.success('Plano cancelado. Você foi movido para o plano gratuito.');
+      }
+      // Refresh page data after a short delay
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao cancelar o plano.');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const paymentProviderLabel: Record<string, string> = { stripe: 'Stripe', paypal: 'PayPal' };
@@ -185,15 +217,25 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
             ) : null}
           </div>
 
-          {/* Botão de renovação */}
-          {diasRestantes !== null && diasRestantes <= 7 && currentPlan !== 'free' && (
-            <button
-              onClick={onUpgrade}
-              className="flex-shrink-0 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-medium transition-all shadow-lg text-sm"
-            >
-              {diasRestantes === 0 ? 'Renovar Agora' : 'Renovar'}
-            </button>
-          )}
+          {/* Botão de renovação + cancelamento */}
+          <div className="flex flex-col gap-2 flex-shrink-0">
+            {diasRestantes !== null && diasRestantes <= 7 && currentPlan !== 'free' && (
+              <button
+                onClick={onUpgrade}
+                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-medium transition-all shadow-lg text-sm"
+              >
+                {diasRestantes === 0 ? 'Renovar Agora' : 'Renovar'}
+              </button>
+            )}
+            {currentPlan !== 'free' && (
+              <button
+                onClick={() => setShowCancelModal(true)}
+                className="px-5 py-2.5 border border-red-500/40 text-red-400 hover:bg-red-500/10 rounded-lg font-medium transition-all text-sm"
+              >
+                Cancelar Plano
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -396,6 +438,85 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
         planId={planForPayment}
         billingPeriod={billingPeriod}
       />
+
+      {/* Cancel Plan Confirmation Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowCancelModal(false)} />
+          <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                  <XCircle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Cancelar Plano</h3>
+                  <p className="text-xs text-muted-foreground capitalize">{currentPlan}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowCancelModal(false)} className="text-muted-foreground hover:text-foreground transition-colors mt-0.5">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Refund notice */}
+            {activatedToday ? (
+              <div className="flex items-start gap-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 p-4">
+                <RotateCcw className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-emerald-300">Reembolso automático disponível</p>
+                  <p className="text-xs text-emerald-400/80 mt-0.5">
+                    Como você ativou o plano hoje, ao cancelar o Stripe devolverá o valor total pago.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 rounded-xl bg-amber-500/10 border border-amber-500/25 p-4">
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-300">Sem reembolso</p>
+                  <p className="text-xs text-amber-400/80 mt-0.5">
+                    O reembolso só é aplicável no mesmo dia da ativação do plano. Você perderá o acesso imediatamente.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* What happens */}
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground text-sm">O que vai acontecer:</p>
+              <ul className="space-y-1.5">
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />Plano downgraded para <strong className="text-foreground">Gratuito</strong> imediatamente</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />Subscrição Stripe cancelada</li>
+                {activatedToday && <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />Reembolso total emitido via Stripe</li>}
+              </ul>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                disabled={cancelling}
+                className="flex-1 px-4 py-2.5 border border-border rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 transition-colors disabled:opacity-50"
+              >
+                Manter Plano
+              </button>
+              <button
+                onClick={handleCancelPlan}
+                disabled={cancelling}
+                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                {cancelling ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Cancelando...</>
+                ) : (
+                  <><XCircle className="w-4 h-4" /> {activatedToday ? 'Cancelar e Reembolsar' : 'Confirmar Cancelamento'}</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

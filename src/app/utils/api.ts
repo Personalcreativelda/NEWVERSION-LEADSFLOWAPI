@@ -857,6 +857,14 @@ export const plansApi = {
   getPaymentHistory: async () => {
     return apiCall('/plans/payment-history', {}, true);
   },
+
+  cancelPlan: async () => {
+    return apiCall('/plans/cancel', { method: 'POST' }, true);
+  },
+
+  syncActiveSubscription: async () => {
+    return apiCall('/plans/sync-active-subscription', { method: 'POST' }, true);
+  },
 };
 
 // ============================================
