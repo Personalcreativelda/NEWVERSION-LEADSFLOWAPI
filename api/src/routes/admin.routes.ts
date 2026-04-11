@@ -5,6 +5,7 @@ import { query } from '../database/connection';
 import { plansService } from '../services/plans.service';
 import { planExpirationService } from '../services/plan-expiration.service';
 import { activityService } from '../services/activity.service';
+import { notificationsService } from '../services/notifications.service';
 import nodemailer from 'nodemailer';
 
 const router = Router();
@@ -171,6 +172,16 @@ router.post('/activate-plan', requireAuth, requireAdmin, async (req: Authenticat
     const user = result.rows[0];
     console.log(`[Admin] Plan ${planId} activated for user ${user.email} (expires: ${expiresAt || 'never'})`);
 
+    // Enviar notificação ao(s) admin(s)
+    void notificationsService.sendAdminNotification(
+      'upgradeNotifications',
+      'admin_plan_upgrade',
+      'Upgrade de Plano (Admin)',
+      `Plano ${planId} ativado manualmente para ${user.name || user.email}`,
+      'TrendingUp',
+      { userId: user.id, userEmail: user.email, userName: user.name, plan: planId, expiresAt: expiresAt || null }
+    );
+
     res.json({ 
       success: true, 
       message: `Plano ${planId} ativado com sucesso para ${user.email}`,
@@ -220,6 +231,18 @@ router.post('/suspend-user', requireAuth, requireAdmin, async (req: Authenticate
     const user = result.rows[0];
     const status = user.is_active ? 'reativado' : 'suspenso';
     console.log(`[Admin] User ${user.email} ${status}`);
+
+    // Notificar admin se suspensão
+    if (!user.is_active) {
+      void notificationsService.sendAdminNotification(
+        'suspensionNotifications',
+        'admin_user_suspended',
+        'Conta Suspensa',
+        `Conta de ${user.name || user.email} foi suspensa`,
+        'ShieldOff',
+        { userId: user.id, userEmail: user.email, userName: user.name }
+      );
+    }
 
     res.json({ 
       success: true, 
@@ -335,8 +358,10 @@ router.get('/notification-settings', requireAuth, requireAdmin, async (req: Auth
       success: true, 
       settings: {
         upgradeNotifications: true,
-        newUserNotifications: false,
+        newUserNotifications: true,
         paymentNotifications: true,
+        expirationNotifications: true,
+        suspensionNotifications: false,
       }
     });
   } catch (error) {

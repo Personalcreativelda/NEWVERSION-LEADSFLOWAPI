@@ -15,6 +15,7 @@ import {
 } from '../services/auth.service';
 import { googleOAuthService } from '../services/google-oauth.service';
 import { activityService } from '../services/activity.service';
+import { notificationsService } from '../services/notifications.service';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -258,6 +259,16 @@ router.post('/register', async (req, res, next) => {
       description: `Novo cadastro: ${email}`,
       metadata: { ip: req.ip, ...metadata }
     });
+
+    // 🔔 Notify admins of new user registration
+    void notificationsService.sendAdminNotification(
+      'newUserNotifications',
+      'admin_new_user',
+      'Novo Usuário Cadastrado',
+      `${data.user.name || email} acabou de criar uma conta.`,
+      'user-plus',
+      { userId: data.user.id, email, name: data.user.name }
+    );
 
     return res.json(data);
   } catch (error) {

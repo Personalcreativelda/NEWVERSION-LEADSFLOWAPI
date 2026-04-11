@@ -1,5 +1,5 @@
 import React from 'react';
-import { Rocket, Crown, Bell, Check, X } from 'lucide-react';
+import { Rocket, Crown, Bell, Check, X, UserPlus, TrendingUp, CreditCard, AlertTriangle, ShieldOff } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Switch } from '../../ui/switch';
@@ -153,12 +153,57 @@ interface NotificationSettingsModalProps {
     upgradeNotifications: boolean;
     newUserNotifications: boolean;
     paymentNotifications: boolean;
+    expirationNotifications: boolean;
+    suspensionNotifications: boolean;
   };
   setSettings: (settings: any) => void;
   onClose: () => void;
   onSave: () => void;
   loading: boolean;
 }
+
+const NOTIFICATION_TYPES = [
+  {
+    key: 'newUserNotifications',
+    icon: UserPlus,
+    iconBg: 'bg-emerald-500/10',
+    iconColor: 'text-emerald-500',
+    label: 'Novo Usuário Cadastrado',
+    description: 'Receba um alerta quando um novo usuário criar conta na plataforma.',
+  },
+  {
+    key: 'upgradeNotifications',
+    icon: TrendingUp,
+    iconBg: 'bg-purple-500/10',
+    iconColor: 'text-purple-500',
+    label: 'Upgrade de Plano',
+    description: 'Seja notificado quando um usuário fizer upgrade para um plano superior.',
+  },
+  {
+    key: 'paymentNotifications',
+    icon: CreditCard,
+    iconBg: 'bg-blue-500/10',
+    iconColor: 'text-blue-500',
+    label: 'Pagamento Recebido',
+    description: 'Alerta ao confirmar um pagamento via Stripe ou ativação manual.',
+  },
+  {
+    key: 'expirationNotifications',
+    icon: AlertTriangle,
+    iconBg: 'bg-amber-500/10',
+    iconColor: 'text-amber-500',
+    label: 'Plano Expirando',
+    description: 'Aviso quando o plano de um usuário estiver prestes a expirar.',
+  },
+  {
+    key: 'suspensionNotifications',
+    icon: ShieldOff,
+    iconBg: 'bg-red-500/10',
+    iconColor: 'text-red-500',
+    label: 'Conta Suspensa',
+    description: 'Notificação quando uma conta for suspensa por inatividade ou falha.',
+  },
+] as const;
 
 export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps> = ({
   settings,
@@ -167,75 +212,79 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
   onSave,
   loading,
 }) => {
+  const enabledCount = Object.values(settings).filter(Boolean).length;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-[hsl(var(--background))/0.85] transition-colors" onClick={onClose} />
-      <div className="relative modal-panel border rounded-2xl max-w-md w-full p-6">
-        <h3 className="text-lg font-bold text-foreground mb-4">
-          Configurações de Notificação
-        </h3>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative modal-panel border w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh]">
+        {/* Drag handle (mobile) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full bg-border" />
+        </div>
 
-        <div className="space-y-4">
-          {/* Upgrade Notifications */}
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-foreground">
-              Notificações de Upgrade
-            </label>
-            <Switch
-              checked={settings.upgradeNotifications}
-              onCheckedChange={(checked) =>
-                setSettings({
-                  ...settings,
-                  upgradeNotifications: checked,
-                })
-              }
-            />
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Bell className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-foreground">Notificações do Admin</h3>
+              <p className="text-xs text-muted-foreground">{enabledCount} de {NOTIFICATION_TYPES.length} ativas</p>
+            </div>
           </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
-          {/* New User Notifications */}
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-foreground">
-              Notificações de Novo Usuário
-            </label>
-            <Switch
-              checked={settings.newUserNotifications}
-              onCheckedChange={(checked) =>
-                setSettings({
-                  ...settings,
-                  newUserNotifications: checked,
-                })
-              }
-            />
-          </div>
+        {/* Scrollable content */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-3">
+          {NOTIFICATION_TYPES.map(({ key, icon: Icon, iconBg, iconColor, label, description }) => {
+            const checked = !!(settings as any)[key];
+            return (
+              <div
+                key={key}
+                className={`flex items-start gap-4 p-4 rounded-xl border transition-all ${
+                  checked ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/30'
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0 mt-0.5`}>
+                  <Icon className={`w-5 h-5 ${iconColor}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
+                </div>
+                <Switch
+                  checked={checked}
+                  onCheckedChange={(val) => setSettings({ ...settings, [key]: val })}
+                  className="shrink-0 mt-1"
+                />
+              </div>
+            );
+          })}
 
-          {/* Payment Notifications */}
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-foreground">
-              Notificações de Pagamento
-            </label>
-            <Switch
-              checked={settings.paymentNotifications}
-              onCheckedChange={(checked) =>
-                setSettings({
-                  ...settings,
-                  paymentNotifications: checked,
-                })
-              }
-            />
+          {/* Delivery info */}
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 border border-border mt-2">
+            <Bell className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              As notificações aparecem no <strong>sino do painel admin</strong>. Entrega por e-mail estará disponível em breve.
+            </p>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-3 mt-6">
-          <Button
-            onClick={onClose}
-            variant="outline"
-            className="flex-1"
-          >
+        {/* Footer actions */}
+        <div className="flex gap-3 px-5 py-4 border-t shrink-0">
+          <Button onClick={onClose} variant="outline" className="flex-1">
             Cancelar
           </Button>
           <Button onClick={onSave} disabled={loading} className="flex-1">
-            {loading ? 'Salvando...' : 'Salvar Configurações'}
+            {loading ? 'Salvando...' : 'Salvar'}
           </Button>
         </div>
       </div>

@@ -148,19 +148,33 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
   const whatsappChannels = channels.filter(c => c.type === 'whatsapp' || !c.type);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border flex-shrink-0">
-          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <User className="w-5 h-5 text-primary" />
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-card border border-border sm:rounded-2xl rounded-t-2xl shadow-2xl w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden">
+
+        {/* Drag handle (mobile only) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
+          <div className="w-10 h-1 rounded-full bg-border" />
+        </div>
+
+        {/* Header — always visible / sticky */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
+          <h2 className="text-base sm:text-xl font-bold text-foreground flex items-center gap-2">
+            <User className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
             Detalhes do Usuário
           </h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors">
-            <X className="w-5 h-5 text-muted-foreground" />
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            aria-label="Fechar"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
+        {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 custom-scrollbar">
           {loading ? (
             <div className="flex items-center justify-center py-16">
@@ -171,19 +185,19 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
               Usuário não encontrado
             </div>
           ) : (
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-5">
               {/* User info card */}
-              <div className="flex items-start gap-4 p-4 rounded-xl bg-muted/30 border border-border/50">
-                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 flex-shrink-0 overflow-hidden">
+              <div className="flex items-start gap-3 sm:gap-4 p-4 rounded-xl bg-muted/30 border border-border/50">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 flex-shrink-0 overflow-hidden">
                   {userDetails.avatar_url ? (
                     <img src={userDetails.avatar_url} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <User className="w-7 h-7 text-primary" />
+                    <User className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-lg text-foreground">{userDetails.name || '—'}</h3>
+                    <h3 className="font-bold text-base sm:text-lg text-foreground leading-tight">{userDetails.name || '—'}</h3>
                     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${
                       userDetails.is_active
                         ? 'bg-green-500/10 text-green-600 border-green-500/20'
@@ -193,9 +207,9 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
                       {userDetails.is_active ? 'Ativo' : 'Suspenso'}
                     </span>
                   </div>
-                  <p className="text-muted-foreground text-sm mt-0.5">{userDetails.email}</p>
-                  <div className="flex items-center gap-3 mt-2 flex-wrap">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground/80">
+                  <p className="text-muted-foreground text-xs sm:text-sm mt-0.5 truncate">{userDetails.email}</p>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-foreground/80">
                       {getPlanIcon(userDetails.plan)}
                       Plano: <strong>{userDetails.plan}</strong>
                     </span>
@@ -219,14 +233,14 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 {[
                   { label: 'Leads', value: userDetails.leads_count },
                   { label: 'Mensagens', value: userDetails.messages_count },
                   { label: 'Campanhas', value: userDetails.campaigns_count },
                 ].map(stat => (
                   <div key={stat.label} className="p-3 rounded-xl bg-muted/30 border border-border/50 text-center">
-                    <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-foreground">{stat.value}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
                   </div>
                 ))}

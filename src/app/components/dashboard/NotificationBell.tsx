@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   Bell, X, Check, Trash2, UserPlus, UserMinus, TrendingUp, 
   AlertTriangle, Crown, PartyPopper, Target, Calendar, 
-  Sparkles, Rocket, CheckCircle2, XCircle, Clock
+  Sparkles, Rocket, CheckCircle2, XCircle, Clock, CreditCard, ShieldOff
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -27,7 +27,11 @@ type NotificationType =
   | 'task_reminder'      // 📞 Lembrete follow-up
   | 'welcome'            // 👋 Bem-vindo
   | 'tour'               // 🎯 Tour disponível
-  | 'system_update';     // ✨ Atualização
+  | 'system_update'      // ✨ Atualização
+  | 'admin_new_user'     // 👤 Admin: novo usuário
+  | 'admin_plan_upgrade' // 📈 Admin: upgrade de plano
+  | 'admin_payment_received' // 💳 Admin: pagamento
+  | 'admin_user_suspended';  // 🚫 Admin: conta suspensa
 
 interface Notification {
   id: string;
@@ -118,21 +122,49 @@ const notificationConfig: Record<NotificationType, NotificationConfig> = {
     bgColor: 'bg-pink-50/80 dark:bg-pink-950/30',
     borderColor: 'border-pink-200/50 dark:border-pink-800/50',
   },
+  admin_new_user: {
+    icon: UserPlus,
+    color: 'text-emerald-600 dark:text-emerald-400',
+    bgColor: 'bg-emerald-50/80 dark:bg-emerald-950/30',
+    borderColor: 'border-emerald-200/50 dark:border-emerald-800/50',
+  },
+  admin_plan_upgrade: {
+    icon: TrendingUp,
+    color: 'text-purple-600 dark:text-purple-400',
+    bgColor: 'bg-purple-50/80 dark:bg-purple-950/30',
+    borderColor: 'border-purple-200/50 dark:border-purple-800/50',
+  },
+  admin_payment_received: {
+    icon: CreditCard,
+    color: 'text-blue-600 dark:text-blue-400',
+    bgColor: 'bg-blue-50/80 dark:bg-blue-950/30',
+    borderColor: 'border-blue-200/50 dark:border-blue-800/50',
+  },
+  admin_user_suspended: {
+    icon: ShieldOff,
+    color: 'text-red-600 dark:text-red-400',
+    bgColor: 'bg-red-50/80 dark:bg-red-950/30',
+    borderColor: 'border-red-200/50 dark:border-red-800/50',
+  },
 };
 
 // ✅ PRIORIDADE DAS NOTIFICAÇÕES (ordem de exibição)
 const notificationPriority: Record<NotificationType, number> = {
   task_overdue: 1,      // ⚠️ Mais urgente
   plan_expiring: 2,
-  task_reminder: 3,
-  lead_new: 4,
-  lead_converted: 5,
-  lead_moved: 6,
-  plan_limit: 7,
-  lead_removed: 8,
-  welcome: 9,
-  tour: 10,
-  system_update: 11,    // Menos urgente
+  admin_plan_upgrade: 3,
+  admin_payment_received: 3,
+  admin_new_user: 4,
+  admin_user_suspended: 4,
+  task_reminder: 5,
+  lead_new: 6,
+  lead_converted: 7,
+  lead_moved: 8,
+  plan_limit: 9,
+  lead_removed: 10,
+  welcome: 11,
+  tour: 12,
+  system_update: 13,    // Menos urgente
 };
 
 interface NotificationBellProps {
@@ -228,6 +260,13 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
       return () => clearInterval(interval);
     }
   }, [dismissedReady, loadNotifications]);
+
+  // Refresh when the bell panel is opened
+  useEffect(() => {
+    if (open) {
+      void loadNotifications();
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const markAsRead = async (notificationId: string, closePanel = false) => {
     try {

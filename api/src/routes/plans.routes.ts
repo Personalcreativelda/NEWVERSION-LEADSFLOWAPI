@@ -54,7 +54,7 @@ router.post('/upgrade', requireAuth, async (req: AuthenticatedRequest, res, next
 
     console.log(`[Plans] User ${user.email} upgraded to plan: ${planId}`);
 
-    // Create notification
+    // Create notification for user
     await notificationsService.createNotification(
       req.user.id,
       'plan_upgraded',
@@ -62,6 +62,16 @@ router.post('/upgrade', requireAuth, async (req: AuthenticatedRequest, res, next
       `Você atualizou seu plano para ${user.plan.toUpperCase()}`,
       'zap',
       { planId, planName: user.plan }
+    );
+
+    // 🔔 Notify admins of upgrade
+    void notificationsService.sendAdminNotification(
+      'upgradeNotifications',
+      'admin_plan_upgrade',
+      'Upgrade de Plano',
+      `${user.name || user.email} fez upgrade para o plano ${planId.toUpperCase()}.`,
+      'trending-up',
+      { userId: user.id, email: user.email, plan: planId }
     );
 
     res.json({
@@ -257,6 +267,26 @@ router.post('/stripe/webhook', async (req, res) => {
           `Seu plano foi atualizado para ${planId} com sucesso.`,
           'zap',
           { planId }
+        );
+
+        // 🔔 Notify admins of payment
+        void notificationsService.sendAdminNotification(
+          'paymentNotifications',
+          'admin_payment_received',
+          'Pagamento Recebido',
+          `Pagamento de ${currency} ${(amountTotal / 100).toFixed(2)} recebido para o plano ${planId} (${billingCycle}).`,
+          'credit-card',
+          { userId, planId, billingCycle, amount: amountTotal, currency, cardBrand, cardLast4 }
+        );
+
+        // 🔔 Notify admins of upgrade
+        void notificationsService.sendAdminNotification(
+          'upgradeNotifications',
+          'admin_plan_upgrade',
+          'Upgrade via Stripe',
+          `Usuário ID ${userId} fez upgrade para ${planId} (${billingCycle}) via Stripe.`,
+          'trending-up',
+          { userId, planId, billingCycle }
         );
 
         console.log(`[Stripe Webhook] User ${userId} upgraded to ${planId} (${billingCycle}) card: ${cardBrand} ****${cardLast4}`);

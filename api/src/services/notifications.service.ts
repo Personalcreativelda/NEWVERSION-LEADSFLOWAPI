@@ -124,4 +124,51 @@ export const notificationsService = {
 
     return parseInt(result.rows[0].count);
   },
+
+  // ── Admin notification helper ──────────────────────────────────────────────
+  // Sends an in-app notification to every admin whose settings allow this type.
+  // settingKey must match a key in admin_settings.settings (e.g. 'newUserNotifications').
+  async sendAdminNotification(
+    settingKey: 'newUserNotifications' | 'upgradeNotifications' | 'paymentNotifications' | 'expirationNotifications' | 'suspensionNotifications',
+    type: string,
+    title: string,
+    description: string,
+    icon: string,
+    metadata: Record<string, any> = {}
+  ): Promise<void> {
+    try {
+      // Get all admins
+      const admins = await query(`SELECT id FROM users WHERE role = 'admin'`);
+      if (!admins.rows.length) return;
+
+      for (const admin of admins.rows) {
+        try {
+          // Read this admin's notification settings
+          let enabled = true; // default on if no settings saved yet
+          try {
+            const settingsResult = await query(
+              `SELECT settings FROM admin_settings WHERE admin_id = $1 AND setting_key = 'notifications'`,
+              [admin.id]
+            );
+            if (settingsResult.rows.length > 0) {
+              const s = settingsResult.rows[0].settings;
+              enabled = s[settingKey] !== false; // default true if key missing
+            }
+          } catch { /* admin_settings table may not exist yet */ }
+
+          if (!enabled) continue;
+
+          await query(
+            `INSERT INTO notifications (user_id, type, title, description, icon, metadata)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [admin.id, type, title, description, icon, JSON.stringify(metadata)]
+          );
+        } catch (err) {
+          console.warn(`[Notifications] Could not send admin notification to ${admin.id}:`, err);
+        }
+      }
+    } catch (err) {
+      console.warn('[Notifications] sendAdminNotification error:', err);
+    }
+  },
 };
