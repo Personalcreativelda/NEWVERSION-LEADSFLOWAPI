@@ -88,7 +88,7 @@ const fetchUsageCounts = async (userId: string): Promise<UsageCounts> => {
 const buildProfileResponse = (user: DbUserRow, usage?: UsageCounts) => {
   const safeUsage = usage || { ...DEFAULT_USAGE };
   const fallbackName = user.email?.split('@')[0] || 'Usuário';
-  const plan = user.plan || 'free';
+  const plan = (user.plan || 'free').toLowerCase();
 
   return {
     id: user.id,
@@ -96,7 +96,7 @@ const buildProfileResponse = (user: DbUserRow, usage?: UsageCounts) => {
     name: user.name || fallbackName,
     avatar_url: user.avatar_url,
     plan,
-    subscription_plan: user.subscription_plan || plan,
+    subscription_plan: (user.subscription_plan || plan).toLowerCase(),
     subscription_status: user.subscription_status || 'active',
     plan_expires_at: user.plan_expires_at || null,
     planExpiresAt: user.plan_expires_at || null,

@@ -71,8 +71,8 @@ const sanitizeUser = (user: DbUser) => ({
   avatar_url: user.avatar_url,
   role: user.role,
   email_verified: user.email_verified,
-  plan: user.plan || user.subscription_plan || 'free',
-  subscription_plan: user.plan || user.subscription_plan || 'free',
+  plan: (user.plan || user.subscription_plan || 'free').toLowerCase(),
+  subscription_plan: (user.plan || user.subscription_plan || 'free').toLowerCase(),
   subscription_status: user.subscription_status || 'active',
   // Expose expiry under both naming conventions so all frontend code finds it
   planExpiresAt: user.plan_expires_at || user.subscription_expires_at || null,

@@ -865,7 +865,7 @@ router.post('/portal-session', requireAuth, async (req: AuthenticatedRequest, re
     }
 
     const appUrl = process.env.APP_URL || (req.headers.origin as string) || 'https://app.leadsflowapi.com';
-    const returnUrl = `${appUrl}/settings?tab=plan`;
+    const returnUrl = `${appUrl}/dashboard/plan`;
 
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,

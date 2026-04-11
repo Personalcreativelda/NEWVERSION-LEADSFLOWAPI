@@ -606,12 +606,24 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
         planActivatedAt: profile?.planActivatedAt || profile?.plan_activated_at || authUser.planActivatedAt || authUser.plan_activated_at || null,
       };
 
-      if (!userData.plan) {
-        userData.plan = 'free';
+      // Normalize plan values to lowercase to ensure consistent comparisons throughout the UI
+      userData.plan = (userData.plan || 'free').toLowerCase();
+      userData.subscription_plan = (userData.subscription_plan || userData.plan).toLowerCase();
+
+      // If the user has a paid plan but no expiry date stored, sync from Stripe to populate it
+      if (userData.plan !== 'free' && !userData.plan_expires_at && !userData.planExpiresAt) {
+        try {
+          const syncResult = await apiRequest('/plans/sync-active-subscription', 'POST');
+          if (syncResult?.synced && syncResult.expiresAt) {
+            userData.plan_expires_at = syncResult.expiresAt;
+            userData.planExpiresAt = syncResult.expiresAt;
+            console.log('[Auth] Auto-synced plan expiry from Stripe:', syncResult.expiresAt);
+          }
+        } catch (e) {
+          console.warn('[Auth] Could not auto-sync subscription expiry from Stripe:', e);
+        }
       }
-      if (!userData.subscription_plan) {
-        userData.subscription_plan = userData.plan;
-      }
+
       if (!userData.limits) {
         userData.limits = {
           leads: 100,
