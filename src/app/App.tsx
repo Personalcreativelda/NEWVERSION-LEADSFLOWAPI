@@ -93,6 +93,9 @@ const getPageFromPath = (): Page | null => {
   const pathname = window.location.pathname;
   const cleanPath = pathname.split('?')[0].split('#')[0]; // Remove query params and hash
 
+  // Dashboard sub-routes (/dashboard, /dashboard/leads, etc.) all map to dashboard
+  if (cleanPath === '/dashboard' || cleanPath.startsWith('/dashboard/')) return 'dashboard';
+
   const pageMap: Record<string, Page> = {
     '/login': 'login',
     '/signup': 'signup',
@@ -108,9 +111,18 @@ const getPageFromPath = (): Page | null => {
 };
 
 const setPagePath = (page: Page) => {
-  // Don't set path for dashboard or landing
-  if (page === 'dashboard' || page === 'landing') {
+  if (page === 'landing') {
     if (window.location.pathname !== '/' && window.location.pathname !== '') {
+      window.history.pushState({ page }, '', '/');
+    }
+    return;
+  }
+
+  if (page === 'dashboard') {
+    // Don't overwrite /dashboard/* sub-paths — those are managed within Dashboard
+    const p = window.location.pathname;
+    const isAlreadyDashboard = p === '/' || p === '/dashboard' || p.startsWith('/dashboard/');
+    if (!isAlreadyDashboard) {
       window.history.pushState({ page }, '', '/');
     }
     return;
@@ -656,9 +668,17 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
           if (userData && userData.id) {
             localStorage.setItem('leadflow_user', JSON.stringify(userData));
           }
-          // Don't redirect if we're on a standalone page like agent-call
+          // Navigate to the page the user originally requested, if it requires auth
+          // Public pages (login, signup, landing) are redirected to dashboard
           const pageFromUrl = getPageFromPath();
-          if (pageFromUrl !== 'agent-call') {
+          const authRequiredPages: Page[] = ['dashboard', 'settings', 'admin', 'agent-call'];
+          if (pageFromUrl === 'agent-call') {
+            // agent-call is standalone, don't change page
+            return;
+          }
+          if (pageFromUrl && authRequiredPages.includes(pageFromUrl)) {
+            setCurrentPage(pageFromUrl);
+          } else {
             setCurrentPage('dashboard');
           }
           return;

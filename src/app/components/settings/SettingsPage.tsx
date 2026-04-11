@@ -27,6 +27,17 @@ export default function SettingsPage({
   onProfileUpdate,
   onUpgrade,
 }: SettingsPageProps) {
+  // Read initial tab from ?tab= query param (e.g. returned from Stripe portal with ?tab=plan)
+  const initialTab = (() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    const valid = ['profile', 'plan', 'webhooks', 'security'];
+    if (tab && valid.includes(tab)) {
+      // Clean the query param from the URL without triggering a reload
+      window.history.replaceState({}, '', window.location.pathname);
+      return tab;
+    }
+    return 'profile';
+  })();
   const [name, setName] = useState(user?.name || '');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -174,7 +185,7 @@ export default function SettingsPage({
           </p>
         </div>
 
-        <Tabs defaultValue="profile" className="space-y-6">
+        <Tabs defaultValue={initialTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile">
               <User className="w-4 h-4 mr-2" />

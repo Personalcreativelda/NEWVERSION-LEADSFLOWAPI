@@ -430,6 +430,99 @@ router.post('/stripe/webhook', async (req, res) => {
       }
     }
 
+    // ── customer.subscription.deleted → cancelled via portal or admin ──
+    if (event.type === 'customer.subscription.deleted') {
+      const sub = event.data.object as any;
+      const stripeCustomerId = sub.customer as string;
+      try {
+        const userResult = await query(
+          `SELECT id, email, name, plan FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+          [stripeCustomerId]
+        );
+        if (!userResult.rows.length) {
+          console.warn(`[Stripe Webhook] No user found for deleted subscription customer ${stripeCustomerId}`);
+        } else {
+          const user = userResult.rows[0];
+          if (user.plan !== 'free') {
+            await query(
+              `UPDATE users
+               SET plan = 'free', subscription_plan = 'free',
+                   subscription_status = 'cancelled',
+                   stripe_subscription_id = NULL,
+                   plan_expires_at = NULL,
+                   plan_activated_at = NULL,
+                   updated_at = NOW()
+               WHERE id = $1`,
+              [user.id]
+            );
+            await notificationsService.createNotification(
+              user.id,
+              'plan_upgraded',
+              'Plano Cancelado',
+              'Sua assinatura foi cancelada. Você foi movido para o plano gratuito.',
+              'zap',
+              { previousPlan: user.plan }
+            );
+            void notificationsService.sendAdminNotification(
+              'upgradeNotifications',
+              'admin_plan_upgrade',
+              'Plano Cancelado via Portal',
+              `${user.name || user.email} cancelou o plano ${user.plan.toUpperCase()} via portal Stripe.`,
+              'trending-up',
+              { userId: user.id, email: user.email, plan: user.plan }
+            );
+            console.log(`[Stripe Webhook] Subscription deleted for user ${user.id}, downgraded to free`);
+          }
+        }
+      } catch (err) {
+        console.error('[Stripe Webhook] Error processing subscription.deleted:', err);
+      }
+    }
+
+    // ── customer.subscription.updated → plan changed or renewed via portal ──
+    if (event.type === 'customer.subscription.updated') {
+      const sub = event.data.object as any;
+      const stripeCustomerId = sub.customer as string;
+      const subStatus = sub.status as string;
+      try {
+        const userResult = await query(
+          `SELECT id, plan FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+          [stripeCustomerId]
+        );
+        if (userResult.rows.length) {
+          const user = userResult.rows[0];
+          if (subStatus === 'canceled') {
+            await query(
+              `UPDATE users
+               SET plan = 'free', subscription_plan = 'free',
+                   subscription_status = 'cancelled',
+                   stripe_subscription_id = NULL,
+                   plan_expires_at = NULL,
+                   plan_activated_at = NULL,
+                   updated_at = NOW()
+               WHERE id = $1`,
+              [user.id]
+            );
+          } else if (subStatus === 'active' || subStatus === 'trialing') {
+            const subAny = sub as any;
+            const periodEnd: number | undefined = subAny.current_period_end ?? subAny.currentPeriodEnd;
+            if (periodEnd) {
+              const expiresAt = new Date(periodEnd * 1000);
+              await query(
+                `UPDATE users
+                 SET subscription_status = 'active', plan_expires_at = $1, updated_at = NOW()
+                 WHERE id = $2`,
+                [expiresAt, user.id]
+              );
+            }
+          }
+          console.log(`[Stripe Webhook] Subscription updated for user ${user.id}, status=${subStatus}`);
+        }
+      } catch (err) {
+        console.error('[Stripe Webhook] Error processing subscription.updated:', err);
+      }
+    }
+
     res.json({ received: true });
   } catch (error) {
     console.error('[Stripe Webhook] Error handling webhook:', error);
@@ -729,6 +822,59 @@ router.post('/cancel', requireAuth, async (req: AuthenticatedRequest, res, next)
     });
   } catch (error) {
     console.error('[Plans] Error cancelling plan:', error);
+    next(error);
+  }
+});
+
+// Create a Stripe Customer Portal session
+router.post('/portal-session', requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) {
+      return res.status(503).json({ error: 'Stripe not configured' });
+    }
+
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-03-25.dahlia' });
+
+    const userResult = await query(
+      'SELECT id, email, stripe_customer_id FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    const user = userResult.rows[0];
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    let stripeCustomerId: string | null = user.stripe_customer_id || null;
+
+    // Look up by email if no customer ID stored
+    if (!stripeCustomerId) {
+      try {
+        const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+        if (customers.data.length > 0) {
+          stripeCustomerId = customers.data[0].id;
+          await query('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [stripeCustomerId, user.id]);
+        }
+      } catch (e) {
+        console.warn('[Portal] Customer lookup by email failed:', e);
+      }
+    }
+
+    if (!stripeCustomerId) {
+      return res.status(400).json({ error: 'Nenhuma conta Stripe encontrada. Faça um pagamento primeiro.' });
+    }
+
+    const appUrl = process.env.APP_URL || (req.headers.origin as string) || 'https://app.leadsflowapi.com';
+    const returnUrl = `${appUrl}/settings?tab=plan`;
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: stripeCustomerId,
+      return_url: returnUrl,
+    });
+
+    return res.json({ url: session.url });
+  } catch (error) {
+    console.error('[Plans] Error creating portal session:', error);
     next(error);
   }
 });

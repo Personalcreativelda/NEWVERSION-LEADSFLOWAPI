@@ -71,9 +71,9 @@ const sanitizeUser = (user: DbUser) => ({
   avatar_url: user.avatar_url,
   role: user.role,
   email_verified: user.email_verified,
-  subscription_plan: user.subscription_plan || user.plan || 'free',
+  plan: user.plan || user.subscription_plan || 'free',
+  subscription_plan: user.plan || user.subscription_plan || 'free',
   subscription_status: user.subscription_status || 'active',
-  plan: user.subscription_plan || user.plan || 'free', // Alias for frontend compatibility
   // Expose expiry under both naming conventions so all frontend code finds it
   planExpiresAt: user.plan_expires_at || user.subscription_expires_at || null,
   plan_expires_at: user.plan_expires_at || user.subscription_expires_at || null,
@@ -263,6 +263,7 @@ export class AuthService {
           `UPDATE users SET
             name = COALESCE($1, name),
             avatar_url = COALESCE($2, avatar_url),
+            subscription_plan = COALESCE(NULLIF(plan, ''), subscription_plan, 'free'),
             email_verified = true,
             updated_at = NOW()
            WHERE id = $3`,

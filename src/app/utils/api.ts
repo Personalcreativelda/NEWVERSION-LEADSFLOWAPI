@@ -865,6 +865,10 @@ export const plansApi = {
   syncActiveSubscription: async () => {
     return apiCall('/plans/sync-active-subscription', { method: 'POST' }, true);
   },
+
+  createPortalSession: async () => {
+    return apiCall('/plans/portal-session', { method: 'POST' }, true);
+  },
 };
 
 // ============================================

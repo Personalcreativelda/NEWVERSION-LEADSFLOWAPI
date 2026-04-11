@@ -108,7 +108,44 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     return false;
   });
   const [language, setLanguage] = useState<Language>(() => loadLanguage());
-  const [currentPage, setCurrentPage] = useState('dashboard');
+
+  // Resolve the dashboard sub-page from the URL path on first mount
+  const getSubPageFromUrl = () => {
+    const subPathMap: Record<string, string> = {
+      '/dashboard/leads': 'leads',
+      '/dashboard/inbox': 'inbox',
+      '/dashboard/inbox/settings': 'inbox-settings',
+      '/dashboard/inbox/ai-assistants': 'ai-assistants',
+      '/dashboard/inbox/automations': 'automations',
+      '/dashboard/funnel': 'funnel',
+      '/dashboard/analytics': 'analytics',
+      '/dashboard/tasks': 'tasks',
+      '/dashboard/campaigns': 'campaigns',
+      '/dashboard/integrations': 'integrations',
+      '/dashboard/security': 'security',
+      '/dashboard/account': 'account',
+    };
+    const path = window.location.pathname.split('?')[0];
+    return subPathMap[path] || 'dashboard';
+  };
+
+  const subPageToPath: Record<string, string> = {
+    'dashboard': '/',
+    'leads': '/dashboard/leads',
+    'inbox': '/dashboard/inbox',
+    'inbox-settings': '/dashboard/inbox/settings',
+    'ai-assistants': '/dashboard/inbox/ai-assistants',
+    'automations': '/dashboard/inbox/automations',
+    'funnel': '/dashboard/funnel',
+    'analytics': '/dashboard/analytics',
+    'tasks': '/dashboard/tasks',
+    'campaigns': '/dashboard/campaigns',
+    'integrations': '/dashboard/integrations',
+    'security': '/dashboard/security',
+    'account': '/dashboard/account',
+  };
+
+  const [currentPage, setCurrentPage] = useState(() => getSubPageFromUrl());
   const [conversationIdToOpen, setConversationIdToOpen] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     // Carregar estado da sidebar do localStorage
@@ -233,6 +270,24 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   useEffect(() => {
     localStorage.setItem('sidebar_open', JSON.stringify(isSidebarOpen));
   }, [isSidebarOpen]);
+
+  // Navigation handler: updates internal page state AND browser URL
+  const handleNavigate = useCallback((pageId: string) => {
+    setCurrentPage(pageId);
+    const path = subPageToPath[pageId] ?? `/dashboard/${pageId}`;
+    if (window.location.pathname !== path) {
+      window.history.pushState({ dashboardPage: pageId }, '', path);
+    }
+  }, [subPageToPath]);
+
+  // Sync internal page with browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPage(getSubPageFromUrl());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Log page changes for debugging
   useEffect(() => {
@@ -1781,7 +1836,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   };
 
   const handleStartTour = () => {
-    setCurrentPage('dashboard');
+    handleNavigate('dashboard');
     setTimeout(() => {
       setShowTour(true);
     }, 500);
@@ -1801,7 +1856,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         currentPage={currentPage}
-        onNavigate={setCurrentPage}
+        onNavigate={handleNavigate}
         isDark={isDark}
         onToggleTheme={handleToggleTheme}
         isMobile={isMobile}
@@ -1823,14 +1878,14 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
             user={user}
             isDark={isDark}
             currentPage={currentPage}
-            onNavigate={setCurrentPage}
+            onNavigate={handleNavigate}
             onToggleTheme={handleToggleTheme}
             onThemeChange={handleThemeChange}
             themeMode={themeMode}
             onNovoLead={handleNovoLead}
             onEmailMarketing={handleEmailMarketing}
             onMassMessage={handleEnvioMassa}
-            onSettings={() => setCurrentPage('account')}
+            onSettings={() => handleNavigate('account')}
             onLogout={onLogout}
             isSidebarOpen={isSidebarOpen}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -2039,7 +2094,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                 isDark={isDark}
                 leads={leads}
                 currentSubPage={currentPage}
-                onNavigate={setCurrentPage}
+                onNavigate={handleNavigate}
                 conversationIdToOpen={conversationIdToOpen}
                 onConversationOpened={() => setConversationIdToOpen(null)}
               />
@@ -2347,7 +2402,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
           onComplete={handleTourComplete}
           onSkip={handleTourSkip}
           isDark={isDark}
-          onNavigate={setCurrentPage}
+          onNavigate={handleNavigate}
         />
       )}
 
