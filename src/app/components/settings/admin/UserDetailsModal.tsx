@@ -12,7 +12,6 @@ interface Channel {
   id: string;
   name: string;
   type: string;
-  provider?: string;
   status: string;
   credentials?: Record<string, any>;
   created_at: string;
@@ -248,9 +247,9 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${ch.status === 'connected' ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">{ch.name}</p>
-                          {(ch.credentials?.phone_number_id || ch.credentials?.instance_id || ch.provider) && (
+                          {(ch.credentials?.phone_number_id || ch.credentials?.instance_id || ch.credentials?.phone_number) && (
                             <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Phone className="w-3 h-3" /> {ch.credentials?.phone_number_id || ch.credentials?.instance_id || ch.provider}
+                              <Phone className="w-3 h-3" /> {ch.credentials?.phone_number || ch.credentials?.phone_number_id || ch.credentials?.instance_id}
                             </p>
                           )}
                         </div>

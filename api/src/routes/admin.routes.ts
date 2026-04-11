@@ -526,12 +526,11 @@ router.get('/users/:userId/details', requireAuth, requireAdmin, async (req: Auth
   try {
     const { userId } = req.params;
 
+    // Build user query only with columns guaranteed to exist
     const userResult = await query(
-      `SELECT u.id, u.email, u.name, u.avatar_url, u.role, u.is_active, u.plan, u.plan_expires_at,
-              u.plan_activated_at, u.subscription_status, u.stripe_customer_id,
-              u.created_at, u.last_active_at,
+      `SELECT u.id, u.email, u.name, u.avatar_url, u.role, u.is_active, u.plan,
+              u.created_at,
               (SELECT COUNT(*) FROM leads WHERE user_id = u.id) as leads_count,
-              (SELECT COUNT(*) FROM messages WHERE user_id = u.id AND direction = 'outgoing') as messages_count,
               (SELECT COUNT(*) FROM campaigns WHERE user_id = u.id) as campaigns_count
        FROM users u WHERE u.id = $1`,
       [userId]
@@ -541,8 +540,29 @@ router.get('/users/:userId/details', requireAuth, requireAdmin, async (req: Auth
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Fetch optional columns separately to avoid crashing if they don't exist
+    let extraUserData: any = {};
+    try {
+      const extra = await query(
+        `SELECT plan_expires_at, plan_activated_at, subscription_status, stripe_customer_id, last_active_at
+         FROM users WHERE id = $1`,
+        [userId]
+      );
+      if (extra.rows[0]) extraUserData = extra.rows[0];
+    } catch { /* columns may not exist in older DBs */ }
+
+    // Optional messages count
+    let messagesCount = 0;
+    try {
+      const mc = await query(
+        `SELECT COUNT(*) as cnt FROM messages WHERE user_id = $1 AND direction = 'outgoing'`,
+        [userId]
+      );
+      messagesCount = parseInt(mc.rows[0]?.cnt) || 0;
+    } catch { /* messages table may not have direction column */ }
+
     const channelsResult = await query(
-      `SELECT id, name, type, provider, status, credentials, created_at
+      `SELECT id, name, type, status, credentials, created_at
        FROM channels WHERE user_id = $1 ORDER BY created_at DESC`,
       [userId]
     );
@@ -555,7 +575,7 @@ router.get('/users/:userId/details', requireAuth, requireAdmin, async (req: Auth
 
     res.json({
       success: true,
-      user: userResult.rows[0],
+      user: { ...userResult.rows[0], ...extraUserData, messages_count: messagesCount },
       channels: channelsResult.rows,
       recentActivities: activitiesResult.rows,
     });
