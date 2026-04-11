@@ -272,6 +272,10 @@ router.post('/stripe/webhook', async (req, res) => {
         // Retrieve card info from the subscription's payment method
         let cardBrand: string | null = null;
         let cardLast4: string | null = null;
+        // Default expiry fallback — will be overwritten by Stripe's current_period_end below
+        let expiresAt: Date = billingCycle === 'annual'
+          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         if (stripeSubscriptionId) {
           try {
             const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
@@ -282,14 +286,18 @@ router.post('/stripe/webhook', async (req, res) => {
               cardBrand = pm.card.brand || null;
               cardLast4 = pm.card.last4 || null;
             }
+            // Use Stripe's exact period end as the source of truth for expiry
+            const subAny = sub as any;
+            const periodEnd: number | undefined = subAny.current_period_end ?? subAny.currentPeriodEnd;
+            if (periodEnd) {
+              expiresAt = new Date(periodEnd * 1000);
+            }
           } catch (err) {
             console.warn('[Stripe Webhook] Could not retrieve payment method card info:', err);
           }
         }
 
-        const expiresAt = billingCycle === 'annual'
-          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        // expiresAt is set above from Stripe if available, fallback only if sub fetch fails
 
         await query(
           `UPDATE users
@@ -374,6 +382,7 @@ router.post('/stripe/webhook', async (req, res) => {
             let cardBrand: string | null = null;
             let cardLast4: string | null = null;
             let billingCycle = 'monthly';
+            let expiresAt: Date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
             try {
               const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
                 expand: ['default_payment_method', 'items.data.price'],
@@ -383,13 +392,19 @@ router.post('/stripe/webhook', async (req, res) => {
               // Determine billing cycle from interval
               const interval = (sub.items?.data?.[0]?.price as any)?.recurring?.interval;
               if (interval === 'year') billingCycle = 'annual';
+              // Use Stripe's exact period end as the source of truth
+              const subAny = sub as any;
+              const periodEnd: number | undefined = subAny.current_period_end ?? subAny.currentPeriodEnd;
+              if (periodEnd) {
+                expiresAt = new Date(periodEnd * 1000);
+              } else {
+                expiresAt = billingCycle === 'annual'
+                  ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+                  : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+              }
             } catch (err) {
               console.warn('[Stripe Webhook] Could not get subscription details on renewal:', err);
             }
-
-            const expiresAt = billingCycle === 'annual'
-              ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-              : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
             await query(
               `UPDATE users
