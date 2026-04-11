@@ -613,7 +613,7 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       // If the user has a paid plan but no expiry date stored, sync from Stripe to populate it
       if (userData.plan !== 'free' && !userData.plan_expires_at && !userData.planExpiresAt) {
         try {
-          const syncResult = await apiRequest('/plans/sync-active-subscription', 'POST');
+          const syncResult = await plansApi.syncActiveSubscription();
           if (syncResult?.synced && syncResult.expiresAt) {
             userData.plan_expires_at = syncResult.expiresAt;
             userData.planExpiresAt = syncResult.expiresAt;
