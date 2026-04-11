@@ -522,8 +522,11 @@ router.post('/sync-active-subscription', requireAuth, async (req: AuthenticatedR
     const cardLast4: string | null = pm?.card?.last4 || null;
 
     // Calculate expiry from Stripe's current period end
-    const expiresAt = sub.current_period_end
-      ? new Date(sub.current_period_end * 1000)
+    // The Stripe SDK 2026-03-25.dahlia uses 'billing_cycle_anchor' style — cast to any for compat
+    const subAny = sub as any;
+    const periodEnd: number | undefined = subAny.current_period_end ?? subAny.currentPeriodEnd;
+    const expiresAt = periodEnd
+      ? new Date(periodEnd * 1000)
       : billingCycle === 'annual'
         ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
