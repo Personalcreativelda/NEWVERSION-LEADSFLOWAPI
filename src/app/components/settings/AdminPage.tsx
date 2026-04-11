@@ -3,7 +3,7 @@ import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import { 
-  Users, Bell, History, ChevronRight
+  Users, Bell, History, ChevronRight, Megaphone
 } from 'lucide-react';
 
 // New Modular Components
@@ -11,6 +11,8 @@ import { AdminStatsCards } from './admin/AdminStatsCards';
 import { AdminRevenueBreakdown } from './admin/AdminRevenueBreakdown';
 import { AdminUsersTab } from './admin/AdminUsersTab';
 import { AdminActivityTab } from './admin/AdminActivityTab';
+import { AdminMarketingTab } from './admin/AdminMarketingTab';
+import { UserDetailsModal } from './admin/UserDetailsModal';
 import { ActivatePlanModal, NotificationSettingsModal } from './admin/AdminModals';
 
 interface User {
@@ -56,10 +58,11 @@ export default function AdminPage() {
   });
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [filterPlan, setFilterPlan] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'users' | 'activity'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'activity' | 'marketing'>('users');
   const [activities, setActivities] = useState<any[]>([]);
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [viewDetailsUserId, setViewDetailsUserId] = useState<string | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -350,17 +353,36 @@ export default function AdminPage() {
             <History className={`w-4 h-4 ${activeTab === 'activity' ? 'text-primary' : 'text-muted-foreground'}`} />
           </div>
           <span className="whitespace-nowrap">Fluxo de Atividade</span>
-          
-          {/* Active Highlight Underline */}
           <div className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full transition-all duration-300 ${
             activeTab === 'activity' 
               ? 'bg-primary scale-x-100 shadow-[0_-4px_12px_rgba(var(--primary),0.6)]' 
               : 'bg-transparent scale-x-0 group-hover:bg-border group-hover:scale-x-50'
           }`} />
         </button>
+
+        <ChevronRight className="w-4 h-4 text-muted-foreground/40 flex-shrink-0" />
+
+        <button
+          onClick={() => setActiveTab('marketing')}
+          className={`relative flex items-center gap-2.5 px-2 py-4 font-bold text-sm transition-all duration-300 group ${
+            activeTab === 'marketing' 
+              ? 'text-primary' 
+              : 'text-muted-foreground hover:text-foreground/80'
+          }`}
+        >
+          <div className={`p-1.5 rounded-lg transition-all duration-300 ${activeTab === 'marketing' ? 'bg-primary/10 shadow-sm' : 'group-hover:bg-muted'}`}>
+            <Megaphone className={`w-4 h-4 ${activeTab === 'marketing' ? 'text-primary' : 'text-muted-foreground'}`} />
+          </div>
+          <span className="whitespace-nowrap">Marketing</span>
+          <div className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full transition-all duration-300 ${
+            activeTab === 'marketing' 
+              ? 'bg-primary scale-x-100 shadow-[0_-4px_12px_rgba(var(--primary),0.6)]' 
+              : 'bg-transparent scale-x-0 group-hover:bg-border group-hover:scale-x-50'
+          }`} />
+        </button>
       </div>
 
-      {activeTab === 'users' ? (
+      {activeTab === 'users' && (
         <>
           <AdminStatsCards 
             usersCount={users.length}
@@ -384,14 +406,27 @@ export default function AdminPage() {
             }}
             onSuspendUser={handleSuspendUser}
             onDeleteUser={handleDeleteUser}
+            onViewDetails={(userId) => setViewDetailsUserId(userId)}
           />
         </>
-      ) : (
+      )}
+
+      {activeTab === 'activity' && (
         <AdminActivityTab 
           activities={activities}
           activeUsers={activeUsers}
           activitiesLoading={activitiesLoading}
           onRefreshActivities={loadActivities}
+        />
+      )}
+
+      {activeTab === 'marketing' && (
+        <AdminMarketingTab
+          totalUsers={users.length}
+          freeCount={users.filter(u => u.plan === 'free').length}
+          businessCount={users.filter(u => u.plan === 'business').length}
+          enterpriseCount={users.filter(u => u.plan === 'enterprise').length}
+          users={users.map(u => ({ id: u.id, name: u.name, email: u.email, plan: u.plan }))}
         />
       )}
 
@@ -419,6 +454,13 @@ export default function AdminPage() {
           loading={loading}
           onClose={() => setShowNotificationSettings(false)}
           onSave={saveNotificationSettings}
+        />
+      )}
+
+      {viewDetailsUserId && (
+        <UserDetailsModal
+          userId={viewDetailsUserId}
+          onClose={() => setViewDetailsUserId(null)}
         />
       )}
     </div>

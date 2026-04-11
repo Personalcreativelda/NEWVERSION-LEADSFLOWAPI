@@ -78,19 +78,29 @@ export const AdminActivityTab: React.FC<ActivityTabProps> = ({
                     {user.recent_activities?.[0]?.description || 'Ativo agora'}
                   </p>
 
-                  {/* Show small history of last 5 activities */}
-                  {user.recent_activities && user.recent_activities.length > 1 && (
-                    <div className="mt-1.5 pt-1.5 border-t border-border/30">
-                      <div className="flex flex-col gap-1">
-                        {user.recent_activities.slice(1, 4).map((act: any, idx: number) => (
-                          <div key={idx} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
-                            <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
-                            <span className="truncate">{act.description}</span>
-                          </div>
-                        ))}
+                  {/* Show unique recent activities (skip duplicates) */}
+                  {user.recent_activities && user.recent_activities.length > 1 && (() => {
+                    const seen = new Set<string>();
+                    seen.add(user.recent_activities[0]?.description || '');
+                    const unique = user.recent_activities.slice(1).filter((act: any) => {
+                      if (seen.has(act.description)) return false;
+                      seen.add(act.description);
+                      return true;
+                    }).slice(0, 3);
+                    if (unique.length === 0) return null;
+                    return (
+                      <div className="mt-1.5 pt-1.5 border-t border-border/30">
+                        <div className="flex flex-col gap-1">
+                          {unique.map((act: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
+                              <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                              <span className="truncate">{act.description}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
             ))

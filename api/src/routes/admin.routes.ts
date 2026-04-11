@@ -5,6 +5,7 @@ import { query } from '../database/connection';
 import { plansService } from '../services/plans.service';
 import { planExpirationService } from '../services/plan-expiration.service';
 import { activityService } from '../services/activity.service';
+import nodemailer from 'nodemailer';
 
 const router = Router();
 
@@ -514,6 +515,240 @@ router.get('/user-activities', requireAuth, requireAdmin, async (req: Authentica
     res.json({ success: true, activities });
   } catch (error) {
     console.error('[Admin] Error fetching user activities:', error);
+    next(error);
+  }
+});
+
+// ==========================================
+// GET /admin/users/:userId/details - Detalhes completos de um usuário
+// ==========================================
+router.get('/users/:userId/details', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { userId } = req.params;
+
+    const userResult = await query(
+      `SELECT u.id, u.email, u.name, u.avatar_url, u.role, u.is_active, u.plan, u.plan_expires_at,
+              u.plan_activated_at, u.subscription_status, u.stripe_customer_id,
+              u.created_at, u.last_active_at,
+              (SELECT COUNT(*) FROM leads WHERE user_id = u.id) as leads_count,
+              (SELECT COUNT(*) FROM messages WHERE user_id = u.id AND direction = 'outgoing') as messages_count,
+              (SELECT COUNT(*) FROM campaigns WHERE user_id = u.id) as campaigns_count
+       FROM users u WHERE u.id = $1`,
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const channelsResult = await query(
+      `SELECT id, name, type, phone_number, status, created_at
+       FROM channels WHERE user_id = $1 ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    const activitiesResult = await query(
+      `SELECT type, description, metadata, created_at
+       FROM activities WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      user: userResult.rows[0],
+      channels: channelsResult.rows,
+      recentActivities: activitiesResult.rows,
+    });
+  } catch (error) {
+    console.error('[Admin] Error fetching user details:', error);
+    next(error);
+  }
+});
+
+// ==========================================
+// POST /admin/users/:userId/send-email - Enviar email para usuário
+// ==========================================
+router.post('/users/:userId/send-email', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { subject, message, is_html } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'subject and message are required' });
+    }
+
+    const userResult = await query('SELECT email, name FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { email, name } = userResult.rows[0];
+
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = process.env.SMTP_PORT;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpFrom = process.env.SMTP_FROM || `LeadsFlow API <${smtpUser}>`;
+
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+      return res.status(503).json({ error: 'SMTP not configured on server. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in .env' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: parseInt(smtpPort, 10),
+      secure: parseInt(smtpPort, 10) === 465,
+      auth: { user: smtpUser, pass: smtpPass },
+    });
+
+    await transporter.sendMail({
+      from: smtpFrom,
+      to: email,
+      subject,
+      text: is_html ? undefined : message,
+      html: is_html ? message : `<p>${message.replace(/\n/g, '<br>')}</p>`,
+    });
+
+    console.log(`[Admin] Email sent to ${email} (${name}) — subject: ${subject}`);
+    res.json({ success: true, message: `Email enviado para ${email}` });
+  } catch (error: any) {
+    console.error('[Admin] Error sending email:', error);
+    next(error);
+  }
+});
+
+// ==========================================
+// POST /admin/users/:userId/send-whatsapp - Enviar WhatsApp para usuário via canal dele
+// ==========================================
+router.post('/users/:userId/send-whatsapp', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { phone, message, channel_id } = req.body;
+
+    if (!phone || !message) {
+      return res.status(400).json({ error: 'phone and message are required' });
+    }
+
+    // Find one connected channel — prefer explicitly provided, else first active
+    let instanceName: string | null = null;
+    if (channel_id) {
+      const ch = await query('SELECT name FROM channels WHERE id = $1 AND user_id = $2', [channel_id, userId]);
+      if (ch.rows.length > 0) instanceName = ch.rows[0].name;
+    }
+    if (!instanceName) {
+      const ch = await query(
+        `SELECT name FROM channels WHERE user_id = $1 AND status = 'connected' ORDER BY created_at DESC LIMIT 1`,
+        [userId]
+      );
+      if (ch.rows.length > 0) instanceName = ch.rows[0].name;
+    }
+
+    if (!instanceName) {
+      return res.status(400).json({ error: 'No connected WhatsApp channel found for this user' });
+    }
+
+    const evolutionUrl = process.env.EVOLUTION_API_URL?.replace(/\/$/, '');
+    const apiKey = process.env.EVOLUTION_API_KEY;
+    if (!evolutionUrl || !apiKey) {
+      return res.status(503).json({ error: 'Evolution API not configured' });
+    }
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    const response = await fetch(`${evolutionUrl}/message/sendText/${instanceName}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: apiKey },
+      body: JSON.stringify({ number: cleanPhone, text: message }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(502).json({ error: `Evolution API error: ${err}` });
+    }
+
+    console.log(`[Admin] WhatsApp sent to ${cleanPhone} via instance ${instanceName}`);
+    res.json({ success: true, message: `WhatsApp enviado para ${cleanPhone}` });
+  } catch (error: any) {
+    console.error('[Admin] Error sending WhatsApp:', error);
+    next(error);
+  }
+});
+
+// ==========================================
+// POST /admin/broadcast/email - Enviar email para múltiplos usuários
+// ==========================================
+router.post('/broadcast/email', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { subject, message, is_html, target } = req.body;
+    // target: 'all' | 'free' | 'business' | 'enterprise' | string[] (user ids)
+
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'subject and message are required' });
+    }
+
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = process.env.SMTP_PORT;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpFrom = process.env.SMTP_FROM || `LeadsFlow API <${smtpUser}>`;
+
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+      return res.status(503).json({ error: 'SMTP not configured on server' });
+    }
+
+    let usersResult;
+    if (Array.isArray(target)) {
+      usersResult = await query(
+        'SELECT id, email, name FROM users WHERE id = ANY($1) AND is_active = true',
+        [target]
+      );
+    } else if (target === 'all') {
+      usersResult = await query('SELECT id, email, name FROM users WHERE is_active = true');
+    } else {
+      // plan filter
+      usersResult = await query(
+        'SELECT id, email, name FROM users WHERE plan = $1 AND is_active = true',
+        [target || 'all']
+      );
+    }
+
+    const recipients = usersResult.rows;
+    if (recipients.length === 0) {
+      return res.status(400).json({ error: 'No recipients found' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: parseInt(smtpPort, 10),
+      secure: parseInt(smtpPort, 10) === 465,
+      auth: { user: smtpUser, pass: smtpPass },
+    });
+
+    let sent = 0;
+    const errors: string[] = [];
+
+    for (const user of recipients) {
+      try {
+        const personalizedMessage = message
+          .replace(/\{\{name\}\}/gi, user.name || user.email.split('@')[0])
+          .replace(/\{\{email\}\}/gi, user.email);
+
+        await transporter.sendMail({
+          from: smtpFrom,
+          to: user.email,
+          subject,
+          text: is_html ? undefined : personalizedMessage,
+          html: is_html ? personalizedMessage : `<p>${personalizedMessage.replace(/\n/g, '<br>')}</p>`,
+        });
+        sent++;
+      } catch (err: any) {
+        errors.push(`${user.email}: ${err.message}`);
+      }
+    }
+
+    console.log(`[Admin] Broadcast email: sent=${sent}, errors=${errors.length}`);
+    res.json({ success: true, sent, total: recipients.length, errors: errors.slice(0, 10) });
+  } catch (error: any) {
+    console.error('[Admin] Error broadcasting email:', error);
     next(error);
   }
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Users, Check, X, Ban, Trash2, Calendar, Rocket, Crown } from 'lucide-react';
+import { Search, Users, Check, X, Ban, Trash2, Calendar, Rocket, Crown, Eye } from 'lucide-react';
 import { Input } from '../../ui/input';
 import { Button } from '../../ui/button';
 
@@ -28,6 +28,7 @@ interface AdminUsersTabProps {
   onActivatePlan: (user: User) => void;
   onSuspendUser: (userId: string, currentStatus?: string) => void;
   onDeleteUser: (userId: string, userEmail: string) => void;
+  onViewDetails?: (userId: string) => void;
 }
 
 export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
@@ -38,6 +39,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
   onActivatePlan,
   onSuspendUser,
   onDeleteUser,
+  onViewDetails,
 }) => {
   const badgeBaseClass = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all";
   const cardClass = "rounded-2xl border border-border bg-card shadow-sm overflow-hidden";
@@ -189,7 +191,18 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                       {new Date(user.createdAt).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
+                        {onViewDetails && (
+                          <Button
+                            onClick={() => onViewDetails(user.id)}
+                            size="sm"
+                            variant="outline"
+                            className="text-xs gap-1"
+                          >
+                            <Eye className="w-3 h-3" />
+                            Detalhes
+                          </Button>
+                        )}
                         <Button
                           onClick={() => onActivatePlan(user)}
                           size="sm"

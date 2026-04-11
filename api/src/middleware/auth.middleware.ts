@@ -57,17 +57,72 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     if (now - lastUpdate > UPDATE_INTERVAL) {
       lastUpdateMap.set(user.id, now);
       
-      // Determine descriptive action based on path
-      let actionDescription = 'Ativo na plataforma';
+      // Determine descriptive action based on method + path
+      const method = req.method.toUpperCase();
       const path = req.path.toLowerCase();
-      
-      if (path.includes('/admin')) actionDescription = 'No painel administrativo';
-      else if (path.includes('/leads')) actionDescription = 'Gerenciando leads';
-      else if (path.includes('/inbox') || path.includes('/messages')) actionDescription = 'No Inbox de mensagens';
-      else if (path.includes('/campaigns')) actionDescription = 'Gerenciando campanhas';
-      else if (path.includes('/analytics')) actionDescription = 'Analisando relatórios';
-      else if (path.includes('/settings')) actionDescription = 'Nas configurações';
-      else if (path.includes('/auth')) actionDescription = 'Na autenticação';
+      let actionDescription = 'Ativo na plataforma';
+      let feature = 'general';
+
+      if (path.includes('/leads')) {
+        feature = 'leads';
+        if (method === 'POST') actionDescription = 'Criou um novo lead';
+        else if (method === 'PUT' || method === 'PATCH') actionDescription = 'Atualizou um lead';
+        else if (method === 'DELETE') actionDescription = 'Excluiu um lead';
+        else actionDescription = 'Visualizou leads';
+      } else if (path.includes('/contacts')) {
+        feature = 'contacts';
+        if (method === 'POST') actionDescription = 'Criou um contato';
+        else if (method === 'PUT' || method === 'PATCH') actionDescription = 'Atualizou um contato';
+        else if (method === 'DELETE') actionDescription = 'Excluiu um contato';
+        else actionDescription = 'Visualizou contatos';
+      } else if (path.includes('/inbox') || path.includes('/messages')) {
+        feature = 'inbox';
+        if (method === 'POST') actionDescription = 'Enviou uma mensagem';
+        else actionDescription = 'Abriu o Inbox';
+      } else if (path.includes('/conversations')) {
+        feature = 'inbox';
+        actionDescription = 'Visualizou conversas';
+      } else if (path.includes('/campaigns')) {
+        feature = 'campaigns';
+        if (method === 'POST') actionDescription = 'Criou uma campanha';
+        else if (method === 'PUT' || method === 'PATCH') actionDescription = 'Editou uma campanha';
+        else if (method === 'DELETE') actionDescription = 'Excluiu uma campanha';
+        else actionDescription = 'Visualizou campanhas';
+      } else if (path.includes('/analytics')) {
+        feature = 'analytics';
+        actionDescription = 'Visualizou relatórios de analytics';
+      } else if (path.includes('/channels')) {
+        feature = 'channels';
+        if (method === 'POST') actionDescription = 'Adicionou um canal';
+        else if (method === 'PUT' || method === 'PATCH') actionDescription = 'Configurou um canal';
+        else actionDescription = 'Visualizou canais';
+      } else if (path.includes('/assistants') || path.includes('/ai-assistants')) {
+        feature = 'assistants';
+        if (method === 'POST') actionDescription = 'Criou um assistente de IA';
+        else if (method === 'PUT' || method === 'PATCH') actionDescription = 'Editou assistente de IA';
+        else actionDescription = 'Visualizou assistentes de IA';
+      } else if (path.includes('/plans')) {
+        feature = 'billing';
+        if (path.includes('/checkout')) actionDescription = 'Iniciou checkout de plano';
+        else actionDescription = 'Visualizou planos';
+      } else if (path.includes('/integrations')) {
+        feature = 'integrations';
+        if (method === 'POST') actionDescription = 'Adicionou uma integração';
+        else if (method === 'PUT' || method === 'PATCH') actionDescription = 'Editou uma integração';
+        else actionDescription = 'Configurou integrações';
+      } else if (path.includes('/admin')) {
+        feature = 'admin';
+        actionDescription = 'No painel administrativo';
+      } else if (path.includes('/settings')) {
+        feature = 'settings';
+        if (method === 'PUT' || method === 'PATCH') actionDescription = 'Atualizou configurações';
+        else actionDescription = 'Nas configurações';
+      } else if (path.includes('/auth')) {
+        feature = 'auth';
+        if (path.includes('/login')) actionDescription = 'Realizou login';
+        else if (path.includes('/register')) actionDescription = 'Realizou cadastro';
+        else actionDescription = 'Na autenticação';
+      }
 
       // We don't await this to keep the auth response fast
       void activityService.updateLastActive(user.id);
@@ -80,6 +135,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
         metadata: {
           path: req.path,
           method: req.method,
+          feature,
           ip: req.ip,
           userAgent: req.headers['user-agent']
         }
