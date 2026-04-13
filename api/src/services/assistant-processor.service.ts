@@ -332,12 +332,20 @@ export class AssistantProcessorService {
                     throw new Error('Sem instanceId ou phone para enviar mensagem WhatsApp');
                 }
 
-                // Tentar múltiplos formatos de número para garantir compatibilidade
+                // Usar a mesma lógica que inbox.routes.ts:
+                // - @lid JIDs: enviar sempre com o remoteJid completo (@lid ou @s.whatsapp.net resolvido)
+                // - Outros: enviar com número limpo (dígitos), JID completo como fallback
+                const isLidJid = ctx.remoteJid?.endsWith('@lid');
+                const isGroupJid = ctx.remoteJid?.endsWith('@g.us');
+                const primaryNumber = (isLidJid || isGroupJid) && ctx.remoteJid
+                    ? ctx.remoteJid   // @lid ou grupo: usar JID completo
+                    : ctx.contactPhone; // normal: usar dígitos limpos
+
                 const numberFormats = [
-                    ctx.contactPhone,                                          // Número limpo (ex: 5511999999999)
-                    ctx.remoteJid || '',                                       // JID completo (ex: 5511999@s.whatsapp.net)
-                    ctx.contactPhone.includes('@') ? ctx.contactPhone : `${ctx.contactPhone}@s.whatsapp.net`,  // Forçar JID
-                ].filter(n => n && n.length > 0);
+                    primaryNumber,                                             // Formato primário correto
+                    ctx.remoteJid || '',                                       // JID completo como fallback
+                    ctx.contactPhone.includes('@') ? ctx.contactPhone : `${ctx.contactPhone}@s.whatsapp.net`,  // Último recurso
+                ].filter((n, i, arr) => n && n.length > 0 && arr.indexOf(n) === i); // remover duplicados
 
                 let lastError: any = null;
                 let sent = false;

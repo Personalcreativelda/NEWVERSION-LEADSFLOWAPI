@@ -793,13 +793,10 @@ router.post('/evolution/messages', async (req, res) => {
     // lidValue = valor a guardar em whatsapp_lid quando usamos LID como referência
     const lidValue = isLid ? remoteJid : null;
 
-    // Para mensagens enviadas pelo próprio usuário (isFromMe=true), o pushName é o nome
-    // da própria conta/dispositivo — NÃO o nome do contato receptor.
-    // Nesses casos ignoramos pushName para não sobrescrever o nome do lead com o nome
-    // do negócio/conta do usuário.
-    const contactName = !isFromMe
-      ? (messageData.pushName || messageData.senderName || messageData.notifyName || phone)
-      : (messageData.senderName || messageData.notifyName || phone);
+    // pushName em Evolution: para mensagens recebidas (isFromMe=false) é o nome do remetente;
+    // para mensagens enviadas (isFromMe=true) na Evolution v2 é o nome do CONTACTO guardado
+    // no telemóvel — portanto usamos em ambos os sentidos.
+    const contactName = messageData.pushName || messageData.senderName || messageData.notifyName || phone;
 
     console.log('[Evolution Webhook] Telefone:', phone, 'LID:', lidValue || 'N/A', 'Nome:', contactName, 'isFromMe:', isFromMe);
 
@@ -2806,35 +2803,35 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
               messageContent = `[${messageType}]`;
           }
 
-          // Encontrar canal pelo phone_number_id
+          // Encontrar canal pelo phone_number_id (sem filtro de status - Meta envia mesmo quando canal está em 'error')
           let channelResult;
           if (req.params.channelId) {
-            // Buscar por ID do canal (aceitar active ou connected)
+            // Buscar por ID do canal (qualquer status)
             channelResult = await query(
-              `SELECT * FROM channels WHERE id = $1 AND status IN ('active', 'connected')`,
+              `SELECT * FROM channels WHERE id = $1`,
               [req.params.channelId]
             );
           }
 
           if (!channelResult || channelResult.rows.length === 0) {
-            // Buscar por phone_number_id nas credenciais
+            // Buscar por phone_number_id nas credenciais (sem filtro de status)
             channelResult = await query(
               `SELECT * FROM channels
                WHERE type = 'whatsapp_cloud'
-               AND status IN ('active', 'connected')
                AND credentials->>'phone_number_id' = $1`,
               [phoneNumberId]
             );
           }
 
-          // Fallback: buscar qualquer canal whatsapp_cloud ativo
+          // Fallback: buscar qualquer canal whatsapp_cloud (priorizar active/connected)
           if (channelResult.rows.length === 0) {
             console.warn('[WhatsApp Cloud Webhook] Canal não encontrado por phone_number_id:', phoneNumberId, '- tentando fallback...');
             channelResult = await query(
               `SELECT * FROM channels
                WHERE type = 'whatsapp_cloud'
-               AND status IN ('active', 'connected')
-               ORDER BY updated_at DESC
+               ORDER BY
+                 CASE WHEN status IN ('active','connected') THEN 0 ELSE 1 END,
+                 updated_at DESC
                LIMIT 1`
             );
           }
