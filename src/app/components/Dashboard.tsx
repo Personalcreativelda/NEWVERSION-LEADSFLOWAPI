@@ -266,10 +266,15 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
       carregarLeads();
     };
     window.addEventListener('leads-updated', handleLeadsUpdated);
+
+    // Listener for upgrade modal triggered by sub-pages (e.g. AssistantsPage)
+    const handleOpenUpgrade = () => setModalUpgrade(true);
+    window.addEventListener('leadflow:open-upgrade', handleOpenUpgrade);
     
     return () => {
       window.removeEventListener('resize', checkMobile);
       window.removeEventListener('leads-updated', handleLeadsUpdated);
+      window.removeEventListener('leadflow:open-upgrade', handleOpenUpgrade);
     };
   }, []);
 

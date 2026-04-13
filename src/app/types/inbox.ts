@@ -110,7 +110,6 @@ export interface AIAssistant {
     webhook_url?: string;
     webhook_headers?: Record<string, string>;
     llm_provider?: 'gemini' | 'openai' | 'anthropic';
-    llm_api_key?: string;
     llm_model?: string;
     llm_system_prompt?: string;
     settings: {
@@ -122,6 +121,7 @@ export interface AIAssistant {
         fallback_to_human?: boolean;
         trigger_keywords?: string[];
         exclude_keywords?: string[];
+        monthly_message_limit?: number;
     };
     is_active: boolean;
     created_at: string;

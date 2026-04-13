@@ -146,8 +146,8 @@ router.post('/activate-plan', requireAuth, requireAdmin, async (req: Authenticat
     // Fallback se não encontrou no banco
     if (!limits) {
       const fallbackLimits: Record<string, any> = {
-        free: { leads: 100, messages: 100, massMessages: 200 },
-        business: { leads: 500, messages: 500, massMessages: 1000 },
+        free: { leads: 100, messages: 100, massMessages: 50 },
+        business: { leads: 2000, messages: 1000, massMessages: 5000 },
         enterprise: { leads: -1, messages: -1, massMessages: -1 },
       };
       limits = fallbackLimits[planId] || fallbackLimits.free;
@@ -493,9 +493,9 @@ router.get('/plans-pricing', requireAuth, requireAdmin, async (req: Authenticate
     res.json({ 
       success: true, 
       plans: [
-        { id: 'free', name: 'Free', price: { monthly: 0, annual: 0 }, limits: { leads: 100, messages: 100, massMessages: 200 } },
-        { id: 'business', name: 'Business', price: { monthly: 20, annual: 100 }, limits: { leads: 500, messages: 500, massMessages: 1000 } },
-        { id: 'enterprise', name: 'Enterprise', price: { monthly: 59, annual: 200 }, limits: { leads: -1, messages: -1, massMessages: -1 } },
+        { id: 'free', name: 'Free', price: { monthly: 0, annual: 0 }, limits: { leads: 100, messages: 100, massMessages: 50 } },
+        { id: 'business', name: 'Business', price: { monthly: 97, annual: 79 }, limits: { leads: 2000, messages: 1000, massMessages: 5000 } },
+        { id: 'enterprise', name: 'Enterprise', price: { monthly: 197, annual: 159 }, limits: { leads: -1, messages: -1, massMessages: -1 } },
       ]
     });
   }

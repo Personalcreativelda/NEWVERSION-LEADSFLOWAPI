@@ -40,7 +40,7 @@ const faqs = [
   {
     question: 'Existe limite de leads ou mensagens?',
     answer:
-      'O plano Gratuito permite até 100 leads, 100 mensagens WhatsApp individuais e 200 mensagens em massa. O plano Business oferece até 500 leads, 500 mensagens individuais e 1000 mensagens em massa. O plano Enterprise oferece tudo ilimitado - leads, mensagens WhatsApp individuais e mensagens em massa sem restrições. Todos os planos têm validade de 30 dias.',
+      'O plano Gratuito permite até 100 leads, 100 mensagens individuais e 50 campanhas em massa por mês. O plano Business (R$97/mês) oferece até 2.000 leads, 1.000 mensagens individuais, 5.000 campanhas em massa, 5 canais conectados, assistentes de IA e 1 agente de voz. O plano Enterprise (R$197/mês) oferece tudo ilimitado — leads, mensagens, campanhas, canais e recursos de IA sem restrições.',
   },
 ];
 

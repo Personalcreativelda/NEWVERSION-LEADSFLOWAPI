@@ -48,8 +48,8 @@ router.post('/upgrade', requireAuth, async (req: AuthenticatedRequest, res, next
     } catch (e) { /* fallback below */ }
     if (!limits) {
       const fallback: Record<string, any> = {
-        free: { leads: 100, messages: 100, massMessages: 200 },
-        business: { leads: 1000, messages: 500, massMessages: 1000 },
+        free: { leads: 100, messages: 100, massMessages: 50 },
+        business: { leads: 2000, messages: 1000, massMessages: 5000 },
         enterprise: { leads: -1, messages: -1, massMessages: -1 },
       };
       limits = fallback[planId] || fallback.free;
@@ -267,8 +267,8 @@ router.post('/stripe/webhook', async (req, res) => {
         } catch (e) { /* ignore */ }
         if (!planLimits) {
           const fallback: Record<string, any> = {
-            free: { leads: 100, messages: 100, massMessages: 200 },
-            business: { leads: 1000, messages: 500, massMessages: 1000 },
+            free: { leads: 100, messages: 100, massMessages: 50 },
+            business: { leads: 2000, messages: 1000, massMessages: 5000 },
             enterprise: { leads: -1, messages: -1, massMessages: -1 },
           };
           planLimits = fallback[planId] || fallback.free;

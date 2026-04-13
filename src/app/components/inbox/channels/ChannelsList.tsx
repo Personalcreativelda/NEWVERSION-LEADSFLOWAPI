@@ -1,6 +1,7 @@
 // INBOX: Lista e gestão de canais com UI Moderna inspirada no Chatwoot
 import React, { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
+import { usePlanLimits } from '../../../hooks/usePlanLimits';
 import { ChannelCard } from './ChannelCard';
 import { WhatsAppConnect } from './WhatsAppConnect';
 import { WhatsAppCloudConnect } from './WhatsAppCloudConnect';
@@ -27,7 +28,10 @@ import {
     Plus,
     Settings,
     ChevronDown,
-    ChevronRight
+    ChevronRight,
+    Lock,
+    Zap,
+    AlertTriangle
 } from 'lucide-react';
 
 // Configuração dos canais disponíveis para conexão
@@ -112,6 +116,7 @@ const AVAILABLE_CHANNELS = [
 export function ChannelsList() {
     const [channels, setChannels] = useState<Channel[]>([]);
     const [loading, setLoading] = useState(true);
+    const planLimits = usePlanLimits();
     const [modalOpen, setModalOpen] = useState(false);
     const [cloudModalOpen, setCloudModalOpen] = useState(false);
     const [telegramModalOpen, setTelegramModalOpen] = useState(false);
@@ -162,7 +167,10 @@ export function ChannelsList() {
         }
     };
 
+    const isAtChannelLimit = !planLimits.canAddChannel(channels.length);
+
     const handleConnect = (channelId: string) => {
+        if (isAtChannelLimit) return; // silently blocked — UI already shows the limit banner
         setEditingChannel(null); // Criar novo, não editar
         if (channelId === 'whatsapp') {
             setModalOpen(true);
@@ -320,7 +328,7 @@ export function ChannelsList() {
                             <span className="w-1.5 h-6 bg-green-500 rounded-full"></span>
                             Canais Conectados
                         </h2>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
                             {channels.map(channel => (
                                 <ChannelCard
                                     key={channel.id}
@@ -337,10 +345,52 @@ export function ChannelsList() {
 
                 {/* Grid de Seleção (Estilo Chatwoot) */}
                 <div>
-                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
-                        <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
-                        Adicionar Novo Canal
-                    </h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
+                            <span className={`w-1.5 h-6 rounded-full ${isAtChannelLimit ? 'bg-amber-500' : 'bg-blue-500'}`}></span>
+                            Adicionar Novo Canal
+                        </h2>
+                        <span
+                            className="text-xs font-medium px-2.5 py-1 rounded-full border"
+                            style={{
+                                color: isAtChannelLimit ? 'hsl(38 92% 50%)' : 'hsl(var(--muted-foreground))',
+                                borderColor: isAtChannelLimit ? 'hsl(38 92% 50% / 0.4)' : 'hsl(var(--border))',
+                                backgroundColor: isAtChannelLimit ? 'hsl(38 92% 50% / 0.1)' : 'transparent',
+                            }}
+                        >
+                            {channels.length} / {planLimits.limitLabel.channels} canais
+                        </span>
+                    </div>
+
+                    {/* Inline limit-reached banner — no modal popup */}
+                    {isAtChannelLimit && (
+                        <div
+                            className="mb-6 p-4 rounded-xl border flex items-start gap-4"
+                            style={{
+                                backgroundColor: 'hsl(38 92% 50% / 0.08)',
+                                borderColor: 'hsl(38 92% 50% / 0.35)',
+                            }}
+                        >
+                            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'hsl(38 92% 50%)' }} />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold" style={{ color: 'hsl(38 92% 50%)' }}>Limite de canais atingido</p>
+                                <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    Você está usando {channels.length} de {planLimits.limitLabel.channels} canal(es) disponível(is) no plano{' '}
+                                    <span className="font-medium capitalize">{planLimits.plan}</span>.
+                                    Remova um canal existente ou faça upgrade para adicionar mais.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => planLimits.openUpgradeModal()}
+                                className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                                style={{ backgroundColor: 'hsl(38 92% 50%)', color: '#000' }}
+                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 40%)')}
+                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 50%)')}
+                            >
+                                <Zap size={13} /> Fazer Upgrade
+                            </button>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {AVAILABLE_CHANNELS.map((item) => {
@@ -349,14 +399,24 @@ export function ChannelsList() {
                                 <button
                                     key={item.id}
                                     onClick={() => handleConnect(item.id)}
-                                    className="group flex flex-col items-start p-6 border rounded-xl hover:border-blue-500 hover:shadow-md transition-all text-left"
+                                    disabled={isAtChannelLimit}
+                                    className={`group relative flex flex-col items-start p-6 border rounded-xl transition-all text-left ${
+                                        isAtChannelLimit
+                                            ? 'opacity-50 cursor-not-allowed'
+                                            : 'hover:border-blue-500 hover:shadow-md'
+                                    }`}
                                     style={{ 
                                         backgroundColor: 'hsl(var(--card))',
                                         borderColor: 'hsl(var(--border))'
                                     }}
                                 >
+                                    {isAtChannelLimit && (
+                                        <div className="absolute top-3 right-3">
+                                            <Lock size={14} style={{ color: 'hsl(38 92% 50%)' }} />
+                                        </div>
+                                    )}
                                     <div 
-                                        className={`p-3 rounded-lg mb-4 group-hover:scale-110 transition-transform ${item.color}`}
+                                        className={`p-3 rounded-lg mb-4 ${!isAtChannelLimit ? 'group-hover:scale-110' : ''} transition-transform ${item.color}`}
                                         style={{ backgroundColor: 'hsl(var(--muted))' }}
                                     >
                                         <Icon size={24} />

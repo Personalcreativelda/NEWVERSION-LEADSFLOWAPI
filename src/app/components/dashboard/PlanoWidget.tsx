@@ -79,7 +79,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, onU
       esgotado: isLeadsEsgotado,
     },
     {
-      title: 'Mensagens Individuais',
+      title: 'Mensagens',
       label: isMensagensEsgotado ? '⚠️ Limite Esgotado' : 'Restantes',
       usado: limites.usados.mensagens,
       restante: restantesMensagens,
@@ -92,7 +92,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, onU
       esgotado: isMensagensEsgotado,
     },
     {
-      title: 'Mensagens em Massa',
+      title: 'Campanhas',
       label: isEnviosEsgotado ? '⚠️ Limite Esgotado' : 'Restantes',
       usado: limites.usados.envios,
       restante: restantesEnvios,

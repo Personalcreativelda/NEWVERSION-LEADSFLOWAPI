@@ -11,6 +11,25 @@ import type {
     PaginatedResponse
 } from '../../types/inbox';
 
+export interface MarketplaceTemplate {
+    id: string;
+    name: string;
+    description: string;
+    category: string;
+    icon: string;
+    mode: 'llm' | 'webhook';
+    llm_provider?: 'gemini' | 'openai' | 'anthropic';
+    llm_model?: string;
+    llm_system_prompt?: string;
+    settings: {
+        enabled: boolean;
+        auto_respond: boolean;
+        max_tokens?: number;
+        temperature?: number;
+        monthly_message_limit?: number;
+    };
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const baseURL = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
 
@@ -222,6 +241,22 @@ export const aiAssistantsApi = {
      */
     async toggle(id: string, isActive: boolean): Promise<{ success: boolean; is_active: boolean }> {
         const { data } = await api.post(`/ai-assistants/${id}/toggle`, { is_active: isActive });
+        return data;
+    },
+
+    /**
+     * Lista templates do marketplace
+     */
+    async getMarketplaceTemplates(): Promise<MarketplaceTemplate[]> {
+        const { data } = await api.get<MarketplaceTemplate[]>('/ai-assistants/marketplace');
+        return data;
+    },
+
+    /**
+     * Instala template do marketplace para o usuário
+     */
+    async installFromMarketplace(templateId: string): Promise<AIAssistant> {
+        const { data } = await api.post<AIAssistant>(`/ai-assistants/marketplace/${templateId}/install`);
         return data;
     }
 };

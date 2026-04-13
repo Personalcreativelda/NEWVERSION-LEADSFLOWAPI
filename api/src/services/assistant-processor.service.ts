@@ -38,15 +38,37 @@ export class AssistantProcessorService {
 
             console.log(`[AssistantProcessor] Assistente "${activeAssistant.assistant_name}" ativo para canal ${ctx.channelId}`);
 
-            // 2. Verificar configuração de IA (API key e provider)
+            // 2. Verificar configuração de IA (provider via env)
             const config = activeAssistant.config || {};
-            const provider = (config.ai_provider || process.env.AI_PROVIDER || 'openai') as AIProvider;
-            const apiKey = config.ai_api_key ||
-                          (provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.GEMINI_API_KEY) || '';
+            const provider = (config.ai_provider || process.env.AI_PROVIDER || 'gemini') as AIProvider;
+            const apiKey = provider === 'anthropic'
+                ? process.env.ANTHROPIC_API_KEY
+                : provider === 'openai'
+                    ? process.env.OPENAI_API_KEY
+                    : process.env.GEMINI_API_KEY;
             const model = config.ai_model || undefined;
 
             if (!apiKey) {
-                console.warn('[AssistantProcessor] Sem API key configurada para o assistente');
+                console.warn('[AssistantProcessor] Sem API key configurada nas variáveis de ambiente');
+                return false;
+            }
+
+            // 2b. Verificar limite mensal de mensagens do assistente
+            const isFreePlan = activeAssistant.user_plan === 'free';
+            const monthlyLimit = (activeAssistant.is_custom && isFreePlan)
+                ? 100
+                : Number(config.monthly_message_limit) || 200;
+            const startOfMonth = new Date();
+            startOfMonth.setDate(1);
+            startOfMonth.setHours(0, 0, 0, 0);
+            const usageResult = await query(
+                `SELECT COUNT(*) as count FROM assistant_logs
+                 WHERE user_assistant_id = $1 AND status = 'success' AND created_at >= $2`,
+                [activeAssistant.user_assistant_id, startOfMonth]
+            );
+            const usedThisMonth = parseInt(usageResult.rows[0]?.count || '0', 10);
+            if (usedThisMonth >= monthlyLimit) {
+                console.warn(`[AssistantProcessor] Limite mensal atingido para assistente ${activeAssistant.user_assistant_id}: ${usedThisMonth}/${monthlyLimit}`);
                 return false;
             }
 
@@ -111,8 +133,11 @@ export class AssistantProcessorService {
             // 9. Atualizar memória de longo prazo do contato (assíncrono, não bloqueia)
             const memoryEnabled = config.memory_enabled !== false;
             if (memoryEnabled && ctx.contactPhone) {
-                const memoryApiKey = config.ai_api_key ||
-                    (provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.GEMINI_API_KEY) || '';
+                const memoryApiKey = provider === 'anthropic'
+                    ? process.env.ANTHROPIC_API_KEY
+                    : provider === 'openai'
+                        ? process.env.OPENAI_API_KEY
+                        : process.env.GEMINI_API_KEY;
                 void aiService.updateContactMemory({
                     userAssistantId: activeAssistant.user_assistant_id,
                     contactPhone: ctx.contactPhone,
@@ -161,9 +186,11 @@ export class AssistantProcessorService {
             
             const result = await query(
                 `SELECT ua.id as user_assistant_id, ua.config, ua.channel_ids, ua.assistant_id,
-                        a.name as assistant_name, a.default_config
+                        a.name as assistant_name, a.default_config, a.is_custom,
+                        COALESCE(u.plan, 'free') as user_plan
                  FROM user_assistants ua
                  JOIN assistants a ON ua.assistant_id = a.id
+                 JOIN users u ON u.id = ua.user_id
                  WHERE ua.user_id = $1
                    AND ua.is_active = true
                    AND ($2 = ANY(ua.channel_ids) OR ua.channel_id = $2)

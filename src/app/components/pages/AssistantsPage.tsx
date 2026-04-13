@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Bot, Search, Plus, Settings, Power, PowerOff, Trash2,
   Briefcase, Headphones, Calendar, Users, ShoppingCart,
   Zap, X, Check, Loader2,
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash,
-  Key, Brain, Eye, EyeOff, Smartphone, Cloud, History
+  Brain, Smartphone, Cloud, History, Lock, AlertTriangle
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { assistantsApi, type Assistant, type UserAssistant, type CreateAssistantInput } from '../../services/api/assistants';
 import { channelsApi } from '../../services/api/inbox';
 import type { Channel } from '../../types/inbox';
+import { usePlanLimits } from '../../hooks/usePlanLimits';
 
 interface AssistantsPageProps {
   isDark: boolean;
@@ -32,6 +33,18 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   'star': Star,
   'message-square': MessageSquare,
 };
+
+// Detect current user plan from localStorage
+function getUserPlan(): string {
+  try {
+    const raw = localStorage.getItem('leadflow_user');
+    if (raw) {
+      const u = JSON.parse(raw);
+      return (u.plan || 'free').toLowerCase();
+    }
+  } catch { /* ignore */ }
+  return 'free';
+}
 
 const ICON_OPTIONS = [
   { value: 'bot', label: 'Bot', icon: Bot },
@@ -85,7 +98,15 @@ const CHANNEL_COLORS: Record<string, string> = {
   'twilio': 'text-teal-500',
 };
 
+// Assistants available for free-plan users to try (by name, case-insensitive)
+const FREE_SAMPLE_ASSISTANTS = ['atendente virtual'];
+
+function isFreeTrialAssistant(assistant: Assistant): boolean {
+  return !assistant.is_custom && FREE_SAMPLE_ASSISTANTS.includes(assistant.name.toLowerCase());
+}
+
 export default function AssistantsPage({ isDark }: AssistantsPageProps) {
+  const planLimits = usePlanLimits();
   const [activeTab, setActiveTab] = useState<'marketplace' | 'connected'>('marketplace');
   const [availableAssistants, setAvailableAssistants] = useState<Assistant[]>([]);
   const [userAssistants, setUserAssistants] = useState<UserAssistant[]>([]);
@@ -93,6 +114,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [premiumModalOpen, setPremiumModalOpen] = useState(false);
+  const [premiumModalReason, setPremiumModalReason] = useState<'marketplace' | 'custom_limit'>('marketplace');
 
   // Modal states
   const [connectModalOpen, setConnectModalOpen] = useState(false);
@@ -106,7 +129,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const [actionLoading, setActionLoading] = useState(false);
 
   // Create modal state
-  const [showApiKey, setShowApiKey] = useState(false);
 
   const [createForm, setCreateForm] = useState<CreateAssistantInput>({
     name: '',
@@ -329,7 +351,11 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     try {
       setActionLoading(true);
       await assistantsApi.deleteAssistant(assistant.id);
+      // Optimistic update — remove immediately from state
+      setAvailableAssistants(prev => prev.filter(a => a.id !== assistant.id));
+      setUserAssistants(prev => prev.filter(ua => ua.assistant_id !== assistant.id));
       toast.success('Assistente deletado com sucesso');
+      // Sync from server in background
       loadData();
     } catch (error) {
       console.error('[AssistantsPage] Error deleting assistant:', error);
@@ -409,11 +435,14 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     const IconComponent = ICON_MAP[assistant.icon] || Bot;
     const connected = isConnected(assistant.id);
     const userAssistant = getUserAssistantByAssistantId(assistant.id);
+    const resolvedChannels = (userAssistant?.channel_ids || [])
+      .map(id => getChannelById(id))
+      .filter(Boolean) as Channel[];
 
     return (
       <div
         key={assistant.id}
-        className={`relative rounded-2xl border p-5 transition-all duration-200 hover:shadow-lg ${
+        className={`relative flex flex-col rounded-2xl border p-4 transition-all duration-200 hover:shadow-lg ${
           isDark
             ? 'bg-card border border-border text-card-foreground shadow-sm'
             : 'bg-muted/30 border border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/50'
@@ -440,7 +469,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         )}
 
         {/* Header */}
-        <div className="flex items-start gap-4 mb-4">
+        <div className="flex items-start gap-3 mb-3">
           <div
             className="w-12 h-12 rounded-xl flex items-center justify-center"
             style={{ backgroundColor: `${assistant.color}20` }}
@@ -455,25 +484,32 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               {CATEGORY_LABELS[assistant.category] || assistant.category}
             </p>
           </div>
-          {/* Price or Free badge */}
-          {assistant.is_free || assistant.is_custom ? (
-            <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">
+          {/* Price badge */}
+          {assistant.is_custom ? (
+            <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30 shrink-0">
+              Grátis
+            </Badge>
+          ) : isFreeTrialAssistant(assistant) ? (
+            <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 shrink-0">
               Grátis
             </Badge>
           ) : (
-            <Badge variant="outline" className="border-border">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(assistant.price_monthly)}/mês
+            <Badge className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-0 shrink-0">
+              Pro
             </Badge>
           )}
         </div>
 
         {/* Description */}
-        <p className="text-sm mb-4 line-clamp-2 text-muted-foreground">
-          {assistant.short_description}
-        </p>
+        {assistant.short_description && (
+          <p className="text-sm mb-3 line-clamp-2 text-muted-foreground">
+            {assistant.short_description}
+          </p>
+        )}
 
         {/* Features */}
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        {(assistant.features?.length || 0) > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
           {assistant.features?.slice(0, 3).map((feature, idx) => (
             <span
               key={idx}
@@ -489,39 +525,37 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               +{(assistant.features?.length || 0) - 3} mais
             </span>
           )}
-        </div>
+          </div>
+        )}
 
         {/* Connected channels */}
-        {userAssistant && (userAssistant.channel_ids?.length > 0) && (
-          <div className="flex flex-wrap items-center gap-1.5 mb-4 py-2 px-3 rounded-lg bg-muted/40">
+        {resolvedChannels.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 mb-3">
             <span className="text-[10px] font-medium text-muted-foreground">Canais:</span>
-            {userAssistant.channel_ids.map(channelId => {
-              const channel = getChannelById(channelId);
-              if (!channel) return null;
-              return (
-                <span key={channelId} className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full ${
-                  isDark ? 'bg-muted/60' : 'bg-muted border border-border'
-                }`}>
-                  {renderChannelIcon(channel.type, 'w-3 h-3')}
-                  {channel.name || channel.type}
-                </span>
-              );
-            })}
+            {resolvedChannels.map(channel => (
+              <span key={channel.id} className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full ${
+                isDark ? 'bg-muted/60' : 'bg-muted border border-border'
+              }`}>
+                {renderChannelIcon(channel.type, 'w-3 h-3')}
+                {channel.name || channel.type}
+                {connected && <Check className="w-3 h-3 text-green-500 ml-0.5" />}
+              </span>
+            ))}
           </div>
         )}
 
         {/* Stats for connected assistants */}
         {!isMarketplace && userAssistant && (
-          <div className="flex items-center gap-4 mb-4 py-3 px-3 rounded-lg bg-muted/40">
+          <div className="flex items-center gap-4 mb-3">
             <div className="flex items-center gap-1.5">
               <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
-              <span className="text-xs text-foreground">
+              <span className="text-xs text-muted-foreground">
                 {userAssistant.stats?.conversations || 0} conversas
               </span>
             </div>
             <div className="flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-green-500" />
-              <span className="text-xs text-foreground">
+              <span className="text-xs text-muted-foreground">
                 {userAssistant.last_triggered_at
                   ? new Date(userAssistant.last_triggered_at).toLocaleDateString('pt-BR')
                   : 'Nunca usado'}
@@ -531,7 +565,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mt-auto pt-1">
           {isMarketplace ? (
             connected ? (
               <>
@@ -559,6 +593,11 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
                   size="sm"
                   onClick={() => {
+                    if (!assistant.is_custom && !isFreeTrialAssistant(assistant) && !planLimits.features.marketplaceAssistants) {
+                      setPremiumModalReason('marketplace');
+                      setPremiumModalOpen(true);
+                      return;
+                    }
                     setSelectedAssistant(assistant);
                     setSelectedChannelIds([]);
                     setConnectModalOpen(true);
@@ -628,15 +667,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
           )}
         </div>
 
-        {/* Connected indicator */}
-        {isMarketplace && connected && (
-          <div className="absolute top-3 left-3">
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/10 text-green-500 text-xs font-medium">
-              <Check className="w-3 h-3" />
-              Conectado
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -656,16 +686,32 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
         <div className="flex items-center gap-3 w-full md:w-auto">
           {/* Create button */}
-          <Button
-            onClick={() => {
-              resetCreateForm();
-              setCreateModalOpen(true);
-            }}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Criar Assistente
-          </Button>
+          {(() => {
+            const customCount = availableAssistants.filter(a => a.is_custom).length;
+            const canCreate = planLimits.canCreateCustomAssistant(customCount);
+            return (
+              <Button
+                onClick={() => {
+                  if (!canCreate) return;
+                  resetCreateForm();
+                  setCreateModalOpen(true);
+                }}
+                disabled={!canCreate}
+                className={canCreate
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white'
+                  : 'bg-gradient-to-r from-purple-600/40 to-indigo-600/40 text-white/60 cursor-not-allowed'
+                }
+              >
+                {canCreate ? <Plus className="w-4 h-4 mr-2" /> : <Lock className="w-4 h-4 mr-2" />}
+                Criar Assistente
+                {!canCreate && (
+                  <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
+                    {planLimits.limits.customAssistants === 0 ? 'Pro' : `${customCount}/${planLimits.limitLabel.customAssistants}`}
+                  </span>
+                )}
+              </Button>
+            );
+          })()}
 
           {/* Search */}
           <div className="relative flex-1 md:w-72 md:flex-none">
@@ -731,6 +777,45 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
           ))}
         </div>
       )}
+
+      {/* Inline custom-assistant limit banner */}
+      {(() => {
+        const customCount = availableAssistants.filter(a => a.is_custom).length;
+        const atLimit = !planLimits.canCreateCustomAssistant(customCount);
+        if (!atLimit) return null;
+        const isFeatureLocked = planLimits.limits.customAssistants === 0;
+        return (
+          <div
+            className="mb-5 p-4 rounded-xl border flex items-start gap-4"
+            style={{
+              backgroundColor: 'hsl(38 92% 50% / 0.08)',
+              borderColor: 'hsl(38 92% 50% / 0.35)',
+            }}
+          >
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'hsl(38 92% 50%)' }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: 'hsl(38 92% 50%)' }}>
+                {isFeatureLocked ? 'Recurso indisponível no plano Gratuito' : 'Limite de assistentes atingido'}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                {isFeatureLocked
+                  ? 'O plano Gratuito não inclui Assistentes Personalizados. Faça upgrade para Business para criar os seus próprios.'
+                  : `Você está usando ${customCount} de ${planLimits.limitLabel.customAssistants} assistente(s) permitido(s). Remova um ou faça upgrade para criar mais.`
+                }
+              </p>
+            </div>
+            <button
+              onClick={() => planLimits.openUpgradeModal()}
+              className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+              style={{ backgroundColor: 'hsl(38 92% 50%)', color: '#000' }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 40%)')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 50%)')}
+            >
+              <Zap size={13} /> Fazer Upgrade
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Content */}
       {loading ? (
@@ -992,107 +1077,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 <p className="text-xs mt-1 text-muted-foreground">
                   Descreva como o assistente deve se comportar e responder
                 </p>
-              </div>
-
-              {/* AI Configuration */}
-              <div className="p-4 rounded-lg border bg-muted/30 border-border">
-                <div className="flex items-center gap-2 mb-3">
-                  <Brain className={`w-4 h-4 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-                  <h4 className="text-sm font-semibold text-foreground">
-                    Configuração de IA
-                  </h4>
-                </div>
-
-                {/* AI Provider */}
-                <div className="mb-3">
-                  <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
-                    Provedor de IA
-                  </label>
-                  <Select
-                    value={configValues.ai_provider || 'openai'}
-                    onValueChange={(v) => setConfigValues({ ...configValues, ai_provider: v, ai_model: '' })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="openai">OpenAI (ChatGPT)</SelectItem>
-                      <SelectItem value="gemini">Google Gemini</SelectItem>
-                      <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* AI Model */}
-                <div className="mb-3">
-                  <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
-                    Modelo
-                  </label>
-                  <Select
-                    value={configValues.ai_model || '__default__'}
-                    onValueChange={(v) => setConfigValues({ ...configValues, ai_model: v === '__default__' ? '' : v })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(configValues.ai_provider || 'openai') === 'openai' ? (
-                        <>
-                          <SelectItem value="__default__">gpt-4o-mini (padrão)</SelectItem>
-                          <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                          <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
-                          <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
-                          <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-                        </>
-                      ) : configValues.ai_provider === 'anthropic' ? (
-                        <>
-                          <SelectItem value="__default__">claude-3-haiku (padrão)</SelectItem>
-                          <SelectItem value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</SelectItem>
-                          <SelectItem value="claude-3-haiku-20240307">Claude 3 Haiku</SelectItem>
-                          <SelectItem value="claude-3-opus-20240229">Claude 3 Opus</SelectItem>
-                        </>
-                      ) : (
-                        <>
-                          <SelectItem value="__default__">gemini-2.0-flash (padrão)</SelectItem>
-                          <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
-                          <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
-                          <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* API Key */}
-                <div>
-                  <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
-                    API Key
-                  </label>
-                  <div className="relative">
-                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                    <input
-                      type={showApiKey ? 'text' : 'password'}
-                      value={configValues.ai_api_key || ''}
-                      onChange={(e) => setConfigValues({ ...configValues, ai_api_key: e.target.value })}
-                      placeholder={`Cole sua ${configValues.ai_provider === 'anthropic' ? 'Anthropic' : (configValues.ai_provider || 'openai') === 'openai' ? 'OpenAI' : 'Google'} API Key`}
-                      className="w-full pl-9 pr-10 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                  <p className="text-[10px] mt-1 text-muted-foreground">
-                    {(configValues.ai_provider || 'openai') === 'openai'
-                      ? 'Obtenha em platform.openai.com/api-keys'
-                      : configValues.ai_provider === 'anthropic'
-                      ? 'Obtenha em console.anthropic.com/settings/keys'
-                      : 'Obtenha em aistudio.google.com/apikey'}
-                  </p>
-                </div>
               </div>
 
               {/* Business Hours */}
@@ -1440,6 +1424,42 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   <Plus className="w-4 h-4 mr-2" />
                 )}
                 {editingAssistantId ? 'Salvar' : 'Criar Assistente'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Upgrade Modal */}
+      {premiumModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl shadow-2xl bg-card border border-border p-6 flex flex-col items-center text-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-amber-500/15 flex items-center justify-center">
+              <Lock className="w-8 h-8 text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Recurso Premium</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Os assistentes do Marketplace estão disponíveis nos planos pagos.
+                Faça upgrade para conectar e automatizar o seu atendimento.
+              </p>
+            </div>
+            <div className="flex gap-3 w-full">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setPremiumModalOpen(false)}
+              >
+                Fechar
+              </Button>
+              <Button
+                className="flex-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-semibold"
+                onClick={() => {
+                  setPremiumModalOpen(false);
+                  window.dispatchEvent(new Event('leadflow:open-upgrade'));
+                }}
+              >
+                Ver Planos
               </Button>
             </div>
           </div>

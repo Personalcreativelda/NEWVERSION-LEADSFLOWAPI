@@ -10,7 +10,6 @@ export interface AIAssistant {
     webhook_url?: string;
     webhook_headers?: any;
     llm_provider?: 'gemini' | 'openai' | 'anthropic';
-    llm_api_key?: string;
     llm_model?: string;
     llm_system_prompt?: string;
     settings: any;
@@ -72,10 +71,10 @@ export class AIAssistantsService {
             `INSERT INTO ai_assistants (
         user_id, channel_id, name, mode, 
         webhook_url, webhook_headers,
-        llm_provider, llm_api_key, llm_model, llm_system_prompt,
+        llm_provider, llm_model, llm_system_prompt,
         settings, is_active
       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
             [
                 userId,
@@ -85,7 +84,6 @@ export class AIAssistantsService {
                 data.webhook_url || null,
                 JSON.stringify(data.webhook_headers || {}),
                 data.llm_provider || null,
-                data.llm_api_key || null, // TODO: Criptografar
                 data.llm_model || null,
                 data.llm_system_prompt || null,
                 JSON.stringify(data.settings || { enabled: true, auto_respond: false }),
@@ -131,11 +129,6 @@ export class AIAssistantsService {
         if (data.llm_provider !== undefined) {
             fields.push(`llm_provider = $${paramIndex++}`);
             values.push(data.llm_provider);
-        }
-
-        if (data.llm_api_key !== undefined) {
-            fields.push(`llm_api_key = $${paramIndex++}`);
-            values.push(data.llm_api_key); // TODO: Criptografar
         }
 
         if (data.llm_model !== undefined) {

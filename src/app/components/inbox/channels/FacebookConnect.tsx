@@ -142,16 +142,10 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                onClick={onClose}
-            />
-
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn">
             {/* Modal */}
             <div
-                className="relative w-[95vw] max-w-2xl mx-2 sm:mx-4 rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
+                className="relative w-[95vw] max-w-2xl rounded-2xl border shadow-2xl overflow-hidden animate-fadeIn max-h-[90vh] flex flex-col"
                 style={{
                     backgroundColor: 'hsl(var(--card))',
                     borderColor: 'hsl(var(--border))'

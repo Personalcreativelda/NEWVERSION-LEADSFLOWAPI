@@ -194,14 +194,9 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn">
             <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                onClick={onClose}
-            />
-
-            <div
-                className="relative w-full max-w-lg mx-4 rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+                className="relative w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden animate-fadeIn"
                 style={{
                     backgroundColor: 'hsl(var(--card))',
                     borderColor: 'hsl(var(--border))'

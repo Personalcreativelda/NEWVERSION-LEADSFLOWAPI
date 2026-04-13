@@ -24,7 +24,8 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
             enabled: true,
             auto_respond: true,
             max_tokens: 500,
-            temperature: 0.7
+            temperature: 0.7,
+            monthly_message_limit: 200
         }
     });
 
@@ -162,21 +163,8 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                                 <option value="openai">OpenAI (GPT-4/3.5)</option>
                                 <option value="anthropic">Anthropic (Claude)</option>
                             </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                API Key
-                            </label>
-                            <input
-                                type="password"
-                                value={formData.llm_api_key || ''}
-                                onChange={e => setFormData({ ...formData, llm_api_key: e.target.value })}
-                                placeholder="sk-..."
-                                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none placeholder-gray-400"
-                            />
-                            <p className="mt-1 text-xs text-gray-500">
-                                Sua chave será armazenada de forma segura e criptografada.
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                A IA é fornecida pela plataforma — não é necessária chave própria.
                             </p>
                         </div>
 
@@ -191,6 +179,27 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                                 className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none placeholder-gray-400 resize-y"
                                 placeholder="Ex: Você é um assistente da LeadFlow. Seja educado, breve e tente agendar uma reunião..."
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Limite de mensagens por mês
+                            </label>
+                            <input
+                                type="number"
+                                min={10}
+                                max={10000}
+                                value={formData.settings?.monthly_message_limit ?? 200}
+                                onChange={e => setFormData({
+                                    ...formData,
+                                    settings: { ...formData.settings, monthly_message_limit: Number(e.target.value) }
+                                })}
+                                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none"
+                            />
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                O assistente para de responder automaticamente ao atingir este limite mensal. 
+                                <span className="text-purple-500 font-medium"> Faça upgrade do plano para aumentar o limite.</span>
+                            </p>
                         </div>
                     </div>
                 )}

@@ -345,8 +345,8 @@ function getMockData(endpoint: string): any {
         isTrial: false,
         limits: {
           leads: 100,
-          messages: 50,
-          massMessages: 5,
+          messages: 100,
+          massMessages: 50,
         },
         usage: {
           leads: 0,
@@ -365,8 +365,8 @@ function getMockData(endpoint: string): any {
       isTrial: false,
       limits: {
         leads: 100,
-        messages: 50,
-        massMessages: 5,
+        messages: 100,
+        massMessages: 50,
       },
       usage: {
         leads: 0,

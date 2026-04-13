@@ -235,15 +235,15 @@ export default function UpgradeModal({
                 <div className="text-center mb-6">
                   <div className="text-3xl font-bold text-foreground">
                     {plan.id === 'free' ? (
-                      '$0'
+                      'Grátis'
                     ) : billingPeriod === 'annual' ? (
-                      `$${plan.price?.annual || 0}`
+                      `R$${plan.price?.annual || 0}`
                     ) : (
-                      `$${plan.price?.monthly || 0}`
+                      `R$${plan.price?.monthly || 0}`
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {billingPeriod === 'annual' ? '/ano' : '/mês'}
+                    {plan.id === 'free' ? '' : billingPeriod === 'annual' ? '/mês (anual)' : '/mês'}
                   </p>
                   {plan.id !== 'free' && (
                     <p className="text-xs text-muted-foreground mt-2">
@@ -358,15 +358,15 @@ export default function UpgradeModal({
                 <div className="text-center mb-6">
                   <div className="text-3xl font-bold text-foreground">
                     {plan.id === 'free' ? (
-                      '$0'
+                      'Grátis'
                     ) : billingPeriod === 'annual' ? (
-                      `$${plan.price?.annual || 0}`
+                      `R$${plan.price?.annual || 0}`
                     ) : (
-                      `$${plan.price?.monthly || 0}`
+                      `R$${plan.price?.monthly || 0}`
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {billingPeriod === 'annual' ? '/ano' : '/mês'}
+                    {plan.id === 'free' ? '' : billingPeriod === 'annual' ? '/mês (anual)' : '/mês'}
                   </p>
                 </div>
 

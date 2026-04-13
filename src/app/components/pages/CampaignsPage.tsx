@@ -17,6 +17,7 @@ import CampaignMessageModal from '../modals/CampaignMessageModal';
 import CampaignAlertsModal from '../modals/CampaignAlertsModal';
 import { toast } from 'sonner';
 import { saveCampaignToDatabase, loadCampaignsFromDatabase, updateCampaignProgress } from '../../utils/campaignsHelper';
+import { usePlanLimits } from '../../hooks/usePlanLimits';
 
 interface Lead {
   id: string;
@@ -59,6 +60,7 @@ const INITIAL_CAMPAIGNS: Campaign[] = [];
 
 // ✅ Restaurando props leads e userPlan que foram removidos acidentalmente
 export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp', isDark = false, userPlan = 'free' }: CampaignsPageProps) {
+  const planLimits = usePlanLimits();
   const [activeTab, setActiveTab] = useState(initialTab);
 
   // ✅ Carregar campanhas do banco de dados
@@ -1092,7 +1094,21 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
               </Button>
             </div>
             <Button
-              onClick={() => setChannelSelectorOpen(true)}
+              onClick={() => {
+                // Count all non-completed campaigns across all types as "active"
+                const activeCampaignCount = campaigns.filter(c =>
+                  c.status === 'active' || c.status === 'scheduled' || c.status === 'paused'
+                ).length;
+                if (!planLimits.canCreateActiveCampaign(activeCampaignCount)) {
+                  planLimits.openUpgradeModal();
+                  toast.warning(
+                    `Limite de ${planLimits.limitLabel.activeCampaigns} campanha(s) ativa(s) atingido. Faça upgrade para criar mais.`,
+                    { duration: 4000 }
+                  );
+                  return;
+                }
+                setChannelSelectorOpen(true);
+              }}
               className="bg-[#10B981] hover:bg-green-600 text-white font-medium shadow-sm flex items-center justify-center space-x-2 w-full sm:w-auto"
             >
               <Plus className="w-4 h-4" />

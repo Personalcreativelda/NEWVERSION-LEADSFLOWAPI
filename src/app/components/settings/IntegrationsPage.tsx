@@ -859,44 +859,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
               {/* Expanded Content */}
               {isExpanded && (
                 <div className="px-6 pb-6 border-t border-gray-200 dark:border-gray-800 pt-6 relative">
-                  {/* OVERLAY DE BLOQUEIO para Meta Pixel e Google Analytics no plano FREE */}
-                  {!hasTrackingAccess && (integration.id === 'meta-pixel' || integration.id === 'google-analytics') && (
-                    <div className="absolute inset-0 bg-background/95 dark:bg-background/95 backdrop-blur-sm z-50 flex items-center justify-center rounded-b-xl border border-border">
-                      <div className="max-w-md mx-auto p-8 text-center space-y-4">
-                        <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto shadow-lg dark:shadow-none">
-                          <Crown className="w-8 h-8 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-foreground">
-                          Recurso Premium
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {integration.name} está disponível apenas nos planos <span className="font-semibold text-primary">Business</span> e <span className="font-semibold text-purple-500 dark:text-purple-300">Enterprise</span>.
-                        </p>
-
-                        <Button
-                          onClick={() => {
-                            const event = new CustomEvent('open-upgrade-modal');
-                            window.dispatchEvent(event);
-                          }}
-                          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg dark:shadow-none"
-                        >
-                          <Crown className="w-4 h-4 mr-2" />
-                          Fazer Upgrade
-                        </Button>
-
-                        <div className="grid grid-cols-2 gap-2 text-xs mt-4">
-                          <div className="rounded p-2 border border-border bg-card dark:bg-card/60">
-                            <p className="font-semibold text-foreground">Business</p>
-                            <p className="text-primary font-bold">$20/mês</p>
-                          </div>
-                          <div className="rounded p-2 border border-border bg-card dark:bg-card/60">
-                            <p className="font-semibold text-foreground">Enterprise</p>
-                            <p className="text-purple-500 dark:text-purple-300 font-bold">$59/mês</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Webhook Content */}
                   {integration.id === 'webhook' && (

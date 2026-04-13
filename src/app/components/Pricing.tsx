@@ -12,16 +12,17 @@ const plans = [
     name: 'Gratuito',
     icon: Zap,
     iconColor: 'text-gray-700 dark:text-gray-300',
-    price: '$0',
-    period: '/mês',
-    description: 'Perfeito para começar',
+    price: 'Grátis',
+    period: '',
+    description: 'Para dar os primeiros passos',
     features: [
-      'Até 100 leads',
-      '100 mensagens individuais/mês',
-      '200 mensagens em massa/mês',
-      '3 campanhas ativas',
-      'Painel básico de métricas',
-      'Suporte por email (48h)',
+      'Até 100 leads cadastrados',
+      '100 mensagens WhatsApp/mês',
+      '50 disparos em massa/mês',
+      '1 canal WhatsApp conectado',
+      'Painel de métricas básico',
+      'Acesso ao marketplace de IA',
+      'Suporte por email em até 48h',
     ],
     cta: 'Criar Conta Grátis',
     highlighted: false,
@@ -32,21 +33,24 @@ const plans = [
     name: 'Business',
     icon: Star,
     iconColor: 'text-blue-600',
-    price: '$20',
+    price: 'R$97',
     period: '/mês',
-    priceAnnual: '$100',
-    periodAnnual: '/ano',
-    description: 'Para equipes em crescimento',
+    priceAnnual: 'R$79',
+    periodAnnual: '/mês',
+    annualNote: 'cobrado anualmente · economize R$216/ano',
+    description: 'Para equipes que querem crescer com IA',
     features: [
-      'Até 500 leads',
-      '500 mensagens individuais/mês',
-      '1.000 mensagens em massa/mês',
-      'Até 50 campanhas ativas',
-      'Painel completo e personalizável',
-      'Relatórios em tempo real',
-      'Todas as integrações',
-      'API de acesso e HTTP endpoint',
-      'Suporte prioritário (4h)',
+      'Até 2.000 leads cadastrados',
+      '1.000 mensagens WhatsApp/mês',
+      '5.000 disparos em massa/mês',
+      'Até 5 canais WhatsApp conectados',
+      'Assistentes de IA do marketplace',
+      'Até 3 assistentes de IA personalizados',
+      '1 agente de voz (ligacões automatizadas)',
+      'Relatórios detalhados em tempo real',
+      'API REST + HTTP endpoint (webhooks)',
+      'Todas as integracões nativas (N8N, Meta Ads...)',
+      'Suporte prioritário em até 4h',
     ],
     cta: 'Começar Agora',
     highlighted: true,
@@ -58,23 +62,25 @@ const plans = [
     name: 'Enterprise',
     icon: Crown,
     iconColor: 'text-purple-600',
-    price: '$59',
+    price: 'R$197',
     period: '/mês',
-    priceAnnual: '$200',
-    periodAnnual: '/ano',
-    description: 'Para grandes operações',
+    priceAnnual: 'R$159',
+    periodAnnual: '/mês',
+    annualNote: 'cobrado anualmente · economize R$456/ano',
+    description: 'Para operações de alta escala',
     features: [
       'Leads ilimitados',
-      'Mensagens individuais ilimitadas',
-      'Mensagens em massa ilimitadas',
-      'Campanhas ilimitadas',
+      'Mensagens WhatsApp ilimitadas',
+      'Disparos em massa ilimitados',
+      'Canais WhatsApp ilimitados',
+      'Assistentes de IA ilimitados (custom + marketplace)',
+      'Agentes de voz ilimitados',
       'Tudo do Business, mais:',
       'Gerente de conta dedicado',
-      'SLA garantido 99.9%',
-      'Suporte prioritário 24/7',
+      'SLA garantido 99,9% de uptime',
       'Onboarding personalizado',
       'Customizações sob medida',
-      'Segurança avançada',
+      'Suporte prioritário 24/7',
     ],
     cta: 'Começar Agora',
     highlighted: false,
@@ -189,6 +195,11 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
                     >
                       {billingPeriod === 'annual' && plan.periodAnnual ? plan.periodAnnual : plan.period}
                     </span>
+                    {billingPeriod === 'annual' && (plan as any).annualNote && (
+                      <p className={`text-xs mt-1 ${
+                        plan.highlighted ? 'text-white/70' : 'text-green-400'
+                      }`}>{(plan as any).annualNote}</p>
+                    )}
                   </div>
 
                   <p
@@ -308,6 +319,11 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
                   >
                     {billingPeriod === 'annual' && plan.periodAnnual ? plan.periodAnnual : plan.period}
                   </span>
+                  {billingPeriod === 'annual' && (plan as any).annualNote && (
+                    <p className={`text-xs mt-1 ${
+                      plan.highlighted ? 'text-white/70' : 'text-green-400'
+                    }`}>{(plan as any).annualNote}</p>
+                  )}
                 </div>
 
                 <p

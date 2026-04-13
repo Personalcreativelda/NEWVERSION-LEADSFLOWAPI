@@ -5,32 +5,55 @@ import { getStorageService } from './storage.service';
 
 const DEFAULT_LIMITS = {
   leads: 100,
-  messages: 50,
-  massMessages: 5,
+  messages: 100,
+  massMessages: 50,
+  channels: 1,
+  customAssistants: 0,
+  voiceAgents: 0,
+  activeCampaigns: 1,
 };
 
 const DEFAULT_USAGE = {
   leads: 0,
   messages: 0,
   massMessages: 0,
+  channels: 0,
+  customAssistants: 0,
+  voiceAgents: 0,
+  activeCampaigns: 0,
 };
 
 const getPlanLimits = (plan: string) => {
-  const limitsMap: Record<string, { leads: number; messages: number; massMessages: number }> = {
+  const limitsMap: Record<string, {
+    leads: number; messages: number; massMessages: number;
+    channels: number; customAssistants: number; voiceAgents: number; activeCampaigns: number;
+  }> = {
     free: {
       leads: 100,
       messages: 100,
-      massMessages: 200,
+      massMessages: 50,
+      channels: 1,
+      customAssistants: 0,
+      voiceAgents: 0,
+      activeCampaigns: 1,
     },
     business: {
-      leads: 1000,
-      messages: 500,
-      massMessages: 1000,
+      leads: 2000,
+      messages: 1000,
+      massMessages: 5000,
+      channels: 5,
+      customAssistants: 3,
+      voiceAgents: 1,
+      activeCampaigns: 10,
     },
     enterprise: {
-      leads: -1, // unlimited
-      messages: -1, // unlimited
-      massMessages: -1, // unlimited
+      leads: -1,
+      messages: -1,
+      massMessages: -1,
+      channels: -1,
+      customAssistants: -1,
+      voiceAgents: -1,
+      activeCampaigns: -1,
     },
   };
 
@@ -54,6 +77,10 @@ interface UsageCounts {
   leads: number;
   messages: number;
   massMessages: number;
+  channels: number;
+  customAssistants: number;
+  voiceAgents: number;
+  activeCampaigns: number;
 }
 
 const parseCount = (result: QueryResult): number => {
@@ -86,7 +113,7 @@ const fetchUsageCounts = async (userId: string): Promise<UsageCounts> => {
       periodStart = new Date(now.getFullYear(), now.getMonth(), 1); // 1st of current month
     }
 
-    const [leadsResult, messagesResult, massMessagesResult] = await Promise.all([
+    const [leadsResult, messagesResult, massMessagesResult, channelsResult, customAssistantsResult, voiceAgentsResult, activeCampaignsResult] = await Promise.all([
       query('SELECT COUNT(*) FROM leads WHERE user_id = $1', [userId]),
       // Mensagens individuais: enviadas (out), não são de campanha, dentro do período, excluindo IA
       query(
@@ -98,12 +125,24 @@ const fetchUsageCounts = async (userId: string): Promise<UsageCounts> => {
         "SELECT COALESCE(SUM((stats->>'sent')::int), 0) as count FROM campaigns WHERE user_id = $1 AND created_at >= $2",
         [userId, periodStart]
       ),
+      // Canais conectados
+      query('SELECT COUNT(*) FROM channels WHERE user_id = $1', [userId]),
+      // Assistentes personalizados
+      query('SELECT COUNT(*) FROM ai_assistants WHERE user_id = $1 AND is_custom = true', [userId]),
+      // Agentes de voz
+      query('SELECT COUNT(*) FROM voice_agents WHERE user_id = $1', [userId]),
+      // Campanhas ativas (active ou scheduled)
+      query("SELECT COUNT(*) FROM campaigns WHERE user_id = $1 AND status IN ('active','scheduled','paused')", [userId]),
     ]);
 
     return {
       leads: parseCount(leadsResult),
       messages: parseCount(messagesResult),
       massMessages: parseCount(massMessagesResult),
+      channels: parseCount(channelsResult),
+      customAssistants: parseCount(customAssistantsResult),
+      voiceAgents: parseCount(voiceAgentsResult),
+      activeCampaigns: parseCount(activeCampaignsResult),
     };
   } catch (error) {
     console.error('[UsersService] Failed to compute usage counts:', error);
@@ -130,16 +169,22 @@ const buildProfileResponse = (user: DbUserRow, usage?: UsageCounts) => {
     planActivatedAt: user.plan_activated_at || null,
     isTrial: false,
     // Prefer plan_limits stored on user row (set during subscription/sync), fall back to hardcoded map
-    limits: (user.plan_limits && typeof user.plan_limits === 'object' && Object.keys(user.plan_limits).length > 0)
-      ? {
-          leads: user.plan_limits.leads ?? 0,
-          messages: user.plan_limits.messages ?? 0,
-          massMessages: user.plan_limits.massMessages ?? 0,
-          // exportLeads and importBatch mirror leads limit (updatable in DB)
-          exportLeads: user.plan_limits.exportLeads ?? user.plan_limits.leads ?? 0,
-          importBatch: user.plan_limits.importBatch ?? user.plan_limits.leads ?? 0,
-        }
-      : (() => { const l = getPlanLimits(plan); return { ...l, exportLeads: l.leads, importBatch: l.leads }; })(),
+    limits: (() => {
+      const fallback = getPlanLimits(plan);
+      const db = (user.plan_limits && typeof user.plan_limits === 'object' && Object.keys(user.plan_limits).length > 0)
+        ? user.plan_limits : null;
+      return {
+        leads: db?.leads ?? fallback.leads,
+        messages: db?.messages ?? fallback.messages,
+        massMessages: db?.massMessages ?? fallback.massMessages,
+        channels: db?.channels ?? fallback.channels,
+        customAssistants: db?.customAssistants ?? fallback.customAssistants,
+        voiceAgents: db?.voiceAgents ?? fallback.voiceAgents,
+        activeCampaigns: db?.activeCampaigns ?? fallback.activeCampaigns,
+        exportLeads: db?.exportLeads ?? db?.leads ?? fallback.leads,
+        importBatch: db?.importBatch ?? db?.leads ?? fallback.leads,
+      };
+    })(),
     usage: { ...safeUsage },
   };
 };

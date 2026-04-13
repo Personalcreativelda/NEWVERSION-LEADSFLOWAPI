@@ -9,6 +9,7 @@ import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { voiceAgentsApi } from '../../services/api/voice-agents';
+import { usePlanLimits } from '../../hooks/usePlanLimits';
 import type {
   VoiceAgent,
   CreateVoiceAgentInput,
@@ -23,6 +24,7 @@ interface VoiceAgentsPageProps {
 }
 
 export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
+  const planLimits = usePlanLimits();
   console.log('[VoiceAgentsPage] Render - isDark:', isDark);
   
   // LocalStorage helper functions for API keys
@@ -260,6 +262,10 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   };
 
   const handleCreate = async () => {
+    if (!planLimits.canCreateVoiceAgent(voiceAgents.length)) {
+      planLimits.openUpgradeModal();
+      return;
+    }
     setSelectedAgent(null);
     setForm(emptyForm);
     await refreshConvAIData();
@@ -823,6 +829,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
             <Button onClick={handleCreate} className="bg-purple-600 hover:bg-purple-700">
               <Plus className="w-4 h-4 mr-2" />
               Criar Agente
+              {planLimits.limits.voiceAgents === 0 && <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Pro</span>}
             </Button>
           </div>
         </div>

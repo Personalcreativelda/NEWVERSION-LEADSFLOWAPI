@@ -27,7 +27,7 @@ const PLAN_CONFIG: Record<string, {
     badgeBg: 'bg-blue-500/20 border border-blue-500/40',
     badgeText: 'text-blue-300',
     ringColor: 'ring-blue-500/30',
-    features: ['1.000 leads', '500 mensagens individuais', '1.000 envios em massa'],
+    features: ['2.000 leads', '1.000 mensagens individuais', '5.000 campanhas em massa'],
   },
   enterprise: {
     label: 'Enterprise',

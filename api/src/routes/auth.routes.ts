@@ -17,6 +17,8 @@ import { googleOAuthService } from '../services/google-oauth.service';
 import { activityService } from '../services/activity.service';
 import { notificationsService } from '../services/notifications.service';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
+import { AIAssistantsService } from '../services/ai-assistants.service';
+import { DEFAULT_ONBOARDING_TEMPLATE } from './ai-assistants.routes';
 
 const router = Router();
 
@@ -252,6 +254,24 @@ router.post('/register', async (req, res, next) => {
 
     const data = await registerWithEmail(email, password, metadata);
     
+    // 🤖 Auto-create onboarding assistant for new user
+    void (async () => {
+      try {
+        const aiService = new AIAssistantsService();
+        await aiService.create({
+          name: DEFAULT_ONBOARDING_TEMPLATE.name,
+          mode: DEFAULT_ONBOARDING_TEMPLATE.mode,
+          channel_id: null,
+          llm_provider: DEFAULT_ONBOARDING_TEMPLATE.llm_provider,
+          llm_model: DEFAULT_ONBOARDING_TEMPLATE.llm_model,
+          llm_system_prompt: DEFAULT_ONBOARDING_TEMPLATE.llm_system_prompt,
+          settings: { ...DEFAULT_ONBOARDING_TEMPLATE.settings }
+        }, data.user.id);
+      } catch (err) {
+        console.error('[Register] Error creating onboarding assistant:', err);
+      }
+    })();
+
     // 📝 Log activity
     void activityService.logActivity({
       userId: data.user.id,

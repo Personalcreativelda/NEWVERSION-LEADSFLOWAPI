@@ -22,7 +22,7 @@ export const clearPlanEnforcementCache = (userId: string): void => {
 
 // Hard-coded fallback lead limits if plan_limits column is NULL.
 const hardcodedLeadLimit = (plan: string): number => {
-  const map: Record<string, number> = { free: 100, business: 1000, enterprise: -1 };
+  const map: Record<string, number> = { free: 100, business: 2000, enterprise: -1 };
   return map[plan] ?? 100;
 };
 
@@ -155,8 +155,8 @@ export const planEnforcement = async (
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DEFAULT_MSG_LIMITS: Record<string, { messages: number; massMessages: number }> = {
-  free:       { messages: 100,  massMessages: 200  },
-  business:   { messages: 500,  massMessages: 1000 },
+  free:       { messages: 100,  massMessages: 50   },
+  business:   { messages: 1000, massMessages: 5000 },
   enterprise: { messages: -1,   massMessages: -1   },
 };
 
