@@ -1,0 +1,8 @@
+api/
+docker-compose.yml
+Dockerfile
+setup-db.js
+setup-db.sh
+scripts/
+SVG logos/
+env. backup.com
