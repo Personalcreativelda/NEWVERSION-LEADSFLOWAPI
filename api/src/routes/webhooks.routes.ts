@@ -327,17 +327,20 @@ router.post('/evolution/setup-all', async (req, res) => {
 
       try {
         const webhookConfig = {
-          url: fullWebhookUrl,
-          webhook_by_events: false,
-          webhook_base64: true,
-          events: [
-            'MESSAGES_UPSERT',
-            'MESSAGES_UPDATE',
-            'MESSAGES_DELETE',
-            'SEND_MESSAGE',
-            'CONNECTION_UPDATE',
-            'QRCODE_UPDATED',
-          ],
+          webhook: {
+            enabled: true,
+            url: fullWebhookUrl,
+            webhookByEvents: false,
+            webhookBase64: true,
+            events: [
+              'MESSAGES_UPSERT',
+              'MESSAGES_UPDATE',
+              'MESSAGES_DELETE',
+              'SEND_MESSAGE',
+              'CONNECTION_UPDATE',
+              'QRCODE_UPDATED',
+            ],
+          },
         };
 
         const configResponse = await fetch(`${evolutionUrl}/webhook/set/${instanceName}`, {
@@ -836,7 +839,7 @@ router.post('/evolution/messages', async (req, res) => {
       console.log('[Evolution Webhook] Criando novo lead:', contactName, phone, lidValue ? `(LID: ${lidValue})` : '');
       const leadResult = await query(
         `INSERT INTO leads (user_id, name, phone, whatsapp, source, status, avatar_url, whatsapp_lid)
-         VALUES ($1, $2, $3, $3, 'whatsapp', 'novo', $4)
+         VALUES ($1, $2, $3, $3, 'whatsapp', 'novo', $4, $5)
          RETURNING *`,
         [channel.user_id, contactName, phone, waProfilePic, lidValue]
       );

@@ -725,18 +725,20 @@ router.post('/fix-webhook/:instanceId', async (req, res, next) => {
 
     // Configurar webhook com TODOS os eventos de mensagem
     const webhookConfig = {
-      enabled: true,
-      url: fullWebhookUrl,
-      webhookByEvents: false,
-      webhookBase64: true,
-      events: [
-        'MESSAGES_UPSERT',
-        'MESSAGES_UPDATE',
-        'MESSAGES_DELETE',
-        'SEND_MESSAGE',
-        'CONNECTION_UPDATE',
-        'QRCODE_UPDATED',
-      ],
+      webhook: {
+        enabled: true,
+        url: fullWebhookUrl,
+        webhookByEvents: false,
+        webhookBase64: true,
+        events: [
+          'MESSAGES_UPSERT',
+          'MESSAGES_UPDATE',
+          'MESSAGES_DELETE',
+          'SEND_MESSAGE',
+          'CONNECTION_UPDATE',
+          'QRCODE_UPDATED',
+        ],
+      },
     };
 
     console.log('[WhatsApp Routes] Webhook config:', JSON.stringify(webhookConfig));

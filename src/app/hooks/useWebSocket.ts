@@ -104,14 +104,15 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             });
 
             socket.on('connect_error', (err) => {
-                console.error('[WebSocket] Connection error:', err.message);
-                // Don't set error state for transient connection errors
-                // Only set error if this is not a reconnection attempt
-                if (reconnectAttemptsRef.current === 0 && !wasConnectedRef.current) {
-                    setError(err.message);
-                }
+                console.error('[WebSocket] Connection error:', err.message, '| URL:', WS_URL);
+                setError(err.message);
                 setIsConnected(false);
                 connectingRef.current = false;
+            });
+
+            socket.on('reconnect_failed', () => {
+                console.error('[WebSocket] All reconnection attempts failed. Clique no ícone WiFi para tentar novamente.');
+                setError('Falha ao reconectar após várias tentativas. Clique no ícone de sinal para reconectar.');
             });
 
             // Route all events through refs so callbacks are always current

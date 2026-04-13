@@ -5,9 +5,6 @@ import { useMessages } from './useMessages';
 import { useWebSocket } from './useWebSocket';
 import type { ConversationWithDetails } from '../types/inbox';
 
-// Som de notificação simples (pop)
-const NOTIFICATION_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
-
 interface UseInboxOptions {
     onlyWithHistory?: boolean;
     enablePolling?: boolean;
@@ -19,17 +16,29 @@ export function useInbox(options: UseInboxOptions = {}) {
     const refreshConversationsRef = useRef<() => void>(() => {});
     const refreshMessagesRef = useRef<() => void>(() => {});
 
-    // Função para tocar som
+    // Gera beep de notificação via Web Audio API (sem dependência de URL externa)
     const playNotificationSound = useCallback(() => {
         try {
-            const audio = new Audio(NOTIFICATION_SOUND_URL);
-            audio.volume = 0.5;
-            audio.play().catch(e => {
-                // Autoplay policy pode bloquear se não houver interação do usuário antes
-                console.warn('[useInbox] Não foi possível reproduzir som de notificação:', e);
-            });
+            const AudioContextClass =
+                window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioContextClass) return;
+            const ctx = new AudioContextClass() as AudioContext;
+            const oscillator = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            // Beep curto: 880 Hz → 440 Hz em 120ms, fade out até 400ms
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.12);
+            gainNode.gain.setValueAtTime(0.35, ctx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+            oscillator.start(ctx.currentTime);
+            oscillator.stop(ctx.currentTime + 0.4);
+            // Fechar contexto após uso para liberação de recursos
+            oscillator.onended = () => ctx.close().catch(() => {});
         } catch (e) {
-            console.error('[useInbox] Erro ao tentar reproduzir som:', e);
+            console.warn('[useInbox] Não foi possível reproduzir som de notificação:', e);
         }
     }, []);
 

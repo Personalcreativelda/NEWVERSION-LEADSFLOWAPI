@@ -250,16 +250,18 @@ export class WhatsAppService {
       const result = await this.request(`/webhook/set/${instanceName}`, {
         method: 'POST',
         body: JSON.stringify({
-          enabled: true,
-          url: webhookUrl,
-          webhookByEvents: false,
-          webhookBase64: true,
-          events: [
-            'MESSAGES_UPSERT',
-            'MESSAGES_UPDATE',
-            'CONNECTION_UPDATE',
-            'QRCODE_UPDATED',
-          ],
+          webhook: {
+            enabled: true,
+            url: webhookUrl,
+            webhookByEvents: false,
+            webhookBase64: true,
+            events: [
+              'MESSAGES_UPSERT',
+              'MESSAGES_UPDATE',
+              'CONNECTION_UPDATE',
+              'QRCODE_UPDATED',
+            ],
+          },
         }),
       });
 

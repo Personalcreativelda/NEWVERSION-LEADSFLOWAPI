@@ -27,16 +27,18 @@ async function configureWebhookForInstance(instanceId: string): Promise<void> {
 
     try {
         const webhookConfig = {
-            enabled: true,
-            url: fullWebhookUrl,
-            webhookByEvents: false,
-            webhookBase64: true,
-            events: [
-                'MESSAGES_UPSERT',
-                'MESSAGES_UPDATE',
-                'CONNECTION_UPDATE',
-                'QRCODE_UPDATED',
-            ],
+            webhook: {
+                enabled: true,
+                url: fullWebhookUrl,
+                webhookByEvents: false,
+                webhookBase64: true,
+                events: [
+                    'MESSAGES_UPSERT',
+                    'MESSAGES_UPDATE',
+                    'CONNECTION_UPDATE',
+                    'QRCODE_UPDATED',
+                ],
+            },
         };
 
         const response = await fetch(`${evolutionUrl}/webhook/set/${instanceId}`, {

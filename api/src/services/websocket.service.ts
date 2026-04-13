@@ -2,7 +2,6 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
-
 interface AuthenticatedSocket extends Socket {
     userId?: string;
 }
@@ -14,7 +13,7 @@ export class WebSocketService {
     constructor(httpServer: HttpServer) {
         this.io = new Server(httpServer, {
             cors: {
-                origin: process.env.CORS_ORIGINS?.split(',').map(o => o.trim()) || ['http://localhost:3200'],
+                origin: process.env.CORS_ORIGINS?.split(',').map(o => o.trim().replace(/\/$/, '')),
                 credentials: true,
                 methods: ['GET', 'POST']
             },

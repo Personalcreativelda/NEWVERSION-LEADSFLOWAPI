@@ -3,7 +3,6 @@ import { config } from '../config/env';
 import { RequestHandler } from 'express';
 
 const allowedOrigins = config.corsOrigins;
-const tunnelPatterns = config.corsTunnelPatterns;
 
 // Validate CORS configuration on startup
 if (allowedOrigins.length === 0) {
@@ -12,14 +11,6 @@ if (allowedOrigins.length === 0) {
     'Set CORS_ORIGINS environment variable with allowed origins (comma-separated).'
   );
 }
-
-if (tunnelPatterns.length > 0) {
-  console.log(`[CORS] Tunnel patterns enabled: ${process.env.CORS_TUNNEL_PATTERNS}`);
-}
-
-/** Returns true if the origin matches any configured tunnel wildcard pattern */
-const matchesTunnelPattern = (origin: string): boolean =>
-  tunnelPatterns.some((re) => re.test(origin));
 
 // Rotas que não precisam de Origin header (webhooks, APIs externas, OAuth callbacks, admin)
 const noOriginRequiredPaths = [
@@ -49,11 +40,6 @@ const options: CorsOptions = {
 
     // Check if origin is in allowed list
     if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    // Check if origin matches a tunnel wildcard pattern
-    if (tunnelPatterns.length > 0 && matchesTunnelPattern(origin)) {
       return callback(null, true);
     }
 
