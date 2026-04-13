@@ -18,6 +18,7 @@ import AdminPage from './components/settings/AdminPage';
 import SetupTestUser from './components/SetupTestUser';
 import AgentCallPage from './components/pages/AgentCallPage';
 import UpgradeModal from './components/modals/UpgradeModal';
+import PlanUpgradeSuccessModal from './components/modals/PlanUpgradeSuccessModal';
 import { MetaPixel } from './components/MetaPixel';
 import { authApi, apiRequest, plansApi, isSessionExpired, startSessionExpiryTimer } from './utils/api';
 import { mockAuth } from './utils/auth-mock';
@@ -160,12 +161,28 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
   const [currentPage, setCurrentPage] = useState<Page>(resolvedInitialPage);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // Prevent concurrent checkAuth calls (e.g. React StrictMode double-invocation in dev)
+  const isCheckingAuthRef = useRef(false);
   const [appVersion, setAppVersion] = useState<string>('...');
   const [versionNotification, setVersionNotification] = useState<{ id: number; version: string; releaseNotes: string } | null>(null);
   const envMetaPixelId = import.meta.env.VITE_META_PIXEL_ID as string | undefined;
   const [metaPixelId] = useState<string>(envMetaPixelId ? envMetaPixelId.trim() : '');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [planEnforcementBlock, setPlanEnforcementBlock] = useState<{ code: string; message: string } | null>(null);
+  const [upgradeSuccessModal, setUpgradeSuccessModal] = useState<{ open: boolean; plan: string }>({ open: false, plan: '' });
+  // Capture checkout success from URL params on mount (before user loads)
+  const [pendingCheckoutSuccess, setPendingCheckoutSuccess] = useState<boolean>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('checkoutSuccess') === 'true';
+  });
+  const [pendingCheckoutPlanId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('checkoutSuccess') === 'true' ? (params.get('plan') || null) : null;
+  });
+  const [pendingCheckoutCanceled] = useState<boolean>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('checkoutCanceled') === 'true';
+  });
   const isLoggingOutRef = useRef(false);
 
   // Sync currentPage with URL path
@@ -316,50 +333,70 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     window.addEventListener('open-upgrade-modal', handleOpenUpgradeModal);
     window.addEventListener('plan-enforcement-blocked', handlePlanEnforcement);
 
+    // Refresh usage counters after a message is sent (debounced 2s to batch rapid sends)
+    let messageSentTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleMessageSent = () => {
+      if (messageSentTimer) clearTimeout(messageSentTimer);
+      messageSentTimer = setTimeout(() => {
+        refreshUserData().catch(() => {});
+      }, 2000);
+    };
+    window.addEventListener('message-sent', handleMessageSent);
+
     return () => {
       window.removeEventListener('open-upgrade-modal', handleOpenUpgradeModal);
       window.removeEventListener('plan-enforcement-blocked', handlePlanEnforcement);
+      window.removeEventListener('message-sent', handleMessageSent);
+      if (messageSentTimer) clearTimeout(messageSentTimer);
     };
   }, []);
 
 
 
   // Handle Stripe redirect back with ?checkoutSuccess=true
+  // Clean the URL on mount (runs once) — params already captured in state above
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const checkoutSuccess = params.get('checkoutSuccess');
-    const checkoutCanceled = params.get('checkoutCanceled');
-
-    if (checkoutSuccess === 'true') {
-      // Clean the URL
+    if (pendingCheckoutSuccess || pendingCheckoutCanceled) {
       window.history.replaceState({}, document.title, window.location.pathname);
-      // Sync subscription directly from Stripe (safety net independent of webhook)
-      // Then refresh user profile to reflect the new plan
-      const timer = setTimeout(async () => {
-        if (user) {
-          try {
-            const syncResult = await plansApi.syncActiveSubscription();
-            await refreshUserData();
-            if (syncResult?.synced) {
-              toast.success(`🎉 Plano ${syncResult.plan?.toUpperCase()} ativado com sucesso!`, { duration: 6000 });
-            } else {
-              toast.success('🎉 Pagamento confirmado! Seu plano foi atualizado.', { duration: 5000 });
-            }
-          } catch (e) {
-            console.warn('[Stripe] Could not auto-refresh after checkout:', e);
-            toast.success('🎉 Pagamento confirmado! Seu plano foi atualizado.', { duration: 5000 });
-          }
-        }
-      }, 2000);
-      return () => clearTimeout(timer);
     }
-
-    if (checkoutCanceled === 'true') {
-      window.history.replaceState({}, document.title, window.location.pathname);
+    if (pendingCheckoutCanceled) {
       toast.info('Pagamento cancelado. Você pode tentar novamente quando quiser.');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, []);
+
+  // When user is available and there's a pending checkout success, sync the plan
+  useEffect(() => {
+    if (!pendingCheckoutSuccess || !user) return;
+
+    setPendingCheckoutSuccess(false);
+
+    // Optimistic update: immediately apply the plan from the URL param so the
+    // dashboard shows the new plan as soon as the user object is available,
+    // before the network sync comes back.
+    if (pendingCheckoutPlanId) {
+      setUser((prev: any) => ({
+        ...prev,
+        plan: pendingCheckoutPlanId,
+        subscription_plan: pendingCheckoutPlanId,
+      }));
+    }
+
+    // Sync with Stripe in background to get accurate limits + expiry
+    const doSync = async () => {
+      try {
+        const syncResult = await plansApi.syncActiveSubscription(pendingCheckoutPlanId || undefined);
+        await refreshUserData();
+        const activatedPlan = syncResult?.plan || pendingCheckoutPlanId || '';
+        setUpgradeSuccessModal({ open: true, plan: activatedPlan });
+      } catch (e) {
+        console.warn('[Stripe] Could not auto-refresh after checkout:', e);
+        setUpgradeSuccessModal({ open: true, plan: pendingCheckoutPlanId || '' });
+      }
+    };
+    void doSync();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, pendingCheckoutSuccess]);
 
   // Fetch app version from database
   useEffect(() => {
@@ -620,8 +657,9 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       };
 
       // Normalize plan values to lowercase to ensure consistent comparisons throughout the UI
-      userData.plan = (userData.plan || 'free').toLowerCase();
-      userData.subscription_plan = (userData.subscription_plan || userData.plan).toLowerCase();
+      // Use authUser.plan as fallback in case profile fetch failed silently (avoids defaulting to 'free')
+      userData.plan = (userData.plan || authUser.plan || 'free').toLowerCase();
+      userData.subscription_plan = (userData.subscription_plan || authUser.subscription_plan || userData.plan).toLowerCase();
 
       // If the user has a paid plan but no expiry date stored, sync from Stripe to populate it
       if (userData.plan !== 'free' && !userData.plan_expires_at && !userData.planExpiresAt) {
@@ -660,6 +698,12 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
   }, []);
 
   const checkAuth = useCallback(async () => {
+    // Guard: prevent concurrent executions (React StrictMode runs effects twice in dev)
+    if (isCheckingAuthRef.current) {
+      console.log('[checkAuth] Already running, skipping duplicate call');
+      return;
+    }
+    isCheckingAuthRef.current = true;
     try {
       console.log('[checkAuth] Starting authentication check...');
 
@@ -751,6 +795,7 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     } finally {
       console.log('[checkAuth] Setting loading to false');
       setLoading(false);
+      isCheckingAuthRef.current = false;
     }
   }, [fetchUserContext, forceLogout, homePage]);
 
@@ -1034,6 +1079,17 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
           }}
         />
       )}
+
+      {/* Plan Upgrade Success Modal */}
+      <PlanUpgradeSuccessModal
+        isOpen={upgradeSuccessModal.open}
+        plan={upgradeSuccessModal.plan}
+        onClose={() => {
+          setUpgradeSuccessModal({ open: false, plan: '' });
+          // Refresh user data so dashboard cards reflect new plan limits immediately
+          refreshUserData().catch(() => {});
+        }}
+      />
 
 
 

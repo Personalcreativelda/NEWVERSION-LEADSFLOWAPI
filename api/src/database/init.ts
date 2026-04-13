@@ -248,6 +248,49 @@ const runPendingMigrations = async () => {
   } catch (error: any) {
     console.warn('[DB] lead_interactions migration warning:', error.message);
   }
+
+  // Migração: Fila de mensagens + lock para assistente IA (debounce/mutex como no n8n)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS assistant_message_queue (
+          id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          conversation_id UUID    NOT NULL,
+          user_id         UUID    NOT NULL,
+          channel_id      UUID    NOT NULL,
+          channel_type    VARCHAR(50) NOT NULL DEFAULT 'whatsapp',
+          message_content TEXT    NOT NULL,
+          remote_jid      VARCHAR(255),
+          contact_phone   VARCHAR(255),
+          contact_name    VARCHAR(255),
+          credentials     JSONB,
+          created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_amq_conversation_id ON assistant_message_queue(conversation_id);
+      CREATE INDEX IF NOT EXISTS idx_amq_created_at      ON assistant_message_queue(created_at);
+
+      CREATE TABLE IF NOT EXISTS assistant_processing_lock (
+          conversation_id UUID PRIMARY KEY,
+          locked_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          expires_at      TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '90 seconds')
+      );
+    `);
+    console.log('[DB] ✅ assistant_message_queue + assistant_processing_lock created/verified');
+  } catch (error: any) {
+    console.warn('[DB] assistant queue migration warning:', error.message);
+  }
+
+  // ── whatsapp_lid em leads ──────────────────────────────────────────────────
+  // Armazena o @lid (Linked Device ID) do WhatsApp para lookups futuros
+  // quando o remoteJid é apenas LID e não um número de telefone real.
+  try {
+    await pool.query(`
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS whatsapp_lid TEXT;
+      CREATE INDEX IF NOT EXISTS idx_leads_whatsapp_lid ON leads(whatsapp_lid) WHERE whatsapp_lid IS NOT NULL;
+    `);
+    console.log('[DB] ✅ whatsapp_lid column added to leads');
+  } catch (error: any) {
+    console.warn('[DB] whatsapp_lid migration warning:', error.message);
+  }
 };
 
 export const initDatabase = async () => {

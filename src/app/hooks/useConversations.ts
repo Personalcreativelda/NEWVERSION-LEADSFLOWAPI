@@ -19,6 +19,7 @@ export function useConversations(onlyWithHistory: boolean = false, options: UseC
     const [unreadCount, setUnreadCount] = useState(0);
     const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
     const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const fetchConversationsRef = useRef<(search?: string, silent?: boolean) => Promise<void>>(() => Promise.resolve());
 
     const fetchConversations = useCallback(async (search?: string, silent: boolean = false) => {
         try {
@@ -48,6 +49,11 @@ export function useConversations(onlyWithHistory: boolean = false, options: UseC
             }
         }
     }, [onlyWithHistory]);
+
+    // Manter referência atualizada para uso em callbacks sem re-criar funções
+    useEffect(() => {
+        fetchConversationsRef.current = fetchConversations;
+    }, [fetchConversations]);
 
     const refreshConversations = useCallback(() => {
         fetchConversations(searchQuery);
@@ -88,6 +94,15 @@ export function useConversations(onlyWithHistory: boolean = false, options: UseC
 
     const addNewMessage = useCallback((conversationId: string, message: any) => {
         setConversations(prev => {
+            const conversationExists = prev.some(conv => conv.id === conversationId);
+
+            // Se a conversa não existe na lista (novo contato), agendar refresh
+            if (!conversationExists) {
+                console.log('[useConversations] Nova conversa detectada, atualizando lista:', conversationId);
+                setTimeout(() => fetchConversationsRef.current(undefined, true), 500);
+                return prev;
+            }
+
             const updated = prev.map(conv => {
                 if (conv.id === conversationId) {
                     return {

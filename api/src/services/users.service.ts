@@ -67,12 +67,37 @@ const parseCount = (result: QueryResult): number => {
 
 const fetchUsageCounts = async (userId: string): Promise<UsageCounts> => {
   try {
+    // Fetch plan info to determine billing period start
+    const userRow = await query(
+      'SELECT plan, plan_activated_at FROM users WHERE id = $1',
+      [userId]
+    );
+    const userData = userRow.rows[0];
+    const plan = (userData?.plan || 'free').toLowerCase();
+
+    // Billing period start:
+    //  - Paid plans: from plan_activated_at (when they subscribed)
+    //  - Free plan: beginning of current calendar month (resets monthly)
+    let periodStart: Date;
+    if (plan !== 'free' && userData?.plan_activated_at) {
+      periodStart = new Date(userData.plan_activated_at);
+    } else {
+      const now = new Date();
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1); // 1st of current month
+    }
+
     const [leadsResult, messagesResult, massMessagesResult] = await Promise.all([
       query('SELECT COUNT(*) FROM leads WHERE user_id = $1', [userId]),
-      // Mensagens individuais: apenas enviadas (outgoing) e que NÃO são de campanha
-      query("SELECT COUNT(*) FROM messages WHERE user_id = $1 AND direction = 'outgoing' AND campaign_id IS NULL", [userId]),
-      // Mensagens em massa: soma de todas as mensagens enviadas por campanhas
-      query("SELECT COALESCE(SUM((stats->>'sent')::int), 0) as count FROM campaigns WHERE user_id = $1", [userId]),
+      // Mensagens individuais: enviadas (out), não são de campanha, dentro do período, excluindo IA
+      query(
+        "SELECT COUNT(*) FROM messages WHERE user_id = $1 AND direction = 'out' AND campaign_id IS NULL AND created_at >= $2 AND NOT (metadata @> '{\"automated\":true}'::jsonb)",
+        [userId, periodStart]
+      ),
+      // Mensagens em massa: soma das campanhas criadas dentro do período
+      query(
+        "SELECT COALESCE(SUM((stats->>'sent')::int), 0) as count FROM campaigns WHERE user_id = $1 AND created_at >= $2",
+        [userId, periodStart]
+      ),
     ]);
 
     return {

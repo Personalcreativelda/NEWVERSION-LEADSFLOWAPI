@@ -6,12 +6,16 @@ import type { MessageWithSender } from '../types/inbox';
 // Helper para gerar ID temporário
 const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+// Intervalo de polling de mensagens (60 segundos) - fallback quando WebSocket falha
+const MESSAGE_POLLING_INTERVAL = 60_000;
+
 export function useMessages(conversationId: string | null) {
     const [messages, setMessages] = useState<MessageWithSender[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [sending, setSending] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const fetchMessages = useCallback(async () => {
         if (!conversationId) {
@@ -167,6 +171,41 @@ export function useMessages(conversationId: string | null) {
     useEffect(() => {
         fetchMessages();
     }, [fetchMessages]);
+
+    // Polling de fallback: recarregar mensagens silenciosamente caso WebSocket tenha perdido eventos
+    useEffect(() => {
+        if (!conversationId) return;
+
+        // Limpar polling anterior
+        if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+        }
+
+        pollingRef.current = setInterval(async () => {
+            if (!conversationId) return;
+            try {
+                const data = await conversationsApi.getMessages(conversationId, { limit: 100 });
+                setMessages(prev => {
+                    // Só atualizar se há mensagens novas (evitar re-renders desnecessários)
+                    const prevIds = new Set(prev.filter(m => !m.id.startsWith('temp_')).map(m => m.id));
+                    const hasNew = data.some(m => !prevIds.has(m.id));
+                    if (!hasNew) return prev;
+                    // Preservar mensagens temporárias (em envio)
+                    const tempMessages = prev.filter(m => m.id.startsWith('temp_'));
+                    return [...data, ...tempMessages];
+                });
+            } catch {
+                // Polling silencioso - não mostrar erro
+            }
+        }, MESSAGE_POLLING_INTERVAL);
+
+        return () => {
+            if (pollingRef.current) {
+                clearInterval(pollingRef.current);
+                pollingRef.current = null;
+            }
+        };
+    }, [conversationId]);
 
     useEffect(() => {
         // Scroll inicial

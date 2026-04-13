@@ -141,19 +141,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     const isMediaPlaceholder = mediaPlaceholders.includes(message.content || '');
     const showTextContent = message.content && (!isMediaPlaceholder || !hasValidMedia);
 
+    // Detectar se é mensagem automática (AI assistant)
+    const isAutomated = (message.metadata as any)?.automated === true || (message.metadata as any)?.source === 'ai_assistant';
+
     return (
         <div className={`flex w-full mb-2 px-4 ${isOut ? 'justify-end' : 'justify-start'}`}>
             <div
                 className={`relative max-w-[75%] min-w-[100px] rounded-lg px-3 py-2 shadow-sm text-sm leading-relaxed
           ${isOut
                         ? 'bg-teal-600 dark:bg-teal-700 text-white rounded-br-none'
-                        : 'rounded-bl-none border'
+                        : 'bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-slate-600 rounded-bl-none'
                     }`}
-                style={!isOut ? {
-                    backgroundColor: 'hsl(var(--card))',
-                    borderColor: 'hsl(var(--border))',
-                    color: 'hsl(var(--foreground))'
-                } : undefined}
             >
                 {/* Media Content */}
                 {hasValidMedia && (
@@ -227,7 +225,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 )}
 
                 {/* Metadata */}
-                <div className={`flex justify-end items-center gap-1 mt-1 text-[10px] ${isOut ? 'text-blue-100' : 'text-gray-400'}`}>
+                <div className={`flex justify-end items-center gap-1 mt-1 text-[10px] ${isOut ? 'text-teal-100' : 'text-gray-400 dark:text-slate-400'}`}>
+                    {isAutomated && (
+                        <span className="flex items-center gap-0.5 opacity-70">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
+                            </svg>
+                            <span>IA</span>
+                        </span>
+                    )}
                     <span>{formatTime(message.created_at)}</span>
                     {isOut && <StatusIcon status={message.status} />}
                 </div>

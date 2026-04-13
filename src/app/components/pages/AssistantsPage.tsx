@@ -5,11 +5,12 @@ import {
   Zap, X, Check, Loader2,
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash,
-  Key, Brain, Eye, EyeOff, Smartphone, Cloud
+  Key, Brain, Eye, EyeOff, Smartphone, Cloud, History
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { assistantsApi, type Assistant, type UserAssistant, type CreateAssistantInput } from '../../services/api/assistants';
 import { channelsApi } from '../../services/api/inbox';
@@ -96,6 +97,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   // Modal states
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [configLoadingFresh, setConfigLoadingFresh] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedAssistant, setSelectedAssistant] = useState<Assistant | null>(null);
   const [selectedUserAssistant, setSelectedUserAssistant] = useState<UserAssistant | null>(null);
@@ -230,31 +232,64 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const handleSaveConfig = async () => {
     if (!selectedUserAssistant) return;
 
+    // Basic validation: require AI api key if provider is configured
+    if (configValues.ai_provider && !configValues.ai_api_key?.trim()) {
+      toast.error('API Key é obrigatória para usar IA');
+      return;
+    }
+
     try {
       setActionLoading(true);
+      // Normalize __default__ sentinel back to empty string before saving
+      const valuesToSave = {
+        ...configValues,
+        ai_model: configValues.ai_model === '__default__' ? '' : (configValues.ai_model || ''),
+      };
       await assistantsApi.configure(
         selectedUserAssistant.id,
-        configValues,
+        valuesToSave,
         selectedChannelIds.length > 0 ? selectedChannelIds : undefined
       );
       toast.success('Configuração salva com sucesso!');
       setConfigModalOpen(false);
       setSelectedUserAssistant(null);
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('[AssistantsPage] Error saving config:', error);
-      toast.error('Erro ao salvar configuração');
+      const msg = error.response?.data?.error || error.response?.data?.details || error.message || 'Erro ao salvar configuração';
+      toast.error(msg);
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Open config modal
-  const openConfigModal = (userAssistant: UserAssistant) => {
+  const normalizeConfig = (cfg: Record<string, any>) => ({
+    ...cfg,
+    ai_model: cfg.ai_model || '__default__',
+    context_window_enabled: cfg.context_window_enabled !== false,
+    context_window_messages: cfg.context_window_messages ?? 10,
+    memory_enabled: cfg.memory_enabled !== false,
+  });
+
+  // Open config modal — fetch fresh data to avoid stale cached config
+  const openConfigModal = async (userAssistant: UserAssistant) => {
     setSelectedUserAssistant(userAssistant);
-    setConfigValues(userAssistant.config || {});
+    setConfigValues(normalizeConfig(userAssistant.config || {}));
     setSelectedChannelIds(userAssistant.channel_ids || []);
     setConfigModalOpen(true);
+    // Re-fetch fresh config in background (updates modal if data differs)
+    setConfigLoadingFresh(true);
+    try {
+      const fresh = await assistantsApi.getUserAssistantById(userAssistant.id);
+      setSelectedUserAssistant(fresh);
+      setConfigValues(normalizeConfig(fresh.config || {}));
+      setSelectedChannelIds(fresh.channel_ids || []);
+    } catch (err) {
+      // Keep cached data on error — just warn
+      console.warn('[AssistantsPage] Could not refresh config, using cached data');
+    } finally {
+      setConfigLoadingFresh(false);
+    }
   };
 
   // Handle create assistant
@@ -380,8 +415,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         key={assistant.id}
         className={`relative rounded-2xl border p-5 transition-all duration-200 hover:shadow-lg ${
           isDark
-            ? 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
-            : 'bg-white border-gray-200 hover:border-gray-300'
+            ? 'bg-card border border-border text-card-foreground shadow-sm'
+            : 'bg-muted/30 border border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/50'
         }`}
       >
         {/* Featured badge */}
@@ -416,7 +451,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             <h3 className={`font-semibold text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>
               {assistant.name}
             </h3>
-            <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+            <p className="text-xs text-muted-foreground">
               {CATEGORY_LABELS[assistant.category] || assistant.category}
             </p>
           </div>
@@ -426,14 +461,14 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               Grátis
             </Badge>
           ) : (
-            <Badge variant="outline" className={isDark ? 'border-slate-600' : ''}>
+            <Badge variant="outline" className="border-border">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(assistant.price_monthly)}/mês
             </Badge>
           )}
         </div>
 
         {/* Description */}
-        <p className={`text-sm mb-4 line-clamp-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+        <p className="text-sm mb-4 line-clamp-2 text-muted-foreground">
           {assistant.short_description}
         </p>
 
@@ -443,14 +478,14 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             <span
               key={idx}
               className={`text-[10px] px-2 py-0.5 rounded-full ${
-                isDark ? 'bg-slate-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                  'bg-muted text-muted-foreground'
               }`}
             >
               {feature}
             </span>
           ))}
           {(assistant.features?.length || 0) > 3 && (
-            <span className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+            <span className="text-[10px] text-muted-foreground">
               +{(assistant.features?.length || 0) - 3} mais
             </span>
           )}
@@ -458,16 +493,14 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
         {/* Connected channels */}
         {userAssistant && (userAssistant.channel_ids?.length > 0) && (
-          <div className={`flex flex-wrap items-center gap-1.5 mb-4 py-2 px-3 rounded-lg ${
-            isDark ? 'bg-slate-900/50' : 'bg-gray-50'
-          }`}>
-            <span className={`text-[10px] font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Canais:</span>
+          <div className="flex flex-wrap items-center gap-1.5 mb-4 py-2 px-3 rounded-lg bg-muted/40">
+            <span className="text-[10px] font-medium text-muted-foreground">Canais:</span>
             {userAssistant.channel_ids.map(channelId => {
               const channel = getChannelById(channelId);
               if (!channel) return null;
               return (
                 <span key={channelId} className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full ${
-                  isDark ? 'bg-slate-700' : 'bg-white border border-gray-200'
+                  isDark ? 'bg-muted/60' : 'bg-muted border border-border'
                 }`}>
                   {renderChannelIcon(channel.type, 'w-3 h-3')}
                   {channel.name || channel.type}
@@ -479,18 +512,16 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
         {/* Stats for connected assistants */}
         {!isMarketplace && userAssistant && (
-          <div className={`flex items-center gap-4 mb-4 py-3 px-3 rounded-lg ${
-            isDark ? 'bg-slate-900/50' : 'bg-gray-50'
-          }`}>
+          <div className="flex items-center gap-4 mb-4 py-3 px-3 rounded-lg bg-muted/40">
             <div className="flex items-center gap-1.5">
               <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
-              <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+              <span className="text-xs text-foreground">
                 {userAssistant.stats?.conversations || 0} conversas
               </span>
             </div>
             <div className="flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-green-500" />
-              <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+              <span className="text-xs text-foreground">
                 {userAssistant.last_triggered_at
                   ? new Date(userAssistant.last_triggered_at).toLocaleDateString('pt-BR')
                   : 'Nunca usado'}
@@ -618,7 +649,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
           <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
             Assistentes de IA
           </h1>
-          <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+          <p className="text-sm mt-1 text-muted-foreground">
             Conecte assistentes inteligentes aos seus canais para automatizar o atendimento
           </p>
         </div>
@@ -638,29 +669,25 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
           {/* Search */}
           <div className="relative flex-1 md:w-72 md:flex-none">
-            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar assistentes..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`pl-9 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}
+              className={`pl-9 bg-background border-border`}
             />
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className={`flex gap-1 p-1 rounded-lg mb-6 w-fit ${isDark ? 'bg-slate-800' : 'bg-gray-100'}`}>
+      <div className="flex gap-1 p-1 rounded-lg mb-6 w-fit bg-muted">
         <button
           onClick={() => setActiveTab('marketplace')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             activeTab === 'marketplace'
-              ? isDark
-                ? 'bg-slate-700 text-white'
-                : 'bg-white text-gray-900 shadow-sm'
-              : isDark
-                ? 'text-gray-400 hover:text-white'
-                : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <Sparkles className="w-4 h-4 inline-block mr-1.5" />
@@ -670,12 +697,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
           onClick={() => setActiveTab('connected')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             activeTab === 'connected'
-              ? isDark
-                ? 'bg-slate-700 text-white'
-                : 'bg-white text-gray-900 shadow-sm'
-              : isDark
-                ? 'text-gray-400 hover:text-white'
-                : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <Bot className="w-4 h-4 inline-block mr-1.5" />
@@ -699,7 +722,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 selectedCategory === cat
                   ? 'bg-blue-600 text-white'
                   : isDark
-                    ? 'bg-slate-800 text-gray-300 hover:bg-slate-700'
+                    ? 'bg-slate-800 text-muted-foreground hover:bg-muted hover:text-foreground'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -712,13 +735,13 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <Loader2 className={`w-8 h-8 animate-spin ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
       ) : activeTab === 'marketplace' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredAssistants.map(assistant => renderAssistantCard(assistant, true))}
           {filteredAssistants.length === 0 && (
-            <div className={`col-span-full text-center py-12 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+            <div className="col-span-full text-center py-12 text-muted-foreground">
               <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>Nenhum assistente encontrado</p>
             </div>
@@ -728,7 +751,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {userAssistants.map(ua => ua.assistant && renderAssistantCard(ua.assistant, false))}
           {userAssistants.length === 0 && (
-            <div className={`col-span-full text-center py-12 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+            <div className="col-span-full text-center py-12 text-muted-foreground">
               <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p className="mb-4">Você ainda não conectou nenhum assistente</p>
               <Button onClick={() => setActiveTab('marketplace')}>
@@ -743,9 +766,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       {/* Connect Modal - Multi-channel */}
       {connectModalOpen && selectedAssistant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className={`w-full max-w-md rounded-2xl shadow-2xl ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
-            <div className={`flex items-center justify-between p-4 border-b ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
-              <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <div className="w-full max-w-md rounded-2xl shadow-2xl bg-card border border-border">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h3 className="text-lg font-semibold text-foreground">
                 Conectar Assistente
               </h3>
               <button
@@ -754,7 +777,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   setSelectedAssistant(null);
                   setSelectedChannelIds([]);
                 }}
-                className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                className="p-2 rounded-lg transition-colors hover:bg-muted text-muted-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -762,7 +785,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
             <div className="p-4 space-y-4">
               {/* Assistant Info */}
-              <div className={`flex items-center gap-3 p-3 rounded-lg ${isDark ? 'bg-slate-800' : 'bg-gray-50'}`}>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
                 {(() => {
                   const IconComponent = ICON_MAP[selectedAssistant.icon] || Bot;
                   return (
@@ -775,10 +798,10 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   );
                 })()}
                 <div>
-                  <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  <p className="font-medium text-foreground">
                     {selectedAssistant.name}
                   </p>
-                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <p className="text-xs text-muted-foreground">
                     {selectedAssistant.short_description}
                   </p>
                 </div>
@@ -786,7 +809,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
               {/* Channel Selection - Multi-select with checkboxes */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-2 text-foreground">
                   Selecione os canais para conectar
                 </label>
                 
@@ -808,7 +831,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
                 
                 {channels.length === 0 ? (
-                  <div className={`text-center py-4 rounded-lg border-2 border-dashed ${isDark ? 'border-slate-700 text-gray-500' : 'border-gray-200 text-gray-400'}`}>
+                  <div className="text-center py-4 rounded-lg border-2 border-dashed border-border text-muted-foreground">
                     <Hash className="w-6 h-6 mx-auto mb-2 opacity-50" />
                     <p className="text-xs">Nenhum canal conectado</p>
                     <p className="text-[10px] mt-1">Conecte canais na página de configurações</p>
@@ -827,21 +850,19 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                               ? isDark
                                 ? 'bg-blue-900/30 border-blue-500/50 text-blue-400'
                                 : 'bg-blue-50 border-blue-300 text-blue-700'
-                              : isDark
-                                ? 'bg-slate-800 border-slate-700 hover:border-slate-600 text-gray-300'
-                                : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
+                              : 'bg-background border-border hover:border-muted-foreground/40 text-foreground'
                           }`}
                         >
                           <div className={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
                             isSelected
                               ? 'bg-blue-600 border-blue-600'
-                              : isDark ? 'border-slate-600' : 'border-gray-300'
+                              : 'border-border'
                           }`}>
                             {isSelected && <Check className="w-3 h-3 text-white" />}
                           </div>
                           {renderChannelIcon(channel.type)}
                           <span className="flex-1 text-sm font-medium">{channel.name || channel.type}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-700 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                             {channel.type}
                           </span>
                         </button>
@@ -849,13 +870,13 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     })}
                   </div>
                 )}
-                <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                <p className="text-xs mt-2 text-muted-foreground">
                   O assistente responderá nas caixas de entrada dos canais selecionados
                 </p>
               </div>
             </div>
 
-            <div className={`flex items-center justify-end gap-2 p-4 border-t ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-border">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -890,17 +911,18 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       {/* Config Modal */}
       {configModalOpen && selectedUserAssistant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className={`w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
-            <div className={`sticky top-0 z-10 flex items-center justify-between p-4 border-b ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
-              <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl bg-card border border-border">
+            <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-card border-border">
+              <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
                 Configurar {selectedUserAssistant.assistant?.name}
+                {configLoadingFresh && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
               </h3>
               <button
                 onClick={() => {
                   setConfigModalOpen(false);
                   setSelectedUserAssistant(null);
                 }}
-                className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                className="p-2 rounded-lg transition-colors hover:bg-muted text-muted-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -909,7 +931,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             <div className="p-4 space-y-4">
               {/* Channel Selection */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-2 text-foreground">
                   Canais conectados
                 </label>
                 <div className="space-y-2 max-h-36 overflow-y-auto">
@@ -925,13 +947,11 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                             ? isDark
                               ? 'bg-blue-900/30 border-blue-500/50 text-blue-400'
                               : 'bg-blue-50 border-blue-300 text-blue-700'
-                            : isDark
-                              ? 'bg-slate-800 border-slate-700 hover:border-slate-600 text-gray-300'
-                              : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
+                            : 'bg-background border-border hover:border-muted-foreground/40 text-foreground'
                         }`}
                       >
                         <div className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
-                          isSelected ? 'bg-blue-600 border-blue-600' : isDark ? 'border-slate-600' : 'border-gray-300'
+                          isSelected ? 'bg-blue-600 border-blue-600' : 'border-border'
                         }`}>
                           {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
@@ -945,133 +965,131 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
               {/* Greeting */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-2 text-foreground">
                   Mensagem de Boas-vindas
                 </label>
                 <textarea
                   value={configValues.greeting || ''}
                   onChange={(e) => setConfigValues({ ...configValues, greeting: e.target.value })}
                   rows={3}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                    isDark
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
                   placeholder="Ex: Olá! Como posso ajudar você hoje?"
                 />
               </div>
 
               {/* Instructions */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-2 text-foreground">
                   Instruções do Assistente
                 </label>
                 <textarea
                   value={configValues.instructions || ''}
                   onChange={(e) => setConfigValues({ ...configValues, instructions: e.target.value })}
                   rows={4}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                    isDark
-                      ? 'bg-slate-800 border-slate-700 text-white'
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
                   placeholder="Ex: Você é um assistente de vendas amigável que ajuda clientes a encontrar os melhores produtos..."
                 />
-                <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                <p className="text-xs mt-1 text-muted-foreground">
                   Descreva como o assistente deve se comportar e responder
                 </p>
               </div>
 
               {/* AI Configuration */}
-              <div className={`p-4 rounded-lg border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-blue-50/50 border-blue-200'}`}>
+              <div className="p-4 rounded-lg border bg-muted/30 border-border">
                 <div className="flex items-center gap-2 mb-3">
                   <Brain className={`w-4 h-4 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-                  <h4 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  <h4 className="text-sm font-semibold text-foreground">
                     Configuração de IA
                   </h4>
                 </div>
 
                 {/* AI Provider */}
                 <div className="mb-3">
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
                     Provedor de IA
                   </label>
-                  <select
+                  <Select
                     value={configValues.ai_provider || 'openai'}
-                    onChange={(e) => setConfigValues({ ...configValues, ai_provider: e.target.value, ai_model: '' })}
-                    className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                      isDark
-                        ? 'bg-slate-800 border-slate-600 text-white'
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
+                    onValueChange={(v) => setConfigValues({ ...configValues, ai_provider: v, ai_model: '' })}
                   >
-                    <option value="openai">OpenAI (ChatGPT)</option>
-                    <option value="gemini">Google Gemini</option>
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="openai">OpenAI (ChatGPT)</SelectItem>
+                      <SelectItem value="gemini">Google Gemini</SelectItem>
+                      <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* AI Model */}
                 <div className="mb-3">
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
                     Modelo
                   </label>
-                  <select
-                    value={configValues.ai_model || ''}
-                    onChange={(e) => setConfigValues({ ...configValues, ai_model: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                      isDark
-                        ? 'bg-slate-800 border-slate-600 text-white'
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
+                  <Select
+                    value={configValues.ai_model || '__default__'}
+                    onValueChange={(v) => setConfigValues({ ...configValues, ai_model: v === '__default__' ? '' : v })}
                   >
-                    {(configValues.ai_provider || 'openai') === 'openai' ? (
-                      <>
-                        <option value="">gpt-4o-mini (padrão)</option>
-                        <option value="gpt-4o">GPT-4o</option>
-                        <option value="gpt-4o-mini">GPT-4o Mini</option>
-                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="">gemini-2.0-flash (padrão)</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                      </>
-                    )}
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(configValues.ai_provider || 'openai') === 'openai' ? (
+                        <>
+                          <SelectItem value="__default__">gpt-4o-mini (padrão)</SelectItem>
+                          <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                          <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                          <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
+                          <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                        </>
+                      ) : configValues.ai_provider === 'anthropic' ? (
+                        <>
+                          <SelectItem value="__default__">claude-3-haiku (padrão)</SelectItem>
+                          <SelectItem value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</SelectItem>
+                          <SelectItem value="claude-3-haiku-20240307">Claude 3 Haiku</SelectItem>
+                          <SelectItem value="claude-3-opus-20240229">Claude 3 Opus</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="__default__">gemini-2.0-flash (padrão)</SelectItem>
+                          <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+                          <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
+                          <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* API Key */}
                 <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
                     API Key
                   </label>
                   <div className="relative">
-                    <Key className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                     <input
                       type={showApiKey ? 'text' : 'password'}
                       value={configValues.ai_api_key || ''}
                       onChange={(e) => setConfigValues({ ...configValues, ai_api_key: e.target.value })}
-                      placeholder={`Cole sua ${(configValues.ai_provider || 'openai') === 'openai' ? 'OpenAI' : 'Google'} API Key`}
-                      className={`w-full pl-9 pr-10 py-2 rounded-lg border text-sm ${
-                        isDark
-                          ? 'bg-slate-800 border-slate-600 text-white placeholder:text-gray-500'
-                          : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400'
-                      }`}
+                      placeholder={`Cole sua ${configValues.ai_provider === 'anthropic' ? 'Anthropic' : (configValues.ai_provider || 'openai') === 'openai' ? 'OpenAI' : 'Google'} API Key`}
+                      className="w-full pl-9 pr-10 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
                     />
                     <button
                       type="button"
                       onClick={() => setShowApiKey(!showApiKey)}
-                      className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
-                  <p className={`text-[10px] mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  <p className="text-[10px] mt-1 text-muted-foreground">
                     {(configValues.ai_provider || 'openai') === 'openai'
                       ? 'Obtenha em platform.openai.com/api-keys'
+                      : configValues.ai_provider === 'anthropic'
+                      ? 'Obtenha em console.anthropic.com/settings/keys'
                       : 'Obtenha em aistudio.google.com/apikey'}
                   </p>
                 </div>
@@ -1079,70 +1097,142 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
               {/* Business Hours */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-2 text-foreground">
                   Horário de Funcionamento
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Início</label>
+                    <label className="text-xs text-muted-foreground">Início</label>
                     <input
                       type="time"
                       value={configValues.business_hours_start || '09:00'}
                       onChange={(e) => setConfigValues({ ...configValues, business_hours_start: e.target.value })}
-                      className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                        isDark
-                          ? 'bg-slate-800 border-slate-700 text-white'
-                          : 'bg-white border-gray-300 text-gray-900'
-                      }`}
+                      className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
+                      style={{ colorScheme: isDark ? 'dark' : 'light' }}
                     />
                   </div>
                   <div>
-                    <label className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Fim</label>
+                    <label className="text-xs text-muted-foreground">Fim</label>
                     <input
                       type="time"
                       value={configValues.business_hours_end || '18:00'}
                       onChange={(e) => setConfigValues({ ...configValues, business_hours_end: e.target.value })}
-                      className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                        isDark
-                          ? 'bg-slate-800 border-slate-700 text-white'
-                          : 'bg-white border-gray-300 text-gray-900'
-                      }`}
+                      className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
+                      style={{ colorScheme: isDark ? 'dark' : 'light' }}
                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* Memory & Context Window */}
+              <div className="p-4 rounded-lg border bg-muted/30 border-border">
+                <div className="flex items-center gap-2 mb-4">
+                  <History className={`w-4 h-4 ${isDark ? 'text-purple-400' : 'text-purple-600'}`} />
+                  <h4 className="text-sm font-semibold text-foreground">Memória & Contexto</h4>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Context Window toggle */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">Janela de contexto</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Lembrar da última conversa ao iniciar uma nova sessão
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!configValues.context_window_enabled}
+                      onClick={() => setConfigValues({ ...configValues, context_window_enabled: !configValues.context_window_enabled })}
+                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                      style={{ width: 44, height: 24, background: configValues.context_window_enabled ? '#2563eb' : '#6b7280' }}
+                    >
+                      <span
+                        className="inline-block rounded-full bg-white shadow transition-transform"
+                        style={{ width: 18, height: 18, transform: configValues.context_window_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                      />
+                    </button>
+                  </div>
+
+                  {configValues.context_window_enabled && (
+                    <div className="pl-0">
+                      <label className="text-xs text-muted-foreground">
+                        Mensagens anteriores a incluir no contexto
+                      </label>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <input
+                          type="number"
+                          min={4}
+                          max={30}
+                          value={configValues.context_window_messages}
+                          onChange={(e) => setConfigValues({
+                            ...configValues,
+                            context_window_messages: Math.min(30, Math.max(4, Number(e.target.value) || 10))
+                          })}
+                          className="w-20 px-3 py-1.5 rounded-lg border text-sm bg-background border-border text-foreground"
+                        />
+                        <span className="text-xs text-muted-foreground">mensagens (4 – 30)</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Long-term memory toggle */}
+                  <div className="flex items-start justify-between gap-4 pt-3 border-t border-border">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">Memória de longo prazo</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Construir perfil do contato ao longo do tempo
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!configValues.memory_enabled}
+                      onClick={() => setConfigValues({ ...configValues, memory_enabled: !configValues.memory_enabled })}
+                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                      style={{ width: 44, height: 24, background: configValues.memory_enabled ? '#2563eb' : '#6b7280' }}
+                    >
+                      <span
+                        className="inline-block rounded-full bg-white shadow transition-transform"
+                        style={{ width: 18, height: 18, transform: configValues.memory_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                      />
+                    </button>
                   </div>
                 </div>
               </div>
 
               {/* Stats */}
               {selectedUserAssistant.stats && (
-                <div className={`p-3 rounded-lg ${isDark ? 'bg-slate-800' : 'bg-gray-50'}`}>
-                  <h4 className={`text-sm font-medium mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <div className="p-3 rounded-lg bg-muted">
+                  <h4 className="text-sm font-medium mb-2 text-foreground">
                     Estatísticas
                   </h4>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="text-center">
-                      <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      <p className="text-lg font-bold text-foreground">
                         {selectedUserAssistant.stats.conversations || 0}
                       </p>
-                      <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Conversas</p>
+                      <p className="text-xs text-muted-foreground">Conversas</p>
                     </div>
                     <div className="text-center">
-                      <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      <p className="text-lg font-bold text-foreground">
                         {selectedUserAssistant.stats.messages_received || 0}
                       </p>
-                      <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Recebidas</p>
+                      <p className="text-xs text-muted-foreground">Recebidas</p>
                     </div>
                     <div className="text-center">
-                      <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      <p className="text-lg font-bold text-foreground">
                         {selectedUserAssistant.stats.messages_sent || 0}
                       </p>
-                      <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Enviadas</p>
+                      <p className="text-xs text-muted-foreground">Enviadas</p>
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className={`sticky bottom-0 flex items-center justify-end gap-2 p-4 border-t ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
+            <div className="sticky bottom-0 flex items-center justify-end gap-2 p-4 border-t bg-card border-border">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1172,9 +1262,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       {/* Create/Edit Assistant Modal */}
       {createModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className={`w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl shadow-2xl ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
-            <div className={`sticky top-0 z-10 flex items-center justify-between p-4 border-b ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
-              <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl shadow-2xl bg-card border border-border">
+            <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-card border-border">
+              <h3 className="text-lg font-semibold text-foreground">
                 {editingAssistantId ? 'Editar Assistente' : 'Criar Assistente'}
               </h3>
               <button
@@ -1182,7 +1272,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   setCreateModalOpen(false);
                   resetCreateForm();
                 }}
-                className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                className="p-2 rounded-lg transition-colors hover:bg-muted text-muted-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1191,29 +1281,27 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             <div className="p-4 space-y-4">
               {/* Name */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-2 text-foreground">
                   Nome *
                 </label>
                 <Input
                   value={createForm.name}
                   onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Ex: Assistente de Vendas"
-                  className={isDark ? 'bg-slate-800 border-slate-700' : ''}
+                  className="bg-background border-border"
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-2 text-foreground">
                   Descrição
                 </label>
                 <textarea
                   value={createForm.description || ''}
                   onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
                   rows={2}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                    isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
                   placeholder="Descrição detalhada do assistente..."
                 />
               </div>
@@ -1221,7 +1309,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               {/* Icon and Color */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-2 text-foreground">
                     Ícone
                   </label>
                   <div className="grid grid-cols-4 gap-2">
@@ -1235,7 +1323,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                           className={`p-2 rounded-lg border transition-colors flex items-center justify-center ${
                             createForm.icon === opt.value
                               ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                              : isDark ? 'border-slate-700 hover:border-slate-600' : 'border-gray-200 hover:border-gray-300'
+                              : 'border-border hover:border-muted-foreground/50'
                           }`}
                           title={opt.label}
                         >
@@ -1246,7 +1334,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   </div>
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-2 text-foreground">
                     Cor
                   </label>
                   <div className="grid grid-cols-5 gap-2">
@@ -1267,42 +1355,38 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
               {/* Greeting */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-2 text-foreground">
                   Mensagem de Boas-vindas
                 </label>
                 <textarea
                   value={createForm.greeting || ''}
                   onChange={(e) => setCreateForm(prev => ({ ...prev, greeting: e.target.value }))}
                   rows={2}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                    isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
                   placeholder="Ex: Olá! Como posso ajudar você hoje?"
                 />
               </div>
 
               {/* Instructions */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-2 text-foreground">
                   Instruções / Prompt
                 </label>
                 <textarea
                   value={createForm.instructions || ''}
                   onChange={(e) => setCreateForm(prev => ({ ...prev, instructions: e.target.value }))}
                   rows={4}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                    isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900'
-                  }`}
+                  className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
                   placeholder="Descreva como o assistente deve se comportar, que tipo de perguntas deve responder, tom de voz, etc..."
                 />
-                <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                <p className="text-xs mt-1 text-muted-foreground">
                   Estas instruções definem o comportamento do assistente nas conversas
                 </p>
               </div>
 
               {/* Features */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-2 text-foreground">
                   Funcionalidades
                 </label>
                 <div className="flex gap-2 mb-2">
@@ -1310,7 +1394,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     value={newFeature}
                     onChange={(e) => setNewFeature(e.target.value)}
                     placeholder="Ex: Qualificação de leads"
-                    className={`flex-1 ${isDark ? 'bg-slate-800 border-slate-700' : ''}`}
+                    className="flex-1 bg-background border-border"
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFeature())}
                   />
                   <Button variant="outline" size="sm" onClick={addFeature} disabled={(createForm.features?.length || 0) >= 8}>
@@ -1321,9 +1405,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   {(createForm.features || []).map((feature, idx) => (
                     <span
                       key={idx}
-                      className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
-                        isDark ? 'bg-slate-700 text-gray-300' : 'bg-gray-100 text-gray-600'
-                      }`}
+                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground"
                     >
                       {feature}
                       <button onClick={() => removeFeature(idx)} className="hover:text-red-500">
@@ -1335,7 +1417,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               </div>
             </div>
 
-            <div className={`sticky bottom-0 flex items-center justify-end gap-2 p-4 border-t ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
+            <div className="sticky bottom-0 flex items-center justify-end gap-2 p-4 border-t bg-card border-border">
               <Button
                 variant="outline"
                 onClick={() => {

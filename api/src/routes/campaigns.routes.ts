@@ -8,6 +8,7 @@ import { ConversationsService } from '../services/conversations.service';
 import { ChannelsService } from '../services/channels.service';
 import { getWebSocketService } from '../services/websocket.service';
 import { query } from '../database/connection';
+import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 
 const router = Router();
 const campaignsService = new CampaignsService();
@@ -586,6 +587,18 @@ router.post('/:id/execute', async (req, res, next) => {
 
     console.log(`[Campaigns Execute] ${leads.length} leads encontrados para envio`);
 
+    // ── Verifica limite de mensagens em massa ─────────────────────────────
+    const massCheck = await checkMessageLimit(user.id, 'massMessages');
+    if (!massCheck.allowed) {
+      return res.status(403).json({
+        error: 'plan_limit_exceeded',
+        code: massCheck.code,
+        message: massCheck.message,
+        current: massCheck.current,
+        limit: massCheck.limit,
+      });
+    }
+
     // 4. Atualizar status da campanha para 'active'
     await query(
       `UPDATE campaigns
@@ -659,6 +672,21 @@ async function executeCampaignMessages(
 
   for (let i = 0; i < leads.length; i++) {
     const lead = leads[i];
+
+    // ── Verifica limite a cada 10 mensagens (e na primeira) para não bloquear o loop inteiro ──
+    if (i === 0 || i % 10 === 0) {
+      const midCheck = await checkMessageLimit(userId, 'massMessages');
+      if (!midCheck.allowed) {
+        console.warn(`[Campaigns Execute] Limite de mensagens em massa atingido a ${i}/${leads.length}. Parando campanha.`);
+        stats.errors.push('Limite de mensagens em massa do plano atingido. Campanha pausada.');
+        // Marcar campanha como pausada por limite
+        await query(
+          `UPDATE campaigns SET status = 'paused', stats = $1, updated_at = NOW() WHERE id = $2`,
+          [JSON.stringify({ ...stats, pausedReason: 'MASS_MESSAGE_LIMIT_EXCEEDED' }), campaign.id]
+        );
+        return;
+      }
+    }
 
     try {
       // Obter telefone do lead

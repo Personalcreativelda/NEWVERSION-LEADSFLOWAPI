@@ -233,8 +233,14 @@ async function apiCall(
         throw new Error('Sessão expirada. Faça login novamente.');
       }
 
-      // Plan enforcement: plan expired, payment overdue, or lead limit exceeded
-      const ENFORCEMENT_CODES = ['PLAN_EXPIRED', 'PAYMENT_OVERDUE', 'LEAD_LIMIT_EXCEEDED'];
+      // Plan enforcement: plan expired, payment overdue, or any limit exceeded
+      const ENFORCEMENT_CODES = [
+        'PLAN_EXPIRED',
+        'PAYMENT_OVERDUE',
+        'LEAD_LIMIT_EXCEEDED',
+        'MESSAGE_LIMIT_EXCEEDED',
+        'MASS_MESSAGE_LIMIT_EXCEEDED',
+      ];
       if (response.status === 403 && data?.code && ENFORCEMENT_CODES.includes(data.code)) {
         window.dispatchEvent(
           new CustomEvent('plan-enforcement-blocked', {
@@ -876,8 +882,11 @@ export const plansApi = {
     return apiCall('/plans/cancel', { method: 'POST' }, true);
   },
 
-  syncActiveSubscription: async () => {
-    return apiCall('/plans/sync-active-subscription', { method: 'POST' }, true);
+  syncActiveSubscription: async (planHint?: string) => {
+    return apiCall('/plans/sync-active-subscription', {
+      method: 'POST',
+      body: planHint ? JSON.stringify({ planHint }) : undefined,
+    }, true);
   },
 
   createPortalSession: async () => {

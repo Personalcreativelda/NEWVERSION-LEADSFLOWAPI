@@ -666,19 +666,36 @@ export class AssistantsService {
         );
 
         // Atualizar estatísticas
-        await query(
-            `UPDATE user_assistants
-             SET stats = jsonb_set(
-                 jsonb_set(
+        // conversations e messages_received: sempre incrementa (1 interação = 1 mensagem recebida)
+        // messages_sent: só incrementa se foi enviado com sucesso
+        const isSuccess = (data.status || 'success') === 'success' && !!data.message_out;
+        if (isSuccess) {
+            await query(
+                `UPDATE user_assistants
+                 SET stats = jsonb_set(
+                     jsonb_set(
+                         jsonb_set(stats, '{conversations}', ((stats->>'conversations')::int + 1)::text::jsonb),
+                         '{messages_received}', ((stats->>'messages_received')::int + 1)::text::jsonb
+                     ),
+                     '{messages_sent}', ((stats->>'messages_sent')::int + 1)::text::jsonb
+                 ),
+                 last_triggered_at = NOW()
+                 WHERE id = $1`,
+                [data.user_assistant_id]
+            );
+        } else {
+            // Erro: incrementa só conversations e received, não sent
+            await query(
+                `UPDATE user_assistants
+                 SET stats = jsonb_set(
                      jsonb_set(stats, '{conversations}', ((stats->>'conversations')::int + 1)::text::jsonb),
                      '{messages_received}', ((stats->>'messages_received')::int + 1)::text::jsonb
                  ),
-                 '{messages_sent}', ((stats->>'messages_sent')::int + 1)::text::jsonb
-             ),
-             last_triggered_at = NOW()
-             WHERE id = $1`,
-            [data.user_assistant_id]
-        );
+                 last_triggered_at = NOW()
+                 WHERE id = $1`,
+                [data.user_assistant_id]
+            );
+        }
 
         return result.rows[0];
     }

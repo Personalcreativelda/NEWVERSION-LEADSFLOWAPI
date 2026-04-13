@@ -4,6 +4,8 @@ import { query } from '../database/connection';
 import { AIService, type AIMessage, type AIProvider } from './ai.service';
 import { AssistantsService } from './assistants.service';
 import { WhatsAppService } from './whatsapp.service';
+import { getWebSocketService } from './websocket.service';
+import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 
 const aiService = new AIService();
 const assistantsService = new AssistantsService();
@@ -75,11 +77,18 @@ export class AssistantProcessorService {
 
             console.log(`[AssistantProcessor] Resposta gerada em ${responseTime}ms (${aiResponse.tokensUsed} tokens)`);
 
-            // 6. Enviar resposta pelo canal
-            await this.sendReply(ctx, aiResponse.content);
+            // ── Verificar limite de mensagens individuais antes de enviar ──
+            const msgCheck = await checkMessageLimit(ctx.userId, 'messages');
+            if (!msgCheck.allowed) {
+                console.warn(`[AssistantProcessor] Limite de mensagens individuais atingido para user ${ctx.userId}. Resposta da IA não enviada.`);
+                return false;
+            }
 
-            // 7. Salvar mensagem de resposta no banco
-            await this.saveOutgoingMessage(ctx, aiResponse.content);
+            // 6. Enviar resposta pelo canal (capturar externalId para dedup no webhook)
+            const externalMsgId = await this.sendReply(ctx, aiResponse.content);
+
+            // 7. Salvar mensagem de resposta no banco (com external_id para evitar duplicata via webhook)
+            await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId);
 
             // 8. Registrar log do assistente
             try {
@@ -207,17 +216,24 @@ export class AssistantProcessorService {
         const config = assistant.config || {};
         const defaultConfig = assistant.default_config || {};
         const instructions = config.instructions || defaultConfig.instructions || '';
-        const greeting = config.greeting || defaultConfig.greeting || '';
         const memoryEnabled = config.memory_enabled !== false; // padrão: ativado
 
-        // System prompt base
+        // Buscar histórico da conversa.
+        // A mensagem atual JÁ foi salva no banco antes do processor ser chamado,
+        // portanto ela aparece como último item em `rawHistory`.
+        // Usamos slice(0,-1) para removê-la e adicioná-la via ctx.messageContent no final.
+        const rawHistory = await aiService.getConversationHistory(ctx.conversationId, 21);
+        const history = rawHistory.slice(0, -1);
+
+        console.log(`[AssistantProcessor] 📜 Histórico carregado: ${rawHistory.length} msgs totais, ${history.length} no contexto (conversa=${ctx.conversationId})`);
+
+        // System prompt: 100% controlado pelas instruções do usuário.
+        // Saudações, tom, comportamento inicial e final — tudo definido no prompt.
         let systemPrompt = instructions;
         if (!systemPrompt) {
             systemPrompt = `Você é ${assistant.assistant_name}, um assistente virtual inteligente. Responda de forma educada, profissional e útil.`;
         }
-        if (greeting && !systemPrompt.includes(greeting)) {
-            systemPrompt += `\n\nMensagem de boas-vindas: "${greeting}"`;
-        }
+
         systemPrompt += '\n\nResponda sempre no mesmo idioma do cliente. Mantenha respostas concisas e diretas.';
 
         // Injetar memória de longo prazo no system prompt
@@ -255,11 +271,44 @@ export class AssistantProcessorService {
             { role: 'system', content: systemPrompt }
         ];
 
-        // Buscar histórico da conversa atual (curto prazo - 20 mensagens)
-        const history = await aiService.getConversationHistory(ctx.conversationId, 20);
+        // history já foi buscado acima (antes do system prompt) — reutilizar
+
+        // ── Janela de contexto cross-sessão ──────────────────────────────────────
+        // Quando a conversa atual é nova (poucas mensagens), injetar o trecho final
+        // da última sessão com este contato para manter continuidade natural.
+        const contextWindowEnabled = config.context_window_enabled !== false; // padrão: ativo
+        const contextWindowSize = Math.min(Math.max(Number(config.context_window_messages) || 10, 4), 30);
+
+        if (contextWindowEnabled && ctx.remoteJid && history.length < 5) {
+            try {
+                const crossCtx = await aiService.getCrossConversationContext(
+                    ctx.userId, ctx.remoteJid, ctx.conversationId, contextWindowSize
+                );
+                if (crossCtx.messages.length > 0) {
+                    const dateStr = crossCtx.lastSessionDate
+                        ? new Date(crossCtx.lastSessionDate).toLocaleDateString('pt-BR')
+                        : 'sessão anterior';
+
+                    let ctxBlock = `\n\n---\n[JANELA DE CONTEXTO — Retomando conversa de ${dateStr}]`;
+                    ctxBlock += '\n(Trecho recente da última sessão com este contato — use para manter continuidade)\n';
+                    for (const m of crossCtx.messages) {
+                        const prefix = m.role === 'user' ? 'Contato' : 'Você';
+                        ctxBlock += `${prefix}: ${m.content.substring(0, 300).replace(/\n/g, ' ')}\n`;
+                    }
+                    ctxBlock += '[Fim do contexto anterior — esta é uma nova sessão]\n---';
+
+                    messages[0].content += ctxBlock;
+                    console.log(`[AssistantProcessor] 🪟 Janela de contexto: ${crossCtx.messages.length} msgs de sessão anterior (${dateStr})`);
+                }
+            } catch (ctxErr: any) {
+                console.warn('[AssistantProcessor] Falha ao carregar janela de contexto:', ctxErr.message);
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+
         messages.push(...history);
 
-        // Mensagem atual
+        // Adicionar mensagem atual (NÃO está em `history` pois fizemos slice(0,-1))
         messages.push({ role: 'user', content: ctx.messageContent });
 
         return messages;
@@ -267,8 +316,9 @@ export class AssistantProcessorService {
 
     /**
      * Envia resposta pelo canal correto
+     * Retorna o external_id da mensagem enviada (para dedup no webhook Evolution)
      */
-    private async sendReply(ctx: IncomingMessageContext, text: string): Promise<void> {
+    private async sendReply(ctx: IncomingMessageContext, text: string): Promise<string | null> {
         let credentials = ctx.credentials || {};
         // Safe-parse se credentials vier como string
         if (typeof credentials === 'string') {
@@ -291,11 +341,12 @@ export class AssistantProcessorService {
 
                 let lastError: any = null;
                 let sent = false;
+                let lastSentResult: any = null;
 
                 for (const numberFormat of numberFormats) {
                     try {
                         console.log(`[AssistantProcessor] Tentando enviar para: ${numberFormat} (instance: ${instanceId})`);
-                        await whatsappService.sendMessage({
+                        lastSentResult = await whatsappService.sendMessage({
                             instanceId,
                             number: numberFormat,
                             text
@@ -312,7 +363,9 @@ export class AssistantProcessorService {
                 if (!sent) {
                     throw lastError || new Error('Falha ao enviar mensagem WhatsApp em todos os formatos');
                 }
-                break;
+                // Tentar extrair o ID da mensagem enviada (Evolution API retorna key.id)
+                const sentResult = lastSentResult as any;
+                return sentResult?.key?.id || sentResult?.id || null;
             }
 
             case 'whatsapp_cloud': {
@@ -322,7 +375,7 @@ export class AssistantProcessorService {
                     throw new Error('Sem credenciais para WhatsApp Cloud API');
                 }
                 await this.sendWhatsAppCloudMessage(phoneNumberId, accessToken, ctx.contactPhone, text);
-                break;
+                return null;
             }
 
             case 'telegram': {
@@ -332,7 +385,7 @@ export class AssistantProcessorService {
                     throw new Error('Sem credenciais para Telegram');
                 }
                 await this.sendTelegramMessage(botToken, chatId, text);
-                break;
+                return null;
             }
 
             case 'instagram': {
@@ -342,7 +395,7 @@ export class AssistantProcessorService {
                     throw new Error('Sem credenciais para Instagram');
                 }
                 await this.sendInstagramMessage(accessToken, recipientId, text);
-                break;
+                return null;
             }
 
             case 'facebook': {
@@ -352,27 +405,31 @@ export class AssistantProcessorService {
                     throw new Error('Sem credenciais para Facebook Messenger');
                 }
                 await this.sendFacebookMessage(accessToken, recipientId, text);
-                break;
+                return null;
             }
 
             default:
                 console.warn(`[AssistantProcessor] Canal ${ctx.channelType} não suportado para resposta automática`);
+                return null;
         }
     }
 
     /**
      * Salva mensagem de saída no banco
+     * externalId: ID da mensagem retornado pela Evolution API (para dedup no webhook)
      */
-    private async saveOutgoingMessage(ctx: IncomingMessageContext, content: string): Promise<void> {
+    private async saveOutgoingMessage(ctx: IncomingMessageContext, content: string, externalId?: string | null): Promise<void> {
         try {
-            await query(
-                `INSERT INTO messages (user_id, conversation_id, direction, channel, content, status, metadata)
-                 VALUES ($1, $2, 'out', $3, $4, 'sent', $5)`,
+            const result = await query(
+                `INSERT INTO messages (user_id, conversation_id, direction, channel, content, status, external_id, metadata)
+                 VALUES ($1, $2, 'out', $3, $4, 'sent', $5, $6)
+                 RETURNING *`,
                 [
                     ctx.userId,
                     ctx.conversationId,
                     ctx.channelType,
                     content,
+                    externalId || null,
                     JSON.stringify({ source: 'ai_assistant', automated: true })
                 ]
             );
@@ -382,6 +439,23 @@ export class AssistantProcessorService {
                 `UPDATE conversations SET last_message_at = NOW(), updated_at = NOW() WHERE id = $1`,
                 [ctx.conversationId]
             );
+
+            // Emitir WebSocket para atualização em tempo real no dashboard
+            const savedMessage = result.rows[0];
+            if (savedMessage) {
+                try {
+                    const wsService = getWebSocketService();
+                    if (wsService) {
+                        wsService.emitNewMessage(ctx.userId, {
+                            conversationId: ctx.conversationId,
+                            message: savedMessage,
+                        });
+                        console.log(`[AssistantProcessor] WebSocket emitido para mensagem da IA: ${savedMessage.id}`);
+                    }
+                } catch (wsErr: any) {
+                    console.warn('[AssistantProcessor] Falha ao emitir WebSocket (não crítico):', wsErr.message);
+                }
+            }
         } catch (err: any) {
             console.error('[AssistantProcessor] Erro ao salvar mensagem:', err.message);
         }

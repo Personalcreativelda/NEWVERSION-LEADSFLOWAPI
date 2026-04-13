@@ -6,6 +6,7 @@ import { ChannelsService } from '../services/channels.service';
 import { ConversationsService } from '../services/conversations.service';
 import { MessagesService } from '../services/messages.service';
 import { query } from '../database/connection';
+import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 
 const router = Router();
 const whatsappService = new WhatsAppService();
@@ -51,6 +52,18 @@ router.post('/send', async (req, res, next) => {
 
     if (!phone || !message) {
       return res.status(400).json({ error: 'Phone and message are required' });
+    }
+
+    // ── Verifica limite de mensagens individuais ──────────────────────────
+    const msgCheck = await checkMessageLimit(user.id, 'messages');
+    if (!msgCheck.allowed) {
+      return res.status(403).json({
+        error: 'plan_limit_exceeded',
+        code: msgCheck.code,
+        message: msgCheck.message,
+        current: msgCheck.current,
+        limit: msgCheck.limit,
+      });
     }
 
     // Get instance and channel to use

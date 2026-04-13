@@ -17,6 +17,8 @@ const TITLES: Record<string, string> = {
   PLAN_EXPIRED: 'Plano Expirado',
   PAYMENT_OVERDUE: 'Pagamento em Atraso',
   LEAD_LIMIT_EXCEEDED: 'Limite de Leads Atingido',
+  MESSAGE_LIMIT_EXCEEDED: 'Limite de Mensagens Atingido',
+  MASS_MESSAGE_LIMIT_EXCEEDED: 'Limite de Campanhas Atingido',
 };
 
 export default function PlanEnforcementModal({
@@ -32,7 +34,7 @@ export default function PlanEnforcementModal({
   if (!code) return null;
 
   const isExpiredOrOverdue = code === 'PLAN_EXPIRED' || code === 'PAYMENT_OVERDUE';
-  const isLimitExceeded = code === 'LEAD_LIMIT_EXCEEDED';
+  const isLimitExceeded = code === 'LEAD_LIMIT_EXCEEDED' || code === 'MESSAGE_LIMIT_EXCEEDED' || code === 'MASS_MESSAGE_LIMIT_EXCEEDED';
   const hasPaidPlan = currentPlan !== 'free';
 
   const handlePortal = async () => {

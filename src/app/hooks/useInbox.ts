@@ -17,6 +17,7 @@ export function useInbox(options: UseInboxOptions = {}) {
     const { onlyWithHistory = false, enablePolling = true } = options;
     const [selectedConversation, setSelectedConversation] = useState<ConversationWithDetails | null>(null);
     const refreshConversationsRef = useRef<() => void>(() => {});
+    const refreshMessagesRef = useRef<() => void>(() => {});
 
     // Função para tocar som
     const playNotificationSound = useCallback(() => {
@@ -64,6 +65,11 @@ export function useInbox(options: UseInboxOptions = {}) {
         refreshMessages,
         scrollToBottom
     } = useMessages(selectedConversation?.id || null);
+
+    // Manter referência atualizada para refreshMessages (deve vir após useMessages)
+    useEffect(() => {
+        refreshMessagesRef.current = refreshMessages;
+    }, [refreshMessages]);
 
     // WebSocket integration
     const {
@@ -115,10 +121,12 @@ export function useInbox(options: UseInboxOptions = {}) {
             }
         }, [selectedConversation?.id, updateConversation]),
 
-        // Callback quando WebSocket reconecta - atualizar conversas
+        // Callback quando WebSocket reconecta - atualizar conversas e mensagens da conversa atual
         onReconnect: useCallback(() => {
-            console.log('[useInbox] WebSocket reconectado - atualizando conversas');
+            console.log('[useInbox] WebSocket reconectado - atualizando conversas e mensagens');
             refreshConversationsRef.current();
+            // Recarregar mensagens da conversa atual para recuperar mensagens perdidas durante desconexão
+            refreshMessagesRef.current();
         }, [])
     });
 
@@ -148,6 +156,8 @@ export function useInbox(options: UseInboxOptions = {}) {
 
         try {
             await sendMessage(content, mediaUrl, mediaType);
+            // Notify App-level usage counters to refresh after a message is sent
+            window.dispatchEvent(new CustomEvent('message-sent'));
         } catch (error) {
             console.error('[useInbox] Erro ao enviar mensagem:', error);
             throw error;

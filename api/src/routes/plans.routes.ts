@@ -570,6 +570,11 @@ router.post('/sync-active-subscription', requireAuth, async (req: AuthenticatedR
       return res.status(400).json({ synced: false, reason: 'Stripe not configured' });
     }
 
+    // planHint: sent by the frontend from the ?plan= URL param after Stripe redirect.
+    // Used as a safe fallback when the DB price-ID mapping is not yet configured.
+    // Only applied when we can confirm an active Stripe subscription exists.
+    const planHint = (req.body?.planHint as string | undefined)?.toLowerCase?.() || null;
+
     const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-03-25.dahlia' });
 
     // Get current user row to find stripe identifiers
@@ -582,30 +587,64 @@ router.post('/sync-active-subscription', requireAuth, async (req: AuthenticatedR
 
     let stripeCustomerId: string | null = user.stripe_customer_id || null;
 
-    // Look up Stripe customer by email if we don't have an ID yet
-    if (!stripeCustomerId) {
+    // Helper: lookup customer by email (used as fallback)
+    const lookupByEmail = async (): Promise<string | null> => {
       try {
         const customers = await stripe.customers.list({ email: user.email, limit: 1 });
         if (customers.data.length > 0) {
-          stripeCustomerId = customers.data[0].id;
-          await query('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [stripeCustomerId, user.id]);
+          const id = customers.data[0].id;
+          await query('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [id, user.id]);
+          return id;
         }
       } catch (e) {
         console.warn('[Sync] Customer lookup by email failed:', e);
       }
+      return null;
+    };
+
+    // Look up Stripe customer by email if we don't have an ID yet
+    if (!stripeCustomerId) {
+      stripeCustomerId = await lookupByEmail();
     }
 
     if (!stripeCustomerId) {
       return res.json({ synced: false, reason: 'No Stripe customer found for this account' });
     }
 
-    // Get all active/trialing subscriptions for this customer
-    const subscriptions = await stripe.subscriptions.list({
-      customer: stripeCustomerId,
-      status: 'active',
-      limit: 5,
-      expand: ['data.items.data.price', 'data.default_payment_method'],
-    });
+    // Get all active/trialing subscriptions for this customer.
+    // If the stored customer ID is from a different Stripe mode (live vs test),
+    // Stripe returns a "similar object exists in live mode" error — clear and re-lookup by email.
+    let subscriptions: Awaited<ReturnType<typeof stripe.subscriptions.list>>;
+    try {
+      subscriptions = await stripe.subscriptions.list({
+        customer: stripeCustomerId,
+        status: 'active',
+        limit: 5,
+        expand: ['data.items.data.price', 'data.default_payment_method'],
+      });
+    } catch (stripeErr: any) {
+      const isModeMismatch =
+        stripeErr?.code === 'resource_missing' ||
+        (typeof stripeErr?.message === 'string' &&
+          stripeErr.message.includes('similar object exists in live mode'));
+      if (isModeMismatch) {
+        console.warn('[Sync] Stored stripe_customer_id belongs to a different Stripe mode — clearing and re-looking up by email.');
+        // Clear the stale live-mode customer ID and also clear stale subscription ID
+        await query('UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL WHERE id = $1', [user.id]);
+        stripeCustomerId = await lookupByEmail();
+        if (!stripeCustomerId) {
+          return res.json({ synced: false, reason: 'No Stripe customer found for this account in current mode (test/live mismatch cleared)' });
+        }
+        subscriptions = await stripe.subscriptions.list({
+          customer: stripeCustomerId,
+          status: 'active',
+          limit: 5,
+          expand: ['data.items.data.price', 'data.default_payment_method'],
+        });
+      } else {
+        throw stripeErr;
+      }
+    }
 
     if (!subscriptions.data.length) {
       return res.json({ synced: false, reason: 'No active Stripe subscriptions found' });
@@ -635,6 +674,19 @@ router.post('/sync-active-subscription', requireAuth, async (req: AuthenticatedR
     }
 
     if (!resolvedPlanId) {
+      // Last fallback: use planHint from the ?plan= URL param (passed by frontend after Stripe redirect).
+      // Safe because we already confirmed an active Stripe subscription exists above.
+      if (planHint) {
+        const hintValid = await plansService.validatePlanId(planHint);
+        if (hintValid) {
+          resolvedPlanId = planHint;
+          console.log(`[Sync] Price ${priceId} not mapped in DB — using planHint "${planHint}" from checkout URL`);
+        }
+      }
+    }
+
+    if (!resolvedPlanId) {
+      console.error(`[Sync] Could not map Stripe price ${priceId} to any plan. Configure stripe_price_*_id on the plans table or set price IDs via env vars.`);
       return res.json({ synced: false, reason: `Could not map price ${priceId} to a plan` });
     }
 

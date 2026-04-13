@@ -1,7 +1,7 @@
 // Serviço de IA - suporta OpenAI e Gemini
 import { query } from '../database/connection';
 
-export type AIProvider = 'openai' | 'gemini';
+export type AIProvider = 'openai' | 'gemini' | 'anthropic';
 
 export interface AIMessage {
     role: 'system' | 'user' | 'assistant';
@@ -42,8 +42,61 @@ export class AIService {
             return this.callOpenAI(messages, apiKey, model || 'gpt-4o-mini');
         } else if (provider === 'gemini') {
             return this.callGemini(messages, apiKey, model || 'gemini-2.0-flash');
+        } else if (provider === 'anthropic') {
+            return this.callAnthropic(messages, apiKey, model || 'claude-3-haiku-20240307');
         }
         throw new Error(`Provedor de IA não suportado: ${provider}`);
+    }
+
+    /**
+     * Chama a API da Anthropic (Claude)
+     */
+    private async callAnthropic(messages: AIMessage[], apiKey: string, model: string): Promise<AIResponse> {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+        // Separar system prompt das mensagens de chat
+        const systemContent = messages.find(m => m.role === 'system')?.content || '';
+        const chatMessages = messages
+            .filter(m => m.role !== 'system')
+            .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+        try {
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                },
+                body: JSON.stringify({
+                    model,
+                    max_tokens: 1024,
+                    ...(systemContent ? { system: systemContent } : {}),
+                    messages: chatMessages,
+                }),
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`Anthropic API error ${response.status}: ${errorData}`);
+            }
+
+            const data = await response.json();
+            const text = data.content?.[0]?.text || '';
+            const tokensUsed = (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0);
+
+            return { content: text, tokensUsed, provider: 'anthropic', model };
+        } catch (error: any) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('Anthropic API timeout (30s)');
+            }
+            throw error;
+        }
     }
 
     /**
@@ -160,17 +213,86 @@ export class AIService {
      */
     async getConversationHistory(conversationId: string, limit: number = 20): Promise<AIMessage[]> {
         const result = await query(
-            `SELECT direction, content FROM messages
+            `SELECT direction, content, metadata FROM messages
              WHERE conversation_id = $1 AND content IS NOT NULL AND content != ''
              ORDER BY created_at DESC LIMIT $2`,
             [conversationId, limit]
         );
 
         // Reverter para ordem cronológica
-        return result.rows.reverse().map((row: Record<string, any>) => ({
-            role: row.direction === 'in' ? 'user' as const : 'assistant' as const,
-            content: row.content
-        }));
+        return result.rows.reverse().map((row: Record<string, any>) => {
+            const meta = (row.metadata || {}) as Record<string, any>;
+            const source: string = meta.source || '';
+            const fromMe: boolean = meta.fromMe === true || meta.fromMe === 'true';
+
+            // Regra de mapeamento direction → role para a IA:
+            //   direction='in'  → sempre do contato → role='user'
+            //   direction='out' e source='ai_assistant' → resposta da IA → role='assistant'
+            //   direction='out' e source='phone' (echo do device) → veio do contato no device → role='user'
+            //   direction='out' e source='user' (enviado pela dashboard) → role='assistant'
+            let role: 'user' | 'assistant';
+            if (row.direction === 'in') {
+                role = 'user';
+            } else if (source === 'ai_assistant' || source === 'user') {
+                role = 'assistant';
+            } else if (source === 'phone' || fromMe === false) {
+                // Echo de mensagem enviada pelo device fisico do contato (comum em @lid)
+                role = 'user';
+            } else {
+                // Padrão seguro: se saiu do sistema, tratar como assistant
+                role = 'assistant';
+            }
+
+            return { role, content: row.content as string };
+        });
+    }
+
+    /**
+     * Janela de contexto cross-sessão: busca as últimas N mensagens de conversas
+     * anteriores do mesmo contato (remoteJid), excluindo a conversa atual.
+     * Usado para manter continuidade entre sessões distintas.
+     */
+    async getCrossConversationContext(
+        userId: string,
+        remoteJid: string,
+        currentConversationId: string,
+        limit: number = 10
+    ): Promise<{ messages: AIMessage[]; lastSessionDate: string | null }> {
+        try {
+            const result = await query(
+                `SELECT m.direction, m.content, m.created_at
+                 FROM messages m
+                 JOIN conversations c ON m.conversation_id = c.id
+                 WHERE c.user_id = $1
+                   AND c.remote_jid = $2
+                   AND c.id != $3
+                   AND m.content IS NOT NULL
+                   AND TRIM(m.content) != ''
+                   AND TRIM(m.content) != '[Mídia]'
+                 ORDER BY m.created_at DESC
+                 LIMIT $4`,
+                [userId, remoteJid, currentConversationId, limit]
+            );
+
+            if (result.rows.length === 0) {
+                return { messages: [], lastSessionDate: null };
+            }
+
+            // Reverter para ordem cronológica
+            const rows = (result.rows as Record<string, any>[]).reverse();
+            const lastSessionDate: string | null = rows[rows.length - 1]?.created_at || null;
+
+            const messages: AIMessage[] = rows.map((row) => ({
+                role: row.direction === 'in' ? 'user' as const : 'assistant' as const,
+                content: row.content as string,
+            }));
+
+            return { messages, lastSessionDate };
+        } catch (err: any) {
+            if (err.code === '42P01') return { messages: [], lastSessionDate: null };
+            console.error('[AIService] Erro ao buscar contexto cross-sessão:', err.message);
+            return { messages: [], lastSessionDate: null };
+        }
     }
 
     /**

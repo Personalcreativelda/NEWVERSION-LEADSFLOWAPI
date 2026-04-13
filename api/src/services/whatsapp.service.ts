@@ -3,6 +3,10 @@ export class WhatsAppService {
   private readonly apiKey: string;
   private readonly isConfigured: boolean;
 
+  // Cache LID → real phone/JID (válido por 24h — LIDs são estáveis)
+  private readonly lidCache = new Map<string, { phone: string; jid: string; resolvedAt: number }>();
+  private readonly LID_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
   constructor() {
     const rawUrl = process.env.EVOLUTION_API_URL || '';
     const rawKey = process.env.EVOLUTION_API_KEY || '';
@@ -501,6 +505,102 @@ export class WhatsAppService {
       console.error('[WhatsAppService] Error fetching contacts:', error);
       throw error;
     }
+  }
+
+  /**
+   * Resolve um JID @lid para o número de telefone real.
+   *
+   * WhatsApp Business (e dispositivos vinculados via Baileys/Evolution v2+) usa
+   * o formato @lid (Linked Device ID) em vez do @s.whatsapp.net tradicional.
+   * O LID não é o número de telefone — precisamos resolver via Evolution API.
+   *
+   * Retorna: { phone: string (digits only), jid: string (xxx@s.whatsapp.net) }
+   * ou null se não conseguir resolver.
+   */
+  async resolveLidToPhone(
+    instanceName: string,
+    lidJid: string
+  ): Promise<{ phone: string; jid: string } | null> {
+    // Só faz sentido para @lid
+    if (!lidJid.endsWith('@lid')) return null;
+
+    // Cache hit
+    const cached = this.lidCache.get(lidJid);
+    if (cached && Date.now() - cached.resolvedAt < this.LID_CACHE_TTL_MS) {
+      return { phone: cached.phone, jid: cached.jid };
+    }
+
+    const lidNumber = lidJid.replace('@lid', '');
+
+    // Endpoints a tentar em ordem (Evolution API v1/v2/v2.1)
+    const attempts: Array<{ url: string; body: object }> = [
+      // v2.1 — findContacts com where
+      {
+        url: `/contact/findContacts/${instanceName}`,
+        body: { where: { id: lidJid } },
+      },
+      // v2 — profileInfo passando o @lid completo
+      {
+        url: `/contact/fetchProfile/${instanceName}`,
+        body: { number: lidJid },
+      },
+      // v2 alternativo — info pelo número sem @
+      {
+        url: `/contact/fetchProfile/${instanceName}`,
+        body: { number: lidNumber },
+      },
+      // v1/v2 — chat/findContacts (retorna lista; filtramos)
+      {
+        url: `/chat/findContacts/${instanceName}`,
+        body: { where: { id: lidJid } },
+      },
+    ];
+
+    for (const attempt of attempts) {
+      try {
+        const result: any = await this.request(attempt.url, {
+          method: 'POST',
+          body: JSON.stringify(attempt.body),
+        });
+
+        // Normalizar resposta — diferentes versões retornam shapes diferentes
+        const contacts: any[] = Array.isArray(result)
+          ? result
+          : result?.contacts ?? result?.data ?? (result?.id ? [result] : []);
+
+        for (const c of contacts) {
+          // Aceita qualquer campo que pareça ser um número ou JID real
+          const rawJid: string =
+            c.jid || c.id || c.remoteJid || c.whatsapp || '';
+          const rawPhone: string =
+            c.number || c.phone || c.pushName || '';
+
+          // Se vier um @s.whatsapp.net, é o JID real
+          if (rawJid.endsWith('@s.whatsapp.net')) {
+            const phone = rawJid.replace('@s.whatsapp.net', '');
+            const entry = { phone, jid: rawJid, resolvedAt: Date.now() };
+            this.lidCache.set(lidJid, entry);
+            console.log(`[WhatsAppService] ✅ LID resolvido: ${lidJid} → ${rawJid}`);
+            return { phone, jid: rawJid };
+          }
+
+          // Se vier apenas dígitos (número de telefone), construir JID
+          const digitsOnly = (rawPhone || rawJid).replace(/\D/g, '');
+          if (digitsOnly.length >= 8) {
+            const resolvedJid = `${digitsOnly}@s.whatsapp.net`;
+            const entry = { phone: digitsOnly, jid: resolvedJid, resolvedAt: Date.now() };
+            this.lidCache.set(lidJid, entry);
+            console.log(`[WhatsAppService] ✅ LID resolvido via digits: ${lidJid} → ${resolvedJid}`);
+            return { phone: digitsOnly, jid: resolvedJid };
+          }
+        }
+      } catch (err: any) {
+        console.debug(`[WhatsAppService] LID resolve attempt ${attempt.url} failed:`, err.message);
+      }
+    }
+
+    console.warn(`[WhatsAppService] ⚠️ Não foi possível resolver LID ${lidJid} — usando LID como fallback`);
+    return null;
   }
 
   /**

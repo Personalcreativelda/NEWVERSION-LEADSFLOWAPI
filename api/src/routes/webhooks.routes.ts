@@ -11,6 +11,7 @@ import { leadTrackingService } from '../services/lead-tracking.service';
 import { getWebSocketService } from '../services/websocket.service';
 // IA: Importar processador de assistentes
 import { assistantProcessor } from '../services/assistant-processor.service';
+import { assistantQueueService } from '../services/assistant-queue.service';
 // Webhooks: Importar dispatcher para enviar eventos para webhooks do usuário
 import { webhookDispatcher } from '../services/webhook-dispatcher.service';
 // Storage: Importar para upload de mídia recebida
@@ -766,17 +767,47 @@ router.post('/evolution/messages', async (req, res) => {
     console.log('[Evolution Webhook] Mídia final:', { mediaType, hasUrl: !!mediaUrl });
 
     // Extrair telefone do JID
-    const phone = remoteJid.split('@')[0];
-    const contactName = messageData.pushName || messageData.senderName || messageData.notifyName || phone;
+    // ── Resolver @lid → número de telefone real ──────────────────────────────
+    // WhatsApp Business / dispositivos vinculados usam @lid em vez de @s.whatsapp.net.
+    // O @lid não é um número de telefone — armazenamos como referência cruzada e
+    // tentamos resolver o número real via Evolution API para exibição e lookups.
+    const isLid = remoteJid.endsWith('@lid');
+    let resolvedPhone: string | null = null;
+    let resolvedJid: string | null = null;
 
-    console.log('[Evolution Webhook] Telefone:', phone, 'Nome:', contactName);
+    if (isLid) {
+      console.log('[Evolution Webhook] Detectado @lid JID, tentando resolver número real:', remoteJid);
+      const lidResolution = await whatsappService.resolveLidToPhone(instance, remoteJid).catch(() => null);
+      if (lidResolution) {
+        resolvedPhone = lidResolution.phone;
+        resolvedJid   = lidResolution.jid;
+        console.log('[Evolution Webhook] @lid resolvido:', remoteJid, '→', resolvedJid);
+      }
+    }
+
+    // phone = número real (se resolvido) OU LID bruto como fallback
+    const phone = resolvedPhone || remoteJid.split('@')[0];
+    // lidValue = valor a guardar em whatsapp_lid quando usamos LID como referência
+    const lidValue = isLid ? remoteJid : null;
+
+    // Para mensagens enviadas pelo próprio usuário (isFromMe=true), o pushName é o nome
+    // da própria conta/dispositivo — NÃO o nome do contato receptor.
+    // Nesses casos ignoramos pushName para não sobrescrever o nome do lead com o nome
+    // do negócio/conta do usuário.
+    const contactName = !isFromMe
+      ? (messageData.pushName || messageData.senderName || messageData.notifyName || phone)
+      : (messageData.senderName || messageData.notifyName || phone);
+
+    console.log('[Evolution Webhook] Telefone:', phone, 'LID:', lidValue || 'N/A', 'Nome:', contactName, 'isFromMe:', isFromMe);
 
     // Buscar foto de perfil via Evolution API
+    // Para @lid usamos o JID resolvido (@s.whatsapp.net) se disponível — mais confiável
     let waProfilePic: string | null = null;
     try {
       const instanceName = instance;
       if (instanceName) {
-        waProfilePic = await whatsappService.fetchProfilePicture(instanceName, remoteJid);
+        const jidForPic = resolvedJid || remoteJid;
+        waProfilePic = await whatsappService.fetchProfilePicture(instanceName, jidForPic);
         if (waProfilePic) {
           console.log('[Evolution Webhook] ✅ Foto de perfil encontrada');
         }
@@ -786,9 +817,15 @@ router.post('/evolution/messages', async (req, res) => {
     }
 
     // Buscar ou criar lead
+    // Para @lid: buscar também pelo whatsapp_lid OU pelo número resolvido
     let lead = await query(
-      `SELECT * FROM leads WHERE user_id = $1 AND (phone = $2 OR whatsapp = $2)`,
-      [channel.user_id, phone]
+      `SELECT * FROM leads
+       WHERE user_id = $1
+         AND (
+           phone = $2 OR whatsapp = $2
+           ${lidValue ? 'OR whatsapp_lid = $3' : ''}
+         )`,
+      lidValue ? [channel.user_id, phone, lidValue] : [channel.user_id, phone]
     );
 
     let leadId: string;
@@ -796,12 +833,12 @@ router.post('/evolution/messages', async (req, res) => {
 
     if (lead.rows.length === 0) {
       // Criar lead automaticamente
-      console.log('[Evolution Webhook] Criando novo lead:', contactName, phone);
+      console.log('[Evolution Webhook] Criando novo lead:', contactName, phone, lidValue ? `(LID: ${lidValue})` : '');
       const leadResult = await query(
-        `INSERT INTO leads (user_id, name, phone, whatsapp, source, status, avatar_url)
+        `INSERT INTO leads (user_id, name, phone, whatsapp, source, status, avatar_url, whatsapp_lid)
          VALUES ($1, $2, $3, $3, 'whatsapp', 'novo', $4)
          RETURNING *`,
-        [channel.user_id, contactName, phone, waProfilePic]
+        [channel.user_id, contactName, phone, waProfilePic, lidValue]
       );
       leadId = leadResult.rows[0].id;
       isNewLead = true;
@@ -825,12 +862,40 @@ router.post('/evolution/messages', async (req, res) => {
       }
     } else {
       leadId = lead.rows[0].id;
+      const currentLead = lead.rows[0];
+
+      // Atualizar nome se:
+      //   1. A mensagem é recebida (não isFromMe) — assim temos o pushName real do contato
+      //   2. O nome atual é apenas o telefone (foi salvo sem pushName, p.ex. criado por isFromMe)
+      //   3. O novo nome é melhor (não é simplesmente o número de telefone)
+      const currentNameIsPhone = currentLead.name === currentLead.phone || currentLead.name === phone;
+      const shouldUpdateName = !isFromMe && contactName !== phone && currentNameIsPhone;
+
       // Atualizar avatar se mudou ou não existia
-      if (waProfilePic && lead.rows[0].avatar_url !== waProfilePic) {
+      const shouldUpdateAvatar = !!waProfilePic && currentLead.avatar_url !== waProfilePic;
+      // Atualizar whatsapp_lid se foi resolvido pela primeira vez
+      const shouldUpdateLid = lidValue && !currentLead.whatsapp_lid;
+
+      if (shouldUpdateName && shouldUpdateAvatar) {
         await query(
-          `UPDATE leads SET avatar_url = $1 WHERE id = $2`,
-          [waProfilePic, leadId]
+          `UPDATE leads SET name = $1, avatar_url = $2${shouldUpdateLid ? ', whatsapp_lid = $4' : ''} WHERE id = $3`,
+          shouldUpdateLid ? [contactName, waProfilePic, leadId, lidValue] : [contactName, waProfilePic, leadId]
         );
+        console.log('[Evolution Webhook] Lead atualizado (nome + avatar):', contactName);
+      } else if (shouldUpdateName) {
+        await query(
+          `UPDATE leads SET name = $1${shouldUpdateLid ? ', whatsapp_lid = $3' : ''} WHERE id = $2`,
+          shouldUpdateLid ? [contactName, leadId, lidValue] : [contactName, leadId]
+        );
+        console.log('[Evolution Webhook] Lead atualizado (nome):', contactName);
+      } else if (shouldUpdateAvatar) {
+        await query(
+          `UPDATE leads SET avatar_url = $1${shouldUpdateLid ? ', whatsapp_lid = $3' : ''} WHERE id = $2`,
+          shouldUpdateLid ? [waProfilePic, leadId, lidValue] : [waProfilePic, leadId]
+        );
+      } else if (shouldUpdateLid) {
+        await query(`UPDATE leads SET whatsapp_lid = $1 WHERE id = $2`, [lidValue, leadId]);
+        console.log('[Evolution Webhook] Lead atualizado (whatsapp_lid):', lidValue);
       }
     }
 
@@ -999,28 +1064,33 @@ router.post('/evolution/messages', async (req, res) => {
       rawPayload: req.body,
     }).catch(err => console.error('[Evolution Webhook] Erro ao disparar webhook:', err.message));
 
-    // Processar assistente de IA (assíncrono - não bloqueia a resposta)
-    if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
-      console.log('[Evolution Webhook] 🤖 Acionando processador de assistente IA...');
+    // Processar assistente de IA via fila (debounce + lock — evita greeting repetido e respostas duplicadas)
+    // Só processar mensagens RECEBIDAS (isFromMe=false): evita loop infinito quando a própria IA envia
+    if (!isFromMe && messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+      console.log('[Evolution Webhook] 🤖 Enfileirando mensagem para assistente IA...');
       console.log('[Evolution Webhook]   - channelId:', channel.id);
       console.log('[Evolution Webhook]   - userId:', channel.user_id);
       console.log('[Evolution Webhook]   - conversationId:', conversation.id);
-      
-      assistantProcessor.processIncomingMessage({
-        channelId: channel.id,
-        channelType: channel.type || 'whatsapp',
-        conversationId: conversation.id,
-        userId: channel.user_id,
-        contactPhone: phone || remoteJid,
-        contactName: contactName,
-        messageContent: messageContent,
-        credentials: channel.credentials,
-        remoteJid: remoteJid  // JID completo para fallback no envio
-      }).then(replied => {
-        if (replied) console.log('[Evolution Webhook] ✅ Assistente IA respondeu automaticamente');
-        else console.log('[Evolution Webhook] ℹ️ Nenhum assistente ativo para este canal');
-      }).catch(err => {
-        console.error('[Evolution Webhook] ❌ Erro no assistente IA:', err.message);
+
+      assistantQueueService.enqueueAndSchedule(
+        {
+          channelId: channel.id,
+          channelType: channel.type || 'whatsapp',
+          conversationId: conversation.id,
+          userId: channel.user_id,
+          // Usar o número real resolvido se o remoteJid era @lid;
+          // caso contrário usar o phone normal. O remoteJid completo é sempre passado
+          // para que sendReply use os formatos corretos (incluindo @lid para Evolution).
+          contactPhone: phone,
+          contactName: contactName,
+          messageContent: messageContent,
+          credentials: channel.credentials,
+          // remoteJid resolvido para @s.whatsapp.net (preferred) ou original (@lid)
+          remoteJid: resolvedJid || remoteJid,
+        },
+        (ctx) => assistantProcessor.processIncomingMessage(ctx)
+      ).catch(err => {
+        console.error('[Evolution Webhook] ❌ Erro ao enfileirar para assistente IA:', err.message);
       });
     }
 

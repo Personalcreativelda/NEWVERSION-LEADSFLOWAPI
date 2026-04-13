@@ -145,3 +145,89 @@ export const planEnforcement = async (
     next();
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// checkMessageLimit
+//
+// Checks whether a user has remaining quota for individual or mass messages.
+// Returns { allowed: true } or { allowed: false, code, message, current, limit }.
+// Call this at the start of any message-sending route/service.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_MSG_LIMITS: Record<string, { messages: number; massMessages: number }> = {
+  free:       { messages: 100,  massMessages: 200  },
+  business:   { messages: 500,  massMessages: 1000 },
+  enterprise: { messages: -1,   massMessages: -1   },
+};
+
+export interface MessageLimitResult {
+  allowed: boolean;
+  current: number;
+  limit: number;
+  code: string;
+  message: string;
+}
+
+export async function checkMessageLimit(
+  userId: string,
+  type: 'messages' | 'massMessages'
+): Promise<MessageLimitResult> {
+  try {
+    const userResult = await query(
+      'SELECT plan, plan_limits, plan_activated_at FROM users WHERE id = $1',
+      [userId]
+    );
+
+    const userData = userResult.rows[0];
+    if (!userData) return { allowed: true, current: 0, limit: -1, code: '', message: '' };
+
+    const plan = (userData.plan || 'free').toLowerCase();
+
+    // Billing period start (same logic as users.service)
+    let periodStart: Date;
+    if (plan !== 'free' && userData.plan_activated_at) {
+      periodStart = new Date(userData.plan_activated_at);
+    } else {
+      const now = new Date();
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    const countResult = await (type === 'messages'
+      ? query(
+          "SELECT COUNT(*) AS count FROM messages WHERE user_id = $1 AND direction = 'out' AND campaign_id IS NULL AND created_at >= $2 AND NOT (metadata @> '{\"automated\":true}'::jsonb)",
+          [userId, periodStart]
+        )
+      : query(
+          "SELECT COALESCE(SUM((stats->>'sent')::int), 0) AS count FROM campaigns WHERE user_id = $1 AND created_at >= $2",
+          [userId, periodStart]
+        ));
+
+    const storedLimits = userData.plan_limits;
+    const defaults = DEFAULT_MSG_LIMITS[plan] ?? DEFAULT_MSG_LIMITS.free;
+    const limit: number =
+      storedLimits && typeof storedLimits[type] === 'number'
+        ? storedLimits[type]
+        : defaults[type];
+
+    const current = parseInt(countResult.rows[0]?.count ?? '0', 10);
+
+    if (limit !== -1 && current >= limit) {
+      const isIndividual = type === 'messages';
+      return {
+        allowed: false,
+        current,
+        limit,
+        code: isIndividual ? 'MESSAGE_LIMIT_EXCEEDED' : 'MASS_MESSAGE_LIMIT_EXCEEDED',
+        message: isIndividual
+          ? `Você atingiu o limite de ${limit} mensagens individuais do seu plano. Faça upgrade para continuar.`
+          : `Você atingiu o limite de ${limit} mensagens em massa do seu plano. Faça upgrade para continuar.`,
+      };
+    }
+
+    return { allowed: true, current, limit, code: '', message: '' };
+  } catch (err) {
+    // Fail open — never block because of a monitoring error
+    console.error('[checkMessageLimit] Error:', err);
+    return { allowed: true, current: 0, limit: -1, code: '', message: '' };
+  }
+}
