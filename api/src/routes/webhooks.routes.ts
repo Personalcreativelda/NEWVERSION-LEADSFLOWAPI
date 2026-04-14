@@ -642,28 +642,40 @@ router.post('/evolution/messages', async (req, res) => {
     // (Diferentes versões da Evolution API usam nomes diferentes)
     let senderJidToUse: string | null = null;
     
+    // ⭐ SOLUÇÃO: remoteJid e remoteJidAlt TROCAM de posição!
+    // - Contato SALVO: remoteJid = @s.whatsapp.net, remoteJidAlt = @lid
+    // - Contato NÃO SALVO: remoteJid = @lid, remoteJidAlt = @s.whatsapp.net
+    // Então coletamos ambos e depois escolhemos o que tem @s.whatsapp.net
     const candidatesJids = [
-      // 🎯 PRIORIDADE MÁXIMA: Campos no nível superior do req.body (mais confiáveis!)
-      req.body.sender,
-      req.body.remoteJid,
-      req.body.remoteId,    // ← Campo correto em algumas versões da API!
-      
-      // Prioridade 1: Campos dentro de messageData.key (a estrutura correta)
-      messageData.key?.remoteId,         // ← NOVO
-      messageData.key?.remoteIdAlt,      // ← NOVO (alternativo)
-      messageData.key?.participantAlt,
+      // 🎯 PRIORIDADE MÁXIMA: remoteJid + remoteJidAlt de messageData.key
       messageData.key?.remoteJid,
-      messageData.remoteId,              // ← NOVO
-      messageData.remoteIdAlt,           // ← NOVO
-      messageData.remoteJid,
+      messageData.key?.remoteJidAlt,
       
-      // Prioridade 2: messageData top-level
+      // Prioridade 2: Variantes com remoteId (outras versões da API)
+      messageData.key?.remoteId,
+      messageData.key?.remoteIdAlt,
+      
+      // Prioridade 3: Campos top-level do body (exceto sender que é o BOT)
+      req.body.remoteJid,
+      req.body.remoteId,
+      
+      // Prioridade 4: participantAlt (para grupos)
+      messageData.key?.participantAlt,
       messageData.key?.participant,
+      
+      // Prioridade 5: messageData top-level
+      messageData.remoteJid,
+      messageData.remoteId,
+      messageData.remoteIdAlt,
+      messageData.remoteJidAlt,
       messageData.participant,
       messageData.senderJid,
       messageData.contactJid,
       messageData.from,
-      messageData.sender,
+      
+      // ⚠️ ÚLTIMO RECURSO: req.body.sender (é o número do BOT/instância!)
+      // Só será usado se NENHUM outro campo existir
+      req.body.sender,
     ];
     
     // Filtrar, converter números brutos para JID, e desduplicar
@@ -674,11 +686,10 @@ router.post('/evolution/messages', async (req, res) => {
         .filter(Boolean)
     )];
     
-    console.log('[Evolution Webhook] 🔍 Candidates de JID após formatação (ORDEM DE PRIORIDADE):', validCandidates);
-    console.log('[Evolution Webhook] 📊 req.body.sender:', req.body.sender);
-    console.log('[Evolution Webhook] 📊 messageData.key.remoteId:', messageData.key?.remoteId);
-    console.log('[Evolution Webhook] 📊 messageData.key.remoteIdAlt:', messageData.key?.remoteIdAlt);
-    console.log('[Evolution Webhook] 📊 messageData.key.remoteJid:', messageData.key?.remoteJid);
+    console.log('[Evolution Webhook] 🔍 Candidates de JID (ORDEM DE PRIORIDADE):', validCandidates);
+    console.log('[Evolution Webhook] 📊 key.remoteJid:', messageData.key?.remoteJid, '| key.remoteJidAlt:', messageData.key?.remoteJidAlt);
+    console.log('[Evolution Webhook] 📊 key.remoteId:', messageData.key?.remoteId, '| key.remoteIdAlt:', messageData.key?.remoteIdAlt);
+    console.log('[Evolution Webhook] ⚠️ req.body.sender (BOT):', req.body.sender);
     
     if (isGroupMessage) {
       console.log('[Evolution Webhook] 📱 Mensagem de GRUPO detectada');
