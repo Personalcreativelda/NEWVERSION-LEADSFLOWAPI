@@ -288,7 +288,12 @@ export default function InboxAutomations() {
 
   // Delete webhook
   const handleDelete = async (webhook: UserWebhook) => {
-    if (!confirm(`Deseja realmente excluir o webhook "${webhook.name}"?`)) return;
+    const confirmed = await confirm(`Deseja realmente excluir o webhook "${webhook.name}"?`, {
+      title: 'Excluir webhook',
+      confirmLabel: 'Excluir',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     try {
       setActionLoading(webhook.id);

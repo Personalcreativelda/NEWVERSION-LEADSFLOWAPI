@@ -14,6 +14,7 @@ import { AdminActivityTab } from './admin/AdminActivityTab';
 import { AdminMarketingTab } from './admin/AdminMarketingTab';
 import { UserDetailsModal } from './admin/UserDetailsModal';
 import { ActivatePlanModal, NotificationSettingsModal } from './admin/AdminModals';
+import { useConfirm } from '../ui/ConfirmDialog';
 
 interface User {
   id: string;
@@ -40,6 +41,7 @@ interface PlanPricing {
 }
 
 export default function AdminPage() {
+  const confirm = useConfirm();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
@@ -258,7 +260,12 @@ export default function AdminPage() {
   const handleSuspendUser = async (userId: string, currentStatus?: string) => {
     const isSuspended = currentStatus === 'suspended';
     const action = isSuspended ? 'reativar' : 'suspender';
-    if (!confirm(`Deseja realmente ${action} este usuário?`)) return;
+    const confirmed = await confirm(`Deseja realmente ${action} este usuário?`, {
+      title: `${isSuspended ? 'Reativar' : 'Suspender'} usuário`,
+      confirmLabel: action.charAt(0).toUpperCase() + action.slice(1),
+      variant: 'warning',
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -279,9 +286,20 @@ export default function AdminPage() {
   };
 
   const handleDeleteUser = async (userId: string, userEmail: string) => {
-    if (!confirm(`⚠️ ATENÇÃO: Deseja realmente REMOVER o usuário ${userEmail}?\n\nEsta ação é IRREVERSÍVEL. Digite "CONFIRMAR":`)) return;
-    const confirmation = prompt('Digite "CONFIRMAR" para remover:');
-    if (confirmation !== 'CONFIRMAR') return;
+    const firstConfirm = await confirm(`⚠️ ATENÇÃO: Deseja realmente REMOVER o usuário ${userEmail}?`, {
+      title: 'Remover utilizador',
+      description: 'Esta ação é irreversível.',
+      confirmLabel: 'Continuar',
+      variant: 'danger',
+    });
+    if (!firstConfirm) return;
+
+    const finalConfirm = await confirm('Confirma a remoção definitiva deste utilizador?', {
+      title: 'Confirmação final',
+      confirmLabel: 'Remover definitivamente',
+      variant: 'danger',
+    });
+    if (!finalConfirm) return;
 
     setLoading(true);
     try {

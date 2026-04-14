@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { conversationTagsApi } from '../../../services/api/inbox';
+import { useConfirm } from '../../ui/ConfirmDialog';
 import { Plus, Trash2, Edit2, GripVertical, Loader } from 'lucide-react';
 import TagCreateModal from './TagCreateModal';
 import TagEditModal from './TagEditModal';
@@ -65,7 +66,12 @@ export default function TagsList() {
     };
 
     const handleDeleteTag = async (tagId: string) => {
-        if (!window.confirm('Tem certeza que deseja deletar esta etiqueta? As conversas não serão afetadas.')) {
+        const confirmed = await confirm('Tem certeza que deseja deletar esta etiqueta? As conversas não serão afetadas.', {
+            title: 'Excluir etiqueta',
+            confirmLabel: 'Excluir',
+            variant: 'danger',
+        });
+        if (!confirmed) {
             return;
         }
         try {

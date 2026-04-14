@@ -5,7 +5,7 @@ import {
   Send, Trash2, Copy, MoreVertical,
   FileDown, Bell, Calendar, MessageCircle,
   Mail, MessageSquare, PlayCircle, Clock,
-  Timer, Save, Users, CheckCircle, CalendarCheck
+  Timer, Save, Users, CheckCircle, CalendarCheck, XCircle
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -15,6 +15,7 @@ import ChannelSelectorModal from '../modals/ChannelSelectorModal';
 import CampaignDetailsModal from '../modals/CampaignDetailsModal';
 import CampaignMessageModal from '../modals/CampaignMessageModal';
 import CampaignAlertsModal from '../modals/CampaignAlertsModal';
+import { useConfirm } from '../ui/ConfirmDialog';
 import { toast } from 'sonner';
 import { saveCampaignToDatabase, loadCampaignsFromDatabase, updateCampaignProgress } from '../../utils/campaignsHelper';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
@@ -64,6 +65,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   const [activeTab, setActiveTab] = useState(initialTab);
 
   // ✅ Carregar campanhas do banco de dados
+  const confirm = useConfirm();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
 
@@ -313,6 +315,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
               delivered: campaign.type === 'email' ? camp.delivered_count : (camp.stats?.delivered || 0),
               read: campaign.type === 'email' ? camp.opened_count : (camp.stats?.read || 0),
               failed: campaign.type === 'email' ? camp.failed_count : (camp.stats?.failed || 0),
+              total: campaign.type === 'email' ? 0 : (camp.stats?.total || 0),
               status: camp.status
             };
           }
@@ -370,8 +373,11 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
             const failed = realData.failed || 0;
             const pending = realData.pending || 0;
 
+            // Use the actual total from DB stats if available (may differ from recipientCount setting)
+            const totalRecipients = realData.total || campaign.totalRecipients || 1;
+
             const progress = Math.min(
-              Math.floor((sent / campaign.totalRecipients) * 100),
+              Math.floor((sent / totalRecipients) * 100),
               100
             );
 
@@ -379,7 +385,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
             const readRate = delivered > 0 ? Math.floor((read / delivered) * 100) : 0;
 
             // Se completou, marcar como concluída
-            if (progress >= 100 || (sent + failed) >= campaign.totalRecipients) {
+            if (progress >= 100 || (sent + failed) >= totalRecipients || realData.status === 'completed' || realData.status === 'failed') {
               debugLog('[CampaignsPage] ✅ Campanha CONCLUÍDA (dados reais):', campaign.name);
               const needsCompletionUpdate =
                 campaign.status !== 'completed' ||
@@ -596,7 +602,13 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   };
 
   const handleCancelCampaign = async (campaign: Campaign) => {
-    if (confirm(`Tem certeza que deseja cancelar a campanha "${campaign.name}"?`)) {
+    const confirmed = await confirm(`Tem certeza que deseja cancelar a campanha "${campaign.name}"?`, {
+      title: 'Cancelar campanha',
+      description: 'A campanha será interrompida e removida da lista ativa.',
+      confirmLabel: 'Cancelar campanha',
+      variant: 'warning',
+    });
+    if (confirmed) {
       try {
         const token = localStorage.getItem('leadflow_access_token');
         if (!token) {
@@ -631,7 +643,13 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   };
 
   const handleDeleteCampaign = async (id: string, name: string) => {
-    if (confirm(`Tem certeza que deseja excluir a campanha "${name}"?\n\nEsta ação não pode ser desfeita.`)) {
+    const confirmed = await confirm(`Tem certeza que deseja excluir a campanha "${name}"?`, {
+      title: 'Excluir campanha',
+      description: 'Esta ação não pode ser desfeita.',
+      confirmLabel: 'Excluir',
+      variant: 'danger',
+    });
+    if (confirmed) {
       try {
         const token = localStorage.getItem('leadflow_access_token');
         if (!token) {
@@ -676,7 +694,13 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   };
 
   const handleSendNow = async (id: string, name: string, type?: string) => {
-    if (confirm(`Enviar campanha "${name}" agora?`)) {
+    const confirmed = await confirm(`Enviar campanha "${name}" agora?`, {
+      title: 'Confirmar envio',
+      description: 'O envio começará imediatamente e os resultados aparecerão nas notificações.',
+      confirmLabel: 'Enviar agora',
+      variant: 'info',
+    });
+    if (confirmed) {
       try {
         const token = localStorage.getItem('leadflow_access_token');
         if (!token) {
@@ -817,12 +841,20 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
   // ✅ Reenviar para falhados
   const handleResendFailed = (campaign: Campaign) => {
-    if (confirm(`Reenviar campanha "${campaign.name}" apenas para os destinatários que falharam?`)) {
+    void (async () => {
+      const confirmed = await confirm(`Reenviar campanha "${campaign.name}" apenas para os destinatários que falharam?`, {
+        title: 'Reenviar falhados',
+        description: 'Apenas os contactos com falha serão reenviados.',
+        confirmLabel: 'Reenviar',
+        variant: 'warning',
+      });
+      if (!confirmed) return;
+
       // Aqui você implementaria a lógica para reenviar apenas para quem falhou
       // Por enquanto, vamos simular
       toast.success('🔄 Campanha reenviada para destinatários com falha!');
       setDropdownOpen(null);
-    }
+    })();
   };
 
   const filteredCampaigns = campaigns.filter(
@@ -833,6 +865,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   const scheduledCampaigns = filteredCampaigns.filter(c => c.status === 'scheduled');
   const draftCampaigns = filteredCampaigns.filter(c => c.status === 'draft');
   const completedCampaigns = filteredCampaigns.filter(c => c.status === 'completed');
+  const failedCampaigns = filteredCampaigns.filter(c => c.status === 'failed');
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -1490,6 +1523,62 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     </div>
                   )}
                 </section>
+
+                {/* Failed Campaigns */}
+                {failedCampaigns.length > 0 && (
+                  <section>
+                    <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
+                      <XCircle className="w-5 h-5 text-red-500" />
+                      <span>Campanhas Falhadas</span>
+                      <span className="text-sm font-normal text-gray-500 dark:text-gray-400">({failedCampaigns.length})</span>
+                    </h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                      {failedCampaigns.map((campaign) => (
+                        <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-red-200 dark:border-red-900 p-6 hover:shadow-md transition-shadow duration-200">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
+                              <div className="flex items-center space-x-2">
+                                <XCircle className="w-4 h-4 text-red-500" />
+                                <span className="text-sm text-red-500 dark:text-red-400">{formatDate(campaign.completedDate || campaign.updatedDate || campaign.createdDate)}</span>
+                              </div>
+                            </div>
+                            <DropdownMenu campaign={campaign} />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                            <div>
+                              <span className="text-gray-500 dark:text-gray-400">Enviadas</span>
+                              <p className="font-semibold text-gray-900 dark:text-white">{campaign.sent?.toLocaleString() ?? 0}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 dark:text-gray-400">Falhadas</span>
+                              <p className="font-semibold text-red-600 dark:text-red-400">{campaign.failed?.toLocaleString() ?? 0}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 dark:text-gray-400">Total previsto</span>
+                              <p className="font-semibold text-gray-900 dark:text-white">{campaign.totalRecipients?.toLocaleString() ?? 0}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 dark:text-gray-400">Taxa de entrega</span>
+                              <p className="font-semibold text-red-600 dark:text-red-400">{campaign.deliveryRate ?? 0}%</p>
+                            </div>
+                          </div>
+
+                          <Button
+                            onClick={() => handleViewReport(campaign)}
+                            variant="outline"
+                            size="sm"
+                            className="w-full bg-red-50 dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800 font-medium"
+                          >
+                            <BarChart3 className="w-4 h-4 mr-2" />
+                            Ver Relatório
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
               </>
             )}
           </div>

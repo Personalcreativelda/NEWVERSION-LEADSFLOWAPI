@@ -25,10 +25,8 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [smtpSaveState, setSmtpSaveState] = useState<'idle' | 'loading' | 'saved'>('idle');
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState('');
-  const [n8nBulkSendUrl, setN8nBulkSendUrl] = useState('');
   const [n8nWhatsAppImportUrl, setN8nWhatsAppImportUrl] = useState('');
   const [isN8nConfigured, setIsN8nConfigured] = useState(false);
-  const [isN8nBulkSendConfigured, setIsN8nBulkSendConfigured] = useState(false);
   const [isN8nWhatsAppImportConfigured, setIsN8nWhatsAppImportConfigured] = useState(false);
   const [metaPixelId, setMetaPixelId] = useState('');
   const [isMetaPixelConfigured, setIsMetaPixelConfigured] = useState(false);
@@ -67,7 +65,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
     const hydrateFromLocalStorage = () => {
       applyStringSetting(localStorage.getItem('n8n_webhook_url'), setN8nWebhookUrl, setIsN8nConfigured);
-      applyStringSetting(localStorage.getItem('n8n_bulk_send_url'), setN8nBulkSendUrl, setIsN8nBulkSendConfigured);
       applyStringSetting(localStorage.getItem('n8n_whatsapp_import_url'), setN8nWhatsAppImportUrl, setIsN8nWhatsAppImportConfigured);
       applyStringSetting(localStorage.getItem('meta_pixel_id'), setMetaPixelId, setIsMetaPixelConfigured);
       applyStringSetting(localStorage.getItem('google_analytics_id'), setGoogleAnalyticsId, setIsGoogleAnalyticsConfigured);
@@ -94,7 +91,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
         }
 
         applyStringSetting(settings.n8n_webhook_url, setN8nWebhookUrl, setIsN8nConfigured);
-        applyStringSetting(settings.n8n_bulk_send_url, setN8nBulkSendUrl, setIsN8nBulkSendConfigured);
         applyStringSetting(settings.n8n_whatsapp_import_url, setN8nWhatsAppImportUrl, setIsN8nWhatsAppImportConfigured);
         applyStringSetting(settings.meta_pixel_id, setMetaPixelId, setIsMetaPixelConfigured);
         applyStringSetting(settings.google_analytics_id, setGoogleAnalyticsId, setIsGoogleAnalyticsConfigured);
@@ -336,53 +332,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
     } catch (error: any) {
       console.error('[Test Webhook] Error:', error);
       toast.error(`❌ Erro ao testar webhook: ${error.message}`);
-    }
-  };
-
-  const handleSaveN8nBulkSendUrl = async () => {
-    if (!n8nBulkSendUrl) {
-      toast.error('Por favor, insira a URL do webhook N8N de envio em massa');
-      return;
-    }
-
-    // Validar URL
-    try {
-      new URL(n8nBulkSendUrl);
-    } catch (e) {
-      toast.error('URL inválida. Certifique-se de incluir http:// ou https://');
-      return;
-    }
-
-    try {
-      // ✅ SALVAR NO BACKEND
-      await userApi.saveSettings({ n8n_bulk_send_url: n8nBulkSendUrl });
-
-      // Sync com localStorage
-      localStorage.setItem('n8n_bulk_send_url', n8nBulkSendUrl);
-      setIsN8nBulkSendConfigured(true);
-      toast.success('✅ URL de envio em massa configurada com sucesso!');
-
-      console.log('[N8N Bulk Send] URL salva no backend:', n8nBulkSendUrl);
-    } catch (error) {
-      console.error('[N8N Bulk Send] Error:', error);
-      toast.error('Erro ao salvar URL. Tente novamente.');
-    }
-  };
-
-  const handleClearN8nBulkSendUrl = async () => {
-    try {
-      // ✅ LIMPAR NO BACKEND
-      await userApi.saveSettings({ n8n_bulk_send_url: '' });
-
-      // Sync com localStorage
-      localStorage.removeItem('n8n_bulk_send_url');
-      setN8nBulkSendUrl('');
-      setIsN8nBulkSendConfigured(false);
-      toast.success('🗑️ Configuração de envio em massa removida');
-      console.log('[N8N Bulk Send] Configuration cleared from backend');
-    } catch (error) {
-      console.error('[N8N Bulk Send Clear] Error:', error);
-      toast.error('Erro ao remover configuração');
     }
   };
 
@@ -1178,7 +1127,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         <div className="flex items-center justify-between mb-1.5">
                           <Label htmlFor="n8n-webhook-url" className="text-sm flex items-center gap-2">
                             <Webhook className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                            Webhook - Cadastrar Novo Lead
+                            Webhook - Cadastrar Leads Externos
                           </Label>
                           {isN8nConfigured && (
                             <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -1205,43 +1154,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           className={n8nInputClass}
                         />
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                          Endpoint GET/POST para listar ou criar leads na planilha
-                        </p>
-                      </div>
-
-                      {/* Webhook - Envio em Massa WhatsApp */}
-                      <div className="border-t border-cyan-200 dark:border-cyan-700 pt-4">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <Label htmlFor="n8n-bulk-send-url" className="text-sm flex items-center gap-2">
-                            <MessageSquare className="w-4 h-4 text-green-600 dark:text-green-400" />
-                            Webhook - Envio em Massa WhatsApp
-                          </Label>
-                          {isN8nBulkSendConfigured && (
-                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                              ✓ Configurado
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Mostrar URL salva se houver */}
-                        {isN8nBulkSendConfigured && n8nBulkSendUrl && (
-                          <div className="mb-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
-                            <p className="text-xs text-green-800 dark:text-green-200 break-all">
-                              <strong>URL atual:</strong> {n8nBulkSendUrl}
-                            </p>
-                          </div>
-                        )}
-
-                        <Input
-                          id="n8n-bulk-send-url"
-                          type="url"
-                          value={n8nBulkSendUrl}
-                          onChange={(e) => setN8nBulkSendUrl(e.target.value)}
-                          placeholder="https://seu-n8n.com/webhook/envio-massa-whatsapp"
-                          className={n8nInputClass}
-                        />
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                          Endpoint POST para enviar mensagens em massa via WhatsApp através das Campanhas
+                          Endpoint para cadastrar leads em tempo real a partir de planilhas externas (Google Sheets, Excel, etc.) via N8N
                         </p>
                       </div>
 
@@ -1284,7 +1197,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         <Button
                           onClick={() => {
                             handleSaveN8nWebhook();
-                            handleSaveN8nBulkSendUrl();
                             handleSaveN8nWhatsAppImportUrl();
                           }}
                           className="bg-cyan-600 hover:bg-cyan-700 text-white"
@@ -1302,11 +1214,10 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             Testar Webhook
                           </Button>
                         )}
-                        {(isN8nConfigured || isN8nBulkSendConfigured || isN8nWhatsAppImportConfigured) && (
+                        {(isN8nConfigured || isN8nWhatsAppImportConfigured) && (
                           <Button
                             onClick={() => {
                               handleClearN8nWebhook();
-                              handleClearN8nBulkSendUrl();
                               handleClearN8nWhatsAppImportUrl();
                             }}
                             variant="outline"

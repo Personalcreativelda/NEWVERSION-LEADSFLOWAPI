@@ -20,6 +20,8 @@ import AgentCallPage from './components/pages/AgentCallPage';
 import UpgradeModal from './components/modals/UpgradeModal';
 import PlanUpgradeSuccessModal from './components/modals/PlanUpgradeSuccessModal';
 import { MetaPixel } from './components/MetaPixel';
+import { GoogleAnalytics } from './components/GoogleAnalytics';
+import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import { authApi, apiRequest, plansApi, isSessionExpired, startSessionExpiryTimer } from './utils/api';
 import { mockAuth } from './utils/auth-mock';
 import { Toaster } from './components/ui/sonner';
@@ -166,7 +168,8 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
   const [appVersion, setAppVersion] = useState<string>('...');
   const [versionNotification, setVersionNotification] = useState<{ id: number; version: string; releaseNotes: string } | null>(null);
   const envMetaPixelId = import.meta.env.VITE_META_PIXEL_ID as string | undefined;
-  const [metaPixelId] = useState<string>(envMetaPixelId ? envMetaPixelId.trim() : '');
+  const [metaPixelId, setMetaPixelId] = useState<string>(envMetaPixelId ? envMetaPixelId.trim() : '');
+  const [googleAnalyticsId, setGoogleAnalyticsId] = useState<string>('');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [planEnforcementBlock, setPlanEnforcementBlock] = useState<{ code: string; message: string } | null>(null);
   const [upgradeSuccessModal, setUpgradeSuccessModal] = useState<{ open: boolean; plan: string }>({ open: false, plan: '' });
@@ -620,6 +623,11 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       if (response.success && response.webhookSettings?.metaPixelId) {
         console.log('[Meta Pixel] Dynamic pixel ID from settings:', response.webhookSettings.metaPixelId);
       }
+      // Load pixel + GA IDs from user settings (saved by IntegrationsPage)
+      const storedPixelId = localStorage.getItem('meta_pixel_id');
+      const storedGaId = localStorage.getItem('google_analytics_id');
+      if (storedPixelId) setMetaPixelId(storedPixelId);
+      if (storedGaId) setGoogleAnalyticsId(storedGaId);
     } catch (error) {
       console.log('[Meta Pixel] Using default configuration (webhook settings unavailable)');
     }
@@ -966,8 +974,9 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
   }
 
   return (
-    <>
+    <ConfirmProvider>
       <MetaPixel pixelId={metaPixelId} />
+      <GoogleAnalytics gaId={googleAnalyticsId} />
       <Toaster />
       {/* Landing Page */}
       {landingEnabled && currentPage === 'landing' && (
@@ -1117,6 +1126,6 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
         </div>
       )}
 
-    </>
+    </ConfirmProvider>
   );
 }

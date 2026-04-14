@@ -153,292 +153,252 @@ export default function UpgradeModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-5xl bg-card text-card-foreground border border-border shadow-xl max-h-[90vh] overflow-y-auto animate-in fade-in slide-in-from-bottom-10 duration-300">
-        <DialogHeader>
-          <DialogTitle className="text-2xl text-center text-foreground mb-2">
-            ✨ Escolha o Plano Ideal para Você
-          </DialogTitle>
-          <DialogDescription className="text-center text-muted-foreground">
-            Desbloqueie recursos poderosos e leve sua operação para o próximo nível
-          </DialogDescription>
-        </DialogHeader>
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl max-h-[92vh] flex flex-col bg-card text-card-foreground border border-border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-bottom-8 duration-300 p-0">
 
-        {/* Toggle */}
-        <div className="flex justify-center pb-6 px-4">
-          <div className="inline-flex items-center bg-muted/30 rounded-xl p-1 border border-border">
-            <button
-              onClick={() => setBillingPeriod('monthly')}
-              className={`px-6 py-2 rounded-lg text-sm font-medium transition-colors ${
-                billingPeriod === 'monthly'
-                  ? 'bg-card text-foreground shadow-sm border border-border'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Mensal
-            </button>
-            <button
-              onClick={() => setBillingPeriod('annual')}
-              className={`relative px-6 py-2 rounded-lg text-sm font-medium transition-colors ${
-                billingPeriod === 'annual'
-                  ? 'bg-card text-foreground shadow-sm border border-border'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Anual
-              <span className="ml-2 text-xs bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">-20%</span>
-            </button>
-          </div>
-        </div>
+          {/* Header */}
+          <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0">
+            <DialogTitle className="text-lg sm:text-xl text-center text-foreground font-bold">
+              ✨ Escolha o Plano Ideal para Você
+            </DialogTitle>
+            <DialogDescription className="text-center text-muted-foreground text-xs sm:text-sm mt-1">
+              Desbloqueie recursos poderosos e leve sua operação para o próximo nível
+            </DialogDescription>
+          </DialogHeader>
 
-        {/* Cards - Desktop Grid */}
-        <div className="hidden sm:grid sm:grid-cols-3 gap-6 px-6 sm:px-8">
-          {plans.map((plan) => {
-            const isCurrentPlan = plan.id === currentPlan;
-            const isBestValue = plan.id === 'business';
-            const config = planConfig[plan.id as keyof typeof planConfig] || planConfig.free;
-            const Icon = config?.icon || Zap;
-
-            return (
-              <div
-                key={plan.id}
-                className={`relative rounded-xl p-6 border-2 transition ${
-                  isBestValue
-                    ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500/20'
-                    : 'bg-muted border-border hover:border-muted-foreground/40'
+          {/* Billing toggle */}
+          <div className="flex justify-center py-2 px-4 flex-shrink-0">
+            <div className="inline-flex items-center bg-muted/30 rounded-lg p-0.5 border border-border">
+              <button
+                onClick={() => setBillingPeriod('monthly')}
+                className={`px-5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                  billingPeriod === 'monthly'
+                    ? 'bg-card text-foreground shadow-sm border border-border'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {isBestValue && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium shadow-md">
-                    Popular
-                  </div>
-                )}
-
-                {isCurrentPlan && (
-                  <div className="absolute top-3 right-3">
-                    <span className="bg-green-500/10 text-green-600 dark:text-green-300 px-2 py-1 rounded-md text-xs border border-green-500/20">
-                      Current
-                    </span>
-                  </div>
-                )}
-
-                {/* Icon */}
-                <div className="flex justify-center mb-4">
-                  <div className={`${config.bg} p-3 rounded-lg`}>
-                    <Icon className={`w-8 h-8 ${config.color}`} />
-                  </div>
-                </div>
-
-                {/* Plan Name */}
-                <h3 className="text-xl font-bold text-foreground text-center mb-1">{plan.name}</h3>
-
-                {/* Price */}
-                <div className="text-center mb-6">
-                  <div className="text-3xl font-bold text-foreground">
-                    {plan.id === 'free' ? (
-                      'Grátis'
-                    ) : billingPeriod === 'annual' ? (
-                      `R$${plan.price?.annual || 0}`
-                    ) : (
-                      `R$${plan.price?.monthly || 0}`
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {plan.id === 'free' ? '' : billingPeriod === 'annual' ? '/mês (anual)' : '/mês'}
-                  </p>
-                  {plan.id !== 'free' && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {plan.stripe?.priceMonthlyId || plan.stripe?.priceAnnualId
-                        ? 'Pagamento com Stripe disponível'
-                        : 'Stripe não configurado para este plano. Usando PayPal como fallback.'}
-                    </p>
-                  )}
-                </div>
-
-                {/* Select Plan Button */}
-                {plan.id !== 'free' ? (
-                  <Button
-                    onClick={() => handleSelectPlan(plan.id)}
-                    disabled={isCurrentPlan || loading}
-                    className={`w-full font-medium py-5 rounded-lg mb-6 transition-all duration-200 transform hover:shadow-lg hover:scale-105 ${
-                      isCurrentPlan
-                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                        : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/50'
-                    }`}
-                  >
-                    {loading && selectedPlan === plan.id ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Carregando...
-                      </span>
-                    ) : isCurrentPlan ? (
-                      'Plano Atual'
-                    ) : (
-                      'Selecionar Plano'
-                    )}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => handleSelectPlan(plan.id)}
-                    disabled={isCurrentPlan || loading}
-                    className={`w-full font-medium py-5 rounded-lg mb-6 transition ${
-                      isCurrentPlan
-                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    }`}
-                  >
-                    {loading && selectedPlan === plan.id ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Carregando...
-                      </span>
-                    ) : isCurrentPlan ? (
-                      'Plano Atual'
-                    ) : (
-                      'Fazer Upgrade'
-                    )}
-                  </Button>
-                )}
-
-                {/* Features */}
-                <div className="space-y-2 border-t border-border pt-4">
-                  {plan.features.slice(0, 5).map((feature: string, index: number) => (
-                    <div key={index} className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                      <span className="text-xs text-muted-foreground leading-relaxed">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Cards - Mobile Scroll Horizontal */}
-        <div className="sm:hidden flex gap-4 overflow-x-auto snap-x snap-mandatory px-4 pb-4">
-          {plans.map((plan) => {
-            const isCurrentPlan = plan.id === currentPlan;
-            const isBestValue = plan.id === 'business';
-            const config = planConfig[plan.id as keyof typeof planConfig] || planConfig.free;
-            const Icon = config?.icon || Zap;
-
-            return (
-              <div
-                key={plan.id}
-                className={`snap-center min-w-[85%] relative rounded-xl p-6 border-2 flex-shrink-0 transition ${
-                  isBestValue
-                    ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20'
-                    : 'bg-muted border-border'
+                Mensal
+              </button>
+              <button
+                onClick={() => setBillingPeriod('annual')}
+                className={`relative px-5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                  billingPeriod === 'annual'
+                    ? 'bg-card text-foreground shadow-sm border border-border'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {isBestValue && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium shadow-md">
-                    Popular
-                  </div>
-                )}
-
-                {isCurrentPlan && (
-                  <div className="absolute top-3 right-3">
-                    <span className="bg-green-500/10 text-green-600 dark:text-green-300 px-2 py-1 rounded-md text-xs border border-green-500/20">
-                      Atual
-                    </span>
-                  </div>
-                )}
-
-                {/* Icon */}
-                <div className="flex justify-center mb-4">
-                  <div className={`${config.bg} p-3 rounded-lg`}>
-                    <Icon className={`w-8 h-8 ${config.color}`} />
-                  </div>
-                </div>
-
-                {/* Plan Name */}
-                <h3 className="text-xl font-bold text-foreground text-center mb-1">{plan.name}</h3>
-
-                {/* Price */}
-                <div className="text-center mb-6">
-                  <div className="text-3xl font-bold text-foreground">
-                    {plan.id === 'free' ? (
-                      'Grátis'
-                    ) : billingPeriod === 'annual' ? (
-                      `R$${plan.price?.annual || 0}`
-                    ) : (
-                      `R$${plan.price?.monthly || 0}`
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {plan.id === 'free' ? '' : billingPeriod === 'annual' ? '/mês (anual)' : '/mês'}
-                  </p>
-                </div>
-
-                {/* Select Plan Button */}
-                {plan.id !== 'free' ? (
-                  <Button
-                    onClick={() => handleSelectPlan(plan.id)}
-                    disabled={isCurrentPlan || loading}
-                    className={`w-full font-medium py-5 rounded-lg mb-6 transition-all duration-200 transform hover:shadow-lg hover:scale-105 ${
-                      isCurrentPlan
-                        ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
-                        : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/50'
-                    }`}
-                  >
-                    {loading && selectedPlan === plan.id ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Carregando...
-                      </span>
-                    ) : isCurrentPlan ? (
-                      'Plano Atual'
-                    ) : (
-                      'Selecionar Plano'
-                    )}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => handleSelectPlan(plan.id)}
-                    disabled={isCurrentPlan || loading}
-                    className={`w-full font-medium py-5 rounded-lg mb-6 transition ${
-                      isCurrentPlan
-                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    }`}
-                  >
-                    {loading && selectedPlan === plan.id ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Carregando...
-                      </span>
-                    ) : isCurrentPlan ? (
-                      'Plano Atual'
-                    ) : (
-                      'Fazer Upgrade'
-                    )}
-                  </Button>
-                )}
-
-                {/* Features */}
-                <div className="space-y-2 border-t border-border pt-4">
-                  {plan.features.slice(0, 5).map((feature: string, index: number) => (
-                    <div key={index} className="flex items-start gap-2">
-                      <Check className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                      <span className="text-xs text-muted-foreground leading-relaxed">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Footer */}
-        <div className="mt-6 text-center border-t border-border pt-6 px-4">
-          <div className="flex flex-wrap items-center justify-center gap-4 text-muted-foreground text-xs">
-            <span>✓ No hidden fees</span>
-            <span>✓ Cancel anytime</span>
-            <span>✓ Secure payments</span>
+                Anual
+                <span className="ml-1.5 text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">-20%</span>
+              </button>
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+
+          {/* Scrollable cards area */}
+          <div className="flex-1 overflow-y-auto px-4 pb-4 min-h-0">
+
+            {/* Desktop grid */}
+            <div className="hidden sm:grid sm:grid-cols-3 gap-4 pt-5">
+              {plans.map((plan) => {
+                const isCurrentPlan = plan.id === currentPlan;
+                const isBestValue = plan.id === 'business';
+                const config = planConfig[plan.id as keyof typeof planConfig] || planConfig.free;
+                const Icon = config?.icon || Zap;
+
+                return (
+                  <div
+                    key={plan.id}
+                    className={`relative rounded-xl p-5 border-2 transition flex flex-col ${
+                      isBestValue
+                        ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500/20'
+                        : 'bg-muted border-border hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    {isBestValue && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] px-3 py-0.5 rounded-full font-medium shadow-md whitespace-nowrap">
+                        ⭐ Popular
+                      </div>
+                    )}
+                    {isCurrentPlan && (
+                      <div className="absolute top-3 right-3">
+                        <span className="bg-green-500/10 text-green-600 dark:text-green-300 px-1.5 py-0.5 rounded text-[10px] border border-green-500/20">
+                          Atual
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Icon + name */}
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className={`${config.bg} p-2 rounded-lg flex-shrink-0`}>
+                        <Icon className={`w-6 h-6 ${config.color}`} />
+                      </div>
+                      <h3 className="text-base font-bold text-foreground">{plan.name}</h3>
+                    </div>
+
+                    {/* Price */}
+                    <div className="mb-4">
+                      <span className="text-3xl font-bold text-foreground">
+                        {plan.id === 'free' ? 'Grátis' : billingPeriod === 'annual' ? `$${plan.price?.annual || 0}` : `$${plan.price?.monthly || 0}`}
+                      </span>
+                      {plan.id !== 'free' && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          {billingPeriod === 'annual' ? '/ano' : '/mo'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Features */}
+                    <div className="space-y-1.5 border-t border-border pt-3 flex-1">
+                      {plan.features.map((feature: string, index: number) => (
+                        <div key={index} className="flex items-start gap-2">
+                          <Check className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+                          <span className="text-xs text-muted-foreground leading-snug">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Button */}
+                    {plan.id !== 'free' ? (
+                      <Button
+                        onClick={() => handleSelectPlan(plan.id)}
+                        disabled={isCurrentPlan || loading}
+                        className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition-all ${
+                          isCurrentPlan
+                            ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                            : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600'
+                        }`}
+                      >
+                        {loading && selectedPlan === plan.id ? (
+                          <span className="flex items-center justify-center gap-1.5">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Carregando...
+                          </span>
+                        ) : isCurrentPlan ? 'Plano Atual' : 'Selecionar Plano'}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handleSelectPlan(plan.id)}
+                        disabled={isCurrentPlan || loading}
+                        className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition ${
+                          isCurrentPlan
+                            ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                        }`}
+                      >
+                        {isCurrentPlan ? 'Plano Atual' : 'Fazer Upgrade'}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Mobile horizontal scroll */}
+            <div className="sm:hidden flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 pt-5">
+              {plans.map((plan) => {
+                const isCurrentPlan = plan.id === currentPlan;
+                const isBestValue = plan.id === 'business';
+                const config = planConfig[plan.id as keyof typeof planConfig] || planConfig.free;
+                const Icon = config?.icon || Zap;
+
+                return (
+                  <div
+                    key={plan.id}
+                    className={`snap-center min-w-[82vw] max-w-[82vw] relative rounded-xl p-5 border-2 flex-shrink-0 flex flex-col transition ${
+                      isBestValue
+                        ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20'
+                        : 'bg-muted border-border'
+                    }`}
+                  >
+                    {isBestValue && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] px-3 py-0.5 rounded-full font-medium shadow-md whitespace-nowrap">
+                        ⭐ Popular
+                      </div>
+                    )}
+                    {isCurrentPlan && (
+                      <div className="absolute top-3 right-3">
+                        <span className="bg-green-500/10 text-green-600 dark:text-green-300 px-1.5 py-0.5 rounded text-[10px] border border-green-500/20">
+                          Atual
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Icon + name */}
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className={`${config.bg} p-2 rounded-lg flex-shrink-0`}>
+                        <Icon className={`w-6 h-6 ${config.color}`} />
+                      </div>
+                      <h3 className="text-base font-bold text-foreground">{plan.name}</h3>
+                    </div>
+
+                    {/* Price */}
+                    <div className="mb-4">
+                      <span className="text-3xl font-bold text-foreground">
+                        {plan.id === 'free' ? 'Grátis' : billingPeriod === 'annual' ? `$${plan.price?.annual || 0}` : `$${plan.price?.monthly || 0}`}
+                      </span>
+                      {plan.id !== 'free' && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          {billingPeriod === 'annual' ? '/ano' : '/mo'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Features */}
+                    <div className="space-y-2 border-t border-border pt-3 flex-1">
+                      {plan.features.map((feature: string, index: number) => (
+                        <div key={index} className="flex items-start gap-2">
+                          <Check className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+                          <span className="text-xs text-muted-foreground leading-snug">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Button */}
+                    {plan.id !== 'free' ? (
+                      <Button
+                        onClick={() => handleSelectPlan(plan.id)}
+                        disabled={isCurrentPlan || loading}
+                        className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition-all ${
+                          isCurrentPlan
+                            ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
+                            : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600'
+                        }`}
+                      >
+                        {loading && selectedPlan === plan.id ? (
+                          <span className="flex items-center justify-center gap-1.5">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Carregando...
+                          </span>
+                        ) : isCurrentPlan ? 'Plano Atual' : 'Selecionar Plano'}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handleSelectPlan(plan.id)}
+                        disabled={isCurrentPlan || loading}
+                        className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition ${
+                          isCurrentPlan
+                            ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                        }`}
+                      >
+                        {isCurrentPlan ? 'Plano Atual' : 'Fazer Upgrade'}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex-shrink-0 border-t border-border px-4 py-3">
+            <div className="flex flex-wrap items-center justify-center gap-5 text-muted-foreground text-xs">
+              <span>✓ No hidden fees</span>
+              <span>✓ Cancel anytime</span>
+              <span>✓ Secure payments</span>
+            </div>
+          </div>
+
+        </DialogContent>
+      </Dialog>
 
     {/* Payment Method Modal */}
     <PaymentMethodModal
@@ -453,6 +413,4 @@ export default function UpgradeModal({
   </>
   );
 }
-
-
 

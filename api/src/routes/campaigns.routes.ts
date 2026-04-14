@@ -7,6 +7,7 @@ import { WhatsAppService } from '../services/whatsapp.service';
 import { ConversationsService } from '../services/conversations.service';
 import { ChannelsService } from '../services/channels.service';
 import { getWebSocketService } from '../services/websocket.service';
+import { notificationsService } from '../services/notifications.service';
 import { query } from '../database/connection';
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 
@@ -520,11 +521,11 @@ router.post('/:id/execute', async (req, res, next) => {
     // Terceiro: buscar primeiro canal WhatsApp ou WhatsApp Cloud ativo
     if (!channel) {
       const channels = await channelsService.findByType('whatsapp', user.id);
-      channel = channels.find(c => c.status === 'active');
+      channel = channels.find(c => c.status === 'active' || c.status === 'connected');
     }
     if (!channel) {
       const cloudChannels = await channelsService.findByType('whatsapp_cloud', user.id);
-      channel = cloudChannels.find(c => c.status === 'active');
+      channel = cloudChannels.find(c => c.status === 'active' || c.status === 'connected' || c.status === 'pending');
     }
 
     if (!channel) {
@@ -549,35 +550,61 @@ router.post('/:id/execute', async (req, res, next) => {
     console.log(`[Campaigns Execute] Canal ${channel.type}: ${channel.id}, ${isWhatsAppCloud ? 'PhoneNumberId' : 'Instance'}: ${whatsappInstanceId}`);
 
     // 3. Buscar leads destinatários
-    let leadsQuery = 'SELECT * FROM leads WHERE user_id = $1';
-    const queryParams: any[] = [user.id];
-    let paramIndex = 2;
+    let leads: any[] = [];
 
-    // Aplicar filtros baseados nas configurações da campanha
-    if (settings.leadIds && Array.isArray(settings.leadIds) && settings.leadIds.length > 0) {
-      // Lista personalizada de leads
-      leadsQuery += ` AND id = ANY($${paramIndex})`;
-      queryParams.push(settings.leadIds);
-      paramIndex++;
-    } else if (settings.segments && Array.isArray(settings.segments) && settings.segments.length > 0) {
-      // Filtro por segmentos/status
-      leadsQuery += ` AND status = ANY($${paramIndex})`;
-      queryParams.push(settings.segments);
-      paramIndex++;
+    if (settings.customNumbers && typeof settings.customNumbers === 'string') {
+      // Modo custom: NÃO consultar o DB — criar leads sintéticos direto da lista
+      // Isso garante que 6 números = 6 envios (sem deduplicação SQL)
+      const rawPhones = (settings.customNumbers as string)
+        .split(',')
+        .map((p: string) => p.trim())
+        .filter(Boolean);
+
+      leads = rawPhones.map((phone, idx) => ({
+        id: `custom-${idx}-${Date.now()}`,
+        user_id: user.id,
+        name: phone,
+        phone: phone,
+        whatsapp: phone,
+        email: null,
+        company: null,
+        status: null,
+      }));
+
+      console.log(`[Campaigns Execute] 📲 Modo custom: ${leads.length} número(s) da lista`);
+    } else {
+      let leadsQuery = 'SELECT * FROM leads WHERE user_id = $1';
+      const queryParams: any[] = [user.id];
+      let paramIndex = 2;
+
+      if (settings.leadIds && Array.isArray(settings.leadIds) && settings.leadIds.length > 0) {
+        leadsQuery += ` AND id = ANY($${paramIndex})`;
+        queryParams.push(settings.leadIds);
+        paramIndex++;
+      } else {
+        // Filtro por status/segmentos: SOMENTE quando recipientMode é 'segments'
+        if (settings.recipientMode === 'segments') {
+          const segments = settings.segments || settings.selectedStatuses;
+          if (Array.isArray(segments) && segments.length > 0) {
+            leadsQuery += ` AND status = ANY($${paramIndex})`;
+            queryParams.push(segments);
+            paramIndex++;
+          }
+        }
+        // recipientMode === 'all' → sem filtro extra, busca todos os leads com telefone
+      }
+
+      leadsQuery += ` AND (phone IS NOT NULL OR whatsapp IS NOT NULL)`;
+      leadsQuery += ` ORDER BY created_at DESC`;
+
+      if (settings.limit && typeof settings.limit === 'number') {
+        leadsQuery += ` LIMIT $${paramIndex}`;
+        queryParams.push(settings.limit);
+      }
+
+      const leadsResult = await query(leadsQuery, queryParams);
+      leads = leadsResult.rows;
     }
-
-    // Apenas leads com telefone
-    leadsQuery += ` AND (phone IS NOT NULL OR whatsapp IS NOT NULL OR telefone IS NOT NULL)`;
-    leadsQuery += ` ORDER BY created_at DESC`;
-
-    // Aplicar limite se especificado
-    if (settings.limit && typeof settings.limit === 'number') {
-      leadsQuery += ` LIMIT $${paramIndex}`;
-      queryParams.push(settings.limit);
-    }
-
-    const leadsResult = await query(leadsQuery, queryParams);
-    const leads = leadsResult.rows;
 
     if (leads.length === 0) {
       return res.status(400).json({
@@ -651,8 +678,19 @@ async function executeCampaignMessages(
   userId: string
 ) {
   const isWhatsAppCloud = channel.type === 'whatsapp_cloud';
-  const cloudAccessToken = isWhatsAppCloud ? channel.credentials?.access_token : null;
+  const cloudAccessToken = isWhatsAppCloud
+    ? (channel.credentials?.access_token || channel.credentials?.token)
+    : null;
   const cloudPhoneNumberId = isWhatsAppCloud ? instanceId : null;
+
+  // Cloud API — template settings
+  const campSettings = typeof campaign.settings === 'string'
+    ? JSON.parse(campaign.settings)
+    : campaign.settings || {};
+  const useTemplate = isWhatsAppCloud && campSettings.useTemplate && campSettings.templateName;
+  const templateName = campSettings.templateName || '';
+  const templateLanguage = campSettings.templateLanguage || 'pt_BR';
+
   const stats = {
     total: leads.length,
     sent: 0,
@@ -662,13 +700,22 @@ async function executeCampaignMessages(
   };
 
   console.log(`[Campaigns Execute] 📤 Iniciando envio para ${leads.length} leads...`);
+  if (isWhatsAppCloud) {
+    console.log(`[Campaigns Execute] ☁️ Canal: API Oficial Meta | Template: ${useTemplate ? templateName : 'N/A (texto livre)'}`);
+  }
 
   // Obter configurações de delay
   const settings = typeof campaign.settings === 'string'
     ? JSON.parse(campaign.settings)
     : campaign.settings || {};
 
-  const delayBetweenMessages = settings.delay || settings.delayBetweenMessages || 3000; // 3 segundos padrão
+  // Delay aleatório entre mensagens (anti-bloqueio WhatsApp: variação imita comportamento humano)
+  const minDelay = Math.max(1000, ((settings.minDelaySeconds ?? 3)) * 1000);
+  const maxDelay = Math.max(minDelay, ((settings.maxDelaySeconds ?? 5)) * 1000);
+  const getDelay = () =>
+    minDelay >= maxDelay
+      ? minDelay
+      : Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
 
   for (let i = 0; i < leads.length; i++) {
     const lead = leads[i];
@@ -722,30 +769,65 @@ async function executeCampaignMessages(
       try {
         if (isWhatsAppCloud && cloudPhoneNumberId && cloudAccessToken) {
           // ===== WhatsApp Cloud (Graph API) =====
-          const textPayload = {
-            messaging_product: 'whatsapp',
-            to: cleanPhone,
-            type: 'text',
-            text: { body: messageContent }
+          const cloudApiUrl = `https://graph.facebook.com/v21.0/${cloudPhoneNumberId}/messages`;
+          const cloudHeaders = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${cloudAccessToken}`
           };
 
-          const textResponse = await fetch(`https://graph.facebook.com/v21.0/${cloudPhoneNumberId}/messages`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${cloudAccessToken}`
-            },
-            body: JSON.stringify(textPayload)
-          });
+          if (useTemplate && templateName) {
+            // ── Template Message (cold campaigns / outside 24h window) ────────
+            const templatePayload: any = {
+              messaging_product: 'whatsapp',
+              to: cleanPhone,
+              type: 'template',
+              template: {
+                name: templateName,
+                language: { code: templateLanguage },
+                components: messageContent ? [
+                  {
+                    type: 'body',
+                    parameters: [{ type: 'text', text: messageContent }]
+                  }
+                ] : []
+              }
+            };
 
-          const textResult = await textResponse.json();
-          if (!textResponse.ok) {
-            throw new Error(`WhatsApp Cloud API error: ${textResult?.error?.message || JSON.stringify(textResult)}`);
+            const tplResponse = await fetch(cloudApiUrl, {
+              method: 'POST',
+              headers: cloudHeaders,
+              body: JSON.stringify(templatePayload)
+            });
+
+            const tplResult = await tplResponse.json();
+            if (!tplResponse.ok) {
+              throw new Error(`WhatsApp Cloud API (template) error: ${tplResult?.error?.message || JSON.stringify(tplResult)}`);
+            }
+            sendResult = tplResult;
+          } else {
+            // ── Free-form text (warm contacts / 24h session window) ───────────
+            const textPayload = {
+              messaging_product: 'whatsapp',
+              to: cleanPhone,
+              type: 'text',
+              text: { body: messageContent }
+            };
+
+            const textResponse = await fetch(cloudApiUrl, {
+              method: 'POST',
+              headers: cloudHeaders,
+              body: JSON.stringify(textPayload)
+            });
+
+            const textResult = await textResponse.json();
+            if (!textResponse.ok) {
+              throw new Error(`WhatsApp Cloud API error: ${textResult?.error?.message || JSON.stringify(textResult)}`);
+            }
+            sendResult = textResult;
           }
-          sendResult = textResult;
 
-          // Enviar mídia via Graph API se houver
-          if (campaign.media_urls && campaign.media_urls.length > 0) {
+          // Enviar mídia via Graph API se houver (only for free-form, templates carry their own media)
+          if (!useTemplate && campaign.media_urls && campaign.media_urls.length > 0) {
             for (const mediaUrl of campaign.media_urls) {
               try {
                 const mediaType = mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) ? 'image' :
@@ -760,12 +842,9 @@ async function executeCampaignMessages(
                   [mediaType]: { link: mediaUrl }
                 };
 
-                await fetch(`https://graph.facebook.com/v21.0/${cloudPhoneNumberId}/messages`, {
+                await fetch(cloudApiUrl, {
                   method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${cloudAccessToken}`
-                  },
+                  headers: cloudHeaders,
                   body: JSON.stringify(mediaPayload)
                 });
               } catch (mediaError: any) {
@@ -913,9 +992,9 @@ async function executeCampaignMessages(
         );
       }
 
-      // Delay entre mensagens (exceto na última)
+      // Delay aleatório entre mensagens (exceto na última)
       if (i < leads.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, delayBetweenMessages));
+        await new Promise(resolve => setTimeout(resolve, getDelay()));
       }
 
     } catch (error: any) {
@@ -942,6 +1021,25 @@ async function executeCampaignMessages(
     status: finalStatus,
     stats
   });
+
+  // Criar notificação no sino com resumo da campanha
+  try {
+    await notificationsService.createNotification(
+      userId,
+      'campaign_sent',
+      `Campanha "${campaign.name}" finalizada`,
+      `Enviadas: ${stats.sent}/${stats.total} • Falhas: ${stats.failed} • Leituras: ${stats.read || 0} • Respostas: ${stats.replied || 0}`,
+      'megaphone',
+      {
+        campaignId: campaign.id,
+        campaignName: campaign.name,
+        status: finalStatus,
+        stats,
+      }
+    );
+  } catch (notificationError: any) {
+    console.warn('[Campaigns Execute] Falha ao criar notificação da campanha:', notificationError.message);
+  }
 
   // Emitir WebSocket para notificar conclusão
   const wsService = getWebSocketService();

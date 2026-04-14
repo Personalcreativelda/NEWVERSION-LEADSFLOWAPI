@@ -209,8 +209,13 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                             </button>
                             <div className="border-t" style={{ borderColor: 'hsl(var(--border))' }} />
                             <button
-                                onClick={() => {
-                                    if (window.confirm('Tem certeza que deseja apagar esta conversa? Todas as mensagens serão removidas.')) {
+                                onClick={async () => {
+                                    const confirmed = await confirm('Tem certeza que deseja apagar esta conversa? Todas as mensagens serão removidas.', {
+                                        title: 'Apagar conversa',
+                                        confirmLabel: 'Apagar',
+                                        variant: 'danger',
+                                    });
+                                    if (confirmed) {
                                         onDeleteConversation?.();
                                     }
                                     setShowMenu(false);

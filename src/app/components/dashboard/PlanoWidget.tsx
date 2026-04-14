@@ -1,4 +1,4 @@
-import { Users, MessageSquare, Mail, Crown, RefreshCw } from 'lucide-react';
+import { Users, MessageSquare, Mail, Crown, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
@@ -16,13 +16,14 @@ interface PlanoWidgetProps {
   };
   diasRestantes: number | null;
   planExpiresAt?: string | null;
+  subscriptionStatus?: string | null;
   onUpgrade: () => void;
   userPlan?: string;
   isTrial?: boolean;
   onRefresh?: () => Promise<void>;
 }
 
-export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, onUpgrade, userPlan = 'free', isTrial = false, onRefresh }: PlanoWidgetProps) {
+export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, subscriptionStatus, onUpgrade, userPlan = 'free', isTrial = false, onRefresh }: PlanoWidgetProps) {
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -55,6 +56,13 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, onU
   const isMensagensEsgotado = limites.mensagens > 0 && limites.mensagens !== -1 && restantesMensagens === 0;
   const isEnviosEsgotado = limites.envios > 0 && limites.envios !== -1 && restantesEnvios === 0;
   const algumLimiteEsgotado = isLeadsEsgotado || isMensagensEsgotado || isEnviosEsgotado;
+
+  // Estado do plano
+  const isPlanPaid = userPlan !== 'free';
+  const isPlanExpired = isPlanPaid && !!planExpiresAt && new Date(planExpiresAt) < new Date();
+  const isPaymentOverdue = subscriptionStatus === 'past_due';
+  const diasParaExpirar = diasRestantes ?? null;
+  const isExpiringSoon = isPlanPaid && !isPlanExpired && diasParaExpirar !== null && diasParaExpirar <= 7 && diasParaExpirar > 0;
 
   // Determinar cor do círculo baseado no percentual
   const getCircleColor = (perc: number) => {
@@ -142,7 +150,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, onU
   };
 
   return (
-    <div id="plan-limits-card" className="space-y-6">
+    <div id="plan-limits-card" className="space-y-4">
       {/* Header com botão de atualizar limites e botão de abrir modal de upgrade */}
       <div id="dashboard-welcome" className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4">
         <div className="flex flex-wrap gap-3 items-center w-full md:w-auto">
@@ -160,12 +168,112 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, onU
 
         <button
           onClick={onUpgrade}
-          className="w-full md:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+          className={`w-full md:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2 ${algumLimiteEsgotado ? 'hidden' : ''}`}
         >
           <Crown className="w-4 h-4" />
           Upgrade
         </button>
       </div>
+
+      {/* Banner: Plano Expirado */}
+      {isPlanExpired && (
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-red-500 dark:text-red-400">Plano Expirado</p>
+              <p className="text-xs text-red-400/80 dark:text-red-400/60">
+                Seu plano expirou. Renove sua assinatura para continuar.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onUpgrade}
+            className="w-full sm:w-auto px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
+          >
+            <Crown className="w-4 h-4" />
+            Renovar Plano
+          </button>
+        </div>
+      )}
+
+      {/* Banner: Pagamento Atrasado */}
+      {!isPlanExpired && isPaymentOverdue && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+              <Clock className="w-5 h-5 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-amber-500 dark:text-amber-400">Pagamento em Atraso</p>
+              <p className="text-xs text-amber-400/80 dark:text-amber-400/60">
+                Regularize sua assinatura para não perder o acesso.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onUpgrade}
+            className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25"
+          >
+            <Crown className="w-4 h-4" />
+            Regularizar
+          </button>
+        </div>
+      )}
+
+      {/* Banner: Plano expirando em breve */}
+      {isExpiringSoon && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+              <Clock className="w-5 h-5 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-amber-500 dark:text-amber-400">
+                Plano expira em {diasParaExpirar} {diasParaExpirar === 1 ? 'dia' : 'dias'}
+              </p>
+              <p className="text-xs text-amber-400/80 dark:text-amber-400/60">
+                Renove agora para não perder o acesso aos seus dados.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onUpgrade}
+            className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25"
+          >
+            <Crown className="w-4 h-4" />
+            Renovar Agora
+          </button>
+        </div>
+      )}
+
+      {/* Banner de alerta quando algum limite está esgotado */}
+      {algumLimiteEsgotado && (
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+              <Crown className="w-5 h-5 text-red-500" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-red-500 dark:text-red-400">
+                Limite do plano atingido!
+              </p>
+              <p className="text-xs text-red-400/80 dark:text-red-400/60">
+                Faça upgrade para continuar usando todos os recursos sem limitações.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onUpgrade}
+            className="w-full sm:w-auto px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
+          >
+            <Crown className="w-4 h-4" />
+            Upgrade Agora
+          </button>
+        </div>
+      )}
 
       {/* Grid de Cards Horizontais com Círculos */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-5">
@@ -237,32 +345,6 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, onU
           );
         })}
       </div>
-
-      {/* Banner de alerta quando algum limite está esgotado */}
-      {algumLimiteEsgotado && (
-        <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-              <Crown className="w-5 h-5 text-red-500" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-red-500 dark:text-red-400">
-                Limite do plano atingido!
-              </p>
-              <p className="text-xs text-red-400/80 dark:text-red-400/60">
-                Faça upgrade para continuar usando todos os recursos sem limitações.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onUpgrade}
-            className="w-full sm:w-auto px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
-          >
-            <Crown className="w-4 h-4" />
-            Upgrade Agora
-          </button>
-        </div>
-      )}
     </div>
   );
 }

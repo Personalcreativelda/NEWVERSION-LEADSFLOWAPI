@@ -127,8 +127,13 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
         }
     };
 
-    const handleDisconnect = () => {
-        if (!confirm('Deseja realmente desconectar este canal?')) return;
+    const handleDisconnect = async () => {
+        const confirmed = await confirm('Deseja realmente desconectar este canal?', {
+            title: 'Desconectar canal',
+            confirmLabel: 'Desconectar',
+            variant: 'warning',
+        });
+        if (!confirmed) return;
         onDelete(channel);
     };
 

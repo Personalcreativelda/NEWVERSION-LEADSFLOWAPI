@@ -2,24 +2,32 @@ import { query } from '../database/connection';
 import * as https from 'https';
 import * as http from 'http';
 import { URL } from 'url';
+import jwt from 'jsonwebtoken';
+import { config } from '../config/env';
 
 /**
  * Helper function to make HTTP/HTTPS POST requests without external dependencies
  */
-function postWebhook(url: string, data: any): Promise<{ ok: boolean; statusText: string }> {
+function postWebhook(url: string, data: any, authToken?: string): Promise<{ ok: boolean; statusText: string }> {
   return new Promise((resolve, reject) => {
     const parsedUrl = new URL(url);
     const postData = JSON.stringify(data);
+
+    const headers: Record<string, string | number> = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData),
+    };
+
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
 
     const options = {
       hostname: parsedUrl.hostname,
       port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
       path: parsedUrl.pathname + parsedUrl.search,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData),
-      },
+      headers,
     };
 
     const client = parsedUrl.protocol === 'https:' ? https : http;
@@ -146,54 +154,30 @@ export class CampaignScheduler {
     try {
       console.log(`[Campaign Scheduler] 🎯 Disparando campanha: ${campaign.name} (${campaign.id})`);
 
-      // 1. Atualizar status da campanha para 'active'
-      await query(
-        `UPDATE campaigns
-         SET status = 'active',
-             started_at = NOW(),
-             updated_at = NOW()
-         WHERE id = $1`,
-        [campaign.id]
+      // Gerar token JWT interno para o usuário dono da campanha
+      const internalToken = jwt.sign(
+        { userId: campaign.user_id },
+        config.jwtSecret,
+        { expiresIn: '10m' }
       );
 
-      // 2. Disparar webhook do N8N (se configurado)
-      const n8nWebhookUrl = process.env.N8N_CAMPAIGN_WEBHOOK_URL;
+      // Chamar o endpoint de execução interno
+      const port = process.env.PORT || 4000;
+      const executeUrl = `http://127.0.0.1:${port}/api/campaigns/${campaign.id}/execute`;
 
-      if (n8nWebhookUrl) {
-        console.log(`[Campaign Scheduler] 📡 Disparando webhook N8N: ${n8nWebhookUrl}`);
+      console.log(`[Campaign Scheduler] 📡 Chamando executor interno: ${executeUrl}`);
 
-        const settings = typeof campaign.settings === 'string'
-          ? JSON.parse(campaign.settings)
-          : campaign.settings || {};
+      const response = await postWebhook(executeUrl, {}, internalToken);
 
-        const webhookPayload = {
-          campaignId: campaign.id,
-          campaignName: campaign.name,
-          userId: campaign.user_id,
-          type: campaign.type,
-          template: campaign.template,
-          settings,
-          media_urls: campaign.media_urls || [],
-          scheduled_at: campaign.scheduled_at,
-          triggered_at: new Date().toISOString()
-        };
-
-        try {
-          const response = await postWebhook(n8nWebhookUrl, webhookPayload);
-
-          if (response.ok) {
-            console.log(`[Campaign Scheduler] ✅ Webhook N8N disparado com sucesso para campanha ${campaign.id}`);
-          } else {
-            console.error(`[Campaign Scheduler] ❌ Erro ao disparar webhook N8N:`, response.statusText);
-          }
-        } catch (webhookError) {
-          console.error(`[Campaign Scheduler] ❌ Erro ao disparar webhook N8N:`, webhookError);
-        }
+      if (response.ok) {
+        console.log(`[Campaign Scheduler] ✅ Campanha ${campaign.name} disparada com sucesso!`);
       } else {
-        console.warn(`[Campaign Scheduler] ⚠️ N8N_CAMPAIGN_WEBHOOK_URL não configurado, campanha ${campaign.id} ativada mas webhook não disparado`);
+        console.error(`[Campaign Scheduler] ❌ Executor retornou erro para campanha ${campaign.id}: ${response.statusText}`);
+        await query(
+          `UPDATE campaigns SET status = 'failed', updated_at = NOW() WHERE id = $1`,
+          [campaign.id]
+        );
       }
-
-      console.log(`[Campaign Scheduler] ✅ Campanha ${campaign.name} disparada com sucesso!`);
     } catch (error) {
       console.error(`[Campaign Scheduler] ❌ Erro ao disparar campanha ${campaign.id}:`, error);
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { apiRequest } from '../../utils/api';
+import { useConfirm } from '../ui/ConfirmDialog';
 import { toast } from "sonner";
 
 /**
@@ -8,6 +9,7 @@ import { toast } from "sonner";
  * USO: Adicione este componente temporariamente no Dashboard e execute uma vez
  */
 export function MigrateConvertedDates() {
+  const confirm = useConfirm();
   const [migrating, setMigrating] = useState(false);
   const [result, setResult] = useState<any>(null);
   
@@ -18,7 +20,12 @@ export function MigrateConvertedDates() {
     console.log('[Migration] 🔵 runMigration called');
     try {
       console.log('[Migration] 🔵 Mostrando confirmação...');
-      if (!confirm('🔧 Isso vai atualizar todos os leads convertidos para adicionar o campo convertedAt. Continuar?')) {
+      const confirmed = await confirm('🔧 Isso vai atualizar todos os leads convertidos para adicionar o campo convertedAt. Continuar?', {
+        title: 'Executar migração',
+        confirmLabel: 'Continuar',
+        variant: 'warning',
+      });
+      if (!confirmed) {
         console.log('[Migration] ⏭️ Migração cancelada pelo usuário');
         return;
       }

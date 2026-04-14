@@ -60,6 +60,7 @@ export interface UserAssistant {
         conversations: number;
         messages_sent: number;
         messages_received: number;
+        monthly_messages_used: number;
     };
     created_at: string;
     updated_at: string;

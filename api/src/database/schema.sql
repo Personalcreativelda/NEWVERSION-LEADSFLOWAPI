@@ -292,7 +292,7 @@ CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
 CREATE INDEX idx_users_plan ON users(plan);
 CREATE INDEX idx_users_plan_expires_at ON users(plan_expires_at);
 
--- Insert default plans
+-- Insert default plans (only if they don't already exist — preserves admin edits)
 INSERT INTO plans (id, name, description, price_monthly, price_annual, features, limits) VALUES
 ('free', 'Free', 'Plano gratuito para começar', 0, 0, 
   '["100 leads", "100 mensagens individuais/mês", "200 mensagens em massa/mês", "3 campanhas ativas", "Suporte básico"]'::jsonb,
@@ -305,7 +305,8 @@ INSERT INTO plans (id, name, description, price_monthly, price_annual, features,
 ('enterprise', 'Enterprise', 'Para empresas em crescimento', 59, 200,
   '["Leads ilimitados", "Mensagens individuais ilimitadas", "Mensagens em massa ilimitadas", "Campanhas ilimitadas", "Suporte VIP 24/7", "API dedicada", "Gestor de conta"]'::jsonb,
   '{"leads": -1, "messages": -1, "massMessages": -1}'::jsonb
-);
+)
+ON CONFLICT (id) DO NOTHING;
 
 -- Trigger helper
 CREATE OR REPLACE FUNCTION update_updated_at_column()

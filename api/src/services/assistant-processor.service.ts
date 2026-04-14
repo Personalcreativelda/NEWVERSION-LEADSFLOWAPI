@@ -59,7 +59,14 @@ export class AssistantProcessorService {
                 availableProviders.map(p => p.provider).join(' → ')
             );
 
-            // 2b. Verificar limite mensal de mensagens do assistente
+            // 2b. Verificar limite do plano ANTES de chamar a IA (evita gastar tokens da API)
+            const msgCheck = await checkMessageLimit(ctx.userId, 'messages');
+            if (!msgCheck.allowed) {
+                console.warn(`[AssistantProcessor] Limite de mensagens do plano atingido para user ${ctx.userId} (${msgCheck.current}/${msgCheck.limit}). Assistente bloqueado.`);
+                return false;
+            }
+
+            // 2c. Verificar limite mensal de mensagens do assistente
             const isFreePlan = activeAssistant.user_plan === 'free';
             const monthlyLimit = (activeAssistant.is_custom && isFreePlan)
                 ? 100
@@ -105,13 +112,6 @@ export class AssistantProcessorService {
             }
 
             console.log(`[AssistantProcessor] Resposta gerada em ${responseTime}ms (${aiResponse.tokensUsed} tokens)`);
-
-            // ── Verificar limite de mensagens individuais antes de enviar ──
-            const msgCheck = await checkMessageLimit(ctx.userId, 'messages');
-            if (!msgCheck.allowed) {
-                console.warn(`[AssistantProcessor] Limite de mensagens individuais atingido para user ${ctx.userId}. Resposta da IA não enviada.`);
-                return false;
-            }
 
             // 6. Enviar resposta pelo canal (capturar externalId para dedup no webhook)
             const externalMsgId = await this.sendReply(ctx, aiResponse.content);

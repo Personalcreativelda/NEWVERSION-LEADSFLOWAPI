@@ -166,9 +166,13 @@ export function useInbox(options: UseInboxOptions = {}) {
         try {
             await sendMessage(content, mediaUrl, mediaType);
             // Notify App-level usage counters to refresh after a message is sent
-            window.dispatchEvent(new CustomEvent('message-sent'));
-        } catch (error) {
+            window.dispatchEvent(new CustomEvent('leadflow:usage-changed'));
+        } catch (error: any) {
             console.error('[useInbox] Erro ao enviar mensagem:', error);
+            // If plan limit reached, trigger upgrade modal
+            if (error?.response?.status === 429 || error?.response?.data?.upgrade || error?.message?.includes('Limite')) {
+                window.dispatchEvent(new CustomEvent('leadflow:show-upgrade'));
+            }
             throw error;
         }
     }, [selectedConversation, sendMessage]);

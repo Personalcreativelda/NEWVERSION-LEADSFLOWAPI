@@ -422,8 +422,84 @@ router.post('/evolution/messages', async (req, res) => {
     console.log('[Evolution Webhook] Event (parsed):', event);
     console.log('[Evolution Webhook] Data keys:', data ? Object.keys(data) : 'null');
 
-    // Verificar tipo de evento - só processar mensagens
-    const messageEvents = ['MESSAGES_UPSERT', 'messages.upsert', 'message', 'MESSAGES_UPDATE'];
+    // ─── Processar MESSAGES_UPDATE (confirmações de entrega / leitura) ─────────
+    if (event === 'MESSAGES_UPDATE') {
+      const updates = Array.isArray(data) ? data : (data ? [data] : []);
+      console.log(`[Evolution Webhook] MESSAGES_UPDATE: ${updates.length} atualizações`);
+
+      for (const update of updates) {
+        const msgId = update?.key?.id || update?.id;
+        const newStatus: string = update?.update?.status || update?.status || '';
+        const fromMe: boolean = update?.key?.fromMe === true;
+
+        if (!msgId || !newStatus || !fromMe) continue;
+
+        // Mapear status do Evolution API para status interno
+        const statusMap: Record<string, string> = {
+          'SERVER_ACK': 'sent',
+          'DELIVERY_ACK': 'delivered',
+          'READ': 'read',
+          'PLAYED': 'read',
+        };
+        const internalStatus = statusMap[newStatus];
+        if (!internalStatus) continue;
+
+        console.log(`[Evolution Webhook] Atualizando mensagem ${msgId} → ${internalStatus}`);
+
+        // Atualizar status da mensagem na tabela messages
+        const msgUpdateResult = await query(
+          `UPDATE messages
+           SET status = $1, updated_at = NOW()
+           WHERE external_id = $2
+           RETURNING id, campaign_id, user_id`,
+          [internalStatus, msgId]
+        ).catch(() => null);
+
+        if (!msgUpdateResult || msgUpdateResult.rowCount === 0) continue;
+
+        const msg = msgUpdateResult.rows[0];
+        if (!msg.campaign_id) continue;
+
+        // Incrementar contador na campanha de acordo com o status
+        if (internalStatus === 'delivered') {
+          await query(
+            `UPDATE campaigns
+             SET stats = jsonb_set(
+               COALESCE(stats, '{}'::jsonb),
+               '{delivered}',
+               (COALESCE((stats->>'delivered')::int, 0) + 1)::text::jsonb
+             ),
+             updated_at = NOW()
+             WHERE id = $1`,
+            [msg.campaign_id]
+          ).catch(() => null);
+        } else if (internalStatus === 'read') {
+          await query(
+            `UPDATE campaigns
+             SET stats = jsonb_set(
+               jsonb_set(
+                 COALESCE(stats, '{}'::jsonb),
+                 '{read}',
+                 (COALESCE((stats->>'read')::int, 0) + 1)::text::jsonb
+               ),
+               '{delivered}',
+               GREATEST(
+                 COALESCE((stats->>'delivered')::int, 0),
+                 (COALESCE((stats->>'delivered')::int, 0))
+               )::text::jsonb
+             ),
+             updated_at = NOW()
+             WHERE id = $1`,
+            [msg.campaign_id]
+          ).catch(() => null);
+        }
+      }
+
+      return res.json({ success: true, message: `${updates.length} status(es) atualizados` });
+    }
+
+    // Verificar tipo de evento - só processar mensagens novas
+    const messageEvents = ['MESSAGES_UPSERT', 'messages.upsert', 'message'];
     if (event && !messageEvents.includes(event)) {
       // Disparar webhooks de automação para eventos de conexão/QR do WhatsApp
       const connectionEvents = ['CONNECTION_UPDATE', 'connection.update'];
@@ -990,6 +1066,46 @@ router.post('/evolution/messages', async (req, res) => {
     // Atualizar last_message_at e unread_count (só incrementa se for mensagem recebida, não enviada)
     if (!isFromMe) {
       await conversationsService.updateUnreadCount(conversation.id, 1);
+
+      // Verificar se existe mensagem de campanha enviada para este número e incrementar "replied"
+      if (leadId) {
+        const campaignMsgResult = await query(
+          `SELECT campaign_id FROM messages
+           WHERE user_id = $1 AND lead_id = $2 AND direction = 'out' AND campaign_id IS NOT NULL
+           ORDER BY created_at DESC LIMIT 1`,
+          [channel.user_id, leadId]
+        ).catch(() => null);
+
+        if (campaignMsgResult && campaignMsgResult.rows.length > 0) {
+          const campaignId = campaignMsgResult.rows[0].campaign_id;
+          // Só contar a primeira resposta (verificar se já foi contado)
+          const alreadyReplied = await query(
+            `SELECT COUNT(*) as cnt FROM messages
+             WHERE user_id = $1 AND lead_id = $2 AND direction = 'in' AND campaign_id IS NULL
+             AND created_at > (
+               SELECT MAX(created_at) FROM messages WHERE user_id = $1 AND lead_id = $2 AND direction = 'out' AND campaign_id = $3
+             )`,
+            [channel.user_id, leadId, campaignId]
+          ).catch(() => null);
+
+          const repliedCount = alreadyReplied ? parseInt(alreadyReplied.rows[0]?.cnt || '0') : 0;
+          if (repliedCount === 0) {
+            // Primeira resposta depois da campanha — incrementar replied
+            await query(
+              `UPDATE campaigns
+               SET stats = jsonb_set(
+                 COALESCE(stats, '{}'::jsonb),
+                 '{replied}',
+                 (COALESCE((stats->>'replied')::int, 0) + 1)::text::jsonb
+               ),
+               updated_at = NOW()
+               WHERE id = $1`,
+              [campaignId]
+            ).catch(() => null);
+            console.log(`[Evolution Webhook] 💬 Resposta à campanha ${campaignId} registada (lead ${leadId})`);
+          }
+        }
+      }
     }
     await query(
       `UPDATE conversations

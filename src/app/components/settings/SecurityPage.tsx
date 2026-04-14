@@ -225,7 +225,12 @@ export default function SecurityPage({ user }: SecurityPageProps) {
   };
 
   const handleDeleteToken = async (tokenId: string) => {
-    if (!confirm('Tem certeza que deseja deletar este token? Esta ação não pode ser desfeita.')) {
+    const confirmed = await confirm('Tem certeza que deseja deletar este token? Esta ação não pode ser desfeita.', {
+      title: 'Excluir token',
+      confirmLabel: 'Excluir',
+      variant: 'danger',
+    });
+    if (!confirmed) {
       return;
     }
 

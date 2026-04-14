@@ -92,6 +92,17 @@ const parseCount = (result: QueryResult): number => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
+// Run a single count query, returning 0 on any error (missing table, bad cast, etc.)
+const safeCount = async (sql: string, params: any[]): Promise<number> => {
+  try {
+    const result = await query(sql, params);
+    return parseCount(result);
+  } catch (err) {
+    console.warn('[UsersService] safeCount query failed (returning 0):', (err as Error)?.message?.substring(0, 120));
+    return 0;
+  }
+};
+
 const fetchUsageCounts = async (userId: string): Promise<UsageCounts> => {
   try {
     // Fetch plan info to determine billing period start
@@ -113,37 +124,29 @@ const fetchUsageCounts = async (userId: string): Promise<UsageCounts> => {
       periodStart = new Date(now.getFullYear(), now.getMonth(), 1); // 1st of current month
     }
 
-    const [leadsResult, messagesResult, massMessagesResult, channelsResult, customAssistantsResult, voiceAgentsResult, activeCampaignsResult] = await Promise.all([
-      query('SELECT COUNT(*) FROM leads WHERE user_id = $1', [userId]),
-      // Mensagens individuais: enviadas (out), não são de campanha, dentro do período, excluindo IA
-      query(
-        "SELECT COUNT(*) FROM messages WHERE user_id = $1 AND direction = 'out' AND campaign_id IS NULL AND created_at >= $2 AND NOT (metadata @> '{\"automated\":true}'::jsonb)",
+    // Each query is isolated — a failure in one does NOT zero out other counts.
+    const [leads, messages, massMessages, channels, customAssistants, voiceAgents, activeCampaigns] = await Promise.all([
+      safeCount('SELECT COUNT(*) FROM leads WHERE user_id = $1', [userId]),
+      // Mensagens individuais: enviadas (out), não são de campanha, dentro do período (inclui IA)
+      safeCount(
+        "SELECT COUNT(*) FROM messages WHERE user_id = $1 AND direction = 'out' AND campaign_id IS NULL AND created_at >= $2",
         [userId, periodStart]
       ),
-      // Mensagens em massa: soma das campanhas criadas dentro do período
-      query(
-        "SELECT COALESCE(SUM((stats->>'sent')::int), 0) as count FROM campaigns WHERE user_id = $1 AND created_at >= $2",
+      // Mensagens em massa: soma de envios das campanhas criadas dentro do período
+      // Use CASE guard to avoid cast errors when stats->>'sent' is not a valid integer
+      safeCount(
+        `SELECT COALESCE(SUM(
+           CASE WHEN (stats->>'sent') ~ '^[0-9]+$' THEN (stats->>'sent')::bigint ELSE 0 END
+         ), 0) as count FROM campaigns WHERE user_id = $1 AND created_at >= $2`,
         [userId, periodStart]
       ),
-      // Canais conectados
-      query('SELECT COUNT(*) FROM channels WHERE user_id = $1', [userId]),
-      // Assistentes personalizados
-      query('SELECT COUNT(*) FROM ai_assistants WHERE user_id = $1 AND is_custom = true', [userId]),
-      // Agentes de voz
-      query('SELECT COUNT(*) FROM voice_agents WHERE user_id = $1', [userId]),
-      // Campanhas ativas (active ou scheduled)
-      query("SELECT COUNT(*) FROM campaigns WHERE user_id = $1 AND status IN ('active','scheduled','paused')", [userId]),
+      safeCount('SELECT COUNT(*) FROM channels WHERE user_id = $1', [userId]),
+      safeCount('SELECT COUNT(*) FROM ai_assistants WHERE user_id = $1 AND is_custom = true', [userId]),
+      safeCount('SELECT COUNT(*) FROM voice_agents WHERE user_id = $1', [userId]),
+      safeCount("SELECT COUNT(*) FROM campaigns WHERE user_id = $1 AND status IN ('active','scheduled','paused')", [userId]),
     ]);
 
-    return {
-      leads: parseCount(leadsResult),
-      messages: parseCount(messagesResult),
-      massMessages: parseCount(massMessagesResult),
-      channels: parseCount(channelsResult),
-      customAssistants: parseCount(customAssistantsResult),
-      voiceAgents: parseCount(voiceAgentsResult),
-      activeCampaigns: parseCount(activeCampaignsResult),
-    };
+    return { leads, messages, massMessages, channels, customAssistants, voiceAgents, activeCampaigns };
   } catch (error) {
     console.error('[UsersService] Failed to compute usage counts:', error);
     return { ...DEFAULT_USAGE };

@@ -493,15 +493,6 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
             </div>
 
             <h1 className="text-white text-3xl sm:text-4xl font-semibold mb-3">Entrar na conta</h1>
-            <p className="text-gray-400 text-sm sm:text-base">
-              Não tem uma conta?{' '}
-              <button
-                onClick={onSwitchToSignup}
-                className="text-[#00C48C] hover:text-[#00a576] font-medium"
-              >
-                Criar conta
-              </button>
-            </p>
           </div>
 
           {/* ✅ ALERTA DE ERRO MELHORADO */}
@@ -620,6 +611,17 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>
           </form>
+
+          {/* Link criar conta */}
+          <p className="text-center text-gray-400 text-sm mt-4 mb-2">
+            Não tem uma conta?{' '}
+            <button
+              onClick={onSwitchToSignup}
+              className="text-[#00C48C] hover:text-[#00a576] font-medium"
+            >
+              Criar conta
+            </button>
+          </p>
 
           {/* Divider */}
           <div className="relative mb-6">

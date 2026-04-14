@@ -453,9 +453,17 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
             `SELECT ua.*,
                     a.name, a.slug, a.description, a.short_description,
                     a.icon, a.color, a.category, a.features,
-                    a.price_monthly, a.is_free, a.is_custom, a.created_by, a.default_config
+                    a.price_monthly, a.is_free, a.is_custom, a.created_by, a.default_config,
+                    COALESCE(monthly.count, 0)::int AS monthly_messages_used
              FROM user_assistants ua
              JOIN assistants a ON ua.assistant_id = a.id
+             LEFT JOIN (
+               SELECT user_assistant_id, COUNT(*) AS count
+               FROM assistant_logs
+               WHERE status = 'success'
+                 AND created_at >= date_trunc('month', NOW())
+               GROUP BY user_assistant_id
+             ) monthly ON monthly.user_assistant_id = ua.id
              WHERE ua.user_id = $1
              ORDER BY ua.created_at DESC`,
             [userId]
@@ -472,7 +480,10 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
             channel_ids: row.channel_ids || [],
             n8n_workflow_id: row.n8n_workflow_id,
             last_triggered_at: row.last_triggered_at,
-            stats: row.stats,
+            stats: {
+                ...(row.stats || {}),
+                monthly_messages_used: row.monthly_messages_used,
+            },
             created_at: row.created_at,
             updated_at: row.updated_at,
             assistant: {
@@ -503,9 +514,17 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
                     a.name, a.slug, a.description, a.short_description,
                     a.icon, a.color, a.category, a.features,
                     a.price_monthly, a.is_free, a.is_custom, a.created_by,
-                    a.default_config, a.n8n_webhook_url
+                    a.default_config, a.n8n_webhook_url,
+                    COALESCE(monthly.count, 0)::int AS monthly_messages_used
              FROM user_assistants ua
              JOIN assistants a ON ua.assistant_id = a.id
+             LEFT JOIN (
+               SELECT user_assistant_id, COUNT(*) AS count
+               FROM assistant_logs
+               WHERE status = 'success'
+                 AND created_at >= date_trunc('month', NOW())
+               GROUP BY user_assistant_id
+             ) monthly ON monthly.user_assistant_id = ua.id
              WHERE ua.id = $1 AND ua.user_id = $2`,
             [id, userId]
         );
@@ -524,7 +543,10 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
             channel_ids: row.channel_ids || [],
             n8n_workflow_id: row.n8n_workflow_id,
             last_triggered_at: row.last_triggered_at,
-            stats: row.stats,
+            stats: {
+                ...(row.stats || {}),
+                monthly_messages_used: row.monthly_messages_used,
+            },
             created_at: row.created_at,
             updated_at: row.updated_at,
             assistant: {

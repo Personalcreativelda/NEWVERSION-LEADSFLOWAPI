@@ -1,5 +1,6 @@
 import { X, User, Phone, CheckCircle, MessageSquare, Edit2, Trash2, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useConfirm } from '../ui/ConfirmDialog';
 import { toast } from "sonner";
 
 interface WhatsAppContact {
@@ -170,9 +171,14 @@ export default function PreviewWhatsAppLeadsModal({
     onImport(contactsToImport);
   };
 
-  const handleDelete = (index: number) => {
+  const handleDelete = async (index: number) => {
     const contact = editedContacts[index];
-    if (confirm(`Deseja remover "${contact.nome}" da lista de importação?`)) {
+    const confirmed = await confirm(`Deseja remover "${contact.nome}" da lista de importação?`, {
+      title: 'Remover contacto',
+      confirmLabel: 'Remover',
+      variant: 'danger',
+    });
+    if (confirmed) {
       const newContacts = editedContacts.filter((_, idx) => idx !== index);
       setEditedContacts(newContacts);
       

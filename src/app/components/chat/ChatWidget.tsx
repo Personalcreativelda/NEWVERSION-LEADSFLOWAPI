@@ -222,8 +222,13 @@ export function ChatWidget({
     }
   };
 
-  const handleClearChat = () => {
-    if (confirm('Tem certeza que deseja limpar o histórico de conversas?')) {
+  const handleClearChat = async () => {
+    const confirmed = await confirm('Tem certeza que deseja limpar o histórico de conversas?', {
+      title: 'Limpar conversa',
+      confirmLabel: 'Limpar',
+      variant: 'warning',
+    });
+    if (confirmed) {
       setMessages([]);
       localStorage.removeItem('leadflow_chat_history');
       setShowSatisfaction(false);

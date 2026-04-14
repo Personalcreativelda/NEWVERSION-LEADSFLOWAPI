@@ -20,10 +20,14 @@ export const clearPlanEnforcementCache = (userId: string): void => {
   enforcementCache.delete(userId);
 };
 
-// Hard-coded fallback lead limits if plan_limits column is NULL.
-const hardcodedLeadLimit = (plan: string): number => {
-  const map: Record<string, number> = { free: 100, business: 2000, enterprise: -1 };
-  return map[plan] ?? 100;
+// Hard-coded fallback limits per plan if plan_limits column is NULL.
+const hardcodedLimit = (plan: string, resource: 'leads' | 'messages' | 'massMessages'): number => {
+  const map: Record<string, Record<string, number>> = {
+    free:       { leads: 100,  messages: 100,  massMessages: 50   },
+    business:   { leads: 2000, messages: 1000, massMessages: 5000 },
+    enterprise: { leads: -1,   messages: -1,   massMessages: -1   },
+  };
+  return map[plan]?.[resource] ?? map.free[resource];
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,7 +36,10 @@ const hardcodedLeadLimit = (plan: string): number => {
 // Blocks mutating requests (POST / PUT / PATCH / DELETE) when:
 //   1. The user's plan has expired (paid plans with plan_expires_at in the past)
 //   2. The subscription status is "past_due"
-//   3. The user has reached or exceeded their lead limit
+//
+// NOTE: Resource-specific limits (leads, messages, campaigns) are enforced
+// individually at their respective routes via checkLeadLimit / checkMessageLimit,
+// so that exhausting one resource never blocks the others.
 //
 // GET / HEAD / OPTIONS pass through unconditionally.
 // Requires req.user to be set (i.e. run AFTER requireAuth).
@@ -50,7 +57,6 @@ export const planEnforcement = async (
 
   const user = (req as any).user as { id: string } | undefined;
   if (!user?.id) {
-    // Not yet authenticated — let requireAuth handle the 401
     next();
     return;
   }
@@ -62,7 +68,7 @@ export const planEnforcement = async (
     if (cached && now - cached.lastCheck < CACHE_TTL) {
       if (cached.isBlocked) {
         res.status(403).json({
-          error: cached.code === 'LEAD_LIMIT_EXCEEDED' ? 'plan_limit_exceeded' : 'plan_expired',
+          error: 'plan_expired',
           code: cached.code,
           message: cached.message,
         });
@@ -72,14 +78,10 @@ export const planEnforcement = async (
       return;
     }
 
-    // Parallel: fetch user plan data + current lead count
-    const [userResult, leadCountResult] = await Promise.all([
-      query(
-        'SELECT plan, plan_limits, plan_expires_at, subscription_status FROM users WHERE id = $1',
-        [user.id]
-      ),
-      query('SELECT COUNT(*) AS count FROM leads WHERE user_id = $1', [user.id]),
-    ]);
+    const userResult = await query(
+      'SELECT plan, plan_expires_at, subscription_status FROM users WHERE id = $1',
+      [user.id]
+    );
 
     const userData = userResult.rows[0];
     if (!userData) {
@@ -108,43 +110,66 @@ export const planEnforcement = async (
       message = 'Pagamento em atraso. Regularize sua assinatura para continuar.';
     }
 
-    // ── Check 3: lead limit exceeded ────────────────────────────────────────
-    if (!isBlocked) {
-      const storedLimits = userData.plan_limits;
-      const leadLimit: number =
-        storedLimits && typeof storedLimits.leads === 'number'
-          ? storedLimits.leads
-          : hardcodedLeadLimit(plan);
-
-      if (leadLimit !== -1) {
-        const currentLeads = parseInt(leadCountResult.rows[0]?.count ?? '0', 10);
-        if (currentLeads >= leadLimit) {
-          isBlocked = true;
-          code = 'LEAD_LIMIT_EXCEEDED';
-          message = `Você atingiu o limite de ${leadLimit} leads do seu plano. Faça upgrade para continuar.`;
-        }
-      }
-    }
-
-    // Store in cache
     enforcementCache.set(user.id, { lastCheck: now, isBlocked, code, message });
 
     if (isBlocked) {
-      res.status(403).json({
-        error: code === 'LEAD_LIMIT_EXCEEDED' ? 'plan_limit_exceeded' : 'plan_expired',
-        code,
-        message,
-      });
+      res.status(403).json({ error: 'plan_expired', code, message });
       return;
     }
 
     next();
   } catch (error) {
-    // Don't block the request on enforcement errors — fail open intentionally
     console.error('[PlanEnforcement] Unexpected error, allowing request:', error);
     next();
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// checkMessageLimit
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// checkLeadLimit
+//
+// Checks whether a user can still create leads.
+// Returns { allowed: true } or { allowed: false, code, message, current, limit }.
+// Apply only on lead-creation routes (POST /leads, bulk import, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function checkLeadLimit(userId: string): Promise<MessageLimitResult> {
+  try {
+    const [userResult, countResult] = await Promise.all([
+      query('SELECT plan, plan_limits FROM users WHERE id = $1', [userId]),
+      query('SELECT COUNT(*) AS count FROM leads WHERE user_id = $1', [userId]),
+    ]);
+
+    const userData = userResult.rows[0];
+    if (!userData) return { allowed: true, current: 0, limit: -1, code: '', message: '' };
+
+    const plan = (userData.plan || 'free').toLowerCase();
+    const storedLimits = userData.plan_limits;
+    const limit: number =
+      storedLimits && typeof storedLimits.leads === 'number'
+        ? storedLimits.leads
+        : hardcodedLimit(plan, 'leads');
+
+    const current = parseInt(countResult.rows[0]?.count ?? '0', 10);
+
+    if (limit !== -1 && current >= limit) {
+      return {
+        allowed: false,
+        current,
+        limit,
+        code: 'LEAD_LIMIT_EXCEEDED',
+        message: `Você atingiu o limite de ${limit} leads do seu plano. Faça upgrade para continuar.`,
+      };
+    }
+
+    return { allowed: true, current, limit, code: '', message: '' };
+  } catch (err) {
+    console.error('[checkLeadLimit] Error:', err);
+    return { allowed: true, current: 0, limit: -1, code: '', message: '' };
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // checkMessageLimit
@@ -194,20 +219,19 @@ export async function checkMessageLimit(
 
     const countResult = await (type === 'messages'
       ? query(
-          "SELECT COUNT(*) AS count FROM messages WHERE user_id = $1 AND direction = 'out' AND campaign_id IS NULL AND created_at >= $2 AND NOT (metadata @> '{\"automated\":true}'::jsonb)",
+          "SELECT COUNT(*) AS count FROM messages WHERE user_id = $1 AND direction = 'out' AND campaign_id IS NULL AND created_at >= $2",
           [userId, periodStart]
         )
       : query(
-          "SELECT COALESCE(SUM((stats->>'sent')::int), 0) AS count FROM campaigns WHERE user_id = $1 AND created_at >= $2",
-          [userId, periodStart]
+          "SELECT COALESCE(SUM((stats->>'sent')::int), 0) AS count FROM campaigns WHERE user_id = $1",
+          [userId]
         ));
 
     const storedLimits = userData.plan_limits;
-    const defaults = DEFAULT_MSG_LIMITS[plan] ?? DEFAULT_MSG_LIMITS.free;
     const limit: number =
       storedLimits && typeof storedLimits[type] === 'number'
         ? storedLimits[type]
-        : defaults[type];
+        : hardcodedLimit(plan, type);
 
     const current = parseInt(countResult.rows[0]?.count ?? '0', 10);
 

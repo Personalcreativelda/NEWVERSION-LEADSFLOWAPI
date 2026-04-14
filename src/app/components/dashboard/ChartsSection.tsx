@@ -1,8 +1,9 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart } from 'recharts';
 import type { Lead } from '../../types';
 import FilterBar from './FilterBar';
-import { useMemo, useState } from 'react';
-import { MessageCircle, Cloud, Mail, Instagram, Facebook, Send, Globe, Megaphone, Webhook, Phone, Search, Link, Hash, Smartphone, Users } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { MessageCircle, Cloud, Mail, Instagram, Facebook, Send, Globe, Megaphone, Webhook, Phone, Search, Link, Hash, Smartphone, Users, RefreshCw } from 'lucide-react';
+import { apiRequest } from '../../utils/api';
 
 interface ChartsSectionProps {
   leads: Lead[];
@@ -183,7 +184,35 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
   // Estado para alternar entre 7 e 30 dias
   const [chartDays, setChartDays] = useState<7 | 30>(7);
 
-  // ✅ Dados para evolução de leads com useMemo
+  // ── Campaign Engagement: dados reais da API ───────────────────────────────
+  const [engagementData, setEngagementData] = useState<{
+    totals: { sent: number; delivered: number; read: number; replied: number; failed: number; deliveryRate: number; openRate: number; replyRate: number };
+    campaigns: any[];
+  } | null>(null);
+  const [engagementLoading, setEngagementLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setEngagementLoading(true);
+    apiRequest('/analytics/campaigns/engagement', 'GET')
+      .then((data) => { if (!cancelled) setEngagementData(data); })
+      .catch(() => { /* silently fallback to null */ })
+      .finally(() => { if (!cancelled) setEngagementLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Build chart bars from real totals
+  const engajamentoData = useMemo(() => {
+    if (!engagementData?.totals) return null;
+    const t = engagementData.totals;
+    return [
+      { name: 'Enviadas', value: t.sent,      color: '#5B9FED' },
+      { name: 'Entregues', value: t.delivered, color: '#10b981' },
+      { name: 'Visualizadas', value: t.read,   color: '#a855f7' },
+      { name: 'Respostas', value: t.replied,   color: '#f59e0b' },
+      { name: 'Falhas',    value: t.failed,    color: '#ef4444' },
+    ].filter(d => d.value > 0);
+  }, [engagementData]);
   const evolutionData = useMemo(() => {
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -212,14 +241,6 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     
     return data;
   }, [leads, chartDays]);
-
-  // Dados simulados para engajamento em campanhas
-  const engajamentoData = [
-    { name: 'Entregues', value: 5234, color: '#10b981' },
-    { name: 'Abertas', value: 4123, color: '#3b82f6' },
-    { name: 'Respostas', value: 2045, color: '#a855f7' },
-    { name: 'Cliques', value: 892, color: '#f59e0b' },
-  ];
 
   // Custom Tooltip
   const CustomTooltip = ({ active, payload }: any) => {
@@ -532,48 +553,102 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
 
         {/* Engajamento em Campanhas (Barras horizontais) */}
         <div className="bg-card dark:bg-card rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-border dark:border-border shadow-sm hover:shadow-md transition-all duration-300">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-semibold text-foreground dark:text-foreground">
+          <div className="flex items-center justify-between mb-4 sm:mb-5">
+            <h3 className="text-base sm:text-lg font-semibold text-foreground dark:text-foreground flex items-center gap-2">
+              <Megaphone className="w-5 h-5 text-[#5B9FED]" />
               Engajamento em Campanhas
             </h3>
+            {engagementLoading && <RefreshCw className="w-4 h-4 text-muted-foreground animate-spin" />}
           </div>
-          
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={engajamentoData} layout="vertical" margin={{ top: 10, right: 20, left: 60, bottom: 10 }} barSize={28} barCategoryGap="15%">
-              <XAxis 
-                type="number"
-                tick={{ fill: '#9ca3af', fontSize: 11 }}
-                stroke="#e5e7eb"
-                className="dark:stroke-gray-700"
-              />
-              <YAxis 
-                type="category"
-                dataKey="name"
-                tick={{ fill: '#9ca3af', fontSize: 11 }}
-                stroke="#e5e7eb"
-                className="dark:stroke-gray-700"
-                width={55}
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'var(--tooltip-bg, white)',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '12px',
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                  padding: '12px',
-                }}
-                cursor={{ fill: 'rgba(99, 102, 241, 0.1)' }}
-              />
-              <Bar 
-                dataKey="value" 
-                radius={[0, 8, 8, 0]}
-              >
-                {engajamentoData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
+
+          {/* KPI rate badges */}
+          {engagementData?.totals && (
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              <div className="bg-muted/40 dark:bg-muted/20 rounded-xl p-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">Taxa de Entrega</p>
+                <p className="text-xl font-bold text-green-500">{engagementData.totals.deliveryRate}%</p>
+              </div>
+              <div className="bg-muted/40 dark:bg-muted/20 rounded-xl p-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">Taxa de Abertura</p>
+                <p className="text-xl font-bold text-purple-500">{engagementData.totals.openRate}%</p>
+              </div>
+              <div className="bg-muted/40 dark:bg-muted/20 rounded-xl p-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">Taxa de Resposta</p>
+                <p className="text-xl font-bold text-amber-500">{engagementData.totals.replyRate}%</p>
+              </div>
+            </div>
+          )}
+
+          {engajamentoData && engajamentoData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={engajamentoData} layout="vertical" margin={{ top: 5, right: 40, left: 75, bottom: 5 }} barSize={24} barCategoryGap="20%">
+                <XAxis
+                  type="number"
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
+                  stroke="#e5e7eb"
+                  className="dark:stroke-gray-700"
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
+                  stroke="none"
+                  width={70}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                    padding: '10px 14px',
+                  }}
+                  formatter={(value: any, _name: any, props: any) => [
+                    `${value.toLocaleString()} msgs`,
+                    props.payload.name,
+                  ]}
+                  cursor={{ fill: 'rgba(91,159,237,0.08)' }}
+                />
+                <Bar dataKey="value" radius={[0, 8, 8, 0]} label={{ position: 'right', fill: '#9ca3af', fontSize: 11 }}>
+                  {engajamentoData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : !engagementLoading ? (
+            <div className="flex flex-col items-center justify-center h-[180px] text-muted-foreground">
+              <Megaphone className="w-10 h-10 opacity-20 mb-3" />
+              <p className="text-sm">Nenhuma campanha concluída ainda</p>
+              <p className="text-xs opacity-60 mt-1">Os dados aparecem após a primeira campanha enviada</p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-[180px]">
+              <RefreshCw className="w-8 h-8 text-muted-foreground animate-spin" />
+            </div>
+          )}
+
+          {/* Per-campaign mini table */}
+          {engagementData?.campaigns && engagementData.campaigns.length > 0 && (
+            <div className="mt-5 border-t border-border pt-4">
+              <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Campanhas Recentes</p>
+              <div className="space-y-2 max-h-48 overflow-auto">
+                {engagementData.campaigns.slice(0, 5).map((c: any) => (
+                  <div key={c.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg hover:bg-muted/40 transition-colors">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${c.status === 'completed' ? 'bg-green-500' : c.status === 'failed' ? 'bg-red-500' : 'bg-blue-500'}`} />
+                      <span className="truncate text-foreground font-medium max-w-[140px]">{c.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0 text-muted-foreground">
+                      <span title="Enviadas">{c.stats.sent} env</span>
+                      <span title="Taxa de entrega" className="text-green-500">{c.rates.deliveryRate}%</span>
+                      <span title="Respostas" className="text-amber-500">{c.rates.replyRate}%</span>
+                    </div>
+                  </div>
                 ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

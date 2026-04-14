@@ -2,6 +2,7 @@ import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, CheckSq
 import { useState, useEffect } from 'react';
 import type { Lead } from '../../types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { useConfirm } from '../ui/ConfirmDialog';
 
 // Ícone do WhatsApp
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -125,6 +126,8 @@ interface LeadsTableProps {
   userPlan?: 'free' | 'business' | 'enterprise';
   planExpired?: boolean;
   limitReached?: boolean;
+  leadsLimitReached?: boolean;
+  campaignsLimitReached?: boolean;
   loading?: boolean;
 }
 
@@ -145,6 +148,8 @@ export default function LeadsTable({
   userPlan,
   planExpired,
   limitReached,
+  leadsLimitReached,
+  campaignsLimitReached,
   loading
 }: LeadsTableProps) {
   const [busca, setBusca] = useState('');
@@ -211,10 +216,15 @@ export default function LeadsTable({
     }
   };
 
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = async () => {
     if (selectedLeads.size === 0) return;
 
-    if (!confirm(`Tem certeza que deseja deletar ${selectedLeads.size} lead(s) selecionado(s)?`)) {
+    const confirmed = await confirm(`Tem certeza que deseja deletar ${selectedLeads.size} lead(s) selecionado(s)?`, {
+      title: 'Excluir leads selecionados',
+      confirmLabel: 'Excluir',
+      variant: 'danger',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -304,8 +314,22 @@ export default function LeadsTable({
   // Verificar se pode importar - HABILITADO PARA TODOS OS PLANOS
   const canImport = true; // Todos os planos podem importar, o limite é controlado na importação
   const isExpired = planExpired === true;
-  // isBlocked covers expired plan AND limit exceeded (shows enforcement modal via callback)
-  const isBlocked = isExpired || (limitReached === true);
+  // isAdicionarBlocked: apenas plano expirado (limitão de leads é tratada via modal de upgrade ao clicar)
+  const isAdicionarBlocked = isExpired;
+  // isCampaignsBlocked: plano expirado OU limite de campanhas atingido
+  const isCampaignsBlocked = isExpired || (campaignsLimitReached === true);
+  // isBlocked genérico (importar, etc.): apenas plano expirado
+  const isBlocked = isExpired;
+
+  // Handler para "Adicionar Leads" com verificação de limite
+  const handleNovoLeadClick = () => {
+    if (isAdicionarBlocked) return;
+    if (leadsLimitReached) {
+      window.dispatchEvent(new CustomEvent('leadflow:show-upgrade'));
+      return;
+    }
+    onNovoLead?.();
+  };
 
   return (
     <div className="bg-card dark:bg-card rounded-2xl border border-border dark:border-border shadow-[0_2px_8px_-4px_rgba(15,23,42,0.12)] dark:shadow-[0_2px_8px_-4px_rgba(15,23,42,0.4)] overflow-hidden">
@@ -334,12 +358,12 @@ export default function LeadsTable({
           <div className="flex gap-2 overflow-x-auto pb-1">
             {onNovoLead && (
               <button
-                onClick={() => onNovoLead?.()}
-                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isBlocked
+                onClick={handleNovoLeadClick}
+                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isAdicionarBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
                   }`}
-                title={isBlocked ? 'Plano bloqueado' : 'Adicionar Leads'}
+                title={isAdicionarBlocked ? 'Plano bloqueado' : leadsLimitReached ? 'Limite de leads atingido — clique para fazer upgrade' : 'Adicionar Leads'}
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -395,11 +419,11 @@ export default function LeadsTable({
             {onCampaigns && (
               <button
                 onClick={() => onCampaigns?.()}
-                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isBlocked
+                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isCampaignsBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
                     : 'bg-purple-600 hover:bg-purple-700 text-white'
                   }`}
-                title={isBlocked ? 'Plano bloqueado' : 'Campanhas'}
+                title={isCampaignsBlocked ? (campaignsLimitReached ? 'Limite de campanhas atingido' : 'Plano bloqueado') : 'Campanhas'}
               >
                 <Megaphone className="w-5 h-5" />
               </button>
@@ -429,11 +453,12 @@ export default function LeadsTable({
           <div className="flex flex-wrap gap-2">
             {onNovoLead && (
               <button
-                onClick={() => onNovoLead?.()}
-                className={`inline-flex items-center gap-2 px-4 py-2 ${isBlocked
+                onClick={handleNovoLeadClick}
+                className={`inline-flex items-center gap-2 px-4 py-2 ${isAdicionarBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
                   } rounded-lg transition-colors shadow-sm`}
+                title={isAdicionarBlocked ? 'Plano bloqueado' : leadsLimitReached ? 'Limite de leads atingido — clique para fazer upgrade' : undefined}
               >
                 <Plus className="w-4 h-4" />
                 <span>Adicionar Leads</span>
@@ -510,7 +535,7 @@ export default function LeadsTable({
             {onCampaigns && (
               <button
                 onClick={() => onCampaigns?.()}
-                className={`inline-flex items-center gap-2 px-4 py-2 ${isBlocked
+                className={`inline-flex items-center gap-2 px-4 py-2 ${isCampaignsBlocked
                     ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
                     : 'bg-purple-600 hover:bg-purple-700 text-white'
                   } rounded-lg transition-colors shadow-sm`}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Check, Crown, Rocket, Zap, Switch as SwitchIcon, Info } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
+import { useConfirm } from '../ui/ConfirmDialog';
 import { projectId } from '../../utils/supabase/info';
 import type { Lead } from '../../types';
 
@@ -22,6 +23,7 @@ const TEMPLATES = {
 };
 
 export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, userPlan, onUpgrade }: MassMessageModalProps) {
+  const confirm = useConfirm();
   const [selecionados, setSelecionados] = useState<number[]>([]);
   const [mensagem, setMensagem] = useState('');
   const [preview, setPreview] = useState('');
@@ -108,7 +110,12 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
       return;
     }
 
-    if (!confirm(`Confirma o envio de ${selecionados.length} mensagens?`)) {
+    const confirmed = await confirm(`Confirma o envio de ${selecionados.length} mensagens?`, {
+      title: 'Confirmar envio em massa',
+      confirmLabel: 'Enviar mensagens',
+      variant: 'info',
+    });
+    if (!confirmed) {
       return;
     }
 

@@ -21,6 +21,7 @@ type NotificationType =
   | 'lead_removed'       // 🗑️ Lead removido
   | 'lead_converted'     // 🎉 Lead convertido
   | 'lead_moved'         // 📊 Lead movido no funil
+  | 'campaign_sent'      // 📣 Resultado de campanha
   | 'plan_expiring'      // ⚠️ Plano expirando
   | 'plan_limit'         // 📈 Limite atingido
   | 'task_overdue'       // ⏰ Tarefa atrasada
@@ -79,6 +80,12 @@ const notificationConfig: Record<NotificationType, NotificationConfig> = {
     color: 'text-purple-600 dark:text-purple-400',
     bgColor: 'bg-purple-50/80 dark:bg-purple-950/30',
     borderColor: 'border-purple-200/50 dark:border-purple-800/50',
+  },
+  campaign_sent: {
+    icon: CheckCircle2,
+    color: 'text-emerald-600 dark:text-emerald-400',
+    bgColor: 'bg-emerald-50/80 dark:bg-emerald-950/30',
+    borderColor: 'border-emerald-200/50 dark:border-emerald-800/50',
   },
   plan_expiring: {
     icon: AlertTriangle,
@@ -157,6 +164,7 @@ const notificationPriority: Record<NotificationType, number> = {
   admin_new_user: 4,
   admin_user_suspended: 4,
   task_reminder: 5,
+  campaign_sent: 6,
   lead_new: 6,
   lead_converted: 7,
   lead_moved: 8,

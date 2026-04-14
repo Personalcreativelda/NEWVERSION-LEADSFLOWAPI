@@ -12,6 +12,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { useConfirm } from './ui/ConfirmDialog';
 
 interface FloatingChatProps {
   chatWebhookUrl?: string;
@@ -47,6 +48,7 @@ export function FloatingChat({
   userPlan,
   currentPage
 }: FloatingChatProps) {
+  const confirm = useConfirm();
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -399,8 +401,13 @@ export function FloatingChat({
     }
   };
 
-  const handleClearChat = () => {
-    if (confirm('Tem certeza que deseja limpar o histórico de conversas?')) {
+  const handleClearChat = async () => {
+    const confirmed = await confirm('Tem certeza que deseja limpar o histórico de conversas?', {
+      title: 'Limpar conversa',
+      confirmLabel: 'Limpar',
+      variant: 'warning',
+    });
+    if (confirmed) {
       setMessages([]);
       localStorage.removeItem('leadflow_chat_history');
       setShowSatisfaction(false);

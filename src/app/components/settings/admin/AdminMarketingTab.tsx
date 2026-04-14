@@ -79,7 +79,12 @@ export const AdminMarketingTab: React.FC<AdminMarketingTabProps> = ({
       return;
     }
     const count = target === 'specific' ? selectedUsers.length : selectedTarget.count;
-    if (!confirm(`Enviar para ${count} usuário(s)?`)) return;
+    const confirmed = await confirm(`Enviar para ${count} usuário(s)?`, {
+      title: 'Confirmar envio',
+      confirmLabel: 'Enviar',
+      variant: 'info',
+    });
+    if (!confirmed) return;
 
     setSending(true);
     setResult(null);

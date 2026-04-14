@@ -355,7 +355,12 @@ export function WhatsAppConnection() {
   };
 
   const disconnectWhatsApp = async () => {
-    if (!confirm('Tem certeza que deseja desconectar o WhatsApp?')) {
+    const confirmed = await confirm('Tem certeza que deseja desconectar o WhatsApp?', {
+      title: 'Desconectar WhatsApp',
+      confirmLabel: 'Desconectar',
+      variant: 'warning',
+    });
+    if (!confirmed) {
       return;
     }
 

@@ -11,6 +11,7 @@ import { getStorageService } from '../services/storage.service';
 import { TwilioSMSService } from '../services/twilio-sms.service';
 import { getWebSocketService } from '../services/websocket.service';
 import { webhookDispatcher } from '../services/webhook-dispatcher.service';
+import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 
 const router = Router();
 
@@ -998,6 +999,17 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
     const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Enforce per-plan individual message limit
+    const msgCheck = await checkMessageLimit(user.id, 'messages');
+    if (!msgCheck.allowed) {
+      return res.status(429).json({
+        error: 'Limite de mensagens do plano atingido',
+        limit: msgCheck.limit,
+        current: msgCheck.current,
+        upgrade: true,
+      });
     }
 
     const { content, channel, media_url, media_type } = req.body;

@@ -69,10 +69,17 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const content = event.target?.result as string;
-      if (htmlContent.trim() && !confirm('Isso irá substituir o conteúdo atual. Continuar?')) {
-        return;
+      if (htmlContent.trim()) {
+        const confirmed = await confirm('Isso irá substituir o conteúdo atual. Continuar?', {
+          title: 'Substituir conteúdo HTML',
+          confirmLabel: 'Substituir',
+          variant: 'warning',
+        });
+        if (!confirmed) {
+          return;
+        }
       }
       setHtmlContent(content);
       setUseHtml(true);
@@ -81,9 +88,16 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
     reader.readAsText(file);
   };
 
-  const applyTemplate = (templateHtml: string) => {
-    if (htmlContent.trim() && !confirm('Isso irá substituir o conteúdo HTML atual. Deseja continuar?')) {
-      return;
+  const applyTemplate = async (templateHtml: string) => {
+    if (htmlContent.trim()) {
+      const confirmed = await confirm('Isso irá substituir o conteúdo HTML atual. Deseja continuar?', {
+        title: 'Aplicar modelo HTML',
+        confirmLabel: 'Aplicar',
+        variant: 'warning',
+      });
+      if (!confirmed) {
+        return;
+      }
     }
     setHtmlContent(templateHtml);
     setUseHtml(true);

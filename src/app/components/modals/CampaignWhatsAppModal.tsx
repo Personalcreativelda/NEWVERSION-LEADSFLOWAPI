@@ -9,6 +9,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
+import { useConfirm } from '../ui/ConfirmDialog';
 import { toast } from "sonner";
 import EmojiPicker from 'emoji-picker-react';
 import { channelsApi } from '../../services/api/inbox';
@@ -45,6 +46,7 @@ interface CampaignWhatsAppModalProps {
 }
 
 export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampaignCreated, onCampaignUpdated, editingCampaign, isDark = false }: CampaignWhatsAppModalProps) {
+  const confirm = useConfirm();
   const [campaignName, setCampaignName] = useState('');
   const [recipientMode, setRecipientMode] = useState<'all' | 'segments' | 'custom'>('all');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['novo']);
@@ -72,6 +74,15 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const [whatsappChannels, setWhatsappChannels] = useState<any[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<string>('');
   const [loadingChannels, setLoadingChannels] = useState(false);
+
+  // ✅ Estado para API Oficial (WhatsApp Cloud) — template messages
+  const [useTemplate, setUseTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateLanguage, setTemplateLanguage] = useState('pt_BR');
+
+  // ✅ Canal selecionado atualmente
+  const selectedChannelData = whatsappChannels.find(ch => ch.id === selectedChannel) || null;
+  const isCloudChannel = selectedChannelData?.type === 'whatsapp_cloud';
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -110,6 +121,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         setScheduleDate(settings.scheduleDate || '');
         setScheduleTime(settings.scheduleTime || '');
         setSendSpeed(settings.sendSpeed || 'normal');
+        setUseTemplate(settings.useTemplate || false);
+        setTemplateName(settings.templateName || '');
+        setTemplateLanguage(settings.templateLanguage || 'pt_BR');
+        if (settings.channelId) setSelectedChannel(settings.channelId);
 
         // ✅ Carregar arquivos anexados (media_urls) como attachments
         if (editingCampaign.media_urls && Array.isArray(editingCampaign.media_urls) && editingCampaign.media_urls.length > 0) {
@@ -164,6 +179,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       setScheduleTime('');
       setSendSpeed('normal');
       setAttachments([]);
+      setUseTemplate(false);
+      setTemplateName('');
+      setTemplateLanguage('pt_BR');
     }
   }, [editingCampaign]);
 
@@ -197,64 +215,73 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
   // ✅ CARREGAR RASCUNHO com confirmação
   useEffect(() => {
-    if (isOpen && !editingCampaign) { // ✅ Só carregar rascunho se NÃO estiver editando
-      const draft = localStorage.getItem('whatsapp_campaign_draft');
-      if (draft) {
-        try {
-          const parsed = JSON.parse(draft);
+    const loadDraft = async () => {
+      if (isOpen && !editingCampaign) { // ✅ Só carregar rascunho se NÃO estiver editando
+        const draft = localStorage.getItem('whatsapp_campaign_draft');
+        if (draft) {
+          try {
+            const parsed = JSON.parse(draft);
 
-          // ✅ Verificar se o rascunho é recente (máximo 24 horas)
-          const savedAt = parsed.autoSavedAt || parsed.savedAt;
-          if (savedAt) {
-            const hoursSinceSave = (Date.now() - new Date(savedAt).getTime()) / (1000 * 60 * 60);
-            if (hoursSinceSave > 24) {
-              // Rascunho muito antigo, remover automaticamente
+            // ✅ Verificar se o rascunho é recente (máximo 24 horas)
+            const savedAt = parsed.autoSavedAt || parsed.savedAt;
+            if (savedAt) {
+              const hoursSinceSave = (Date.now() - new Date(savedAt).getTime()) / (1000 * 60 * 60);
+              if (hoursSinceSave > 24) {
+                // Rascunho muito antigo, remover automaticamente
+                localStorage.removeItem('whatsapp_campaign_draft');
+                console.log('[Campaign Draft] Rascunho antigo removido (>24h)');
+                return;
+              }
+            }
+
+            // ✅ Verificar se tem conteúdo significativo
+            const hasContent = (parsed.campaignName && parsed.campaignName.trim()) ||
+              (parsed.message && parsed.message.trim());
+
+            if (!hasContent) {
+              // Rascunho vazio, remover sem perguntar
               localStorage.removeItem('whatsapp_campaign_draft');
-              console.log('[Campaign Draft] Rascunho antigo removido (>24h)');
+              console.log('[Campaign Draft] Rascunho vazio removido');
               return;
             }
-          }
 
-          // ✅ Verificar se tem conteúdo significativo
-          const hasContent = (parsed.campaignName && parsed.campaignName.trim()) ||
-            (parsed.message && parsed.message.trim());
+            const confirmRestore = await confirm(
+              '💾 Encontramos um rascunho salvo.\n\n' +
+              `📝 Nome: ${parsed.campaignName || 'Sem nome'}\n` +
+              `📅 Salvo em: ${new Date(parsed.autoSavedAt || parsed.savedAt).toLocaleString('pt-BR')}\n\n` +
+              'Deseja restaurar?',
+              {
+                title: 'Restaurar rascunho',
+                confirmLabel: 'Restaurar',
+                cancelLabel: 'Descartar',
+                variant: 'info',
+              }
+            );
 
-          if (!hasContent) {
-            // Rascunho vazio, remover sem perguntar
+            if (confirmRestore) {
+              setCampaignName(parsed.campaignName || '');
+              setMessage(parsed.message || '');
+              setRecipientMode(parsed.recipientMode || 'all');
+              setSelectedStatuses(parsed.selectedStatuses || ['novo']);
+              setCustomNumbers(parsed.customNumbers || '');
+              setScheduleMode(parsed.scheduleMode || 'now');
+              setScheduleDate(parsed.scheduleDate || '');
+              setScheduleTime(parsed.scheduleTime || '');
+              setSendSpeed(parsed.sendSpeed || 'normal');
+              toast.success('✅ Rascunho restaurado!');
+            } else {
+              localStorage.removeItem('whatsapp_campaign_draft');
+              toast.info('Rascunho descartado');
+            }
+          } catch (e) {
+            console.error('Failed to load draft:', e);
+            // Remover rascunho corrompido
             localStorage.removeItem('whatsapp_campaign_draft');
-            console.log('[Campaign Draft] Rascunho vazio removido');
-            return;
           }
-
-          const confirmRestore = window.confirm(
-            '💾 Encontramos um rascunho salvo.\n\n' +
-            `📝 Nome: ${parsed.campaignName || 'Sem nome'}\n` +
-            `📅 Salvo em: ${new Date(parsed.autoSavedAt || parsed.savedAt).toLocaleString('pt-BR')}\n\n` +
-            'Deseja restaurar?'
-          );
-
-          if (confirmRestore) {
-            setCampaignName(parsed.campaignName || '');
-            setMessage(parsed.message || '');
-            setRecipientMode(parsed.recipientMode || 'all');
-            setSelectedStatuses(parsed.selectedStatuses || ['novo']);
-            setCustomNumbers(parsed.customNumbers || '');
-            setScheduleMode(parsed.scheduleMode || 'now');
-            setScheduleDate(parsed.scheduleDate || '');
-            setScheduleTime(parsed.scheduleTime || '');
-            setSendSpeed(parsed.sendSpeed || 'normal');
-            toast.success('✅ Rascunho restaurado!');
-          } else {
-            localStorage.removeItem('whatsapp_campaign_draft');
-            toast.info('Rascunho descartado');
-          }
-        } catch (e) {
-          console.error('Failed to load draft:', e);
-          // Remover rascunho corrompido
-          localStorage.removeItem('whatsapp_campaign_draft');
         }
       }
-    }
+    };
+    loadDraft();
   }, [isOpen, editingCampaign]); // ✅ Adicionar editingCampaign como dependência
 
   // Fechar dropdown ao clicar fora
@@ -280,9 +307,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       setLoadingChannels(true);
       try {
         const response = await channelsApi.getAll();
-        // Filtrar canais WhatsApp e WhatsApp Cloud conectados
+        // Filtrar canais WhatsApp e WhatsApp Cloud conectados (qualquer status ativo)
         const whatsappOnly = response.filter(
-          (ch: any) => (ch.type === 'whatsapp' || ch.type === 'whatsapp_cloud') && (ch.status === 'connected' || ch.status === 'active')
+          (ch: any) => (ch.type === 'whatsapp' || ch.type === 'whatsapp_cloud') &&
+            (ch.status === 'connected' || ch.status === 'active' || ch.status === 'pending')
         );
         setWhatsappChannels(whatsappOnly);
 
@@ -687,6 +715,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
     setStopOnError(true);
     setSkipInvalid(true);
     setRandomDelay(false);
+    setUseTemplate(false);
+    setTemplateName('');
+    setTemplateLanguage('pt_BR');
   };
 
   // ✅ ENVIAR CAMPANHA
@@ -760,7 +791,14 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       ? `📤 Você está prestes a enviar para ${recipientCount} destinatário(s).\n\n✅ Confirmar envio?`
       : `📅 Agendar campanha para ${new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString('pt-BR')}?\n\n📤 ${recipientCount} destinatário(s)`;
 
-    if (!window.confirm(confirmMessage)) {
+    const confirmed = await confirm(confirmMessage, {
+      title: scheduleMode === 'now' ? 'Confirmar envio' : 'Confirmar agendamento',
+      confirmLabel: scheduleMode === 'now' ? 'Enviar' : 'Agendar',
+      variant: 'info',
+      detail: `${recipientCount} destinatário(s)`
+    });
+
+    if (!confirmed) {
       console.log('[Campaign WhatsApp] ❌ Usuário cancelou o envio');
       return;
     }
@@ -801,19 +839,15 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       console.log('[Campaign WhatsApp] 📋 Total de destinatários preparados:', recipients.length);
       console.log('[Campaign WhatsApp] 📋 Destinatários:', recipients);
 
-      // Obter URL do webhook de envio em massa
-      const bulkSendUrl = localStorage.getItem('n8n_bulk_send_url');
-      console.log('[Campaign WhatsApp] 🔗 URL N8N obtida:', bulkSendUrl);
-
-      if (!bulkSendUrl) {
-        toast.error('⚠️ Configure o webhook de envio em massa nas Integrações');
+      // Verificar token de autenticação
+      const token = localStorage.getItem('leadflow_access_token');
+      if (!token) {
+        toast.error('Você precisa estar autenticado');
         setIsSending(false);
-        console.log('[Campaign WhatsApp] ❌ URL N8N não configurada');
         return;
       }
 
-      // ✅ Obter instância/credenciais do canal selecionado
-      const selectedChannelData = whatsappChannels.find(ch => ch.id === selectedChannel);
+      // ✅ Obter instância/credenciais do canal selecionado (usa variável do componente)
       let evolutionInstance = '';
       const isWhatsAppCloud = selectedChannelData?.type === 'whatsapp_cloud';
 
@@ -1085,6 +1119,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           settings: {
             recipientMode,
             selectedStatuses,
+            // Só aplica segmentos quando o modo é efetivamente por segmentos
+            segments: recipientMode === 'segments' ? selectedStatuses : [],
             customNumbers,
             scheduleMode,
             scheduleDate,
@@ -1097,6 +1133,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             maxDelaySeconds,
             channelId: selectedChannel,
             channelType: selectedChannelData?.type || 'whatsapp',
+            // API Oficial (Cloud API) — template messages
+            useTemplate: isCloudChannel ? useTemplate : false,
+            templateName: isCloudChannel && useTemplate ? templateName.trim() : undefined,
+            templateLanguage: isCloudChannel && useTemplate ? templateLanguage : undefined,
           },
           media_urls: allMediaUrls,
           // Construir data com timezone local do usuário
@@ -1145,16 +1185,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         }
 
       } else {
-        // ✅ MODO IMEDIATO: Salvar no banco (como ativa) e depois enviar para N8N
-        console.log('[Campaign WhatsApp] 🚀 Modo imediato - salvando e enviando para N8N...');
-
-        // Obter token de autenticação
-        const token = localStorage.getItem('leadflow_access_token');
-        if (!token) {
-          toast.error('Você precisa estar autenticado');
-          setIsSending(false);
-          return;
-        }
+        // ✅ MODO IMEDIATO: Salvar no banco e disparar via executor do backend
+        console.log('[Campaign WhatsApp] 🚀 Modo imediato - salvando e disparando via backend...');
 
         // 1. Upload de arquivos novos (se houver)
         const uploadedMediaUrls: string[] = [];
@@ -1175,17 +1207,18 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         const existingUrls = attachments.filter(a => a.isExisting && a.url).map(a => a.url!);
         const allMediaUrls = [...existingUrls, ...uploadedMediaUrls];
 
-        // 2. Salvar no Banco como 'active'
+        // 2. Salvar no Banco como 'pending' — o executor mudará para 'active'
         const campaignDataForDB = {
           name: campaignName,
           description: `Disparo imediato para ${recipientCount} destinatários`,
           type: 'whatsapp',
-          status: 'active',
+          status: 'pending',
           template: message,
-          started_at: new Date().toISOString(),
           settings: {
             recipientMode,
             selectedStatuses,
+            // Só envia 'segments' quando o modo é efetivamente por segmentos
+            segments: recipientMode === 'segments' ? selectedStatuses : [],
             customNumbers,
             scheduleMode: 'now',
             sendSpeed,
@@ -1196,6 +1229,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             maxDelaySeconds,
             channelId: selectedChannel,
             channelType: selectedChannelData?.type || 'whatsapp',
+            // API Oficial (Cloud API) — template messages
+            useTemplate: isCloudChannel ? useTemplate : false,
+            templateName: isCloudChannel && useTemplate ? templateName.trim() : undefined,
+            templateLanguage: isCloudChannel && useTemplate ? templateLanguage : undefined,
           },
           media_urls: allMediaUrls
         };
@@ -1221,36 +1258,43 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             const savedCampaign = await saveResponse.json();
             savedCampaignId = savedCampaign.id;
             console.log('[Campaign WhatsApp] ✅ Campanha salva no banco:', savedCampaignId);
-
-            // Notificar UI
-            if (isEditing && onCampaignUpdated) onCampaignUpdated(savedCampaign);
-            else if (!isEditing && onCampaignCreated) onCampaignCreated(savedCampaign);
+            // Não notifica a UI ainda — aguarda o execute setar status 'active'
           }
         } catch (err) {
           console.warn('[Campaign WhatsApp] ⚠️ Erro ao salvar no banco, mas prosseguindo com trigger:', err);
         }
 
-        // 3. Enviar para N8N (com o ID real do banco)
-        const n8nPayload = { ...campaignData, id: savedCampaignId };
-
-        console.log('[Campaign WhatsApp] 🌐 Triggering N8N:', bulkSendUrl);
-
-        fetch(bulkSendUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(n8nPayload),
-          mode: 'cors',
-        })
-          .then(async response => {
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const text = await response.text();
-            console.log('[Campaign WhatsApp] ✅ N8N Response:', text);
+        // 3. Disparar via executor do backend (atualiza stats e status em tempo real)
+        try {
+          const executeResponse = await fetch(
+            `${(import.meta as any).env.VITE_API_URL}/api/campaigns/${savedCampaignId}/execute`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+            }
+          );
+          if (executeResponse.ok) {
+            console.log('[Campaign WhatsApp] ✅ Execução iniciada pelo backend');
             toast.success('🚀 Disparo iniciado com sucesso!');
-          })
-          .catch(error => {
-            console.error('[Campaign WhatsApp] ⚠️ Erro N8N:', error);
-            toast.error('⚠️ Campanha salva, mas erro ao iniciar disparo automático. Tente novamente ou verifique o N8N.');
-          });
+            // Notificar UI agora que a campanha está 'active' no banco
+            const isEditing = !!editingCampaign;
+            if (isEditing && onCampaignUpdated) {
+              onCampaignUpdated({ id: savedCampaignId, status: 'active' });
+            } else if (!isEditing && onCampaignCreated) {
+              onCampaignCreated({ id: savedCampaignId, status: 'active' });
+            }
+          } else {
+            const err = await executeResponse.json().catch(() => ({ error: 'Erro desconhecido' }));
+            console.error('[Campaign WhatsApp] ❌ Erro ao executar:', err);
+            toast.warning(`⚠️ Campanha salva, mas erro ao iniciar: ${err.error || 'Verifique os logs'}`);
+          }
+        } catch (execError: any) {
+          console.error('[Campaign WhatsApp] ❌ Erro de rede ao executar:', execError);
+          toast.warning('⚠️ Campanha salva. Iniciando em segundo plano...');
+        }
       }
 
       // ✅ MOSTRAR TOAST DE SUCESSO
@@ -1429,17 +1473,27 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   };
 
   // ✅ FECHAR COM CONFIRMAÇÃO
-  const handleClose = () => {
+  const handleClose = async () => {
     if (message.trim() || campaignName.trim() || attachments.length > 0) {
-      const confirmDiscard = window.confirm(
+      const confirmDiscard = await confirm(
         '⚠️ Você tem alterações não salvas.\n\n' +
-        '💾 Deseja salvar como rascunho antes de fechar?'
+        '💾 Deseja salvar como rascunho antes de fechar?',
+        {
+          title: 'Alterações não salvas',
+          confirmLabel: 'Salvar rascunho',
+          cancelLabel: 'Não salvar',
+          variant: 'warning',
+        }
       );
 
       if (confirmDiscard) {
         handleSaveDraft();
       } else {
-        const confirmDelete = window.confirm('❌ Descartar todas as alterações?');
+        const confirmDelete = await confirm('❌ Descartar todas as alterações?', {
+          title: 'Descartar alterações',
+          confirmLabel: 'Descartar',
+          variant: 'danger',
+        });
         if (confirmDelete) {
           localStorage.removeItem('whatsapp_campaign_draft');
           resetForm();
@@ -1543,6 +1597,78 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   </select>
                 )}
               </div>
+
+              {/* ☁️ Painel de API Oficial (WhatsApp Cloud) */}
+              {isCloudChannel && (
+                <div className="rounded-xl border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">☁️</span>
+                    <span className="text-sm font-semibold text-blue-800 dark:text-blue-300">
+                      API Oficial Meta — WhatsApp Cloud
+                    </span>
+                  </div>
+
+                  {/* Toggle: Template ou Mensagem Livre */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-blue-700 dark:text-blue-400">Usar Template Aprovado</p>
+                      <p className="text-xs text-blue-600 dark:text-blue-500">
+                        Obrigatório para contatos fora da janela de 24 h
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setUseTemplate(v => !v)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useTemplate ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${useTemplate ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+
+                  {useTemplate && (
+                    <div className="space-y-2">
+                      <div>
+                        <Label className="text-xs font-medium text-blue-700 dark:text-blue-400 mb-1 block">
+                          Nome do Template *
+                        </Label>
+                        <Input
+                          value={templateName}
+                          onChange={e => setTemplateName(e.target.value)}
+                          placeholder="ex: campaign_promo"
+                          className="h-9 text-sm !bg-white dark:!bg-white !text-gray-900 !border-blue-300"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-blue-700 dark:text-blue-400 mb-1 block">
+                          Idioma
+                        </Label>
+                        <select
+                          value={templateLanguage}
+                          onChange={e => setTemplateLanguage(e.target.value)}
+                          className="w-full h-9 px-3 text-sm rounded-lg border border-blue-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="pt_BR">Português (Brasil)</option>
+                          <option value="en_US">English (US)</option>
+                          <option value="es_ES">Español</option>
+                          <option value="pt_PT">Português (Portugal)</option>
+                          <option value="fr_FR">Français</option>
+                        </select>
+                      </div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 rounded p-2">
+                        💡 O conteúdo da mensagem abaixo será usado como parâmetro <code>{'{{1}}'}</code> do template.
+                        Certifique-se que o template esteja aprovado no Meta Business Manager.
+                      </p>
+                    </div>
+                  )}
+
+                  {!useTemplate && (
+                    <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 rounded p-2 border border-amber-200">
+                      ⚠️ Mensagem livre funciona apenas para contatos que interagiram nas últimas 24 h.
+                      Para campanhas em frio, ative "Usar Template Aprovado".
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="border-t border-gray-200 dark:border-gray-700"></div>
 

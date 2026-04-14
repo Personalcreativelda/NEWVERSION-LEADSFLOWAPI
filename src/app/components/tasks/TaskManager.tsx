@@ -169,8 +169,13 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
     }));
   };
 
-  const handleDeleteTask = (taskId: string) => {
-    if (confirm('Tem certeza que deseja deletar esta tarefa?')) {
+  const handleDeleteTask = async (taskId: string) => {
+    const confirmed = await confirm('Tem certeza que deseja deletar esta tarefa?', {
+      title: 'Excluir tarefa',
+      confirmLabel: 'Excluir',
+      variant: 'danger',
+    });
+    if (confirmed) {
       setTasks(tasks.filter(t => t.id !== taskId));
       toast.success('Tarefa deletada');
     }

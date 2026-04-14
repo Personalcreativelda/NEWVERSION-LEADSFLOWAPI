@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { checkLeadLimit } from '../middleware/plan-enforcement.middleware';
 import { LeadsService } from '../services/leads.service';
 import { notificationsService } from '../services/notifications.service';
 import { getStorageService } from '../services/storage.service';
@@ -334,6 +335,19 @@ router.post('/', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // Check lead limit before creating
+    const limitCheck = await checkLeadLimit(user.id);
+    if (!limitCheck.allowed) {
+      return res.status(429).json({
+        error: 'plan_limit_exceeded',
+        code: limitCheck.code,
+        message: limitCheck.message,
+        current: limitCheck.current,
+        limit: limitCheck.limit,
+        upgrade: true,
+      });
+    }
+
     const lead = await leadsService.create(req.body, user.id);
 
     // Create notification for new lead
@@ -466,6 +480,19 @@ router.post('/import-bulk', async (req, res, next) => {
       return res.status(400).json({ error: 'Leads payload cannot be empty' });
     }
 
+    // Check lead limit before importing
+    const limitCheck = await checkLeadLimit(user.id);
+    if (!limitCheck.allowed) {
+      return res.status(429).json({
+        error: 'plan_limit_exceeded',
+        code: limitCheck.code,
+        message: limitCheck.message,
+        current: limitCheck.current,
+        limit: limitCheck.limit,
+        upgrade: true,
+      });
+    }
+
     // Get user plan and limits from database
     const { query } = require('../database/connection');
     const userResult = await query(
@@ -571,6 +598,19 @@ router.post('/import-with-validation', async (req, res, next) => {
     const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Check lead limit before importing
+    const limitCheck = await checkLeadLimit(user.id);
+    if (!limitCheck.allowed) {
+      return res.status(429).json({
+        error: 'plan_limit_exceeded',
+        code: limitCheck.code,
+        message: limitCheck.message,
+        current: limitCheck.current,
+        limit: limitCheck.limit,
+        upgrade: true,
+      });
     }
 
     const {

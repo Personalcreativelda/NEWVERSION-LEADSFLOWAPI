@@ -248,7 +248,12 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
         const typeLabel = tag.type === 'funnel' ? 'etapa do funil' : tag.type === 'lead_tag' ? 'tag' : 'etiqueta';
         const confirmMsg = `Tem certeza que deseja remover a ${typeLabel} "${tag.name}"?\n\nOs leads não serão afetados.`;
         
-        if (!window.confirm(confirmMsg)) {
+        const confirmed = await confirm(confirmMsg, {
+            title: 'Remover etiqueta',
+            confirmLabel: 'Remover',
+            variant: 'danger',
+        });
+        if (!confirmed) {
             console.log('[InboxTreeMenu] Delete cancelled by user');
             return;
         }

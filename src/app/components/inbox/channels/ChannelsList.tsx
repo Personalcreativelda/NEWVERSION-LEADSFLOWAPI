@@ -196,7 +196,12 @@ export function ChannelsList() {
     };
 
     const handleDelete = async (channel: Channel) => {
-        if (!confirm(`Remover canal ${channel.name}?`)) return;
+        const confirmed = await confirm(`Remover canal ${channel.name}?`, {
+            title: 'Remover canal',
+            confirmLabel: 'Remover',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         try {
             await channelsApi.delete(channel.id);
             setChannels(prev => prev.filter(c => c.id !== channel.id));

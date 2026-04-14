@@ -16,6 +16,7 @@ import { assistantsApi, type Assistant, type UserAssistant, type CreateAssistant
 import { channelsApi } from '../../services/api/inbox';
 import type { Channel } from '../../types/inbox';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
+import { useConfirm } from '../ui/ConfirmDialog';
 
 interface AssistantsPageProps {
   isDark: boolean;
@@ -106,6 +107,7 @@ function isFreeTrialAssistant(assistant: Assistant): boolean {
 }
 
 export default function AssistantsPage({ isDark }: AssistantsPageProps) {
+  const confirm = useConfirm();
   const planLimits = usePlanLimits();
   const [activeTab, setActiveTab] = useState<'marketplace' | 'connected'>('marketplace');
   const [availableAssistants, setAvailableAssistants] = useState<Assistant[]>([]);
@@ -168,6 +170,22 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     loadData();
   }, [loadData]);
 
+  // Auto-refresh dos stats a cada 60s e quando a janela ganha foco
+  useEffect(() => {
+    const refreshStats = async () => {
+      try {
+        const userAssists = await assistantsApi.getUserAssistants();
+        setUserAssistants(userAssists);
+      } catch { /* silent */ }
+    };
+    const interval = setInterval(refreshStats, 60_000);
+    window.addEventListener('focus', refreshStats);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', refreshStats);
+    };
+  }, []);
+
   // Filter assistants
   const filteredAssistants = availableAssistants.filter(assistant => {
     const matchesSearch = assistant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -223,7 +241,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
   // Handle disconnect
   const handleDisconnect = async (userAssistant: UserAssistant) => {
-    if (!confirm(`Deseja realmente desconectar ${userAssistant.assistant?.name}?`)) return;
+    const confirmed = await confirm(`Deseja realmente desconectar ${userAssistant.assistant?.name}?`, {
+      title: 'Desconectar assistente',
+      confirmLabel: 'Desconectar',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
 
     try {
       setActionLoading(true);
@@ -346,7 +369,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
   // Handle delete custom assistant
   const handleDeleteAssistant = async (assistant: Assistant) => {
-    if (!confirm(`Deseja realmente deletar o assistente "${assistant.name}"? Esta ação não pode ser desfeita.`)) return;
+    const confirmed = await confirm(`Deseja realmente deletar o assistente "${assistant.name}"? Esta ação não pode ser desfeita.`, {
+      title: 'Excluir assistente',
+      confirmLabel: 'Excluir',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     try {
       setActionLoading(true);
@@ -439,15 +467,30 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       .map(id => getChannelById(id))
       .filter(Boolean) as Channel[];
 
+    const isFree = isFreeTrialAssistant(assistant);
+    const monthlyUsed = userAssistant?.stats?.monthly_messages_used ?? 0;
+    const monthlyLimit = Number(userAssistant?.config?.monthly_message_limit) || 200;
+    const monthlyPct = Math.min(100, Math.round((monthlyUsed / monthlyLimit) * 100));
+    const nearLimit = monthlyPct >= 80;
+    const atLimit = monthlyPct >= 100;
+
     return (
       <div
         key={assistant.id}
         className={`relative flex flex-col rounded-2xl border p-4 transition-all duration-200 hover:shadow-lg ${
-          isDark
-            ? 'bg-card border border-border text-card-foreground shadow-sm'
-            : 'bg-muted/30 border border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/50'
+          isFree
+            ? isDark
+              ? 'bg-card border-2 border-blue-500/40 text-card-foreground shadow-sm shadow-blue-500/10'
+              : 'bg-blue-50/50 border-2 border-blue-400/50 text-gray-800 hover:border-blue-500/70'
+            : isDark
+              ? 'bg-card border border-border text-card-foreground shadow-sm'
+              : 'bg-muted/30 border border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/50'
         }`}
       >
+        {/* Free plan glow strip at top */}
+        {isFree && (
+          <div className="absolute top-0 left-4 right-4 h-0.5 rounded-full bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-400 opacity-70" />
+        )}
         {/* Featured badge */}
         {assistant.is_featured && (
           <div className="absolute -top-2 -right-2">
@@ -489,8 +532,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30 shrink-0">
               Grátis
             </Badge>
-          ) : isFreeTrialAssistant(assistant) ? (
-            <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 shrink-0">
+          ) : isFree ? (
+            <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 shrink-0 gap-1">
+              <Zap className="w-3 h-3" />
               Grátis
             </Badge>
           ) : (
@@ -546,21 +590,49 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
         {/* Stats for connected assistants */}
         {!isMarketplace && userAssistant && (
-          <div className="flex items-center gap-4 mb-3">
-            <div className="flex items-center gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
-              <span className="text-xs text-muted-foreground">
-                {userAssistant.stats?.conversations || 0} conversas
-              </span>
+          <div className="flex flex-col gap-2 mb-3">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
+                <span className="text-xs text-muted-foreground">
+                  {userAssistant.stats?.conversations || 0} conversas
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-green-500" />
+                <span className="text-xs text-muted-foreground">
+                  {userAssistant.last_triggered_at
+                    ? new Date(userAssistant.last_triggered_at).toLocaleDateString('pt-BR')
+                    : 'Nunca usado'}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-green-500" />
-              <span className="text-xs text-muted-foreground">
-                {userAssistant.last_triggered_at
-                  ? new Date(userAssistant.last_triggered_at).toLocaleDateString('pt-BR')
-                  : 'Nunca usado'}
-              </span>
+            {/* Monthly messages usage bar */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-muted-foreground">Mensagens este mês</span>
+                <span className={`text-[10px] font-semibold ${atLimit ? 'text-red-500' : nearLimit ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                  {monthlyUsed}/{monthlyLimit}
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    atLimit ? 'bg-red-500' : nearLimit ? 'bg-amber-500' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${monthlyPct}%` }}
+                />
+              </div>
             </div>
+          </div>
+        )}
+
+        {/* Free plan callout (only on marketplace card when not yet connected) */}
+        {isFree && isMarketplace && !connected && (
+          <div className="mb-3 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5"
+            style={{ backgroundColor: 'hsl(210 100% 56% / 0.10)', borderLeft: '2px solid hsl(210 100% 56% / 0.5)' }}>
+            <Zap className="w-3 h-3 flex-shrink-0 text-blue-400" />
+            <span className="text-[10px] text-blue-400 font-medium">Disponível gratuitamente · 200 msg/mês incluídas</span>
           </div>
         )}
 
@@ -726,6 +798,45 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         </div>
       </div>
 
+      {/* Inline custom-assistant limit banner */}
+      {(() => {
+        const customCount = availableAssistants.filter(a => a.is_custom).length;
+        const atLimit = !planLimits.canCreateCustomAssistant(customCount);
+        if (!atLimit) return null;
+        const isFeatureLocked = planLimits.limits.customAssistants === 0;
+        return (
+          <div
+            className="mb-5 p-4 rounded-xl border flex items-start gap-4"
+            style={{
+              backgroundColor: 'hsl(38 92% 50% / 0.08)',
+              borderColor: 'hsl(38 92% 50% / 0.35)',
+            }}
+          >
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'hsl(38 92% 50%)' }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: 'hsl(38 92% 50%)' }}>
+                {isFeatureLocked ? 'Recurso indisponível no plano Gratuito' : 'Limite de assistentes atingido'}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                {isFeatureLocked
+                  ? 'O plano Gratuito não inclui Assistentes Personalizados. Faça upgrade para Business para criar os seus próprios.'
+                  : `Você está usando ${customCount} de ${planLimits.limitLabel.customAssistants} assistente(s) permitido(s). Remova um ou faça upgrade para criar mais.`
+                }
+              </p>
+            </div>
+            <button
+              onClick={() => planLimits.openUpgradeModal()}
+              className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+              style={{ backgroundColor: 'hsl(38 92% 50%)', color: '#000' }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 40%)')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 50%)')}
+            >
+              <Zap size={13} /> Fazer Upgrade
+            </button>
+          </div>
+        );
+      })()}
+
       {/* Tabs */}
       <div className="flex gap-1 p-1 rounded-lg mb-6 w-fit bg-muted">
         <button
@@ -777,45 +888,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
           ))}
         </div>
       )}
-
-      {/* Inline custom-assistant limit banner */}
-      {(() => {
-        const customCount = availableAssistants.filter(a => a.is_custom).length;
-        const atLimit = !planLimits.canCreateCustomAssistant(customCount);
-        if (!atLimit) return null;
-        const isFeatureLocked = planLimits.limits.customAssistants === 0;
-        return (
-          <div
-            className="mb-5 p-4 rounded-xl border flex items-start gap-4"
-            style={{
-              backgroundColor: 'hsl(38 92% 50% / 0.08)',
-              borderColor: 'hsl(38 92% 50% / 0.35)',
-            }}
-          >
-            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'hsl(38 92% 50%)' }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold" style={{ color: 'hsl(38 92% 50%)' }}>
-                {isFeatureLocked ? 'Recurso indisponível no plano Gratuito' : 'Limite de assistentes atingido'}
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                {isFeatureLocked
-                  ? 'O plano Gratuito não inclui Assistentes Personalizados. Faça upgrade para Business para criar os seus próprios.'
-                  : `Você está usando ${customCount} de ${planLimits.limitLabel.customAssistants} assistente(s) permitido(s). Remova um ou faça upgrade para criar mais.`
-                }
-              </p>
-            </div>
-            <button
-              onClick={() => planLimits.openUpgradeModal()}
-              className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-              style={{ backgroundColor: 'hsl(38 92% 50%)', color: '#000' }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 40%)')}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 50%)')}
-            >
-              <Zap size={13} /> Fazer Upgrade
-            </button>
-          </div>
-        );
-      })()}
 
       {/* Content */}
       {loading ? (

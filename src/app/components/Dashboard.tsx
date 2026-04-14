@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from "sonner";
+import { trackLeadStatusChange } from '../utils/tracking';
 
 // Dashboard components
 import StatsCards from './dashboard/StatsCards';
@@ -219,6 +220,40 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   // Onboarding state
   const [showTour, setShowTour] = useState(false);
 
+  // Auto-refresh live usage counts (leads / messages / campaigns) on mount
+  useEffect(() => {
+    if (onRefreshUser) {
+      onRefreshUser().catch(() => {});
+    }
+  }, []);
+
+  // Refresh usage whenever the user navigates back to the main dashboard page
+  useEffect(() => {
+    if (currentPage === 'dashboard' && onRefreshUser) {
+      onRefreshUser().catch(() => {});
+    }
+  }, [currentPage]);
+
+  // Periodic usage refresh every 60 seconds
+  useEffect(() => {
+    if (!onRefreshUser) return;
+    const interval = setInterval(() => {
+      onRefreshUser().catch(() => {});
+    }, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [onRefreshUser]);
+
+  // Listen for events dispatched after lead/message operations to refresh usage
+  useEffect(() => {
+    const handleUsageChange = () => {
+      if (onRefreshUser) {
+        onRefreshUser().catch(() => {});
+      }
+    };
+    window.addEventListener('leadflow:usage-changed', handleUsageChange);
+    return () => window.removeEventListener('leadflow:usage-changed', handleUsageChange);
+  }, [onRefreshUser]);
+
   useEffect(() => {
     const token = localStorage.getItem('leadflow_access_token');
     if (token) {
@@ -267,14 +302,16 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     };
     window.addEventListener('leads-updated', handleLeadsUpdated);
 
-    // Listener for upgrade modal triggered by sub-pages (e.g. AssistantsPage)
+    // Listener for upgrade modal triggered by sub-pages (e.g. AssistantsPage, inbox limit)
     const handleOpenUpgrade = () => setModalUpgrade(true);
     window.addEventListener('leadflow:open-upgrade', handleOpenUpgrade);
+    window.addEventListener('leadflow:show-upgrade', handleOpenUpgrade);
     
     return () => {
       window.removeEventListener('resize', checkMobile);
       window.removeEventListener('leads-updated', handleLeadsUpdated);
       window.removeEventListener('leadflow:open-upgrade', handleOpenUpgrade);
+      window.removeEventListener('leadflow:show-upgrade', handleOpenUpgrade);
     };
   }, []);
 
@@ -302,15 +339,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         block = { code: 'PLAN_EXPIRED', message: 'Seu plano expirou. Renove sua assinatura para continuar.' };
       } else if (plan !== 'free' && user?.subscription_status === 'past_due') {
         block = { code: 'PAYMENT_OVERDUE', message: 'Pagamento em atraso. Regularize sua assinatura para continuar.' };
-      } else if (
-        (user?.limits?.leads ?? 0) > 0 &&
-        (user?.limits?.leads ?? 0) !== -1 &&
-        (user?.usage?.leads ?? 0) >= (user?.limits?.leads ?? 0)
-      ) {
-        block = {
-          code: 'LEAD_LIMIT_EXCEEDED',
-          message: `Você atingiu o limite de ${user.limits.leads} leads do seu plano. Faça upgrade para continuar.`,
-        };
       }
 
       // Also respect block passed from App (e.g. backend 403 event)
@@ -564,11 +592,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     if (plan !== 'free' && user?.subscription_status === 'past_due') {
       return { code: 'PAYMENT_OVERDUE', message: 'Pagamento em atraso. Regularize sua assinatura para continuar.' };
     }
-    const leadLimit = user?.limits?.leads ?? 0;
-    const leadUsage = user?.usage?.leads ?? 0;
-    if (leadLimit > 0 && leadLimit !== -1 && leadUsage >= leadLimit) {
-      return { code: 'LEAD_LIMIT_EXCEEDED', message: `Você atingiu o limite de ${leadLimit} leads do seu plano. Faça upgrade para continuar.` };
-    }
     return enforcementBlock || null;
   };
 
@@ -592,19 +615,21 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
           // Atualizar usage manualmente como fallback
           onUserUpdate({ ...user, usage: { ...user.usage, leads: (user.usage?.leads || 0) + 1 } });
         }
+        window.dispatchEvent(new CustomEvent('leadflow:usage-changed'));
         
         return true;
       }
       return false;
     } catch (error: any) {
       console.error('[Dashboard] Error creating lead:', error);
-      const errorMessage = (error?.message || '').toLowerCase();
+      const status = error?.response?.status || error?.status;
+      const data = error?.response?.data || error?.data;
 
-      if (errorMessage.includes('limit reached') || errorMessage.includes('lead limit reached')) {
-        const block = getBlockReason();
-        if (block) { showPlanBlock(block.code, block.message); }
-        else { triggerPlanLimitMessage('leads'); }
-      } else if (errorMessage.includes('duplicate lead') || error?.isDuplicate) {
+      if (status === 429 || data?.upgrade || data?.code === 'LEAD_LIMIT_EXCEEDED') {
+        window.dispatchEvent(new CustomEvent('leadflow:show-upgrade'));
+      } else if ((error?.message || '').toLowerCase().includes('limit reached')) {
+        triggerPlanLimitMessage('leads');
+      } else if ((error?.message || '').toLowerCase().includes('duplicate lead') || error?.isDuplicate) {
         triggerDuplicateLeadMessage();
       } else {
         triggerErrorMessage('Erro ao criar lead', error?.message || 'Erro desconhecido ao criar lead.');
@@ -672,6 +697,14 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
     try {
       await leadsApi.update(leadId, updatedLead);
+      // 🔔 Disparar evento de tracking (Meta Pixel + GA4)
+      trackLeadStatusChange(novoStatus, {
+        id: leadId,
+        name: oldLead.name,
+        email: oldLead.email,
+        phone: oldLead.phone || oldLead.whatsapp,
+        source: oldLead.source,
+      });
     } catch (error) {
       // Reverter em caso de erro
       setLeads(leads);
@@ -1298,12 +1331,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   };
 
   const handleNovoLead = () => {
-    if (!podeExecutar('leads')) {
-      const block = getBlockReason();
-      if (block) { showPlanBlock(block.code, block.message); return; }
-      triggerPlanLimitMessage('leads');
-      return;
-    }
+    const block = getBlockReason();
+    if (block) { showPlanBlock(block.code, block.message); return; }
     setModalNovoLead(true);
   };
 
@@ -2020,6 +2049,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                 <PlanoWidget
                   limites={limites}
                   diasRestantes={diasRestantes}
+                  planExpiresAt={user?.plan_expires_at ?? null}
+                  subscriptionStatus={user?.subscription_status ?? null}
                   onUpgrade={handleUpgrade}
                   userPlan={user?.plan || 'free'}
                   isTrial={user?.isTrial || false}
@@ -2093,6 +2124,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   userPlan={user?.plan || 'free'}
                   planExpired={planExpired}
                   limitReached={!!getBlockReason()}
+                  leadsLimitReached={(user?.limits?.leads ?? 0) > 0 && (user?.limits?.leads ?? 0) !== -1 && (user?.usage?.leads ?? 0) >= (user?.limits?.leads ?? 0)}
+                  campaignsLimitReached={(user?.limits?.massMessages ?? 0) > 0 && (user?.limits?.massMessages ?? 0) !== -1 && (user?.usage?.massMessages ?? 0) >= (user?.limits?.massMessages ?? 0)}
                   loading={loading}
                 />
               </div>
@@ -2166,6 +2199,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   userPlan={user?.plan || 'free'}
                   planExpired={planExpired}
                   limitReached={!!getBlockReason()}
+                  leadsLimitReached={(user?.limits?.leads ?? 0) > 0 && (user?.limits?.leads ?? 0) !== -1 && (user?.usage?.leads ?? 0) >= (user?.limits?.leads ?? 0)}
+                  campaignsLimitReached={(user?.limits?.massMessages ?? 0) > 0 && (user?.limits?.massMessages ?? 0) !== -1 && (user?.usage?.massMessages ?? 0) >= (user?.limits?.massMessages ?? 0)}
                 />
               </div>
             )}
@@ -2206,6 +2241,14 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                     setLeads(newLeads);
                     try {
                       await handleEditarLead(updatedLead);
+                      // 🔔 Disparar evento de tracking (Meta Pixel + GA4)
+                      trackLeadStatusChange(newStatus, {
+                        id: leadId,
+                        name: oldLead.name,
+                        email: oldLead.email,
+                        phone: oldLead.phone || oldLead.whatsapp,
+                        source: oldLead.source,
+                      });
                       toast.success(`Lead movido para ${newStatus}!`);
                     } catch (error) {
                       // Reverte se falhar

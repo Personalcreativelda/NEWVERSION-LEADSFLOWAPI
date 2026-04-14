@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
+import { useConfirm } from '../ui/ConfirmDialog';
 import { voiceAgentsApi } from '../../services/api/voice-agents';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
 import type {
@@ -24,6 +25,7 @@ interface VoiceAgentsPageProps {
 }
 
 export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
+  const confirm = useConfirm();
   const planLimits = usePlanLimits();
   console.log('[VoiceAgentsPage] Render - isDark:', isDark);
   
@@ -320,7 +322,12 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este agente?')) return;
+    const confirmed = await confirm('Tem certeza que deseja excluir este agente?', {
+      title: 'Excluir agente',
+      confirmLabel: 'Excluir',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     try {
       await voiceAgentsApi.delete(id);
@@ -524,7 +531,12 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   };
 
   const handleDeletePhoneNumber = async (phoneNumberId: string) => {
-    if (!confirm('Remover este número do ElevenLabs?')) return;
+    const confirmed = await confirm('Remover este número do ElevenLabs?', {
+      title: 'Remover número',
+      confirmLabel: 'Remover',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await voiceAgentsApi.deletePhoneNumber(phoneNumberId);
       toast.success('Número removido.');
