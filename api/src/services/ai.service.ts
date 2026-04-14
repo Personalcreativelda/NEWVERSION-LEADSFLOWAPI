@@ -1,7 +1,42 @@
-// Serviço de IA - suporta OpenAI e Gemini
+// Serviço de IA - suporta OpenAI, Gemini e Anthropic
 import { query } from '../database/connection';
 
 export type AIProvider = 'openai' | 'gemini' | 'anthropic';
+
+/** Par provedor → chave de API pronto para uso */
+export interface ProviderConfig {
+    provider: AIProvider;
+    apiKey: string;
+}
+
+/**
+ * Detecta os provedores de IA disponíveis lendo as variáveis de ambiente.
+ * Retorna a lista ordenada pela prioridade:
+ *   1. Provedor preferido (argumento > AI_PROVIDER do env > gemini)
+ *   2. Demais provedores com chave configurada, na ordem padrão: gemini → openai → anthropic
+ *
+ * Qualquer chave ausente ou vazia é ignorada automaticamente.
+ */
+export function getAvailableProviders(preferredProvider?: AIProvider): ProviderConfig[] {
+    const DEFAULT_ORDER: AIProvider[] = ['gemini', 'openai', 'anthropic'];
+    const envPreferred = (process.env.AI_PROVIDER?.trim() || 'gemini') as AIProvider;
+    const primary = preferredProvider || envPreferred;
+
+    const keyMap: Record<AIProvider, string> = {
+        gemini:    process.env.GEMINI_API_KEY?.trim()    || '',
+        openai:    process.env.OPENAI_API_KEY?.trim()    || '',
+        anthropic: process.env.ANTHROPIC_API_KEY?.trim() || '',
+    };
+
+    // Ordenar: primary primeiro, depois o resto na ordem padrão
+    const ordered: AIProvider[] = [primary, ...DEFAULT_ORDER.filter(p => p !== primary)];
+
+    const available = ordered
+        .map(p  => ({ provider: p, apiKey: keyMap[p] }))
+        .filter(p => p.apiKey !== '');
+
+    return available;
+}
 
 export interface AIMessage {
     role: 'system' | 'user' | 'assistant';
@@ -30,7 +65,8 @@ export interface ContactMemory {
 
 export class AIService {
     /**
-     * Gera resposta usando o provedor de IA configurado
+     * Gera resposta usando o provedor de IA configurado.
+     * Para uso simples com um único provedor já conhecido.
      */
     async generateResponse(
         messages: AIMessage[],
@@ -46,6 +82,49 @@ export class AIService {
             return this.callAnthropic(messages, apiKey, model || 'claude-3-haiku-20240307');
         }
         throw new Error(`Provedor de IA não suportado: ${provider}`);
+    }
+
+    /**
+     * Gera resposta tentando cada provedor disponível em ordem.
+     * Se um provedor falhar (erro de API, timeout, quota, etc.),
+     * tenta automaticamente o próximo na lista.
+     * Lança erro apenas quando todos falharem.
+     */
+    async generateResponseWithFallback(
+        messages: AIMessage[],
+        providers: ProviderConfig[],
+        model?: string
+    ): Promise<AIResponse> {
+        if (providers.length === 0) {
+            throw new Error(
+                'Nenhum provedor de IA configurado. ' +
+                'Adicione GEMINI_API_KEY, OPENAI_API_KEY ou ANTHROPIC_API_KEY no .env'
+            );
+        }
+
+        const errors: string[] = [];
+
+        for (let i = 0; i < providers.length; i++) {
+            const { provider, apiKey } = providers[i];
+            try {
+                if (i === 0) {
+                    console.log(`[AIService] 🤖 Usando provedor: ${provider}`);
+                } else {
+                    console.log(`[AIService] 🔄 Fallback: tentando ${provider} (${i + 1}/${providers.length})`);
+                }
+                const result = await this.generateResponse(messages, provider, apiKey, model);
+                if (i > 0) {
+                    console.log(`[AIService] ✅ Fallback para ${provider} bem-sucedido`);
+                }
+                return result;
+            } catch (err: any) {
+                const msg = err?.message || String(err);
+                console.warn(`[AIService] ⚠️ Provedor ${provider} falhou: ${msg}`);
+                errors.push(`${provider}: ${msg}`);
+            }
+        }
+
+        throw new Error(`Todos os provedores de IA falharam:\n${errors.join('\n')}`);
     }
 
     /**

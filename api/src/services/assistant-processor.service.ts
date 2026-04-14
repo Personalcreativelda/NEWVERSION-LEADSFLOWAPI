@@ -1,7 +1,7 @@
 // Processador de mensagens dos assistentes de IA
 // Intercepta mensagens recebidas e responde automaticamente usando IA
 import { query } from '../database/connection';
-import { AIService, type AIMessage, type AIProvider } from './ai.service';
+import { AIService, getAvailableProviders, type AIMessage, type AIProvider, type ProviderConfig } from './ai.service';
 import { AssistantsService } from './assistants.service';
 import { WhatsAppService } from './whatsapp.service';
 import { getWebSocketService } from './websocket.service';
@@ -38,20 +38,26 @@ export class AssistantProcessorService {
 
             console.log(`[AssistantProcessor] Assistente "${activeAssistant.assistant_name}" ativo para canal ${ctx.channelId}`);
 
-            // 2. Verificar configuração de IA (provider via env)
+            // 2. Detectar provedores disponíveis (com fallback automático)
             const config = activeAssistant.config || {};
-            const provider = (config.ai_provider || process.env.AI_PROVIDER || 'gemini') as AIProvider;
-            const apiKey = provider === 'anthropic'
-                ? process.env.ANTHROPIC_API_KEY
-                : provider === 'openai'
-                    ? process.env.OPENAI_API_KEY
-                    : process.env.GEMINI_API_KEY;
-            const model = config.ai_model || undefined;
+            const configuredProvider = config.ai_provider as AIProvider | undefined;
+            const model = config.ai_model as string | undefined;
 
-            if (!apiKey) {
-                console.warn('[AssistantProcessor] Sem API key configurada nas variáveis de ambiente');
+            // Constrói lista ordenada: provedor preferido do assistente → env AI_PROVIDER → restantes
+            const availableProviders: ProviderConfig[] = getAvailableProviders(configuredProvider);
+
+            if (availableProviders.length === 0) {
+                console.warn(
+                    '[AssistantProcessor] ❌ Nenhum provedor de IA configurado. ' +
+                    'Defina GEMINI_API_KEY, OPENAI_API_KEY ou ANTHROPIC_API_KEY no .env'
+                );
                 return false;
             }
+
+            console.log(
+                `[AssistantProcessor] 🔑 Provedores disponíveis: ` +
+                availableProviders.map(p => p.provider).join(' → ')
+            );
 
             // 2b. Verificar limite mensal de mensagens do assistente
             const isFreePlan = activeAssistant.user_plan === 'free';
@@ -87,10 +93,11 @@ export class AssistantProcessorService {
             // 4. Construir mensagens para IA
             const messages = await this.buildAIMessages(ctx, activeAssistant);
 
-            // 5. Chamar IA
+            // 5. Chamar IA (com fallback automático entre provedores)
             const startTime = Date.now();
-            const aiResponse = await aiService.generateResponse(messages, provider, apiKey, model);
+            const aiResponse = await aiService.generateResponseWithFallback(messages, availableProviders, model);
             const responseTime = Date.now() - startTime;
+            const provider = aiResponse.provider;
 
             if (!aiResponse.content) {
                 console.warn('[AssistantProcessor] Resposta vazia da IA');
@@ -133,19 +140,17 @@ export class AssistantProcessorService {
             // 9. Atualizar memória de longo prazo do contato (assíncrono, não bloqueia)
             const memoryEnabled = config.memory_enabled !== false;
             if (memoryEnabled && ctx.contactPhone) {
-                const memoryApiKey = provider === 'anthropic'
-                    ? process.env.ANTHROPIC_API_KEY
-                    : provider === 'openai'
-                        ? process.env.OPENAI_API_KEY
-                        : process.env.GEMINI_API_KEY;
+                // Usar o mesmo provedor que respondeu (já foi o que funcionou)
+                const memoryProviderKey = availableProviders.find(p => p.provider === provider)
+                    ?? availableProviders[0];
                 void aiService.updateContactMemory({
                     userAssistantId: activeAssistant.user_assistant_id,
                     contactPhone: ctx.contactPhone,
                     contactName: ctx.contactName,
                     messageIn: ctx.messageContent,
                     messageOut: aiResponse.content,
-                    provider,
-                    apiKey: memoryApiKey,
+                    provider: memoryProviderKey.provider,
+                    apiKey: memoryProviderKey.apiKey,
                     model: config.ai_model
                 });
             }
