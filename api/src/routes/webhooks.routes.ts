@@ -8,7 +8,7 @@ import { WhatsAppService } from '../services/whatsapp.service';
 // Lead Tracking: Importar serviço de rastreamento de leads
 import { leadTrackingService } from '../services/lead-tracking.service';
 // Phone validation utilities
-import { extractPhoneFromJid, isValidPhoneNumber, isGroupJid, isInvalidJid, isSamePhoneNumber } from '../utils/phone.utils';
+import { extractPhoneFromJid, isValidPhoneNumber, isGroupJid, isInvalidJid, isSamePhoneNumber, normalizePhoneNumber } from '../utils/phone.utils';
 // INBOX: Importar WebSocket service para notificações em tempo real
 import { getWebSocketService } from '../services/websocket.service';
 // IA: Importar processador de assistentes
@@ -884,11 +884,15 @@ router.post('/evolution/messages', async (req, res) => {
           const lidResolution = await whatsappService.resolveLidToPhone(instance, remoteJid);
           
           if (lidResolution?.phone) {
-            workingPhone = lidResolution.phone;
-            resolvedJid = lidResolution.jid;
-            console.log(`[Evolution Webhook] ✅ @lid RESOLVIDO com sucesso: ${remoteJid} → ${resolvedJid}`);
-            resolved = true;
-            break;
+            // ✅ NORMALIZAR após resolver
+            const normalizedPhone = normalizePhoneNumber(lidResolution.phone);
+            if (normalizedPhone && isValidPhoneNumber(normalizedPhone)) {
+              workingPhone = normalizedPhone;
+              resolvedJid = lidResolution.jid;
+              console.log(`[Evolution Webhook] ✅ @lid RESOLVIDO com sucesso: ${remoteJid} → ${resolvedJid} → Número normalizado: ${workingPhone}`);
+              resolved = true;
+              break;
+            }
           }
         } catch (err: any) {
           console.warn(`[Evolution Webhook]   - Falha na tentativa ${attempt}:`, err.message);
@@ -901,25 +905,35 @@ router.post('/evolution/messages', async (req, res) => {
       // Se não resolveu, tentar extrair número do @lid (último recurso)
       if (!workingPhone) {
         console.log('[Evolution Webhook] 🚨 Fallback: tentando extrair número do @lid...');
-        const extracted = extractPhoneFromJid(remoteJid);
+        let extracted = extractPhoneFromJid(remoteJid);
+        // ✅ NORMALIZAR após extrair
+        extracted = normalizePhoneNumber(extracted);
         if (extracted && isValidPhoneNumber(extracted)) {
           workingPhone = extracted;
-          console.log('[Evolution Webhook] ✅ Número extraído do @lid:', extracted);
+          console.log('[Evolution Webhook] ✅ Número extraído e normalizado do @lid:', extracted);
         } else {
-          console.error('[Evolution Webhook] ❌ FALHA CRÍTICA: Não conseguiu resolver nem extrair número do @lid');
-          // Ainda assim continuar com o JID como fallback
-          workingPhone = remoteJid.split('@')[0] || null;
+          console.error('[Evolution Webhook] ❌ FALHA CRÍTICA: Não conseguiu resolver nem extrair número válido do @lid');
+          // Ainda assim tentar com o JID como fallback (se conseguir extrair)
+          let fallbackPhone = extractPhoneFromJid(remoteJid.split('@')[0] || '');
+          fallbackPhone = normalizePhoneNumber(fallbackPhone);
+          if (fallbackPhone) {
+            workingPhone = fallbackPhone;
+            console.warn('[Evolution Webhook] ⚠️ Usando fallback final:', fallbackPhone);
+          }
         }
       }
     } else {
       // PASSO 2: Extrair número de @s.whatsapp.net ou outro formato
       console.log('[Evolution Webhook] 📱 Não é @lid, extraindo número diretamente...');
-      workingPhone = extractPhoneFromJid(remoteJid);
+      let extractedPhone = extractPhoneFromJid(remoteJid);
+      // ✅ NORMALIZAR após extrair
+      extractedPhone = normalizePhoneNumber(extractedPhone);
       
-      if (workingPhone) {
-        console.log('[Evolution Webhook] ✅ Número extraído:', workingPhone);
+      if (extractedPhone && isValidPhoneNumber(extractedPhone)) {
+        workingPhone = extractedPhone;
+        console.log('[Evolution Webhook] ✅ Número extraído e normalizado:', workingPhone);
       } else {
-        console.error('[Evolution Webhook] ❌ Não conseguiu extrair número do remoteJid:', remoteJid);
+        console.error('[Evolution Webhook] ❌ Não conseguiu extrair número válido de:', remoteJid);
       }
     }
 
@@ -971,7 +985,9 @@ router.post('/evolution/messages', async (req, res) => {
     }
 
     // Buscar ou criar lead
+    // NOTA: phone já está NORMALIZADO, então comparação é consistente
     // Para @lid: buscar também pelo whatsapp_lid OU pelo número resolvido
+    console.log('[Evolution Webhook] 🔍 Procurando lead existente com phone:', phone, 'e lidValue:', lidValue || 'N/A');
     let lead = await query(
       `SELECT * FROM leads
        WHERE user_id = $1
@@ -982,12 +998,35 @@ router.post('/evolution/messages', async (req, res) => {
       lidValue ? [channel.user_id, phone, lidValue] : [channel.user_id, phone]
     );
 
+    // Se não encontrou, tentar busca "fuzzy" em caso de números históricos mal formatados
+    // (ex: 25884473409 vs 258846070380 - pode ser erro de digitação/formatação anterior)
+    if (lead.rows.length === 0 && phone.length >= 10) {
+      console.log('[Evolution Webhook] 📋 Lead não encontrado com busca exata. Tentando busca fuzzy...');
+      // Buscar por número similar (começando ou terminando com o número)
+      const fuzzyLead = await query(
+        `SELECT * FROM leads
+         WHERE user_id = $1
+           AND (
+             phone LIKE $2 || '%' OR phone LIKE '%' || $2 OR
+             whatsapp LIKE $2 || '%' OR whatsapp LIKE '%' || $2
+           )
+         LIMIT 5`,  // Limitar para não retornar muitos
+        [channel.user_id, phone.slice(-8)]  // Últimos 8 dígitos
+      );
+      
+      if (fuzzyLead.rows.length > 0) {
+        // Se encontrou similares, usar o primeiro e logar
+        lead = fuzzyLead;
+        console.log(`[Evolution Webhook] ⚠️ Lead encontrado por busca fuzzy (${fuzzyLead.rows.length} resultados). Usando o primeiro.`);
+      }
+    }
+
     let leadId: string;
     let isNewLead = false;
 
     if (lead.rows.length === 0) {
       // Criar lead automaticamente
-      console.log('[Evolution Webhook] Criando novo lead:', contactName, phone, lidValue ? `(LID: ${lidValue})` : '');
+      console.log('[Evolution Webhook] ✅ Criando novo lead:', contactName, phone, lidValue ? `(LID: ${lidValue})` : '');
       const leadResult = await query(
         `INSERT INTO leads (user_id, name, phone, whatsapp, source, status, avatar_url, whatsapp_lid)
          VALUES ($1, $2, $3, $3, 'whatsapp', 'novo', $4, $5)

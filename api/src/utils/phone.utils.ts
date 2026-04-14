@@ -103,6 +103,44 @@ export function isSamePhoneNumber(phone1: string | null, phone2: string | null):
 }
 
 /**
+ * Normaliza número telefônico para um formato consistente e único
+ * Remove formatação, valida comprimento, evita duplicações
+ * 
+ * Exemplos:
+ * - "11 99912-3456" → "11999123456"
+ * - "+55 11 99912-3456" → "5511999123456"
+ * - "(11) 99912-3456" → "11999123456"
+ * 
+ * O objetivo é garantir que o mesmo número sempre retorna a mesma sequência,
+ * independente de como foi formatado ou entrado.
+ */
+export function normalizePhoneNumber(phone: string | null): string | null {
+  if (!phone) return null;
+
+  // PASSO 1: Remover todos os caracteres não-numéricos
+  let normalized = phone.replace(/\D/g, '');
+
+  // Se ficou vazio, retornar null
+  if (!normalized || normalized.length === 0) {
+    return null;
+  }
+
+  // PASSO 2: Remover zeros à esquerda (ex: "0011999123456" → "11999123456")
+  // Mas manter pelo menos 5 dígitos
+  while (normalized.length > 5 && normalized.startsWith('0')) {
+    normalized = normalized.substring(1);
+  }
+
+  // PASSO 3: Garantir que tem comprimento válido (5-15 dígitos)
+  if (normalized.length < 5 || normalized.length > 15) {
+    console.warn(`[Phone Utils] Número normalizado com comprimento suspeito: ${phone} → ${normalized} (${normalized.length} dígitos)`);
+    // Ainda assim retornar o número, mas com aviso
+  }
+
+  return normalized;
+}
+
+/**
  * Normaliza número para formato E.164 (com +)
  */
 export function normalizePhoneE164(phone: string): string {

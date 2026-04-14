@@ -6,7 +6,7 @@ import { AssistantsService } from './assistants.service';
 import { WhatsAppService } from './whatsapp.service';
 import { getWebSocketService } from './websocket.service';
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
-import { isValidPhoneNumber, isSamePhoneNumber } from '../utils/phone.utils';
+import { isValidPhoneNumber, isSamePhoneNumber, normalizePhoneNumber } from '../utils/phone.utils';
 
 const aiService = new AIService();
 const assistantsService = new AssistantsService();
@@ -31,6 +31,15 @@ export class AssistantProcessorService {
      */
     async processIncomingMessage(ctx: IncomingMessageContext): Promise<boolean> {
         try {
+            // 0. NORMALIZAR o contactPhone para garantir consistência
+            if (ctx.contactPhone) {
+                const normalizedPhone = normalizePhoneNumber(ctx.contactPhone);
+                if (normalizedPhone) {
+                    ctx.contactPhone = normalizedPhone;
+                    console.log(`[AssistantProcessor] Phone normalizado: ${ctx.contactPhone}`);
+                }
+            }
+
             // 1. Verificar se há assistente ativo para este canal
             const activeAssistant = await this.findActiveAssistantForChannel(ctx.channelId, ctx.userId);
             if (!activeAssistant) {
