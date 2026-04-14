@@ -988,41 +988,57 @@ router.post('/evolution/messages', async (req, res) => {
     // NOTA: phone já está NORMALIZADO, então comparação é consistente
     // Para @lid: buscar também pelo whatsapp_lid OU pelo número resolvido
     console.log('[Evolution Webhook] 🔍 Procurando lead existente com phone:', phone, 'e lidValue:', lidValue || 'N/A');
+    
+    // Query que normaliza TAMBÉM os números no banco durante a busca
+    // Isso evita problemas com números armazenados em formatações diferentes:
+    // - "258 84 473 4090" (com espaços)
+    // - "258-84-473-4090" (com hífens)  
+    // - "(258) 84473-4090" (com parênteses e hífens)
+    // Todos vão ser testados contra "25884473409" (normalizado)
+    
     let lead = await query(
       `SELECT * FROM leads
        WHERE user_id = $1
          AND (
-           phone = $2 OR whatsapp = $2
+           -- Busca exata normalizada no campo phone
+           REGEXP_REPLACE(phone, '[^0-9]', '', 'g') = $2
+           -- Busca exata normalizada no campo whatsapp
+           OR REGEXP_REPLACE(whatsapp, '[^0-9]', '', 'g') = $2
+           -- Busca por whatsapp_lid se fornecido
            ${lidValue ? 'OR whatsapp_lid = $3' : ''}
          )`,
       lidValue ? [channel.user_id, phone, lidValue] : [channel.user_id, phone]
     );
 
-    // Se não encontrou, tentar busca "fuzzy" em caso de números históricos mal formatados
-    // (ex: 25884473409 vs 258846070380 - pode ser erro de digitação/formatação anterior)
+    // Se ainda não encontrou, tentar busca adicional com últimos dígitos
+    // (em caso de erro de formatação muito extremo no passado)
     if (lead.rows.length === 0 && phone.length >= 10) {
-      console.log('[Evolution Webhook] 📋 Lead não encontrado com busca exata. Tentando busca fuzzy...');
-      // Buscar por número similar (começando ou terminando com o número)
-      const fuzzyLead = await query(
+      console.log('[Evolution Webhook] 📋 Lead não encontrado com busca exata. Tentando busca por últimos 8 dígitos...');
+      const lastDigits = phone.slice(-8);
+      
+      const backupLead = await query(
         `SELECT * FROM leads
          WHERE user_id = $1
            AND (
-             phone LIKE $2 || '%' OR phone LIKE '%' || $2 OR
-             whatsapp LIKE $2 || '%' OR whatsapp LIKE '%' || $2
+             REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE $2 || '%'
+             OR REGEXP_REPLACE(whatsapp, '[^0-9]', '', 'g') LIKE $2 || '%'
+             OR phone LIKE '%' || $2 || '%'
+             OR whatsapp LIKE '%' || $2 || '%'
            )
-         LIMIT 5`,  // Limitar para não retornar muitos
-        [channel.user_id, phone.slice(-8)]  // Últimos 8 dígitos
+         ORDER BY updated_at DESC
+         LIMIT 1`,  // Usar o mais recentemente atualizado
+        [channel.user_id, lastDigits]
       );
       
-      if (fuzzyLead.rows.length > 0) {
-        // Se encontrou similares, usar o primeiro e logar
-        lead = fuzzyLead;
-        console.log(`[Evolution Webhook] ⚠️ Lead encontrado por busca fuzzy (${fuzzyLead.rows.length} resultados). Usando o primeiro.`);
+      if (backupLead.rows.length > 0) {
+        lead = backupLead;
+        console.log(`[Evolution Webhook] ℹ️ Lead encontrado por busca de backup (últimos 8 dígitos: ${lastDigits})`);
       }
     }
 
     let leadId: string;
     let isNewLead = false;
+    let finalPhone = phone;  // O phone que será usado daqui em diante
 
     if (lead.rows.length === 0) {
       // Criar lead automaticamente
@@ -1035,6 +1051,7 @@ router.post('/evolution/messages', async (req, res) => {
       );
       leadId = leadResult.rows[0].id;
       isNewLead = true;
+      finalPhone = phone;  // Usar o phone normalizado que foi criado
 
       // 🎯 Registrar captura de lead
       try {
@@ -1054,15 +1071,23 @@ router.post('/evolution/messages', async (req, res) => {
         console.error('[Evolution Webhook] ⚠️ Erro ao registrar captura:', trackErr);
       }
     } else {
-      leadId = lead.rows[0].id;
+      // Lead encontrado - USAR O PHONE DO LEAD!
+      // Isto é crítico: o lead pode estar armazenado com formatação diferente
+      // ou ter um phone que é o "canônico" do sistema
       const currentLead = lead.rows[0];
+      leadId = currentLead.id;
+      finalPhone = normalizePhoneNumber(currentLead.phone) || phone;
+      
+      console.log('[Evolution Webhook] ℹ️ Lead existente encontrado:', leadId);
+      console.log('[Evolution Webhook]   - Phone do lead no banco:', currentLead.phone);
+      console.log('[Evolution Webhook]   - Phone normalizado para usar:', finalPhone);
 
       // Atualizar nome se:
       //   1. A mensagem é recebida (não isFromMe) — assim temos o pushName real do contato
       //   2. O nome atual é apenas o telefone (foi salvo sem pushName, p.ex. criado por isFromMe)
       //   3. O novo nome é melhor (não é simplesmente o número de telefone)
-      const currentNameIsPhone = currentLead.name === currentLead.phone || currentLead.name === phone;
-      const shouldUpdateName = !isFromMe && contactName !== phone && currentNameIsPhone;
+      const currentNameIsPhone = currentLead.name === currentLead.phone || currentLead.name === finalPhone;
+      const shouldUpdateName = !isFromMe && contactName !== finalPhone && currentNameIsPhone;
 
       // Atualizar avatar se mudou ou não existia
       const shouldUpdateAvatar = !!waProfilePic && currentLead.avatar_url !== waProfilePic;
@@ -1100,7 +1125,7 @@ router.post('/evolution/messages', async (req, res) => {
       leadId,
       {
         contact_name: contactName,
-        phone: phone,
+        phone: finalPhone,
         profile_picture: waProfilePic
       }
     );
@@ -1291,7 +1316,7 @@ router.post('/evolution/messages', async (req, res) => {
       messageId: message.id,
       content: messageContent,
       contactName: contactName,
-      contactPhone: phone,
+      contactPhone: finalPhone,
       mediaType: mediaType || undefined,
       mediaUrl: mediaUrl || undefined,
       rawPayload: req.body,
@@ -1314,7 +1339,7 @@ router.post('/evolution/messages', async (req, res) => {
           // Usar o número real resolvido se o remoteJid era @lid;
           // caso contrário usar o phone normal. O remoteJid completo é sempre passado
           // para que sendReply use os formatos corretos (incluindo @lid para Evolution).
-          contactPhone: phone,
+          contactPhone: finalPhone,
           contactName: contactName,
           messageContent: messageContent,
           credentials: channel.credentials,
