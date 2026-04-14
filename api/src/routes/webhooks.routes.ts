@@ -607,7 +607,14 @@ router.post('/evolution/messages', async (req, res) => {
     const channel = channelResult.rows[0];
     console.log('[Evolution Webhook] Canal ID:', channel.id, 'User ID:', channel.user_id);
 
-    const remoteJid = messageData.key?.remoteJid || messageData.remoteJid;
+    // ⭐ CORREÇÃO CRÍTICA: Usar 'sender' como primeira opção (número REAL do remetente)
+    // 'sender' é o campo que Evolution API envia com o JID do remetente VERDADEIRO
+    // 'remoteJid' pode ser incorreto ou incompleto em algumas versões da API
+    const senderJid = req.body.sender || messageData.key?.remoteJid || messageData.remoteJid;
+    const remoteJid = senderJid; // Usar sender como principal
+
+    console.log('[Evolution Webhook] 🎯 JID DO REMETENTE (sender field):', req.body.sender);
+    console.log('[Evolution Webhook] 🔄 JID usado para processamento:', remoteJid);
 
     // Validar remoteJid
     if (!remoteJid) {
