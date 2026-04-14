@@ -521,11 +521,11 @@ router.post('/:id/execute', async (req, res, next) => {
     // Terceiro: buscar primeiro canal WhatsApp ou WhatsApp Cloud ativo
     if (!channel) {
       const channels = await channelsService.findByType('whatsapp', user.id);
-      channel = channels.find(c => c.status === 'active' || c.status === 'connected');
+      channel = channels.find(c => (c.status as string) === 'active' || (c.status as string) === 'connected');
     }
     if (!channel) {
       const cloudChannels = await channelsService.findByType('whatsapp_cloud', user.id);
-      channel = cloudChannels.find(c => c.status === 'active' || c.status === 'connected' || c.status === 'pending');
+      channel = cloudChannels.find(c => (c.status as string) === 'active' || (c.status as string) === 'connected' || (c.status as string) === 'pending');
     }
 
     if (!channel) {
@@ -695,6 +695,8 @@ async function executeCampaignMessages(
     total: leads.length,
     sent: 0,
     delivered: 0,
+    read: 0,
+    replied: 0,
     failed: 0,
     errors: [] as string[]
   };
