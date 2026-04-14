@@ -48,6 +48,29 @@ export function isGroupJid(jid: string): boolean {
 }
 
 /**
+ * Converte número bruto ou parcial para JID completo (@s.whatsapp.net)
+ * Exemplos:
+ * - "844977075" → "844977075@s.whatsapp.net"
+ * - "844977075@s.whatsapp.net" → "844977075@s.whatsapp.net" (já formatado)
+ * - "233693633358028@lid" → "233693633358028@lid" (deixa @lid como está)
+ */
+export function ensureJidFormat(jid: string | null): string | null {
+  if (!jid) return null;
+
+  // Se já tem @ domínio, retornar como está
+  if (jid.includes('@')) return jid;
+
+  // Se é apenas números, adicionar @s.whatsapp.net
+  const digitsOnly = jid.replace(/\D/g, '');
+  if (digitsOnly && digitsOnly.length >= 5) {
+    return `${digitsOnly}@s.whatsapp.net`;
+  }
+
+  // Senão, retornar como está (será validado depois)
+  return jid;
+}
+
+/**
  * Detecta se é uma JID mal formatada (REJEITA APENAS se:
  * - Não é grupo
  * - Não é @lid (LAN temporário é aceitável, será resolvido depois)

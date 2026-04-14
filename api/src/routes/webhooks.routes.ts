@@ -8,7 +8,7 @@ import { WhatsAppService } from '../services/whatsapp.service';
 // Lead Tracking: Importar serviço de rastreamento de leads
 import { leadTrackingService } from '../services/lead-tracking.service';
 // Phone validation utilities
-import { extractPhoneFromJid, isValidPhoneNumber, isGroupJid, isInvalidJid, isSamePhoneNumber, normalizePhoneNumber } from '../utils/phone.utils';
+import { extractPhoneFromJid, isValidPhoneNumber, isGroupJid, isInvalidJid, isSamePhoneNumber, normalizePhoneNumber, ensureJidFormat } from '../utils/phone.utils';
 // INBOX: Importar WebSocket service para notificações em tempo real
 import { getWebSocketService } from '../services/websocket.service';
 // IA: Importar processador de assistentes
@@ -632,31 +632,84 @@ router.post('/evolution/messages', async (req, res) => {
     const remoteJidValue = messageData.key?.remoteJid || messageData.remoteJid || req.body.remoteJid;
     const isGroupMessage = remoteJidValue?.includes('@g.us');
     
-    // Se for grupo, usar o field 'participantAlt' (número real) ou 'participant' (LID)
-    // Se não for grupo, usar o remoteJid direto
+    // ⭐ ESTRATÉGIA ROBUSTA: Coletar TODOS os possíveis JIDs e escolher o melhor
+    // Às vezes o payload vem com estruturas diferentes, então precisamos tentar múltiplos campos
     let senderJidToUse: string | null = null;
+    
+    const candidatesJids = [
+      // Prioridade 1: Campos que EXPLICITAMENTE são do remetente (@s.whatsapp.net é confiável)
+      messageData.key?.participantAlt,
+      messageData.participantAlt,
+      messageData.key?.remoteJid,
+      messageData.remoteJid,
+      req.body.remoteJid,
+      
+      // Prioridade 2: Outros que podem ser @lid ou número bruto
+      messageData.key?.participant,
+      messageData.participant,
+      messageData.senderJid,
+      messageData.contactJid,
+      messageData.from,
+      messageData.sender,  // Último recurso - pode ser instância, mas melhor que nada
+      req.body.sender,
+    ];
+    
+    // Filtrar, converter números brutos para JID, e desduplicar
+    const validCandidates = [...new Set(
+      candidatesJids
+        .filter(Boolean)
+        .map(c => ensureJidFormat(c))
+        .filter(Boolean)
+    )];
+    
+    console.log('[Evolution Webhook] 🔍 Candidates de JID após formatação (ordem de prioridade):', validCandidates);
+    console.log('[Evolution Webhook] 📊 Payload structure - messageData keys:', Object.keys(messageData).slice(0, 15));
     
     if (isGroupMessage) {
       console.log('[Evolution Webhook] 📱 Mensagem de GRUPO detectada');
-      // Em grupos, 'participantAlt' tem o número real da pessoa que enviou
-      const participantAlt = messageData.key?.participantAlt || messageData.participantAlt;
-      const participant = messageData.key?.participant || messageData.participant;
       
-      console.log('[Evolution Webhook]   - participantAlt (número real):', participantAlt);
-      console.log('[Evolution Webhook]   - participant (pode ser @lid):', participant);
+      // Em grupos, procurar por campos que especificamente indicam remetente
+      for (const candidate of validCandidates) {
+        if (candidate && candidate.includes('@s.whatsapp.net')) {
+          senderJidToUse = candidate;
+          console.log('[Evolution Webhook] ✅ Usando campo com @s.whatsapp.net em grupo:', candidate);
+          break;
+        }
+      }
       
-      // Priorizar participantAlt se tiver @s.whatsapp.net, senão usar participant
-      if (participantAlt && participantAlt.includes('@s.whatsapp.net')) {
-        senderJidToUse = participantAlt;
-        console.log('[Evolution Webhook] ✅ Usando participantAlt (número real do grupo)');
-      } else if (participant) {
-        senderJidToUse = participant;
-        console.log('[Evolution Webhook] ⚠️  Usando participant (pode ser @lid, será resolvido depois)');
+      // Se não encontrou @s.whatsapp.net, usar o primeiro (pode ser @lid)
+      if (!senderJidToUse && validCandidates.length > 0) {
+        senderJidToUse = validCandidates[0];
+        console.log('[Evolution Webhook] ⚠️ Usando primeiro candidate (pode ser @lid):', senderJidToUse);
       }
     } else {
-      // Para mensagens diretas, usar remoteJid
-      senderJidToUse = remoteJidValue;
-      console.log('[Evolution Webhook] 📩 Mensagem direta detectada, usando remoteJid:', senderJidToUse);
+      console.log('[Evolution Webhook] 📩 Mensagem DIRETA detectada');
+      
+      // Para diretas, priorizar quem tem @s.whatsapp.net
+      for (const candidate of validCandidates) {
+        if (candidate && candidate.includes('@s.whatsapp.net')) {
+          senderJidToUse = candidate;
+          console.log('[Evolution Webhook] ✅ Usando JID com @s.whatsapp.net:', candidate);
+          break;
+        }
+      }
+      
+      // Se ainda não encontrou, tentar @lid (será resolvido depois)
+      if (!senderJidToUse) {
+        for (const candidate of validCandidates) {
+          if (candidate && candidate.includes('@lid')) {
+            senderJidToUse = candidate;
+            console.log('[Evolution Webhook] ⚠️ Usando @lid (será resolvido depois):', candidate);
+            break;
+          }
+        }
+      }
+      
+      // Último recurso: pegar número bruto de qualquer campo (já formatado com ensureJidFormat)
+      if (!senderJidToUse && validCandidates.length > 0) {
+        senderJidToUse = validCandidates[0];
+        console.log('[Evolution Webhook] 🚨 Fallback: usando primeiro candidate disponível:', senderJidToUse);
+      }
     }
 
     const remoteJid = senderJidToUse;
