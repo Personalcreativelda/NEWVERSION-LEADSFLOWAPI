@@ -3171,13 +3171,46 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
           }
 
           // Buscar ou criar lead
-          const phone = senderId.replace(/\D/g, '');
+          // NORMALIZAR o phone e usar REGEXP_REPLACE no banco para busca consistente
+          let rawPhone = senderId.replace(/\D/g, '');
+          let phone = normalizePhoneNumber(rawPhone);
+          
+          console.log('[WhatsApp Cloud Webhook] 🔍 Procurando lead com phone normalizado:', phone);
+          
           let lead = await query(
-            `SELECT * FROM leads WHERE user_id = $1 AND (phone = $2 OR whatsapp = $2)`,
+            `SELECT * FROM leads 
+             WHERE user_id = $1 
+               AND (
+                 REGEXP_REPLACE(phone, '[^0-9]', '', 'g') = $2
+                 OR REGEXP_REPLACE(whatsapp, '[^0-9]', '', 'g') = $2
+               )`,
             [channel.user_id, phone]
           );
 
+          // Se não encontrou, tentar busca de backup
+          if (lead.rows.length === 0 && phone.length >= 10) {
+            console.log('[WhatsApp Cloud Webhook] 📋 Lead não encontrado. Tentando busca de backup...');
+            const lastDigits = phone.slice(-8);
+            const backupLead = await query(
+              `SELECT * FROM leads
+               WHERE user_id = $1
+                 AND (
+                   REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE $2 || '%'
+                   OR REGEXP_REPLACE(whatsapp, '[^0-9]', '', 'g') LIKE $2 || '%'
+                 )
+               ORDER BY updated_at DESC
+               LIMIT 1`,
+              [channel.user_id, lastDigits]
+            );
+            
+            if (backupLead.rows.length > 0) {
+              lead = backupLead;
+              console.log('[WhatsApp Cloud Webhook] ℹ️ Lead encontrado por busca de backup');
+            }
+          }
+
           let leadId: string;
+          let finalPhone = phone;  // O phone que será usado daqui em diante
 
           if (lead.rows.length === 0) {
             console.log('[WhatsApp Cloud Webhook] Criando novo lead:', contactName);
@@ -3200,9 +3233,17 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
               console.error('[WhatsApp Cloud Webhook] ⚠️ Erro ao registrar captura:', trackErr);
             }
           } else {
-            leadId = lead.rows[0].id;
+            // Lead encontrado - USAR O PHONE DO LEAD!
+            const currentLead = lead.rows[0];
+            leadId = currentLead.id;
+            finalPhone = normalizePhoneNumber(currentLead.phone) || phone;
+            
+            console.log('[WhatsApp Cloud Webhook] ℹ️ Lead existente encontrado:', leadId);
+            console.log('[WhatsApp Cloud Webhook]   - Phone do lead no banco:', currentLead.phone);
+            console.log('[WhatsApp Cloud Webhook]   - Phone normalizado para usar:', finalPhone);
+            
             // Atualizar nome se mudou
-            if (contactName !== senderId && lead.rows[0].name !== contactName) {
+            if (contactName !== senderId && currentLead.name !== contactName) {
               await query(
                 `UPDATE leads SET name = $1 WHERE id = $2`,
                 [contactName, leadId]
@@ -3219,7 +3260,7 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
             leadId,
             {
               contact_name: contactName,
-              phone: phone
+              phone: finalPhone
             }
           );
 
@@ -3306,7 +3347,7 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
             messageId: savedMessage.id,
             content: messageContent,
             contactName: contactName,
-            contactPhone: phone || senderId,
+            contactPhone: finalPhone,
             mediaType: mediaType || undefined,
             rawPayload: message,
           }).catch(err => console.error('[WhatsApp Cloud Webhook] Erro ao disparar webhook:', err.message));
@@ -3318,7 +3359,7 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
               channelType: 'whatsapp_cloud',
               conversationId: conversation.id,
               userId: channel.user_id,
-              contactPhone: phone || senderId,
+              contactPhone: finalPhone,
               contactName: contactName,
               messageContent: messageContent,
               credentials: channel.credentials
@@ -4726,20 +4767,53 @@ router.post('/whatsapp-cloud/messages', async (req, res) => {
     const contactName = contactInfo?.profile?.name || senderPhone;
     const messageText = message.text?.body || message.image?.caption || message.document?.caption || '[Mídia]';
 
-    // Buscar ou criar lead
+    // Normalizar o phone
+    let phone = normalizePhoneNumber(senderPhone);
+    
+    console.log('[WhatsApp Cloud Webhook] 🔍 Procurando lead com phone normalizado:', phone);
+    
+    // Buscar ou criar lead com busca normalizada
     let leadResult = await query(
-      `SELECT * FROM leads WHERE user_id = $1 AND (phone = $2 OR whatsapp = $2)`,
-      [internalUserId, senderPhone]
+      `SELECT * FROM leads 
+       WHERE user_id = $1 
+         AND (
+           REGEXP_REPLACE(phone, '[^0-9]', '', 'g') = $2
+           OR REGEXP_REPLACE(whatsapp, '[^0-9]', '', 'g') = $2
+         )`,
+      [internalUserId, phone]
     );
 
+    // Se não encontrou, tentar busca de backup
+    if (leadResult.rows.length === 0 && phone.length >= 10) {
+      console.log('[WhatsApp Cloud Webhook] 📋 Lead não encontrado. Tentando busca de backup...');
+      const lastDigits = phone.slice(-8);
+      const backupLead = await query(
+        `SELECT * FROM leads
+         WHERE user_id = $1
+           AND (
+             REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE $2 || '%'
+             OR REGEXP_REPLACE(whatsapp, '[^0-9]', '', 'g') LIKE $2 || '%'
+           )
+         ORDER BY updated_at DESC
+         LIMIT 1`,
+        [internalUserId, lastDigits]
+      );
+      
+      if (backupLead.rows.length > 0) {
+        leadResult = backupLead;
+        console.log('[WhatsApp Cloud Webhook] ℹ️ Lead encontrado por busca de backup');
+      }
+    }
+
     let leadId: string;
+    let finalPhone = phone;  // O phone que será usado daqui em diante
 
     if (leadResult.rows.length === 0) {
       const newLeadResult = await query(
         `INSERT INTO leads (user_id, name, phone, whatsapp, source, status)
          VALUES ($1, $2, $3, $3, 'whatsapp_cloud', 'novo')
          RETURNING *`,
-        [internalUserId, contactName, senderPhone]
+        [internalUserId, contactName, phone]
       );
       leadId = newLeadResult.rows[0].id;
 
@@ -4751,12 +4825,19 @@ router.post('/whatsapp-cloud/messages', async (req, res) => {
         'whatsapp_cloud',
         {
           contact_name: contactName,
-          phone: senderPhone,
+          phone: phone,
           initial_message: messageText.substring(0, 100)
         }
       ).catch(err => console.error('[WhatsApp Cloud] Error recording capture:', err));
     } else {
-      leadId = leadResult.rows[0].id;
+      // Lead encontrado - USAR O PHONE DO LEAD!
+      const currentLead = leadResult.rows[0];
+      leadId = currentLead.id;
+      finalPhone = normalizePhoneNumber(currentLead.phone) || phone;
+      
+      console.log('[WhatsApp Cloud Webhook] ℹ️ Lead existente encontrado:', leadId);
+      console.log('[WhatsApp Cloud Webhook]   - Phone do lead no banco:', currentLead.phone);
+      console.log('[WhatsApp Cloud Webhook]   - Phone normalizado para usar:', finalPhone);
     }
 
     // Buscar ou criar conversa
