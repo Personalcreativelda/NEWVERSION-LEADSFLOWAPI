@@ -629,29 +629,41 @@ router.post('/evolution/messages', async (req, res) => {
     console.log('[Evolution Webhook] messageData.transferWhatsapp:', messageData.transferWhatsapp);
     console.log('═'.repeat(100) + '\n');
 
-    const remoteJidValue = messageData.key?.remoteJid || messageData.remoteJid || req.body.remoteJid;
+    // Detectar se é mensagem de grupo (procurar em vários campos possíveis)
+    const remoteJidValue = messageData.key?.remoteId || 
+                           messageData.key?.remoteJid || 
+                           messageData.remoteId || 
+                           messageData.remoteJid || 
+                           req.body.remoteJid;
     const isGroupMessage = remoteJidValue?.includes('@g.us');
     
     // ⭐ ESTRATÉGIA ROBUSTA: Coletar TODOS os possíveis JIDs e escolher o melhor
-    // Às vezes o payload vem com estruturas diferentes, então precisamos tentar múltiplos campos
+    // DESCOBERTA CRÍTICA: O payload usa "remoteId" e "remoteIdAlt", NÃO "remoteJid"!
+    // (Diferentes versões da Evolution API usam nomes diferentes)
     let senderJidToUse: string | null = null;
     
     const candidatesJids = [
-      // Prioridade 1: Campos que EXPLICITAMENTE são do remetente (@s.whatsapp.net é confiável)
-      messageData.key?.participantAlt,
-      messageData.participantAlt,
-      messageData.key?.remoteJid,
-      messageData.remoteJid,
+      // 🎯 PRIORIDADE MÁXIMA: Campos no nível superior do req.body (mais confiáveis!)
+      req.body.sender,
       req.body.remoteJid,
+      req.body.remoteId,    // ← Campo correto em algumas versões da API!
       
-      // Prioridade 2: Outros que podem ser @lid ou número bruto
+      // Prioridade 1: Campos dentro de messageData.key (a estrutura correta)
+      messageData.key?.remoteId,         // ← NOVO
+      messageData.key?.remoteIdAlt,      // ← NOVO (alternativo)
+      messageData.key?.participantAlt,
+      messageData.key?.remoteJid,
+      messageData.remoteId,              // ← NOVO
+      messageData.remoteIdAlt,           // ← NOVO
+      messageData.remoteJid,
+      
+      // Prioridade 2: messageData top-level
       messageData.key?.participant,
       messageData.participant,
       messageData.senderJid,
       messageData.contactJid,
       messageData.from,
-      messageData.sender,  // Último recurso - pode ser instância, mas melhor que nada
-      req.body.sender,
+      messageData.sender,
     ];
     
     // Filtrar, converter números brutos para JID, e desduplicar
@@ -662,8 +674,11 @@ router.post('/evolution/messages', async (req, res) => {
         .filter(Boolean)
     )];
     
-    console.log('[Evolution Webhook] 🔍 Candidates de JID após formatação (ordem de prioridade):', validCandidates);
-    console.log('[Evolution Webhook] 📊 Payload structure - messageData keys:', Object.keys(messageData).slice(0, 15));
+    console.log('[Evolution Webhook] 🔍 Candidates de JID após formatação (ORDEM DE PRIORIDADE):', validCandidates);
+    console.log('[Evolution Webhook] 📊 req.body.sender:', req.body.sender);
+    console.log('[Evolution Webhook] 📊 messageData.key.remoteId:', messageData.key?.remoteId);
+    console.log('[Evolution Webhook] 📊 messageData.key.remoteIdAlt:', messageData.key?.remoteIdAlt);
+    console.log('[Evolution Webhook] 📊 messageData.key.remoteJid:', messageData.key?.remoteJid);
     
     if (isGroupMessage) {
       console.log('[Evolution Webhook] 📱 Mensagem de GRUPO detectada');
@@ -725,6 +740,26 @@ router.post('/evolution/messages', async (req, res) => {
       console.warn('[Evolution Webhook] ❌ JID inválido detectado, ignorando:', remoteJid);
       return res.json({ success: true, message: 'Invalid JID format - rejecting message' });
     }
+
+    // 🔍 DIAGNÓSTICO: Log ultra-detalhado para debug
+    console.log('\n' + '═'.repeat(100));
+    console.log('[Evolution Webhook] 📞 DIAGNÓSTICO DE EXTRAÇÃO DE PHONE:');
+    console.log('═'.repeat(100));
+    console.log('[Evolution Webhook] remoteJid SELECIONADO:', remoteJid);
+    console.log('[Evolution Webhook] É grupo?', remoteJid.includes('@g.us'));
+    console.log('[Evolution Webhook] É @lid?', remoteJid.includes('@lid'));
+    console.log('[Evolution Webhook] Tem @s.whatsapp.net?', remoteJid.includes('@s.whatsapp.net'));
+    
+    // Testar extração de phone
+    const testExtracted = extractPhoneFromJid(remoteJid);
+    console.log('[Evolution Webhook] Phone extraído (bruto):', testExtracted);
+    
+    const testNormalized = normalizePhoneNumber(testExtracted);
+    console.log('[Evolution Webhook] Phone normalizado:', testNormalized);
+    
+    const testValid = testNormalized ? isValidPhoneNumber(testNormalized) : false;
+    console.log('[Evolution Webhook] É válido (5-15 dígitos)?', testValid);
+    console.log('═'.repeat(100) + '\n');
 
     // Extrair conteúdo da mensagem - suporta múltiplos formatos
     const msg = messageData.message || messageData;
