@@ -607,25 +607,64 @@ router.post('/evolution/messages', async (req, res) => {
     const channel = channelResult.rows[0];
     console.log('[Evolution Webhook] Canal ID:', channel.id, 'User ID:', channel.user_id);
 
-    // ⭐ CORREÇÃO CRÍTICA: Usar 'sender' como primeira opção (número REAL do remetente)
-    // 'sender' é o campo que Evolution API envia com o JID do remetente VERDADEIRO
-    // 'remoteJid' pode ser incorreto ou incompleto em algumas versões da API
-    const senderJid = req.body.sender || messageData.key?.remoteJid || messageData.remoteJid;
-    const remoteJid = senderJid; // Usar sender como principal
+    // 🔍 DEBUG EXTRAORDINÁRIO: Log de TODOS os campos possíveis
+    console.log('\n' + '═'.repeat(100));
+    console.log('[Evolution Webhook] 🔍 ANÁLISE COMPLETA DO PAYLOAD:');
+    console.log('═'.repeat(100));
+    console.log('[Evolution Webhook] messageData.key:', JSON.stringify(messageData.key, null, 2));
+    console.log('[Evolution Webhook] messageData (top-level):', Object.keys(messageData));
+    console.log('[Evolution Webhook] req.body.sender:', req.body.sender);
+    console.log('[Evolution Webhook] messageData.sender:', messageData.sender);
+    console.log('[Evolution Webhook] messageData.senderJid:', messageData.senderJid);
+    console.log('[Evolution Webhook] messageData.remoteJid:', messageData.remoteJid);
+    console.log('[Evolution Webhook] messageData.remoteJidAlt:', messageData.remoteJidAlt);
+    console.log('[Evolution Webhook] messageData.participant:', messageData.participant);
+    console.log('[Evolution Webhook] messageData.participantAlt:', messageData.participantAlt);
+    console.log('[Evolution Webhook] messageData.from:', messageData.from);
+    console.log('[Evolution Webhook] messageData.notify:', messageData.notify);
+    console.log('[Evolution Webhook] messageData.pushName:', messageData.pushName);
+    console.log('[Evolution Webhook] messageData.verifiedName:', messageData.verifiedName);
+    console.log('[Evolution Webhook] messageData.notifyName:', messageData.notifyName);
+    console.log('[Evolution Webhook] messageData.contactJid:', messageData.contactJid);
+    console.log('[Evolution Webhook] messageData.transferWhatsapp:', messageData.transferWhatsapp);
+    console.log('═'.repeat(100) + '\n');
 
-    console.log('[Evolution Webhook] 🎯 JID DO REMETENTE (sender field):', req.body.sender);
-    console.log('[Evolution Webhook] 🔄 JID usado para processamento:', remoteJid);
+    const remoteJidValue = messageData.key?.remoteJid || messageData.remoteJid || req.body.remoteJid;
+    const isGroupMessage = remoteJidValue?.includes('@g.us');
+    
+    // Se for grupo, usar o field 'participantAlt' (número real) ou 'participant' (LID)
+    // Se não for grupo, usar o remoteJid direto
+    let senderJidToUse: string | null = null;
+    
+    if (isGroupMessage) {
+      console.log('[Evolution Webhook] 📱 Mensagem de GRUPO detectada');
+      // Em grupos, 'participantAlt' tem o número real da pessoa que enviou
+      const participantAlt = messageData.key?.participantAlt || messageData.participantAlt;
+      const participant = messageData.key?.participant || messageData.participant;
+      
+      console.log('[Evolution Webhook]   - participantAlt (número real):', participantAlt);
+      console.log('[Evolution Webhook]   - participant (pode ser @lid):', participant);
+      
+      // Priorizar participantAlt se tiver @s.whatsapp.net, senão usar participant
+      if (participantAlt && participantAlt.includes('@s.whatsapp.net')) {
+        senderJidToUse = participantAlt;
+        console.log('[Evolution Webhook] ✅ Usando participantAlt (número real do grupo)');
+      } else if (participant) {
+        senderJidToUse = participant;
+        console.log('[Evolution Webhook] ⚠️  Usando participant (pode ser @lid, será resolvido depois)');
+      }
+    } else {
+      // Para mensagens diretas, usar remoteJid
+      senderJidToUse = remoteJidValue;
+      console.log('[Evolution Webhook] 📩 Mensagem direta detectada, usando remoteJid:', senderJidToUse);
+    }
+
+    const remoteJid = senderJidToUse;
 
     // Validar remoteJid
     if (!remoteJid) {
-      console.warn('[Evolution Webhook] Sem remoteJid no payload');
-      return res.json({ success: true, message: 'No remoteJid to process' });
-    }
-
-    // Ignorar mensagens de grupos
-    if (remoteJid.includes('@g.us')) {
-      console.log('[Evolution Webhook] Ignorando mensagem de grupo:', remoteJid);
-      return res.json({ success: true, message: 'Group messages are ignored' });
+      console.warn('[Evolution Webhook] Sem JID do remetente no payload');
+      return res.json({ success: true, message: 'No sender JID to process' });
     }
 
     // ✅ VALIDAÇÃO: Rejeitar JIDs inválidos (LIDs puros, JIDs mal formatados, etc)
