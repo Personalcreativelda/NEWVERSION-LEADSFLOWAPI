@@ -1232,10 +1232,11 @@ router.post('/evolution/messages', async (req, res) => {
 
       // Atualizar nome se:
       //   1. A mensagem é recebida (não isFromMe) — assim temos o pushName real do contato
-      //   2. O nome atual é apenas o telefone (foi salvo sem pushName, p.ex. criado por isFromMe)
-      //   3. O novo nome é melhor (não é simplesmente o número de telefone)
-      const currentNameIsPhone = currentLead.name === currentLead.phone || currentLead.name === finalPhone;
-      const shouldUpdateName = !isFromMe && contactName !== finalPhone && currentNameIsPhone;
+      //   2. O novo nome é significativo (não é simplesmente o número de telefone)
+      //   3. O nome atual é diferente do novo (evitar UPDATE desnecessário)
+      // Nota: Antes só atualizava quando nome == telefone, mas o bug do pushName do bot
+      // fazia leads ficarem com "Mr.creative" (nome do bot) que não é o telefone.
+      const shouldUpdateName = !isFromMe && contactName !== finalPhone && currentLead.name !== contactName;
 
       // Atualizar avatar se mudou ou não existia
       const shouldUpdateAvatar = !!waProfilePic && currentLead.avatar_url !== waProfilePic;
