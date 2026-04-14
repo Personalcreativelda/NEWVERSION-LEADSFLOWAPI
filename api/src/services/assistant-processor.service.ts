@@ -6,6 +6,7 @@ import { AssistantsService } from './assistants.service';
 import { WhatsAppService } from './whatsapp.service';
 import { getWebSocketService } from './websocket.service';
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
+import { isValidPhoneNumber, isSamePhoneNumber } from '../utils/phone.utils';
 
 const aiService = new AIService();
 const assistantsService = new AssistantsService();
@@ -351,10 +352,21 @@ export class AssistantProcessorService {
      * Retorna o external_id da mensagem enviada (para dedup no webhook Evolution)
      */
     private async sendReply(ctx: IncomingMessageContext, text: string): Promise<string | null> {
+        // ✅ VALIDAÇÃO: Verificar se o contactPhone é válido antes de enviar
+        if (!isValidPhoneNumber(ctx.contactPhone)) {
+            throw new Error(`❌ Número de contato inválido para resposta do assistente: ${ctx.contactPhone}`);
+        }
+
+        // ✅ VALIDAÇÃO: Verificar se não está respondendo para si mesmo (loop infinito)
         let credentials = ctx.credentials || {};
         // Safe-parse se credentials vier como string
         if (typeof credentials === 'string') {
             try { credentials = JSON.parse(credentials); } catch (e) { credentials = {}; }
+        }
+
+        const botPhone = credentials.phone || credentials.phone_number;
+        if (botPhone && isSamePhoneNumber(ctx.contactPhone, botPhone)) {
+            throw new Error(`🚫 Assistente tenta responder para seu próprio número (${ctx.contactPhone}) — REJEITADO para evitar loop infinito`);
         }
 
         switch (ctx.channelType) {

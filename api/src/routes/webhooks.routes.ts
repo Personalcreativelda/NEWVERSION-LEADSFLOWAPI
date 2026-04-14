@@ -7,6 +7,8 @@ import { LeadsService } from '../services/leads.service';
 import { WhatsAppService } from '../services/whatsapp.service';
 // Lead Tracking: Importar serviço de rastreamento de leads
 import { leadTrackingService } from '../services/lead-tracking.service';
+// Phone validation utilities
+import { extractPhoneFromJid, isValidPhoneNumber, isGroupJid, isInvalidJid, isSamePhoneNumber } from '../utils/phone.utils';
 // INBOX: Importar WebSocket service para notificações em tempo real
 import { getWebSocketService } from '../services/websocket.service';
 // IA: Importar processador de assistentes
@@ -619,6 +621,12 @@ router.post('/evolution/messages', async (req, res) => {
       return res.json({ success: true, message: 'Group messages are ignored' });
     }
 
+    // ✅ VALIDAÇÃO: Rejeitar JIDs inválidos (LIDs puros, JIDs mal formatados, etc)
+    if (isInvalidJid(remoteJid)) {
+      console.warn('[Evolution Webhook] ❌ JID inválido detectado, ignorando:', remoteJid);
+      return res.json({ success: true, message: 'Invalid JID format - rejecting message' });
+    }
+
     // Extrair conteúdo da mensagem - suporta múltiplos formatos
     const msg = messageData.message || messageData;
 
@@ -864,8 +872,23 @@ router.post('/evolution/messages', async (req, res) => {
       }
     }
 
-    // phone = número real (se resolvido) OU LID bruto como fallback
-    const phone = resolvedPhone || remoteJid.split('@')[0];
+    // phone = número real (se resolvido) OU número extraído do JID
+    const phone = resolvedPhone || extractPhoneFromJid(remoteJid);
+
+    // ✅ VALIDAÇÃO: Verificar se o número é válido
+    if (!isValidPhoneNumber(phone)) {
+      console.warn('[Evolution Webhook] ❌ Número telefônico inválido extraído do JID:', remoteJid, '→', phone);
+      return res.json({ success: true, message: 'Invalid phone number extracted from JID' });
+    }
+
+    // ✅ VALIDAÇÃO: Verificar se é o próprio número do bot (evitar loop infinito)
+    // O número do bot está no credentials do canal
+    const botPhone = channel?.credentials?.phone || channel?.credentials?.phone_number;
+    if (botPhone && isSamePhoneNumber(phone, botPhone)) {
+      console.warn('[Evolution Webhook] 🚫 Tentativa de responder para si mesmo detectada! Ignorando mensagem de:', phone, '(bot:', botPhone + ')');
+      return res.json({ success: true, message: 'Cannot respond to self - same phone number' });
+    }
+
     // lidValue = valor a guardar em whatsapp_lid quando usamos LID como referência
     const lidValue = isLid ? remoteJid : null;
 
