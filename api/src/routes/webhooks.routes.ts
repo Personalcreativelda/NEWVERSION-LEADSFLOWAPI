@@ -1106,10 +1106,13 @@ router.post('/evolution/messages', async (req, res) => {
     // lidValue = valor a guardar em whatsapp_lid quando usamos LID como referência
     const lidValue = isLid ? remoteJid : null;
 
-    // pushName em Evolution: para mensagens recebidas (isFromMe=false) é o nome do remetente;
-    // para mensagens enviadas (isFromMe=true) na Evolution v2 é o nome do CONTACTO guardado
-    // no telemóvel — portanto usamos em ambos os sentidos.
-    const contactName = messageData.pushName || messageData.senderName || messageData.notifyName || phone;
+    // pushName em Evolution: para mensagens recebidas (isFromMe=false) é o nome do REMETENTE REAL;
+    // para mensagens enviadas (isFromMe=true) é o nome do BOT/instância ("Mr.creative" etc.)
+    // ⚠️ CORREÇÃO: Quando isFromMe=true, NÃO usar pushName como nome do contato!
+    // Usar o telefone como placeholder — será atualizado quando o contato enviar uma mensagem.
+    const contactName = isFromMe 
+      ? (messageData.notifyName || phone)  // isFromMe: pushName é do BOT, não do contato
+      : (messageData.pushName || messageData.senderName || messageData.notifyName || phone);
 
     console.log('[Evolution Webhook] Telefone:', phone, 'LID:', lidValue || 'N/A', 'Nome:', contactName, 'isFromMe:', isFromMe);
 
