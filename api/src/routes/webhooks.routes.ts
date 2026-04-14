@@ -853,33 +853,88 @@ router.post('/evolution/messages', async (req, res) => {
 
     console.log('[Evolution Webhook] Mídia final:', { mediaType, hasUrl: !!mediaUrl });
 
-    // Extrair telefone do JID
-    // ── Resolver @lid → número de telefone real ──────────────────────────────
-    // WhatsApp Business / dispositivos vinculados usam @lid em vez de @s.whatsapp.net.
-    // O @lid não é um número de telefone — armazenamos como referência cruzada e
-    // tentamos resolver o número real via Evolution API para exibição e lookups.
-    const isLid = remoteJid.endsWith('@lid');
-    let resolvedPhone: string | null = null;
-    let resolvedJid: string | null = null;
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ESTRATÉGIA DE PHONE EXTRACTION:
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 1. Se @lid: SEMPRE tentar resolver via Evolution API (contato não salvo)
+    // 2. Se @s.whatsapp.net: Extrair número direto
+    // 3. Usar phone para TODAS operações (armazenar, enviar, comparar)
+    // 4. Guardar remoteJid original apenas como referência (metadata)
+    // ═══════════════════════════════════════════════════════════════════════════
 
+    const isLid = remoteJid.endsWith('@lid');
+    let workingPhone: string | null = null;  // Número que será usado para TUDO
+    let resolvedJid: string | null = null;   // JID resolvido para envio (se houver)
+    let lidReference: string | null = null;  // Guardar @lid para referência cruzada
+
+    console.log('[Evolution Webhook] 📞 Iniciando estratégia de phone extraction...');
+    console.log('[Evolution Webhook]   - remoteJid:', remoteJid);
+    console.log('[Evolution Webhook]   - isLid:', isLid);
+
+    // PASSO 1: Tentar resolver @lid
     if (isLid) {
-      console.log('[Evolution Webhook] Detectado @lid JID, tentando resolver número real:', remoteJid);
-      const lidResolution = await whatsappService.resolveLidToPhone(instance, remoteJid).catch(() => null);
-      if (lidResolution) {
-        resolvedPhone = lidResolution.phone;
-        resolvedJid   = lidResolution.jid;
-        console.log('[Evolution Webhook] @lid resolvido:', remoteJid, '→', resolvedJid);
+      console.log('[Evolution Webhook] 🔍 Detectado @lid, tentando resolver para número real...');
+      lidReference = remoteJid;  // Guardar @lid como referência
+
+      // Tentar resolver com retry
+      let resolved = false;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          console.log(`[Evolution Webhook]   - Tentativa ${attempt}/2 de resolver @lid...`);
+          const lidResolution = await whatsappService.resolveLidToPhone(instance, remoteJid);
+          
+          if (lidResolution?.phone) {
+            workingPhone = lidResolution.phone;
+            resolvedJid = lidResolution.jid;
+            console.log(`[Evolution Webhook] ✅ @lid RESOLVIDO com sucesso: ${remoteJid} → ${resolvedJid}`);
+            resolved = true;
+            break;
+          }
+        } catch (err: any) {
+          console.warn(`[Evolution Webhook]   - Falha na tentativa ${attempt}:`, err.message);
+          if (attempt === 2) {
+            console.warn('[Evolution Webhook] ⚠️ Não foi possível resolver @lid após 2 tentativas');
+          }
+        }
+      }
+
+      // Se não resolveu, tentar extrair número do @lid (último recurso)
+      if (!workingPhone) {
+        console.log('[Evolution Webhook] 🚨 Fallback: tentando extrair número do @lid...');
+        const extracted = extractPhoneFromJid(remoteJid);
+        if (extracted && isValidPhoneNumber(extracted)) {
+          workingPhone = extracted;
+          console.log('[Evolution Webhook] ✅ Número extraído do @lid:', extracted);
+        } else {
+          console.error('[Evolution Webhook] ❌ FALHA CRÍTICA: Não conseguiu resolver nem extrair número do @lid');
+          // Ainda assim continuar com o JID como fallback
+          workingPhone = remoteJid.split('@')[0] || null;
+        }
+      }
+    } else {
+      // PASSO 2: Extrair número de @s.whatsapp.net ou outro formato
+      console.log('[Evolution Webhook] 📱 Não é @lid, extraindo número diretamente...');
+      workingPhone = extractPhoneFromJid(remoteJid);
+      
+      if (workingPhone) {
+        console.log('[Evolution Webhook] ✅ Número extraído:', workingPhone);
+      } else {
+        console.error('[Evolution Webhook] ❌ Não conseguiu extrair número do remoteJid:', remoteJid);
       }
     }
 
-    // phone = número real (se resolvido) OU número extraído do JID
-    const phone = resolvedPhone || extractPhoneFromJid(remoteJid);
-
-    // ✅ VALIDAÇÃO: Verificar se o número é válido
-    if (!isValidPhoneNumber(phone)) {
-      console.warn('[Evolution Webhook] ❌ Número telefônico inválido extraído do JID:', remoteJid, '→', phone);
-      return res.json({ success: true, message: 'Invalid phone number extracted from JID' });
+    // PASSO 3: Validação final
+    if (!workingPhone || !isValidPhoneNumber(workingPhone)) {
+      console.error('[Evolution Webhook] ❌ REJEIÇÃO: Número final inválido ou vazio:', workingPhone);
+      return res.json({ success: true, message: 'Invalid phone number - rejecting message' });
     }
+
+    console.log('[Evolution Webhook] ✅ Phone final para usar:', workingPhone);
+    console.log('[Evolution Webhook]   - lidReference (se houver):', lidReference);
+    console.log('[Evolution Webhook]   - resolvedJid (se houver):', resolvedJid);
+
+    // phone = número final e validado que será usado em TUDO
+    const phone = workingPhone;
 
     // ✅ VALIDAÇÃO: Verificar se é o próprio número do bot (evitar loop infinito)
     // O número do bot está no credentials do canal

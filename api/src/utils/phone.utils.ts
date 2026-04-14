@@ -48,31 +48,41 @@ export function isGroupJid(jid: string): boolean {
 }
 
 /**
- * Detecta se é uma JID inválida (LID ou formato incomum)
+ * Detecta se é uma JID mal formatada (REJEITA APENAS se:
+ * - Não é grupo
+ * - Não é @lid (LAN temporário é aceitável, será resolvido depois)
+ * - E não consegue extrair NENHUM número válido)
  */
 export function isInvalidJid(jid: string): boolean {
   if (!jid) return true;
 
-  // Rejeitar LIDs puros (temporal, não é número real)
-  if (jid.endsWith('@lid') || jid.includes('@lid')) {
-    console.warn(`[Phone Utils] LID detectado: ${jid}`);
-    return true;
-  }
-
-  // Rejeitar grupos
-  if (isGroupJid(jid)) {
-    console.warn(`[Phone Utils] Grupo detectado: ${jid}`);
-    return true;
-  }
-
-  // Tentar extrair número e validar
+  // ✅ Aceitar GRUPOS e @LIDs (evitar rejeição precipitada)
+  // Grupos serão filtrados em outro lugar
+  // @LIDs serão resolvidos e validados depois
+  
+  // Rejeitar APENAS se for completamente mal formatado
+  // e não conseguir extrair nenhum número
   const phone = extractPhoneFromJid(jid);
-  if (!isValidPhoneNumber(phone)) {
-    console.warn(`[Phone Utils] Número inválido em JID: ${jid} → ${phone}`);
-    return true;
+  
+  // Se conseguiu extrair um número, validar esse número
+  if (phone && phone.length > 0) {
+    if (!isValidPhoneNumber(phone)) {
+      console.warn(`[Phone Utils] Número inválido extraído de JID: ${jid} → ${phone}`);
+      return true;
+    }
+    // Número é válido, JID é válido
+    return false;
   }
 
-  return false;
+  // Se NÃO conseguiu extrair nenhum número E é @lid, aceitar (será resolvido depois)
+  if (jid.includes('@lid')) {
+    console.log(`[Phone Utils] @lid sem número extraído (ok, será resolvido): ${jid}`);
+    return false;
+  }
+
+  // Senão, é inválido
+  console.warn(`[Phone Utils] JID completamente inválido (sem @ e sem números): ${jid}`);
+  return true;
 }
 
 /**

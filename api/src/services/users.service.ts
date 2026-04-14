@@ -141,7 +141,7 @@ const fetchUsageCounts = async (userId: string): Promise<UsageCounts> => {
         [userId, periodStart]
       ),
       safeCount('SELECT COUNT(*) FROM channels WHERE user_id = $1', [userId]),
-      safeCount('SELECT COUNT(*) FROM ai_assistants WHERE user_id = $1 AND is_custom = true', [userId]),
+      safeCount('SELECT COUNT(*) FROM user_assistants ua JOIN assistants a ON ua.assistant_id = a.id WHERE ua.user_id = $1 AND a.is_custom = true', [userId]),
       safeCount('SELECT COUNT(*) FROM voice_agents WHERE user_id = $1', [userId]),
       safeCount("SELECT COUNT(*) FROM campaigns WHERE user_id = $1 AND status IN ('active','scheduled','paused')", [userId]),
     ]);
