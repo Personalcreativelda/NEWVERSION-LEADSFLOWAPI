@@ -15,16 +15,16 @@ const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const startSessionExpiryTimer = () => {
   try {
     localStorage.setItem(SESSION_EXPIRY_KEY, String(Date.now() + SESSION_TTL_MS));
-  } catch (error) {
-    console.error('[Auth] Failed to persist session expiry:', error);
+  } catch {
+    // storage unavailable — session will rely on the access token alone
   }
 };
 
 export const clearSessionExpiry = () => {
   try {
     localStorage.removeItem(SESSION_EXPIRY_KEY);
-  } catch (error) {
-    console.error('[Auth] Failed to clear session expiry:', error);
+  } catch {
+    // ignore
   }
 };
 
@@ -39,8 +39,7 @@ export const getSessionExpiryTimestamp = (): number | null => {
       return null;
     }
     return value;
-  } catch (error) {
-    console.error('[Auth] Failed to read session expiry:', error);
+  } catch {
     return null;
   }
 };
@@ -48,7 +47,13 @@ export const getSessionExpiryTimestamp = (): number | null => {
 export const isSessionExpired = (): boolean => {
   const expiry = getSessionExpiryTimestamp();
   if (!expiry) {
-    return !!localStorage.getItem('leadflow_access_token');
+    // No expiry recorded — if a token exists the session is still valid;
+    // set a fresh 24 h timer so subsequent checks work correctly.
+    if (localStorage.getItem('leadflow_access_token')) {
+      startSessionExpiryTimer();
+      return false;
+    }
+    return true; // no token at all
   }
   return Date.now() > expiry;
 };
@@ -111,10 +116,9 @@ async function ensureValidToken(): Promise<void> {
         localStorage.setItem('leadflow_refresh_token', data.session.refresh_token);
       }
       startSessionExpiryTimer();
-      console.log('[Auth] Token refreshed automatically');
     }
   } catch (error) {
-    console.error('[Auth] Failed to refresh token:', error);
+    logger.error('[Auth] Failed to refresh token:', error);
     clearSessionExpiry();
     localStorage.removeItem('leadflow_access_token');
     localStorage.removeItem('leadflow_refresh_token');
@@ -184,7 +188,10 @@ async function apiCall(
 
     logger.log(`[API] ${methodType} ${apiEndpoint} - Status: ${response.status}`);
 
-    if (response.status === 404 && resourceEndpoint === '/admin/notification-settings') {
+    if (response.status === 404 && (
+      resourceEndpoint === '/admin/notification-settings' ||
+      resourceEndpoint.startsWith('/webhooks/settings')
+    )) {
       return getMockData(resourceEndpoint);
     }
 
@@ -221,7 +228,7 @@ async function apiCall(
           errorMessage.toLowerCase().includes('not found'));
 
       if (!isLeadNotFound) {
-        console.error(`[API] Error response for ${apiEndpoint}:`, data);
+        logger.error(`[API] Error response ${apiEndpoint}:`, data);
       }
 
       if (response.status === 401 && useAuth) {
@@ -256,6 +263,10 @@ async function apiCall(
     }
 
     logger.log(`[API] OK ${apiEndpoint}`);
+    // Slide the inactivity window on every successful authenticated call
+    if (useAuth) {
+      startSessionExpiryTimer();
+    }
     return data;
   } catch (error) {
     const isLeadNotFoundError = error instanceof Error &&
@@ -294,7 +305,7 @@ async function apiCall(
     if (error instanceof Error &&
       error.message.includes('Invalid JSON response from server (404)') &&
       resourceEndpoint === '/admin/notification-settings') {
-      console.warn('[API] Notification settings endpoint not found, using mock data');
+      logger.warn('[API] Notification settings endpoint not found, using mock data');
 
       if (options.method === 'POST') {
         return { success: true, settings: JSON.parse(options.body as string) };
@@ -444,33 +455,22 @@ export const apiRequest = async (
 
 export const authApi = {
   setupDemo: async () => {
-    console.log('Setting up demo user...');
-    const data = await apiCall('/auth/setup-demo', {
-      method: 'POST',
-    });
-    console.log('Demo setup response:', data);
+    const data = await apiCall('/auth/setup-demo', { method: 'POST' });
     return data;
   },
 
   setupAdmin: async () => {
-    console.log('Setting up admin user...');
-    const data = await apiCall('/auth/setup-admin', {
-      method: 'POST',
-    });
-    console.log('Admin setup response:', data);
+    const data = await apiCall('/auth/setup-admin', { method: 'POST' });
     return data;
   },
 
   signup: async (email: string, password: string, name: string, selectedPlan: string = 'starter') => {
-    console.log('[Auth] Signup API call for:', email, 'with name:', name, 'selectedPlan:', selectedPlan);
-
     try {
       const metadata = { name, selectedPlan };
       const data = await apiCall('/auth/register', {
         method: 'POST',
         body: JSON.stringify({ email, password, metadata }),
       });
-      console.log('[Auth] Signup API response:', data);
 
       const user = data?.user;
       const session = data?.session;
@@ -501,7 +501,7 @@ export const authApi = {
       );
 
       if (requiresConfirmation) {
-        console.log('[Auth] Signup successful - awaiting email confirmation before signin');
+        logger.log('[Auth] Signup successful - awaiting email confirmation');
         return {
           success: true,
           requiresEmailConfirmation: true,
@@ -512,18 +512,13 @@ export const authApi = {
         };
       }
 
-      console.log('[Auth] Signup successful, waiting 2 seconds before signin...');
       await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      console.log('[Auth] Attempting automatic signin...');
       return await authApi.signin(email, password);
     } catch (error: any) {
-      console.error('[Auth] Signup error:', error);
-
       const errorMessage = error?.message || '';
 
       if (errorMessage.includes('Backend indisponível') || errorMessage.includes('Failed to fetch')) {
-        console.warn('[Auth] 🔄 Backend offline - using Mock Auth for signup');
+        logger.warn('[Auth] Backend offline - using Mock Auth for signup');
         const result = await mockAuth.signup(email, password, name);
 
         if (result.success) {
@@ -541,7 +536,7 @@ export const authApi = {
         throw error;
       }
 
-      console.warn('[Auth] 🔄 Trying Mock Auth for signup');
+      logger.warn('[Auth] Trying Mock Auth for signup');
       const result = await mockAuth.signup(email, password, name);
 
       if (result.success) {
@@ -553,7 +548,6 @@ export const authApi = {
   },
 
   signin: async (email: string, password: string) => {
-    console.log('[Auth] Signin attempt for:', email);
 
     try {
       const data = await apiCall('/auth/login', {
@@ -582,8 +576,6 @@ export const authApi = {
         },
       };
     } catch (error: any) {
-      console.error('[Auth] Backend signin error:', error);
-
       const errorMessage = error?.message || '';
 
       if (
@@ -591,7 +583,7 @@ export const authApi = {
         errorMessage.includes('Failed to fetch') ||
         errorMessage.includes('ECONNREFUSED')
       ) {
-        console.warn('[Auth] 🔄 Backend offline - using Mock Auth');
+        logger.warn('[Auth] Backend offline - using Mock Auth');
         return handleMockSignin(email, password);
       }
 
@@ -613,7 +605,7 @@ export const authApi = {
           body: JSON.stringify({ refresh_token: refreshToken }),
         });
       } catch (backendError) {
-        console.warn('[Auth] Logout API error (ignored):', backendError);
+        logger.warn('[Auth] Logout API error (ignored):', backendError);
       }
 
       await mockAuth.signout();
@@ -621,7 +613,7 @@ export const authApi = {
 
       return { success: true };
     } catch (error: any) {
-      console.error('[Auth] Signout error:', error);
+      logger.error('[Auth] Signout error:', error);
       await mockAuth.signout();
       clearSessionExpiry();
       return { success: true };
@@ -660,13 +652,13 @@ export const authApi = {
         user: data?.user,
       };
     } catch (error: any) {
-      console.error('[Auth] Refresh session error:', error);
+      logger.error('[Auth] Refresh session error:', error);
 
       const mockSession = await mockAuth.getSession();
       const session = mockSession?.data?.session;
 
       if (session) {
-        console.warn('[Auth] Using mock session refresh fallback');
+        logger.warn('[Auth] Using mock session refresh fallback');
         startSessionExpiryTimer();
         return {
           success: true,

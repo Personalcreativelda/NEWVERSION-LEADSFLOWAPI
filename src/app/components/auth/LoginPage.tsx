@@ -31,7 +31,26 @@ interface ErrorState {
   type: ErrorType;
 }
 
+const SLIDES = [
+  {
+    image: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&q=80',
+    title: 'Gerencie seus Leads,\nCresça seu Negócio',
+    subtitle: 'A solução CRM completa para empresas modernas',
+  },
+  {
+    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&q=80',
+    title: 'Automatize suas\nComunicações',
+    subtitle: 'WhatsApp, e-mail e muito mais em um só lugar',
+  },
+  {
+    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80',
+    title: 'Acompanhe Resultados\nem Tempo Real',
+    subtitle: 'Métricas e relatórios que impulsionam decisões',
+  },
+];
+
 export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForgotPassword, onBackToHome }: LoginPageProps) {
+  const [currentSlide, setCurrentSlide] = useState(0);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<ErrorState | null>(null);
@@ -79,6 +98,14 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
     
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // Slideshow auto-advance
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % SLIDES.length);
+    }, 5000);
+    return () => clearInterval(timer);
   }, []);
 
   // ✅ Focar no erro quando aparecer (acessibilidade)
@@ -438,61 +465,86 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
 
   return (
     <div className="min-h-screen flex bg-[#0a0a0a] relative">
-      {/* Left Column - Visual */}
+      {/* Left Column - Slideshow */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-[#111111] overflow-hidden">
-        {/* Background Image with Overlay */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: 'url(https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&q=80)',
-          }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a]/95 via-[#111111]/90 to-[#0a0a0a]/95"></div>
-        </div>
-
-        {/* Logo */}
-        <div className="absolute top-8 left-8 z-10">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-[#00C48C] rounded-lg flex items-center justify-center">
-              <Zap className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-white text-2xl font-semibold">LeadsFlow</span>
+        {/* Slides */}
+        {SLIDES.map((slide, i) => (
+          <div
+            key={i}
+            className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
+            style={{
+              backgroundImage: `url(${slide.image})`,
+              opacity: i === currentSlide ? 1 : 0,
+            }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a]/95 via-[#111111]/90 to-[#0a0a0a]/95" />
           </div>
-        </div>
+        ))}
 
-        {/* Content */}
+        {/* Content — logo + text + indicators all centered */}
         <div className="relative z-10 flex flex-col items-center justify-center w-full px-12 text-center">
-          <h2 className="text-white text-5xl font-semibold mb-4 leading-tight">
-            Gerencie seus Leads,<br />
-            Cresça seu Negócio
-          </h2>
-          <p className="text-gray-400 text-lg max-w-md">
-            A solução CRM completa para empresas modernas
-          </p>
+          {SLIDES.map((slide, i) => (
+            <div
+              key={i}
+              className="absolute px-12 text-center transition-all duration-700"
+              style={{
+                opacity: i === currentSlide ? 1 : 0,
+                transform: i === currentSlide ? 'translateY(0)' : 'translateY(12px)',
+                pointerEvents: i === currentSlide ? 'auto' : 'none',
+              }}
+            >
+              {/* Logo centered above title */}
+              <div className="flex justify-center mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-[#00C48C] rounded-xl flex items-center justify-center shadow-lg shadow-[#00C48C]/30">
+                    <Zap className="w-7 h-7 text-white" />
+                  </div>
+                  <span className="text-white text-3xl font-semibold">LeadsFlow</span>
+                </div>
+              </div>
 
-          {/* Slide Indicators */}
-          <div className="flex gap-2 mt-12">
-            <div className="w-8 h-1 bg-[#00C48C] rounded-full"></div>
-            <div className="w-8 h-1 bg-white/20 rounded-full"></div>
-            <div className="w-8 h-1 bg-white/20 rounded-full"></div>
-          </div>
+              <h2 className="text-white text-5xl font-semibold mb-4 leading-tight whitespace-pre-line">
+                {slide.title}
+              </h2>
+              <p className="text-gray-400 text-lg max-w-md">
+                {slide.subtitle}
+              </p>
+
+              {/* Slide Indicators — inline, below description */}
+              <div className="flex justify-center gap-2 mt-10">
+                {SLIDES.map((_, j) => (
+                  <button
+                    key={j}
+                    onClick={() => setCurrentSlide(j)}
+                    className={`h-1 rounded-full transition-all duration-300 ${
+                      j === currentSlide ? 'w-8 bg-[#00C48C]' : 'w-8 bg-white/20'
+                    }`}
+                    aria-label={`Slide ${j + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Right Column - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 lg:px-16 bg-[#0a0a0a] overflow-y-auto">
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-10 sm:px-6 sm:py-12 lg:px-16 bg-[#0a0a0a] overflow-y-auto">
         <div className="w-full max-w-md">
+
+          {/* Mobile Logo — outside the card, centered above it */}
+          <div className="lg:hidden flex justify-center mb-6">
+            <div className="w-16 h-16 bg-[#00C48C] rounded-2xl flex items-center justify-center shadow-lg shadow-[#00C48C]/30">
+              <Zap className="w-9 h-9 text-white" />
+            </div>
+          </div>
+
+          {/* Mobile card wrapper */}
+          <div className="bg-[#111111] border border-[#2a2a2a] rounded-3xl p-6 sm:p-8 lg:p-0 lg:bg-transparent lg:border-0 lg:rounded-none">
           {/* Title */}
           <div className="mb-8">
-            {/* Mobile Logo */}
-            <div className="lg:hidden flex items-center gap-2 mb-8">
-              <div className="w-8 h-8 bg-[#00C48C] rounded-lg flex items-center justify-center">
-                <Zap className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-white text-xl font-semibold">LeadsFlow</span>
-            </div>
-
-            <h1 className="text-white text-3xl sm:text-4xl font-semibold mb-3">Entrar na conta</h1>
+            <h1 className="text-white text-3xl sm:text-4xl font-semibold mb-1">Entrar na conta</h1>
+            <p className="text-gray-500 text-sm mt-2">Bem-vindo de volta</p>
           </div>
 
           {/* ✅ ALERTA DE ERRO MELHORADO */}
@@ -526,11 +578,11 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
           {/* Email Login Form */}
           <form onSubmit={handleEmailLogin} className="space-y-5 mb-6">
             <div>
-              <Label htmlFor="email" className="text-sm text-gray-300 mb-2 block">
+              <Label htmlFor="email" className="text-sm font-medium text-gray-300 mb-2 block">
                 Email
               </Label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-500 pointer-events-none" />
                 <Input
                   ref={emailRef}
                   id="email"
@@ -538,9 +590,9 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                   placeholder="Digite seu email"
                   value={email}
                   onChange={(e) => handleEmailChange(e.target.value)}
-                  className={`w-full pl-12 pr-4 py-3 bg-[#1a1a1a] text-white placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-[#00C48C] transition-all ${
-                    fieldErrors.email 
-                      ? 'border-red-500/50 focus:border-red-500' 
+                  className={`w-full pl-12 pr-4 h-14 text-base bg-[#1a1a1a] text-white placeholder:text-gray-600 rounded-2xl border focus:ring-2 focus:ring-[#00C48C]/40 transition-all ${
+                    fieldErrors.email
+                      ? 'border-red-500/50 focus:border-red-500'
                       : 'border-[#2a2a2a] focus:border-[#00C48C]'
                   }`}
                   required
@@ -558,29 +610,29 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label htmlFor="password" className="text-sm text-gray-300">
+                <Label htmlFor="password" className="text-sm font-medium text-gray-300">
                   Senha
                 </Label>
                 <button
                   type="button"
                   onClick={() => onForgotPassword ? onForgotPassword() : setShowForgotPassword(true)}
-                  className="text-sm text-[#00C48C] hover:text-[#00a576]"
+                  className="text-sm text-[#00C48C] hover:text-[#00a576] transition-colors"
                 >
                   Esqueceu a senha?
                 </button>
               </div>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-500 pointer-events-none" />
                 <Input
                   ref={passwordRef}
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="Digite sua senha"
                   value={password}
                   onChange={(e) => handlePasswordChange(e.target.value)}
-                  className={`w-full pl-12 pr-12 py-3 bg-[#1a1a1a] text-white placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-[#00C48C] transition-all ${
-                    fieldErrors.password 
-                      ? 'border-red-500/50 focus:border-red-500' 
+                  className={`w-full pl-12 pr-14 h-14 text-base bg-[#1a1a1a] text-white placeholder:text-gray-600 rounded-2xl border focus:ring-2 focus:ring-[#00C48C]/40 transition-all ${
+                    fieldErrors.password
+                      ? 'border-red-500/50 focus:border-red-500'
                       : 'border-[#2a2a2a] focus:border-[#00C48C]'
                   }`}
                   required
@@ -590,7 +642,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:text-gray-400"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -606,9 +658,9 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
             <Button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-[#00C48C] hover:bg-[#00a576] text-white font-medium rounded-xl"
+              className="w-full h-14 text-base bg-[#00C48C] hover:bg-[#00a576] text-white font-semibold rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-[#00C48C]/20"
             >
-              {loading ? 'Entrando...' : 'Entrar'}
+              {loading ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Entrando...</span> : 'Entrar'}
             </Button>
           </form>
 
@@ -638,7 +690,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
             type="button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full py-3 mb-6 bg-gray-50 hover:bg-gray-50 text-gray-900 font-medium rounded-xl flex items-center justify-center gap-3 border border-gray-300 transition-transform hover:scale-[1.02]"
+            className="w-full h-14 mb-6 text-base bg-white hover:bg-gray-50 text-gray-900 font-medium rounded-2xl flex items-center justify-center gap-3 border border-gray-200 transition-all hover:scale-[1.01] active:scale-[0.99] shadow-sm"
           >
             <GoogleIcon />
             <span>Entrar com Google</span>
@@ -661,6 +713,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
               </button>
             </div>
           )}
+          </div>{/* end mobile card */}
         </div>
       </div>
 

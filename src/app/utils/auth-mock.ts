@@ -2,6 +2,7 @@
  * Mock Authentication System
  * Allows the app to work completely offline without Supabase connection
  */
+import { logger } from './logger';
 
 interface MockUser {
   id: string;
@@ -65,16 +66,16 @@ function isCodeExpired(requestedAt?: string): boolean {
 function setSessionExpiry(): void {
   try {
     localStorage.setItem(SESSION_EXPIRY_KEY, String(Date.now() + SESSION_TTL_MS));
-  } catch (error) {
-    console.error('[MockAuth] Failed to persist session expiry:', error);
+  } catch {
+    // storage unavailable
   }
 }
 
 function clearSessionExpiry(): void {
   try {
     localStorage.removeItem(SESSION_EXPIRY_KEY);
-  } catch (error) {
-    console.error('[MockAuth] Failed to clear session expiry:', error);
+  } catch {
+    // ignore
   }
 }
 
@@ -82,15 +83,19 @@ function isSessionExpired(): boolean {
   try {
     const raw = localStorage.getItem(SESSION_EXPIRY_KEY);
     if (!raw) {
-      return !!localStorage.getItem('leadflow_access_token');
+      // No expiry recorded — if a token exists, set a fresh timer and treat as valid.
+      if (localStorage.getItem('leadflow_access_token')) {
+        setSessionExpiry();
+        return false;
+      }
+      return true;
     }
     const value = Number(raw);
     if (Number.isNaN(value)) {
       return true;
     }
     return Date.now() > value;
-  } catch (error) {
-    console.error('[MockAuth] Failed to read session expiry:', error);
+  } catch {
     return true;
   }
 }
@@ -134,7 +139,7 @@ export const mockAuth = {
    * Sign up a new user
    */
   signup: async (email: string, password: string, name: string): Promise<MockAuthResponse> => {
-    console.log('[MockAuth] 📝 Signup attempt:', email);
+    logger.log('[MockAuth] Signup attempt');
     
     // Validate input
     if (!email || !password || !name) {
@@ -171,8 +176,7 @@ export const mockAuth = {
     users.push(newUser);
     saveUsers(users);
     
-    console.log('[MockAuth] ✅ User created successfully:', email);
-    console.log('[MockAuth] ℹ️  Verification required before login');
+    logger.log('[MockAuth] User registered.');
     
     return {
       success: true,
@@ -184,7 +188,7 @@ export const mockAuth = {
    * Sign in an existing user
    */
   signin: async (email: string, password: string): Promise<MockAuthResponse> => {
-    console.log('[MockAuth] 🔐 Signin attempt:', email);
+    logger.log('[MockAuth] Signin attempt');
     
     // Validate input
     if (!email || !password) {
@@ -243,7 +247,7 @@ export const mockAuth = {
     localStorage.setItem('leadflow_refresh_token', session.refresh_token);
     setSessionExpiry();
     
-    console.log('[MockAuth] ✅ Signin successful:', email);
+    logger.log('[MockAuth] Signin successful');
     
     return {
       success: true,
@@ -255,7 +259,7 @@ export const mockAuth = {
    * Sign out current user
    */
   signout: async (): Promise<{ success: boolean }> => {
-    console.log('[MockAuth] 👋 Signout');
+    logger.log('[MockAuth] Signout');
     
     saveSession(null);
     localStorage.removeItem('leadflow_access_token');
@@ -328,7 +332,6 @@ export const mockAuth = {
     
     if (session) {
       if (isSessionExpired()) {
-        console.log('[MockAuth] ⚠️  Session expired by TTL');
         saveSession(null);
         clearSessionExpiry();
         return { data: { session: null } };
@@ -337,7 +340,6 @@ export const mockAuth = {
     
     // Check if session is expired
     if (session && new Date(session.expires_at) < new Date()) {
-      console.log('[MockAuth] ⚠️  Session expired');
       saveSession(null);
       return { data: { session: null } };
     }
@@ -390,7 +392,7 @@ export const mockAuth = {
     saveUsers(users);
     saveSession(session);
     
-    console.log('[MockAuth] ✅ Profile updated');
+    logger.log('[MockAuth] Profile updated');
     
     return {
       success: true,
@@ -402,7 +404,7 @@ export const mockAuth = {
    * Reset password (mock - just shows success)
    */
   resetPassword: async (email: string): Promise<{ success: boolean; error?: string }> => {
-    console.log('[MockAuth] 📧 Password reset requested for:', email);
+    logger.log('[MockAuth] Password reset requested');
     
     // In mock mode, always succeed
     return {

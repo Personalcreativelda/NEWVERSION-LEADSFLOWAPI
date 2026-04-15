@@ -711,15 +711,46 @@ async function executeCampaignMessages(
     ? JSON.parse(campaign.settings)
     : campaign.settings || {};
 
-  // Delay aleatório entre mensagens (anti-bloqueio WhatsApp: variação imita comportamento humano)
-  const minDelay = Math.max(1000, ((settings.minDelaySeconds ?? 3)) * 1000);
-  const maxDelay = Math.max(minDelay, ((settings.maxDelaySeconds ?? 5)) * 1000);
+  // ─── ANTI-BAN: configurações de ritmo de envio ──────────────────────────
+  // Defaults seguros: 15–45s entre mensagens, pausa de 90s a cada 20 msgs
+  // O utilizador pode customizar nas settings da campanha.
+  const minDelay = Math.max(12000, ((settings.minDelaySeconds ?? 15)) * 1000);
+  const maxDelay = Math.max(minDelay + 5000, ((settings.maxDelaySeconds ?? 45)) * 1000);
+
+  // Tamanho do lote antes de fazer uma pausa mais longa (default: 20)
+  const batchSize = Math.max(5, Math.min(50, settings.batchSize ?? 20));
+  // Pausa entre lotes em MS (default: 90s–3min aleatório)
+  const batchPauseMin = Math.max(30000, ((settings.batchPauseMinSeconds ?? 90)) * 1000);
+  const batchPauseMax = Math.max(batchPauseMin + 30000, ((settings.batchPauseMaxSeconds ?? 180)) * 1000);
+
+  // Limite diário de mensagens (default: 150; -1 = sem limite)
+  const dailyLimit: number = settings.dailyLimit ?? 150;
+
   const getDelay = () =>
-    minDelay >= maxDelay
-      ? minDelay
-      : Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+
+  const getBatchPause = () =>
+    Math.floor(Math.random() * (batchPauseMax - batchPauseMin + 1)) + batchPauseMin;
+
+  // Contador de erros consecutivos — pausa extra se o WA começa a rejeitar
+  let consecutiveErrors = 0;
+  // Mensagens enviadas com sucesso nesta execução
+  let sessionSent = 0;
+
+  console.log(`[Campaigns Execute] ⏱ Anti-ban config: delay ${minDelay/1000}–${maxDelay/1000}s | batch ${batchSize} msgs | batch pause ${batchPauseMin/1000}–${batchPauseMax/1000}s | daily limit ${dailyLimit === -1 ? '∞' : dailyLimit}`);
 
   for (let i = 0; i < leads.length; i++) {
+    // ── Parar se atingiu o limite diário ───────────────────────────────────
+    if (dailyLimit !== -1 && sessionSent >= dailyLimit) {
+      console.warn(`[Campaigns Execute] Limite diário de ${dailyLimit} mensagens atingido. Pausando campanha.`);
+      stats.errors.push(`Limite diário de ${dailyLimit} mensagens atingido. Retome amanhã.`);
+      await query(
+        `UPDATE campaigns SET status = 'paused', stats = $1, updated_at = NOW() WHERE id = $2`,
+        [JSON.stringify({ ...stats, pausedReason: 'DAILY_LIMIT_REACHED' }), campaign.id]
+      );
+      return;
+    }
+
     const lead = leads[i];
 
     // ── Verifica limite a cada 10 mensagens (e na primeira) para não bloquear o loop inteiro ──
@@ -885,8 +916,10 @@ async function executeCampaignMessages(
           }
         }
 
-        stats.sent++;
-      } catch (sendError: any) {
+      stats.sent++;
+      sessionSent++;
+      consecutiveErrors = 0; // reset on success
+      
         console.error(`[Campaigns Execute] Erro ao enviar para ${cleanPhone}:`, sendError.message);
         stats.failed++;
         messageStatus = 'failed';
@@ -994,15 +1027,48 @@ async function executeCampaignMessages(
         );
       }
 
-      // Delay aleatório entre mensagens (exceto na última)
+      // ─── ANTI-BAN: delays e pausas entre lotes ──────────────────────────
       if (i < leads.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, getDelay()));
+        // Pausa longa a cada N mensagens (final do lote)
+        const isEndOfBatch = (i + 1) % batchSize === 0;
+        if (isEndOfBatch) {
+          const batchPause = getBatchPause();
+          const batchNum = Math.floor((i + 1) / batchSize);
+          console.log(`[Campaigns Execute] ⏸ Pausa entre lotes (${batchNum}) — aguardando ${Math.round(batchPause / 1000)}s...`);
+          await query(
+            `UPDATE campaigns SET stats = $1, updated_at = NOW() WHERE id = $2`,
+            [JSON.stringify(stats), campaign.id]
+          );
+          await new Promise(resolve => setTimeout(resolve, batchPause));
+        } else {
+          // Delay normal entre mensagens
+          await new Promise(resolve => setTimeout(resolve, getDelay()));
+        }
       }
 
     } catch (error: any) {
       console.error(`[Campaigns Execute] Erro no lead ${lead.id}:`, error.message);
       stats.failed++;
+      consecutiveErrors++;
       stats.errors.push(`Lead ${lead.id}: ${error.message}`);
+
+      // ─── Backoff adaptativo: se o WA começar a rejeitar, pausar mais ───
+      if (consecutiveErrors >= 3) {
+        const backoffMs = Math.min(consecutiveErrors * 30000, 300000); // max 5 min
+        console.warn(`[Campaigns Execute] ⚠️ ${consecutiveErrors} erros consecutivos — aguardando ${Math.round(backoffMs / 1000)}s antes de continuar...`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
+
+      // Após 10 erros consecutivos, pausar a campanha (provável bloqueio)
+      if (consecutiveErrors >= 10) {
+        console.error(`[Campaigns Execute] 🚫 10 erros consecutivos — pausando campanha por protecção anti-ban`);
+        stats.errors.push('Campanha pausada automaticamente: muitos erros consecutivos. Pode indicar bloqueio do WhatsApp.');
+        await query(
+          `UPDATE campaigns SET status = 'paused', stats = $1, updated_at = NOW() WHERE id = $2`,
+          [JSON.stringify({ ...stats, pausedReason: 'TOO_MANY_ERRORS' }), campaign.id]
+        );
+        return;
+      }
     }
   }
 
