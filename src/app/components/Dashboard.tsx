@@ -61,6 +61,7 @@ import { notifyTourAvailable } from '../utils/notificationHelpers';
 import { leadsApi, userApi, integrationsApi } from '../utils/api';
 import { conversationsApi } from '../services/api/inbox';
 import { useLeadsAutoRefresh } from '../hooks/useLeadsAutoRefresh';
+import { useConfirm } from './ui/ConfirmDialog';
 import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
 
 import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X } from 'lucide-react';
@@ -93,6 +94,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserUpdate, onRefreshUser, enforcementBlock, onEnforcementBlockCleared }: DashboardProps) {
+  const confirm = useConfirm();
   // Theme mode: 'light' | 'dark'
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
     const savedMode = localStorage.getItem('crm_tema_mode') as 'light' | 'dark' | null;
@@ -713,7 +715,13 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   };
 
   const handleDelete = async (leadId: string) => {
-    if (!confirm('Tem certeza que deseja deletar este lead?')) return;
+    const confirmed = await confirm('Tem certeza que deseja deletar este lead?', {
+      title: 'Deletar Lead',
+      variant: 'danger',
+      confirmLabel: 'Deletar',
+      cancelLabel: 'Cancelar',
+    });
+    if (!confirmed) return;
 
     try {
       const response = await leadsApi.delete(leadId);
@@ -1533,7 +1541,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     performExport(maxExport);
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     // Check plan enforcement first
     const block = getBlockReason();
     if (block) { showPlanBlock(block.code, block.message); return; }
@@ -1547,7 +1555,13 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
       ? `📥 Importação de Leads\n\nSeu plano ${currentPlan} tem importação ILIMITADA! 🚀\n\nVocê pode importar quantos leads quiser.\n\nDeseja continuar?`
       : `📥 Importação de Leads\n\nSeu plano ${currentPlan} permite importar até ${maxImport} leads.\n\nO sistema irá importar apenas os primeiros ${maxImport} leads da sua planilha.\n\nDeseja continuar?`;
 
-    if (!confirm(confirmMessage)) return;
+    const importConfirmed = await confirm(confirmMessage, {
+      title: 'Importação de Leads',
+      variant: 'info',
+      confirmLabel: 'Continuar',
+      cancelLabel: 'Cancelar',
+    });
+    if (!importConfirmed) return;
 
     setModalImportarLeads(true);
   };
@@ -1805,11 +1819,14 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   const handleRemoveDuplicates = async () => {
     try {
       // Confirmar ação com o usuário
-      const confirmRemove = confirm(
-        `🗑️ Remover Leads Duplicados\n\n` +
-        `Esta ação irá remover todos os leads duplicados (com mesmo email ou telefone).\n\n` +
-        `Apenas a versão mais antiga de cada lead será mantida.\n\n` +
-        `Deseja continuar?`
+      const confirmRemove = await confirm(
+        'Esta ação irá remover todos os leads duplicados (com mesmo email ou telefone). Apenas a versão mais antiga de cada lead será mantida.',
+        {
+          title: 'Remover Leads Duplicados',
+          variant: 'danger',
+          confirmLabel: 'Remover Duplicados',
+          cancelLabel: 'Cancelar',
+        }
       );
       
       if (!confirmRemove) {
@@ -1975,10 +1992,10 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
       />
 
       {/* Main Content Wrapper - SEMPRE com margin-left em desktop (>1024px) */}
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 lg:ml-[260px] h-screen">
+      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 lg:ml-[260px] h-screen overflow-hidden">
         <div className={`dashboard-container flex flex-col ${
           currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
-            ? 'h-screen overflow-hidden'
+            ? 'h-full overflow-hidden'
             : 'min-h-screen'
         }`} style={{ background: 'hsl(var(--background))' }}>
           {/* Header */}
@@ -2261,7 +2278,13 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                     setModalEditarLead(true);
                   }}
                   onDeleteLead={async (leadId) => {
-                    if (confirm('Tem certeza que deseja deletar este lead permanentemente?')) {
+                    const deleteConfirmed = await confirm('Tem certeza que deseja deletar este lead permanentemente?', {
+                      title: 'Deletar Lead',
+                      variant: 'danger',
+                      confirmLabel: 'Deletar',
+                      cancelLabel: 'Cancelar',
+                    });
+                    if (deleteConfirmed) {
                       await handleDeletarLead(leadId);
                     }
                   }}
@@ -2347,19 +2370,21 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
             )}
           </div>
 
-          {/* Footer */}
-          <footer className="border-t border-gray-200 dark:border-gray-700 mt-12 py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">
-                <p className="text-center md:text-left">
-                  © {new Date().getFullYear()} <span className="font-bold text-gray-900 dark:text-white">LeadsFlow</span> <span className="text-gray-700 dark:text-gray-300">SAAS</span>. Todos os direitos reservados.
-                </p>
-                <p className="text-center md:text-right">
-                  Desenvolvido por <span className="text-blue-600 dark:text-blue-400 font-medium">PersonalCreativeLda</span>
-                </p>
+          {/* Footer - hidden on inbox/full-height pages */}
+          {currentPage !== 'inbox' && currentPage !== 'inbox-settings' && currentPage !== 'ai-assistants' && currentPage !== 'automations' && currentPage !== 'voice-agents' && (
+            <footer className="border-t border-gray-200 dark:border-gray-700 mt-12 py-6">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">
+                  <p className="text-center md:text-left">
+                    © {new Date().getFullYear()} <span className="font-bold text-gray-900 dark:text-white">LeadsFlow</span> <span className="text-gray-700 dark:text-gray-300">SAAS</span>. Todos os direitos reservados.
+                  </p>
+                  <p className="text-center md:text-right">
+                    Desenvolvido por <span className="text-blue-600 dark:text-blue-400 font-medium">PersonalCreativeLda</span>
+                  </p>
+                </div>
               </div>
-            </div>
-          </footer>
+            </footer>
+          )}
         </main>
       </div>
 

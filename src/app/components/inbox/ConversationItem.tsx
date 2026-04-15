@@ -45,6 +45,13 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
     const lastMessage = conversation.last_message;
     const channel = conversation.channel;
     const isGroup = (conversation as any).is_group || conversation.metadata?.is_group || contact?.is_group;
+    // Para grupos, usar group_picture do metadata; para indivíduos, usar avatar do lead
+    const avatarUrl = isGroup
+        ? (conversation.metadata?.group_picture || conversation.metadata?.profile_picture || contact?.avatar_url || null)
+        : (contact?.avatar_url || null);
+    const displayName = isGroup
+        ? (conversation.metadata?.group_name || contact?.name || 'Grupo WhatsApp')
+        : (contact?.name || contact?.phone || 'Desconhecido');
 
     // Coletar todas as etiquetas para exibição
     const leadStatus = (contact as any)?.status || conversation.metadata?.lead_status;
@@ -160,29 +167,27 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
             {/* Avatar */}
             <div className="relative flex-shrink-0">
                 <div 
-                    className={`w-11 h-11 rounded-full flex items-center justify-center overflow-hidden ${
-                        contact?.avatar_url ? '' : getAvatarColor(contact?.name || '?')
+                    className={`w-12 h-12 rounded-full flex items-center justify-center overflow-hidden ${
+                        avatarUrl ? '' : getAvatarColor(displayName || '?')
                     }`}
                 >
-                    {contact?.avatar_url ? (
+                    {avatarUrl ? (
                         <img 
-                            src={contact.avatar_url} 
-                            alt={contact.name} 
+                            src={avatarUrl} 
+                            alt={displayName} 
                             className="w-full h-full object-cover"
                             onError={(e) => {
                                 (e.target as HTMLImageElement).style.display = 'none';
-                                (e.target as HTMLImageElement).parentElement!.innerHTML = `
-                                    <span class="font-semibold text-lg text-white">
-                                        ${(contact?.name || '?').charAt(0).toUpperCase()}
-                                    </span>
-                                `;
+                                (e.target as HTMLImageElement).parentElement!.innerHTML = isGroup
+                                    ? `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
+                                    : `<span class="font-semibold text-lg text-white">${(displayName || '?').charAt(0).toUpperCase()}</span>`;
                             }}
                         />
                     ) : isGroup ? (
-                        <Users size={18} className="text-white" />
+                        <Users size={20} className="text-white" />
                     ) : (
                         <span className="font-semibold text-lg text-white">
-                            {(contact?.name || '?').charAt(0).toUpperCase()}
+                            {(displayName || '?').charAt(0).toUpperCase()}
                         </span>
                     )}
                 </div>
@@ -196,76 +201,24 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-center mb-0.5">
+                {/* Row 1: Name + Time */}
+                <div className="flex justify-between items-baseline mb-0.5">
                     <h4 
-                        className={`text-sm font-semibold truncate ${conversation.unread_count > 0 ? 'font-bold' : ''}`}
+                        className={`text-sm truncate pr-2 ${conversation.unread_count > 0 ? 'font-bold' : 'font-semibold'}`}
                         style={{ color: 'hsl(var(--foreground))' }}
                     >
-                        {contact?.name || contact?.phone || 'Desconhecido'}
+                        {displayName}
                     </h4>
                     <span 
-                        className={`text-[11px] whitespace-nowrap ml-2 ${conversation.unread_count > 0 ? 'text-blue-600 dark:text-blue-400 font-semibold' : ''}`}
+                        className={`text-[11px] whitespace-nowrap flex-shrink-0 ${conversation.unread_count > 0 ? 'text-green-600 dark:text-green-400 font-semibold' : ''}`}
                         style={conversation.unread_count === 0 ? { color: 'hsl(var(--muted-foreground))' } : undefined}
                     >
                         {formatDate(conversation.last_message_at)}
                     </span>
                 </div>
 
-                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                    <ChannelBadge />
-                    {isGroup && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-medium">
-                            Grupo
-                        </span>
-                    )}
-                    {/* Etiqueta do funil de vendas (status do lead) */}
-                    {leadStatus && leadStatus !== 'novo' && leadStatus !== 'new' && (
-                        <span 
-                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium border ${
-                                FUNNEL_STAGE_COLORS[leadStatus]?.bg || 'bg-gray-100 dark:bg-gray-800'
-                            } ${
-                                FUNNEL_STAGE_COLORS[leadStatus]?.text || 'text-gray-600 dark:text-gray-400'
-                            } ${
-                                FUNNEL_STAGE_COLORS[leadStatus]?.border || 'border-gray-300 dark:border-gray-600'
-                            }`}
-                        >
-                            {FUNNEL_STAGE_LABELS[leadStatus] || leadStatus}
-                        </span>
-                    )}
-                    {/* Etiquetas do lead (tags criadas na dashboard) */}
-                    {leadTags.slice(0, 2).map((tag, idx) => (
-                        <span 
-                            key={`lt-${idx}`}
-                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
-                        >
-                            <Tag size={8} />
-                            {tag}
-                        </span>
-                    ))}
-                    {/* Etiquetas da conversa (conversation_tags) */}
-                    {conversationTags.slice(0, 2).map((tag) => (
-                        <span 
-                            key={`ct-${tag.id}`}
-                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium border"
-                            style={{
-                                backgroundColor: `${tag.color}15`,
-                                color: tag.color,
-                                borderColor: `${tag.color}40`,
-                            }}
-                        >
-                            {tag.icon && <span className="text-[8px]">{tag.icon}</span>}
-                            {tag.name}
-                        </span>
-                    ))}
-                    {/* Indicador de mais etiquetas */}
-                    {(leadTags.length + conversationTags.length) > 4 && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
-                            +{(leadTags.length + conversationTags.length) - 4}
-                        </span>
-                    )}
-                </div>
-
-                <div className="flex justify-between items-center gap-2">
+                {/* Row 2: Message preview + unread badge */}
+                <div className="flex items-center gap-2">
                     <p 
                         className={`text-xs truncate flex-1 ${conversation.unread_count > 0 ? 'font-medium' : ''}`}
                         style={{ color: conversation.unread_count > 0 ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))' }}
@@ -273,23 +226,78 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
                         {lastMessage?.direction === 'out' && (
                             <span className="inline-block mr-1 align-middle">
                                 {lastMessage.status === 'read' ? (
-                                    <CheckCheck size={14} className="text-blue-500 inline" />
+                                    <CheckCheck size={13} className="text-blue-500 inline" />
                                 ) : lastMessage.status === 'delivered' ? (
-                                    <CheckCheck size={14} className="inline opacity-60" />
+                                    <CheckCheck size={13} className="inline opacity-60" />
                                 ) : (
-                                    <Check size={14} className="inline opacity-60" />
+                                    <Check size={13} className="inline opacity-60" />
                                 )}
                             </span>
                         )}
-                        {lastMessage?.content || 'Nenhuma mensagem...'}
+                        {lastMessage ? (() => {
+                            const senderName = isGroup && lastMessage.direction === 'in'
+                                ? ((lastMessage as any).sender_name || (lastMessage as any).contact_name || null)
+                                : null;
+                            const content = lastMessage.media_type
+                                ? (lastMessage.media_type.startsWith('image') ? '📷 Imagem' : lastMessage.media_type.startsWith('video') ? '🎥 Vídeo' : lastMessage.media_type.startsWith('audio') ? '🎤 Áudio' : '📎 Arquivo')
+                                : (lastMessage.content || '');
+                            return senderName ? `~ ${senderName}: ${content}` : content;
+                        })() : 'Nenhuma mensagem...'}
                     </p>
 
                     {conversation.unread_count > 0 && (
-                        <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                             {conversation.unread_count > 99 ? '99+' : conversation.unread_count}
                         </span>
                     )}
                 </div>
+
+                {/* Row 3: Tags (only when present) */}
+                {(leadStatus && leadStatus !== 'novo' && leadStatus !== 'new') || leadTags.length > 0 || conversationTags.length > 0 ? (
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        <ChannelBadge />
+                        {leadStatus && leadStatus !== 'novo' && leadStatus !== 'new' && (
+                            <span 
+                                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium border ${
+                                    FUNNEL_STAGE_COLORS[leadStatus]?.bg || 'bg-gray-100 dark:bg-gray-800'
+                                } ${
+                                    FUNNEL_STAGE_COLORS[leadStatus]?.text || 'text-gray-600 dark:text-gray-400'
+                                } ${
+                                    FUNNEL_STAGE_COLORS[leadStatus]?.border || 'border-gray-300 dark:border-gray-600'
+                                }`}
+                            >
+                                {FUNNEL_STAGE_LABELS[leadStatus] || leadStatus}
+                            </span>
+                        )}
+                        {leadTags.slice(0, 2).map((tag, idx) => (
+                            <span 
+                                key={`lt-${idx}`}
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
+                            >
+                                <Tag size={8} />
+                                {tag}
+                            </span>
+                        ))}
+                        {conversationTags.slice(0, 2).map((tag) => (
+                            <span 
+                                key={`ct-${tag.id}`}
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium border"
+                                style={{
+                                    backgroundColor: `${tag.color}15`,
+                                    color: tag.color,
+                                    borderColor: `${tag.color}40`,
+                                }}
+                            >
+                                {tag.icon && <span className="text-[8px]">{tag.icon}</span>}
+                                {tag.name}
+                            </span>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="flex items-center mt-0.5">
+                        <ChannelBadge />
+                    </div>
+                )}
             </div>
         </div>
     );

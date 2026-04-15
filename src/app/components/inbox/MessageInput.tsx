@@ -23,6 +23,8 @@ interface MessageInputProps {
     conversationId?: string;
     disabled?: boolean;
     isSending?: boolean;
+    droppedFile?: File | null;
+    onDroppedFileProcessed?: () => void;
 }
 
 interface SelectedFile {
@@ -31,7 +33,7 @@ interface SelectedFile {
     type: 'image' | 'video' | 'audio' | 'document';
 }
 
-export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversationId, disabled, isSending }: MessageInputProps) {
+export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversationId, disabled, isSending, droppedFile, onDroppedFileProcessed }: MessageInputProps) {
     const [content, setContent] = useState('');
     const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -67,6 +69,18 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    // Process file dropped from ChatPanel drag & drop
+    useEffect(() => {
+        if (!droppedFile) return;
+        let type: SelectedFile['type'] = 'document';
+        if (droppedFile.type.startsWith('image/')) type = 'image';
+        else if (droppedFile.type.startsWith('video/')) type = 'video';
+        else if (droppedFile.type.startsWith('audio/')) type = 'audio';
+        const preview = (type === 'image' || type === 'video') ? URL.createObjectURL(droppedFile) : null;
+        setSelectedFile({ file: droppedFile, preview, type });
+        onDroppedFileProcessed?.();
+    }, [droppedFile]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Cleanup on unmount
     useEffect(() => {

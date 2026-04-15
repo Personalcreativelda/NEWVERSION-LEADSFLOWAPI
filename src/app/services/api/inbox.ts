@@ -189,6 +189,14 @@ export const conversationsApi = {
     async delete(conversationId: string): Promise<{ success: boolean }> {
         const { data } = await api.delete(`/inbox/conversations/${conversationId}`);
         return data;
+    },
+
+    /**
+     * Limpa as mensagens de uma conversa sem apagar a conversa
+     */
+    async clearMessages(conversationId: string): Promise<{ success: boolean }> {
+        const { data } = await api.delete(`/inbox/conversations/${conversationId}/messages`);
+        return data;
     }
 };
 

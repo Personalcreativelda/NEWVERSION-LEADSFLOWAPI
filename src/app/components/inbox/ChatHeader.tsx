@@ -4,33 +4,44 @@ import type { ConversationWithDetails } from '../../types/inbox';
 import {
     MoreVertical,
     Phone,
-    Video,
     User,
     ChevronLeft,
     Search,
-    CheckCircle2,
     MessageCircle,
-    Edit2,
+    X,
+    LogOut,
     Trash2,
-    X
+    Eraser,
+    Info
 } from 'lucide-react';
+import { useConfirm } from '../ui/ConfirmDialog';
 
 interface ChatHeaderProps {
     conversation: ConversationWithDetails;
     onBack?: () => void;
     onEditLead?: () => void;
     onDeleteConversation?: () => void;
+    onClearConversation?: () => void;
+    onCloseConversation?: () => void;
+    onShowDetails?: () => void;
     onSearchInChat?: (query: string) => void;
 }
 
-export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat }: ChatHeaderProps) {
+export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onClearConversation, onCloseConversation, onShowDetails, onSearchInChat }: ChatHeaderProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const menuRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const confirm = useConfirm();
     
-    const contactName = conversation.contact?.name || conversation.contact?.phone || 'Contato';
+    const isGroup = (conversation as any).is_group || conversation.metadata?.is_group;
+    const contactName = isGroup
+        ? (conversation.metadata?.group_name || conversation.contact?.name || 'Grupo WhatsApp')
+        : (conversation.contact?.name || conversation.contact?.phone || 'Contato');
+    const contactAvatar = isGroup
+        ? (conversation.metadata?.group_picture || conversation.metadata?.profile_picture || conversation.contact?.avatar_url || null)
+        : (conversation.contact?.avatar_url || null);
     const isOnline = true; // TODO: Implementar real status
     const channelType = conversation.channel?.type || 'whatsapp';
 
@@ -93,12 +104,12 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                 <div className="relative">
                     <div 
                         className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ${
-                            conversation.contact?.avatar_url ? '' : getAvatarColor(contactName)
+                            contactAvatar ? '' : getAvatarColor(contactName)
                         }`}
                     >
-                        {conversation.contact?.avatar_url ? (
+                        {contactAvatar ? (
                             <img 
-                                src={conversation.contact.avatar_url} 
+                                src={contactAvatar} 
                                 alt={contactName} 
                                 className="w-full h-full object-cover" 
                             />
@@ -141,7 +152,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
             {/* Actions */}
             <div className="flex items-center gap-1">
                 {showSearch ? (
-                    <div className="flex items-center gap-2 px-2 py-1 rounded-full border" style={{ borderColor: 'hsl(var(--border))' }}>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border" style={{ borderColor: 'hsl(var(--border))' }}>
                         <input
                             ref={searchInputRef}
                             type="text"
@@ -149,15 +160,15 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
                             placeholder="Buscar na conversa..."
-                            className="w-32 sm:w-48 bg-transparent text-sm outline-none"
+                            className="w-36 sm:w-52 bg-transparent text-sm outline-none"
                             style={{ color: 'hsl(var(--foreground))' }}
                         />
                         <button 
-                            onClick={() => { setShowSearch(false); setSearchQuery(''); }}
+                            onClick={() => { setShowSearch(false); setSearchQuery(''); onSearchInChat?.(''); }}
                             className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
                             style={{ color: 'hsl(var(--muted-foreground))' }}
                         >
-                            <X size={16} />
+                            <X size={15} />
                         </button>
                     </div>
                 ) : (
@@ -173,7 +184,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                             onClick={() => setShowSearch(true)}
                             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
                             style={{ color: 'hsl(var(--muted-foreground))' }}
-                            title="Buscar"
+                            title="Buscar na conversa"
                         >
                             <Search size={18} />
                         </button>
@@ -184,7 +195,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                 <div className="relative" ref={menuRef}>
                     <button 
                         onClick={() => setShowMenu(!showMenu)}
-                        className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+                        className={`p-2 rounded-full transition-all ${showMenu ? 'bg-gray-100 dark:bg-gray-800' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
                         style={{ color: 'hsl(var(--muted-foreground))' }}
                         title="Mais opções"
                     >
@@ -193,37 +204,78 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                     
                     {showMenu && (
                         <div 
-                            className="absolute top-full right-0 mt-1 w-48 rounded-lg border shadow-lg overflow-hidden z-50"
+                            className="absolute top-full right-0 mt-1 w-52 rounded-xl border shadow-xl overflow-hidden z-50 py-1"
                             style={{
                                 backgroundColor: 'hsl(var(--card))',
                                 borderColor: 'hsl(var(--border))'
                             }}
                         >
+                            {/* Detalhes */}
                             <button
-                                onClick={() => { onEditLead?.(); setShowMenu(false); }}
-                                className="w-full px-4 py-3 flex items-center gap-3 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                onClick={() => { onShowDetails?.(); setShowMenu(false); }}
+                                className="w-full px-4 py-2.5 flex items-center gap-3 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                 style={{ color: 'hsl(var(--foreground))' }}
                             >
-                                <Edit2 className="w-4 h-4" />
-                                Editar Lead
+                                <Info size={16} style={{ color: 'hsl(var(--muted-foreground))' }} />
+                                Detalhes do contato
                             </button>
-                            <div className="border-t" style={{ borderColor: 'hsl(var(--border))' }} />
+
+                            {/* Buscar */}
+                            <button
+                                onClick={() => { setShowSearch(true); setShowMenu(false); }}
+                                className="w-full px-4 py-2.5 flex items-center gap-3 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                style={{ color: 'hsl(var(--foreground))' }}
+                            >
+                                <Search size={16} style={{ color: 'hsl(var(--muted-foreground))' }} />
+                                Buscar na conversa
+                            </button>
+
+                            <div className="my-1 border-t" style={{ borderColor: 'hsl(var(--border))' }} />
+
+                            {/* Fechar */}
+                            <button
+                                onClick={() => { onCloseConversation?.(); setShowMenu(false); }}
+                                className="w-full px-4 py-2.5 flex items-center gap-3 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                style={{ color: 'hsl(var(--foreground))' }}
+                            >
+                                <LogOut size={16} style={{ color: 'hsl(var(--muted-foreground))' }} />
+                                Fechar conversa
+                            </button>
+
+                            <div className="my-1 border-t" style={{ borderColor: 'hsl(var(--border))' }} />
+
+                            {/* Limpar */}
                             <button
                                 onClick={async () => {
-                                    const confirmed = await confirm('Tem certeza que deseja apagar esta conversa? Todas as mensagens serão removidas.', {
-                                        title: 'Apagar conversa',
-                                        confirmLabel: 'Apagar',
+                                    setShowMenu(false);
+                                    const ok = await confirm('Todas as mensagens serão apagadas do histórico, mas a conversa continuará existindo.', {
+                                        title: 'Limpar conversa',
+                                        confirmLabel: 'Limpar',
                                         variant: 'danger',
                                     });
-                                    if (confirmed) {
-                                        onDeleteConversation?.();
-                                    }
-                                    setShowMenu(false);
+                                    if (ok) onClearConversation?.();
                                 }}
-                                className="w-full px-4 py-3 flex items-center gap-3 text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-600 dark:text-red-400"
+                                className="w-full px-4 py-2.5 flex items-center gap-3 text-sm hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors text-orange-600 dark:text-orange-400"
                             >
-                                <Trash2 className="w-4 h-4" />
-                                Apagar conversa
+                                <Eraser size={16} />
+                                Limpar conversa
+                            </button>
+
+                            {/* Eliminar */}
+                            <button
+                                onClick={async () => {
+                                    setShowMenu(false);
+                                    const ok = await confirm('A conversa e todas as mensagens serão eliminadas permanentemente.', {
+                                        title: 'Eliminar conversa',
+                                        confirmLabel: 'Eliminar',
+                                        variant: 'danger',
+                                    });
+                                    if (ok) onDeleteConversation?.();
+                                }}
+                                className="w-full px-4 py-2.5 flex items-center gap-3 text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-600 dark:text-red-400"
+                            >
+                                <Trash2 size={16} />
+                                Eliminar conversa
                             </button>
                         </div>
                     )}

@@ -5,13 +5,16 @@ import { ChatBackground } from './ChatBackground';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import type { ConversationWithDetails, MessageWithSender } from '../../types/inbox';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload } from 'lucide-react';
 
 interface ChatPanelProps {
     conversation: ConversationWithDetails;
     onBack?: () => void;
     onEditLead?: () => void;
     onDeleteConversation?: () => void;
+    onClearConversation?: () => void;
+    onCloseConversation?: () => void;
+    onShowDetails?: () => void;
     // Props de mensagens do parent (useInbox com WebSocket)
     messages?: MessageWithSender[];
     messagesLoading?: boolean;
@@ -27,6 +30,9 @@ export function ChatPanel({
     onBack,
     onEditLead,
     onDeleteConversation,
+    onClearConversation,
+    onCloseConversation,
+    onShowDetails,
     messages: externalMessages,
     messagesLoading: externalMessagesLoading,
     messagesError: externalMessagesError,
@@ -37,7 +43,10 @@ export function ChatPanel({
 }: ChatPanelProps) {
     const [isTyping, setIsTyping] = useState(false);
     const [searchHighlight, setSearchHighlight] = useState<string>('');
+    const [isDragging, setIsDragging] = useState(false);
+    const [droppedFile, setDroppedFile] = useState<File | null>(null);
     const internalEndRef = useRef<HTMLDivElement>(null);
+    const dragCounterRef = useRef(0);
 
     // Usar dados externos (do useInbox com WebSocket) se disponíveis
     const messages = externalMessages || [];
@@ -54,11 +63,61 @@ export function ChatPanel({
         setSearchHighlight(query);
     }, []);
 
+    const handleDragEnter = (e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounterRef.current++;
+        if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+            setIsDragging(true);
+        }
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounterRef.current--;
+        if (dragCounterRef.current === 0) {
+            setIsDragging(false);
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        dragCounterRef.current = 0;
+        const file = e.dataTransfer.files?.[0];
+        if (file) {
+            setDroppedFile(file);
+        }
+    };
+
     return (
         <div
             className="flex flex-col h-full max-h-full relative overflow-hidden"
             style={{ backgroundColor: 'hsl(var(--background))', height: '100%', maxHeight: '100%' }}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
         >
+            {/* Drag & Drop Overlay */}
+            {isDragging && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 pointer-events-none"
+                    style={{ backgroundColor: 'hsl(var(--background) / 0.92)', backdropFilter: 'blur(4px)' }}
+                >
+                    <div className="w-24 h-24 rounded-full bg-blue-500/10 border-2 border-dashed border-blue-500 flex items-center justify-center">
+                        <Upload size={36} className="text-blue-500" />
+                    </div>
+                    <p className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
+                        Soltar para enviar
+                    </p>
+                    <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                        Imagens, vídeos, documentos e áudio
+                    </p>
+                </div>
+            )}
 
             {/* Header - Fixed */}
             <div className="flex-shrink-0">
@@ -67,6 +126,9 @@ export function ChatPanel({
                     onBack={onBack}
                     onEditLead={onEditLead}
                     onDeleteConversation={onDeleteConversation}
+                    onClearConversation={onClearConversation}
+                    onCloseConversation={onCloseConversation}
+                    onShowDetails={onShowDetails}
                     onSearchInChat={handleSearchInChat}
                 />
             </div>
@@ -137,6 +199,8 @@ export function ChatPanel({
                     onTyping={handleTyping}
                     isSending={sending}
                     conversationId={conversation?.id}
+                    droppedFile={droppedFile}
+                    onDroppedFileProcessed={() => setDroppedFile(null)}
                 />
             </div>
         </div>

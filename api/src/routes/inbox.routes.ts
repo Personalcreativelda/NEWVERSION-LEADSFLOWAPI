@@ -427,23 +427,37 @@ router.get('/conversations', async (req, res, next) => {
 
     // Transform to frontend format
     const conversations = dbConversations.map((conv: any) => {
-      let displayName = conv.lead_name || conv.metadata?.contact_name || conv.remote_jid?.split('@')[0] || 'Desconhecido';
-      
-      // Se o displayName é um ID numérico longo (PSID do Facebook/Instagram), usar nome amigável
-      if (/^\d{6,}$/.test(displayName)) {
-        const channelType = conv.channel_type || '';
-        const shortId = displayName.slice(-4);
-        if (channelType === 'facebook' || channelType === 'messenger') {
-          displayName = `Visitante Facebook #${shortId}`;
-        } else if (channelType === 'instagram') {
-          displayName = `Visitante Instagram #${shortId}`;
-        } else if (channelType === 'telegram') {
-          displayName = `Visitante Telegram #${shortId}`;
+      const isGroupConv = conv.is_group || false;
+
+      // Display name: grupos usam group_name; indivíduos usam lead_name ou contact_name
+      let displayName: string;
+      if (isGroupConv) {
+        const groupName = conv.metadata?.group_name || conv.metadata?.contact_name || null;
+        // Se parece com um JID (só dígitos e hífens ou só dígitos), não usar como nome
+        const looksLikeJid = groupName && /^[\d\-]{10,}$/.test(groupName.replace(/\s/g,''));
+        displayName = (!looksLikeJid && groupName) ? groupName : 'Grupo WhatsApp';
+      } else {
+        displayName = conv.lead_name || conv.metadata?.contact_name || conv.remote_jid?.split('@')[0] || 'Desconhecido';
+
+        // Se o displayName é um ID numérico longo (PSID do Facebook/Instagram), usar nome amigável
+        if (/^\d{6,}$/.test(displayName)) {
+          const channelType = conv.channel_type || '';
+          const shortId = displayName.slice(-4);
+          if (channelType === 'facebook' || channelType === 'messenger') {
+            displayName = `Visitante Facebook #${shortId}`;
+          } else if (channelType === 'instagram') {
+            displayName = `Visitante Instagram #${shortId}`;
+          } else if (channelType === 'telegram') {
+            displayName = `Visitante Telegram #${shortId}`;
+          }
         }
       }
       
-      const phone = conv.lead_phone || conv.lead_whatsapp || conv.metadata?.phone || conv.remote_jid?.split('@')[0];
-      const profilePic = conv.lead_avatar || conv.metadata?.profile_picture || null;
+      const phone = conv.lead_phone || conv.lead_whatsapp || conv.metadata?.phone || (!isGroupConv ? conv.remote_jid?.split('@')[0] : null);
+      // Para grupos: usar group_picture do metadata; para indivíduos: usar avatar do lead
+      const profilePic = isGroupConv
+        ? (conv.metadata?.group_picture || conv.metadata?.profile_picture || null)
+        : (conv.lead_avatar || conv.metadata?.profile_picture || null);
       
       return {
         // CORREÇÃO: Usar sempre o UUID real da conversa, não o remote_jid
@@ -461,6 +475,9 @@ router.get('/conversations', async (req, res, next) => {
         message_count: conv.message_count || 0,
         metadata: {
           contact_name: displayName,
+          group_name: isGroupConv ? (conv.metadata?.group_name || displayName) : undefined,
+          group_picture: isGroupConv ? (conv.metadata?.group_picture || null) : undefined,
+          participants_count: isGroupConv ? (conv.metadata?.participants_count || 0) : undefined,
           phone: phone,
           profile_picture: profilePic,
           is_group: conv.is_group || false,
@@ -1752,6 +1769,41 @@ router.delete('/conversations/:conversationId', async (req, res, next) => {
     res.json({ success: true, message: 'Conversa deletada com sucesso' });
   } catch (error) {
     console.error('[Inbox] Erro ao deletar conversa:', error);
+    next(error);
+  }
+});
+
+// Clear messages (keep conversation, delete messages only)
+router.delete('/conversations/:conversationId/messages', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { query: dbQuery } = require('../database/connection');
+    const { conversationId } = req.params;
+
+    const conv = await dbQuery(
+      'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
+      [conversationId, user.id]
+    );
+    if (conv.rows.length === 0) {
+      return res.status(404).json({ error: 'Conversa não encontrada' });
+    }
+
+    await dbQuery(
+      'DELETE FROM messages WHERE conversation_id = $1',
+      [conversationId]
+    );
+
+    await dbQuery(
+      `UPDATE conversations SET unread_count = 0 WHERE id = $1`,
+      [conversationId]
+    );
+
+    console.log('[Inbox] Mensagens limpas:', conversationId);
+    res.json({ success: true, message: 'Mensagens limpas com sucesso' });
+  } catch (error) {
+    console.error('[Inbox] Erro ao limpar mensagens:', error);
     next(error);
   }
 });

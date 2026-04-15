@@ -1028,7 +1028,6 @@ router.post('/evolution/messages', async (req, res) => {
       // Buscar ou criar conversa com o GROUP JID (não o sender individual)
       const groupMetadata: any = {
         is_group: true,
-        contact_name: remoteJidValue.replace('@g.us', ''),
         last_sender_name: groupSenderName,
         last_sender_jid: groupSenderJid,
         last_sender_phone: groupSenderPhone,
@@ -1048,6 +1047,38 @@ router.post('/evolution/messages', async (req, res) => {
           `UPDATE conversations SET is_group = true, updated_at = NOW() WHERE id = $1`,
           [conversation.id]
         );
+      }
+
+      // Buscar info do grupo se ainda não tiver nome real (faça em background)
+      const hasGroupName = conversation.metadata?.group_name;
+      if (!hasGroupName) {
+        const creds = typeof channel.credentials === 'string'
+          ? JSON.parse(channel.credentials)
+          : (channel.credentials || {});
+        const instanceId = creds.instance_name || creds.instance_id;
+        if (instanceId) {
+          // Background fetch - não bloquear o webhook
+          whatsappService.getGroupInfo(instanceId, remoteJidValue).then(async (groupInfo: any) => {
+            if (!groupInfo) return;
+            const groupName = groupInfo.subject || groupInfo.name || groupInfo.groupName || null;
+            const groupPicture = groupInfo.profilePictureUrl || groupInfo.picture || null;
+            const participantsCount = groupInfo.participants?.length || groupInfo.size || 0;
+            if (groupName) {
+              await query(
+                `UPDATE conversations SET metadata = metadata || $1::jsonb, updated_at = NOW() WHERE id = $2`,
+                [JSON.stringify({
+                  group_name: groupName,
+                  contact_name: groupName,
+                  group_picture: groupPicture,
+                  participants_count: participantsCount,
+                }), conversation.id]
+              );
+              console.log('[Evolution Webhook] 📚 Nome do grupo atualizado:', groupName);
+            }
+          }).catch((e: any) => {
+            console.warn('[Evolution Webhook] Não foi possível buscar nome do grupo:', e.message);
+          });
+        }
       }
 
       console.log('[Evolution Webhook] 👥 Conversa de GRUPO:', conversation.id);

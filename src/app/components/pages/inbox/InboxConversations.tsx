@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ConversationList } from '../../inbox/ConversationList';
 import { useInbox } from '../../../hooks/useInbox';
 import { useInboxFilters } from '../../../hooks/useInboxFilters';
@@ -50,7 +50,15 @@ export default function InboxConversations({
     const [isEditingLead, setIsEditingLead] = useState(false);
     // Chat type filter: 'all' | 'chats' | 'groups'
     const [chatTypeFilter, setChatTypeFilter] = useState<'all' | 'chats' | 'groups'>('all');
-    const [syncingGroups, setSyncingGroups] = useState(false);
+    const groupsSyncedRef = useRef(false);
+
+    // Auto-sync groups the first time the groups tab is opened in this session
+    useEffect(() => {
+        if (chatTypeFilter === 'groups' && !groupsSyncedRef.current) {
+            groupsSyncedRef.current = true;
+            groupsApi.sync().then(() => refreshConversations()).catch(() => {});
+        }
+    }, [chatTypeFilter, refreshConversations]);
 
     // Auto-select conversation when conversationIdToOpen is provided
     useEffect(() => {
@@ -108,13 +116,31 @@ export default function InboxConversations({
         if (!selectedConversation) return;
         try {
             await conversationsApi.delete(selectedConversation.id);
-            // Limpar conversa selecionada primeiro para fechar o painel de chat
             selectConversation(null);
             await refreshConversations();
         } catch (error) {
             console.error('Erro ao deletar conversa:', error);
             alert('Erro ao apagar conversa. Tente novamente.');
         }
+    };
+
+    const handleClearConversation = async () => {
+        if (!selectedConversation) return;
+        try {
+            await conversationsApi.clearMessages(selectedConversation.id);
+            await refreshConversations();
+        } catch (error) {
+            console.error('Erro ao limpar conversa:', error);
+            alert('Erro ao limpar conversa. Tente novamente.');
+        }
+    };
+
+    const handleCloseConversation = () => {
+        selectConversation(null);
+    };
+
+    const handleShowDetails = () => {
+        setShowContactDetails(true);
     };
 
     const handleSelectLead = async (lead: any) => {
@@ -167,19 +193,19 @@ export default function InboxConversations({
         }
     };
 
-    // Sync groups from WhatsApp
-    const handleSyncGroups = async () => {
-        setSyncingGroups(true);
-        try {
-            const result = await groupsApi.sync();
-            console.log('[InboxConversations] Groups synced:', result);
-            await refreshConversations();
-        } catch (error) {
-            console.error('Error syncing groups:', error);
-        } finally {
-            setSyncingGroups(false);
-        }
-    };
+    // Unread counts per tab
+    const tabUnreadCounts = useMemo(() => {
+        let all = 0, chats = 0, groups = 0;
+        conversations.forEach(conv => {
+            const jid = conv.metadata?.jid || conv.remote_jid || '';
+            const isGroup = conv.is_group || conv.metadata?.is_group || jid.includes('@g.us');
+            const u = conv.unread_count || 0;
+            all += u;
+            if (isGroup) groups += u;
+            else chats += u;
+        });
+        return { all, chats, groups };
+    }, [conversations]);
 
     // Filtrar conversas baseado nos filtros aplicados
     const filteredConversations = useMemo(() => {
@@ -202,15 +228,16 @@ export default function InboxConversations({
             
             // Filtrar por tipo (mentions, unattended)
             if (filters.type === 'mentions') {
-                // Mostrar apenas conversas onde o usuário foi mencionado
-                const hasMention = conv.metadata?.hasMention || conv.has_mention || false;
-                if (!hasMention) return false;
+                // Conversas com menção explícita OU com mensagens não lidas em grupos
+                const hasMention = conv.metadata?.hasMention || (conv as any).has_mention;
+                const hasUnreadInGroup = isGroup && (conv.unread_count || 0) > 0;
+                if (!hasMention && !hasUnreadInGroup) return false;
             } else if (filters.type === 'unattended') {
-                // Mostrar apenas conversas não atendidas (sem responsável ou sem resposta)
-                const hasAssignee = conv.assignee_id || conv.metadata?.assigneeId;
-                const hasOutgoingMessage = conv.last_message?.direction === 'out';
-                // Não atendida = sem responsável OU última mensagem foi recebida (não respondida)
-                if (hasAssignee && hasOutgoingMessage) return false;
+                // Não atendidas = última mensagem é RECEBIDA (direction 'in') OU tem mensagens não lidas
+                const lastMsgDir = conv.last_message?.direction;
+                const hasUnread = (conv.unread_count || 0) > 0;
+                const waitingForReply = lastMsgDir === 'in' || (!lastMsgDir && hasUnread);
+                if (!waitingForReply) return false;
             }
             
             // Filtrar por canal (channel) - usando channel_id
@@ -271,7 +298,7 @@ export default function InboxConversations({
 
             {/* Sidebar de Conversas */}
             <div 
-                className={`w-full md:w-80 lg:w-[300px] xl:w-[320px] flex-shrink-0 flex flex-col border-r ${selectedConversation ? 'hidden md:flex' : 'flex'}`}
+                className={`w-full md:w-[340px] lg:w-[380px] xl:w-[400px] flex-shrink-0 flex flex-col border-r ${selectedConversation ? 'hidden md:flex' : 'flex'}`}
                 style={{ 
                     backgroundColor: 'hsl(var(--card))',
                     borderColor: 'hsl(var(--border))'
@@ -378,10 +405,10 @@ export default function InboxConversations({
                     {/* Chat Type Tabs: Todos / Chats / Grupos */}
                     <div className="flex items-center gap-1 mt-3">
                         {([
-                            { key: 'all' as const, label: 'Todos', icon: MessagesSquare },
-                            { key: 'chats' as const, label: 'Chats', icon: MessageSquare },
-                            { key: 'groups' as const, label: 'Grupos', icon: Users },
-                        ]).map(({ key, label, icon: Icon }) => (
+                            { key: 'all' as const, label: 'Todos', icon: MessagesSquare, badge: tabUnreadCounts.all },
+                            { key: 'chats' as const, label: 'Chats', icon: MessageSquare, badge: tabUnreadCounts.chats },
+                            { key: 'groups' as const, label: 'Grupos', icon: Users, badge: tabUnreadCounts.groups },
+                        ]).map(({ key, label, icon: Icon, badge }) => (
                             <button
                                 key={key}
                                 onClick={() => setChatTypeFilter(key)}
@@ -394,21 +421,16 @@ export default function InboxConversations({
                             >
                                 <Icon size={14} />
                                 {label}
+                                {badge > 0 && (
+                                    <span className={`inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold leading-none ${
+                                        chatTypeFilter === key ? 'bg-white text-blue-600' : 'bg-green-500 text-white'
+                                    }`}>
+                                        {badge > 99 ? '99+' : badge}
+                                    </span>
+                                )}
                             </button>
                         ))}
-                        {/* Sync Groups Button - shown only when groups tab is active */}
-                        {chatTypeFilter === 'groups' && (
-                            <button
-                                onClick={handleSyncGroups}
-                                disabled={syncingGroups}
-                                className="ml-auto flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium hover:bg-muted transition-all"
-                                style={{ color: 'hsl(var(--muted-foreground))' }}
-                                title="Sincronizar grupos do WhatsApp"
-                            >
-                                <RefreshCw size={12} className={syncingGroups ? 'animate-spin' : ''} />
-                                Sync
-                            </button>
-                        )}
+
                     </div>
 
                     {/* Indicador de filtros ativos */}
@@ -458,6 +480,9 @@ export default function InboxConversations({
                         onBack={handleBack}
                         onEditLead={handleEditLead}
                         onDeleteConversation={handleDeleteConversation}
+                        onClearConversation={handleClearConversation}
+                        onCloseConversation={handleCloseConversation}
+                        onShowDetails={handleShowDetails}
                         messages={messages}
                         messagesLoading={messagesLoading}
                         messagesError={messagesError}
