@@ -1,11 +1,12 @@
 import { mockAuth } from './auth-mock';
 import { getApiBaseUrl } from './api-client';
+import { logger } from './logger';
 import type { Lead, LeadNote, ScheduledConversation, InboxConversation, Message } from '../types';
 
 const API_BASE_URL = getApiBaseUrl();
 
 if (!API_BASE_URL) {
-  console.error('[API] Missing backend URL. Configure VITE_API_URL ou garanta que o dashboard esteja atrás do mesmo domínio do backend.');
+  logger.error('[API] Missing backend URL. Configure VITE_API_URL ou garanta que o dashboard esteja atrás do mesmo domínio do backend.');
 }
 
 const SESSION_EXPIRY_KEY = 'leadflow_session_expires_at';
@@ -146,7 +147,7 @@ async function apiCall(
     await ensureValidToken();
 
     if (isSessionExpired()) {
-      console.warn('[API] Session expired - clearing credentials');
+      logger.warn('[API] Session expired - clearing credentials');
       clearSessionExpiry();
       localStorage.removeItem('leadflow_access_token');
       localStorage.removeItem('leadflow_refresh_token');
@@ -156,16 +157,16 @@ async function apiCall(
     const token = localStorage.getItem('leadflow_access_token');
 
     if (!token) {
-      console.error('[API] Auth required but no token found');
+      logger.error('[API] Auth required but no token found');
 
       if (DEV_MODE) {
-        console.warn('[DEV MODE] No auth token - using mock data');
+        logger.warn('[DEV MODE] No auth token - using mock data');
       } else {
         throw new Error('Você precisa estar logado para realizar esta ação. Por favor, faça login novamente.');
       }
     } else {
       headers['Authorization'] = `Bearer ${token}`;
-      console.log(`[API] Using auth token (length: ${token.length})`);
+      // Do NOT log token or its length — treat auth headers as secrets
     }
   }
 
@@ -174,14 +175,14 @@ async function apiCall(
 
   try {
     const methodType = options.method || 'GET';
-    console.log(`[API] 📡 ${methodType} ${apiEndpoint}`);
+    logger.log(`[API] ${methodType} ${apiEndpoint}`);
 
     const response = await fetch(`${API_BASE_URL}${apiEndpoint}`, {
       ...options,
       headers,
     });
 
-    console.log(`[API] ✅ ${methodType} ${apiEndpoint} - Status: ${response.status} ${response.statusText}`);
+    logger.log(`[API] ${methodType} ${apiEndpoint} - Status: ${response.status}`);
 
     if (response.status === 404 && resourceEndpoint === '/admin/notification-settings') {
       return getMockData(resourceEndpoint);
@@ -201,13 +202,11 @@ async function apiCall(
         try {
           data = JSON.parse(trimmedBody);
         } catch (jsonError) {
-          console.error(`[API] Failed to parse JSON response for ${apiEndpoint}:`, jsonError);
-          console.error('[API] Response preview:', trimmedBody.slice(0, 200));
+          logger.error(`[API] Failed to parse JSON for ${apiEndpoint}:`, jsonError);
           throw new Error(`Invalid JSON response from server (${response.status}). Verifique se VITE_API_URL aponta para o backend Node.`);
         }
       } else if (trimmedBody && !expectsJson) {
-        console.error(`[API] Unexpected non-JSON response for ${apiEndpoint}. Content-Type: ${contentTypeHeader || 'desconhecido'}`);
-        console.error('[API] Response preview:', trimmedBody.slice(0, 200));
+        logger.error(`[API] Unexpected non-JSON response for ${apiEndpoint}. Content-Type: ${contentTypeHeader || 'unknown'}`);
         throw new Error('Backend respondeu HTML/texto. Certifique-se de que o dashboard está apontando para o servidor Express (VITE_API_URL).');
       }
     }
@@ -226,7 +225,7 @@ async function apiCall(
       }
 
       if (response.status === 401 && useAuth) {
-        console.warn('[API] 401 Unauthorized - clearing credentials');
+        logger.warn('[API] 401 Unauthorized - clearing credentials');
         localStorage.removeItem('leadflow_access_token');
         localStorage.removeItem('leadflow_refresh_token');
         clearSessionExpiry();
@@ -256,7 +255,7 @@ async function apiCall(
       throw new Error(errorMessage || errorDetails || `API error: ${response.status}`);
     }
 
-    console.log(`[API] Success response for ${apiEndpoint}`);
+    logger.log(`[API] OK ${apiEndpoint}`);
     return data;
   } catch (error) {
     const isLeadNotFoundError = error instanceof Error &&
@@ -264,35 +263,17 @@ async function apiCall(
       resourceEndpoint.startsWith('/leads/');
 
     if (!isLeadNotFoundError) {
-      console.error(`[API] API call error for ${apiEndpoint}:`, error);
+      logger.error(`[API] Error ${apiEndpoint}:`, error);
     }
 
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
       if (networkErrorCount < MAX_NETWORK_ERRORS) {
-        console.warn('[API] ⚠️  Backend offline - using mock data');
-        console.warn(`  Endpoint: ${apiEndpoint}`);
+        logger.warn(`[API] Backend offline — ${apiEndpoint}`);
         networkErrorCount++;
 
         if (networkErrorCount === MAX_NETWORK_ERRORS) {
-          console.error('');
-          console.error('═══════════════════════════════════════════════════════════════');
-          console.error('🚨 BACKEND OFFLINE - App rodando em MOCK MODE');
-          console.error('═══════════════════════════════════════════════════════════════');
-          console.error('');
-          console.error('⚠️  ATENÇÃO: Operações de DELETE, POST e PUT NÃO funcionarão!');
-          console.error('');
-          console.error('🔧 COMO RESOLVER:');
-          console.error('');
-          console.error('   1. Abra o terminal na pasta do projeto');
-          console.error('   2. Execute: chmod +x deploy-backend.sh && ./deploy-backend.sh');
-          console.error('   3. Aguarde o deploy completar');
-          console.error('   4. Recarregue a página');
-          console.error('');
-          console.error('📖 Documentação completa: BACKEND_DEPLOY_QUICK.md');
-          console.error('');
-          console.error('═══════════════════════════════════════════════════════════════');
-          console.error('');
-          console.warn('[API] 📢 Further network errors will be silenced.');
+          logger.error('[API] Backend offline — app running in mock mode. Operations that write data will not be persisted.');
+          logger.warn('[API] Further network errors will be silenced.');
         }
       }
 
@@ -305,8 +286,7 @@ async function apiCall(
       }
 
       if (options.method && options.method !== 'GET') {
-        console.error(`[API] ❌ Cannot use mock data for ${options.method} request`);
-        console.error(`[API] ❌ Backend is OFFLINE. Cannot perform ${options.method} operations.`);
+        logger.error(`[API] Cannot use mock data for ${options.method} request — backend offline.`);
         throw new Error('Backend indisponível. O servidor não está respondendo. Por favor, verifique a conexão ou tente novamente mais tarde.');
       }
     }

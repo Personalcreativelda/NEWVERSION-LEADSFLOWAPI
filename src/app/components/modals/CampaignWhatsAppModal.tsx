@@ -56,13 +56,13 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const [scheduleMode, setScheduleMode] = useState<'now' | 'scheduled'>('now');
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
-  const [sendSpeed, setSendSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
+  const [sendSpeed, setSendSpeed] = useState<'slow' | 'normal' | 'fast'>('slow');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [stopOnError, setStopOnError] = useState(true);
   const [skipInvalid, setSkipInvalid] = useState(true);
   const [randomDelay, setRandomDelay] = useState(false);
-  const [minDelay, setMinDelay] = useState('5');
-  const [maxDelay, setMaxDelay] = useState('10');
+  const [minDelay, setMinDelay] = useState('15');
+  const [maxDelay, setMaxDelay] = useState('45');
   const [isSending, setIsSending] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -120,7 +120,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         setScheduleMode(settings.scheduleMode || 'now');
         setScheduleDate(settings.scheduleDate || '');
         setScheduleTime(settings.scheduleTime || '');
-        setSendSpeed(settings.sendSpeed || 'normal');
+        setSendSpeed(settings.sendSpeed || 'slow');
         setUseTemplate(settings.useTemplate || false);
         setTemplateName(settings.templateName || '');
         setTemplateLanguage(settings.templateLanguage || 'pt_BR');
@@ -177,7 +177,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       setScheduleMode('now');
       setScheduleDate('');
       setScheduleTime('');
-      setSendSpeed('normal');
+      setSendSpeed('slow');
       setAttachments([]);
       setUseTemplate(false);
       setTemplateName('');
@@ -685,11 +685,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   };
 
   const getEstimatedTime = () => {
-    // ✅ Usar delays seguros em segundos
-    // Slow: 5-8s (média 6.5s = ~9 msgs/min)
-    // Normal: 3-5s (média 4s = ~15 msgs/min)
-    // Fast: 2-3s (média 2.5s = ~24 msgs/min)
-    const messagesPerMinute = sendSpeed === 'slow' ? 9 : sendSpeed === 'normal' ? 15 : 24;
+    // Slow: 15-45s (média 30s = ~2 msgs/min) | Normal: 10-25s (~3.5/min) | Fast: 6-15s (~5.5/min)
+    const messagesPerMinute = sendSpeed === 'slow' ? 2 : sendSpeed === 'normal' ? 3.5 : 5.5;
     const totalMinutes = Math.ceil(recipientCount / messagesPerMinute);
 
     if (totalMinutes < 1) return '< 1 minuto';
@@ -710,7 +707,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
     setScheduleMode('now');
     setScheduleDate('');
     setScheduleTime('');
-    setSendSpeed('normal');
+    setSendSpeed('slow');
     setAdvancedOpen(false);
     setStopOnError(true);
     setSkipInvalid(true);
@@ -994,27 +991,48 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         console.warn('[Campaign WhatsApp] ⚠️ Callback não está definido!');
       }
 
-      // ✅ PREPARAR DELAYS EM SEGUNDOS (para evitar banimento)
-      // Slow: 5-8s (12 msgs/min) | Normal: 3-5s (20 msgs/min) | Fast: 2-3s (30 msgs/min)
+      // ✅ PREPARAR DELAYS EM SEGUNDOS (anti-ban WhatsApp)
+      // Slow: 15-45s | Normal: 10-25s | Fast: 6-15s
       let minDelaySeconds: number;
       let maxDelaySeconds: number;
+      let batchSize: number;
+      let batchPauseMinSeconds: number;
+      let batchPauseMaxSeconds: number;
+      let dailyLimit: number;
 
       if (randomDelay) {
         // Usar delays customizados do usuário
         minDelaySeconds = parseInt(minDelay);
         maxDelaySeconds = parseInt(maxDelay);
+        batchSize = 20;
+        batchPauseMinSeconds = 90;
+        batchPauseMaxSeconds = 180;
+        dailyLimit = 150;
       } else {
-        // Usar delays padrão seguros baseados na velocidade
         if (sendSpeed === 'slow') {
-          minDelaySeconds = 5;
-          maxDelaySeconds = 8;
+          // ~2 msgs/min — conta nova ou histórico de ban — MÁXIMA segurança
+          minDelaySeconds = 15;
+          maxDelaySeconds = 45;
+          batchSize = 15;
+          batchPauseMinSeconds = 120;
+          batchPauseMaxSeconds = 240;
+          dailyLimit = 100;
         } else if (sendSpeed === 'normal') {
-          minDelaySeconds = 3;
-          maxDelaySeconds = 5;
+          // ~3.5 msgs/min — conta com alguma actividade
+          minDelaySeconds = 10;
+          maxDelaySeconds = 25;
+          batchSize = 20;
+          batchPauseMinSeconds = 90;
+          batchPauseMaxSeconds = 180;
+          dailyLimit = 200;
         } else {
-          // fast
-          minDelaySeconds = 2;
-          maxDelaySeconds = 3;
+          // fast — ~5.5 msgs/min — conta estabelecida, risco moderado
+          minDelaySeconds = 6;
+          maxDelaySeconds = 15;
+          batchSize = 25;
+          batchPauseMinSeconds = 60;
+          batchPauseMaxSeconds = 120;
+          dailyLimit = 300;
         }
       }
 
@@ -1131,6 +1149,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             skipInvalid,
             minDelaySeconds,
             maxDelaySeconds,
+            batchSize,
+            batchPauseMinSeconds,
+            batchPauseMaxSeconds,
+            dailyLimit,
             channelId: selectedChannel,
             channelType: selectedChannelData?.type || 'whatsapp',
             // API Oficial (Cloud API) — template messages
@@ -1227,6 +1249,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             skipInvalid,
             minDelaySeconds,
             maxDelaySeconds,
+            batchSize,
+            batchPauseMinSeconds,
+            batchPauseMaxSeconds,
+            dailyLimit,
             channelId: selectedChannel,
             channelType: selectedChannelData?.type || 'whatsapp',
             // API Oficial (Cloud API) — template messages
@@ -2269,9 +2295,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                       </Label>
                       <div className="space-y-1">
                         {[
-                          { value: 'slow', label: 'Lento (30/min)', desc: 'Mais seguro' },
-                          { value: 'normal', label: 'Normal (60/min)', desc: 'Recomendado' },
-                          { value: 'fast', label: 'Rápido (120/min)', desc: 'Maior risco' },
+                          { value: 'slow', label: 'Seguro (~2/min)', desc: 'Recomendado — menos risco de ban' },
+                          { value: 'normal', label: 'Normal (~3.5/min)', desc: 'Conta com actividade regular' },
+                          { value: 'fast', label: 'Rápido (~5.5/min)', desc: '⚠️ Risco moderado de ban' },
                         ].map(({ value, label, desc }) => (
                           <label key={value} className="flex items-start gap-2 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors">
                             <input
@@ -2312,13 +2338,14 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     {randomDelay && (
                       <div>
                         <Label className="text-xs text-gray-700 dark:text-gray-300 mb-1 block">
-                          Intervalo (segundos)
+                          Intervalo entre mensagens (segundos)
                         </Label>
                         <div className="flex items-center gap-2">
-                          <Input type="number" value={minDelay} onChange={(e) => setMinDelay(e.target.value)} min="1" max="60" className="w-16 h-8 text-sm" />
+                          <Input type="number" value={minDelay} onChange={(e) => setMinDelay(e.target.value)} min="6" max="300" className="w-16 h-8 text-sm" />
                           <span className="text-xs text-gray-600 dark:text-gray-700 dark:text-gray-300">a</span>
-                          <Input type="number" value={maxDelay} onChange={(e) => setMaxDelay(e.target.value)} min="1" max="60" className="w-16 h-8 text-sm" />
+                          <Input type="number" value={maxDelay} onChange={(e) => setMaxDelay(e.target.value)} min="6" max="300" className="w-16 h-8 text-sm" />
                         </div>
+                        <p className="text-[10px] text-orange-500 mt-1">Mínimo recomendado: 15s. Valores abaixo de 6s aumentam risco de ban.</p>
                       </div>
                     )}
 
