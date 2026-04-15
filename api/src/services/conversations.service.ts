@@ -11,6 +11,7 @@ export interface Conversation {
     assigned_to: string | null;
     last_message_at: string;
     unread_count: number;
+    is_group: boolean;
     metadata: any;
     created_at: string;
     updated_at: string;

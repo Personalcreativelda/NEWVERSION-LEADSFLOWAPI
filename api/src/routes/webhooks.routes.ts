@@ -1103,10 +1103,9 @@ router.post('/evolution/messages', async (req, res) => {
       try {
         const wsService = getWebSocketService();
         if (wsService) {
-          wsService.sendToUser(channel.user_id, 'new_message', {
+          wsService.emitNewMessage(channel.user_id, {
             conversationId: conversation.id,
             message: message,
-            timestamp: new Date().toISOString()
           });
         }
       } catch (wsErr) {
