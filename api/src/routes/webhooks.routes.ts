@@ -1001,10 +1001,140 @@ router.post('/evolution/messages', async (req, res) => {
     // ═══════════════════════════════════════════════════════════════════════════
     // ESTRATÉGIA DE PHONE EXTRACTION:
     // ═══════════════════════════════════════════════════════════════════════════
+    // 0. Se GRUPO: Pular TODA lógica de phone/lead e ir direto para conversa
     // 1. Se @lid: SEMPRE tentar resolver via Evolution API (contato não salvo)
     // 2. Se @s.whatsapp.net: Extrair número direto
     // 3. Usar phone para TODAS operações (armazenar, enviar, comparar)
     // 4. Guardar remoteJid original apenas como referência (metadata)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 🔀 GRUPO: Atalho - pular phone extraction/lead creation
+    // Mensagens de grupo devem ser agrupadas sob a conversa do GRUPO (JID @g.us),
+    // NÃO criar conversas individuais para cada membro que envia mensagem.
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (isGroupMessage && remoteJidValue?.includes('@g.us')) {
+      console.log('[Evolution Webhook] 👥 GRUPO DETECTADO - processando como grupo');
+      console.log('[Evolution Webhook]   - Group JID:', remoteJidValue);
+      
+      // Sender info do membro que enviou (para metadata da mensagem)
+      const groupSenderJid = remoteJid; // JID individual do sender
+      const groupSenderName = messageData.pushName || messageData.senderName || messageData.notifyName || 
+                              extractPhoneFromJid(remoteJid) || 'Desconhecido';
+      const groupSenderPhone = extractPhoneFromJid(remoteJid);
+      
+      console.log('[Evolution Webhook]   - Sender:', groupSenderName, '(', groupSenderJid, ')');
+
+      // Buscar ou criar conversa com o GROUP JID (não o sender individual)
+      const groupMetadata: any = {
+        is_group: true,
+        contact_name: remoteJidValue.replace('@g.us', ''),
+        last_sender_name: groupSenderName,
+        last_sender_jid: groupSenderJid,
+        last_sender_phone: groupSenderPhone,
+      };
+
+      const conversation = await conversationsService.findOrCreate(
+        channel.user_id,
+        channel.id,
+        remoteJidValue, // ⭐ Usar GROUP JID como remote_jid
+        undefined,       // Sem lead vinculado para grupos
+        groupMetadata
+      );
+
+      // Garantir flag is_group no banco
+      if (!conversation.is_group) {
+        await query(
+          `UPDATE conversations SET is_group = true, updated_at = NOW() WHERE id = $1`,
+          [conversation.id]
+        );
+      }
+
+      console.log('[Evolution Webhook] 👥 Conversa de GRUPO:', conversation.id);
+
+      // Determinar direção da mensagem
+      const messageDirection = isFromMe ? 'out' : 'in';
+      const messageStatus = isFromMe ? 'sent' : 'delivered';
+
+      // Salvar mensagem com sender info no metadata
+      const messageResult = await query(
+        `INSERT INTO messages (
+          user_id, conversation_id, lead_id, direction, channel,
+          content, media_url, media_type, status, external_id, metadata
+        )
+         VALUES ($1, $2, NULL, $3, 'whatsapp', $4, $5, $6, $7, $8, $9)
+         RETURNING *`,
+        [
+          channel.user_id,
+          conversation.id,
+          messageDirection,
+          messageContent,
+          mediaUrl,
+          mediaType,
+          messageStatus,
+          messageData.key?.id || messageData.id || messageData.messageId,
+          JSON.stringify({
+            from: remoteJidValue,
+            timestamp: messageData.messageTimestamp || messageData.timestamp || Date.now(),
+            pushName: groupSenderName,
+            fromMe: isFromMe,
+            source: isFromMe ? 'phone' : 'contact',
+            // ⭐ Group-specific fields
+            is_group_message: true,
+            sender_name: groupSenderName,
+            sender_jid: groupSenderJid,
+            sender_phone: groupSenderPhone,
+            group_jid: remoteJidValue,
+            fileName: msg?.documentMessage?.fileName || msg?.documentMessage?.title || undefined,
+            mimetype: mediaMimetype || undefined,
+          })
+        ]
+      );
+
+      const message = messageResult.rows[0];
+
+      console.log('[Evolution Webhook] ✅ MENSAGEM DE GRUPO SALVA');
+      console.log('[Evolution Webhook]   - Message ID:', message.id);
+      console.log('[Evolution Webhook]   - Grupo:', remoteJidValue);
+      console.log('[Evolution Webhook]   - Sender:', groupSenderName);
+      console.log('[Evolution Webhook]   - Direção:', messageDirection);
+
+      // 📡 Notificar via WebSocket
+      try {
+        const wsService = getWebSocketService();
+        if (wsService) {
+          wsService.sendToUser(channel.user_id, 'new_message', {
+            conversationId: conversation.id,
+            message: message,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (wsErr) {
+        console.warn('[Evolution Webhook] WebSocket notification failed:', wsErr);
+      }
+
+      // 📡 Disparar webhook de usuário
+      try {
+        await webhookDispatcher.dispatch(channel.user_id, 'message.received', {
+          message_id: message.id,
+          conversation_id: conversation.id,
+          direction: messageDirection,
+          channel: 'whatsapp',
+          content: messageContent,
+          is_group: true,
+          group_jid: remoteJidValue,
+          sender_name: groupSenderName,
+          sender_phone: groupSenderPhone,
+          timestamp: new Date().toISOString()
+        });
+      } catch (whErr) {
+        console.warn('[Evolution Webhook] User webhook dispatch failed:', whErr);
+      }
+
+      return res.json({ success: true, type: 'group_message', conversationId: conversation.id });
+    }
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ↓ CHAT INDIVIDUAL: Continuar com lógica normal de phone/lead
     // ═══════════════════════════════════════════════════════════════════════════
 
     const isLid = remoteJid.endsWith('@lid');
@@ -1267,17 +1397,40 @@ router.post('/evolution/messages', async (req, res) => {
     }
 
     // Buscar ou criar conversa
+    // Para grupos: usar o JID do grupo como remote_jid, e incluir sender info no metadata
+    const isGroup = isGroupMessage && remoteJidValue?.includes('@g.us');
+    const conversationRemoteJid = isGroup ? remoteJidValue : remoteJid;
+    const groupSenderName = isGroup ? (messageData.pushName || messageData.senderName || messageData.notifyName || contactName) : undefined;
+    const groupSenderJid = isGroup ? remoteJid : undefined;
+
+    const conversationMetadata: any = {
+      contact_name: isGroup ? (remoteJidValue || 'Grupo') : contactName,
+      phone: isGroup ? undefined : finalPhone,
+      profile_picture: waProfilePic,
+      is_group: isGroup || false,
+    };
+
+    // Para grupos: guardar o nome do sender da última mensagem
+    if (isGroup) {
+      conversationMetadata.last_sender_name = groupSenderName;
+      conversationMetadata.last_sender_jid = groupSenderJid;
+    }
+
     const conversation = await conversationsService.findOrCreate(
       channel.user_id,
       channel.id,
-      remoteJid,
-      leadId,
-      {
-        contact_name: contactName,
-        phone: finalPhone,
-        profile_picture: waProfilePic
-      }
+      conversationRemoteJid,
+      isGroup ? undefined : leadId,
+      conversationMetadata
     );
+
+    // Se é grupo, garantir que o flag is_group está setado no banco
+    if (isGroup && !conversation.is_group) {
+      await query(
+        `UPDATE conversations SET is_group = true, updated_at = NOW() WHERE id = $1`,
+        [conversation.id]
+      );
+    }
 
     console.log('[Evolution Webhook] 💬 Conversa processada:');
     console.log('[Evolution Webhook]   - ID:', conversation.id);
@@ -1314,6 +1467,10 @@ router.post('/evolution/messages', async (req, res) => {
           source: isFromMe ? 'phone' : 'contact',
           fileName: msg?.documentMessage?.fileName || msg?.documentMessage?.title || undefined,
           mimetype: mediaMimetype || undefined,
+          // Group-specific: who sent this message in the group
+          sender_name: isGroup ? groupSenderName : undefined,
+          sender_jid: isGroup ? groupSenderJid : undefined,
+          is_group_message: isGroup || undefined,
           rawPayload: JSON.stringify(req.body).substring(0, 500)
         })
       ]

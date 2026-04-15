@@ -197,9 +197,27 @@ export class ChannelsService {
     }
 
     /**
-     * Remove canal
+     * Remove canal (preservando histórico de conversas)
      */
     async delete(id: string, userId: string): Promise<boolean> {
+        // Buscar info do canal antes de deletar (para guardar referência no histórico)
+        const channelResult = await query(
+            'SELECT id, type, name, status FROM channels WHERE id = $1 AND user_id = $2',
+            [id, userId]
+        );
+        const channelInfo = channelResult.rows[0];
+
+        if (channelInfo) {
+            // Salvar info do canal nas conversas antes de deletar
+            // (o FK ON DELETE SET NULL vai setar channel_id = null)
+            await query(
+                `UPDATE conversations 
+                 SET deleted_channel_info = $1, updated_at = NOW() 
+                 WHERE channel_id = $2 AND user_id = $3`,
+                [JSON.stringify({ id: channelInfo.id, type: channelInfo.type, name: channelInfo.name, deleted_at: new Date().toISOString() }), id, userId]
+            );
+        }
+
         const result = await query(
             'DELETE FROM channels WHERE id = $1 AND user_id = $2 RETURNING id',
             [id, userId]

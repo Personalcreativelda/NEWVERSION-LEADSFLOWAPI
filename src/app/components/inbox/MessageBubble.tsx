@@ -144,6 +144,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     // Detectar se é mensagem automática (AI assistant)
     const isAutomated = (message.metadata as any)?.automated === true || (message.metadata as any)?.source === 'ai_assistant';
 
+    // Group: extract sender name from metadata
+    const groupSenderName = (message.metadata as any)?.sender_name;
+    const isGroupMessage = (message.metadata as any)?.is_group_message;
+
     return (
         <div className={`flex w-full mb-2 px-4 ${isOut ? 'justify-end' : 'justify-start'}`}>
             <div
@@ -153,6 +157,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                         : 'bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-slate-600 rounded-bl-none'
                     }`}
             >
+                {/* Group Message: Sender Name */}
+                {isGroupMessage && groupSenderName && !isOut && (
+                    <div className="text-xs font-semibold mb-1 text-blue-500 dark:text-blue-400">
+                        {groupSenderName}
+                    </div>
+                )}
+
                 {/* Media Content */}
                 {hasValidMedia && (
                     <div className="mb-2">

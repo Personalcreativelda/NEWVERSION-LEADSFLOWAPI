@@ -76,10 +76,20 @@ export function useMessages(conversationId: string | null) {
                 media_type: mediaType
             });
 
-            // Substituir mensagem temporária pela real
-            setMessages(prev => prev.map(m => 
-                m.id === tempId ? { ...message, status: 'sent' } : m
-            ));
+            // Substituir mensagem temporária pela real + dedup
+            // (WebSocket pode ter adicionado a mensagem real antes da resposta da API)
+            setMessages(prev => {
+                const replaced = prev.map(m => 
+                    m.id === tempId ? { ...message, status: 'sent' as const } : m
+                );
+                // Remover duplicatas pelo ID real
+                const seen = new Set<string>();
+                return replaced.filter(m => {
+                    if (seen.has(m.id)) return false;
+                    seen.add(m.id);
+                    return true;
+                });
+            });
 
         } catch (err: any) {
             console.error('[useMessages] Error sending:', err);
@@ -126,10 +136,18 @@ export function useMessages(conversationId: string | null) {
             setSending(true);
             const message = await inboxApi.sendAudio(conversationId, audioBlob);
             
-            // Substituir mensagem temporária pela real
-            setMessages(prev => prev.map(m => 
-                m.id === tempId ? { ...message, status: 'sent' } : m
-            ));
+            // Substituir mensagem temporária pela real + dedup
+            setMessages(prev => {
+                const replaced = prev.map(m => 
+                    m.id === tempId ? { ...message, status: 'sent' as const } : m
+                );
+                const seen = new Set<string>();
+                return replaced.filter(m => {
+                    if (seen.has(m.id)) return false;
+                    seen.add(m.id);
+                    return true;
+                });
+            });
         } catch (err: any) {
             console.error('[useMessages] Error sending audio:', err);
             setMessages(prev => prev.map(m => 
@@ -143,9 +161,23 @@ export function useMessages(conversationId: string | null) {
 
     const addMessage = useCallback((message: MessageWithSender) => {
         setMessages(prev => {
-            // Evitar duplicatas
+            // Evitar duplicatas por ID
             if (prev.some(m => m.id === message.id)) {
                 return prev;
+            }
+            // Para mensagens de saída (out) vindas do WebSocket:
+            // Se existe uma mensagem temp_ pendente com mesmo conteúdo, substituir
+            if (message.direction === 'out') {
+                const tempIdx = prev.findIndex(m => 
+                    m.id.startsWith('temp_') && 
+                    m.direction === 'out' && 
+                    m.status === 'pending'
+                );
+                if (tempIdx !== -1) {
+                    const updated = [...prev];
+                    updated[tempIdx] = { ...message, status: message.status || 'sent' };
+                    return updated;
+                }
             }
             return [...prev, message];
         });

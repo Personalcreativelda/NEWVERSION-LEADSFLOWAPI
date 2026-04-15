@@ -2,12 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ConversationList } from '../../inbox/ConversationList';
 import { useInbox } from '../../../hooks/useInbox';
 import { useInboxFilters } from '../../../hooks/useInboxFilters';
-import { conversationsApi, contactsApi } from '../../../services/api/inbox';
-import { Settings, Search, Filter, Plus, X, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { conversationsApi, contactsApi, groupsApi } from '../../../services/api/inbox';
+import { Settings, Search, Filter, Plus, X, Wifi, WifiOff, RefreshCw, Users, MessageSquare, MessagesSquare } from 'lucide-react';
 import { ChatPanel } from '../../inbox/ChatPanel';
 import { EmptyState } from '../../inbox/EmptyState';
 import { ContactDetailsPanel } from '../../inbox/ContactDetailsPanel';
 import { NewConversationModal } from '../../inbox/NewConversationModal';
+import { GroupDetailsPanel } from '../../inbox/GroupDetailsPanel';
 
 interface InboxConversationsProps {
     onNavigate?: (page: string) => void;
@@ -47,6 +48,9 @@ export default function InboxConversations({
     const [showNewConversationModal, setShowNewConversationModal] = useState(false);
     const [isCreatingConversation, setIsCreatingConversation] = useState(false);
     const [isEditingLead, setIsEditingLead] = useState(false);
+    // Chat type filter: 'all' | 'chats' | 'groups'
+    const [chatTypeFilter, setChatTypeFilter] = useState<'all' | 'chats' | 'groups'>('all');
+    const [syncingGroups, setSyncingGroups] = useState(false);
 
     // Auto-select conversation when conversationIdToOpen is provided
     useEffect(() => {
@@ -163,24 +167,38 @@ export default function InboxConversations({
         }
     };
 
+    // Sync groups from WhatsApp
+    const handleSyncGroups = async () => {
+        setSyncingGroups(true);
+        try {
+            const result = await groupsApi.sync();
+            console.log('[InboxConversations] Groups synced:', result);
+            await refreshConversations();
+        } catch (error) {
+            console.error('Error syncing groups:', error);
+        } finally {
+            setSyncingGroups(false);
+        }
+    };
+
     // Filtrar conversas baseado nos filtros aplicados
     const filteredConversations = useMemo(() => {
         return conversations.filter(conv => {
             const jid = conv.metadata?.jid || conv.remote_jid || '';
             const channelType = conv.channel?.type || '';
-            const isGroup = jid.includes('@g.us');
+            const isGroup = conv.is_group || conv.metadata?.is_group || jid.includes('@g.us');
 
-            // Excluir grupos
-            if (isGroup) return false;
+            // Chat type filter: all / chats / groups
+            if (chatTypeFilter === 'chats' && isGroup) return false;
+            if (chatTypeFilter === 'groups' && !isGroup) return false;
 
-            // Verificar se é um contato válido:
-            // - WhatsApp: @lid ou @s.whatsapp.net
-            // - Telegram/Instagram/Facebook/Email: sempre válidos (usam IDs numéricos)
-            const isWhatsAppContact = jid.includes('@lid') || jid.includes('@s.whatsapp.net');
-            const isNonWhatsAppChannel = ['telegram', 'instagram', 'facebook', 'email', 'whatsapp_cloud', 'website'].includes(channelType);
-            const isValidContact = isWhatsAppContact || isNonWhatsAppChannel || /^\d+$/.test(jid);
-
-            if (!isValidContact) return false;
+            // Para chats individuais, validar contato
+            if (!isGroup) {
+                const isWhatsAppContact = jid.includes('@lid') || jid.includes('@s.whatsapp.net');
+                const isNonWhatsAppChannel = ['telegram', 'instagram', 'facebook', 'email', 'whatsapp_cloud', 'website'].includes(channelType);
+                const isValidContact = isWhatsAppContact || isNonWhatsAppChannel || /^\d+$/.test(jid);
+                if (!isValidContact) return false;
+            }
             
             // Filtrar por tipo (mentions, unattended)
             if (filters.type === 'mentions') {
@@ -231,7 +249,7 @@ export default function InboxConversations({
             
             return true;
         });
-    }, [conversations, filters, searchQuery]);
+    }, [conversations, filters, searchQuery, chatTypeFilter]);
 
     const handleOpenSettings = () => {
         if (onNavigate) {
@@ -357,6 +375,42 @@ export default function InboxConversations({
                         />
                     </div>
 
+                    {/* Chat Type Tabs: Todos / Chats / Grupos */}
+                    <div className="flex items-center gap-1 mt-3">
+                        {([
+                            { key: 'all' as const, label: 'Todos', icon: MessagesSquare },
+                            { key: 'chats' as const, label: 'Chats', icon: MessageSquare },
+                            { key: 'groups' as const, label: 'Grupos', icon: Users },
+                        ]).map(({ key, label, icon: Icon }) => (
+                            <button
+                                key={key}
+                                onClick={() => setChatTypeFilter(key)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                    chatTypeFilter === key
+                                        ? 'bg-blue-600 text-white'
+                                        : 'hover:bg-muted'
+                                }`}
+                                style={chatTypeFilter !== key ? { color: 'hsl(var(--muted-foreground))' } : undefined}
+                            >
+                                <Icon size={14} />
+                                {label}
+                            </button>
+                        ))}
+                        {/* Sync Groups Button - shown only when groups tab is active */}
+                        {chatTypeFilter === 'groups' && (
+                            <button
+                                onClick={handleSyncGroups}
+                                disabled={syncingGroups}
+                                className="ml-auto flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium hover:bg-muted transition-all"
+                                style={{ color: 'hsl(var(--muted-foreground))' }}
+                                title="Sincronizar grupos do WhatsApp"
+                            >
+                                <RefreshCw size={12} className={syncingGroups ? 'animate-spin' : ''} />
+                                Sync
+                            </button>
+                        )}
+                    </div>
+
                     {/* Indicador de filtros ativos */}
                     {hasActiveFilters && (
                         <div className="flex items-center gap-2 mt-3 px-1">
@@ -422,18 +476,25 @@ export default function InboxConversations({
                 )}
             </div>
 
-            {/* Contact Details Panel - Only visible on larger screens when a conversation is selected */}
+            {/* Contact/Group Details Panel - Only visible on larger screens when a conversation is selected */}
             {selectedConversation && showContactDetails && (
                 <div 
                     className="hidden xl:flex w-[320px] 2xl:w-[350px] flex-shrink-0 h-full overflow-hidden border-l transition-all duration-300" 
                     style={{ borderColor: 'hsl(var(--border))' }}
                 >
-                    <ContactDetailsPanel 
-                        conversation={selectedConversation}
-                        onClose={() => setShowContactDetails(false)}
-                        isEditingExternal={isEditingLead}
-                        onEditingChange={setIsEditingLead}
-                    />
+                    {(selectedConversation.is_group || selectedConversation.metadata?.is_group || selectedConversation.remote_jid?.includes('@g.us')) ? (
+                        <GroupDetailsPanel
+                            conversation={selectedConversation}
+                            onClose={() => setShowContactDetails(false)}
+                        />
+                    ) : (
+                        <ContactDetailsPanel 
+                            conversation={selectedConversation}
+                            onClose={() => setShowContactDetails(false)}
+                            isEditingExternal={isEditingLead}
+                            onEditingChange={setIsEditingLead}
+                        />
+                    )}
                 </div>
             )}
 

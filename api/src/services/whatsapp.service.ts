@@ -862,4 +862,189 @@ export class WhatsAppService {
       body: JSON.stringify(body),
     });
   }
+
+  // ============================================
+  // GROUP MANAGEMENT (Evolution API)
+  // ============================================
+
+  /**
+   * Fetch all groups from a WhatsApp instance
+   * Tries multiple Evolution API endpoint formats for compatibility
+   */
+  async fetchAllGroups(instanceId: string): Promise<any[]> {
+    console.log('[WhatsAppService] Fetching all groups for instance:', instanceId);
+
+    const endpointsToTry = [
+      { url: `/group/fetchAllGroups/${instanceId}`, method: 'GET' },
+      { url: `/group/fetchAllGroups/${instanceId}`, method: 'POST', body: { getParticipants: false } },
+      { url: `/group/findGroupInfos/${instanceId}`, method: 'GET' },
+    ];
+
+    for (const endpoint of endpointsToTry) {
+      try {
+        console.log(`[WhatsAppService] Trying ${endpoint.method} ${endpoint.url}`);
+        const result = await this.request(endpoint.url, {
+          method: endpoint.method,
+          ...(endpoint.body ? { body: JSON.stringify(endpoint.body) } : {}),
+        }) as any;
+
+        if (Array.isArray(result)) {
+          console.log('[WhatsAppService] Found', result.length, 'groups');
+          return result;
+        }
+        if (result?.groups && Array.isArray(result.groups)) {
+          console.log('[WhatsAppService] Found', result.groups.length, 'groups (in groups key)');
+          return result.groups;
+        }
+        if (result?.data && Array.isArray(result.data)) {
+          return result.data;
+        }
+
+        console.log('[WhatsAppService] Response format not recognized, trying next endpoint');
+      } catch (error: any) {
+        console.log(`[WhatsAppService] ${endpoint.method} ${endpoint.url} failed:`, error.message);
+      }
+    }
+
+    console.warn('[WhatsAppService] All group fetch endpoints failed, returning empty array');
+    return [];
+  }
+
+  /**
+   * Get detailed info about a specific group
+   */
+  async getGroupInfo(instanceId: string, groupJid: string): Promise<any> {
+    console.log('[WhatsAppService] Getting group info:', groupJid, 'instance:', instanceId);
+
+    const endpointsToTry = [
+      {
+        url: `/group/findGroupInfos/${instanceId}`,
+        method: 'POST',
+        body: { groupJid },
+      },
+      {
+        url: `/group/findGroupInfos/${instanceId}?groupJid=${encodeURIComponent(groupJid)}`,
+        method: 'GET',
+      },
+      {
+        url: `/group/inviteInfo/${instanceId}`,
+        method: 'POST',
+        body: { groupJid },
+      },
+    ];
+
+    for (const endpoint of endpointsToTry) {
+      try {
+        const result = await this.request(endpoint.url, {
+          method: endpoint.method,
+          ...(endpoint.body ? { body: JSON.stringify(endpoint.body) } : {}),
+        }) as any;
+
+        if (result) {
+          // Normalize: some versions return array, some return object
+          const info = Array.isArray(result) ? result[0] : result;
+          if (info?.id || info?.jid || info?.subject) {
+            console.log('[WhatsAppService] Group info found:', info.subject || info.id);
+            return info;
+          }
+        }
+      } catch (error: any) {
+        console.log(`[WhatsAppService] getGroupInfo ${endpoint.url} failed:`, error.message);
+      }
+    }
+
+    throw new Error(`Could not fetch group info for ${groupJid}`);
+  }
+
+  /**
+   * Get participants (members) of a group
+   */
+  async getGroupParticipants(instanceId: string, groupJid: string): Promise<any[]> {
+    console.log('[WhatsAppService] Getting group participants:', groupJid);
+
+    const endpointsToTry = [
+      {
+        url: `/group/participants/${instanceId}`,
+        method: 'POST',
+        body: { groupJid },
+      },
+      {
+        url: `/group/participants/${instanceId}?groupJid=${encodeURIComponent(groupJid)}`,
+        method: 'GET',
+      },
+      {
+        url: `/group/findGroupInfos/${instanceId}`,
+        method: 'POST',
+        body: { groupJid },
+      },
+    ];
+
+    for (const endpoint of endpointsToTry) {
+      try {
+        const result = await this.request(endpoint.url, {
+          method: endpoint.method,
+          ...(endpoint.body ? { body: JSON.stringify(endpoint.body) } : {}),
+        }) as any;
+
+        // Direct array of participants
+        if (Array.isArray(result)) {
+          console.log('[WhatsAppService] Found', result.length, 'participants');
+          return result;
+        }
+        // Nested in participants key
+        if (result?.participants && Array.isArray(result.participants)) {
+          console.log('[WhatsAppService] Found', result.participants.length, 'participants');
+          return result.participants;
+        }
+        // findGroupInfos returns full group info with participants inside
+        if (Array.isArray(result) && result[0]?.participants) {
+          return result[0].participants;
+        }
+        if (result?.data && Array.isArray(result.data)) {
+          return result.data;
+        }
+      } catch (error: any) {
+        console.log(`[WhatsAppService] getGroupParticipants ${endpoint.url} failed:`, error.message);
+      }
+    }
+
+    console.warn('[WhatsAppService] Could not fetch group participants, returning empty array');
+    return [];
+  }
+
+  /**
+   * Get group invite link
+   */
+  async getGroupInviteLink(instanceId: string, groupJid: string): Promise<string | null> {
+    console.log('[WhatsAppService] Getting group invite link:', groupJid);
+
+    try {
+      const result = await this.request(`/group/inviteCode/${instanceId}`, {
+        method: 'POST',
+        body: JSON.stringify({ groupJid }),
+      }) as any;
+
+      const code = result?.inviteCode || result?.code || result?.inviteUrl || result?.link;
+      if (code) {
+        const inviteLink = code.startsWith('http') ? code : `https://chat.whatsapp.com/${code}`;
+        console.log('[WhatsAppService] Invite link generated');
+        return inviteLink;
+      }
+      return null;
+    } catch (error: any) {
+      console.warn('[WhatsAppService] Could not get invite link:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Get group profile picture URL
+   */
+  async getGroupProfilePicture(instanceId: string, groupJid: string): Promise<string | null> {
+    try {
+      return await this.fetchProfilePicture(instanceId, groupJid);
+    } catch {
+      return null;
+    }
+  }
 }

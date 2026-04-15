@@ -332,6 +332,74 @@ export const inboxApi = {
 };
 
 // ============================================
+// GROUPS (WhatsApp)
+// ============================================
+
+export interface GroupInfo {
+    id: string;
+    jid: string;
+    subject: string;
+    description: string;
+    owner: string;
+    creation?: number;
+    participants_count: number;
+    profile_picture: string | null;
+    restrict?: boolean;
+    announce?: boolean;
+    _source?: string;
+}
+
+export interface GroupMember {
+    jid: string;
+    phone: string;
+    name: string | null;
+    role: 'admin' | 'superadmin' | 'member';
+    profile_picture: string | null;
+}
+
+export const groupsApi = {
+    /**
+     * Lista todas as conversas de grupo
+     */
+    async getAll(): Promise<any[]> {
+        const { data } = await api.get('/groups');
+        return data;
+    },
+
+    /**
+     * Sincroniza grupos do WhatsApp via Evolution API
+     */
+    async sync(channelId?: string): Promise<{ success: boolean; total_synced: number; total_new: number; groups: any[] }> {
+        const { data } = await api.post('/groups/sync', channelId ? { channelId } : {});
+        return data;
+    },
+
+    /**
+     * Info detalhada de um grupo
+     */
+    async getInfo(conversationId: string): Promise<GroupInfo> {
+        const { data } = await api.get<GroupInfo>(`/groups/${conversationId}/info`);
+        return data;
+    },
+
+    /**
+     * Lista membros de um grupo
+     */
+    async getMembers(conversationId: string): Promise<{ group_jid: string; total: number; members: GroupMember[] }> {
+        const { data } = await api.get(`/groups/${conversationId}/members`);
+        return data;
+    },
+
+    /**
+     * Obtém link de convite do grupo
+     */
+    async getInviteLink(conversationId: string): Promise<{ invite_link: string }> {
+        const { data } = await api.get(`/groups/${conversationId}/invite-link`);
+        return data;
+    },
+};
+
+// ============================================
 // CONTACTS
 // ============================================
 
