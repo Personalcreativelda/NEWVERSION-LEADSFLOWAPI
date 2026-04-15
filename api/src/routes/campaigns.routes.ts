@@ -919,7 +919,7 @@ async function executeCampaignMessages(
       stats.sent++;
       sessionSent++;
       consecutiveErrors = 0; // reset on success
-      
+      } catch (sendError: any) {
         console.error(`[Campaigns Execute] Erro ao enviar para ${cleanPhone}:`, sendError.message);
         stats.failed++;
         messageStatus = 'failed';
