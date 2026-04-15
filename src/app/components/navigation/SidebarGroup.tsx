@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface SidebarGroupProps {
     label: string;
     icon: any;
     isActive: boolean;
     isExpandedInitial?: boolean;
+    isCollapsed?: boolean;
     children: React.ReactNode;
 }
 
@@ -14,15 +15,102 @@ export default function SidebarGroup({
     icon: Icon,
     isActive,
     isExpandedInitial = false,
+    isCollapsed = false,
     children
 }: SidebarGroupProps) {
     const [isExpanded, setIsExpanded] = useState(isExpandedInitial || isActive);
+    const [isFlyoutOpen, setIsFlyoutOpen] = useState(false);
+    const [flyoutTop, setFlyoutTop] = useState(0);
+    const itemRef = useRef<HTMLLIElement>(null);
+    const flyoutRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (isActive) {
             setIsExpanded(true);
         }
     }, [isActive]);
+
+    // Close flyout when sidebar expands
+    useEffect(() => {
+        if (!isCollapsed) setIsFlyoutOpen(false);
+    }, [isCollapsed]);
+
+    // Click-outside to close flyout
+    useEffect(() => {
+        if (!isFlyoutOpen) return;
+        const handler = (e: MouseEvent) => {
+            if (
+                flyoutRef.current && !flyoutRef.current.contains(e.target as Node) &&
+                itemRef.current && !itemRef.current.contains(e.target as Node)
+            ) {
+                setIsFlyoutOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [isFlyoutOpen]);
+
+    const handleCollapsedClick = () => {
+        if (itemRef.current) {
+            const rect = itemRef.current.getBoundingClientRect();
+            setFlyoutTop(rect.top);
+        }
+        setIsFlyoutOpen(prev => !prev);
+    };
+
+    if (isCollapsed) {
+        return (
+            <li ref={itemRef} className="relative">
+                <button
+                    onClick={handleCollapsedClick}
+                    title={label}
+                    className={`sidebar-nav-item w-full flex items-center justify-center py-3 rounded-lg transition-all duration-75 group ${
+                        isActive || isFlyoutOpen
+                            ? 'bg-[#00C48C] text-white shadow-lg shadow-[#00C48C]/30'
+                            : 'hover:bg-white/10'
+                    }`}
+                    style={!isActive && !isFlyoutOpen ? { color: 'hsl(var(--sidebar-foreground))' } : {}}
+                >
+                    <Icon className="sidebar-nav-item-icon w-[22px] h-[22px] flex-shrink-0" />
+                </button>
+
+                {/* Flyout panel – appears to the right of the collapsed sidebar */}
+                {isFlyoutOpen && (
+                    <div
+                        ref={flyoutRef}
+                        className="fixed z-[500] rounded-xl border shadow-2xl overflow-hidden"
+                        style={{
+                            left: '88px',
+                            top: flyoutTop,
+                            minWidth: '220px',
+                            maxHeight: '80vh',
+                            overflowY: 'auto',
+                            backgroundColor: 'hsl(var(--sidebar))',
+                            borderColor: 'hsl(var(--sidebar-border))',
+                        }}
+                    >
+                        {/* Group title */}
+                        <div
+                            className="px-4 py-2.5 border-b flex items-center gap-2"
+                            style={{ borderColor: 'hsl(var(--sidebar-border))' }}
+                        >
+                            <Icon className="w-4 h-4 opacity-60" style={{ color: 'hsl(var(--sidebar-foreground))' }} />
+                            <span
+                                className="text-xs font-semibold uppercase tracking-wider"
+                                style={{ color: 'hsl(var(--sidebar-foreground) / 0.5)' }}
+                            >
+                                {label}
+                            </span>
+                        </div>
+                        {/* Sub-items – click any child to also close flyout */}
+                        <div onClick={() => setIsFlyoutOpen(false)} className="py-1.5">
+                            {children}
+                        </div>
+                    </div>
+                )}
+            </li>
+        );
+    }
 
     return (
         <li className="relative">

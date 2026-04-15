@@ -91,49 +91,49 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
         switch (channel?.type) {
             case 'whatsapp':
                 return (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white" style={{ backgroundColor: '#16a34a' }}>
                         <MessageCircle size={10} />
                         WhatsApp
                     </span>
                 );
             case 'whatsapp_cloud':
                 return (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white" style={{ backgroundColor: '#15803d' }}>
                         <Cloud size={10} />
                         WhatsApp Cloud
                     </span>
                 );
             case 'telegram':
                 return (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white" style={{ backgroundColor: '#0284c7' }}>
                         <Send size={10} />
                         Telegram
                     </span>
                 );
             case 'facebook':
                 return (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white" style={{ backgroundColor: '#1d4ed8' }}>
                         <Facebook size={10} />
                         Facebook
                     </span>
                 );
             case 'instagram':
                 return (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white" style={{ backgroundColor: '#db2777' }}>
                         <Instagram size={10} />
                         Instagram
                     </span>
                 );
             case 'email':
                 return (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white" style={{ backgroundColor: '#0891b2' }}>
                         <Mail size={10} />
                         Email
                     </span>
                 );
             case 'website':
                 return (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white" style={{ backgroundColor: '#7c3aed' }}>
                         <Globe size={10} />
                         Website
                     </span>
@@ -142,7 +142,7 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
             case 'sms':
             case 'twilio':
                 return (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white" style={{ backgroundColor: '#0d9488' }}>
                         <Smartphone size={10} />
                         SMS
                     </span>

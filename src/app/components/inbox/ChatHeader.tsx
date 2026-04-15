@@ -137,7 +137,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                     <div className="flex items-center gap-1.5 text-[11px]">
                         {/* Channel Badge */}
                         {channelType === 'whatsapp' && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-white" style={{ backgroundColor: '#16a34a' }}>
                                 <MessageCircle size={10} />
                                 WhatsApp
                             </span>

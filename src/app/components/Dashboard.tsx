@@ -161,6 +161,10 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     const saved = localStorage.getItem('sidebar_open');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar_collapsed');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [isMobile, setIsMobile] = useState(false);
   const [filtros, setFiltros] = useState({ origem: '', status: '', busca: '' });
   const [filtrosAplicados, setFiltrosAplicados] = useState({ origem: '', status: '', busca: '' });
@@ -323,6 +327,10 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   useEffect(() => {
     localStorage.setItem('sidebar_open', JSON.stringify(isSidebarOpen));
   }, [isSidebarOpen]);
+
+  useEffect(() => {
+    localStorage.setItem('sidebar_collapsed', JSON.stringify(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
 
   // Navigation handler: updates internal page state AND browser URL
   const handleNavigate = useCallback((pageId: string) => {
@@ -1969,7 +1977,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
   return (
     <div
-      className="min-h-screen flex transition-colors duration-200 relative"
+      className="min-h-screen transition-colors duration-200"
       style={{ background: 'hsl(var(--background))' }}
     >
       {/* Background Grid - Dark Mode Only - Removido para ter fundo preto puro */}
@@ -1985,14 +1993,20 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         isDark={isDark}
         onToggleTheme={handleToggleTheme}
         isMobile={isMobile}
-        isCollapsed={false}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
         user={user}
         language={language}
         onLogout={onLogout}
       />
 
-      {/* Main Content Wrapper - SEMPRE com margin-left em desktop (>1024px) */}
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 lg:ml-[260px] h-screen overflow-hidden">
+      {/* Main Content Wrapper - fixed panel, left edge = sidebar width */}
+      <div
+        className="fixed top-0 bottom-0 right-0 flex flex-col overflow-hidden transition-all duration-300"
+        style={{
+          left: isMobile ? 0 : isSidebarCollapsed ? 80 : 260,
+        }}
+      >
         <div className={`dashboard-container flex flex-col ${
           currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
             ? 'h-full overflow-hidden'
@@ -2054,10 +2068,10 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
               ? 'overflow-hidden flex flex-col' 
               : 'overflow-y-auto'
           }`}>
-            <div className={`w-full mx-auto ${
+            <div className={`w-full ${
               currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
                 ? 'h-full flex-1 min-h-0 max-w-none px-0 py-0 overflow-hidden'
-                : 'max-w-[1600px] px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8'
+                : 'px-4 sm:px-6 lg:px-8 py-4 sm:py-5 lg:py-6'
             }`} style={{ background: 'hsl(var(--background))' }}>
             {/* Renderizar conteúdo baseado na página atual */}
             {currentPage === 'dashboard' && (

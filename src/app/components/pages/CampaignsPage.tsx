@@ -11,6 +11,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import CampaignWhatsAppModal from '../modals/CampaignWhatsAppModal';
 import CampaignEmailModal from '../modals/CampaignEmailModal';
+import CampaignSMSModal from '../modals/CampaignSMSModal';
 import ChannelSelectorModal from '../modals/ChannelSelectorModal';
 import CampaignDetailsModal from '../modals/CampaignDetailsModal';
 import CampaignMessageModal from '../modals/CampaignMessageModal';
@@ -74,6 +75,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   const [channelSelectorOpen, setChannelSelectorOpen] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showSMSModal, setShowSMSModal] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
 
   // ✅ Estados para modals de funcionalidades
@@ -114,6 +116,13 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
       // ✅ Fetch Email campaigns from specialized endpoint
       const emailResponse = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/email-campaigns`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      // ✅ Fetch SMS campaigns
+      const smsResponse = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/sms-campaigns`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -218,6 +227,41 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
         }
       }
 
+      if (smsResponse.ok) {
+        const smsData = await smsResponse.json();
+        if (smsData.success && smsData.campaigns) {
+          const mappedSMS = smsData.campaigns.map((c: any) => ({
+            id: c.id,
+            name: c.campaign_name,
+            type: 'sms' as const,
+            status: c.status,
+            totalRecipients: c.recipient_count || 0,
+            sent: c.sent_count || 0,
+            delivered: c.delivered_count || 0,
+            read: 0,
+            replies: 0,
+            failed: c.failed_count || 0,
+            scheduledDate: c.scheduled_datetime || (c.scheduled_date ? `${c.scheduled_date}T${c.scheduled_time || '00:00:00'}` : null),
+            completedDate: c.sent_at,
+            createdAt: c.created_at,
+            progress: (c.status === 'completed') ? 100 : (c.status === 'active' ? Math.floor(((c.sent_count || 0) / (c.recipient_count || 1)) * 100) : 0),
+            deliveryRate: c.sent_count > 0 ? Math.floor(((c.delivered_count || 0) / c.sent_count) * 100) : 0,
+            template: c.message?.substring(0, 60),
+            settings: {
+              message: c.message,
+              channelId: c.channel_id,
+              recipientMode: c.recipient_mode,
+              selectedStatuses: typeof c.selected_statuses === 'string' ? JSON.parse(c.selected_statuses) : (c.selected_statuses || []),
+              customPhones: c.custom_phones,
+              scheduleMode: c.schedule_mode,
+              scheduledDate: c.scheduled_date,
+              scheduledTime: c.scheduled_time,
+            },
+          }));
+          campaignsData = [...campaignsData, ...mappedSMS];
+        }
+      }
+
       // Sort by created date descending
       campaignsData.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
@@ -236,7 +280,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
     } else if (channel === 'email') {
       setShowEmailModal(true);
     } else if (channel === 'sms') {
-      alert('📱 SMS estará disponível em breve!');
+      setShowSMSModal(true);
     }
   };
 
@@ -690,6 +734,8 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
       setShowWhatsAppModal(true);
     } else if (campaign.type === 'email') {
       setShowEmailModal(true);
+    } else if (campaign.type === 'sms') {
+      setShowSMSModal(true);
     }
   };
 
@@ -730,6 +776,24 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
           console.log('[CampaignsPage] Campanha iniciada:', result);
 
           toast.success(`Campanha "${name}" iniciada! Enviando para ${result.totalLeads} contatos...`);
+        } else if (type === 'sms') {
+          // Para campanhas SMS, acionar endpoint de send dedicado
+          const smsResponse = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/sms-campaigns/${id}/send`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({}),
+          });
+
+          if (!smsResponse.ok) {
+            const errData = await smsResponse.json();
+            throw new Error(errData.error || 'Erro ao enviar SMS');
+          }
+
+          const smsResult = await smsResponse.json();
+          toast.success(`Campanha SMS "${name}" iniciada! Enviando para ${smsResult.recipientCount} contatos...`);
         } else {
           // Para outros tipos (email), apenas atualizar status
           const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/${id}`, {
@@ -1128,6 +1192,17 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
             </div>
             <Button
               onClick={() => {
+                // SMS campaigns: open SMS modal directly (Twilio handles sending)
+                if (activeTab === 'sms') {
+                  setShowSMSModal(true);
+                  return;
+                }
+                // Email campaigns bypass plan limits when SMTP is configured
+                const hasSmtp = !!localStorage.getItem('smtp_host');
+                if (activeTab === 'email' && hasSmtp) {
+                  setShowEmailModal(true);
+                  return;
+                }
                 // Count all non-completed campaigns across all types as "active"
                 const activeCampaignCount = campaigns.filter(c =>
                   c.status === 'active' || c.status === 'scheduled' || c.status === 'paused'
@@ -1183,38 +1258,24 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
               <button
                 onClick={() => setActiveTab('sms')}
                 className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'sms'
-                  ? 'border-[#F59E0B] text-[#F59E0B]'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-[#F59E0B]'
+                  ? 'border-[#F22F46] text-[#F22F46]'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-[#F22F46]'
                   }`}
               >
                 <MessageSquare className="w-4 h-4" />
                 <span>SMS</span>
-                <span className="bg-gray-200 text-gray-700 dark:text-gray-300 text-xs px-2 py-1 rounded-full font-semibold">
-                  0
+                <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                  activeTab === 'sms' ? 'bg-[#F22F46] text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                }`}>
+                  {campaigns.filter(c => c.type === 'sms').length}
                 </span>
               </button>
             </nav>
           </div>
         </div>
 
-        {/* SMS Coming Soon */}
-        {activeTab === 'sms' && (
-          <div className="text-center py-20">
-            <div className="text-6xl mb-6">🚧</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">Em breve!</h2>
-            <p className="text-gray-700 dark:text-gray-300 mb-8">
-              O envio de SMS estará disponível em breve.<br />
-              Por enquanto, use <strong>WhatsApp</strong> ou <strong>Email</strong>.
-            </p>
-            <Button variant="outline" className="border-[#F59E0B] text-[#F59E0B] hover:bg-orange-50">
-              <Bell className="w-4 h-4 mr-2" />
-              Notificar quando disponível
-            </Button>
-          </div>
-        )}
-
-        {/* WhatsApp & Email Content */}
-        {(activeTab === 'whatsapp' || activeTab === 'email') && (
+        {/* WhatsApp, Email & SMS Content */}
+        {(activeTab === 'whatsapp' || activeTab === 'email' || activeTab === 'sms') && (
           <div className="space-y-10">
             {/* Loading State */}
             {isLoadingCampaigns && (
@@ -1311,7 +1372,6 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     </div>
                   ) : (
                     <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <div className="text-4xl mb-3 opacity-40">💤</div>
                       <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha ativa no momento</p>
                     </div>
                   )}
@@ -1391,7 +1451,6 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     </div>
                   ) : (
                     <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <div className="text-4xl mb-3 opacity-40">📅</div>
                       <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha agendada</p>
                     </div>
                   )}
@@ -1457,7 +1516,6 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     </div>
                   ) : (
                     <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <div className="text-4xl mb-3 opacity-40">💾</div>
                       <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha salva</p>
                     </div>
                   )}
@@ -1518,7 +1576,6 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     </div>
                   ) : (
                     <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <div className="text-4xl mb-3 opacity-40">📊</div>
                       <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha concluída</p>
                     </div>
                   )}
@@ -1613,6 +1670,20 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
           isOpen={showEmailModal}
           onClose={() => {
             setShowEmailModal(false);
+            setEditingCampaign(null);
+          }}
+          leads={leads}
+          onCampaignCreated={handleCampaignCreated}
+          onCampaignUpdated={handleCampaignUpdated}
+          editingCampaign={editingCampaign}
+        />
+      )}
+
+      {showSMSModal && (
+        <CampaignSMSModal
+          isOpen={showSMSModal}
+          onClose={() => {
+            setShowSMSModal(false);
             setEditingCampaign(null);
           }}
           leads={leads}

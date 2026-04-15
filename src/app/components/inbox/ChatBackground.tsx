@@ -11,7 +11,7 @@ export function ChatBackground({ children, className = '' }: ChatBackgroundProps
         <div 
             className={`relative ${className}`}
             style={{
-                backgroundColor: 'hsl(var(--background))',
+                backgroundColor: 'hsl(var(--chat-bg))',
             }}
         >
             {/* Pattern Background */}

@@ -18,6 +18,7 @@ import leadNotesRoutes from './lead-notes.routes';
 import scheduledConversationsRoutes from './scheduled-conversations.routes';
 import inboxRoutes from './inbox.routes';
 import emailCampaignsRoutes from './email-campaigns';
+import smsCampaignsRoutes from './sms-campaigns';
 // INBOX: Importar rotas de canais e assistentes
 import channelsRoutes from './channels.routes';
 import aiAssistantsRoutes from './ai-assistants.routes';
@@ -59,6 +60,7 @@ router.use('/whatsapp', withPlan, whatsappRoutes);
 router.use('/integrations', withPlan, integrationsRoutes);
 router.use('/inbox', withPlan, inboxRoutes);
 router.use('/email-campaigns', withPlan, emailCampaignsRoutes);
+router.use('/sms-campaigns', withPlan, smsCampaignsRoutes);
 router.use('/channels', withPlan, channelsRoutes);
 router.use('/ai-assistants', withPlan, aiAssistantsRoutes);
 router.use('/assistants', withPlan, assistantsRoutes);

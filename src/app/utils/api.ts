@@ -1340,3 +1340,44 @@ export const emailsApi = {
     }, true);
   }
 };
+
+// ============================================
+// SMS CAMPAIGNS API
+// ============================================
+
+export const smsCampaignsApi = {
+  getAll: async () => {
+    return apiCall('/sms-campaigns', {}, true);
+  },
+
+  getById: async (id: string) => {
+    return apiCall(`/sms-campaigns/${id}`, {}, true);
+  },
+
+  create: async (data: any) => {
+    return apiCall('/sms-campaigns', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }, true);
+  },
+
+  update: async (id: string, data: any) => {
+    return apiCall(`/sms-campaigns/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }, true);
+  },
+
+  delete: async (id: string) => {
+    return apiCall(`/sms-campaigns/${id}`, {
+      method: 'DELETE'
+    }, true);
+  },
+
+  send: async (id: string) => {
+    return apiCall(`/sms-campaigns/${id}/send`, {
+      method: 'POST',
+      body: JSON.stringify({})
+    }, true);
+  }
+};

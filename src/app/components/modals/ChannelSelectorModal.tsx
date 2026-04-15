@@ -39,12 +39,12 @@ export default function ChannelSelectorModal({ isOpen, onClose, onSelectChannel 
       id: 'sms',
       name: 'SMS',
       icon: MessageSquare,
-      description: 'Mensagens curtas e diretas',
-      available: false,
-      bgGradient: 'bg-gray-200',
-      borderColor: '',
-      buttonBg: '',
-      shadowHover: '',
+      description: 'Mensagens curtas e diretas via Twilio',
+      available: true,
+      bgGradient: 'bg-gradient-to-br from-[#F22F46] to-[#b91c35]',
+      borderColor: 'border-[#F22F46]',
+      buttonBg: 'bg-[#F22F46] hover:bg-[#b91c35]',
+      shadowHover: 'shadow-red-500/20',
     },
   ];
 

@@ -683,7 +683,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               {editPhone && (
                 <div 
                   className="flex items-center gap-3 text-sm p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-                  style={{ backgroundColor: 'hsl(var(--muted) / 0.5)' }}
+                  style={{ backgroundColor: 'hsl(var(--muted))' }}
                 >
                   <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                     <Phone className="w-4 h-4 text-blue-500" />
@@ -698,7 +698,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               {editEmail && (
                 <div 
                   className="flex items-center gap-3 text-sm p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-                  style={{ backgroundColor: 'hsl(var(--muted) / 0.5)' }}
+                  style={{ backgroundColor: 'hsl(var(--muted))' }}
                 >
                   <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
                     <Mail className="w-4 h-4 text-purple-500" />
@@ -713,7 +713,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               {editCompany && (
                 <div 
                   className="flex items-center gap-3 text-sm p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-                  style={{ backgroundColor: 'hsl(var(--muted) / 0.5)' }}
+                  style={{ backgroundColor: 'hsl(var(--muted))' }}
                 >
                   <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
                     <Building2 className="w-4 h-4 text-orange-500" />
@@ -728,7 +728,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               {leadDetails?.source && (
                 <div 
                   className="flex items-center gap-3 text-sm p-3 rounded-lg"
-                  style={{ backgroundColor: 'hsl(var(--muted) / 0.5)' }}
+                  style={{ backgroundColor: 'hsl(var(--muted))' }}
                 >
                   <div className="w-8 h-8 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
                     <User className="w-4 h-4 text-cyan-500" />
@@ -749,7 +749,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 </h5>
                 <div 
                   className="rounded-lg p-3 flex items-center gap-3"
-                  style={{ backgroundColor: 'hsl(var(--muted) / 0.5)' }}
+                  style={{ backgroundColor: 'hsl(var(--muted))' }}
                 >
                   <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                     <Calendar className="w-4 h-4 text-green-500" />
@@ -770,7 +770,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 </h5>
                 <div 
                   className="rounded-lg p-3"
-                  style={{ backgroundColor: 'hsl(var(--muted) / 0.5)' }}
+                  style={{ backgroundColor: 'hsl(var(--muted))' }}
                 >
                   <p className="text-sm leading-relaxed" style={{ color: 'hsl(var(--foreground))' }}>
                     {editNotes}
@@ -790,7 +790,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                     <div 
                       key={schedule.id}
                       className="rounded-lg p-3 flex items-start gap-3"
-                      style={{ backgroundColor: 'hsl(var(--muted) / 0.5)' }}
+                      style={{ backgroundColor: 'hsl(var(--muted))' }}
                     >
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                         schedule.title?.startsWith('📋') 
@@ -991,3 +991,4 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
     </div>
   );
 }
+
