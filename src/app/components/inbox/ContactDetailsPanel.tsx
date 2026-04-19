@@ -51,7 +51,7 @@ const loadStatusOptions = () => {
       return parsed.map((stage: any) => ({
         value: stage.id,
         label: stage.label,
-        color: stage.color || 'bg-gray-500',
+        color: stage.color || 'bg-muted-foreground',
       }));
     }
   } catch (e) {
@@ -306,7 +306,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
 
   const getStatusColor = (status: string) => {
     const option = statusOptions.find(s => s.value === status);
-    return option?.color || 'bg-gray-500';
+    return option?.color || 'bg-muted-foreground';
   };
 
   const formatStatus = (status: string) => {
@@ -332,13 +332,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
   const createdAt = leadDetails?.created_at || leadDetails?.createdAt || leadDetails?.data;
 
   return (
-    <div 
-      className="w-full h-full flex flex-col border-l overflow-hidden"
-      style={{
-        backgroundColor: 'hsl(var(--card))',
-        borderColor: 'hsl(var(--border))'
-      }}
-    >
+    <div className="w-full h-full flex flex-col border-l border-border bg-card overflow-hidden">
       {/* Hidden file input */}
       <input
         type="file"
@@ -349,22 +343,18 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
       />
 
       {/* Header */}
-      <div 
-        className="flex-shrink-0 p-3 border-b flex items-center justify-between"
-        style={{ borderColor: 'hsl(var(--border))' }}
-      >
-        <h3 className="text-sm font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-          {isEditing ? 'Editar Contacto' : 'Detalhes do Lead'}
+      <div className="flex-shrink-0 px-4 py-3.5 border-b border-border flex items-center justify-between bg-card">
+        <h3 className="text-sm font-semibold text-foreground">
+          {isEditing ? 'Editar Contato' : 'Contato'}
         </h3>
         <div className="flex items-center gap-1">
           {!isEditing ? (
             <button
               onClick={() => setIsEditing(true)}
-              className="p-1.5 rounded-lg transition-colors hover:bg-[hsl(var(--muted))]"
-              style={{ color: 'hsl(var(--primary))' }}
+              className="p-1.5 rounded-lg transition-colors hover:bg-muted text-primary"
               title="Editar"
             >
-              <Edit2 className="w-4 h-4" />
+              <Edit2 className="w-3.5 h-3.5" />
             </button>
           ) : (
             <button
@@ -373,7 +363,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               className="p-1.5 rounded-lg transition-colors hover:bg-green-500/20 text-green-500"
               title="Salvar"
             >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             </button>
           )}
           <button
@@ -385,10 +375,9 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 onClose();
               }
             }}
-            className="p-1.5 rounded-lg hover:bg-[hsl(var(--muted))] transition-colors"
-            style={{ color: 'hsl(var(--muted-foreground))' }}
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -397,12 +386,12 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
       <div className="flex-1 overflow-y-auto p-4 pb-8 space-y-4 custom-scrollbar">
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'hsl(var(--primary))' }} />
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : error && !leadDetails ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <AlertCircle className="w-8 h-8 text-red-400 mb-2" />
-            <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>{error}</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
           </div>
         ) : isEditing ? (
           /* EDIT MODE */
@@ -431,14 +420,14 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                   )}
                 </div>
               </div>
-              <p className="text-xs mt-2" style={{ color: 'hsl(var(--muted-foreground))' }}>
+              <p className="text-xs mt-2 text-muted-foreground">
                 Clique para alterar a foto
               </p>
             </div>
 
             {/* Status Selector */}
             <div>
-              <label className="text-xs font-medium mb-2 block" style={{ color: 'hsl(var(--muted-foreground))' }}>
+              <label className="text-xs font-medium mb-2 block text-muted-foreground">
                 Status
               </label>
               <div className="grid grid-cols-3 gap-1.5">
@@ -449,9 +438,8 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                     className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                       editStatus === option.value
                         ? `${option.color} text-white border-transparent`
-                        : 'border-[hsl(var(--border))] hover:border-[hsl(var(--primary))]'
+                        : 'border-border text-foreground hover:border-primary'
                     }`}
-                    style={editStatus !== option.value ? { color: 'hsl(var(--foreground))' } : {}}
                   >
                     {option.label}
                   </button>
@@ -468,109 +456,79 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 type="text"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]/20"
-                style={{
-                  backgroundColor: 'hsl(var(--muted))',
-                  borderColor: 'hsl(var(--border))',
-                  color: 'hsl(var(--foreground))'
-                }}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-150"
                 placeholder="Nome do lead"
               />
             </div>
 
             {/* Phone */}
             <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'hsl(var(--muted-foreground))' }}>
+              <label className="text-xs font-medium mb-1.5 block text-muted-foreground">
                 Telefone
               </label>
               <input
                 type="tel"
                 value={editPhone}
                 onChange={(e) => setEditPhone(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]/20"
-                style={{
-                  backgroundColor: 'hsl(var(--muted))',
-                  borderColor: 'hsl(var(--border))',
-                  color: 'hsl(var(--foreground))'
-                }}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-150"
                 placeholder="+55 00 00000-0000"
               />
             </div>
 
             {/* Email */}
             <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'hsl(var(--muted-foreground))' }}>
+              <label className="text-xs font-medium mb-1.5 block text-muted-foreground">
                 Email
               </label>
               <input
                 type="email"
                 value={editEmail}
                 onChange={(e) => setEditEmail(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]/20"
-                style={{
-                  backgroundColor: 'hsl(var(--muted))',
-                  borderColor: 'hsl(var(--border))',
-                  color: 'hsl(var(--foreground))'
-                }}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-150"
                 placeholder="email@exemplo.com"
               />
             </div>
 
             {/* Company */}
             <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'hsl(var(--muted-foreground))' }}>
+              <label className="text-xs font-medium mb-1.5 block text-muted-foreground">
                 Empresa
               </label>
               <input
                 type="text"
                 value={editCompany}
                 onChange={(e) => setEditCompany(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]/20"
-                style={{
-                  backgroundColor: 'hsl(var(--muted))',
-                  borderColor: 'hsl(var(--border))',
-                  color: 'hsl(var(--foreground))'
-                }}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-150"
                 placeholder="Nome da empresa"
               />
             </div>
 
             {/* Position/Cargo */}
             <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'hsl(var(--muted-foreground))' }}>
+              <label className="text-xs font-medium mb-1.5 block text-muted-foreground">
                 Cargo
               </label>
               <input
                 type="text"
                 value={editPosition}
                 onChange={(e) => setEditPosition(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]/20"
-                style={{
-                  backgroundColor: 'hsl(var(--muted))',
-                  borderColor: 'hsl(var(--border))',
-                  color: 'hsl(var(--foreground))'
-                }}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-150"
                 placeholder="Ex: Gerente, Diretor, CEO..."
               />
             </div>
 
             {/* Value */}
             <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'hsl(var(--muted-foreground))' }}>
+              <label className="text-xs font-medium mb-1.5 block text-muted-foreground">
                 Valor do Negócio
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>R$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
                 <input
                   type="number"
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]/20"
-                  style={{
-                    backgroundColor: 'hsl(var(--muted))',
-                    borderColor: 'hsl(var(--border))',
-                    color: 'hsl(var(--foreground))'
-                  }}
+                  className="w-full pl-10 pr-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all duration-150"
                   placeholder="0.00"
                 />
               </div>
@@ -578,19 +536,14 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
 
             {/* Notes */}
             <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: 'hsl(var(--muted-foreground))' }}>
+              <label className="text-xs font-medium mb-1.5 block text-muted-foreground">
                 Observações
               </label>
               <textarea
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]/20 resize-none"
-                style={{
-                  backgroundColor: 'hsl(var(--muted))',
-                  borderColor: 'hsl(var(--border))',
-                  color: 'hsl(var(--foreground))'
-                }}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all duration-150"
                 placeholder="Adicione observações sobre o lead..."
               />
             </div>
@@ -606,11 +559,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-              style={{
-                backgroundColor: 'hsl(var(--primary))',
-                color: 'hsl(var(--primary-foreground))'
-              }}
+              className="w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:opacity-90"
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -625,11 +574,8 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
         ) : (
           /* VIEW MODE */
           <>
-            {/* Avatar Section - Card Style */}
-            <div 
-              className="rounded-xl p-4 text-center"
-              style={{ backgroundColor: 'hsl(var(--muted))' }}
-            >
+            {/* Avatar Section - ManyChat-style centered card */}
+            <div className="text-center pt-2 pb-4">
               <div 
                 className="relative group cursor-pointer mx-auto w-fit"
                 onClick={() => setIsEditing(true)}
@@ -638,178 +584,142 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                   <img
                     src={displayAvatar}
                     alt={editName}
-                    className="w-20 h-20 rounded-full object-cover transition-opacity group-hover:opacity-70 ring-4 ring-white dark:ring-gray-800 mx-auto"
+                    className="w-16 h-16 rounded-full object-cover transition-opacity group-hover:opacity-70 mx-auto"
                   />
                 ) : (
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center transition-opacity group-hover:opacity-70 ring-4 ring-white dark:ring-gray-800 mx-auto">
-                    <span className="text-white text-2xl font-semibold">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center transition-opacity group-hover:opacity-70 mx-auto">
+                    <span className="text-white text-xl font-semibold">
                       {editName?.charAt(0)?.toUpperCase() || '?'}
                     </span>
                   </div>
                 )}
-                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity mx-auto">
-                  <Edit2 className="w-5 h-5 text-white" />
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity mx-auto">
+                  <Edit2 className="w-4 h-4 text-white" />
                 </div>
               </div>
               
-              <h4 className="font-semibold text-base mt-3" style={{ color: 'hsl(var(--foreground))' }}>{editName}</h4>
+              <h4 className="font-semibold text-sm mt-3 text-foreground">{editName}</h4>
               
-              {/* Position/Cargo */}
-              {editPosition && (
-                <p className="text-xs mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                  {editPosition}
-                </p>
-              )}
+              {/* Position or "Customer since" */}
+              <p className="text-[11px] mt-0.5 text-muted-foreground">
+                {editPosition || (formatDate(createdAt) ? `Cliente desde ${formatDate(createdAt)}` : 'Lead')}
+              </p>
 
-              {/* Status Badge */}
-              <div className={`mt-2 inline-flex px-3 py-1 text-xs rounded-full text-white font-medium ${getStatusColor(editStatus)}`}>
-                {formatStatus(editStatus)}
+              {/* Status Badge + Value row */}
+              <div className="flex items-center justify-center gap-2 mt-2.5">
+                <span className={`inline-flex px-2.5 py-0.5 text-[11px] rounded-full text-white font-medium ${getStatusColor(editStatus)}`}>
+                  {formatStatus(editStatus)}
+                </span>
+                {editValue && parseFloat(editValue) > 0 && (
+                  <span className="text-sm font-semibold text-green-500">
+                    R$ {parseFloat(editValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                )}
               </div>
-
-              {/* Deal Value - Prominent */}
-              {editValue && parseFloat(editValue) > 0 && (
-                <div className="mt-3 text-xl font-bold text-green-500">
-                  R$ {parseFloat(editValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </div>
-              )}
             </div>
 
-            {/* Contact Info - List Style */}
-            <div className="space-y-2 mt-4">
-              <h5 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                Informações de Contato
-              </h5>
-              
-              {editPhone && (
-                <div 
-                  className="flex items-center gap-3 text-sm p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-                  style={{ backgroundColor: 'hsl(var(--muted))' }}
-                >
-                  <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                    <Phone className="w-4 h-4 text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>Telefone</p>
-                    <p className="font-medium" style={{ color: 'hsl(var(--foreground))' }}>{editPhone}</p>
-                  </div>
-                </div>
-              )}
-              
-              {editEmail && (
-                <div 
-                  className="flex items-center gap-3 text-sm p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-                  style={{ backgroundColor: 'hsl(var(--muted))' }}
-                >
-                  <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                    <Mail className="w-4 h-4 text-purple-500" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>Email</p>
-                    <p className="font-medium truncate" style={{ color: 'hsl(var(--foreground))' }}>{editEmail}</p>
-                  </div>
-                </div>
-              )}
-
-              {editCompany && (
-                <div 
-                  className="flex items-center gap-3 text-sm p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-                  style={{ backgroundColor: 'hsl(var(--muted))' }}
-                >
-                  <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                    <Building2 className="w-4 h-4 text-orange-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>Empresa</p>
-                    <p className="font-medium" style={{ color: 'hsl(var(--foreground))' }}>{editCompany}</p>
-                  </div>
-                </div>
-              )}
-
-              {leadDetails?.source && (
-                <div 
-                  className="flex items-center gap-3 text-sm p-3 rounded-lg"
-                  style={{ backgroundColor: 'hsl(var(--muted))' }}
-                >
-                  <div className="w-8 h-8 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
-                    <User className="w-4 h-4 text-cyan-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>Origem</p>
-                    <p className="font-medium" style={{ color: 'hsl(var(--foreground))' }}>{leadDetails.source}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Timeline Section */}
-            {formatDate(createdAt) && (
-              <div className="mt-4">
-                <h5 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                  Timeline
+            {/* Details Card */}
+            <div className="rounded-xl border border-border/60 overflow-hidden">
+              <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40">
+                <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Detalhes
                 </h5>
-                <div 
-                  className="rounded-lg p-3 flex items-center gap-3"
-                  style={{ backgroundColor: 'hsl(var(--muted))' }}
-                >
-                  <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                    <Calendar className="w-4 h-4 text-green-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>Criado em</p>
-                    <p className="font-medium text-sm" style={{ color: 'hsl(var(--foreground))' }}>{formatDate(createdAt)}</p>
-                  </div>
-                </div>
               </div>
-            )}
+              <div className="divide-y divide-border/30">
+                {editPhone && (
+                  <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer">
+                    <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                      <Phone className="w-3.5 h-3.5 text-blue-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-muted-foreground">Telefone</p>
+                      <p className="text-sm font-medium truncate text-foreground">{editPhone}</p>
+                    </div>
+                  </div>
+                )}
+                {editEmail && (
+                  <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer">
+                    <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                      <Mail className="w-3.5 h-3.5 text-purple-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-muted-foreground">Email</p>
+                      <p className="text-sm font-medium truncate text-foreground">{editEmail}</p>
+                    </div>
+                  </div>
+                )}
+                {editCompany && (
+                  <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer">
+                    <div className="w-7 h-7 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="w-3.5 h-3.5 text-orange-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-muted-foreground">Empresa</p>
+                      <p className="text-sm font-medium text-foreground">{editCompany}</p>
+                    </div>
+                  </div>
+                )}
+                {leadDetails?.source && (
+                  <div className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
+                      <User className="w-3.5 h-3.5 text-cyan-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-muted-foreground">Origem</p>
+                      <p className="text-sm font-medium text-foreground">{leadDetails.source}</p>
+                    </div>
+                  </div>
+                )}
+                {!editPhone && !editEmail && !editCompany && !leadDetails?.source && (
+                  <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                    Nenhum detalhe disponível
+                  </div>
+                )}
+              </div>
+            </div>
 
-            {/* Notes */}
+            {/* Notes Card */}
             {editNotes && (
-              <div className="mt-4">
-                <h5 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                  Observações
-                </h5>
-                <div 
-                  className="rounded-lg p-3"
-                  style={{ backgroundColor: 'hsl(var(--muted))' }}
-                >
-                  <p className="text-sm leading-relaxed" style={{ color: 'hsl(var(--foreground))' }}>
-                    {editNotes}
-                  </p>
+              <div className="rounded-xl border border-border/60 overflow-hidden">
+                <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40">
+                  <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Observações
+                  </h5>
+                </div>
+                <div className="px-3 py-3 text-sm leading-relaxed text-foreground/80">
+                  {editNotes}
                 </div>
               </div>
             )}
 
-            {/* Schedules and Tasks List - After Notes */}
+            {/* Schedules Card */}
             {schedules.length > 0 && (
-              <div className="mt-4">
-                <h5 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                  Compromissos e Tarefas
-                </h5>
-                <div className="space-y-2">
+              <div className="rounded-xl border border-border/60 overflow-hidden">
+                <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40">
+                  <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Compromissos e Tarefas
+                  </h5>
+                </div>
+                <div className="divide-y divide-border/30">
                   {schedules.filter(s => s.status === 'pending').slice(0, 5).map((schedule: any) => (
-                    <div 
+                    <div
                       key={schedule.id}
-                      className="rounded-lg p-3 flex items-start gap-3"
-                      style={{ backgroundColor: 'hsl(var(--muted))' }}
+                      className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted/30 transition-colors"
                     >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        schedule.title?.startsWith('📋') 
-                          ? 'bg-blue-100 dark:bg-blue-900/30' 
-                          : 'bg-purple-100 dark:bg-purple-900/30'
-                      }`}>
-                        {schedule.title?.startsWith('📋') 
-                          ? <ListTodo className="w-4 h-4 text-blue-500" />
-                          : <Calendar className="w-4 h-4 text-purple-500" />
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${schedule.title?.startsWith('📋') ? 'bg-blue-500/10' : 'bg-purple-500/10'}`}>
+                        {schedule.title?.startsWith('📋')
+                          ? <ListTodo className="w-3.5 h-3.5 text-blue-500" />
+                          : <Calendar className="w-3.5 h-3.5 text-purple-500" />
                         }
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: 'hsl(var(--foreground))' }}>
+                        <p className="text-sm font-medium truncate text-foreground">
                           {schedule.title?.replace('📋 ', '')}
                         </p>
-                        <p className="text-xs flex items-center gap-1 mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                        <p className="text-[11px] flex items-center gap-1 mt-0.5 text-muted-foreground">
                           <Clock className="w-3 h-3" />
-                          {new Date(schedule.scheduled_at).toLocaleDateString('pt-BR', { 
-                            day: '2-digit', 
+                          {new Date(schedule.scheduled_at).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
                             month: '2-digit',
                             hour: '2-digit',
                             minute: '2-digit'
@@ -822,17 +732,16 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               </div>
             )}
 
+            {/* Divider before actions */}
+            <div className="border-t border-border/40" />
+
             {/* Action Buttons */}
-            <div className="mt-6 space-y-2">
+            <div className="mt-3 space-y-2">
               <button
                 onClick={() => setIsEditing(true)}
-                className="w-full py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 hover:opacity-90"
-                style={{
-                  backgroundColor: 'hsl(var(--primary))',
-                  color: 'hsl(var(--primary-foreground))'
-                }}
+                className="w-full py-2 rounded-lg text-xs font-medium transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-2 hover:opacity-90 bg-primary text-primary-foreground"
               >
-                <Edit2 className="w-4 h-4" />
+                <Edit2 className="w-3.5 h-3.5" />
                 Editar Contacto
               </button>
               
@@ -840,11 +749,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               <div className="relative">
                 <button
                   onClick={() => setShowActionMenu(!showActionMenu)}
-                  className="w-full py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 border hover:bg-gray-100 dark:hover:bg-gray-800"
-                  style={{
-                    borderColor: 'hsl(var(--border))',
-                    color: 'hsl(var(--foreground))'
-                  }}
+                  className="w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2 border border-border text-foreground hover:bg-muted/50"
                 >
                   <Calendar className="w-4 h-4" />
                   Ações Rápidas
@@ -852,25 +757,17 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 </button>
                 
                 {showActionMenu && (
-                  <div 
-                    className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border shadow-lg overflow-hidden z-10"
-                    style={{
-                      backgroundColor: 'hsl(var(--card))',
-                      borderColor: 'hsl(var(--border))'
-                    }}
-                  >
+                  <div className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-border shadow-lg bg-card overflow-hidden z-10">
                     <button
                       onClick={() => { setActiveAction('schedule'); setShowActionMenu(false); }}
-                      className="w-full px-4 py-3 flex items-center gap-3 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                      style={{ color: 'hsl(var(--foreground))' }}
+                      className="w-full px-4 py-3 flex items-center gap-3 text-sm text-foreground hover:bg-muted/50 transition-colors"
                     >
                       <Calendar className="w-4 h-4 text-purple-500" />
                       Agendar Reunião
                     </button>
                     <button
                       onClick={() => { setActiveAction('task'); setShowActionMenu(false); }}
-                      className="w-full px-4 py-3 flex items-center gap-3 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors border-t"
-                      style={{ color: 'hsl(var(--foreground))', borderColor: 'hsl(var(--border))' }}
+                      className="w-full px-4 py-3 flex items-center gap-3 text-sm text-foreground hover:bg-muted/50 transition-colors border-t border-border"
                     >
                       <ListTodo className="w-4 h-4 text-blue-500" />
                       Criar Tarefa
@@ -881,49 +778,35 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
 
               {/* Task Form */}
               {activeAction === 'task' && (
-                <div 
-                  className="rounded-lg border p-3 space-y-3"
-                  style={{ borderColor: 'hsl(var(--border))' }}
-                >
+                <div className="rounded-lg border border-border p-3 space-y-3">
                   <div className="flex items-center gap-2">
                     <ListTodo className="w-4 h-4 text-blue-500" />
-                    <span className="text-sm font-medium" style={{ color: 'hsl(var(--foreground))' }}>Nova Tarefa</span>
+                    <span className="text-sm font-medium text-foreground">Nova Tarefa</span>
                   </div>
                   <input
                     type="text"
                     value={taskTitle}
                     onChange={(e) => setTaskTitle(e.target.value)}
                     placeholder="Título da tarefa"
-                    className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-blue-500/30"
-                    style={{
-                      backgroundColor: 'hsl(var(--muted))',
-                      borderColor: 'hsl(var(--border))',
-                      color: 'hsl(var(--foreground))'
-                    }}
+                    className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-blue-500/30 transition-all duration-150"
                   />
                   <input
                     type="datetime-local"
                     value={taskDate}
                     onChange={(e) => setTaskDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-blue-500/30"
-                    style={{
-                      backgroundColor: 'hsl(var(--muted))',
-                      borderColor: 'hsl(var(--border))',
-                      color: 'hsl(var(--foreground))'
-                    }}
+                    className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-blue-500/30 transition-all duration-150"
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={() => setActiveAction(null)}
-                      className="flex-1 py-2 rounded-lg text-sm border hover:bg-gray-100 dark:hover:bg-gray-800"
-                      style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                      className="flex-1 py-2 rounded-lg text-sm border border-border text-foreground hover:bg-muted/50 transition-colors"
                     >
                       Cancelar
                     </button>
                     <button
                       onClick={handleCreateTask}
                       disabled={submittingAction || !taskTitle.trim() || !taskDate}
-                      className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
                     >
                       {submittingAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                       Criar
@@ -934,49 +817,35 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
 
               {/* Schedule Form */}
               {activeAction === 'schedule' && (
-                <div 
-                  className="rounded-lg border p-3 space-y-3"
-                  style={{ borderColor: 'hsl(var(--border))' }}
-                >
+                <div className="rounded-lg border border-border p-3 space-y-3">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-purple-500" />
-                    <span className="text-sm font-medium" style={{ color: 'hsl(var(--foreground))' }}>Novo Agendamento</span>
+                    <span className="text-sm font-medium text-foreground">Novo Agendamento</span>
                   </div>
                   <input
                     type="text"
                     value={scheduleTitle}
                     onChange={(e) => setScheduleTitle(e.target.value)}
                     placeholder="Título do agendamento"
-                    className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-purple-500/30"
-                    style={{
-                      backgroundColor: 'hsl(var(--muted))',
-                      borderColor: 'hsl(var(--border))',
-                      color: 'hsl(var(--foreground))'
-                    }}
+                    className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-purple-500/30 transition-all duration-150"
                   />
                   <input
                     type="datetime-local"
                     value={scheduleDate}
                     onChange={(e) => setScheduleDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-purple-500/30"
-                    style={{
-                      backgroundColor: 'hsl(var(--muted))',
-                      borderColor: 'hsl(var(--border))',
-                      color: 'hsl(var(--foreground))'
-                    }}
+                    className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-purple-500/30 transition-all duration-150"
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={() => setActiveAction(null)}
-                      className="flex-1 py-2 rounded-lg text-sm border hover:bg-gray-100 dark:hover:bg-gray-800"
-                      style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                      className="flex-1 py-2 rounded-lg text-sm border border-border text-foreground hover:bg-muted/50 transition-colors"
                     >
                       Cancelar
                     </button>
                     <button
                       onClick={handleCreateSchedule}
                       disabled={submittingAction || !scheduleTitle.trim() || !scheduleDate}
-                      className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-purple-500 hover:bg-purple-600 disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-purple-500 hover:bg-purple-600 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
                     >
                       {submittingAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
                       Agendar
@@ -991,4 +860,3 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
     </div>
   );
 }
-

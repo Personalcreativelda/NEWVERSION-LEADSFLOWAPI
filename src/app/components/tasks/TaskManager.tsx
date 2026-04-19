@@ -57,11 +57,11 @@ const TASK_TYPES = [
   { value: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, color: 'text-green-600' },
   { value: 'meeting', label: 'Reunião', icon: User, color: 'text-orange-600' },
   { value: 'follow-up', label: 'Follow-up', icon: Bell, color: 'text-pink-600' },
-  { value: 'other', label: 'Outro', icon: Circle, color: 'text-gray-700 dark:text-gray-300' },
+  { value: 'other', label: 'Outro', icon: Circle, color: 'text-foreground/80' },
 ];
 
 const PRIORITY_LEVELS = [
-  { value: 'low', label: 'Baixa', color: 'bg-gray-100 text-gray-700', dot: 'bg-gray-400' },
+  { value: 'low', label: 'Baixa', color: 'bg-muted text-foreground/80', dot: 'bg-muted-foreground/70' },
   { value: 'medium', label: 'Média', color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
   { value: 'high', label: 'Alta', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
   { value: 'urgent', label: 'Urgente', color: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
@@ -169,13 +169,8 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
     }));
   };
 
-  const handleDeleteTask = async (taskId: string) => {
-    const confirmed = await confirm('Tem certeza que deseja deletar esta tarefa?', {
-      title: 'Excluir tarefa',
-      confirmLabel: 'Excluir',
-      variant: 'danger',
-    });
-    if (confirmed) {
+  const handleDeleteTask = (taskId: string) => {
+    if (confirm('Tem certeza que deseja deletar esta tarefa?')) {
       setTasks(tasks.filter(t => t.id !== taskId));
       toast.success('Tarefa deletada');
     }
@@ -219,7 +214,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
         </div>
         <Button
           onClick={() => setShowNewTaskModal(true)}
-          className="gap-2 px-4 md:px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-sm shadow-[#2563EB]/15 transition flex-shrink-0"
+          className="gap-2 px-4 md:px-5 flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Nova Tarefa</span>
@@ -275,7 +270,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
       <Card className="p-4 bg-card border-border overflow-hidden">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="flex items-center gap-3">
-            <Filter className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0 hidden md:block" />
+            <Filter className="w-5 h-5 text-muted-foreground flex-shrink-0 hidden md:block" />
 
             <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
               {['all', 'today', 'overdue', 'upcoming', 'completed'].map(f => (
@@ -285,8 +280,8 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                   size="sm"
                   onClick={() => setFilter(f as any)}
                   className={`transition-colors flex-shrink-0 ${filter === f
-                    ? '!bg-blue-600 !text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted/50'
                     }`}
                 >
                   {f === 'all' && 'Todas'}
@@ -299,7 +294,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
             </div>
           </div>
 
-          <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-600" />
+          <div className="hidden md:block h-6 w-px bg-muted" />
 
           <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -369,7 +364,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                         <div className="flex items-center gap-2 mb-1">
                           <Icon className={`w-4 h-4 ${typeInfo.color}`} />
                           <h3
-                            className={`${isDark ? 'text-white' : 'text-gray-900'} ${task.status === 'completed' ? 'line-through' : ''
+                            className={`text-foreground ${task.status === 'completed' ? 'line-through' : ''
                               }`}
                           >
                             {task.title}
@@ -377,7 +372,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                         </div>
 
                         {task.description && (
-                          <p className={`text-sm ${isDark ? 'text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-300'} mb-2`}>
+                          <p className="text-sm text-foreground/80 mb-2">
                             {task.description}
                           </p>
                         )}
@@ -430,7 +425,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
 
       {/* Modal de Nova Tarefa */}
       <Dialog open={showNewTaskModal} onOpenChange={setShowNewTaskModal}>
-        <DialogContent className="max-w-2xl bg-card dark:bg-card border border-border shadow-2xl p-6">
+        <DialogContent className="max-w-2xl bg-card border border-border shadow-2xl p-6">
           <DialogHeader>
             <DialogTitle className="text-foreground dark:text-foreground">Nova Tarefa</DialogTitle>
             <DialogDescription className="text-muted-foreground dark:text-muted-foreground">
@@ -440,19 +435,19 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
 
           <div className="space-y-4 mt-4">
             <div>
-              <label className="text-sm mb-2 block text-foreground">
+              <label className="text-sm mb-2 block text-muted-foreground">
                 Título *
               </label>
               <Input
                 value={newTask.title}
                 onChange={e => setNewTask({ ...newTask, title: e.target.value })}
                 placeholder="Ex: Ligar para cliente..."
-                className="bg-background dark:bg-background text-foreground border-border focus:border-[#10B981] focus:ring-[#10B981]"
+                className="!bg-card !text-foreground !border-border"
               />
             </div>
 
             <div>
-              <label className="text-sm mb-2 block text-foreground">
+              <label className="text-sm mb-2 block text-muted-foreground">
                 Descrição
               </label>
               <Textarea
@@ -460,38 +455,38 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                 onChange={e => setNewTask({ ...newTask, description: e.target.value })}
                 placeholder="Detalhes da tarefa..."
                 rows={3}
-                className="bg-background dark:bg-background text-foreground border-border focus:border-[#10B981] focus:ring-[#10B981]"
+                className="!bg-card !text-foreground !border-border"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm mb-2 block text-foreground">
+                <label className="text-sm mb-2 block text-muted-foreground">
                   Tipo
                 </label>
                 <Select value={newTask.type} onValueChange={type => setNewTask({ ...newTask, type })}>
-                  <SelectTrigger className="bg-background dark:bg-background text-foreground border-border">
+                  <SelectTrigger className="bg-background text-foreground border-border">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-card dark:bg-card text-foreground border-border shadow-md max-h-[200px] z-[9999]">
+                  <SelectContent className="text-popover-foreground border-border shadow-md max-h-[200px] z-[9999]">
                     {TASK_TYPES.map(t => (
-                      <SelectItem key={t.value} value={t.value} className="text-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{t.label}</SelectItem>
+                      <SelectItem key={t.value} value={t.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{t.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
-                <label className="text-sm mb-2 block text-foreground">
+                <label className="text-sm mb-2 block text-muted-foreground">
                   Prioridade
                 </label>
                 <Select value={newTask.priority} onValueChange={priority => setNewTask({ ...newTask, priority })}>
-                  <SelectTrigger className="bg-background dark:bg-background text-foreground border-border">
+                  <SelectTrigger className="bg-background text-foreground border-border">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-card dark:bg-card text-foreground border-border shadow-md z-[9999]">
+                  <SelectContent className="text-popover-foreground border-border shadow-md z-[9999]">
                     {PRIORITY_LEVELS.map(p => (
-                      <SelectItem key={p.value} value={p.value} className="text-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{p.label}</SelectItem>
+                      <SelectItem key={p.value} value={p.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{p.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -499,20 +494,20 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
             </div>
 
             <div>
-              <label className="text-sm mb-2 block text-foreground">
-                Lead Relacionado (opcional)
+              <label className="text-sm mb-2 block text-muted-foreground">
+                Lead Relacionado
               </label>
               <Select
                 value={newTask.leadId || 'none'}
                 onValueChange={leadId => setNewTask({ ...newTask, leadId: leadId === 'none' ? '' : leadId })}
               >
-                <SelectTrigger className="bg-background dark:bg-background text-foreground border-border">
+                <SelectTrigger className="!bg-card !text-foreground !border-border">
                   <SelectValue placeholder="Selecione um lead..." />
                 </SelectTrigger>
-                <SelectContent className="bg-card dark:bg-card text-foreground border-border shadow-lg max-h-[200px] z-[9999]">
-                  <SelectItem value="none" className="cursor-pointer text-foreground focus:bg-accent focus:text-accent-foreground">Nenhum lead</SelectItem>
+                <SelectContent className="!bg-card border border-border shadow-lg max-h-[200px] z-[9999]">
+                  <SelectItem value="none" className="cursor-pointer !text-foreground hover:bg-muted focus:bg-muted">Nenhum lead</SelectItem>
                   {leads.filter(lead => lead.id).map(lead => (
-                    <SelectItem key={lead.id} value={lead.id} className="cursor-pointer text-foreground focus:bg-accent focus:text-accent-foreground">
+                    <SelectItem key={lead.id} value={lead.id} className="cursor-pointer !text-foreground hover:bg-muted focus:bg-muted">
                       {lead.nome} {lead.empresa ? `- ${lead.empresa}` : ''}
                     </SelectItem>
                   ))}
@@ -521,17 +516,17 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
             </div>
 
             <div>
-              <label className="text-sm mb-2 block text-foreground">
+              <label className="text-sm mb-2 block text-muted-foreground">
                 Data de Vencimento
               </label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start bg-background dark:bg-background text-foreground border-border hover:bg-muted font-normal text-left">
+                  <Button variant="outline" className="w-full justify-start !bg-card !text-foreground !border-border font-normal text-left">
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {format(newTask.dueDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-card dark:bg-card border-border shadow-lg z-[9999]">
+                <PopoverContent className="w-auto p-0 !bg-card border border-border shadow-lg z-[9999]">
                   <Calendar
                     mode="single"
                     selected={newTask.dueDate}

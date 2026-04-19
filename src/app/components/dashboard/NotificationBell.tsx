@@ -65,9 +65,9 @@ const notificationConfig: Record<NotificationType, NotificationConfig> = {
   },
   lead_removed: {
     icon: UserMinus,
-    color: 'text-gray-600 dark:text-gray-500 dark:text-gray-400',
+    color: 'text-muted-foreground',
     bgColor: 'bg-muted/80',
-    borderColor: 'border-gray-200/50 dark:border-gray-800/50',
+    borderColor: 'border-border/50',
   },
   lead_converted: {
     icon: PartyPopper,
@@ -77,9 +77,9 @@ const notificationConfig: Record<NotificationType, NotificationConfig> = {
   },
   lead_moved: {
     icon: TrendingUp,
-    color: 'text-purple-600 dark:text-purple-400',
-    bgColor: 'bg-purple-50/80 dark:bg-purple-950/30',
-    borderColor: 'border-purple-200/50 dark:border-purple-800/50',
+    color: 'text-primary',
+    bgColor: 'bg-primary/5',
+    borderColor: 'border-primary/20',
   },
   campaign_sent: {
     icon: CheckCircle2,
@@ -137,9 +137,9 @@ const notificationConfig: Record<NotificationType, NotificationConfig> = {
   },
   admin_plan_upgrade: {
     icon: TrendingUp,
-    color: 'text-purple-600 dark:text-purple-400',
-    bgColor: 'bg-purple-50/80 dark:bg-purple-950/30',
-    borderColor: 'border-purple-200/50 dark:border-purple-800/50',
+    color: 'text-primary',
+    bgColor: 'bg-primary/5',
+    borderColor: 'border-primary/20',
   },
   admin_payment_received: {
     icon: CreditCard,
@@ -663,4 +663,5 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
     </Popover>
   );
 }
+
 

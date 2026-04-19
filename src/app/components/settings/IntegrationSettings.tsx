@@ -223,8 +223,8 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
 
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-        <h3 className="text-gray-900 dark:text-gray-100 mb-6">Integrações Externas</h3>
+      <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+        <h3 className="text-foreground mb-6">Integrações Externas</h3>
 
         <div className="space-y-6">
           {/* HTTP Endpoint para receber leads */}
@@ -235,10 +235,10 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                   <Webhook className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg text-gray-900 dark:text-white mb-2">
+                  <h3 className="text-lg text-foreground mb-2">
                     HTTP Endpoint para Captura de Leads
                   </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  <p className="text-sm text-muted-foreground mb-4">
                     Use este endpoint para receber leads de integrações externas como N8N, Facebook Leads Ads, Google Ads, etc.
                   </p>
 
@@ -246,7 +246,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                     <Input
                       value={httpEndpoint || ''}
                       readOnly
-                      className="pr-24 font-mono text-sm !bg-white dark:!bg-gray-800 !text-gray-900 dark:!text-gray-100 !border-gray-200 dark:!border-gray-700"
+                      className="pr-24 font-mono text-sm !bg-card !text-foreground !border-border"
                     />
                     <Button
                       size="sm"
@@ -269,10 +269,10 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                   </div>
 
                   <div className="mt-4 bg-card rounded-lg p-4 border border-border">
-                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                    <p className="text-sm text-foreground/80 mb-2">
                       <strong>📋 Exemplo de requisição POST:</strong>
                     </p>
-                    <pre className="bg-gray-50 dark:bg-gray-900 p-3 rounded text-xs overflow-x-auto">
+                    <pre className="bg-muted/50 p-3 rounded text-xs overflow-x-auto">
                       {`{
   "nome": "João Silva",
   "email": "joao@email.com",
@@ -295,10 +295,10 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                   <Webhook className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg text-gray-900 dark:text-white mb-2">
+                  <h3 className="text-lg text-foreground mb-2">
                     HTTP Endpoint - Recurso Premium
                   </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     O endpoint HTTP para captura automática de leads está disponível apenas nos planos <strong>Business</strong> e <strong>Enterprise</strong>.
                   </p>
                   <Button className="mt-4" size="sm" onClick={onUpgrade}>
@@ -316,36 +316,36 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                 <Sheet className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                <h3 className="text-lg text-foreground mb-2 flex items-center gap-2">
                   Atualizar Lista de Leads - Google Sheets
                   <span className="px-2 py-0.5 text-xs bg-teal-500 text-white rounded-full">Todos os planos</span>
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                <p className="text-sm text-muted-foreground mb-4">
                   Configure um webhook N8N que retorna os dados do Google Sheets. Clique em "Atualizar" para sincronizar manualmente os leads
                 </p>
 
                 <div className="space-y-4">
                   {/* URL do Webhook */}
                   <div>
-                    <Label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block">
+                    <Label className="text-sm text-foreground/80 mb-2 block">
                       <strong>🔗 URL do Webhook N8N (GET)</strong>
                     </Label>
                     <Input
                       value={googleSheetsWebhook}
                       onChange={(e) => setGoogleSheetsWebhook(e.target.value)}
                       placeholder="https://seu-n8n.com/webhook/google-sheets"
-                      className="w-full font-mono text-sm !bg-white dark:!bg-gray-800 !text-gray-900 dark:!text-gray-100 !border-gray-200 dark:!border-gray-700"
+                      className="w-full font-mono text-sm !bg-card !text-foreground !border-border"
                     />
                   </div>
 
                   {/* Botão Atualizar */}
                   <div className="flex items-center justify-between bg-card rounded-lg p-4 border border-border">
                     <div>
-                      <p className="text-sm text-gray-700 dark:text-gray-300">
+                      <p className="text-sm text-foreground/80">
                         <strong>📊 Sincronizar Leads</strong>
                       </p>
                       {lastSyncDate && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           Última sincronização: {lastSyncDate}
                         </p>
                       )}
@@ -371,10 +371,10 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
 
                   {/* Como funciona */}
                   <div className="bg-card rounded-lg p-4 border border-border">
-                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                    <p className="text-sm text-foreground/80 mb-2">
                       <strong>🔄 Como configurar o webhook N8N:</strong>
                     </p>
-                    <ol className="text-xs text-gray-600 dark:text-gray-400 space-y-1.5 ml-4 list-decimal">
+                    <ol className="text-xs text-muted-foreground space-y-1.5 ml-4 list-decimal">
                       <li>Crie um workflow N8N com trigger "Webhook"</li>
                       <li>Adicione um nó "Google Sheets" para ler os dados</li>
                       <li>Formate os dados no formato JSON esperado (veja abaixo)</li>
@@ -386,10 +386,10 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
 
                   {/* Formato esperado */}
                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                    <p className="text-sm text-foreground/80 mb-2">
                       <strong>📋 Formato JSON que o webhook deve retornar:</strong>
                     </p>
-                    <pre className="bg-gray-50 dark:bg-gray-900 p-3 rounded text-xs overflow-x-auto">
+                    <pre className="bg-muted/50 p-3 rounded text-xs overflow-x-auto">
                       {`{
   "leads": [
     {
@@ -428,7 +428,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Facebook className="w-5 h-5 text-blue-600" />
-              <Label className="text-gray-700 dark:text-gray-300">Meta Pixel ID</Label>
+              <Label className="text-foreground/80">Meta Pixel ID</Label>
             </div>
             <Input
               value={metaPixelId}
@@ -436,7 +436,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
               placeholder="Ex: 1234567890123456"
               className="w-full"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground">
               Integre o Meta Pixel para rastrear conversões no Facebook e Instagram
             </p>
           </div>
@@ -445,7 +445,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-orange-600" />
-              <Label className="text-gray-700 dark:text-gray-300">Google Analytics ID</Label>
+              <Label className="text-foreground/80">Google Analytics ID</Label>
             </div>
             <Input
               value={googleAnalyticsId}
@@ -453,7 +453,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
               placeholder="Ex: G-XXXXXXXXXX ou UA-XXXXXXXXX"
               className="w-full"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground">
               Adicione o Google Analytics para rastrear o comportamento dos visitantes
             </p>
           </div>
@@ -463,7 +463,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
             <Button
               onClick={handleSave}
               disabled={loading}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+              className="bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
             >
               {loading ? (
                 <>

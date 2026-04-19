@@ -217,7 +217,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
                     <span>{phoneError}</span>
                   </p>
                 ) : (
-                  <p className="text-gray-700 dark:text-gray-300 text-xs mt-1">
+                  <p className="text-muted-foreground text-xs mt-1">
                     📱 Obrigatório incluir código do país (ex: 258 para Moçambique)
                   </p>
                 )}

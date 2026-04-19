@@ -33,7 +33,7 @@ export default function ThemeSelector({
   return (
     <button
       onClick={handleToggle}
-      className="relative p-2 rounded-lg transition-all duration-300 ease-in-out hover:bg-muted text-muted-foreground hover:text-purple-500 group"
+      className="relative p-2 rounded-lg transition-all duration-300 ease-in-out hover:bg-muted text-muted-foreground hover:text-primary group"
       title={themeMode === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
       aria-label={themeMode === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
     >

@@ -5,16 +5,13 @@ import { ChatBackground } from './ChatBackground';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import type { ConversationWithDetails, MessageWithSender } from '../../types/inbox';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface ChatPanelProps {
     conversation: ConversationWithDetails;
     onBack?: () => void;
     onEditLead?: () => void;
     onDeleteConversation?: () => void;
-    onClearConversation?: () => void;
-    onCloseConversation?: () => void;
-    onShowDetails?: () => void;
     // Props de mensagens do parent (useInbox com WebSocket)
     messages?: MessageWithSender[];
     messagesLoading?: boolean;
@@ -23,6 +20,10 @@ interface ChatPanelProps {
     messagesEndRef?: React.RefObject<HTMLDivElement>;
     onSendMessage?: (content: string, mediaUrl?: string, mediaType?: string) => Promise<void>;
     onSendAudio?: (audioBlob: Blob) => Promise<void>;
+    /** Optional layout control buttons rendered inside the chat header */
+    layoutControls?: React.ReactNode;
+    /** Ref to attach to the scroll container for position save/restore */
+    scrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function ChatPanel({
@@ -30,23 +31,19 @@ export function ChatPanel({
     onBack,
     onEditLead,
     onDeleteConversation,
-    onClearConversation,
-    onCloseConversation,
-    onShowDetails,
     messages: externalMessages,
     messagesLoading: externalMessagesLoading,
     messagesError: externalMessagesError,
     sending: externalSending,
     messagesEndRef: externalMessagesEndRef,
     onSendMessage,
-    onSendAudio
+    layoutControls,
+    onSendAudio,
+    scrollContainerRef
 }: ChatPanelProps) {
     const [isTyping, setIsTyping] = useState(false);
     const [searchHighlight, setSearchHighlight] = useState<string>('');
-    const [isDragging, setIsDragging] = useState(false);
-    const [droppedFile, setDroppedFile] = useState<File | null>(null);
     const internalEndRef = useRef<HTMLDivElement>(null);
-    const dragCounterRef = useRef(0);
 
     // Usar dados externos (do useInbox com WebSocket) se disponíveis
     const messages = externalMessages || [];
@@ -63,61 +60,10 @@ export function ChatPanel({
         setSearchHighlight(query);
     }, []);
 
-    const handleDragEnter = (e: React.DragEvent) => {
-        e.preventDefault();
-        dragCounterRef.current++;
-        if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-            setIsDragging(true);
-        }
-    };
-
-    const handleDragLeave = (e: React.DragEvent) => {
-        e.preventDefault();
-        dragCounterRef.current--;
-        if (dragCounterRef.current === 0) {
-            setIsDragging(false);
-        }
-    };
-
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-        dragCounterRef.current = 0;
-        const file = e.dataTransfer.files?.[0];
-        if (file) {
-            setDroppedFile(file);
-        }
-    };
-
     return (
         <div
-            className="flex flex-col h-full max-h-full relative overflow-hidden"
-            style={{ backgroundColor: 'hsl(var(--background))', height: '100%', maxHeight: '100%' }}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
+            className="flex flex-col h-full max-h-full relative overflow-hidden bg-background"
         >
-            {/* Drag & Drop Overlay */}
-            {isDragging && (
-                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 pointer-events-none"
-                    style={{ backgroundColor: 'hsl(var(--background) / 0.92)', backdropFilter: 'blur(4px)' }}
-                >
-                    <div className="w-24 h-24 rounded-full bg-blue-500/10 border-2 border-dashed border-blue-500 flex items-center justify-center">
-                        <Upload size={36} className="text-blue-500" />
-                    </div>
-                    <p className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                        Soltar para enviar
-                    </p>
-                    <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                        Imagens, vídeos, documentos e áudio
-                    </p>
-                </div>
-            )}
 
             {/* Header - Fixed */}
             <div className="flex-shrink-0">
@@ -126,21 +72,35 @@ export function ChatPanel({
                     onBack={onBack}
                     onEditLead={onEditLead}
                     onDeleteConversation={onDeleteConversation}
-                    onClearConversation={onClearConversation}
-                    onCloseConversation={onCloseConversation}
-                    onShowDetails={onShowDetails}
                     onSearchInChat={handleSearchInChat}
+                    layoutControls={layoutControls}
                 />
             </div>
 
             {/* Messages List - Scrollable with WhatsApp-like background */}
-            <ChatBackground className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-                <div className="px-4 py-6 space-y-1 flex flex-col-reverse min-h-full">
+            <ChatBackground scrollRef={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                <div className="px-4 sm:px-6 py-4 flex flex-col-reverse min-h-full">
                     <div ref={messagesEndRef} />
 
-                    {[...messages].reverse().map((message) => (
-                        <MessageBubble key={message.id} message={message} />
-                    ))}
+                    {(() => {
+                        const reversed = [...messages].reverse();
+                        return reversed.map((message, i) => {
+                            const prevMsg = reversed[i + 1]; // visually above
+                            const nextMsg = reversed[i - 1]; // visually below
+                            const isFirstInGroup = !prevMsg || prevMsg.direction !== message.direction;
+                            const isLastInGroup = !nextMsg || nextMsg.direction !== message.direction;
+                            const isGrouped = !isFirstInGroup || !isLastInGroup;
+                            return (
+                                <MessageBubble
+                                    key={message.id}
+                                    message={message}
+                                    isFirstInGroup={isFirstInGroup}
+                                    isLastInGroup={isLastInGroup}
+                                    isGrouped={isGrouped}
+                                />
+                            );
+                        });
+                    })()}
 
                     {messagesLoading && (
                         <div className="flex items-center justify-center py-10">
@@ -150,13 +110,9 @@ export function ChatPanel({
 
                     {!messagesLoading && messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center py-20 opacity-60">
-                            <div
-                                className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
-                                style={{ backgroundColor: 'hsl(var(--muted))' }}
-                            >
+                            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
                                 <svg
-                                    className="w-10 h-10"
-                                    style={{ color: 'hsl(var(--muted-foreground))' }}
+                                    className="w-10 h-10 text-muted-foreground"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -164,8 +120,8 @@ export function ChatPanel({
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
                             </div>
-                            <p className="text-sm font-semibold" style={{ color: 'hsl(var(--foreground))' }}>Nenhuma mensagem ainda</p>
-                            <p className="text-xs mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Envie a primeira mensagem para iniciar a conversa</p>
+                            <p className="text-sm font-semibold text-foreground">Nenhuma mensagem ainda</p>
+                            <p className="text-xs mt-1 text-muted-foreground">Envie a primeira mensagem para iniciar a conversa</p>
                         </div>
                     )}
 
@@ -179,19 +135,13 @@ export function ChatPanel({
 
             {/* Typing Indicator */}
             {isTyping && (
-                <div className="px-4 py-2 text-xs italic" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                <div className="px-4 py-2 text-xs italic text-muted-foreground">
                     Digitando...
                 </div>
             )}
 
             {/* Input Area - Fixed */}
-            <div
-                className="flex-shrink-0 p-3 border-t transition-colors"
-                style={{
-                    backgroundColor: 'hsl(var(--card))',
-                    borderColor: 'hsl(var(--border))'
-                }}
-            >
+            <div className="flex-shrink-0 p-3 border-t transition-colors bg-[#f0f2f5] border-[rgba(17,27,33,0.08)] dark:bg-[#202c33] dark:border-[rgba(233,237,239,0.08)]">
                 <MessageInput
                     onSendMessage={onSendMessage || (async () => {})}
                     onSendAudio={onSendAudio}
@@ -199,8 +149,6 @@ export function ChatPanel({
                     onTyping={handleTyping}
                     isSending={sending}
                     conversationId={conversation?.id}
-                    droppedFile={droppedFile}
-                    onDroppedFileProcessed={() => setDroppedFile(null)}
                 />
             </div>
         </div>

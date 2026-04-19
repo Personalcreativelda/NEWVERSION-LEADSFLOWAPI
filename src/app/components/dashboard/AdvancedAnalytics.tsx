@@ -449,7 +449,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                     </span>
                   </>
                 ) : (
-                  <span className="text-xs text-gray-600 dark:text-gray-400">Aguardando conversões</span>
+                  <span className="text-xs text-muted-foreground">Aguardando conversões</span>
                 )}
               </div>
             </div>
@@ -464,10 +464,10 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <Clock className="w-4 h-4 text-purple-600" />
+                <Clock className="w-4 h-4 text-primary" />
                 <p className="text-sm text-muted-foreground">Tempo Médio</p>
               </div>
-              <p className={`text-3xl mb-1 text-purple-600`}>
+              <p className={`text-3xl mb-1 text-primary`}>
                 {metrics.avgTimeInFunnel > 0
                   ? metrics.avgTimeInFunnel < 1
                     ? `${Math.round(metrics.avgTimeInFunnel * 24)}h`
@@ -490,12 +490,12 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                     </span>
                   </>
                 ) : (
-                  <span className="text-xs text-gray-600 dark:text-gray-400">Aguardando conversões</span>
+                  <span className="text-xs text-muted-foreground">Aguardando conversões</span>
                 )}
               </div>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-              <Clock className="w-6 h-6 text-purple-600" />
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Clock className="w-6 h-6 text-primary" />
             </div>
           </div>
         </Card>
@@ -603,7 +603,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
           </ResponsiveContainer>
 
           {/* Legenda Customizada - LIMPA E ORGANIZADA */}
-          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="mt-6 pt-4 border-t border-border">
             <div className="grid grid-cols-3 gap-x-4 gap-y-3">
               {conversionByStatus.map((entry, index) => (
                 <div key={`legend-${index}`} className="flex items-center gap-2">
@@ -681,7 +681,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  <span className="text-lg text-foreground">
                     {statusItem.count}
                   </span>
                   <Badge 
@@ -698,7 +698,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
               </div>
             ))}
 
-            <div className={`pt-4 mt-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="pt-4 mt-4 border-t border-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Users className="w-4 h-4 text-blue-600" />
@@ -706,7 +706,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                     Total de Leads
                   </span>
                 </div>
-                <span className={`text-xl ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <span className="text-xl text-foreground">
                   {metrics.total}
                 </span>
               </div>
@@ -722,10 +722,10 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
             <span className="text-2xl">💡</span>
           </div>
           <div className="flex-1">
-            <h3 className={`text-lg mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h3 className="text-lg mb-2 text-foreground">
               Insights e Recomendações
             </h3>
-            <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+            <ul className="space-y-2 text-sm text-foreground/80">
               <li className="flex items-start gap-2">
                 <span className="text-green-600 dark:text-green-400">✓</span>
                 <span>Sua taxa de conversão de {metrics.conversionRate}% está {parseFloat(metrics.conversionRate) > 20 ? 'acima' : 'abaixo'} da média do mercado (20%)</span>
@@ -751,4 +751,5 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
     </div>
   );
 }
+
 

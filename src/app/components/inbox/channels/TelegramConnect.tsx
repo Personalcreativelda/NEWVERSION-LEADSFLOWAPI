@@ -151,7 +151,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                     </div>
                     <button 
                         onClick={onClose}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
                     >
                         <span className="text-xl">×</span>
                     </button>
@@ -177,7 +177,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                         </p>
                                         <ol className="list-decimal list-inside space-y-1">
                                             <li>Abra o Telegram e pesquise por <strong>@BotFather</strong></li>
-                                            <li>Envie o comando <code className="px-1 py-0.5 rounded bg-gray-700">/newbot</code></li>
+                                            <li>Envie o comando <code className="px-1 py-0.5 rounded bg-muted">/newbot</code></li>
                                             <li>Siga as instruções para criar seu bot</li>
                                             <li>Copie o token gerado e cole abaixo</li>
                                         </ol>
@@ -243,7 +243,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                             <div className="flex gap-3">
                                 <button
                                     onClick={onClose}
-                                    className="flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    className="flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                     style={{ borderColor: 'hsl(var(--border))' }}
                                 >
                                     Cancelar

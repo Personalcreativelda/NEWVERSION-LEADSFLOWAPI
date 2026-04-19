@@ -52,8 +52,8 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-[#10B981] to-green-600 px-6 py-4 flex items-center justify-between text-white">
           <div>
@@ -73,15 +73,15 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
           {/* Pré-visualização no estilo WhatsApp */}
           {campaign.type === 'whatsapp' && (
             <div className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Pré-visualização WhatsApp</h3>
+              <h3 className="text-sm font-semibold text-foreground/80 uppercase tracking-wider mb-3">Pré-visualização WhatsApp</h3>
               <div className="bg-[#ECE5DD] rounded-lg p-4">
-                <div className="bg-white rounded-lg shadow-sm p-4 max-w-md">
+                <div className="bg-card rounded-lg shadow-sm p-4 max-w-md">
                   <div 
-                    className="text-gray-800 whitespace-pre-wrap"
+                    className="text-foreground whitespace-pre-wrap"
                     dangerouslySetInnerHTML={{ __html: formatMessage(message) }}
                   />
                   <div className="flex items-center justify-end gap-1 mt-2">
-                    <span className="text-xs text-gray-700 dark:text-gray-300">
+                    <span className="text-xs text-foreground/80">
                       {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     <i className="fas fa-check-double text-blue-500 text-xs"></i>
@@ -94,21 +94,21 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
           {/* Pré-visualização Email */}
           {campaign.type === 'email' && (
             <div className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Pré-visualização Email</h3>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-foreground/80 uppercase tracking-wider mb-3">Pré-visualização Email</h3>
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="bg-muted/50 border-b border-border px-4 py-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">De:</span>
-                    <span className="font-medium text-gray-900">noreply@leadsflow.com</span>
+                    <span className="text-foreground/80">De:</span>
+                    <span className="font-medium text-foreground">noreply@leadsflow.com</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm mt-1">
-                    <span className="text-gray-700 dark:text-gray-300">Assunto:</span>
-                    <span className="font-medium text-gray-900">{campaign.name}</span>
+                    <span className="text-foreground/80">Assunto:</span>
+                    <span className="font-medium text-foreground">{campaign.name}</span>
                   </div>
                 </div>
-                <div className="p-6 bg-white">
+                <div className="p-6 bg-card">
                   <div 
-                    className="text-gray-800 whitespace-pre-wrap"
+                    className="text-foreground whitespace-pre-wrap"
                     dangerouslySetInnerHTML={{ __html: formatMessage(message) }}
                   />
                 </div>
@@ -118,9 +118,9 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
 
           {/* Mensagem Raw */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Mensagem Original</h3>
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">{message}</pre>
+            <h3 className="text-sm font-semibold text-foreground/80 uppercase tracking-wider mb-3">Mensagem Original</h3>
+            <div className="bg-muted/50 rounded-lg p-4 border border-border">
+              <pre className="text-sm text-foreground/80 whitespace-pre-wrap font-mono">{message}</pre>
             </div>
           </div>
 
@@ -148,7 +148,7 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-4 flex items-center justify-end bg-gray-50">
+        <div className="border-t border-border px-6 py-4 flex items-center justify-end bg-muted/50">
           <Button onClick={onClose}>
             Fechar
           </Button>

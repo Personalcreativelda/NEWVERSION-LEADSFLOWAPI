@@ -17,6 +17,8 @@ export interface Translations {
   analytics: string;
   tasksFollowup: string;
   campaigns: string;
+  marketing: string;
+  remarketing: string;
   plan: string;
   integrations: string;
   security: string;
@@ -31,7 +33,10 @@ export interface Translations {
   unattended: string;
   inboxSettings: string;
   aiAssistants: string;
+  voiceAgents: string;
+  webhook: string;
   automations: string;
+  automationCategory: string;
   assistentesIA: string;
   regrasAutomacao: string;
   greeting: string;
@@ -91,12 +96,14 @@ export const translations: Record<Language, Translations> = {
     // Sidebar Navigation
     dashboard: 'Dashboard',
     leads: 'Leads',
-    contactos: 'Contactos',
+    contactos: 'Clientes',
     inbox: 'Caixa de Entrada',
     salesFunnel: 'Funil de Vendas',
-    analytics: 'Analytics',
-    tasksFollowup: 'Tarefas & Follow-up',
+    analytics: 'Relatórios',
+    tasksFollowup: 'Agendamentos',
     campaigns: 'Campanhas',
+    marketing: 'Marketing',
+    remarketing: 'Remarketing',
     assistants: 'Assistentes IA',
     plan: 'Plano',
     integrations: 'Integrações',
@@ -111,8 +118,11 @@ export const translations: Record<Language, Translations> = {
     mentions: 'Menções',
     unattended: 'Não atendidas',
     inboxSettings: 'Configurações',
-    aiAssistants: 'Assistentes IA',
+    aiAssistants: 'Assistentes Virtuais',
+    voiceAgents: 'Agentes de Voz',
+    webhook: 'Webhook',
     automations: 'Automação',
+    automationCategory: 'Automação',
     assistentesIA: 'Assistentes IA',
     regrasAutomacao: 'Automação',
     greeting: 'Olá',
@@ -171,12 +181,14 @@ export const translations: Record<Language, Translations> = {
     // Sidebar Navigation
     dashboard: 'Dashboard',
     leads: 'Leads',
-    contactos: 'Contacts',
+    contactos: 'Clients',
     inbox: 'Inbox',
     salesFunnel: 'Sales Funnel',
-    analytics: 'Analytics',
-    tasksFollowup: 'Tasks & Follow-up',
+    analytics: 'Reports',
+    tasksFollowup: 'Schedules',
     campaigns: 'Campaigns',
+    marketing: 'Marketing',
+    remarketing: 'Remarketing',
     plan: 'Plan',
     integrations: 'Integrations',
     security: 'Security',
@@ -190,8 +202,11 @@ export const translations: Record<Language, Translations> = {
     mentions: 'Mentions',
     unattended: 'Unattended',
     inboxSettings: 'Settings',
-    aiAssistants: 'AI Assistants',
+    aiAssistants: 'Virtual Assistants',
+    voiceAgents: 'Voice Agents',
+    webhook: 'Webhook',
     automations: 'Automation',
+    automationCategory: 'Automation',
     assistentesIA: 'AI Assistants',
     regrasAutomacao: 'Rules / Automation',
     greeting: 'Hello',
@@ -250,12 +265,14 @@ export const translations: Record<Language, Translations> = {
     // Sidebar Navigation
     dashboard: 'Panel de Control',
     leads: 'Prospectos',
-    contactos: 'Contactos',
+    contactos: 'Clientes',
     inbox: 'Bandeja de Entrada',
     salesFunnel: 'Embudo de Ventas',
-    analytics: 'Analítica',
-    tasksFollowup: 'Tareas y Seguimiento',
+    analytics: 'Informes',
+    tasksFollowup: 'Programaciones',
     campaigns: 'Campañas',
+    marketing: 'Marketing',
+    remarketing: 'Remarketing',
     plan: 'Plan',
     integrations: 'Integraciones',
     security: 'Seguridad',
@@ -268,8 +285,12 @@ export const translations: Record<Language, Translations> = {
     status: 'Estado',    mentions: 'Menciones',
     unattended: 'No atendidas',
     inboxSettings: 'Configuración',
-    aiAssistants: 'Asistentes IA',
-    automations: 'Automatización',    assistentesIA: 'Asistentes de IA',
+    aiAssistants: 'Asistentes Virtuales',
+    voiceAgents: 'Agentes de Voz',
+    webhook: 'Webhook',
+    automations: 'Automatización',
+    automationCategory: 'Automatización',
+    assistentesIA: 'Asistentes de IA',
     regrasAutomacao: 'Reglas / Automatización',
     greeting: 'Hola',
 
@@ -327,12 +348,14 @@ export const translations: Record<Language, Translations> = {
     // Sidebar Navigation
     dashboard: 'Tableau de Bord',
     leads: 'Prospects',
-    contactos: 'Contacts',
+    contactos: 'Clients',
     inbox: 'Boîte de Réception',
     salesFunnel: 'Entonnoir de Ventes',
-    analytics: 'Analytique',
-    tasksFollowup: 'Tâches et Suivi',
+    analytics: 'Rapports',
+    tasksFollowup: 'Planifications',
     campaigns: 'Campagnes',
+    marketing: 'Marketing',
+    remarketing: 'Remarketing',
     plan: 'Plan',
     integrations: 'Intégrations',
     security: 'Sécurité',
@@ -346,8 +369,11 @@ export const translations: Record<Language, Translations> = {
     mentions: 'Mentions',
     unattended: 'Non traités',
     inboxSettings: 'Paramètres',
-    aiAssistants: 'Assistants IA',
+    aiAssistants: 'Assistants Virtuels',
+    voiceAgents: 'Agents Vocaux',
+    webhook: 'Webhook',
     automations: 'Automatisation',
+    automationCategory: 'Automatisation',
     assistentesIA: 'Assistants IA',
     regrasAutomacao: 'Règles / Automatisation',
     greeting: 'Bonjour',

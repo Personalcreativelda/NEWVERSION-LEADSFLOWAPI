@@ -38,7 +38,7 @@ export function SatisfactionRating({ onRate }: SatisfactionRatingProps) {
   return (
     <div className="flex justify-center animate-fadeIn">
       <div className="bg-card border border-border rounded-2xl px-6 py-4 max-w-sm">
-        <p className="text-sm text-gray-900 dark:text-gray-100 font-medium text-center mb-4">
+        <p className="text-sm text-foreground font-medium text-center mb-4">
           Como foi o atendimento?
         </p>
         
@@ -63,7 +63,7 @@ export function SatisfactionRating({ onRate }: SatisfactionRatingProps) {
               
               {/* Label on hover */}
               {hoveredRating === rating && (
-                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-900 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded">
+                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-900 text-white text-xs px-2 py-1 rounded">
                   {label}
                 </div>
               )}

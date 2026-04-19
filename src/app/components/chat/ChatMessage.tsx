@@ -17,7 +17,7 @@ export function ChatMessage({ message, onRetry, onQuickReply }: ChatMessageProps
         {/* Avatar */}
         {isBot && (
           <div className="flex-shrink-0 mt-1">
-            <div className="bg-purple-600 p-1.5 rounded-full">
+            <div className="bg-primary p-1.5 rounded-full">
               <MessageCircle className="h-4 w-4 text-white" />
             </div>
           </div>
@@ -28,10 +28,10 @@ export function ChatMessage({ message, onRetry, onQuickReply }: ChatMessageProps
           <div
             className={`rounded-2xl px-4 py-2.5 ${
               isBot
-                ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-tl-none'
+                ? 'bg-muted text-foreground rounded-tl-none'
                 : hasError
                 ? 'bg-red-500 text-white rounded-tr-none'
-                : 'bg-purple-600 text-white rounded-tr-none'
+                : 'bg-primary text-primary-foreground rounded-tr-none'
             }`}
           >
             {/* Message Content */}
@@ -43,8 +43,8 @@ export function ChatMessage({ message, onRetry, onQuickReply }: ChatMessageProps
             <div
               className={`text-xs mt-1.5 flex items-center gap-2 ${
                 isBot
-                  ? 'text-gray-500 dark:text-gray-500 dark:text-gray-400'
-                  : 'text-purple-100'
+                  ? 'text-muted-foreground '
+                  : 'text-primary-foreground'
               }`}
             >
               <span>
@@ -89,7 +89,7 @@ export function ChatMessage({ message, onRetry, onQuickReply }: ChatMessageProps
                 <button
                   key={index}
                   onClick={() => onQuickReply(reply)}
-                  className="px-4 py-2.5 text-sm border border-border rounded-lg bg-card hover:bg-muted hover:border-purple-500 dark:hover:border-purple-400 transition-all text-left flex items-center gap-2 group"
+                  className="px-4 py-2.5 text-sm border border-border rounded-lg bg-card hover:bg-muted hover:border-primary transition-all text-left flex items-center gap-2 group"
                 >
                   <span>{reply.text}</span>
                   <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">→</span>
@@ -102,4 +102,5 @@ export function ChatMessage({ message, onRetry, onQuickReply }: ChatMessageProps
     </div>
   );
 }
+
 

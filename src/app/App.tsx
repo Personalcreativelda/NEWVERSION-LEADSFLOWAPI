@@ -4,8 +4,6 @@ import HeroSection from './components/HeroSection';
 import Features from './components/Features';
 import Analytics from './components/Analytics';
 import Pricing from './components/Pricing';
-import Testimonials from './components/Testimonials';
-import FAQ from './components/FAQ';
 import CTASection from './components/CTASection';
 import Footer from './components/Footer';
 import Dashboard from './components/Dashboard';
@@ -990,8 +988,6 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
             <Features />
             <Analytics />
             <Pricing onSelectPlan={() => setCurrentPage('signup')} />
-            <Testimonials />
-            <FAQ />
             <CTASection onGetStarted={() => setCurrentPage('signup')} />
           </main>
           <Footer />
@@ -1046,7 +1042,10 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
       {/* Admin Page */}
       {currentPage === 'admin' && (
-        <AdminPage />
+        <AdminPage
+          onBack={() => setCurrentPage('dashboard')}
+          adminEmail={user?.email}
+        />
       )}
 
       {/* Dashboard Page */}

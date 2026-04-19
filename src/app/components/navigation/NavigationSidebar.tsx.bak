@@ -1,0 +1,470 @@
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  X, Zap, UserCog, LogOut, ChevronDown, ChevronLeft, ChevronRight,
+  LayoutDashboard, Users, BarChart3, Megaphone, Settings
+} from 'lucide-react';
+import { Language, translations, Translations } from '../../utils/i18n';
+import { sidebarConfig, SidebarItemConfig } from '../../config/sidebarConfig';
+import SidebarGroup from './SidebarGroup';
+import InboxTreeMenu from './InboxTreeMenu';
+
+// Mapeamento de path para page id
+const pathToPageId: Record<string, string> = {
+  '/dashboard': 'dashboard',
+  '/dashboard/leads': 'leads',
+  '/dashboard/inbox': 'inbox',
+  '/dashboard/inbox/settings': 'inbox-settings',
+  '/dashboard/inbox/ai-assistants': 'ai-assistants',
+  '/dashboard/inbox/automations': 'automations',
+  '/dashboard/funnel': 'funnel',
+  '/dashboard/analytics': 'analytics',
+  '/dashboard/tasks': 'tasks',
+  '/dashboard/campaigns': 'campaigns',
+  '/dashboard/plan': 'plan',
+  '/dashboard/integrations': 'integrations',
+  '/dashboard/security': 'security',
+  '/dashboard/account': 'account',
+  '/admin': 'admin',
+};
+
+interface NavigationSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+  isDark: boolean;
+  onToggleTheme: () => void;
+  isMobile?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+  user: any;
+  language: Language;
+  onLogout?: () => void;
+  currentPage?: string;
+  onNavigate?: (page: string) => void;
+}
+
+export default function NavigationSidebar({
+  isOpen,
+  onClose,
+  isDark,
+  onToggleTheme,
+  isMobile = false,
+  isCollapsed = false,
+  onToggleCollapse,
+  user,
+  language,
+  onLogout,
+  currentPage = 'dashboard',
+  onNavigate,
+}: NavigationSidebarProps) {
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [adminExpanded, setAdminExpanded] = useState(currentPage === 'admin');
+  const [adminActiveSubTab, setAdminActiveSubTab] = useState<string>('');
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const adminSubItems = [
+    { id: 'dashboard', label: 'Metricas', icon: LayoutDashboard },
+    { id: 'users', label: 'Usuários', icon: Users },
+    { id: 'activity', label: 'Atividade', icon: BarChart3 },
+    { id: 'marketing', label: 'Marketing', icon: Megaphone },
+    { id: 'settings', label: 'Configurações', icon: Settings },
+  ];
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    if (profileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [profileMenuOpen]);
+
+  // Auto-expand admin tree when navigating to admin
+  useEffect(() => {
+    if (currentPage === 'admin') {
+      setAdminExpanded(true);
+    }
+  }, [currentPage]);
+
+  // Check if user is admin
+  const isAdmin = user?.isAdmin === true || user?.email === 'admin@leadflow.com';
+
+  const t = translations[language];
+
+  // Função de navegação que suporta query params opcionais
+  const handleItemClick = (pageId: string, queryParams?: Record<string, string>) => {
+    if (onNavigate) {
+      onNavigate(pageId);
+    }
+    
+    // Atualizar URL com query params se fornecidos
+    if (queryParams && Object.keys(queryParams).length > 0) {
+      const params = new URLSearchParams();
+      Object.entries(queryParams).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+      });
+      const queryString = params.toString();
+      const newUrl = queryString 
+        ? `/dashboard/${pageId}?${queryString}`
+        : `/dashboard/${pageId}`;
+      window.history.replaceState({}, '', newUrl);
+    } else if (pageId === 'inbox') {
+      // Limpar query params quando navegar para inbox sem filtros
+      window.history.replaceState({}, '', '/dashboard/inbox');
+    }
+    
+    if (isMobile) {
+      onClose();
+    }
+  };
+
+  const renderItem = (item: SidebarItemConfig) => {
+    const Icon = item.icon;
+    const pageId = pathToPageId[item.path] || item.id;
+    // Leaf items: only active if directly on this page, NOT if we're on a child page
+    const isActive = !item.children && currentPage === pageId;
+
+    if (item.children) {
+      // Check if any child is active OR if we're on an inbox-related page
+      const isAnyChildActive = currentPage === pageId || 
+                               item.children.some(child => currentPage === pathToPageId[child.path]) ||
+                               (item.id === 'inbox' && currentPage.startsWith('inbox'));
+      
+      // Special handling for Inbox - use InboxTreeMenu
+      if (item.id === 'inbox') {
+        return (
+          <React.Fragment key={item.id}>
+            <SidebarGroup
+              label={t[item.labelKey as keyof Translations]}
+              icon={Icon}
+              isActive={isAnyChildActive}
+              isCollapsed={isCollapsed}
+            >
+              <InboxTreeMenu
+                currentPage={currentPage}
+                onNavigate={handleItemClick}
+                isExpanded={true}
+                translations={t}
+              />
+            </SidebarGroup>
+          </React.Fragment>
+        );
+      }
+      
+      // Default handling for other groups
+      return (
+        <React.Fragment key={item.id}>
+          <SidebarGroup
+            label={t[item.labelKey as keyof Translations]}
+            icon={Icon}
+            isActive={isAnyChildActive}
+            isCollapsed={isCollapsed}
+          >
+            {item.children.map((child) => {
+              const childPageId = pathToPageId[child.path] || child.id;
+              const isChildActive = currentPage === childPageId;
+              return (
+                <li key={child.id}>
+                  <button
+                    onClick={() => handleItemClick(childPageId)}
+                    className={`sidebar-nav-subitem w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-75 group ${isChildActive ? 'active' : ''}`}
+                  >
+                    <div className={`sidebar-nav-bullet w-1.5 h-1.5 rounded-full transition-colors`} />
+                    <span className="text-sm font-medium">{t[child.labelKey as keyof Translations]}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </SidebarGroup>
+        </React.Fragment>
+      );
+    }
+
+    return (
+      <li
+        key={item.id}
+        className="relative"
+        onMouseEnter={() => setHoveredItem(item.id)}
+        onMouseLeave={() => setHoveredItem(null)}
+      >
+        <button
+          onClick={() => handleItemClick(pageId)}
+          title={isCollapsed ? t[item.labelKey as keyof Translations] : undefined}
+          className={`w-full flex items-center ${isCollapsed ? 'justify-center py-3' : 'gap-3 px-3 py-2.5'} rounded-lg transition-colors text-sm font-medium ${
+            isActive
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+              : ''
+          }`}
+          style={!isActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
+          onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'hsl(var(--sidebar-accent))'; e.currentTarget.style.color = 'hsl(var(--sidebar-foreground))'; } setHoveredItem(item.id); }}
+          onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'hsl(var(--sidebar-foreground) / 0.7)'; } setHoveredItem(null); }}
+        >
+          <Icon className="w-5 h-5 flex-shrink-0" />
+          {!isCollapsed && <span className="truncate">{t[item.labelKey as keyof Translations]}</span>}
+        </button>
+      </li>
+    );
+  };
+
+  // Sidebar-aware classes for non-active items
+  const sidebarItemClass = (active: boolean) =>
+    active
+      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+      : 'hover:bg-[hsl(var(--sidebar-accent))] text-[hsl(var(--sidebar-foreground)/0.7)] hover:text-[hsl(var(--sidebar-foreground))]';
+
+  return (
+    <>
+      {/* Overlay - APENAS NO MOBILE quando aberto */}
+      {isOpen && isMobile && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[900] transition-opacity duration-200"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar - SEMPRE VISÍVEL em desktop (>1024px), overlay em mobile */}
+      <aside
+        className={`flex flex-col transition-all duration-300 ease-in-out flex-shrink-0 ${
+          isMobile
+            ? `fixed top-0 left-0 z-[950] h-screen w-64 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`
+            : `fixed top-0 left-0 h-screen z-[100] ${isCollapsed ? 'w-[72px]' : 'w-64'}`
+        }`}
+        style={{
+          backgroundColor: 'hsl(var(--sidebar))',
+          color: 'hsl(var(--sidebar-foreground))',
+          borderRight: '1px solid hsl(var(--sidebar-border))'
+        }}
+      >
+        <div className="flex flex-col h-full">
+          {/* Logo LeadsFlow - NO TOPO DA SIDEBAR */}
+          <div className={`flex-shrink-0 flex items-center gap-3 px-4 py-5 min-h-[68px] ${isCollapsed ? 'justify-center' : ''}`} style={{ borderBottom: '1px solid hsl(var(--sidebar-border))' }}>
+            <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25 flex-shrink-0">
+              <Zap className="w-5 h-5 text-white" />
+            </div>
+            {!isCollapsed && (
+              <div className="overflow-hidden">
+                <p className="text-base font-bold leading-tight truncate" style={{ color: 'hsl(var(--sidebar-foreground))' }}>LeadsFlow</p>
+                <p className="text-[11px] truncate" style={{ color: 'hsl(var(--sidebar-muted))' }}>CRM & SaaS</p>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Header - Close Button - APENAS NO MOBILE */}
+          {isMobile && (
+            <div className="px-4 py-3 flex items-center justify-between lg:hidden" style={{ borderBottom: '1px solid hsl(var(--sidebar-border))' }}>
+              <h2 className="text-sm font-semibold" style={{ color: 'hsl(var(--sidebar-foreground))' }}>Menu</h2>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ color: 'hsl(var(--sidebar-muted))' }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+
+          {/* Navigation Items */}
+          <nav id="sidebar-navigation" className="flex-1 p-3 overflow-y-auto">
+            <ul className="space-y-1">
+              {sidebarConfig.map(renderItem)}
+
+              {/* Admin tree - Only visible for admins */}
+              {isAdmin && (
+                <li className="pt-1 mt-1 relative">
+                  {/* Admin parent button */}
+                  <button
+                    onClick={() => {
+                      if (isCollapsed) {
+                        handleItemClick('admin');
+                      } else {
+                        setAdminExpanded(e => !e);
+                      }
+                    }}
+                    title={isCollapsed ? (t.admin || 'Admin') : undefined}
+                    className={`w-full flex items-center ${isCollapsed ? 'justify-center py-3' : 'gap-3 px-3 py-2.5'} rounded-lg transition-colors text-sm font-medium ${
+                      currentPage === 'admin'
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                        : ''
+                    }`}
+                    style={currentPage !== 'admin' ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
+                  >
+                    <UserCog className="w-5 h-5 flex-shrink-0" />
+                    {!isCollapsed && <span className="flex-1 truncate text-left">{t.admin}</span>}
+                    {!isCollapsed && (
+                      <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${
+                        adminExpanded ? 'rotate-180' : ''
+                      }`} style={currentPage !== 'admin' ? { color: 'hsl(var(--sidebar-muted))' } : { color: 'white' }} />
+                    )}
+                  </button>
+
+                  {/* Admin sub-items tree */}
+                  {!isCollapsed && adminExpanded && (
+                    <ul className="mt-1 ml-3 pl-3 space-y-0.5" style={{ borderLeft: '2px solid hsl(var(--sidebar-border))' }}>
+                      {adminSubItems.map((sub) => {
+                        const SubIcon = sub.icon;
+                        const isSubActive = currentPage === 'admin' && adminActiveSubTab === sub.id;
+                        return (
+                          <li key={sub.id}>
+                            <button
+                              onClick={() => {
+                                sessionStorage.setItem('adminInitialTab', sub.id);
+                                setAdminActiveSubTab(sub.id);
+                                handleItemClick('admin');
+                                window.dispatchEvent(new CustomEvent('adminTabChange', { detail: sub.id }));
+                              }}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-sm ${
+                                isSubActive
+                                  ? 'bg-blue-600/20 text-blue-400 font-medium'
+                                  : ''
+                              }`}
+                              style={!isSubActive ? { color: 'hsl(var(--sidebar-foreground) / 0.6)' } : {}}
+                            >
+                              <SubIcon className="w-4 h-4 flex-shrink-0" />
+                              <span className="truncate">{sub.label}</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </li>
+              )}
+            </ul>
+          </nav>
+
+          {/* Footer Section */}
+          <div className="relative p-3" ref={profileMenuRef} style={{ borderTop: '1px solid hsl(var(--sidebar-border))' }}>
+            {/* Profile Dropdown Menu — only when expanded */}
+            {!isCollapsed && profileMenuOpen && (
+              <div
+                className="absolute bottom-full left-2 right-2 mb-2 rounded-xl shadow-2xl overflow-hidden z-[500]"
+                style={{
+                  backgroundColor: 'hsl(var(--sidebar))',
+                  border: '1px solid hsl(var(--sidebar-border))'
+                }}
+              >
+                {/* User info */}
+                <div className="px-4 py-3" style={{ borderBottom: '1px solid hsl(var(--sidebar-border))' }}>
+                  <p className="text-sm font-semibold truncate" style={{ color: 'hsl(var(--sidebar-foreground))' }}>
+                    {user?.name || 'Usuário'}
+                  </p>
+                  <p className="text-xs truncate mt-0.5" style={{ color: 'hsl(var(--sidebar-muted))' }}>
+                    {user?.email || ''}
+                  </p>
+                </div>
+                {/* Actions */}
+                <div className="p-1.5 space-y-0.5">
+                  <button
+                    onClick={() => { handleItemClick('account'); setProfileMenuOpen(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors hover:bg-white/10"
+                    style={{ color: 'hsl(var(--sidebar-foreground) / 0.8)' }}
+                  >
+                    <UserCog className="w-4 h-4 flex-shrink-0" />
+                    Configurações da Conta
+                  </button>
+                  {onLogout && (
+                    <button
+                      onClick={() => { onLogout(); setProfileMenuOpen(false); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors hover:bg-red-500/20"
+                      style={{ color: '#f87171' }}
+                    >
+                      <LogOut className="w-4 h-4 flex-shrink-0" />
+                      Sair
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {isCollapsed ? (
+              /* Collapsed: just show avatar, click goes to account */
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  onClick={() => handleItemClick('account')}
+                  className="relative focus:outline-none"
+                  title={user?.name || 'Minha Conta'}
+                >
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt={user?.name || 'User'} className="w-9 h-9 rounded-full object-cover shadow-lg" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#B794F6] to-[#5B9FED] flex items-center justify-center shadow-lg">
+                      <span className="text-white text-xs font-semibold">
+                        {user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
+                      </span>
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#00D9A3] rounded-full" style={{ border: '2px solid hsl(var(--sidebar))' }} />
+                </button>
+                {/* Collapse toggle below avatar */}
+                {!isMobile && onToggleCollapse && (
+                  <button
+                    onClick={onToggleCollapse}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-white/10"
+                    style={{ color: 'hsl(var(--sidebar-muted))' }}
+                    title="Expandir"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setProfileMenuOpen(o => !o)}
+                  className="flex-1 flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-white/10"
+                >
+                  {/* Avatar */}
+                  <div className="relative flex-shrink-0">
+                    {user?.avatar_url ? (
+                      <img src={user.avatar_url} alt={user?.name || 'User'} className="w-10 h-10 rounded-full object-cover shadow-lg" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#B794F6] to-[#5B9FED] flex items-center justify-center shadow-lg">
+                        <span className="text-white text-sm font-semibold">
+                          {user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
+                        </span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-[#00D9A3] rounded-full" style={{ border: '2px solid hsl(var(--sidebar))' }} />
+                  </div>
+                  {/* Name + Plan */}
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-sm font-medium truncate" style={{ color: 'hsl(var(--sidebar-foreground))' }}>
+                      {user?.name || 'Usuário'}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {(() => {
+                        const currentPlan = (user?.plan || user?.subscription_plan || 'free').toLowerCase();
+                        if (currentPlan === 'enterprise') return <span className="text-[#FFD700] text-sm" title="Plano Enterprise">👑</span>;
+                        if (currentPlan === 'business') return <span className="text-[#FFD700] text-sm" title="Plano Business">⭐</span>;
+                        return <span className="text-xs text-[#6B7280]" title="Plano Free">🆓</span>;
+                      })()}
+                      <p className={`text-[13px] font-semibold truncate ${(user?.plan || user?.subscription_plan) === 'enterprise' ? 'text-[#8B5CF6]' : 'text-[#6B7280]'}`}>
+                        {(user?.plan || user?.subscription_plan) === 'business' ? 'Business' :
+                          (user?.plan || user?.subscription_plan) === 'enterprise' ? 'Enterprise' : 'Free'}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+                {/* Collapse toggle button */}
+                {!isMobile && onToggleCollapse && (
+                  <button
+                    onClick={onToggleCollapse}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors flex-shrink-0 hover:bg-white/10"
+                    style={{ color: 'hsl(var(--sidebar-muted))' }}
+                    title="Recolher menu"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
+

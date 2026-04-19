@@ -175,7 +175,7 @@ export default function AccountSettingsPage({ user, onUpdateUser }: AccountSetti
                 className={`flex items-center gap-2 px-1 py-3 border-b-2 transition-colors whitespace-nowrap text-sm ${
                   activeTab === tab.id
                     ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    : 'border-transparent text-muted-foreground hover:text-foreground/80'
                 }`}
               >
                 <Icon className="w-4 h-4" />

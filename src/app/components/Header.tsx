@@ -28,8 +28,6 @@ export default function Header({ onLogin, onSignup }: HeaderProps) {
     { label: 'Início', href: '#inicio' },
     { label: 'Recursos', href: '#recursos' },
     { label: 'Planos', href: '#planos' },
-    { label: 'Depoimentos', href: '#depoimentos' },
-    { label: 'FAQ', href: '#faq' },
   ];
 
   return (
@@ -56,7 +54,7 @@ export default function Header({ onLogin, onSignup }: HeaderProps) {
               <a
                 key={item.label}
                 href={item.href}
-                className="text-gray-300 hover:text-white transition-colors text-sm font-medium"
+                className="text-foreground/80 hover:text-white transition-colors text-sm font-medium"
               >
                 {item.label}
               </a>
@@ -67,7 +65,7 @@ export default function Header({ onLogin, onSignup }: HeaderProps) {
           <div className="hidden lg:flex items-center gap-3">
             <Button 
               variant="ghost" 
-              className="text-gray-300 hover:text-white hover:bg-white/10"
+              className="text-foreground/80 hover:text-white hover:bg-white/10"
               onClick={onLogin}
             >
               <LogIn className="w-4 h-4 mr-2" />
@@ -84,7 +82,7 @@ export default function Header({ onLogin, onSignup }: HeaderProps) {
 
           {/* Mobile Menu Button */}
           <button
-            className="lg:hidden p-2 text-gray-300 hover:text-white"
+            className="lg:hidden p-2 text-foreground/80 hover:text-white"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-label="Toggle menu"
           >
@@ -98,22 +96,22 @@ export default function Header({ onLogin, onSignup }: HeaderProps) {
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden py-4 border-t border-gray-700 bg-card">
+          <div className="lg:hidden py-4 border-t border-border bg-card">
             <nav className="flex flex-col gap-4">
               {menuItems.map((item) => (
                 <a
                   key={item.label}
                   href={item.href}
-                  className="text-gray-300 hover:text-white transition-colors px-2 py-1"
+                  className="text-foreground/80 hover:text-white transition-colors px-2 py-1"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {item.label}
                 </a>
               ))}
-              <div className="flex flex-col gap-2 pt-4 border-t border-gray-700">
+              <div className="flex flex-col gap-2 pt-4 border-t border-border">
                 <Button 
                   variant="ghost" 
-                  className="text-gray-300 hover:text-white hover:bg-white/10 w-full"
+                  className="text-foreground/80 hover:text-white hover:bg-white/10 w-full"
                   onClick={onLogin}
                 >
                   <LogIn className="w-4 h-4 mr-2" />

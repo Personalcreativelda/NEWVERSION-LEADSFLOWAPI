@@ -1540,7 +1540,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const minTime = scheduleDate === minDate ? today.toTimeString().slice(0, 5) : '00:00';
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
       <div className="campaign-modal rounded-2xl shadow-lg w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
 
         {/* Header */}
@@ -1573,26 +1573,26 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
               {/* Nome da Campanha */}
               <div>
-                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                <Label className="text-sm font-medium text-foreground/80 mb-2 block">
                   Nome da Campanha *
                 </Label>
                 <Input
                   value={campaignName}
                   onChange={(e) => setCampaignName(e.target.value)}
                   placeholder="Ex: Promoção Black Friday"
-                  className="h-11 !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
+                  className="h-11 !bg-card !text-foreground dark:!text-foreground !border-border dark:!border-border"
                 />
               </div>
 
               {/* ✅ Seletor de Instância WhatsApp */}
               <div>
-                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                <Label className="text-sm font-medium text-foreground/80 mb-2 flex items-center gap-2">
                   <Smartphone className="w-4 h-4 text-green-600" />
                   Instância WhatsApp *
                 </Label>
                 {loadingChannels ? (
-                  <div className="h-11 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <span className="text-sm text-gray-500">Carregando instâncias...</span>
+                  <div className="h-11 flex items-center justify-center bg-muted/50 rounded-lg border border-border">
+                    <span className="text-sm text-muted-foreground">Carregando instâncias...</span>
                   </div>
                 ) : whatsappChannels.length === 0 ? (
                   <div className="h-11 flex items-center justify-center bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-700">
@@ -1604,7 +1604,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   <select
                     value={selectedChannel}
                     onChange={(e) => setSelectedChannel(e.target.value)}
-                    className="w-full h-11 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    className="w-full h-11 px-3 rounded-lg border border-border bg-card text-foreground focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                   >
                     {whatsappChannels.map((channel) => {
                       const credentials = typeof channel.credentials === 'string'
@@ -1645,9 +1645,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     <button
                       type="button"
                       onClick={() => setUseTemplate(v => !v)}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useTemplate ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useTemplate ? 'bg-blue-600' : 'bg-muted'}`}
                     >
-                      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${useTemplate ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                      <span className={`inline-block h-4 w-4 rounded-full bg-card shadow transform transition-transform ${useTemplate ? 'translate-x-4' : 'translate-x-0.5'}`} />
                     </button>
                   </div>
 
@@ -1661,7 +1661,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                           value={templateName}
                           onChange={e => setTemplateName(e.target.value)}
                           placeholder="ex: campaign_promo"
-                          className="h-9 text-sm !bg-white dark:!bg-white !text-gray-900 !border-blue-300"
+                          className="h-9 text-sm !bg-card !text-foreground !border-blue-300"
                         />
                       </div>
                       <div>
@@ -1671,7 +1671,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         <select
                           value={templateLanguage}
                           onChange={e => setTemplateLanguage(e.target.value)}
-                          className="w-full h-9 px-3 text-sm rounded-lg border border-blue-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
+                          className="w-full h-9 px-3 text-sm rounded-lg border border-blue-300 bg-card text-foreground focus:ring-2 focus:ring-blue-500"
                         >
                           <option value="pt_BR">Português (Brasil)</option>
                           <option value="en_US">English (US)</option>
@@ -1696,25 +1696,25 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                 </div>
               )}
 
-              <div className="border-t border-gray-200 dark:border-gray-700"></div>
+              <div className="border-t border-border"></div>
 
               {/* Mensagem com Preview */}
               <div>
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white mb-3 block">
+                <Label className="text-sm font-semibold text-foreground mb-3 block">
                   MENSAGEM *
                 </Label>
 
                 {/* Toolbar */}
-                <div className="flex gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-t-lg border border-gray-200 dark:border-gray-700 border-b-0 relative">
+                <div className="flex gap-2 p-2 bg-muted/50 rounded-t-lg border border-border border-b-0 relative">
                   {/* Dropdown de Variáveis */}
                   <div className="relative" ref={variableDropdownRef}>
                     <button
                       type="button"
                       onClick={() => setShowVariableDropdown(!showVariableDropdown)}
-                      className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors group"
+                      className="p-2 hover:bg-muted/50 rounded-md transition-colors group"
                       title="Inserir variável"
                     >
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white">
+                      <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">
                         {'{x}'}
                       </span>
                     </button>
@@ -1731,7 +1731,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                             key={variable.value}
                             type="button"
                             onClick={() => insertVariable(variable.value)}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                            className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 transition-colors first:rounded-t-lg last:rounded-b-lg"
                           >
                             {variable.label} <span className="text-blue-600 dark:text-blue-400 font-mono">{variable.value}</span>
                           </button>
@@ -1745,10 +1745,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     <button
                       type="button"
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                      className="p-2 hover:bg-muted/50 rounded-md transition-colors"
                       title="Emoji"
                     >
-                      <Smile className="w-4 h-4 text-gray-600 dark:text-gray-700 dark:text-gray-300" />
+                      <Smile className="w-4 h-4 text-muted-foreground" />
                     </button>
 
                     {showEmojiPicker && (
@@ -1761,26 +1761,26 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   <button
                     type="button"
                     onClick={() => applyFormatting('bold')}
-                    className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                    className="p-2 hover:bg-muted/50 rounded-md transition-colors"
                     title="Negrito (selecione o texto ou pressione para inserir)"
                   >
-                    <Bold className="w-4 h-4 text-gray-600 dark:text-gray-700 dark:text-gray-300" />
+                    <Bold className="w-4 h-4 text-muted-foreground" />
                   </button>
                   <button
                     type="button"
                     onClick={() => applyFormatting('italic')}
-                    className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                    className="p-2 hover:bg-muted/50 rounded-md transition-colors"
                     title="Itálico (selecione o texto ou pressione para inserir)"
                   >
-                    <Italic className="w-4 h-4 text-gray-600 dark:text-gray-700 dark:text-gray-300" />
+                    <Italic className="w-4 h-4 text-muted-foreground" />
                   </button>
                   <button
                     type="button"
                     onClick={() => applyFormatting('link')}
-                    className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                    className="p-2 hover:bg-muted/50 rounded-md transition-colors"
                     title="Link (selecione o texto)"
                   >
-                    <Link2 className="w-4 h-4 text-gray-600 dark:text-gray-700 dark:text-gray-300" />
+                    <Link2 className="w-4 h-4 text-muted-foreground" />
                   </button>
                 </div>
 
@@ -1793,14 +1793,14 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   onDragOver={handleEditorDragOver}
                   onDragLeave={handleEditorDragLeave}
                   placeholder="Digite sua mensagem aqui ou arraste variáveis...&#10;&#10;Use {name} para inserir o nome do lead"
-                  className={`min-h-[180px] rounded-t-none border-gray-200 dark:border-gray-700 focus:ring-[#25D366] focus:border-[#25D366] transition-all !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200 ${isDraggingOver ? 'border-[#25D366] bg-green-50 dark:bg-green-900/10 border-2' : ''
+                  className={`min-h-[180px] rounded-t-none border-border focus:ring-[#25D366] focus:border-[#25D366] transition-all !bg-card !text-foreground dark:!text-foreground !border-border dark:!border-border ${isDraggingOver ? 'border-[#25D366] bg-green-50 dark:bg-green-900/10 border-2' : ''
                     }`}
                   maxLength={4096}
                 />
 
                 {/* Variáveis como badges arrastáveis */}
                 <div className="mt-2 flex flex-wrap gap-2 items-center">
-                  <span className="text-xs text-gray-500 dark:text-gray-700 dark:text-gray-300">💡 Arraste ou clique:</span>
+                  <span className="text-xs text-muted-foreground">💡 Arraste ou clique:</span>
                   {[
                     { value: '{name}', label: 'Nome' },
                     { value: '{phone}', label: 'Telefone' },
@@ -1821,7 +1821,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                 </div>
 
                 {/* Contador */}
-                <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-700 dark:text-gray-300">
+                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                   <span>📝 {message.length} / 4096 caracteres</span>
                   {message.length > 1000 && (
                     <span className="text-amber-600 dark:text-amber-400">
@@ -1831,11 +1831,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 dark:border-gray-700"></div>
+              <div className="border-t border-border"></div>
 
               {/* Anexos */}
               <div>
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white mb-3 block">
+                <Label className="text-sm font-semibold text-foreground mb-3 block">
                   ANEXOS (Opcional)
                 </Label>
 
@@ -1900,7 +1900,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                 {attachments.length > 0 && (
                   <div className="mt-3 space-y-2">
                     {attachments.map((att, index) => (
-                      <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-800">
+                      <div key={index} className="border border-border rounded-lg p-3 bg-muted/50">
                         {/* ✅ Info do arquivo */}
                         <div className="flex items-center gap-3 mb-2">
                           <span className="text-xl">
@@ -1908,8 +1908,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               att.type.startsWith('video/') ? '🎥' : '📄'}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{att.name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-700 dark:text-gray-300">{formatFileSize(att.size)}</p>
+                            <p className="text-xs font-medium text-foreground/80 truncate">{att.name}</p>
+                            <p className="text-xs text-muted-foreground">{formatFileSize(att.size)}</p>
                           </div>
                           <button
                             type="button"
@@ -1923,7 +1923,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         {/* ✅ Campo de legenda para imagens e vídeos */}
                         {(att.type.startsWith('image/') || att.type.startsWith('video/')) && (
                           <div className="mt-2">
-                            <Label className="text-xs text-gray-700 dark:text-gray-300 mb-1 block">
+                            <Label className="text-xs text-foreground/80 mb-1 block">
                               💬 Legenda {att.type.startsWith('image/') ? 'da imagem' : 'do vídeo'} (opcional)
                             </Label>
                             <Textarea
@@ -1933,7 +1933,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               className="text-sm resize-none"
                               rows={2}
                             />
-                            <p className="text-xs text-gray-700 dark:text-gray-300 mt-1">
+                            <p className="text-xs text-foreground/80 mt-1">
                               💡 A legenda será exibida junto com {att.type.startsWith('image/') ? 'a imagem' : 'o vídeo'} (estilo WhatsApp)
                             </p>
                           </div>
@@ -1943,7 +1943,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   </div>
                 )}
 
-                <p className="text-xs text-gray-700 dark:text-gray-300 mt-2">
+                <p className="text-xs text-foreground/80 mt-2">
                   ⚠️ Limite: 16 MB • ✓ PDF, JPG, PNG, DOC, XLS, MP4, AVI
                 </p>
               </div>
@@ -1954,7 +1954,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
               {/* Preview em Tempo Real */}
               <div>
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white mb-3 block flex items-center gap-2">
+                <Label className="text-sm font-semibold text-foreground mb-3 block flex items-center gap-2">
                   <Eye className="w-4 h-4" />
                   PREVIEW EM TEMPO REAL
                 </Label>
@@ -1977,7 +1977,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         {att.caption && (
                           <div className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3">
                             <div
-                              className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap break-words"
+                              className="text-sm text-foreground whitespace-pre-wrap break-words"
                               dangerouslySetInnerHTML={{ __html: renderFormattedPreview(att.caption) }}
                               style={{
                                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -1985,7 +1985,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               }}
                             />
                             <div className="flex items-center justify-end gap-1 mt-2">
-                              <span className="text-xs text-gray-600 dark:text-gray-300">14:30</span>
+                              <span className="text-xs text-muted-foreground">14:30</span>
                               <Check className="w-3 h-3 text-blue-500" />
                             </div>
                           </div>
@@ -1994,7 +1994,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         {/* Se não tiver legenda, mostrar apenas checkmark */}
                         {!att.caption && (
                           <div className="flex items-center justify-end gap-1 p-2 bg-[#DCF8C6] dark:bg-[#005C4B]">
-                            <span className="text-xs text-gray-600 dark:text-gray-300">14:30</span>
+                            <span className="text-xs text-muted-foreground">14:30</span>
                             <Check className="w-3 h-3 text-blue-500" />
                           </div>
                         )}
@@ -2022,7 +2022,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         {att.caption && (
                           <div className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3">
                             <div
-                              className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap break-words"
+                              className="text-sm text-foreground whitespace-pre-wrap break-words"
                               dangerouslySetInnerHTML={{ __html: renderFormattedPreview(att.caption) }}
                               style={{
                                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -2030,7 +2030,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               }}
                             />
                             <div className="flex items-center justify-end gap-1 mt-2">
-                              <span className="text-xs text-gray-600 dark:text-gray-300">14:30</span>
+                              <span className="text-xs text-muted-foreground">14:30</span>
                               <Check className="w-3 h-3 text-blue-500" />
                             </div>
                           </div>
@@ -2039,7 +2039,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         {/* Se não tiver legenda, mostrar apenas checkmark */}
                         {!att.caption && (
                           <div className="flex items-center justify-end gap-1 p-2 bg-[#DCF8C6] dark:bg-[#005C4B]">
-                            <span className="text-xs text-gray-500 dark:text-gray-700 dark:text-gray-300">14:30</span>
+                            <span className="text-xs text-muted-foreground">14:30</span>
                             <Check className="w-3 h-3 text-blue-500" />
                           </div>
                         )}
@@ -2050,7 +2050,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     {message && (
                       <div className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3 rounded-lg shadow-sm">
                         <div
-                          className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap break-words"
+                          className="text-sm text-foreground whitespace-pre-wrap break-words"
                           dangerouslySetInnerHTML={{ __html: renderFormattedPreview(message) }}
                           style={{
                             fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -2058,7 +2058,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                           }}
                         />
                         <div className="flex items-center justify-end gap-1 mt-2">
-                          <span className="text-xs text-gray-600 dark:text-gray-300">14:31</span>
+                          <span className="text-xs text-muted-foreground">14:31</span>
                           <Check className="w-3 h-3 text-blue-500" />
                         </div>
                       </div>
@@ -2067,12 +2067,12 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     {/* ✅ ARQUIVOS (documentos, PDFs, etc - NÃO imagem nem vídeo) */}
                     {attachments.filter(att => !att.type.startsWith('image/') && !att.type.startsWith('video/')).map((att, i) => (
                       <div key={i} className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3 rounded-lg shadow-sm">
-                        <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-white bg-white/50 dark:bg-black/20 p-2 rounded">
+                        <div className="flex items-center gap-2 text-sm text-foreground bg-white/50 dark:bg-black/20 p-2 rounded">
                           📄
                           <span className="truncate font-medium">{att.name}</span>
                         </div>
                         <div className="flex items-center justify-end gap-1 mt-2">
-                          <span className="text-xs text-gray-600 dark:text-gray-300">14:32</span>
+                          <span className="text-xs text-muted-foreground">14:32</span>
                           <Check className="w-3 h-3 text-blue-500" />
                         </div>
                       </div>
@@ -2081,24 +2081,24 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     {/* ✅ PLACEHOLDER quando não há conteúdo */}
                     {!message && attachments.length === 0 && (
                       <div className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3 rounded-lg shadow-sm">
-                        <p className="text-sm text-gray-500 dark:text-gray-300 italic">Digite uma mensagem ou adicione uma imagem...</p>
+                        <p className="text-sm text-muted-foreground italic">Digite uma mensagem ou adicione uma imagem...</p>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 dark:border-gray-700"></div>
+              <div className="border-t border-border"></div>
 
               {/* Destinatários */}
               <div>
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white mb-3 block">
+                <Label className="text-sm font-semibold text-foreground mb-3 block">
                   DESTINATÁRIOS *
                 </Label>
 
                 <div className="space-y-2">
                   {/* Todos */}
-                  <label className="flex items-center gap-3 p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-[#25D366] cursor-pointer transition-colors">
+                  <label className="flex items-center gap-3 p-2 rounded-lg border border-border hover:border-[#25D366] cursor-pointer transition-colors">
                     <input
                       type="radio"
                       name="recipient"
@@ -2106,14 +2106,14 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                       onChange={() => setRecipientMode('all')}
                       className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
                     />
-                    <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">
+                    <span className="flex-1 text-sm text-foreground/80">
                       Todos ({leads.length})
                     </span>
                   </label>
 
                   {/* Segmentos */}
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <label className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <label className="flex items-center gap-3 p-2 hover:bg-muted/50 cursor-pointer transition-colors">
                       <input
                         type="radio"
                         name="recipient"
@@ -2121,13 +2121,13 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         onChange={() => setRecipientMode('segments')}
                         className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
                       />
-                      <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">
+                      <span className="flex-1 text-sm text-foreground/80">
                         Filtrar por segmentos
                       </span>
                     </label>
 
                     {recipientMode === 'segments' && (
-                      <div className="px-2 pb-2 space-y-1 bg-gray-50 dark:bg-gray-800/50">
+                      <div className="px-2 pb-2 space-y-1 bg-muted/50">
                         {Object.entries(statusCounts).map(([status, count]) => (
                           <label key={status} className="flex items-center gap-2 pl-7 py-1">
                             <input
@@ -2142,7 +2142,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               }}
                               className="w-3 h-3 text-[#25D366] focus:ring-[#25D366] rounded"
                             />
-                            <span className="text-xs text-gray-700 dark:text-gray-300">
+                            <span className="text-xs text-foreground/80">
                               {statusLabels[status] || status} ({count})
                             </span>
                           </label>
@@ -2152,8 +2152,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   </div>
 
                   {/* Lista personalizada */}
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <label className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <label className="flex items-center gap-3 p-2 hover:bg-muted/50 cursor-pointer transition-colors">
                       <input
                         type="radio"
                         name="recipient"
@@ -2161,13 +2161,13 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         onChange={() => setRecipientMode('custom')}
                         className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
                       />
-                      <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">
+                      <span className="flex-1 text-sm text-foreground/80">
                         Lista personalizada
                       </span>
                     </label>
 
                     {recipientMode === 'custom' && (
-                      <div className="px-2 pb-2 bg-gray-50 dark:bg-gray-800/50">
+                      <div className="px-2 pb-2 bg-muted/50">
                         <Textarea
                           value={customNumbers}
                           onChange={(e) => setCustomNumbers(e.target.value)}
@@ -2188,16 +2188,16 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 dark:border-gray-700"></div>
+              <div className="border-t border-border"></div>
 
               {/* Agendamento */}
               <div>
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white mb-3 block">
+                <Label className="text-sm font-semibold text-foreground mb-3 block">
                   AGENDAMENTO
                 </Label>
 
                 <div className="space-y-2">
-                  <label className="flex items-center gap-3 p-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-[#25D366] cursor-pointer transition-colors">
+                  <label className="flex items-center gap-3 p-2 rounded-lg border border-border hover:border-[#25D366] cursor-pointer transition-colors">
                     <input
                       type="radio"
                       name="schedule"
@@ -2205,13 +2205,13 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                       onChange={() => setScheduleMode('now')}
                       className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
                     />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                    <span className="text-sm text-foreground/80">
                       ✅ Enviar agora
                     </span>
                   </label>
 
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <label className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <label className="flex items-center gap-3 p-2 hover:bg-muted/50 cursor-pointer transition-colors">
                       <input
                         type="radio"
                         name="schedule"
@@ -2219,16 +2219,16 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         onChange={() => setScheduleMode('scheduled')}
                         className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
                       />
-                      <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">
+                      <span className="flex-1 text-sm text-foreground/80">
                         📅 Agendar envio
                       </span>
                     </label>
 
                     {scheduleMode === 'scheduled' && (
-                      <div className="px-2 pb-2 bg-gray-50 dark:bg-gray-800/50">
+                      <div className="px-2 pb-2 bg-muted/50">
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div>
-                            <Label className="text-xs text-gray-700 dark:text-gray-300 mb-1 block">
+                            <Label className="text-xs text-foreground/80 mb-1 block">
                               📅 Data
                             </Label>
                             <Input
@@ -2236,11 +2236,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               value={scheduleDate}
                               onChange={(e) => setScheduleDate(e.target.value)}
                               min={minDate}
-                              className="h-9 text-sm !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
+                              className="h-9 text-sm !bg-card !text-foreground dark:!text-foreground !border-border dark:!border-border"
                             />
                           </div>
                           <div>
-                            <Label className="text-xs text-gray-700 dark:text-gray-300 mb-1 block">
+                            <Label className="text-xs text-foreground/80 mb-1 block">
                               ⏰ Hora
                             </Label>
                             <Input
@@ -2248,7 +2248,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               value={scheduleTime}
                               onChange={(e) => setScheduleTime(e.target.value)}
                               min={scheduleDate === minDate ? minTime : undefined}
-                              className="h-9 text-sm !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
+                              className="h-9 text-sm !bg-card !text-foreground dark:!text-foreground !border-border dark:!border-border"
                             />
                           </div>
                         </div>
@@ -2263,34 +2263,34 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 dark:border-gray-700"></div>
+              <div className="border-t border-border"></div>
 
               {/* Configurações Avançadas */}
               <div>
                 <button
                   type="button"
                   onClick={() => setAdvancedOpen(!advancedOpen)}
-                  className="w-full flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  className="w-full flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <Settings className="w-4 h-4 text-gray-600 dark:text-gray-700 dark:text-gray-300" />
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <Settings className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-semibold text-foreground">
                       Configurações Avançadas
                     </span>
                   </div>
                   {advancedOpen ? (
-                    <ChevronUp className="w-4 h-4 text-gray-600 dark:text-gray-700 dark:text-gray-300" />
+                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-600 dark:text-gray-700 dark:text-gray-300" />
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
                   )}
                 </button>
 
                 {advancedOpen && (
-                  <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-3">
+                  <div className="mt-2 p-3 bg-muted/50 rounded-lg space-y-3">
 
                     {/* Velocidade */}
                     <div>
-                      <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
+                      <Label className="text-xs font-medium text-foreground/80 mb-1 block">
                         Velocidade de Envio
                       </Label>
                       <div className="space-y-1">
@@ -2299,7 +2299,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                           { value: 'normal', label: 'Normal (~3.5/min)', desc: 'Conta com actividade regular' },
                           { value: 'fast', label: 'Rápido (~5.5/min)', desc: '⚠️ Risco moderado de ban' },
                         ].map(({ value, label, desc }) => (
-                          <label key={value} className="flex items-start gap-2 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+                          <label key={value} className="flex items-start gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer transition-colors">
                             <input
                               type="radio"
                               name="speed"
@@ -2308,8 +2308,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               className="w-3 h-3 mt-0.5 text-[#25D366] focus:ring-[#25D366]"
                             />
                             <div className="flex-1">
-                              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{label}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-700 dark:text-gray-300">{desc}</p>
+                              <p className="text-xs font-medium text-foreground/80">{label}</p>
+                              <p className="text-xs text-muted-foreground">{desc}</p>
                             </div>
                           </label>
                         ))}
@@ -2330,26 +2330,26 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                             onChange={(e) => onChange(e.target.checked)}
                             className="w-3 h-3 text-[#25D366] focus:ring-[#25D366] rounded"
                           />
-                          <span className="text-xs text-gray-600 dark:text-gray-700 dark:text-gray-300">{label}</span>
+                          <span className="text-xs text-muted-foreground">{label}</span>
                         </label>
                       ))}
                     </div>
 
                     {randomDelay && (
                       <div>
-                        <Label className="text-xs text-gray-700 dark:text-gray-300 mb-1 block">
+                        <Label className="text-xs text-foreground/80 mb-1 block">
                           Intervalo entre mensagens (segundos)
                         </Label>
                         <div className="flex items-center gap-2">
                           <Input type="number" value={minDelay} onChange={(e) => setMinDelay(e.target.value)} min="6" max="300" className="w-16 h-8 text-sm" />
-                          <span className="text-xs text-gray-600 dark:text-gray-700 dark:text-gray-300">a</span>
+                          <span className="text-xs text-muted-foreground">a</span>
                           <Input type="number" value={maxDelay} onChange={(e) => setMaxDelay(e.target.value)} min="6" max="300" className="w-16 h-8 text-sm" />
                         </div>
                         <p className="text-[10px] text-orange-500 mt-1">Mínimo recomendado: 15s. Valores abaixo de 6s aumentam risco de ban.</p>
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 pt-2 border-t border-gray-200 dark:border-gray-600">
+                    <div className="flex items-center gap-2 text-xs text-foreground/80 pt-2 border-t border-border">
                       <Clock className="w-3 h-3" />
                       <span>Tempo estimado: {getEstimatedTime()}</span>
                     </div>

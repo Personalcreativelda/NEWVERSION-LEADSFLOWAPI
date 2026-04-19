@@ -288,12 +288,7 @@ export default function InboxAutomations() {
 
   // Delete webhook
   const handleDelete = async (webhook: UserWebhook) => {
-    const confirmed = await confirm(`Deseja realmente excluir o webhook "${webhook.name}"?`, {
-      title: 'Excluir webhook',
-      confirmLabel: 'Excluir',
-      variant: 'danger',
-    });
-    if (!confirmed) return;
+    if (!confirm(`Deseja realmente excluir o webhook "${webhook.name}"?`)) return;
 
     try {
       setActionLoading(webhook.id);
@@ -363,7 +358,7 @@ export default function InboxAutomations() {
             resetForm();
             setCreateModalOpen(true);
           }}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+          className="bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
         >
           <Plus className="w-4 h-4 mr-2" />
           Novo Webhook
@@ -417,10 +412,10 @@ export default function InboxAutomations() {
                   <div className="flex items-center gap-3 mb-2">
                     <div
                       className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        webhook.is_active ? 'bg-purple-500/10' : 'bg-gray-500/10'
+                        webhook.is_active ? 'bg-purple-500/10' : 'bg-muted-foreground/10'
                       }`}
                     >
-                      <Webhook className={`w-5 h-5 ${webhook.is_active ? 'text-purple-500' : 'text-gray-500'}`} />
+                      <Webhook className={`w-5 h-5 ${webhook.is_active ? 'text-purple-500' : 'text-muted-foreground'}`} />
                     </div>
                     <div>
                       <h3 className="font-semibold flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
@@ -553,7 +548,7 @@ export default function InboxAutomations() {
 
       {/* Create/Edit Modal */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div
             className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl"
             style={{
@@ -621,7 +616,7 @@ export default function InboxAutomations() {
                 </p>
 
                 {Object.entries((eventsData || STATIC_EVENTS).categories).map(([category, events]) => {
-                  const config = CATEGORY_CONFIG[category] || { color: 'text-gray-500', bgColor: 'bg-gray-500/10', label: category };
+                  const config = CATEGORY_CONFIG[category] || { color: 'text-muted-foreground', bgColor: 'bg-muted-foreground/10', label: category };
                   const categoryEventKeys = events.map(e => e.event);
                   const allSelected = categoryEventKeys.every(e => formData.events.includes(e));
                   const someSelected = categoryEventKeys.some(e => formData.events.includes(e));
@@ -840,7 +835,7 @@ export default function InboxAutomations() {
               <Button
                 onClick={handleSave}
                 disabled={actionLoading === 'save'}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+                className="bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
               >
                 {actionLoading === 'save' ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -856,7 +851,7 @@ export default function InboxAutomations() {
 
       {/* Logs Modal */}
       {logsModalOpen && selectedWebhook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div
             className="w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col"
             style={{

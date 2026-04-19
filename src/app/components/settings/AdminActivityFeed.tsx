@@ -19,8 +19,16 @@ interface ActivityItem {
   user_name?: string;
 }
 
+interface UserInfo {
+  id: string;
+  email: string;
+  name: string;
+  avatar_url?: string;
+}
+
 interface AdminActivityFeedProps {
   activities: ActivityItem[];
+  users?: UserInfo[];
   loading?: boolean;
 }
 
@@ -65,12 +73,30 @@ const getFeatureInfo = (activity: ActivityItem): FeatureInfo => {
   return { icon: <Activity className="w-4 h-4" />, iconColorClass: 'text-slate-400', badgeColorClass: 'bg-muted text-muted-foreground border-border/50', label: 'Geral' };
 };
 
-export default function AdminActivityFeed({ activities, loading }: AdminActivityFeedProps) {
+// Remove duplicates by user_id, description, and within 2 minutes window
+function dedupeActivities(activities: ActivityItem[]) {
+  const seen = new Map<string, number>(); // key -> last timestamp (ms)
+  return activities.filter((a) => {
+    const key = `${a.user_id}|${a.description}`;
+    const ts = new Date(a.created_at).getTime();
+    if (seen.has(key)) {
+      const lastTs = seen.get(key)!;
+      // If within 2 minutes (120000 ms), skip
+      if (Math.abs(ts - lastTs) < 120000) return false;
+    }
+    seen.set(key, ts);
+    return true;
+  });
+}
+
+export default function AdminActivityFeed({ activities, users = [], loading }: AdminActivityFeedProps) {
+  // Remove duplicates
+  const filtered = dedupeActivities(activities);
   if (loading) {
     return (
       <div className="space-y-4 animate-pulse">
         {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="flex gap-4 p-4 rounded-xl border border-border/50 bg-muted/20">
+          <div key={i} className="flex gap-4 p-4 rounded-xl border border-border bg-muted/50">
             <div className="w-10 h-10 rounded-full bg-muted" />
             <div className="flex-1 space-y-2">
               <div className="h-4 bg-muted rounded w-1/4" />
@@ -82,10 +108,10 @@ export default function AdminActivityFeed({ activities, loading }: AdminActivity
     );
   }
 
-  if (activities.length === 0) {
+  if (filtered.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4">
+        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
           <Info className="w-8 h-8 text-muted-foreground" />
         </div>
         <h3 className="text-lg font-medium text-foreground">Nenhuma atividade recente</h3>
@@ -97,57 +123,108 @@ export default function AdminActivityFeed({ activities, loading }: AdminActivity
   }
 
   return (
-    <div className="space-y-4">
-      {activities.map((activity) => {
-        const fi = getFeatureInfo(activity);
-        const pathLabel = activity.metadata?.path
-          ? activity.metadata.path.replace(/\/api\//, '/').replace(/\/$/, '') 
-          : null;
-        return (
-          <div
-            key={activity.id}
-            className="group flex gap-4 p-4 rounded-xl border border-border/50 bg-card hover:bg-muted/30 transition-all duration-200"
-          >
-            <div className="flex-shrink-0">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center border bg-muted/30 border-border/50 ${fi.iconColorClass}`}>
-                {fi.icon}
-              </div>
-            </div>
+    <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border bg-muted">
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Usuário
+              </th>
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Módulo
+              </th>
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Atividade
+              </th>
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Endpoint
+              </th>
+              <th className="px-6 py-3.5 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Quando
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border bg-card">
+            {filtered.map((activity) => {
+              const fi = getFeatureInfo(activity);
+              const pathLabel = activity.metadata?.path
+                ? activity.metadata.path.replace(/\/api\//, '/').replace(/\/$/, '')
+                : null;
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-foreground truncate">
-                    {activity.user_name || activity.user_email?.split('@')[0] || 'Usuário'}
-                  </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${fi.badgeColorClass}`}>
-                    {fi.label}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
-                  <Clock className="w-3.5 h-3.5" />
-                  {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true, locale: ptBR })}
-                </div>
-              </div>
+              // Find user info by user_id
+              const user = users.find(u => u.id === activity.user_id);
+              const userName = user?.name || activity.user_name || user?.email?.split('@')[0] || activity.user_email?.split('@')[0] || 'Usuário';
+              const userEmail = user?.email || activity.user_email || '';
+              const avatarUrl = activity.avatar_url || user?.avatar_url;
+              const initials = userName.split(' ').length >= 2
+                ? (userName.split(' ')[0][0] + userName.split(' ')[1][0]).toUpperCase()
+                : userName.substring(0, 2).toUpperCase();
 
-              <p className="text-sm text-foreground/80 font-medium mb-1.5">
-                {activity.description}
-              </p>
-
-              {pathLabel && (
-                <div className="flex items-center gap-1 text-[11px] text-muted-foreground/70 font-mono bg-muted/40 px-2 py-0.5 rounded w-fit max-w-full overflow-hidden">
-                  <span className="truncate">{pathLabel}</span>
-                  {activity.metadata?.method && (
-                    <span className="ml-1 text-[10px] uppercase font-bold tracking-wider text-muted-foreground/50">
-                      [{activity.metadata.method}]
+              return (
+                <tr key={activity.id} className="hover:bg-muted/50 transition-colors">
+                  {/* User */}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt={userName}
+                          className="w-10 h-10 rounded-full object-cover border border-border"
+                          onError={e => { e.currentTarget.style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border bg-muted border-border ${fi.iconColorClass}`}> 
+                          <span className="text-sm font-semibold">{initials}</span>
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-medium text-foreground">{userName}</p>
+                        <p className="text-sm text-muted-foreground">{userEmail}</p>
+                      </div>
+                    </div>
+                  </td>
+                  {/* Module badge */}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-md border font-medium ${fi.badgeColorClass}`}>
+                      {fi.icon}
+                      {fi.label}
                     </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
+                  </td>
+                  {/* Activity description */}
+                  <td className="px-6 py-4">
+                    <p className="text-sm text-foreground/80 font-medium truncate max-w-[280px]">
+                      {activity.description}
+                    </p>
+                  </td>
+                  {/* Endpoint */}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {pathLabel ? (
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded w-fit max-w-[200px] overflow-hidden">
+                        <span className="truncate">{pathLabel}</span>
+                        {activity.metadata?.method && (
+                          <span className="ml-1 text-[10px] uppercase font-bold tracking-wider text-muted-foreground/70">
+                            [{activity.metadata.method}]
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  {/* Time */}
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5" />
+                      {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true, locale: ptBR })}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

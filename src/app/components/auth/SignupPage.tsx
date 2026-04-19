@@ -120,17 +120,17 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
                 {isConfirmation ? 'Confirme seu email' : 'Conta Criada!'}
               </h2>
               {isConfirmation ? (
-                <div className="space-y-3 text-sm text-gray-400">
+                <div className="space-y-3 text-sm text-muted-foreground/70">
                   <p>Verifique seu email para confirmar a conta antes de acessar o painel.</p>
                   {pendingEmail && (
-                    <p className="text-gray-300">
+                    <p className="text-foreground/80">
                       Enviamos o link para <span className="text-white font-medium">{pendingEmail}</span>.
                     </p>
                   )}
                   <p>Se não encontrar o email, verifique a pasta de spam ou promoções.</p>
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-muted-foreground/70">
                   Bem-vindo ao LeadFlow CRM. Redirecionando para o painel...
                 </p>
               )}
@@ -155,7 +155,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
                   }}
                   disabled={!pendingEmail || resendState === 'loading'}
                   variant="outline"
-                  className="w-full py-3 bg-transparent border border-[#2a2a2a] text-gray-300 hover:bg-[#1a1a1a] rounded-xl"
+                  className="w-full py-3 bg-transparent border border-[#2a2a2a] text-foreground/80 hover:bg-[#1a1a1a] rounded-xl"
                 >
                   {resendState === 'loading' ? 'Reenviando...' : 'Reenviar email de confirmação'}
                 </Button>
@@ -179,7 +179,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
                     setResendState('idle');
                     setResendMessage('');
                   }}
-                  className="text-sm text-gray-500 hover:text-gray-300"
+                  className="text-sm text-muted-foreground hover:text-foreground"
                 >
                   Voltar e tentar outro email
                 </button>
@@ -227,7 +227,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
             Comece a Crescer Hoje,<br />
             Transforme seu Negócio
           </h2>
-          <p className="text-gray-400 text-lg max-w-md">
+            <p className="text-muted-foreground/70 text-lg max-w-md">
             Junte-se a milhares de empresas gerenciando seus leads de forma eficiente
           </p>
 
@@ -254,7 +254,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
             </div>
 
             <h1 className="text-white text-3xl sm:text-4xl font-semibold mb-3">Criar uma conta</h1>
-            <p className="text-gray-400 text-sm sm:text-base">
+            <p className="text-muted-foreground/70 text-sm sm:text-base">
               Já tem uma conta?{' '}
               <button
                 onClick={onSwitchToLogin}
@@ -277,7 +277,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
           <form onSubmit={handleEmailSignup} className="space-y-5 mb-6">
             {/* Email Field */}
             <div>
-              <Label htmlFor="email" className="text-sm text-gray-300 mb-2 block">
+              <Label htmlFor="email" className="text-sm text-foreground/80 mb-2 block">
                 Email
               </Label>
               <Input
@@ -286,14 +286,14 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
                 placeholder="seu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-[#1a1a1a] border-[#2a2a2a] text-white placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-[#00C48C] focus:border-[#00C48C]"
+                className="w-full px-4 py-3 bg-[#1a1a1a] border-[#2a2a2a] text-white placeholder:text-muted-foreground rounded-xl focus:ring-2 focus:ring-[#00C48C] focus:border-[#00C48C]"
                 required
               />
             </div>
 
             {/* Company Name Field */}
             <div>
-              <Label htmlFor="name" className="text-sm text-gray-300 mb-2 block">
+              <Label htmlFor="name" className="text-sm text-foreground/80 mb-2 block">
                 Nome da Empresa
               </Label>
               <Input
@@ -302,14 +302,14 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
                 placeholder="Nome da sua empresa"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 bg-[#1a1a1a] border-[#2a2a2a] text-white placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-[#00C48C] focus:border-[#00C48C]"
+                className="w-full px-4 py-3 bg-[#1a1a1a] border-[#2a2a2a] text-white placeholder:text-muted-foreground rounded-xl focus:ring-2 focus:ring-[#00C48C] focus:border-[#00C48C]"
                 required
               />
             </div>
 
             {/* Password Field */}
             <div>
-              <Label htmlFor="password" className="text-sm text-gray-300 mb-2 block">
+              <Label htmlFor="password" className="text-sm text-foreground/80 mb-2 block">
                 Senha
               </Label>
               <div className="relative">
@@ -319,12 +319,12 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
                   placeholder="Mínimo 6 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 pr-12 bg-[#1a1a1a] border-[#2a2a2a] text-white placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-[#00C48C] focus:border-[#00C48C]"
+                  className="w-full px-4 py-3 pr-12 bg-[#1a1a1a] border-[#2a2a2a] text-white placeholder:text-muted-foreground rounded-xl focus:ring-2 focus:ring-[#00C48C] focus:border-[#00C48C]"
                   required
                 />
                 <button
                   type="button"
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-400"
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -339,9 +339,9 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
                 id="terms"
                 checked={agreeTerms}
                 onChange={(e) => setAgreeTerms(e.target.checked)}
-                className="mt-1 w-4 h-4 border-gray-600 rounded bg-[#1a1a1a] text-[#00C48C] focus:ring-[#00C48C]"
+                className="mt-1 w-4 h-4 border-border rounded bg-[#1a1a1a] text-[#00C48C] focus:ring-[#00C48C]"
               />
-              <label htmlFor="terms" className="text-sm text-gray-400">
+              <label htmlFor="terms" className="text-sm text-muted-foreground/70">
                 Eu concordo com os{' '}
                 <a href="#terms" className="text-[#00C48C] hover:text-[#00a576] underline">
                   Termos e Condições
@@ -365,7 +365,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin, onBackToHome }:
               <div className="w-full border-t border-[#2a2a2a]"></div>
             </div>
             <div className="relative flex justify-center">
-              <span className="px-4 bg-[#0a0a0a] text-sm text-gray-500">ou registre-se com</span>
+              <span className="px-4 bg-[#0a0a0a] text-sm text-muted-foreground">ou registre-se com</span>
             </div>
           </div>
 

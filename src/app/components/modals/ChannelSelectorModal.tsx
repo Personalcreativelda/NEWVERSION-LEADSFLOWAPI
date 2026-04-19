@@ -49,7 +49,7 @@ export default function ChannelSelectorModal({ isOpen, onClose, onSelectChannel 
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 animate-in fade-in duration-200">
       <div className="surface-default border border-border rounded-xl sm:rounded-2xl shadow-xl max-w-4xl w-full mx-auto overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 max-h-[95vh] overflow-y-auto">
         {/* Header */}
         <div className="relative px-4 sm:px-8 py-4 sm:py-6 border-b border-border surface-muted">

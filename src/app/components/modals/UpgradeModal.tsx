@@ -143,7 +143,7 @@ export default function UpgradeModal({
 
 
   const planConfig = {
-    free: { icon: Zap, color: 'text-gray-500 dark:text-muted-foreground', bg: 'bg-gray-100 dark:bg-muted' },
+    free: { icon: Zap, color: 'text-muted-foreground', bg: 'bg-muted' },
     business: { icon: Rocket, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
     enterprise: { icon: Crown, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-100 dark:bg-purple-900/30' },
   };
@@ -193,10 +193,10 @@ export default function UpgradeModal({
           </div>
 
           {/* Scrollable cards area */}
-          <div className="flex-1 overflow-y-auto px-4 pb-4 min-h-0">
+          <div className="flex-1 overflow-y-auto px-6 pb-6 min-h-0">
 
             {/* Desktop grid */}
-            <div className="hidden sm:grid sm:grid-cols-3 gap-4 pt-5">
+            <div className="hidden sm:grid sm:grid-cols-3 gap-5 pt-5">
               {plans.map((plan) => {
                 const isCurrentPlan = plan.id === currentPlan;
                 const isBestValue = plan.id === 'business';
@@ -262,8 +262,8 @@ export default function UpgradeModal({
                         disabled={isCurrentPlan || loading}
                         className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition-all ${
                           isCurrentPlan
-                            ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                            : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600'
+                            ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-60'
+                            : 'bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150'
                         }`}
                       >
                         {loading && selectedPlan === plan.id ? (
@@ -359,7 +359,7 @@ export default function UpgradeModal({
                         className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition-all ${
                           isCurrentPlan
                             ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
-                            : 'bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600'
+                            : 'bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150'
                         }`}
                       >
                         {loading && selectedPlan === plan.id ? (
@@ -389,7 +389,7 @@ export default function UpgradeModal({
           </div>
 
           {/* Footer */}
-          <div className="flex-shrink-0 border-t border-border px-4 py-3">
+          <div className="flex-shrink-0 border-t border-border px-6 py-3">
             <div className="flex flex-wrap items-center justify-center gap-5 text-muted-foreground text-xs">
               <span>✓ No hidden fees</span>
               <span>✓ Cancel anytime</span>

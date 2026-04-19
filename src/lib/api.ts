@@ -128,6 +128,22 @@ class ApiClient {
       this.request(`/api/campaigns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   };
 
+  remarketing = {
+    list: () => this.request<any[]>('/api/remarketing'),
+    get: (id: string) => this.request<any>(`/api/remarketing/${id}`),
+    analytics: () => this.request<any>('/api/remarketing/analytics'),
+    create: (data: any) =>
+      this.request<any>('/api/remarketing', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) =>
+      this.request<any>(`/api/remarketing/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    toggle: (id: string) =>
+      this.request<any>(`/api/remarketing/${id}/toggle`, { method: 'PATCH' }),
+    duplicate: (id: string) =>
+      this.request<any>(`/api/remarketing/${id}/duplicate`, { method: 'POST' }),
+    delete: (id: string) =>
+      this.request<void>(`/api/remarketing/${id}`, { method: 'DELETE' }),
+  };
+
   messages = {
     list: (params?: Record<string, string | number | boolean | null | undefined>) =>
       this.request(`/api/messages${this.buildQuery(params)}`),

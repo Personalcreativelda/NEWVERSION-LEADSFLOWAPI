@@ -41,6 +41,13 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          border: "hsl(var(--sidebar-border))",
+          muted: "hsl(var(--sidebar-muted))",
+        },
         // Override gray para cinza neutro (sem tom azulado)
         gray: {
           50: '#fafafa',

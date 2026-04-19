@@ -24,8 +24,7 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
             enabled: true,
             auto_respond: true,
             max_tokens: 500,
-            temperature: 0.7,
-            monthly_message_limit: 200
+            temperature: 0.7
         }
     });
 
@@ -86,7 +85,7 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                         onChange={e => setFormData({ ...formData, name: e.target.value })}
                         required
                         placeholder="Ex: Atendente Nível 1"
-                        className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder-gray-400"
+                        className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder-muted-foreground"
                         style={{ 
                             backgroundColor: 'hsl(var(--background))',
                             borderColor: 'hsl(var(--border))',
@@ -105,7 +104,7 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
               flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all
               ${formData.mode === 'llm'
                                 ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20'
-                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}
+                                : 'border-border hover:border-border '}
             `}>
                             <input
                                 type="radio"
@@ -115,8 +114,8 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                             />
                             <div className="text-2xl">🧠</div>
                             <div>
-                                <div className="font-semibold text-gray-900 dark:text-white">Inteligência Artificial</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Gemini, GPT ou Claude</div>
+                                <div className="font-semibold text-foreground">Inteligência Artificial</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">Gemini, GPT ou Claude</div>
                             </div>
                         </label>
 
@@ -124,7 +123,7 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
               flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all
               ${formData.mode === 'webhook'
                                 ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20'
-                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}
+                                : 'border-border hover:border-border '}
             `}>
                             <input
                                 type="radio"
@@ -134,8 +133,8 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                             />
                             <div className="text-2xl">🔗</div>
                             <div>
-                                <div className="font-semibold text-gray-900 dark:text-white">Webhook Externo</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">n8n, Typebot, Zapier</div>
+                                <div className="font-semibold text-foreground">Webhook Externo</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">n8n, Typebot, Zapier</div>
                             </div>
                         </label>
                     </div>
@@ -151,55 +150,47 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                         }}
                     >
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-medium text-foreground/80 mb-1">
                                 Provedor de IA
                             </label>
                             <select
                                 value={formData.llm_provider}
                                 onChange={e => setFormData({ ...formData, llm_provider: e.target.value as any })}
-                                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none"
+                                className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:ring-2 focus:ring-purple-500 outline-none"
                             >
                                 <option value="gemini">Google Gemini (Recomendado)</option>
                                 <option value="openai">OpenAI (GPT-4/3.5)</option>
                                 <option value="anthropic">Anthropic (Claude)</option>
                             </select>
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                A IA é fornecida pela plataforma — não é necessária chave própria.
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-foreground/80 mb-1">
+                                API Key
+                            </label>
+                            <input
+                                type="password"
+                                value={formData.llm_api_key || ''}
+                                onChange={e => setFormData({ ...formData, llm_api_key: e.target.value })}
+                                placeholder="sk-..."
+                                className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:ring-2 focus:ring-purple-500 outline-none placeholder-muted-foreground"
+                            />
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Sua chave será armazenada de forma segura e criptografada.
                             </p>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label className="block text-sm font-medium text-foreground/80 mb-1">
                                 System Prompt (Instruções)
                             </label>
                             <textarea
                                 value={formData.llm_system_prompt}
                                 onChange={e => setFormData({ ...formData, llm_system_prompt: e.target.value })}
                                 rows={6}
-                                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none placeholder-gray-400 resize-y"
+                                className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:ring-2 focus:ring-purple-500 outline-none placeholder-muted-foreground resize-y"
                                 placeholder="Ex: Você é um assistente da LeadFlow. Seja educado, breve e tente agendar uma reunião..."
                             />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Limite de mensagens por mês
-                            </label>
-                            <input
-                                type="number"
-                                min={10}
-                                max={10000}
-                                value={formData.settings?.monthly_message_limit ?? 200}
-                                onChange={e => setFormData({
-                                    ...formData,
-                                    settings: { ...formData.settings, monthly_message_limit: Number(e.target.value) }
-                                })}
-                                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none"
-                            />
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                O assistente para de responder automaticamente ao atingir este limite mensal. 
-                                <span className="text-purple-500 font-medium"> Faça upgrade do plano para aumentar o limite.</span>
-                            </p>
                         </div>
                     </div>
                 )}
@@ -213,7 +204,7 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                             borderColor: 'hsl(var(--border))'
                         }}
                     >
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <label className="block text-sm font-medium text-foreground/80 mb-1">
                             URL do Webhook
                         </label>
                         <input
@@ -221,9 +212,9 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                             value={formData.webhook_url || ''}
                             onChange={e => setFormData({ ...formData, webhook_url: e.target.value })}
                             placeholder="https://sua-instancia.n8n.cloud/webhook/..."
-                            className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none placeholder-gray-400"
+                            className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:ring-2 focus:ring-purple-500 outline-none placeholder-muted-foreground"
                         />
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-muted-foreground">
                             O payload será enviado via POST para esta URL contendo os dados da mensagem.
                         </p>
                     </div>
@@ -231,13 +222,13 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
 
                 {/* Canal */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-foreground/80 mb-1">
                         Canal Vinculado
                     </label>
                     <select
                         value={formData.channel_id || ''}
                         onChange={e => setFormData({ ...formData, channel_id: e.target.value === '' ? null : e.target.value })}
-                        className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none"
+                        className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:ring-2 focus:ring-purple-500 outline-none"
                     >
                         <option value="">Todos os canais</option>
                         {channels.map(channel => (
@@ -246,7 +237,7 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                             </option>
                         ))}
                     </select>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs text-muted-foreground">
                         Deixe em "Todos os canais" para responder a qualquer mensagem recebida.
                     </p>
                 </div>
@@ -256,7 +247,7 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="px-6 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
+                        className="px-6 py-2 rounded-lg border border-border text-muted-foreground hover:bg-muted/50 font-medium transition-colors"
                     >
                         Cancelar
                     </button>

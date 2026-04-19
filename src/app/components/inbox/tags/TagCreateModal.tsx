@@ -60,7 +60,7 @@ export default function TagCreateModal({ onClose, onCreate }: TagCreateModalProp
                     </h2>
                     <button
                         onClick={onClose}
-                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                        className="p-1 hover:bg-muted rounded-md transition-colors"
                     >
                         <X className="w-5 h-5" />
                     </button>

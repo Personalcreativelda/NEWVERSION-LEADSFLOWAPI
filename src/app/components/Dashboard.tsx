@@ -15,7 +15,7 @@ import AdvancedAnalytics from './dashboard/AdvancedAnalytics';
 
 // Navigation components
 import RefactoredHeader from './navigation/RefactoredHeader';
-import NavigationSidebar from './navigation/NavigationSidebar';
+import NavigationSidebar, { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './navigation/NavigationSidebar';
 
 // Tasks
 import TaskManager from './tasks/TaskManager';
@@ -30,6 +30,7 @@ import SecurityPage from './settings/SecurityPage';
 import AccountSettingsPage from './settings/AccountSettingsPage';
 import AdminPage from './settings/AdminPage';
 import CampaignsPage from './pages/CampaignsPage';
+import RemarketingPage from './pages/RemarketingPage';
 import InboxPage from './pages/InboxPage';
 
 // Modal imports
@@ -128,6 +129,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
       '/dashboard/analytics': 'analytics',
       '/dashboard/tasks': 'tasks',
       '/dashboard/campaigns': 'campaigns',
+      '/dashboard/remarketing': 'remarketing',
       '/dashboard/plan': 'plan',
       '/dashboard/integrations': 'integrations',
       '/dashboard/security': 'security',
@@ -148,6 +150,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     'analytics': '/dashboard/analytics',
     'tasks': '/dashboard/tasks',
     'campaigns': '/dashboard/campaigns',
+    'remarketing': '/dashboard/remarketing',
     'plan': '/dashboard/plan',
     'integrations': '/dashboard/integrations',
     'security': '/dashboard/security',
@@ -164,6 +167,10 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar_collapsed');
     return saved !== null ? JSON.parse(saved) : false;
+  });
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem('sidebar_width');
+    return saved !== null ? Number(JSON.parse(saved)) : SIDEBAR_DEFAULT_WIDTH;
   });
   const [isMobile, setIsMobile] = useState(false);
   const [filtros, setFiltros] = useState({ origem: '', status: '', busca: '' });
@@ -238,6 +245,17 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     if (currentPage === 'dashboard' && onRefreshUser) {
       onRefreshUser().catch(() => {});
     }
+  }, [currentPage]);
+
+  // Lock body scroll for full-bleed pages (inbox, channels, ai-assistants, automations)
+  useEffect(() => {
+    const isFullBleed = currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations';
+    if (isFullBleed) {
+      document.body.classList.add('full-bleed-lock');
+    } else {
+      document.body.classList.remove('full-bleed-lock');
+    }
+    return () => document.body.classList.remove('full-bleed-lock');
   }, [currentPage]);
 
   // Periodic usage refresh every 60 seconds
@@ -331,6 +349,10 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   useEffect(() => {
     localStorage.setItem('sidebar_collapsed', JSON.stringify(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem('sidebar_width', JSON.stringify(sidebarWidth));
+  }, [sidebarWidth]);
 
   // Navigation handler: updates internal page state AND browser URL
   const handleNavigate = useCallback((pageId: string) => {
@@ -1977,8 +1999,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
   return (
     <div
-      className="min-h-screen transition-colors duration-200"
-      style={{ background: 'hsl(var(--background))' }}
+      className="min-h-screen transition-colors duration-200 bg-background overflow-x-hidden"
     >
       {/* Background Grid - Dark Mode Only - Removido para ter fundo preto puro */}
       
@@ -1998,20 +2019,27 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         user={user}
         language={language}
         onLogout={onLogout}
+        onHelp={handleStartTour}
+        sidebarWidth={sidebarWidth}
+        onSidebarWidthChange={setSidebarWidth}
       />
 
-      {/* Main Content Wrapper - fixed panel, left edge = sidebar width */}
+      {/* Main Content Wrapper - margin-based layout, adapts to sidebar width */}
       <div
-        className="fixed top-0 bottom-0 right-0 flex flex-col overflow-hidden transition-all duration-300"
+        className={`min-w-0 flex flex-col transition-[margin] duration-300 ease-out ${
+          currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
+            ? 'h-[100dvh] overflow-hidden'
+            : 'min-h-screen'
+        }`}
         style={{
-          left: isMobile ? 0 : isSidebarCollapsed ? 80 : 260,
+          marginLeft: isMobile ? 0 : isSidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth,
         }}
       >
-        <div className={`dashboard-container flex flex-col ${
+        <div className={`dashboard-container flex flex-col flex-1 min-w-0 min-h-0 bg-background ${
           currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
-            ? 'h-full overflow-hidden'
-            : 'min-h-screen'
-        }`} style={{ background: 'hsl(var(--background))' }}>
+            ? 'overflow-hidden'
+            : ''
+        }`}>
           {/* Header */}
           <RefactoredHeader
             user={user}
@@ -2036,7 +2064,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
           {/* ⚠️ BANNER DE BACKEND OFFLINE */}
           {isBackendOffline && (
             <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-4 shadow-lg border-b-4 border-red-700">
-              <div className="max-w-[1400px] mx-auto flex items-start gap-4">
+              <div className="max-w-[1720px] mx-auto flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <AlertCircle className="w-6 h-6 mt-0.5" />
                 </div>
@@ -2063,19 +2091,19 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
           )}
 
           {/* Main Content */}
-          <main className={`flex-1 min-h-0 ${
+          <main className={`flex-1 min-w-0 ${
             currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations' 
-              ? 'overflow-hidden flex flex-col' 
-              : 'overflow-y-auto'
+              ? 'overflow-hidden flex flex-col min-h-0' 
+              : ''
           }`}>
-            <div className={`w-full ${
+            <div className={`w-full min-w-0 ${
               currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
                 ? 'h-full flex-1 min-h-0 max-w-none px-0 py-0 overflow-hidden'
-                : 'px-4 sm:px-6 lg:px-8 py-4 sm:py-5 lg:py-6'
-            }`} style={{ background: 'hsl(var(--background))' }}>
+                : 'max-w-[1720px] mx-auto px-6 sm:px-8 lg:px-10 py-8'
+            }`}>
             {/* Renderizar conteúdo baseado na página atual */}
             {currentPage === 'dashboard' && (
-              <div className="space-y-4 sm:space-y-5 lg:space-y-6">
+              <div className="space-y-8">
                 {/* Widget de Planos */}
                 <PlanoWidget
                   limites={limites}
@@ -2165,10 +2193,10 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
             {currentPage === 'leads' && (
               <div className="space-y-5 sm:space-y-6 xl:space-y-8">
                 <div className="mb-6">
-                  <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                  <h1 className="text-2xl font-semibold text-foreground mb-2">
                     Leads
                   </h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     Gerencie todos os seus leads
                   </p>
                 </div>
@@ -2242,6 +2270,10 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                 isDark={isDark}
                 userPlan={(user?.plan || user?.subscription_plan || 'free') as 'free' | 'business' | 'enterprise'}
               />
+            )}
+
+            {currentPage === 'remarketing' && (
+              <RemarketingPage />
             )}
 
             {(currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'voice-agents' || currentPage === 'automations') && (
@@ -2345,7 +2377,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   </div>
                   <button
                     onClick={() => setModalReportExporter(true)}
-                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"
+                    className="px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 rounded-lg flex items-center gap-2"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -2386,11 +2418,11 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
           {/* Footer - hidden on inbox/full-height pages */}
           {currentPage !== 'inbox' && currentPage !== 'inbox-settings' && currentPage !== 'ai-assistants' && currentPage !== 'automations' && currentPage !== 'voice-agents' && (
-            <footer className="border-t border-gray-200 dark:border-gray-700 mt-12 py-6">
+            <footer className="border-t border-border mt-12 py-6">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-sm text-muted-foreground">
                   <p className="text-center md:text-left">
-                    © {new Date().getFullYear()} <span className="font-bold text-gray-900 dark:text-white">LeadsFlow</span> <span className="text-gray-700 dark:text-gray-300">SAAS</span>. Todos os direitos reservados.
+                    © {new Date().getFullYear()} <span className="font-bold text-foreground">LeadsFlow</span> <span className="text-foreground/80">SAAS</span>. Todos os direitos reservados.
                   </p>
                   <p className="text-center md:text-right">
                     Desenvolvido por <span className="text-blue-600 dark:text-blue-400 font-medium">PersonalCreativeLda</span>

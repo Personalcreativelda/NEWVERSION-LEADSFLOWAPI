@@ -460,7 +460,7 @@ export default function SecurityPage({ user }: SecurityPageProps) {
 
           {setupStep === 'qr' && (
             <div className="space-y-4">
-              <div className="bg-white p-4 rounded-lg flex justify-center">
+              <div className="bg-card p-4 rounded-lg flex justify-center">
                 {qrCode && <img src={qrCode} alt="QR Code" className="w-64 h-64" />}
               </div>
               <div className="bg-muted p-3 rounded-lg">

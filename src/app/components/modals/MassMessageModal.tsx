@@ -192,19 +192,19 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-card rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-lg dark:shadow-purple-500/20 dark:border dark:border-purple-500/30">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-lg dark:shadow-purple-500/20 dark:border dark:border-purple-500/30">
         
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-200 dark:border-purple-500/30 flex justify-between items-center sticky top-0 bg-white dark:bg-card backdrop-blur-sm z-10">
-          <h2 className="text-xl text-gray-900 dark:text-white font-semibold">
+        <div className="px-6 py-5 border-b border-border dark:border-purple-500/30 flex justify-between items-center sticky top-0 bg-card backdrop-blur-sm z-10">
+          <h2 className="text-xl text-foreground font-semibold">
             📢 Envio em Massa via WhatsApp
           </h2>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-lg hover:bg-gray-100 dark:hover:bg-purple-500/20 flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-lg hover:bg-muted/50 dark:hover:bg-purple-500/20 flex items-center justify-center transition-colors"
           >
-            <X className="w-5 h-5 text-gray-500 dark:text-gray-700 dark:text-gray-300" />
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
 
@@ -217,17 +217,17 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
                   <Crown className="w-7 h-7 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                  <h3 className="text-lg text-foreground mb-2 flex items-center gap-2">
                     🚀 Recurso Premium - Envio em Massa
                   </h3>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
+                  <p className="text-sm text-foreground/80 mb-4">
                     O <strong>Envio em Massa de Mensagens WhatsApp</strong> está disponível apenas nos planos <strong>Business</strong> e <strong>Enterprise</strong>.
                   </p>
-                  <div className="bg-white dark:bg-card rounded-lg p-4 mb-4 border border-amber-200 dark:border-amber-800">
-                    <p className="text-sm text-gray-800 dark:text-gray-200 mb-2">
+                  <div className="bg-card rounded-lg p-4 mb-4 border border-amber-200 dark:border-amber-800">
+                    <p className="text-sm text-foreground mb-2">
                       <strong>✨ Recursos inclusos:</strong>
                     </p>
-                    <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1.5 ml-4">
+                    <ul className="text-sm text-foreground/80 space-y-1.5 ml-4">
                       <li className="flex items-start gap-2">
                         <Zap className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                         <span><strong>Business:</strong> Envio em massa ilimitado + Webhook N8N</span>
@@ -275,37 +275,37 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
 
           {/* Seletor de Leads */}
           <div className="mb-6">
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-3">
+            <label className="block text-sm text-foreground/80 mb-3">
               📋 Selecione os Leads
             </label>
 
             {/* Select All */}
-            <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg mb-3">
+            <div className="bg-muted/50 p-3 rounded-lg mb-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={selecionados.length === leads.length}
                   onChange={handleToggleAll}
-                  className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-600 border-border rounded focus:ring-blue-500"
                 />
-                <strong className="text-sm text-gray-900 dark:text-white">Selecionar Todos</strong>
+                <strong className="text-sm text-foreground">Selecionar Todos</strong>
               </label>
             </div>
 
             {/* Lista de Leads */}
-            <div className="border border-border dark:border-border rounded-lg max-h-48 overflow-y-auto p-2 bg-white dark:bg-card">
+            <div className="border border-border dark:border-border rounded-lg max-h-48 overflow-y-auto p-2 bg-card">
               {leads.map((lead, index) => (
                 <label
                   key={index}
-                  className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg cursor-pointer transition-colors"
+                  className="flex items-center gap-3 p-2 hover:bg-muted/50 rounded-lg cursor-pointer transition-colors"
                 >
                   <input
                     type="checkbox"
                     checked={selecionados.includes(index)}
                     onChange={() => handleToggleLead(index)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-blue-600 border-border rounded focus:ring-blue-500"
                   />
-                  <div className="flex-1 text-sm text-gray-900 dark:text-gray-200">
+                  <div className="flex-1 text-sm text-foreground">
                     <strong>{lead.nome || 'Sem nome'}</strong> - {lead.telefone || 'Sem telefone'} ({lead.status || 'Sem status'})
                   </div>
                 </label>
@@ -315,31 +315,31 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
 
           {/* Templates */}
           <div className="mb-6">
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-3">
+            <label className="block text-sm text-foreground/80 mb-3">
               📝 Templates Rápidos
             </label>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => handleUseTemplate('saudacao')}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-gray-700 dark:text-gray-300"
+                className="px-4 py-2 border border-border rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-foreground/80"
               >
                 👋 Saudação
               </button>
               <button
                 onClick={() => handleUseTemplate('followup')}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-gray-700 dark:text-gray-300"
+                className="px-4 py-2 border border-border rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-foreground/80"
               >
                 📞 Follow-up
               </button>
               <button
                 onClick={() => handleUseTemplate('promocao')}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-gray-700 dark:text-gray-300"
+                className="px-4 py-2 border border-border rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-foreground/80"
               >
                 🎁 Promoção
               </button>
               <button
                 onClick={() => handleUseTemplate('agradecimento')}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-gray-700 dark:text-gray-300"
+                className="px-4 py-2 border border-border rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-foreground/80"
               >
                 🙏 Agradecimento
               </button>
@@ -348,7 +348,7 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
 
           {/* Mensagem */}
           <div className="mb-6">
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm text-foreground/80 mb-2">
               💬 Mensagem
             </label>
             <textarea
@@ -360,32 +360,32 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
             />
 
             {/* Preview */}
-            <div className="mt-3 bg-[#e5ddd5] dark:bg-gray-700 p-4 rounded-lg">
-              <strong className="text-sm text-gray-700 dark:text-gray-300 block mb-2">Preview:</strong>
-              <div className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">{preview}</div>
+            <div className="mt-3 bg-[#e5ddd5] dark:bg-muted p-4 rounded-lg">
+              <strong className="text-sm text-foreground/80 block mb-2">Preview:</strong>
+              <div className="text-sm text-foreground whitespace-pre-wrap">{preview}</div>
             </div>
           </div>
 
           {/* Estatísticas */}
-          <div className="grid grid-cols-3 gap-4 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+          <div className="grid grid-cols-3 gap-4 bg-muted/50 p-4 rounded-lg">
             <div className="text-center">
               <div className="text-2xl text-blue-600 dark:text-blue-400">{selecionados.length}</div>
-              <div className="text-xs text-gray-700 dark:text-gray-300 mt-1">Leads Selecionados</div>
+              <div className="text-xs text-foreground/80 mt-1">Leads Selecionados</div>
             </div>
             <div className="text-center">
               <div className="text-2xl text-green-600 dark:text-green-400">{stats.enviados}</div>
-              <div className="text-xs text-gray-700 dark:text-gray-300 mt-1">Enviados</div>
+              <div className="text-xs text-foreground/80 mt-1">Enviados</div>
             </div>
             <div className="text-center">
               <div className="text-2xl text-red-600 dark:text-red-400">{stats.falhas}</div>
-              <div className="text-xs text-gray-700 dark:text-gray-300 mt-1">Falhas</div>
+              <div className="text-xs text-foreground/80 mt-1">Falhas</div>
             </div>
           </div>
 
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-border dark:border-border flex gap-3 justify-end sticky bottom-0 bg-white dark:bg-card">
+        <div className="px-6 py-4 border-t border-border dark:border-border flex gap-3 justify-end sticky bottom-0 bg-card">
           <Button
             type="button"
             variant="outline"

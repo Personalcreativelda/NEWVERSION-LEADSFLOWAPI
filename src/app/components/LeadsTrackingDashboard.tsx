@@ -92,7 +92,7 @@ export default function LeadsTrackingDashboard() {
       lost: 'bg-red-100 text-red-800',
       perdido: 'bg-red-100 text-red-800',
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return colors[status] || 'bg-muted text-foreground';
   };
 
   const formatTime = (isoDate: string) => {
@@ -125,52 +125,52 @@ export default function LeadsTrackingDashboard() {
   const totalInteractions = leadsToday.reduce((sum, lead) => sum + lead.interaction_count, 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-muted/30 to-muted/50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">📊 Rastreamento de Leads</h1>
-          <p className="text-slate-600">Monitore leads capturados de múltiplos canais em tempo real</p>
+          <h1 className="text-4xl font-bold text-foreground mb-2">📊 Rastreamento de Leads</h1>
+          <p className="text-muted-foreground">Monitore leads capturados de múltiplos canais em tempo real</p>
         </div>
 
         {/* Estatísticas Rápidas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
+          <div className="bg-card rounded-lg shadow-sm p-4 border-l-4 border-blue-500">
             <div className="flex items-center">
               <MessageCircle className="w-8 h-8 text-blue-500 mr-3" />
               <div>
-                <p className="text-sm text-slate-500">Leads Hoje</p>
-                <p className="text-2xl font-bold text-slate-900">{totalToday}</p>
+                <p className="text-sm text-muted-foreground">Leads Hoje</p>
+                <p className="text-2xl font-bold text-foreground">{totalToday}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-purple-500">
+          <div className="bg-card rounded-lg shadow-sm p-4 border-l-4 border-purple-500">
             <div className="flex items-center">
               <Send className="w-8 h-8 text-purple-500 mr-3" />
               <div>
-                <p className="text-sm text-slate-500">Interações</p>
-                <p className="text-2xl font-bold text-slate-900">{totalInteractions}</p>
+                <p className="text-sm text-muted-foreground">Interações</p>
+                <p className="text-2xl font-bold text-foreground">{totalInteractions}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
+          <div className="bg-card rounded-lg shadow-sm p-4 border-l-4 border-green-500">
             <div className="flex items-center">
               <CheckCircle className="w-8 h-8 text-green-500 mr-3" />
               <div>
-                <p className="text-sm text-slate-500">Canais Ativos</p>
-                <p className="text-2xl font-bold text-slate-900">{channelStats.length}</p>
+                <p className="text-sm text-muted-foreground">Canais Ativos</p>
+                <p className="text-2xl font-bold text-foreground">{channelStats.length}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-orange-500">
+          <div className="bg-card rounded-lg shadow-sm p-4 border-l-4 border-orange-500">
             <div className="flex items-center">
               <TrendingUp className="w-8 h-8 text-orange-500 mr-3" />
               <div>
-                <p className="text-sm text-slate-500">Média/Canal</p>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-sm text-muted-foreground">Média/Canal</p>
+                <p className="text-2xl font-bold text-foreground">
                   {channelStats.length > 0 ? Math.round(totalToday / channelStats.length) : 0}
                 </p>
               </div>
@@ -180,34 +180,34 @@ export default function LeadsTrackingDashboard() {
 
         {/* Estatísticas por Canal */}
         {channelStats.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">📈 Desempenho por Canal</h2>
+          <div className="bg-card rounded-lg shadow-sm p-6 mb-8">
+            <h2 className="text-xl font-semibold text-foreground mb-4">📈 Desempenho por Canal</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {channelStats.map((stat, idx) => (
                 <div key={idx} className="border rounded-lg p-4 hover:shadow-md transition">
                   <div className="text-3xl mb-2">{getChannelIcon(stat.channel)}</div>
-                  <h3 className="font-semibold text-slate-900 capitalize">{stat.channel}</h3>
+                  <h3 className="font-semibold text-foreground capitalize">{stat.channel}</h3>
                   <div className="mt-3 space-y-1 text-sm">
                     <p className="flex justify-between">
-                      <span className="text-slate-600">Total (7 dias):</span>
-                      <span className="font-semibold text-slate-900">{stat.total}</span>
+                      <span className="text-muted-foreground">Total (7 dias):</span>
+                      <span className="font-semibold text-foreground">{stat.total}</span>
                     </p>
                     <p className="flex justify-between">
-                      <span className="text-slate-600">Hoje:</span>
+                      <span className="text-muted-foreground">Hoje:</span>
                       <span className="font-semibold text-blue-600">{stat.today}</span>
                     </p>
                     <p className="flex justify-between">
-                      <span className="text-slate-600">Idade média:</span>
-                      <span className="text-slate-900">{stat.avgHoursOld}h</span>
+                      <span className="text-muted-foreground">Idade média:</span>
+                      <span className="text-foreground">{stat.avgHoursOld}h</span>
                     </p>
                   </div>
                   {Object.entries(stat.byStatus).length > 0 && (
                     <div className="mt-3 pt-3 border-t">
-                      <p className="text-xs text-slate-600 font-semibold mb-2">Por Status:</p>
+                      <p className="text-xs text-muted-foreground font-semibold mb-2">Por Status:</p>
                       <div className="space-y-1 text-xs">
                         {Object.entries(stat.byStatus).map(([status, count]) => (
                           <p key={status} className="flex justify-between">
-                            <span className="capitalize text-slate-600">{status}</span>
+                            <span className="capitalize text-muted-foreground">{status}</span>
                             <span className="font-semibold">{count}</span>
                           </p>
                         ))}
@@ -221,53 +221,53 @@ export default function LeadsTrackingDashboard() {
         )}
 
         {/* Lista de Leads Capturados Hoje */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-card rounded-lg shadow-sm overflow-hidden">
           <div className="p-6 border-b">
-            <h2 className="text-xl font-semibold text-slate-900">🎯 Leads Capturados Hoje</h2>
+            <h2 className="text-xl font-semibold text-foreground">🎯 Leads Capturados Hoje</h2>
           </div>
           
           {leadsToday.length === 0 ? (
-            <div className="p-12 text-center text-slate-500">
+            <div className="p-12 text-center text-muted-foreground">
               <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-20" />
               <p>Nenhum lead capturado ainda hoje</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-50 border-b">
+                <thead className="bg-muted/50 border-b">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Canal</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Nome/Contato</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Email/Telefone</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Horário</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Interações</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Ação</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Canal</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nome/Contato</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email/Telefone</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Horário</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Interações</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ação</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-border">
                   {leadsToday.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-slate-50 transition">
+                    <tr key={lead.id} className="hover:bg-muted/50 transition">
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
                           <span className="text-2xl">{getChannelIcon(lead.channel_source)}</span>
-                          <span className="text-sm font-medium text-slate-900 capitalize">{lead.channel_source}</span>
+                          <span className="text-sm font-medium text-foreground capitalize">{lead.channel_source}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="font-medium text-slate-900">{lead.name}</p>
+                        <p className="font-medium text-foreground">{lead.name}</p>
                       </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">
+                      <td className="px-6 py-4 text-sm text-muted-foreground">
                         {lead.email && <p>{lead.email}</p>}
                         {lead.phone && <p>{lead.phone}</p>}
-                        {!lead.email && !lead.phone && <p className="text-slate-400">-</p>}
+                        {!lead.email && !lead.phone && <p className="text-muted-foreground/70">-</p>}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(lead.status)}`}>
                           {lead.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">
+                      <td className="px-6 py-4 text-sm text-muted-foreground">
                         <div className="flex items-center">
                           <Clock className="w-4 h-4 mr-1" />
                           {formatTime(lead.captured_at)}
@@ -300,12 +300,12 @@ export default function LeadsTrackingDashboard() {
         {/* Modal de Detalhes */}
         {showDetails && selectedLead && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
+            <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6">
               <div className="flex items-start justify-between mb-4">
-                <h2 className="text-2xl font-bold text-slate-900">{selectedLead.name}</h2>
+                <h2 className="text-2xl font-bold text-foreground">{selectedLead.name}</h2>
                 <button
                   onClick={() => setShowDetails(false)}
-                  className="text-slate-500 hover:text-slate-700"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   ✕
                 </button>
@@ -315,40 +315,40 @@ export default function LeadsTrackingDashboard() {
                 <div className="flex items-center">
                   <span className="text-2xl mr-2">{getChannelIcon(selectedLead.channel_source)}</span>
                   <div>
-                    <p className="text-xs text-slate-600 uppercase">Canal</p>
-                    <p className="font-medium text-slate-900 capitalize">{selectedLead.channel_source}</p>
+                    <p className="text-xs text-muted-foreground uppercase">Canal</p>
+                    <p className="font-medium text-foreground capitalize">{selectedLead.channel_source}</p>
                   </div>
                 </div>
 
                 {selectedLead.email && (
                   <div>
-                    <p className="text-xs text-slate-600 uppercase">Email</p>
-                    <p className="font-medium text-slate-900">{selectedLead.email}</p>
+                    <p className="text-xs text-muted-foreground uppercase">Email</p>
+                    <p className="font-medium text-foreground">{selectedLead.email}</p>
                   </div>
                 )}
 
                 {selectedLead.phone && (
                   <div>
-                    <p className="text-xs text-slate-600 uppercase">Telefone</p>
-                    <p className="font-medium text-slate-900">{selectedLead.phone}</p>
+                    <p className="text-xs text-muted-foreground uppercase">Telefone</p>
+                    <p className="font-medium text-foreground">{selectedLead.phone}</p>
                   </div>
                 )}
 
                 <div>
-                  <p className="text-xs text-slate-600 uppercase">Status</p>
+                    <p className="text-xs text-muted-foreground uppercase">Status</p>
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedLead.status)}`}>
                     {selectedLead.status}
                   </span>
                 </div>
 
                 <div>
-                  <p className="text-xs text-slate-600 uppercase">Capturado</p>
-                  <p className="font-medium text-slate-900">{formatTime(selectedLead.captured_at)}</p>
+                    <p className="text-xs text-muted-foreground uppercase">Capturado</p>
+                    <p className="font-medium text-foreground">{formatTime(selectedLead.captured_at)}</p>
                 </div>
 
                 <div>
-                  <p className="text-xs text-slate-600 uppercase">Interações</p>
-                  <p className="font-medium text-slate-900">{selectedLead.interaction_count} mensagens</p>
+                    <p className="text-xs text-muted-foreground uppercase">Interações</p>
+                    <p className="font-medium text-foreground">{selectedLead.interaction_count} mensagens</p>
                 </div>
               </div>
 

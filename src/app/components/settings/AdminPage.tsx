@@ -12,6 +12,8 @@ import { AdminRevenueBreakdown } from './admin/AdminRevenueBreakdown';
 import { AdminUsersTab } from './admin/AdminUsersTab';
 import { AdminActivityTab } from './admin/AdminActivityTab';
 import { AdminMarketingTab } from './admin/AdminMarketingTab';
+import { AdminDashboardTab } from './admin/AdminDashboardTab';
+
 import { UserDetailsModal } from './admin/UserDetailsModal';
 import { ActivatePlanModal, NotificationSettingsModal } from './admin/AdminModals';
 import { useConfirm } from '../ui/ConfirmDialog';
@@ -40,7 +42,12 @@ interface PlanPricing {
   limits: { leads: number; messages: number; massMessages: number };
 }
 
-export default function AdminPage() {
+interface AdminPageProps {
+  onBack?: () => void;
+  adminEmail?: string;
+}
+
+export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
   const confirm = useConfirm();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
@@ -60,7 +67,7 @@ export default function AdminPage() {
   });
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [filterPlan, setFilterPlan] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'users' | 'activity' | 'marketing'>('users');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'activity' | 'marketing' | 'settings'>('dashboard');
   const [activities, setActivities] = useState<any[]>([]);
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
@@ -70,6 +77,19 @@ export default function AdminPage() {
     loadUsers();
     loadPlansPricing();
     loadNotificationSettings();
+    // Read tab requested from sidebar navigation (on initial mount)
+    const initialTab = sessionStorage.getItem('adminInitialTab') as typeof activeTab | null;
+    if (initialTab) {
+      setActiveTab(initialTab);
+      sessionStorage.removeItem('adminInitialTab');
+    }
+    // Listen for tab changes dispatched by sidebar when admin is already active
+    const handleTabChange = (e: Event) => {
+      const tab = (e as CustomEvent<string>).detail as typeof activeTab;
+      if (tab) setActiveTab(tab);
+    };
+    window.addEventListener('adminTabChange', handleTabChange);
+    return () => window.removeEventListener('adminTabChange', handleTabChange);
   }, []);
 
   useEffect(() => {
@@ -175,6 +195,14 @@ export default function AdminPage() {
   };
 
   const calculateRevenue = () => {
+    // Get prices from DB (plansPricing) with safe fallbacks
+    const businessPlan = plansPricing.find(p => p.id === 'business');
+    const enterprisePlan = plansPricing.find(p => p.id === 'enterprise');
+    const businessMonthlyPrice = businessPlan?.price?.monthly || 0;
+    const businessAnnualPrice = businessPlan?.price?.annual || 0;
+    const enterpriseMonthlyPrice = enterprisePlan?.price?.monthly || 0;
+    const enterpriseAnnualPrice = enterprisePlan?.price?.annual || 0;
+
     let businessMonthlyRevenue = 0;
     let businessAnnualRevenue = 0;
     let enterpriseMonthlyRevenue = 0;
@@ -189,15 +217,15 @@ export default function AdminPage() {
 
       if (user.plan === 'business') {
         if (user.subscription_plan?.includes('annual') || user.subscription_plan?.includes('yearly')) {
-          businessAnnualRevenue += 100;
+          businessAnnualRevenue += businessAnnualPrice;
         } else {
-          businessMonthlyRevenue += 20;
+          businessMonthlyRevenue += businessMonthlyPrice;
         }
       } else if (user.plan === 'enterprise') {
         if (user.subscription_plan?.includes('annual') || user.subscription_plan?.includes('yearly')) {
-          enterpriseAnnualRevenue += 200;
+          enterpriseAnnualRevenue += enterpriseAnnualPrice;
         } else {
-          enterpriseMonthlyRevenue += 59;
+          enterpriseMonthlyRevenue += enterpriseMonthlyPrice;
         }
       }
     });
@@ -316,108 +344,43 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Admin - Gestão de Usuários</h1>
-          <p className="text-muted-foreground">Gerencie planos e configurações de usuários</p>
-        </div>
-        <Button
-          onClick={() => setShowNotificationSettings(true)}
-          variant="outline"
-          className="flex items-center gap-2"
-        >
-          <Bell className="w-4 h-4" />
-          Configurar Notificações
-        </Button>
-      </div>
+    <div className="flex flex-col h-full overflow-y-auto bg-background">
+      {/* Dashboard tab */}
+      {activeTab === 'dashboard' && (
+        <AdminDashboardTab
+          users={users}
+          totalMRR={revenue.totalMRR}
+          totalARR={revenue.totalARR}
+        />
+      )}
 
-      {/* Modern Underline Navigation */}
-      <div className="flex items-center gap-8 border-b border-border/50 mb-10 w-full overflow-x-auto custom-scrollbar">
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`relative flex items-center gap-2.5 px-2 py-4 font-bold text-sm transition-all duration-300 group ${
-            activeTab === 'users' 
-              ? 'text-primary' 
-              : 'text-muted-foreground hover:text-foreground/80'
-          }`}
-        >
-          <div className={`p-1.5 rounded-lg transition-all duration-300 ${activeTab === 'users' ? 'bg-primary/10 shadow-sm' : 'group-hover:bg-muted'}`}>
-            <Users className={`w-4 h-4 ${activeTab === 'users' ? 'text-primary' : 'text-muted-foreground'}`} />
-          </div>
-          <span className="whitespace-nowrap">Gestão de Usuários</span>
-          
-          {/* Active Highlight Underline */}
-          <div className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full transition-all duration-300 ${
-            activeTab === 'users' 
-              ? 'bg-primary scale-x-100 shadow-[0_-4px_12px_rgba(var(--primary),0.6)]' 
-              : 'bg-transparent scale-x-0 group-hover:bg-border group-hover:scale-x-50'
-          }`} />
-        </button>
-
-        {/* Chevron Separator */}
-        <ChevronRight className="w-4 h-4 text-muted-foreground/40 flex-shrink-0" />
-
-        <button
-          onClick={() => setActiveTab('activity')}
-          className={`relative flex items-center gap-2.5 px-2 py-4 font-bold text-sm transition-all duration-300 group ${
-            activeTab === 'activity' 
-              ? 'text-primary' 
-              : 'text-muted-foreground hover:text-foreground/80'
-          }`}
-        >
-          <div className={`p-1.5 rounded-lg transition-all duration-300 ${activeTab === 'activity' ? 'bg-primary/10 shadow-sm' : 'group-hover:bg-muted'}`}>
-            <History className={`w-4 h-4 ${activeTab === 'activity' ? 'text-primary' : 'text-muted-foreground'}`} />
-          </div>
-          <span className="whitespace-nowrap">Fluxo de Atividade</span>
-          <div className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full transition-all duration-300 ${
-            activeTab === 'activity' 
-              ? 'bg-primary scale-x-100 shadow-[0_-4px_12px_rgba(var(--primary),0.6)]' 
-              : 'bg-transparent scale-x-0 group-hover:bg-border group-hover:scale-x-50'
-          }`} />
-        </button>
-
-        <ChevronRight className="w-4 h-4 text-muted-foreground/40 flex-shrink-0" />
-
-        <button
-          onClick={() => setActiveTab('marketing')}
-          className={`relative flex items-center gap-2.5 px-2 py-4 font-bold text-sm transition-all duration-300 group ${
-            activeTab === 'marketing' 
-              ? 'text-primary' 
-              : 'text-muted-foreground hover:text-foreground/80'
-          }`}
-        >
-          <div className={`p-1.5 rounded-lg transition-all duration-300 ${activeTab === 'marketing' ? 'bg-primary/10 shadow-sm' : 'group-hover:bg-muted'}`}>
-            <Megaphone className={`w-4 h-4 ${activeTab === 'marketing' ? 'text-primary' : 'text-muted-foreground'}`} />
-          </div>
-          <span className="whitespace-nowrap">Marketing</span>
-          <div className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full transition-all duration-300 ${
-            activeTab === 'marketing' 
-              ? 'bg-primary scale-x-100 shadow-[0_-4px_12px_rgba(var(--primary),0.6)]' 
-              : 'bg-transparent scale-x-0 group-hover:bg-border group-hover:scale-x-50'
-          }`} />
-        </button>
-      </div>
-
+      {/* Users tab */}
       {activeTab === 'users' && (
-        <>
-          <AdminStatsCards 
-            usersCount={users.length}
-            freeCount={users.filter(u => u.plan === 'free').length}
-            businessCount={users.filter(u => u.plan === 'business').length}
-            enterpriseCount={users.filter(u => u.plan === 'enterprise').length}
-            totalMRR={revenue.totalMRR}
-            totalARR={revenue.totalARR}
-          />
+        <div className="p-6 sm:p-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-foreground mb-1">
+                Usuários
+              </h1>
+              <p className="text-sm text-muted-foreground">Gerencie todos os usuários da plataforma</p>
+            </div>
+            <Button
+              onClick={() => {
+                // TODO: Add create user modal
+                toast.info('Funcionalidade em desenvolvimento');
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Adicionar Usuário
+            </Button>
+          </div>
 
-          <AdminRevenueBreakdown revenue={revenue} />
-
-          <AdminUsersTab 
+          <AdminUsersTab
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             filteredUsers={filteredUsers}
             loading={loading}
+            plansPricing={plansPricing}
             onActivatePlan={(user) => {
               setSelectedUser(user);
               setShowActivateModal(true);
@@ -426,31 +389,78 @@ export default function AdminPage() {
             onDeleteUser={handleDeleteUser}
             onViewDetails={(userId) => setViewDetailsUserId(userId)}
           />
-        </>
+        </div>
       )}
 
+      {/* Activity tab */}
       {activeTab === 'activity' && (
-        <AdminActivityTab 
-          activities={activities}
-          activeUsers={activeUsers}
-          activitiesLoading={activitiesLoading}
-          onRefreshActivities={loadActivities}
-        />
+        <div className="p-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-semibold text-foreground mb-1">
+              Fluxo de Atividade
+            </h1>
+            <p className="text-muted-foreground">Atividades recentes e usuários online</p>
+          </div>
+          <AdminActivityTab
+            activities={activities}
+            activeUsers={activeUsers}
+            activitiesLoading={activitiesLoading}
+            onRefreshActivities={loadActivities}
+            users={users}
+          />
+        </div>
       )}
 
+      {/* Marketing tab */}
       {activeTab === 'marketing' && (
-        <AdminMarketingTab
-          totalUsers={users.length}
-          freeCount={users.filter(u => u.plan === 'free').length}
-          businessCount={users.filter(u => u.plan === 'business').length}
-          enterpriseCount={users.filter(u => u.plan === 'enterprise').length}
-          users={users.map(u => ({ id: u.id, name: u.name, email: u.email, plan: u.plan }))}
-        />
+        <div className="p-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-semibold text-foreground mb-1">
+              Marketing
+            </h1>
+            <p className="text-muted-foreground">Ferramentas de marketing e comunicação</p>
+          </div>
+          <AdminMarketingTab
+            totalUsers={users.length}
+            freeCount={users.filter(u => u.plan === 'free').length}
+            businessCount={users.filter(u => u.plan === 'business').length}
+            enterpriseCount={users.filter(u => u.plan === 'enterprise').length}
+            users={users.map(u => ({ id: u.id, name: u.name, email: u.email, plan: u.plan }))}
+          />
+        </div>
       )}
 
-      {/* Modals */}
+      {/* Settings tab */}
+      {activeTab === 'settings' && (
+        <div className="p-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-semibold text-foreground mb-1">
+              Configurações Admin
+            </h1>
+            <p className="text-muted-foreground">Configurações de notificações e sistema</p>
+          </div>
+          <div className="max-w-2xl">
+            <div className="bg-card rounded-xl p-6 shadow-sm border border-border mb-4">
+              <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Bell className="w-5 h-5 text-blue-500" />
+                Notificações
+              </h2>
+              <Button
+                onClick={() => setShowNotificationSettings(true)}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Bell className="w-4 h-4" />
+                Configurar Notificações
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modals — always rendered regardless of active tab */}
       {showActivateModal && (
-        <ActivatePlanModal 
+        <ActivatePlanModal
           user={selectedUser}
           selectedPlan={selectedPlan}
           setSelectedPlan={setSelectedPlan}
@@ -466,7 +476,7 @@ export default function AdminPage() {
       )}
 
       {showNotificationSettings && (
-        <NotificationSettingsModal 
+        <NotificationSettingsModal
           settings={notificationSettings}
           setSettings={setSettings => setNotificationSettings(setSettings)}
           loading={loading}

@@ -74,7 +74,7 @@ export default function RecentLeads({ leads }: RecentLeadsProps) {
             return (
               <div
                 key={index}
-                className="flex justify-between items-center py-4 border-b border-gray-100 last:border-b-0"
+                className="flex justify-between items-center py-4 border-b border-border last:border-b-0"
               >
                 <div className="flex items-center gap-3 flex-1">
                   {/* Avatar */}

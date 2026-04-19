@@ -158,14 +158,10 @@ export default function SettingsPage({
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'hsl(var(--background))' }}>
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <div 
-        className="border-b"
-        style={{ 
-          backgroundColor: 'hsl(var(--card))',
-          borderColor: 'hsl(var(--border))'
-        }}
+        className="border-b border-border bg-card"
       >
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
@@ -179,8 +175,8 @@ export default function SettingsPage({
 
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         <div className="mb-8">
-          <h1 className="text-gray-900 dark:text-gray-100 mb-2">Configurações</h1>
-          <p className="text-gray-600 dark:text-gray-500 dark:text-gray-400">
+          <h1 className="text-foreground mb-2">Configurações</h1>
+          <p className="text-muted-foreground">
             Gerencie suas preferências e informações da conta
           </p>
         </div>
@@ -208,13 +204,9 @@ export default function SettingsPage({
           {/* Profile Tab */}
           <TabsContent value="profile" className="space-y-6">
             <div 
-              className="rounded-xl shadow-sm border p-6"
-              style={{ 
-                backgroundColor: 'hsl(var(--card))',
-                borderColor: 'hsl(var(--border))'
-              }}
+              className="rounded-xl shadow-sm border border-border bg-card p-6"
             >
-              <h3 className="mb-6" style={{ color: 'hsl(var(--foreground))' }}>Informações do perfil</h3>
+              <h3 className="mb-6 text-foreground">Informações do perfil</h3>
 
               <div className="space-y-6">
                 <AvatarUpload
@@ -240,9 +232,9 @@ export default function SettingsPage({
                       id="email"
                       value={user?.email || ''}
                       disabled
-                      className="mt-1 bg-gray-50 dark:bg-gray-800"
+                      className="mt-1 bg-muted/50"
                     />
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                    <p className="text-muted-foreground text-sm mt-1">
                       O email não pode ser alterado
                     </p>
                   </div>
@@ -276,20 +268,16 @@ export default function SettingsPage({
           {/* Plan Tab */}
           <TabsContent value="plan" className="space-y-6">
             <div 
-              className="rounded-xl shadow-sm border p-6"
-              style={{ 
-                backgroundColor: 'hsl(var(--card))',
-                borderColor: 'hsl(var(--border))'
-              }}
+              className="rounded-xl shadow-sm border border-border bg-card p-6"
             >
-              <h3 className="mb-6" style={{ color: 'hsl(var(--foreground))' }}>Plano e cobrança</h3>
+              <h3 className="mb-6 text-foreground">Plano e cobrança</h3>
 
               <div className="space-y-4">
                 <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border border-blue-100 dark:border-blue-900">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-600 dark:text-gray-400 mb-1">Plano atual</p>
-                      <p className="text-gray-900 dark:text-gray-100">
+                      <p className="text-muted-foreground mb-1">Plano atual</p>
+                      <p className="text-foreground">
                         Plano {getPlanName(user?.plan)}
                       </p>
                     </div>
@@ -298,27 +286,27 @@ export default function SettingsPage({
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <p className="text-gray-600 dark:text-gray-400 mb-1">Leads</p>
-                    <p className="text-gray-900 dark:text-gray-100">
+                  <div className="text-center p-4 bg-muted/50 rounded-lg">
+                    <p className="text-muted-foreground mb-1">Leads</p>
+                    <p className="text-foreground">
                       {user?.usage?.leads || 0} /{' '}
                       {user?.limits?.leads === -1
                         ? '∞'
                         : user?.limits?.leads || 0}
                     </p>
                   </div>
-                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <p className="text-gray-600 dark:text-gray-400 mb-1">Mensagens</p>
-                    <p className="text-gray-900 dark:text-gray-100">
+                  <div className="text-center p-4 bg-muted/50 rounded-lg">
+                    <p className="text-muted-foreground mb-1">Mensagens</p>
+                    <p className="text-foreground">
                       {user?.usage?.messages || 0} /{' '}
                       {user?.limits?.messages === -1
                         ? '∞'
                         : user?.limits?.messages || 0}
                     </p>
                   </div>
-                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <p className="text-gray-600 dark:text-gray-400 mb-1">Envios em massa</p>
-                    <p className="text-gray-900 dark:text-gray-100">
+                  <div className="text-center p-4 bg-muted/50 rounded-lg">
+                    <p className="text-muted-foreground mb-1">Envios em massa</p>
+                    <p className="text-foreground">
                       {user?.usage?.massMessages || 0} /{' '}
                       {user?.limits?.massMessages === -1
                         ? '∞'
@@ -330,7 +318,7 @@ export default function SettingsPage({
                 {user?.plan === 'free' && (
                   <Button
                     onClick={onUpgrade}
-                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                    className="w-full bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
                   >
                     <Zap className="w-4 h-4 mr-2" />
                     Fazer upgrade do plano
@@ -350,13 +338,9 @@ export default function SettingsPage({
           {/* Security Tab */}
           <TabsContent value="security" className="space-y-6">
             <div 
-              className="rounded-xl shadow-sm border p-6"
-              style={{ 
-                backgroundColor: 'hsl(var(--card))',
-                borderColor: 'hsl(var(--border))'
-              }}
+              className="rounded-xl shadow-sm border border-border bg-card p-6"
             >
-              <h3 className="mb-6" style={{ color: 'hsl(var(--foreground))' }}>Segurança</h3>
+              <h3 className="mb-6 text-foreground">Segurança</h3>
 
               <div className="space-y-3">
                 <Button 

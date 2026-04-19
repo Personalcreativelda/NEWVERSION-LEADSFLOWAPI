@@ -12,7 +12,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
-import { useConfirm } from './ui/ConfirmDialog';
 
 interface FloatingChatProps {
   chatWebhookUrl?: string;
@@ -48,7 +47,6 @@ export function FloatingChat({
   userPlan,
   currentPage
 }: FloatingChatProps) {
-  const confirm = useConfirm();
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -401,13 +399,8 @@ export function FloatingChat({
     }
   };
 
-  const handleClearChat = async () => {
-    const confirmed = await confirm('Tem certeza que deseja limpar o histórico de conversas?', {
-      title: 'Limpar conversa',
-      confirmLabel: 'Limpar',
-      variant: 'warning',
-    });
-    if (confirmed) {
+  const handleClearChat = () => {
+    if (confirm('Tem certeza que deseja limpar o histórico de conversas?')) {
       setMessages([]);
       localStorage.removeItem('leadflow_chat_history');
       setShowSatisfaction(false);
@@ -455,11 +448,11 @@ export function FloatingChat({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-full shadow-lg transition-all hover:scale-110"
+        className="fixed bottom-6 right-6 z-50 bg-primary hover:brightness-110 text-white p-4 rounded-full shadow-lg transition-all hover:scale-110"
         aria-label="Abrir chat"
       >
         <MessageCircle className="h-6 w-6" />
-        <span className="absolute -top-1 -right-1 bg-green-500 border-2 border-white dark:border-gray-900 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+        <span className="absolute -top-1 -right-1 bg-green-500 border-2 border-white text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
           ●
         </span>
       </button>
@@ -468,7 +461,7 @@ export function FloatingChat({
 
   return (
     <div
-      className={`fixed z-50 bg-white dark:bg-gray-900 shadow-lg flex flex-col ${
+      className={`fixed z-50 bg-card shadow-lg flex flex-col ${
         isMobile
           ? 'inset-0'
           : isExpanded
@@ -477,17 +470,17 @@ export function FloatingChat({
       }`}
     >
       {/* Header */}
-      <div className="bg-slate-800 dark:bg-slate-900 text-white px-4 py-3 rounded-t-2xl flex items-center justify-between border-b border-slate-700">
+      <div className="bg-card text-white px-4 py-3 rounded-t-2xl flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="bg-purple-600 p-2 rounded-full">
+            <div className="bg-primary p-2 rounded-full">
               <MessageCircle className="h-5 w-5" />
             </div>
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-slate-800 rounded-full"></span>
+            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-border rounded-full"></span>
           </div>
           <div>
             <h3 className="font-semibold text-sm">Assistente LeadsFlow</h3>
-            <p className="text-xs text-slate-400">● Online • Resposta em ~30s</p>
+            <p className="text-xs text-muted-foreground/70">● Online • Resposta em ~30s</p>
           </div>
         </div>
 
@@ -495,7 +488,7 @@ export function FloatingChat({
           {!isMobile && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1.5 hover:bg-slate-700 rounded transition-colors"
+              className="p-1.5 hover:bg-muted rounded transition-colors"
               aria-label={isExpanded ? 'Minimizar' : 'Expandir'}
             >
               {isExpanded ? (
@@ -508,7 +501,7 @@ export function FloatingChat({
           
           <button
             onClick={handleClearChat}
-            className="p-1.5 hover:bg-slate-700 rounded transition-colors"
+            className="p-1.5 hover:bg-muted rounded transition-colors"
             aria-label="Limpar conversa"
             title="Limpar conversa"
           >
@@ -517,7 +510,7 @@ export function FloatingChat({
 
           <button
             onClick={() => setIsOpen(false)}
-            className="p-1.5 hover:bg-slate-700 rounded transition-colors"
+            className="p-1.5 hover:bg-muted rounded transition-colors"
             aria-label="Fechar chat"
           >
             <X className="h-4 w-4" />
@@ -528,7 +521,7 @@ export function FloatingChat({
       {/* Messages Area */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-gray-50 dark:bg-gray-800"
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-muted/50"
       >
         {messages.map((message) => (
           <ChatMessage
@@ -549,7 +542,7 @@ export function FloatingChat({
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 rounded-b-2xl">
+      <div className="border-t border-border bg-card p-4 rounded-b-2xl">
         <div className="flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
@@ -561,7 +554,7 @@ export function FloatingChat({
               placeholder="Digite sua mensagem..."
               disabled={isTyping}
               rows={1}
-              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="w-full px-4 py-2.5 bg-muted border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               style={{ maxHeight: '120px' }}
             />
           </div>
@@ -569,7 +562,7 @@ export function FloatingChat({
           <button
             onClick={handleSendMessage}
             disabled={!inputMessage.trim() || isTyping}
-            className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            className="p-2 bg-primary text-primary-foreground rounded-lg hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
             aria-label="Enviar mensagem"
             title="Enviar (Enter)"
           >
@@ -577,9 +570,9 @@ export function FloatingChat({
           </button>
         </div>
 
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-          <kbd className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Enter</kbd> para enviar, 
-          <kbd className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs ml-1">Shift+Enter</kbd> para quebra de linha
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">Enter</kbd> para enviar, 
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs ml-1">Shift+Enter</kbd> para quebra de linha
         </p>
       </div>
     </div>
@@ -604,7 +597,7 @@ function ChatMessage({
       <div className={`flex gap-2 max-w-[85%] ${isBot ? 'flex-row' : 'flex-row-reverse'}`}>
         {isBot && (
           <div className="flex-shrink-0 mt-1">
-            <div className="bg-purple-600 p-1.5 rounded-full">
+            <div className="bg-primary p-1.5 rounded-full">
               <MessageCircle className="h-4 w-4 text-white" />
             </div>
           </div>
@@ -614,10 +607,10 @@ function ChatMessage({
           <div
             className={`rounded-2xl px-4 py-2.5 ${
               isBot
-                ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-tl-none'
+                ? 'bg-muted text-foreground rounded-tl-none'
                 : hasError
                 ? 'bg-red-500 text-white rounded-tr-none'
-                : 'bg-purple-600 text-white rounded-tr-none'
+                : 'bg-primary text-white rounded-tr-none'
             }`}
           >
             <div className="text-sm whitespace-pre-wrap break-words">
@@ -627,8 +620,8 @@ function ChatMessage({
             <div
               className={`text-xs mt-1.5 flex items-center gap-2 ${
                 isBot
-                  ? 'text-gray-500 dark:text-gray-500 dark:text-gray-400'
-                  : 'text-purple-100'
+                  ? 'text-muted-foreground '
+                  : 'text-primary-foreground'
               }`}
             >
               <span>
@@ -664,7 +657,7 @@ function ChatMessage({
                 <button
                   key={index}
                   onClick={() => onQuickReply(reply)}
-                  className="px-4 py-2.5 text-sm border border-border rounded-lg bg-card hover:bg-muted hover:border-purple-500 dark:hover:border-purple-400 transition-all text-left flex items-center gap-2 group"
+                  className="px-4 py-2.5 text-sm border border-border rounded-lg bg-card hover:bg-muted hover:border-primary transition-all text-left flex items-center gap-2 group"
                 >
                   <span>{reply.text}</span>
                   <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">→</span>
@@ -684,16 +677,16 @@ function TypingIndicator() {
     <div className="flex justify-start animate-fadeIn">
       <div className="flex gap-2 max-w-[85%]">
         <div className="flex-shrink-0 mt-1">
-          <div className="bg-purple-600 p-1.5 rounded-full">
+          <div className="bg-primary p-1.5 rounded-full">
             <MessageCircle className="h-4 w-4 text-white" />
           </div>
         </div>
 
-        <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl rounded-tl-none px-4 py-3">
+        <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3">
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
           </div>
         </div>
       </div>
@@ -736,7 +729,7 @@ function SatisfactionRating({ onRate }: { onRate: (rating: number) => void }) {
   return (
     <div className="flex justify-center animate-fadeIn">
       <div className="bg-card border border-border rounded-2xl px-6 py-4 max-w-sm">
-        <p className="text-sm text-gray-900 dark:text-gray-100 font-medium text-center mb-4">
+        <p className="text-sm text-foreground font-medium text-center mb-4">
           Como foi o atendimento?
         </p>
         
@@ -760,7 +753,7 @@ function SatisfactionRating({ onRate }: { onRate: (rating: number) => void }) {
               </div>
               
               {hoveredRating === rating && (
-                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-900 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded">
+                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-900 text-white text-xs px-2 py-1 rounded">
                   {label}
                 </div>
               )}
@@ -821,4 +814,5 @@ function getMockResponse(userMessage: string): {
     ]
   };
 }
+
 

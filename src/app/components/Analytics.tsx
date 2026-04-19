@@ -58,11 +58,11 @@ export default function Analytics() {
               <span className="text-sm font-medium">Analytics & Insights</span>
             </div>
 
-            <h2 className="text-white mb-4 text-3xl sm:text-4xl lg:text-5xl font-bold">
+            <h2 className="text-foreground mb-4 text-3xl sm:text-4xl lg:text-5xl font-bold">
               Decisões baseadas em dados reais
             </h2>
 
-            <p className="text-gray-400 mb-8 text-base sm:text-lg">
+            <p className="text-muted-foreground/70 mb-8 text-base sm:text-lg">
               Acompanhe o desempenho das suas campanhas em tempo real. Identifique
               oportunidades e otimize sua estratégia com insights acionáveis.
             </p>
@@ -74,16 +74,16 @@ export default function Analytics() {
                 return (
                   <div
                     key={index}
-                    className="bg-card rounded-xl p-4 border border-purple-500/10 hover:border-purple-500/30 transition-all hover:bg-muted"
+                    className="bg-card rounded-[10px] p-4 border border-border hover:border-primary/30 transition-all hover:bg-muted"
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
                         <Icon className="w-4 h-4 text-blue-600" />
                       </div>
                     </div>
-                    <p className="text-sm text-gray-400 mb-1">{stat.label}</p>
+                    <p className="text-sm text-muted-foreground/70 mb-1">{stat.label}</p>
                     <div className="flex items-end justify-between">
-                      <p className="text-white text-xl font-bold">{stat.value}</p>
+                      <p className="text-foreground text-xl font-bold">{stat.value}</p>
                       <span
                         className={`text-xs font-medium ${
                           stat.positive ? 'text-green-400' : 'text-red-400'
@@ -98,11 +98,11 @@ export default function Analytics() {
             </div>
 
             <div className="flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="w-3 h-3 bg-green-500 rounded-full" />
                 <span>Atualização em tempo real</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="w-3 h-3 bg-blue-500 rounded-full" />
                 <span>Exportação de relatórios</span>
               </div>
@@ -112,16 +112,16 @@ export default function Analytics() {
           {/* Right Content - Charts */}
           <div className="space-y-6">
             {/* Leads by Source */}
-            <div className="bg-card rounded-2xl p-6 shadow-lg border border-purple-500/10">
-              <h3 className="text-white mb-6 text-lg font-semibold">Leads por Origem</h3>
+            <div className="bg-card rounded-2xl p-6 border border-border">
+              <h3 className="text-foreground mb-6 text-lg font-semibold">Leads por Origem</h3>
               <div className="space-y-4">
                 {leadsBySource.map((item, index) => (
                   <div key={index}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">{item.source}</span>
-                      <span className="text-sm text-white font-medium">{item.count}</span>
+                      <span className="text-sm text-muted-foreground">{item.source}</span>
+                      <span className="text-sm text-foreground font-medium">{item.count}</span>
                     </div>
-                    <div className="relative h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div className="relative h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className={`absolute left-0 top-0 h-full ${item.color} rounded-full transition-all duration-500`}
                         style={{ width: `${item.percentage}%` }}
@@ -133,8 +133,8 @@ export default function Analytics() {
             </div>
 
             {/* Leads by Status */}
-            <div className="bg-card rounded-2xl p-6 shadow-lg border border-purple-500/10">
-              <h3 className="text-white mb-6 text-lg font-semibold">Status dos Leads</h3>
+            <div className="bg-card rounded-2xl p-6 border border-border">
+              <h3 className="text-foreground mb-6 text-lg font-semibold">Status dos Leads</h3>
               <div className="space-y-3">
                 {leadsByStatus.map((item, index) => (
                   <div
@@ -143,9 +143,9 @@ export default function Analytics() {
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-3 h-3 ${item.color} rounded-full`} />
-                      <span className="text-sm text-gray-300">{item.status}</span>
+                      <span className="text-sm text-muted-foreground">{item.status}</span>
                     </div>
-                    <span className="text-white font-medium">{item.count}</span>
+                    <span className="text-foreground font-medium">{item.count}</span>
                   </div>
                 ))}
               </div>

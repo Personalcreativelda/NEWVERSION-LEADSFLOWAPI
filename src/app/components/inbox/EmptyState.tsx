@@ -1,6 +1,6 @@
-// INBOX: Tela vazia (sem conversa selecionada) modernizada
+// INBOX: Empty state - modern ManyChat-style
 import React from 'react';
-import { MessageSquare, Settings } from 'lucide-react';
+import { MessageSquare, Settings, Zap } from 'lucide-react';
 
 interface EmptyStateProps {
     onOpenSettings?: () => void;
@@ -8,46 +8,39 @@ interface EmptyStateProps {
 
 export function EmptyState({ onOpenSettings }: EmptyStateProps) {
     return (
-        <div className="flex flex-col items-center justify-center p-8 text-center animate-fadeIn group">
-            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-[#00D9A3]/10 flex items-center justify-center mb-10 relative transition-transform duration-500 group-hover:scale-110">
-                <div className="absolute inset-0 bg-[#00D9A3]/20 rounded-full animate-ping opacity-20"></div>
-                <MessageSquare size={56} className="text-[#00D9A3] relative z-10" />
+        <div className="flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto">
+            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+                <MessageSquare size={36} className="text-primary" />
             </div>
 
-            <h3 
-                className="text-2xl md:text-3xl font-bold mb-4 tracking-tight"
-                style={{ color: 'hsl(var(--foreground))' }}
-            >
-                Bem-vindo ao seu Inbox
+            <h3 className="text-xl font-semibold mb-2 text-foreground">
+                Selecione uma conversa
             </h3>
 
-            <p 
-                className="max-w-md mx-auto mb-10 leading-relaxed text-lg"
-                style={{ color: 'hsl(var(--muted-foreground))' }}
-            >
-                Selecione uma conversa à esquerda para começar ou configure seus canais.
+            <p className="text-sm mb-8 leading-relaxed text-muted-foreground">
+                Escolha uma conversa à esquerda para começar a interagir com seus leads.
             </p>
 
             <button
                 onClick={onOpenSettings}
-                className="flex items-center gap-2 px-6 py-3 bg-[#00D9A3] hover:bg-[#00C090] text-white rounded-xl font-semibold shadow-lg shadow-[#00D9A3]/20 transition-all active:scale-95 group/btn"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 hover:opacity-90 active:scale-[0.97] bg-primary text-primary-foreground"
             >
-                <Settings size={18} className="group-hover/btn:rotate-90 transition-transform duration-500" />
+                <Settings size={16} />
                 Configurar Canais
             </button>
 
-            <div className="mt-12 grid grid-cols-3 gap-6 opacity-30 grayscale hover:grayscale-0 transition-all duration-700">
-                <div className="flex flex-col items-center">
-                    <span className="text-xs font-bold uppercase tracking-widest mb-2">WhatsApp</span>
-                    <div className="w-1 h-1 bg-green-500 rounded-full"></div>
+            <div className="mt-10 flex items-center gap-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    WhatsApp
                 </div>
-                <div className="flex flex-col items-center">
-                    <span className="text-xs font-bold uppercase tracking-widest mb-2">Instagram</span>
-                    <div className="w-1 h-1 bg-pink-500 rounded-full"></div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 bg-pink-500 rounded-full" />
+                    Instagram
                 </div>
-                <div className="flex flex-col items-center">
-                    <span className="text-xs font-bold uppercase tracking-widest mb-2">Facebook</span>
-                    <div className="w-1 h-1 bg-blue-600 rounded-full"></div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                    Facebook
                 </div>
             </div>
         </div>

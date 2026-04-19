@@ -16,7 +16,7 @@ export default function IntegrationCard({
     icon: Icon,
     status = 'disconnected',
     onConfigure,
-    color = 'text-gray-700 dark:text-gray-300'
+    color = 'text-foreground/80'
 }: IntegrationCardProps) {
     return (
         <div 

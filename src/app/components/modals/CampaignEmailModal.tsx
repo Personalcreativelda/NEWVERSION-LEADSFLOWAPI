@@ -590,7 +590,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
       <div
         style={{
           backgroundColor: 'hsl(var(--card))',
@@ -631,7 +631,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             />
           </div>
 
-          <div className="border-t border-gray-200 dark:border-gray-700"></div>
+          <div className="border-t border-border"></div>
 
           {/* Destinatários */}
           <div>
@@ -641,7 +641,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
 
             <div className="space-y-3">
               {/* Todos */}
-              <label className="flex items-center gap-3 p-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 hover:border-[#3B82F6] cursor-pointer transition-colors">
+              <label className="flex items-center gap-3 p-3 rounded-lg border-2 border-border hover:border-[#3B82F6] cursor-pointer transition-colors">
                 <input
                   type="radio"
                   name="recipient"
@@ -655,8 +655,8 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               </label>
 
               {/* Segmentos */}
-              <div className="border-2 border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <label className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+              <div className="border-2 border-border rounded-lg overflow-hidden">
+                <label className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer transition-colors">
                   <input
                     type="radio"
                     name="recipient"
@@ -670,7 +670,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                 </label>
 
                 {recipientMode === 'segments' && (
-                  <div className="px-3 pb-3 space-y-2 bg-gray-50 dark:bg-gray-800/50">
+                  <div className="px-3 pb-3 space-y-2 bg-muted/50">
                     {Object.entries(statusCounts).map(([status, count]) => (
                       <label key={status} className="flex items-center gap-2 pl-7">
                         <input
@@ -695,8 +695,8 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               </div>
 
               {/* Lista personalizada */}
-              <div className="border-2 border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <label className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+              <div className="border-2 border-border rounded-lg overflow-hidden">
+                <label className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer transition-colors">
                   <input
                     type="radio"
                     name="recipient"
@@ -710,7 +710,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                 </label>
 
                 {recipientMode === 'custom' && (
-                  <div className="px-3 pb-3 bg-gray-50 dark:bg-gray-800/50">
+                  <div className="px-3 pb-3 bg-muted/50">
                     <Textarea
                       value={customEmails}
                       onChange={(e) => setCustomEmails(e.target.value)}
@@ -731,7 +731,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             </div>
           </div>
 
-          <div className="border-t border-gray-200 dark:border-gray-700"></div>
+          <div className="border-t border-border"></div>
 
           {/* Assunto */}
           <div>
@@ -749,7 +749,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             </p>
           </div>
 
-          <div className="border-t border-gray-200 dark:border-gray-700"></div>
+          <div className="border-t border-border"></div>
 
           {/* Conteúdo */}
           <div>
@@ -763,7 +763,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                   onClick={() => setUseHtml(false)}
                   className={`px-3 py-1 text-xs rounded-md transition-colors ${!useHtml
                     ? 'bg-[#3B82F6] text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-foreground hover:bg-gray-200 dark:hover:bg-gray-700'
+                    : 'bg-muted text-foreground hover:bg-muted/50'
                     }`}
                 >
                   <Type className="w-3 h-3 inline mr-1" />
@@ -774,7 +774,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                   onClick={() => setUseHtml(true)}
                   className={`px-3 py-1 text-xs rounded-md transition-colors ${useHtml
                     ? 'bg-[#3B82F6] text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-foreground hover:bg-gray-200 dark:hover:bg-gray-700'
+                    : 'bg-muted text-foreground hover:bg-muted/50'
                     }`}
                 >
                   {'</>'} HTML
@@ -783,30 +783,30 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             </div>
 
             {/* Toolbar */}
-            <div className="flex items-center gap-1 p-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-t-lg">
+            <div className="flex items-center gap-1 p-2 bg-muted border border-border rounded-t-lg">
               <button
                 type="button"
                 onClick={() => insertVariable('{name}')}
-                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors group"
+                className="p-2 hover:bg-muted/50 rounded-md transition-colors group"
                 title="Inserir variável"
               >
-                <span className="text-sm font-medium text-foreground group-hover:text-gray-900 dark:group-hover:text-white">
+                <span className="text-sm font-medium text-foreground group-hover:text-foreground">
                   {'{x}'}
                 </span>
               </button>
-              <button type="button" className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors" title="Emoji">
-                <Smile className="w-4 h-4 text-gray-600 dark:text-foreground" />
+              <button type="button" className="p-2 hover:bg-muted/50 rounded-md transition-colors" title="Emoji">
+                <Smile className="w-4 h-4 text-muted-foreground" />
               </button>
               {!useHtml && (
                 <>
-                  <button type="button" className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors" title="Negrito">
-                    <Bold className="w-4 h-4 text-gray-600 dark:text-foreground" />
+                  <button type="button" className="p-2 hover:bg-muted/50 rounded-md transition-colors" title="Negrito">
+                    <Bold className="w-4 h-4 text-muted-foreground" />
                   </button>
-                  <button type="button" className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors" title="Itálico">
-                    <Italic className="w-4 h-4 text-gray-600 dark:text-foreground" />
+                  <button type="button" className="p-2 hover:bg-muted/50 rounded-md transition-colors" title="Itálico">
+                    <Italic className="w-4 h-4 text-muted-foreground" />
                   </button>
-                  <button type="button" className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors" title="Link">
-                    <Link2 className="w-4 h-4 text-gray-600 dark:text-foreground" />
+                  <button type="button" className="p-2 hover:bg-muted/50 rounded-md transition-colors" title="Link">
+                    <Link2 className="w-4 h-4 text-muted-foreground" />
                   </button>
                 </>
               )}
@@ -815,7 +815,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                 onClick={() => setShowTemplates(!showTemplates)}
                 className={`flex items-center gap-1.5 px-2 py-1 ml-2 rounded-md transition-colors ${showTemplates
                   ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                  : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-foreground'
+                  : 'hover:bg-muted/50 text-muted-foreground'
                   }`}
                 title="Escolher modelo"
               >
@@ -825,10 +825,10 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               <button
                 type="button"
                 onClick={() => htmlInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-2 py-1 ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-foreground rounded-md transition-colors"
+                className="flex items-center gap-1.5 px-2 py-1 ml-1 hover:bg-muted/50 text-muted-foreground rounded-md transition-colors"
                 title="Importar arquivo HTML"
               >
-                <div className="w-4 h-4 rounded border border-gray-400 flex items-center justify-center text-[10px] font-bold">
+                <div className="w-4 h-4 rounded border border-border flex items-center justify-center text-[10px] font-bold">
                   ↓
                 </div>
                 <span className="text-xs font-medium">Importar</span>
@@ -886,7 +886,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
 
               {/* Variáveis */}
               <div className="mt-2 flex flex-wrap gap-2 items-center">
-                <span className="text-xs text-gray-500 dark:text-foreground">💡 Variáveis:</span>
+                <span className="text-xs text-muted-foreground">💡 Variáveis:</span>
                 {['{name}', '{email}', '{phone}', '{company}'].map(v => (
                   <button
                     key={v}
@@ -900,7 +900,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               </div>
 
               {/* Contador */}
-              <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-foreground">
+              <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                 <span>📝 {(useHtml ? htmlContent : message).length} caracteres</span>
                 {!useHtml && message.length > 1000 && (
                   <span className="text-amber-600 dark:text-amber-400">
@@ -911,7 +911,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             </div>
           </div>
 
-          <div className="border-t border-gray-200 dark:border-gray-700"></div>
+          <div className="border-t border-border"></div>
 
           {/* Anexos */}
           <div>
@@ -946,8 +946,8 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                   Arquivos anexados:
                 </p>
                 {attachments.map((att, index) => (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg group/att">
-                    <div className="w-10 h-10 rounded flex-shrink-0 overflow-hidden bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-border">
+                  <div key={index} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg group/att">
+                    <div className="w-10 h-10 rounded flex-shrink-0 overflow-hidden bg-muted flex items-center justify-center border border-border">
                       {att.type.startsWith('image/') ? (
                         <img
                           src={getAttachmentUrl(att) || ''}
@@ -971,7 +971,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                           <Eye className="w-3.5 h-3.5" />
                         </a>
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-foreground">{formatFileSize(att.size)}</p>
+                      <p className="text-xs text-muted-foreground">{formatFileSize(att.size)}</p>
                     </div>
                     <button
                       type="button"
@@ -990,7 +990,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             </p>
           </div>
 
-          <div className="border-t border-gray-200 dark:border-gray-700"></div>
+          <div className="border-t border-border"></div>
 
           {/* Agendamento */}
           <div>
@@ -999,7 +999,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             </Label>
 
             <div className="space-y-3">
-              <label className="flex items-center gap-3 p-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 hover:border-[#3B82F6] cursor-pointer transition-colors">
+              <label className="flex items-center gap-3 p-3 rounded-lg border-2 border-border hover:border-[#3B82F6] cursor-pointer transition-colors">
                 <input
                   type="radio"
                   name="schedule"
@@ -1012,8 +1012,8 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                 </span>
               </label>
 
-              <div className="border-2 border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <label className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+              <div className="border-2 border-border rounded-lg overflow-hidden">
+                <label className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer transition-colors">
                   <input
                     type="radio"
                     name="schedule"
@@ -1027,7 +1027,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                 </label>
 
                 {scheduleMode === 'scheduled' && (
-                  <div className="px-3 pb-3 bg-gray-50 dark:bg-gray-800/50 flex gap-2">
+                  <div className="px-3 pb-3 bg-muted/50 flex gap-2">
                     <Input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="h-9 flex-1" />
                     <Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} className="h-9 flex-1" />
                   </div>
@@ -1048,23 +1048,23 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                 <h4 className="font-semibold text-foreground mb-2">Resumo da Campanha</h4>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
-                    <span className="text-gray-600 dark:text-foreground">Destinatários:</span>
+                    <span className="text-muted-foreground">Destinatários:</span>
                     <p className="font-semibold text-foreground">{recipientCount} emails</p>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-foreground">Tempo estimado:</span>
+                    <span className="text-muted-foreground">Tempo estimado:</span>
                     <p className="font-semibold text-foreground">{getEstimatedTime()}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-foreground">Anexos:</span>
+                    <span className="text-muted-foreground">Anexos:</span>
                     <p className="font-semibold text-foreground">{attachments.length} arquivo(s)</p>
                   </div>
                   <div>
-                    <span className="text-gray-600 dark:text-foreground">Formato:</span>
+                    <span className="text-muted-foreground">Formato:</span>
                     <p className="font-semibold text-foreground">{useHtml ? 'HTML' : 'Texto'}</p>
                   </div>
                   <div className="col-span-2 mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
-                    <span className="text-gray-600 dark:text-foreground">Enviando de:</span>
+                    <span className="text-muted-foreground">Enviando de:</span>
                     <p className="font-semibold text-foreground text-xs truncate">
                       {localStorage.getItem('smtp_from_name') || 'Não configurado'} ({localStorage.getItem('smtp_from_email') || 'Não configurado'})
                     </p>
@@ -1087,7 +1087,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             type="button"
             variant="outline"
             onClick={handleSaveDraft}
-            className="flex items-center gap-2 border-gray-200 dark:border-gray-700 text-foreground hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="flex items-center gap-2 border-border text-foreground hover:bg-muted/50"
           >
             <Save className="w-4 h-4" />
             Salvar Rascunho
@@ -1099,7 +1099,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               variant="outline"
               onClick={handleTestEmail}
               disabled={isSending || !subject.trim() || (!message.trim() && !htmlContent.trim())}
-              className="border-gray-200 dark:border-gray-700 text-foreground hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="border-border text-foreground hover:bg-muted/50"
             >
               <Eye className="w-4 h-4 mr-2" />
               Enviar Teste
@@ -1109,7 +1109,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               variant="outline"
               onClick={onClose}
               disabled={isSending}
-              className="border-gray-200 dark:border-gray-700 text-foreground hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="border-border text-foreground hover:bg-muted/50"
             >
               Cancelar
             </Button>

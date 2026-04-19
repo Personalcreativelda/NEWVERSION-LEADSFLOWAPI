@@ -811,12 +811,12 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   };
 
   return (
-    <div className={`w-full h-full flex flex-col ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+    <div className={`w-full h-full flex flex-col bg-muted/50`}>
       {/* Header */}
-      <div className={`flex-shrink-0 border-b p-6 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+      <div className={`flex-shrink-0 border-b p-6 bg-card border-border`}>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className={`text-2xl font-bold flex items-center gap-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h1 className={`text-2xl font-bold flex items-center gap-3 text-foreground`}>
               <PhoneCall className="w-7 h-7 text-purple-500" />
               Agentes de Voz
               {!elevenLabsConfigured && (
@@ -825,7 +825,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 </Badge>
               )}
             </h1>
-            <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            <p className={`text-sm mt-1 text-muted-foreground`}>
               Crie agentes de voz usando ElevenLabs para gerar vozes realistas e Wavoip para efetuar chamadas automáticas
             </p>
           </div>
@@ -833,12 +833,12 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
             <Button 
               onClick={handleOpenSettings} 
               variant="outline"
-              className={isDark ? 'border-slate-600 hover:bg-slate-700' : ''}
+              className="border-border hover:bg-muted"
             >
               <Settings className="w-4 h-4 mr-2" />
               Configurações
             </Button>
-            <Button onClick={handleCreate} className="bg-purple-600 hover:bg-purple-700">
+            <Button onClick={handleCreate}>
               <Plus className="w-4 h-4 mr-2" />
               Criar Agente
               {planLimits.limits.voiceAgents === 0 && <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Pro</span>}
@@ -848,13 +848,13 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
 
         {/* Search */}
         <div className="relative">
-          <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+          <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground`} />
           <Input
             type="text"
             placeholder="Buscar agentes de voz..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className={`pl-10 ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+            className={`pl-10 bg-muted border-border text-foreground`}
           />
         </div>
       </div>
@@ -863,21 +863,21 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       <div className="flex-1 overflow-auto p-6">
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className={`w-8 h-8 animate-spin ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            <Loader2 className={`w-8 h-8 animate-spin text-muted-foreground`} />
           </div>
         ) : filteredAgents.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
-            <PhoneCall className={`w-16 h-16 mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
-            <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <PhoneCall className={`w-16 h-16 mb-4 text-muted-foreground/70`} />
+            <h3 className={`text-lg font-semibold mb-2 text-foreground`}>
               {searchTerm ? 'Nenhum agente encontrado' : 'Nenhum agente de voz configurado'}
             </h3>
-            <p className={`text-sm mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            <p className={`text-sm mb-4 text-muted-foreground`}>
               {searchTerm
                 ? 'Tente buscar com outros termos'
                 : 'Crie agentes de voz usando ElevenLabs para gerar vozes realistas e Wavoip para efetuar chamadas automáticas'}
             </p>
             {!searchTerm && (
-              <Button onClick={handleCreate} className="bg-purple-600 hover:bg-purple-700">
+              <Button onClick={handleCreate}>
                 <Plus className="w-4 h-4 mr-2" />
                 Criar Primeiro Agente
               </Button>
@@ -888,19 +888,19 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
             {filteredAgents.map((agent) => (
               <div
                 key={agent.id}
-                className={`rounded-lg p-5 hover:shadow-lg transition-shadow ${isDark ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-gray-200'}`}
+                className={`rounded-lg p-5 hover:shadow-lg transition-shadow bg-card border border-border`}
               >
                 {/* Card header */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${agent.call_config?.elevenlabs_agent_id ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-gray-100 dark:bg-slate-700'}`}>
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${agent.call_config?.elevenlabs_agent_id ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-muted'}`}>
                       {agent.call_config?.elevenlabs_agent_id
                         ? <Bot className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                        : <PhoneCall className="w-5 h-5 text-gray-500" />
+                        : <PhoneCall className="w-5 h-5 text-muted-foreground" />
                       }
                     </div>
                     <div>
-                      <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{agent.name}</h3>
+                      <h3 className={`font-semibold text-foreground`}>{agent.name}</h3>
                       <div className="flex items-center gap-1 mt-0.5">
                         <Badge variant={agent.is_active ? 'default' : 'secondary'} className="text-xs">
                           {agent.is_active ? 'Ativo' : 'Inativo'}
@@ -922,12 +922,12 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 </div>
 
                 {agent.description && (
-                  <p className={`text-sm mb-3 line-clamp-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <p className={`text-sm mb-3 line-clamp-2 text-muted-foreground`}>
                     {agent.description}
                   </p>
                 )}
 
-                <div className={`flex items-center gap-2 text-xs mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                <div className={`flex items-center gap-2 text-xs mb-4 text-muted-foreground`}>
                   {agent.call_config?.elevenlabs_agent_id ? (
                     <>
                       <Bot className="w-3 h-3 text-purple-500" />
@@ -993,15 +993,15 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-lg shadow-xl w-full max-w-[calc(100%-2rem)] sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
-            <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3 border-b ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
-              <h2 className={`text-base sm:text-lg md:text-xl font-bold flex-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <div className={`rounded-lg shadow-xl w-full max-w-[calc(100%-2rem)] sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col bg-card`}>
+            <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3 border-b bg-card border-border`}>
+              <h2 className={`text-base sm:text-lg md:text-xl font-bold flex-1 text-foreground`}>
                 {selectedAgent ? 'Editar Agente de Voz' : 'Criar Agente de Voz'}
               </h2>
               <button 
                 type="button"
                 onClick={() => setModalOpen(false)} 
-                className={`flex-shrink-0 p-1 rounded-md transition-colors ${isDark ? 'text-gray-400 hover:text-white hover:bg-slate-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                className={`flex-shrink-0 p-1 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted`}
               >
                 <X className="w-6 h-6" />
               </button>
@@ -1010,61 +1010,61 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
             <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 space-y-4">
               {/* Nome */}
               <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 text-foreground`}>
                   Nome do Agente *
                 </label>
                 <Input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="Ex: Agente de Vendas"
-                  className={`text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                  className={`text-sm sm:text-base bg-muted border-border text-foreground`}
                 />
               </div>
 
               {/* Descrição */}
               <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 text-foreground`}>
                   Descrição
                 </label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder="Descreva a função deste agente..."
-                  className={`w-full px-3 py-2 border rounded-md min-h-[60px] sm:min-h-[80px] text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
+                  className={`w-full px-3 py-2 border rounded-md min-h-[60px] sm:min-h-[80px] text-sm sm:text-base bg-muted border-border text-foreground`}
                 />
               </div>
 
               {/* ── Configuração ElevenLabs ConvAI + SIP ── */}
-              <div className={`rounded-lg p-4 border ${isDark ? 'bg-slate-700/50 border-purple-800/40' : 'bg-purple-50 border-purple-200'}`}>
+              <div className="rounded-lg p-4 border bg-purple-50 dark:bg-muted/50 border-purple-200 dark:border-purple-800/40">
                 <div className="flex items-center gap-2 mb-1">
                   <Bot className="w-4 h-4 text-purple-500" />
-                  <span className={`text-sm font-semibold ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
+                  <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
                     Configuração ElevenLabs + SIP
                   </span>
                 </div>
-                <p className={`text-[11px] mb-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                <p className={`text-[11px] mb-4 text-muted-foreground`}>
                   Selecione o agente ConvAI e o número SIP registrado em <strong>Configurações</strong>.
                 </p>
 
                 {/* ElevenLabs ConvAI Agent selector + inline create */}
                 <div className="mb-3">
                   <div className="flex items-center justify-between mb-1">
-                    <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <label className={`block text-xs font-medium text-foreground/80`}>
                       Agente ElevenLabs (ConvAI)
                     </label>
                     <div className="flex items-center gap-1">
                       <button type="button" title="Recarregar agentes e números"
                         onClick={refreshConvAIData}
                         disabled={convAILoading}
-                        className={`p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-600 ${isDark ? 'text-gray-400' : 'text-gray-500'} ${convAILoading ? 'opacity-50' : ''}`}>
+                        className={`p-0.5 rounded hover:bg-muted text-muted-foreground ${convAILoading ? 'opacity-50' : ''}`}>
                         <RefreshCw className="w-3 h-3" />
                       </button>
                       <button type="button"
                         onClick={() => setCreateAgentFormOpen((v) => !v)}
                         title="Criar novo agente"
                         className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${createAgentFormOpen
-                          ? isDark ? 'bg-purple-800 text-purple-200' : 'bg-purple-100 text-purple-700'
-                          : isDark ? 'bg-slate-600 text-gray-300 hover:bg-purple-800 hover:text-purple-200' : 'bg-gray-200 text-gray-600 hover:bg-purple-100 hover:text-purple-700'}`}>
+                          ? 'bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-200'
+                          : 'bg-muted text-muted-foreground hover:bg-purple-100 dark:hover:bg-purple-800 hover:text-purple-700 dark:hover:text-purple-200'}`}>
                         <Plus className="w-2.5 h-2.5" />
                         Criar agente
                       </button>
@@ -1074,7 +1074,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     value={form.call_config.elevenlabs_agent_id || ''}
                     onChange={(e) => setForm({ ...form, call_config: { ...form.call_config, elevenlabs_agent_id: e.target.value } })}
                     disabled={convAILoading}
-                    className={`w-full px-3 py-2 border rounded-md text-sm ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'} ${convAILoading ? 'opacity-60' : ''}`}
+                    className={`w-full px-3 py-2 border rounded-md text-sm bg-muted border-border text-foreground ${convAILoading ? 'opacity-60' : ''}`}
                   >
                     <option value="">
                       {convAILoading ? '⏳ Carregando...' : '— Selecione um agente ElevenLabs —'}
@@ -1086,38 +1086,38 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
 
                   {/* Inline Create Agent Form */}
                   {createAgentFormOpen && (
-                    <div className={`mt-2 p-3 rounded-lg border space-y-2 ${isDark ? 'bg-slate-900/50 border-purple-700/50' : 'bg-white border-purple-200'}`}>
-                      <p className={`text-[11px] font-semibold mb-1 ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
+                    <div className="mt-2 p-3 rounded-lg border space-y-2 bg-card border-purple-200 dark:border-purple-700/50">
+                      <p className="text-[11px] font-semibold mb-1 text-purple-700 dark:text-purple-300">
                         Criar novo agente ConvAI
                       </p>
                       <div>
-                        <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Nome *</label>
+                        <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Nome *</label>
                         <Input value={createAgentForm.name}
                           onChange={(e) => setCreateAgentForm((p) => ({ ...p, name: e.target.value }))}
                           placeholder="Ex: Atendente Sofia"
-                          className={`text-xs h-7 ${isDark ? 'bg-slate-800 border-slate-600 text-white' : ''}`} />
+                          className={`text-xs h-7 bg-card border-border text-foreground`} />
                       </div>
                       <div>
-                        <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Primeira mensagem *</label>
+                        <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Primeira mensagem *</label>
                         <Input value={createAgentForm.first_message}
                           onChange={(e) => setCreateAgentForm((p) => ({ ...p, first_message: e.target.value }))}
                           placeholder="Olá! Como posso ajudar?"
-                          className={`text-xs h-7 ${isDark ? 'bg-slate-800 border-slate-600 text-white' : ''}`} />
+                          className={`text-xs h-7 bg-card border-border text-foreground`} />
                       </div>
                       <div>
-                        <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Instruções (system prompt) *</label>
+                        <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Instruções (system prompt) *</label>
                         <textarea value={createAgentForm.system_prompt}
                           onChange={(e) => setCreateAgentForm((p) => ({ ...p, system_prompt: e.target.value }))}
                           placeholder="Você é um assistente de vendas da empresa X. Seja cordial e objetivo..."
                           rows={3}
-                          className={`w-full px-2 py-1 border rounded text-xs resize-none ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'border-gray-300'}`} />
+                          className={`w-full px-2 py-1 border rounded text-xs resize-none bg-card border-border text-foreground`} />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Voz</label>
+                          <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Voz</label>
                           <select value={createAgentForm.voice_id}
                             onChange={(e) => setCreateAgentForm((p) => ({ ...p, voice_id: e.target.value }))}
-                            className={`w-full px-2 py-1 border rounded text-xs ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'border-gray-300'}`}>
+                            className={`w-full px-2 py-1 border rounded text-xs bg-card border-border text-foreground`}>
                             <option value="">Padrão</option>
                             {elevenLabsVoices.map((v) => (
                               <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
@@ -1125,10 +1125,10 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                           </select>
                         </div>
                         <div>
-                          <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Idioma</label>
+                          <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Idioma</label>
                           <select value={createAgentForm.language}
                             onChange={(e) => setCreateAgentForm((p) => ({ ...p, language: e.target.value }))}
-                            className={`w-full px-2 py-1 border rounded text-xs ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'border-gray-300'}`}>
+                            className={`w-full px-2 py-1 border rounded text-xs bg-card border-border text-foreground`}>
                             <option value="pt">Português</option>
                             <option value="en">English</option>
                             <option value="es">Español</option>
@@ -1136,10 +1136,10 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                         </div>
                       </div>
                       <div>
-                        <label className={`block text-[10px] font-medium mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Modelo LLM</label>
+                        <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Modelo LLM</label>
                         <select value={createAgentForm.llm}
                           onChange={(e) => setCreateAgentForm((p) => ({ ...p, llm: e.target.value }))}
-                          className={`w-full px-2 py-1 border rounded text-xs ${isDark ? 'bg-slate-800 border-slate-600 text-white' : 'border-gray-300'}`}>
+                          className={`w-full px-2 py-1 border rounded text-xs bg-card border-border text-foreground`}>
                           <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Recomendado)</option>
                           <option value="gpt-4o-mini">GPT-4o Mini</option>
                           <option value="gpt-4o">GPT-4o</option>
@@ -1150,7 +1150,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                         <Button type="button" size="sm"
                           onClick={handleCreateConvAIAgent}
                           disabled={createAgentLoading}
-                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-xs h-7">
+                          className="flex-1 text-xs h-7">
                           {createAgentLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Check className="w-3 h-3 mr-1" />}
                           Criar Agente
                         </Button>
@@ -1167,7 +1167,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 {/* Phone Number / SIP Trunk */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <label className={`block text-xs font-medium text-foreground/80`}>
                       Número de Saída (SIP Wavoip registrado)
                     </label>
                     <button
@@ -1175,7 +1175,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       title="Recarregar números"
                       onClick={refreshConvAIData}
                       disabled={convAILoading}
-                      className={`p-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-600 ${isDark ? 'text-gray-400' : 'text-gray-500'} ${convAILoading ? 'opacity-50' : ''}`}
+                      className={`p-0.5 rounded hover:bg-muted text-muted-foreground ${convAILoading ? 'opacity-50' : ''}`}
                     >
                       <RefreshCw className="w-3 h-3" />
                     </button>
@@ -1184,7 +1184,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     value={form.call_config.phone_number_id || ''}
                     onChange={(e) => setForm({ ...form, call_config: { ...form.call_config, phone_number_id: e.target.value } })}
                     disabled={convAILoading}
-                    className={`w-full px-3 py-2 border rounded-md text-sm ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'} ${convAILoading ? 'opacity-60' : ''}`}
+                    className={`w-full px-3 py-2 border rounded-md text-sm bg-muted border-border text-foreground ${convAILoading ? 'opacity-60' : ''}`}
                   >
                     <option value="">
                       {convAILoading ? '⏳ Carregando...' : phoneNumbers.length === 0 ? '— Nenhum número SIP registrado —' : '— Selecione um número —'}
@@ -1196,7 +1196,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     ))}
                   </select>
                   {!convAILoading && phoneNumbers.length === 0 && (
-                    <p className={`mt-1 text-[10px] ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                    <p className="mt-1 text-[10px] text-yellow-600 dark:text-yellow-400">
                       Nenhum número SIP encontrado. Registre em Configurações → SIP Wavoip ou clique ↺ para recarregar.
                     </p>
                   )}
@@ -1204,7 +1204,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
               </div>
             </div>
 
-            <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+            <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t bg-card border-border`}>
               <Button
                 type="button"
                 variant="outline"
@@ -1241,24 +1241,24 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Overlay */}
           <div 
-            className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+            className="fixed inset-0 bg-black/50 transition-opacity" 
             onClick={() => setSettingsModalOpen(false)}
           ></div>
           
           {/* Modal Content */}
-          <div className={`relative rounded-lg shadow-xl w-full max-w-lg z-10 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+          <div className={`relative rounded-lg shadow-xl w-full max-w-lg z-10 bg-card`}>
             
             {/* Header */}
-              <div className={`px-4 py-3 sm:px-6 sm:py-4 border-b ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+              <div className={`px-4 py-3 sm:px-6 sm:py-4 border-b bg-card border-border`}>
                 <div className="flex items-center justify-between">
-                  <h3 className={`text-base sm:text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  <h3 className={`text-base sm:text-lg font-semibold text-foreground`}>
                     Configurações de API
                   </h3>
                   <button
                     onClick={() => setSettingsModalOpen(false)}
-                    className={`p-1.5 rounded-md transition-colors w-6 h-6 flex items-center justify-center ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}
+                    className={`p-1.5 rounded-md transition-colors w-6 h-6 flex items-center justify-center hover:bg-muted`}
                   >
-                    <X className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                    <X className={`w-4 h-4 text-muted-foreground`} />
                   </button>
                 </div>
               </div>
@@ -1268,13 +1268,13 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 
                 {/* Model Selector */}
                 <div>
-                  <label className={`block text-xs sm:text-sm font-medium mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  <label className={`block text-xs sm:text-sm font-medium mb-2 text-foreground`}>
                     Modelo de IA Preferido
                   </label>
                   <select
                     value={settingsForm.preferred_ai_model}
                     onChange={(e) => setSettingsForm({ ...settingsForm, preferred_ai_model: e.target.value })}
-                    className={`w-full px-3 py-2 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white' : 'border-gray-300'}`}
+                    className={`w-full px-3 py-2 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground`}
                   >
                     <option value="elevenlabs">ElevenLabs (Voz)</option>
                     <option value="openai">OpenAI (GPT-4, GPT-3.5)</option>
@@ -1286,7 +1286,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 {/* ElevenLabs API Key */}
                 <div>
                   <div className="flex items-center gap-2">
-                    <label className={`block text-xs sm:text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <label className={`block text-xs sm:text-sm font-medium text-foreground`}>
                       ElevenLabs API Key
                     </label>
                     {savedApiKeys.elevenlabs && (
@@ -1299,21 +1299,21 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       value={settingsForm.elevenlabs_api_key}
                       onChange={(e) => setSettingsForm({ ...settingsForm, elevenlabs_api_key: e.target.value })}
                       placeholder={savedApiKeys.elevenlabs ? "Digite uma nova chave para atualizar..." : "sk_..."}
-                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder:text-gray-500' : 'border-gray-300'}`}
+                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, elevenlabs: !showSettingsApiKey.elevenlabs })}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${isDark ? 'hover:bg-slate-600' : 'hover:bg-gray-100'}`}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
                     >
                       {showSettingsApiKey.elevenlabs ? (
-                        <EyeOff className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                        <EyeOff className={`w-4 h-4 text-muted-foreground`} />
                       ) : (
-                        <Eye className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                        <Eye className={`w-4 h-4 text-muted-foreground`} />
                       )}
                     </button>
                   </div>
-                  <p className={`mt-1.5 text-[10px] sm:text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <p className={`mt-1.5 text-[10px] sm:text-xs text-muted-foreground`}>
                     Obtenha sua chave em <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">elevenlabs.io</a>
                   </p>
                 </div>
@@ -1321,7 +1321,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 {/* OpenAI API Key */}
                 <div>
                   <div className="flex items-center gap-2">
-                    <label className={`block text-xs sm:text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <label className={`block text-xs sm:text-sm font-medium text-foreground`}>
                       OpenAI API Key
                     </label>
                     {savedApiKeys.openai && (
@@ -1334,21 +1334,21 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       value={settingsForm.openai_api_key}
                       onChange={(e) => setSettingsForm({ ...settingsForm, openai_api_key: e.target.value })}
                       placeholder={savedApiKeys.openai ? "Digite uma nova chave para atualizar..." : "sk-..."}
-                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder:text-gray-500' : 'border-gray-300'}`}
+                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, openai: !showSettingsApiKey.openai })}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${isDark ? 'hover:bg-slate-600' : 'hover:bg-gray-100'}`}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
                     >
                       {showSettingsApiKey.openai ? (
-                        <EyeOff className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                        <EyeOff className={`w-4 h-4 text-muted-foreground`} />
                       ) : (
-                        <Eye className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                        <Eye className={`w-4 h-4 text-muted-foreground`} />
                       )}
                     </button>
                   </div>
-                  <p className={`mt-1.5 text-[10px] sm:text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <p className={`mt-1.5 text-[10px] sm:text-xs text-muted-foreground`}>
                     Obtenha sua chave em <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-cyan-500 hover:underline">platform.openai.com</a>
                   </p>
                 </div>
@@ -1356,7 +1356,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 {/* Anthropic API Key */}
                 <div>
                   <div className="flex items-center gap-2">
-                    <label className={`block text-xs sm:text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <label className={`block text-xs sm:text-sm font-medium text-foreground`}>
                       Anthropic API Key (Claude)
                     </label>
                     {savedApiKeys.anthropic && (
@@ -1369,21 +1369,21 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       value={settingsForm.anthropic_api_key}
                       onChange={(e) => setSettingsForm({ ...settingsForm, anthropic_api_key: e.target.value })}
                       placeholder={savedApiKeys.anthropic ? "Digite uma nova chave para atualizar..." : "sk-ant-..."}
-                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder:text-gray-500' : 'border-gray-300'}`}
+                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, anthropic: !showSettingsApiKey.anthropic })}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${isDark ? 'hover:bg-slate-600' : 'hover:bg-gray-100'}`}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
                     >
                       {showSettingsApiKey.anthropic ? (
-                        <EyeOff className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                        <EyeOff className={`w-4 h-4 text-muted-foreground`} />
                       ) : (
-                        <Eye className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                        <Eye className={`w-4 h-4 text-muted-foreground`} />
                       )}
                     </button>
                   </div>
-                  <p className={`mt-1.5 text-[10px] sm:text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <p className={`mt-1.5 text-[10px] sm:text-xs text-muted-foreground`}>
                     Obtenha sua chave em <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">console.anthropic.com</a>
                   </p>
                 </div>
@@ -1391,7 +1391,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 {/* Google API Key */}
                 <div>
                   <div className="flex items-center gap-2">
-                    <label className={`block text-xs sm:text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <label className={`block text-xs sm:text-sm font-medium text-foreground`}>
                       Google API Key (Gemini)
                     </label>
                     {savedApiKeys.google && (
@@ -1404,34 +1404,34 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       value={settingsForm.google_api_key}
                       onChange={(e) => setSettingsForm({ ...settingsForm, google_api_key: e.target.value })}
                       placeholder={savedApiKeys.google ? "Digite uma nova chave para atualizar..." : "AIza..."}
-                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder:text-gray-500' : 'border-gray-300'}`}
+                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, google: !showSettingsApiKey.google })}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors ${isDark ? 'hover:bg-slate-600' : 'hover:bg-gray-100'}`}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
                     >
                       {showSettingsApiKey.google ? (
-                        <EyeOff className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                        <EyeOff className={`w-4 h-4 text-muted-foreground`} />
                       ) : (
-                        <Eye className={`w-4 h-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />
+                        <Eye className={`w-4 h-4 text-muted-foreground`} />
                       )}
                     </button>
                   </div>
-                  <p className={`mt-1.5 text-[10px] sm:text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <p className={`mt-1.5 text-[10px] sm:text-xs text-muted-foreground`}>
                     Obtenha sua chave em <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-red-500 hover:underline">aistudio.google.com</a>
                   </p>
                 </div>
 
                 {/* ── Integração SIP Wavoip ── */}
-                <div className={`mt-2 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
+                <div className={`mt-2 pt-4 border-t border-border`}>
                   <div className="flex items-center gap-2 mb-3">
                     <Link2 className="w-4 h-4 text-purple-500" />
-                    <h4 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <h4 className={`text-sm font-semibold text-foreground`}>
                       Integração SIP Wavoip → ElevenLabs
                     </h4>
                   </div>
-                  <p className={`text-xs mb-3 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <p className={`text-xs mb-3 text-muted-foreground`}>
                     Registre as credenciais SIP do Wavoip no ElevenLabs para que o agente AI possa fazer chamadas via WhatsApp.
                     Encontre as credenciais em: <strong>Wavoip Dashboard → Dispositivos → SIP</strong>
                   </p>
@@ -1439,56 +1439,56 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Número WhatsApp</label>
+                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>Número WhatsApp</label>
                         <Input
                           value={sipForm.phone_number}
                           onChange={(e) => setSipForm({ ...sipForm, phone_number: e.target.value })}
                           placeholder="+5511999999999"
-                          className={`text-xs ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                          className={`text-xs bg-muted border-border text-foreground`}
                         />
                       </div>
                       <div>
-                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Label (opcional)</label>
+                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>Label (opcional)</label>
                         <Input
                           value={sipForm.label}
                           onChange={(e) => setSipForm({ ...sipForm, label: e.target.value })}
                           placeholder="Ex: Vendas"
-                          className={`text-xs ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                          className={`text-xs bg-muted border-border text-foreground`}
                         />
                       </div>
                     </div>
                     <div>
-                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>SIP Host</label>
+                      <label className={`block text-xs font-medium mb-1 text-foreground/80`}>SIP Host</label>
                       <Input
                         value={sipForm.sip_host}
                         onChange={(e) => setSipForm({ ...sipForm, sip_host: e.target.value })}
                         placeholder="sipv2.wavoip.com"
-                        className={`text-xs ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                        className={`text-xs bg-muted border-border text-foreground`}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>SIP Usuário</label>
+                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>SIP Usuário</label>
                         <Input
                           value={sipForm.sip_username}
                           onChange={(e) => setSipForm({ ...sipForm, sip_username: e.target.value })}
                           placeholder="UUID do Wavoip"
-                          className={`text-xs ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                          className={`text-xs bg-muted border-border text-foreground`}
                         />
                       </div>
                       <div>
-                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>SIP Senha</label>
+                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>SIP Senha</label>
                         <div className="relative">
                           <Input
                             type={showSettingsApiKey.sip_password ? 'text' : 'password'}
                             value={sipForm.sip_password}
                             onChange={(e) => setSipForm({ ...sipForm, sip_password: e.target.value })}
                             placeholder="Senha SIP"
-                            className={`text-xs pr-8 ${isDark ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                            className={`text-xs pr-8 bg-muted border-border text-foreground`}
                           />
                           <button type="button"
                             onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, sip_password: !showSettingsApiKey.sip_password })}
-                            className={`absolute right-2 top-1/2 -translate-y-1/2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            className={`absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground`}>
                             {showSettingsApiKey.sip_password ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                           </button>
                         </div>
@@ -1509,16 +1509,16 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   {/* Registered phone numbers */}
                   {phoneNumbers.length > 0 && (
                     <div className="mt-3">
-                      <p className={`text-xs font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <p className={`text-xs font-medium mb-2 text-foreground/80`}>
                         Números registrados ({phoneNumbers.length}):
                       </p>
                       <div className="space-y-1">
                         {phoneNumbers.map((pn) => (
                           <div key={pn.phone_number_id}
-                            className={`flex items-center justify-between px-2 py-1.5 rounded text-xs ${isDark ? 'bg-slate-700 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                            className={`flex items-center justify-between px-2 py-1.5 rounded text-xs bg-muted text-foreground/80`}>
                             <div>
                               <span className="font-medium">{pn.label || pn.phone_number}</span>
-                              <span className={`ml-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>({pn.phone_number})</span>
+                              <span className={`ml-1 text-muted-foreground/70`}>({pn.phone_number})</span>
                               {pn.assigned_agent && (
                                 <span className="ml-1 text-purple-500">→ {pn.assigned_agent.agent_name}</span>
                               )}
@@ -1540,7 +1540,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
               </div>
 
               {/* Footer */}
-              <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+              <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t bg-card border-border`}>
                 <Button 
                   type="button"
                   variant="outline" 
@@ -1575,9 +1575,9 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       {/* ── Active AI Call Status Modal ───────────────────────────────────── */}
       {activeCall && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-xl shadow-2xl w-full max-w-md ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+          <div className={`rounded-xl shadow-2xl w-full max-w-md bg-card`}>
             {/* Header */}
-            <div className={`px-5 py-4 border-b ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
+            <div className={`px-5 py-4 border-b border-border`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center ${activeCall.status === 'completed' ? 'bg-green-100' : activeCall.status === 'failed' ? 'bg-red-100' : 'bg-purple-100 animate-pulse'}`}>
@@ -1589,10 +1589,10 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     }
                   </div>
                   <div>
-                    <p className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <p className={`font-semibold text-sm text-foreground`}>
                       Chamada AI — {activeCall.agentName}
                     </p>
-                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{activeCall.phone}</p>
+                    <p className={`text-xs text-muted-foreground`}>{activeCall.phone}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1609,7 +1609,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   </span>
                   <button
                     onClick={() => { stopCallPolling(); setActiveCall(null); }}
-                    className={`p-1 rounded ${isDark ? 'hover:bg-slate-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                    className={`p-1 rounded hover:bg-muted text-muted-foreground`}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1618,18 +1618,18 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
             </div>
 
             {/* Transcript */}
-            <div className={`px-5 py-4 max-h-64 overflow-y-auto space-y-2 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+            <div className={`px-5 py-4 max-h-64 overflow-y-auto space-y-2 bg-card`}>
               {(!activeCall.transcript || activeCall.transcript.length === 0) ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   {activeCall.status !== 'completed' && activeCall.status !== 'failed' ? (
                     <>
-                      <Loader2 className={`w-6 h-6 animate-spin mb-2 ${isDark ? 'text-purple-400' : 'text-purple-500'}`} />
-                      <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <Loader2 className="w-6 h-6 animate-spin mb-2 text-purple-500 dark:text-purple-400" />
+                      <p className={`text-sm text-muted-foreground`}>
                         Aguardando início da conversa...
                       </p>
                     </>
                   ) : (
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <p className={`text-sm text-muted-foreground`}>
                       Sem transcrição disponível
                     </p>
                   )}
@@ -1641,8 +1641,8 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       {item.role === 'agent' ? 'AI' : 'U'}
                     </div>
                     <div className={`max-w-[80%] px-3 py-1.5 rounded-lg text-xs ${item.role === 'agent'
-                      ? isDark ? 'bg-slate-700 text-gray-200' : 'bg-gray-100 text-gray-800'
-                      : isDark ? 'bg-purple-900/40 text-purple-200' : 'bg-purple-50 text-purple-900'
+                      ? 'bg-muted text-foreground'
+                      : 'bg-purple-50 dark:bg-purple-900/40 text-purple-900 dark:text-purple-200'
                     }`}>
                       {item.message}
                     </div>
@@ -1652,7 +1652,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
             </div>
 
             {/* Footer */}
-            <div className={`px-5 py-3 border-t flex justify-between items-center ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
+            <div className={`px-5 py-3 border-t flex justify-between items-center border-border`}>
               {(activeCall.status !== 'completed' && activeCall.status !== 'failed') && (
                 <Button size="sm" variant="outline" onClick={() => {
                   voiceAgentsApi.getConversation(activeCall.conversationId)

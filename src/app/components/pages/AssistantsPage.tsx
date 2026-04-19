@@ -479,12 +479,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         key={assistant.id}
         className={`relative flex flex-col rounded-2xl border p-4 transition-all duration-200 hover:shadow-lg ${
           isFree
-            ? isDark
-              ? 'bg-card border-2 border-blue-500/40 text-card-foreground shadow-sm shadow-blue-500/10'
-              : 'bg-blue-50/50 border-2 border-blue-400/50 text-gray-800 hover:border-blue-500/70'
-            : isDark
-              ? 'bg-card border border-border text-card-foreground shadow-sm'
-              : 'bg-muted/30 border border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/50'
+            ? 'bg-card border-2 border-blue-500/40 text-card-foreground shadow-sm shadow-blue-500/10'
+            : 'bg-muted/30 border border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/50'
         }`}
       >
         {/* Free plan glow strip at top */}
@@ -494,8 +490,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         {/* Featured badge */}
         {assistant.is_featured && (
           <div className="absolute -top-2 -right-2">
-            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 gap-1">
-              <Star className="h-3 w-3 fill-current" />
+            <Badge className="bg-muted text-muted-foreground border border-border/60 gap-1 font-medium text-[11px]">
+              <Star className="h-2.5 w-2.5" />
               Destaque
             </Badge>
           </div>
@@ -504,7 +500,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         {/* Custom badge */}
         {assistant.is_custom && (
           <div className="absolute -top-2 -right-2">
-            <Badge className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-0 gap-1">
+            <Badge className="bg-primary text-primary-foreground border-0 gap-1">
               <Edit3 className="h-3 w-3" />
               Personalizado
             </Badge>
@@ -520,7 +516,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             <IconComponent className="w-6 h-6" style={{ color: assistant.color }} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className={`font-semibold text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h3 className="font-semibold text-base text-foreground">
               {assistant.name}
             </h3>
             <p className="text-xs text-muted-foreground">
@@ -533,12 +529,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               Grátis
             </Badge>
           ) : isFree ? (
-            <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0 shrink-0 gap-1">
+            <Badge className="bg-secondary text-secondary-foreground border border-border shrink-0 gap-1">
               <Zap className="w-3 h-3" />
               Grátis
             </Badge>
           ) : (
-            <Badge className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-0 shrink-0">
+            <Badge className="bg-muted text-muted-foreground border-0 shrink-0">
               Pro
             </Badge>
           )}
@@ -577,9 +573,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
           <div className="flex flex-wrap items-center gap-1.5 mb-3">
             <span className="text-[10px] font-medium text-muted-foreground">Canais:</span>
             {resolvedChannels.map(channel => (
-              <span key={channel.id} className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full ${
-                isDark ? 'bg-muted/60' : 'bg-muted border border-border'
-              }`}>
+              <span key={channel.id} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-muted border border-border">
                 {renderChannelIcon(channel.type, 'w-3 h-3')}
                 {channel.name || channel.type}
                 {connected && <Check className="w-3 h-3 text-green-500 ml-0.5" />}
@@ -662,7 +656,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             ) : (
               <>
                 <Button
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  className="flex-1 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
                   size="sm"
                   onClick={() => {
                     if (!assistant.is_custom && !isFreeTrialAssistant(assistant) && !planLimits.features.marketplaceAssistants) {
@@ -748,7 +742,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <h1 className="text-2xl font-bold text-foreground">
             Assistentes de IA
           </h1>
           <p className="text-sm mt-1 text-muted-foreground">
@@ -770,8 +764,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 }}
                 disabled={!canCreate}
                 className={canCreate
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white'
-                  : 'bg-gradient-to-r from-purple-600/40 to-indigo-600/40 text-white/60 cursor-not-allowed'
+                  ? 'bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150'
+                  : 'bg-primary/30 text-primary-foreground/60 cursor-not-allowed'
                 }
               >
                 {canCreate ? <Plus className="w-4 h-4 mr-2" /> : <Lock className="w-4 h-4 mr-2" />}
@@ -878,9 +872,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 selectedCategory === cat
                   ? 'bg-blue-600 text-white'
-                  : isDark
-                    ? 'bg-slate-800 text-muted-foreground hover:bg-muted hover:text-foreground'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
               }`}
             >
               {cat === 'all' ? 'Todos' : CATEGORY_LABELS[cat] || cat}
@@ -922,7 +914,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
       {/* Connect Modal - Multi-channel */}
       {connectModalOpen && selectedAssistant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-2xl shadow-2xl bg-card border border-border">
             <div className="flex items-center justify-between p-4 border-b border-border">
               <h3 className="text-lg font-semibold text-foreground">
@@ -973,12 +965,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 {/* ✅ Aviso obrigatório */}
                 <div className={`p-3 rounded-lg border mb-3 ${
                   selectedChannelIds.length === 0
-                    ? isDark
-                      ? 'bg-red-900/20 border-red-700 text-red-300'
-                      : 'bg-red-50 border-red-300 text-red-700'
-                    : isDark
-                      ? 'bg-green-900/20 border-green-700 text-green-300'
-                      : 'bg-green-50 border-green-300 text-green-700'
+                    ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-700 dark:text-red-300'
+                    : 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300'
                 }`}>
                   {selectedChannelIds.length === 0 ? (
                     <p className="text-xs font-medium">⚠️ Obrigatório selecionar pelo menos 1 canal</p>
@@ -1004,9 +992,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                           onClick={() => toggleChannelSelection(channel.id)}
                           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors text-left ${
                             isSelected
-                              ? isDark
-                                ? 'bg-blue-900/30 border-blue-500/50 text-blue-400'
-                                : 'bg-blue-50 border-blue-300 text-blue-700'
+                              ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-500/50 text-blue-700 dark:text-blue-400'
                               : 'bg-background border-border hover:border-muted-foreground/40 text-foreground'
                           }`}
                         >
@@ -1049,8 +1035,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 disabled={actionLoading || selectedChannelIds.length === 0}
                 className={`${
                   selectedChannelIds.length === 0
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-60'
+                    : 'bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150'
                 } text-white`}
               >
                 {actionLoading ? (
@@ -1067,7 +1053,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
       {/* Config Modal */}
       {configModalOpen && selectedUserAssistant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl bg-card border border-border">
             <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-card border-border">
               <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
@@ -1101,9 +1087,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                         onClick={() => toggleChannelSelection(channel.id)}
                         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors text-left ${
                           isSelected
-                            ? isDark
-                              ? 'bg-blue-900/30 border-blue-500/50 text-blue-400'
-                              : 'bg-blue-50 border-blue-300 text-blue-700'
+                            ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-500/50 text-blue-700 dark:text-blue-400'
                             : 'bg-background border-border hover:border-muted-foreground/40 text-foreground'
                         }`}
                       >
@@ -1183,7 +1167,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               {/* Memory & Context Window */}
               <div className="p-4 rounded-lg border bg-muted/30 border-border">
                 <div className="flex items-center gap-2 mb-4">
-                  <History className={`w-4 h-4 ${isDark ? 'text-purple-400' : 'text-purple-600'}`} />
+                  <History className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                   <h4 className="text-sm font-semibold text-foreground">Memória & Contexto</h4>
                 </div>
 
@@ -1317,7 +1301,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
       {/* Create/Edit Assistant Modal */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl shadow-2xl bg-card border border-border">
             <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-card border-border">
               <h3 className="text-lg font-semibold text-foreground">
@@ -1486,7 +1470,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               <Button
                 onClick={handleCreateAssistant}
                 disabled={actionLoading || !createForm.name.trim()}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+                className="bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
               >
                 {actionLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -1504,7 +1488,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
       {/* Premium Upgrade Modal */}
       {premiumModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm rounded-2xl shadow-2xl bg-card border border-border p-6 flex flex-col items-center text-center gap-4">
             <div className="w-16 h-16 rounded-full bg-amber-500/15 flex items-center justify-center">
               <Lock className="w-8 h-8 text-amber-400" />

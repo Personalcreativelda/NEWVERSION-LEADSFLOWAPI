@@ -22,7 +22,7 @@ const features = [
     title: 'Filtros e Relatórios em Tempo Real',
     description:
       'Filtre leads por origem, status, período e mais. Gere relatórios detalhados instantaneamente.',
-    gradient: 'from-purple-500 to-purple-600',
+    gradient: 'from-blue-500 to-blue-600',
   },
   {
     icon: BarChart3,
@@ -74,14 +74,14 @@ export default function Features() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-12 lg:mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/20 text-purple-300 rounded-full mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 text-primary rounded-full mb-4">
             <Zap className="w-4 h-4" />
             <span className="text-sm font-medium">Recursos Poderosos</span>
           </div>
           <h2 className="text-white mb-4 text-3xl sm:text-4xl lg:text-5xl font-bold">
             Tudo que você precisa para vender mais
           </h2>
-          <p className="text-gray-400 max-w-2xl mx-auto text-base sm:text-lg">
+          <p className="text-muted-foreground/70 max-w-2xl mx-auto text-base sm:text-lg">
             LeadsFlow API oferece ferramentas completas para captar, qualificar e
             converter leads de forma eficiente.
           </p>
@@ -94,7 +94,7 @@ export default function Features() {
             return (
               <div
                 key={index}
-                className="group relative bg-card rounded-2xl p-6 hover:bg-muted transition-all duration-300 hover:-translate-y-1 border border-purple-500/10 hover:border-purple-500/30"
+                className="group relative bg-card rounded-2xl p-6 hover:bg-muted transition-all duration-300 hover:-translate-y-1 border border-border hover:border-primary/30"
               >
                 {/* Icon */}
                 <div
@@ -105,10 +105,10 @@ export default function Features() {
 
                 {/* Content */}
                 <h3 className="text-white mb-2 font-semibold text-lg">{feature.title}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{feature.description}</p>
+                <p className="text-sm text-muted-foreground">{feature.description}</p>
 
                 {/* Hover Effect */}
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
               </div>
             );
           })}
@@ -116,12 +116,12 @@ export default function Features() {
 
         {/* Bottom CTA */}
         <div className="text-center mt-12">
-          <p className="text-gray-400 mb-4">
+          <p className="text-muted-foreground/70 mb-4">
             Explore todos os recursos gratuitamente
           </p>
           <a
             href="#planos"
-            className="inline-flex items-center text-purple-400 hover:text-purple-300 transition-colors group font-medium"
+            className="inline-flex items-center text-primary hover:text-primary/80 transition-colors group font-medium"
           >
             Ver todos os planos
             <svg

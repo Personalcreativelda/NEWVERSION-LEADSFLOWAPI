@@ -114,13 +114,13 @@ export default function ProductTour({ onComplete, onSkip, isDark = false, onNavi
 
   const currentTourStep = tourSteps[currentStep];
   
-  // Theme-aware colors - overlay mais transparente para ver o conteúdo atrás
-  const overlayBg = isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.3)';
-  const cardBg = isDark ? 'hsl(var(--card))' : '#ffffff';
-  const cardBorder = isDark ? 'hsl(var(--border))' : '#e5e7eb';
-  const textPrimary = isDark ? 'hsl(var(--foreground))' : '#1f2937';
-  const textSecondary = isDark ? 'hsl(var(--muted-foreground))' : '#6b7280';
-  const progressBg = isDark ? 'hsl(var(--muted))' : '#e5e7eb';
+  // Theme-aware colors
+  const overlayBg = 'rgba(0, 0, 0, 0.4)';
+  const cardBg = 'hsl(var(--card))';
+  const cardBorder = 'hsl(var(--border))';
+  const textPrimary = 'hsl(var(--foreground))';
+  const textSecondary = 'hsl(var(--muted-foreground))';
+  const progressBg = 'hsl(var(--muted))';
 
   useEffect(() => {
     // Wait for DOM to be ready
@@ -360,7 +360,7 @@ export default function ProductTour({ onComplete, onSkip, isDark = false, onNavi
                 <Button
                   size="sm"
                   onClick={handleComplete}
-                  className="flex items-center gap-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 shadow-lg"
+                  className="flex items-center gap-1 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 border-0"
                 >
                   <Check className="w-4 h-4" />
                   Finalizar
@@ -369,7 +369,7 @@ export default function ProductTour({ onComplete, onSkip, isDark = false, onNavi
                 <Button
                   size="sm"
                   onClick={handleNext}
-                  className="flex items-center gap-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0 shadow-lg"
+                  className="flex items-center gap-1 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 border-0"
                 >
                   Próximo
                   <ChevronRight className="w-4 h-4" />

@@ -1,7 +1,19 @@
 // INBOX: Hook para gerenciar mensagens de uma conversa
+// — WhatsApp-like instant switching: serves cached messages immediately,
+//   fetches fresh data in background, never shows loading spinner on switch.
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { conversationsApi, inboxApi } from '../services/api/inbox';
 import type { MessageWithSender } from '../types/inbox';
+import {
+    getCachedMessages,
+    setCachedMessages,
+    isCacheFresh,
+    patchCachedMessage,
+    patchCachedMessageStatus,
+    saveScrollPosition,
+    getScrollPosition,
+    clearScrollPosition,
+} from './useMessageCache';
 
 // Helper para gerar ID temporário
 const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -10,29 +22,47 @@ const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).su
 const MESSAGE_POLLING_INTERVAL = 60_000;
 
 export function useMessages(conversationId: string | null) {
-    const [messages, setMessages] = useState<MessageWithSender[]>([]);
+    // Initialise from cache instantly — no loading spinner on switch
+    const [messages, setMessages] = useState<MessageWithSender[]>(
+        () => (conversationId ? getCachedMessages(conversationId) : null) ?? []
+    );
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [sending, setSending] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    /** Ref to the scroll container — set by ChatBackground / parent */
+    const scrollContainerRef = useRef<HTMLElement | null>(null);
+    /** Track the previous conversation so we can save its scroll position */
+    const prevConversationIdRef = useRef<string | null>(null);
 
-    const fetchMessages = useCallback(async () => {
+    // ── Fetch messages (background-friendly) ────────────────
+    const fetchMessages = useCallback(async (opts?: { silent?: boolean }) => {
         if (!conversationId) {
             setMessages([]);
             return;
         }
 
+        const silent = opts?.silent ?? false;
+
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
             setError(null);
             const data = await conversationsApi.getMessages(conversationId, { limit: 100 });
-            setMessages(data);
+
+            // Preserve any temp_ (optimistic) messages still in-flight
+            setMessages(prev => {
+                const tempMessages = prev.filter(m => m.id.startsWith('temp_'));
+                const merged = [...data, ...tempMessages];
+                // Write-through to cache
+                setCachedMessages(conversationId, merged);
+                return merged;
+            });
         } catch (err: any) {
             console.error('[useMessages] Error fetching:', err);
-            setError(err.message || 'Failed to load messages');
+            if (!silent) setError(err.message || 'Failed to load messages');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [conversationId]);
 
@@ -160,6 +190,11 @@ export function useMessages(conversationId: string | null) {
     }, [conversationId]);
 
     const addMessage = useCallback((message: MessageWithSender) => {
+        // Write-through to cache for the conversation this message belongs to
+        if (message.conversation_id) {
+            patchCachedMessage(message.conversation_id, message);
+        }
+
         setMessages(prev => {
             // Evitar duplicatas por ID
             if (prev.some(m => m.id === message.id)) {
@@ -187,6 +222,7 @@ export function useMessages(conversationId: string | null) {
     }, []);
 
     const updateMessageStatus = useCallback((messageId: string, status: MessageWithSender['status']) => {
+        if (conversationId) patchCachedMessageStatus(conversationId, messageId, status);
         setMessages(prev =>
             prev.map(msg =>
                 msg.id === messageId
@@ -194,15 +230,52 @@ export function useMessages(conversationId: string | null) {
                     : msg
             )
         );
-    }, []);
+    }, [conversationId]);
 
     const scrollToBottom = useCallback(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, []);
 
+    // ── Conversation switch: cache-first + background refresh ─────
     useEffect(() => {
-        fetchMessages();
-    }, [fetchMessages]);
+        // 1. Save scroll position for the PREVIOUS conversation
+        const prevId = prevConversationIdRef.current;
+        if (prevId && scrollContainerRef.current) {
+            saveScrollPosition(prevId, scrollContainerRef.current.scrollTop);
+        }
+        prevConversationIdRef.current = conversationId;
+
+        if (!conversationId) {
+            setMessages([]);
+            return;
+        }
+
+        // 2. Serve cached messages instantly (no loading spinner)
+        const cached = getCachedMessages(conversationId);
+        if (cached && cached.length > 0) {
+            setMessages(cached);
+            // Restore scroll position after render
+            requestAnimationFrame(() => {
+                const savedScroll = getScrollPosition(conversationId);
+                if (savedScroll != null && scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollTop = savedScroll;
+                    clearScrollPosition(conversationId);
+                }
+            });
+        }
+
+        // 3. Background refresh — silent if we had cache, blocking if first load
+        if (cached && cached.length > 0 && isCacheFresh(conversationId)) {
+            // Cache is fresh — skip fetch entirely, just do a silent poll soon
+            fetchMessages({ silent: true });
+        } else if (cached && cached.length > 0) {
+            // Have cache but stale — silent background refresh
+            fetchMessages({ silent: true });
+        } else {
+            // No cache at all — first ever load, show spinner
+            fetchMessages();
+        }
+    }, [conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Polling de fallback: recarregar mensagens silenciosamente caso WebSocket tenha perdido eventos
     useEffect(() => {
@@ -224,7 +297,10 @@ export function useMessages(conversationId: string | null) {
                     if (!hasNew) return prev;
                     // Preservar mensagens temporárias (em envio)
                     const tempMessages = prev.filter(m => m.id.startsWith('temp_'));
-                    return [...data, ...tempMessages];
+                    const merged = [...data, ...tempMessages];
+                    // Write-through to cache
+                    setCachedMessages(conversationId, merged);
+                    return merged;
                 });
             } catch {
                 // Polling silencioso - não mostrar erro
@@ -239,10 +315,15 @@ export function useMessages(conversationId: string | null) {
         };
     }, [conversationId]);
 
+    // Auto-scroll only on first load (when messages go from 0 → N)
+    const hadMessagesRef = useRef(false);
     useEffect(() => {
-        // Scroll inicial
-        if (messages.length > 0) {
+        if (messages.length > 0 && !hadMessagesRef.current) {
+            hadMessagesRef.current = true;
             setTimeout(() => scrollToBottom(), 100);
+        }
+        if (messages.length === 0) {
+            hadMessagesRef.current = false;
         }
     }, [messages.length, scrollToBottom]);
 
@@ -252,6 +333,7 @@ export function useMessages(conversationId: string | null) {
         error,
         sending,
         messagesEndRef,
+        scrollContainerRef,
         sendMessage,
         sendAudio,
         addMessage,

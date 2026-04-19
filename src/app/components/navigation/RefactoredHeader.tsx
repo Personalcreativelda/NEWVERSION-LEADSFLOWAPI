@@ -102,7 +102,7 @@ export default function RefactoredHeader({
   };
 
   return (
-    <header className="sticky top-0 z-[1000] border-b backdrop-blur-lg shadow-sm transition-all duration-200 bg-background/95 border-border">
+    <header className="flex-shrink-0 sticky top-0 z-[1000] border-b backdrop-blur-xl bg-background/80 border-border dark:border-[rgba(255,255,255,0.06)] dark:bg-[hsl(220,6%,10%)]/90">
       <div className="px-4 lg:px-6 h-14 flex items-center justify-between">
         {/* Left Section: Hamburger APENAS NO MOBILE */}
         <div className="flex items-center lg:hidden">
@@ -124,7 +124,7 @@ export default function RefactoredHeader({
         <div className="hidden lg:block"></div>
 
         {/* Right Section: Notificações + Idioma + Theme + Avatar + Logout */}
-        <div className="flex items-center gap-1 ml-auto">
+        <div className="flex items-center gap-0.5 ml-auto">
           {/* Notification Center */}
           <NotificationBell onNavigate={onNavigate} onStartTour={onStartTour} />
 
@@ -132,34 +132,30 @@ export default function RefactoredHeader({
           <div className="relative" id="language-selector">
             <button
               onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
-              className="p-2 rounded-lg transition-colors group relative hover:bg-muted text-muted-foreground hover:text-purple-500"
+              className="p-2 rounded-lg transition-all duration-150 group relative hover:bg-muted text-muted-foreground hover:text-foreground"
               aria-label="Select language"
               title={t.languagePortuguese}
             >
-              <Languages className="w-5 h-5 transition-colors" />
+              <Languages className="w-4.5 h-4.5" />
             </button>
 
             {/* Language Dropdown */}
             {languageMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[1100] bg-card border border-border">
-                <div className="py-1">
+              <div className="absolute right-0 mt-2 w-52 rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[1100] bg-card border border-border">
+                <div className="p-1">
                   {LANGUAGES.map((lang) => (
                     <button
                       key={lang.code}
                       onClick={() => handleLanguageChange(lang.code)}
-                      className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-colors ${language === lang.code
-                        ? isDark
-                          ? 'bg-purple-500/20 text-purple-400'
-                          : 'bg-purple-50 text-purple-700'
-                        : isDark
-                          ? 'text-slate-300 hover:bg-slate-700'
-                          : 'text-gray-700 hover:bg-gray-100'
+                      className={`w-full px-3 py-2 text-left flex items-center gap-3 rounded-lg transition-colors duration-100 ${language === lang.code
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-foreground hover:bg-muted'
                         }`}
                     >
-                      <span className="text-xl">{lang.flag}</span>
+                      <span className="text-lg">{lang.flag}</span>
                       <span className="text-sm font-medium">{lang.name}</span>
                       {language === lang.code && (
-                        <span className="ml-auto text-purple-500">✓</span>
+                        <span className="ml-auto text-primary text-xs">✓</span>
                       )}
                     </button>
                   ))}

@@ -506,7 +506,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
               <h2 className="text-white text-5xl font-semibold mb-4 leading-tight whitespace-pre-line">
                 {slide.title}
               </h2>
-              <p className="text-gray-400 text-lg max-w-md">
+              <p className="text-muted-foreground/70 text-lg max-w-md">
                 {slide.subtitle}
               </p>
 
@@ -544,7 +544,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
           {/* Title */}
           <div className="mb-8">
             <h1 className="text-white text-3xl sm:text-4xl font-semibold mb-1">Entrar na conta</h1>
-            <p className="text-gray-500 text-sm mt-2">Bem-vindo de volta</p>
+            <p className="text-muted-foreground text-sm mt-2">Bem-vindo de volta</p>
           </div>
 
           {/* ✅ ALERTA DE ERRO MELHORADO */}
@@ -578,11 +578,11 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
           {/* Email Login Form */}
           <form onSubmit={handleEmailLogin} className="space-y-5 mb-6">
             <div>
-              <Label htmlFor="email" className="text-sm font-medium text-gray-300 mb-2 block">
+              <Label htmlFor="email" className="text-sm font-medium text-foreground/80 mb-2 block">
                 Email
               </Label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-500 pointer-events-none" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-muted-foreground pointer-events-none" />
                 <Input
                   ref={emailRef}
                   id="email"
@@ -590,7 +590,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                   placeholder="Digite seu email"
                   value={email}
                   onChange={(e) => handleEmailChange(e.target.value)}
-                  className={`w-full pl-12 pr-4 h-14 text-base bg-[#1a1a1a] text-white placeholder:text-gray-600 rounded-2xl border focus:ring-2 focus:ring-[#00C48C]/40 transition-all ${
+                  className={`w-full pl-12 pr-4 h-14 text-base bg-[#1a1a1a] text-white placeholder:text-muted-foreground rounded-2xl border focus:ring-2 focus:ring-[#00C48C]/40 transition-all ${
                     fieldErrors.email
                       ? 'border-red-500/50 focus:border-red-500'
                       : 'border-[#2a2a2a] focus:border-[#00C48C]'
@@ -610,7 +610,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label htmlFor="password" className="text-sm font-medium text-gray-300">
+                <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
                   Senha
                 </Label>
                 <button
@@ -622,7 +622,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                 </button>
               </div>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-500 pointer-events-none" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-muted-foreground pointer-events-none" />
                 <Input
                   ref={passwordRef}
                   id="password"
@@ -630,7 +630,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                   placeholder="Digite sua senha"
                   value={password}
                   onChange={(e) => handlePasswordChange(e.target.value)}
-                  className={`w-full pl-12 pr-14 h-14 text-base bg-[#1a1a1a] text-white placeholder:text-gray-600 rounded-2xl border focus:ring-2 focus:ring-[#00C48C]/40 transition-all ${
+                  className={`w-full pl-12 pr-14 h-14 text-base bg-[#1a1a1a] text-white placeholder:text-muted-foreground rounded-2xl border focus:ring-2 focus:ring-[#00C48C]/40 transition-all ${
                     fieldErrors.password
                       ? 'border-red-500/50 focus:border-red-500'
                       : 'border-[#2a2a2a] focus:border-[#00C48C]'
@@ -642,7 +642,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -665,7 +665,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
           </form>
 
           {/* Link criar conta */}
-          <p className="text-center text-gray-400 text-sm mt-4 mb-2">
+          <p className="text-center text-muted-foreground/70 text-sm mt-4 mb-2">
             Não tem uma conta?{' '}
             <button
               onClick={onSwitchToSignup}
@@ -681,7 +681,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
               <div className="w-full border-t border-[#2a2a2a]"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-[#0a0a0a] text-gray-500">Ou continue com</span>
+              <span className="px-4 bg-[#0a0a0a] text-muted-foreground">Ou continue com</span>
             </div>
           </div>
 
@@ -690,7 +690,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
             type="button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full h-14 mb-6 text-base bg-white hover:bg-gray-50 text-gray-900 font-medium rounded-2xl flex items-center justify-center gap-3 border border-gray-200 transition-all hover:scale-[1.01] active:scale-[0.99] shadow-sm"
+            className="w-full h-14 mb-6 text-base bg-card hover:bg-muted/50 text-foreground font-medium rounded-2xl flex items-center justify-center gap-3 border border-border transition-all hover:scale-[1.01] active:scale-[0.99] shadow-sm"
           >
             <GoogleIcon />
             <span>Entrar com Google</span>
@@ -701,13 +701,13 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
             <div className="mt-8 flex flex-col gap-2">
               <button
                 onClick={handleDebugSetup}
-                className="text-xs text-gray-700 dark:text-gray-300 hover:text-gray-600 dark:text-gray-400 transition-colors"
+                className="text-xs text-foreground/80 hover:text-muted-foreground transition-colors"
               >
                 Debug Setup
               </button>
               <button
                 onClick={handleAdminSetup}
-                className="text-xs text-gray-700 dark:text-gray-300 hover:text-gray-600 dark:text-gray-400 transition-colors"
+                className="text-xs text-foreground/80 hover:text-muted-foreground transition-colors"
               >
                 Admin Setup
               </button>
@@ -725,14 +725,14 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                 <Mail className="w-6 h-6 text-[#00C48C]" />
               </div>
               <h3 className="text-white text-2xl font-semibold">Confirmar email</h3>
-              <p className="text-sm text-gray-400">
-                Digite o código enviado para <span className="text-gray-200 font-medium">{verificationEmail}</span> para concluir o acesso.
+              <p className="text-sm text-muted-foreground/70">
+                Digite o código enviado para <span className="text-foreground/90 font-medium">{verificationEmail}</span> para concluir o acesso.
               </p>
             </div>
 
             <form onSubmit={handleVerificationSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="verification-code" className="text-sm text-gray-300 mb-2 block">
+                <Label htmlFor="verification-code" className="text-sm text-foreground/80 mb-2 block">
                   Código de verificação
                 </Label>
                 <Input
@@ -743,7 +743,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
                   maxLength={6}
-                  className="w-full px-4 py-3 bg-[#0a0a0a] border-[#2a2a2a] text-white placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-[#00C48C] focus:border-[#00C48C] tracking-widest text-center"
+                  className="w-full px-4 py-3 bg-[#0a0a0a] border-[#2a2a2a] text-white placeholder:text-muted-foreground rounded-xl focus:ring-2 focus:ring-[#00C48C] focus:border-[#00C48C] tracking-widest text-center"
                 />
               </div>
 
@@ -766,7 +766,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                   onClick={handleVerificationResend}
                   disabled={resendStatus === 'loading'}
                   variant="outline"
-                  className="flex-1 py-3 bg-transparent border-[#2a2a2a] text-gray-300 hover:bg-[#1a1a1a] rounded-xl"
+                  className="flex-1 py-3 bg-transparent border-[#2a2a2a] text-foreground/80 hover:bg-[#1a1a1a] rounded-xl"
                 >
                   {resendStatus === 'loading' ? 'Reenviando...' : 'Reenviar email'}
                 </Button>
@@ -789,7 +789,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                 setResendStatus('idle');
                 setVerificationStatus('idle');
               }}
-              className="text-sm text-gray-500 hover:text-gray-300"
+              className="text-sm text-muted-foreground hover:text-foreground"
             >
               Cancelar e voltar
             </button>
@@ -803,7 +803,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
           <div className="bg-[#1a1a1a] rounded-2xl shadow-lg p-10 max-w-md w-full space-y-6 border border-[#2a2a2a]">
             <div className="text-center space-y-2">
               <h3 className="text-white text-2xl font-semibold">Recuperar Senha</h3>
-              <p className="text-gray-400 text-sm">
+              <p className="text-muted-foreground/70 text-sm">
                 Digite seu email para receber o código de recuperação
               </p>
             </div>
@@ -825,16 +825,16 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
 
             <form onSubmit={(e) => { e.preventDefault(); handleForgotPassword(); }} className="space-y-4">
               <div>
-                <Label htmlFor="reset-email" className="text-sm text-gray-300 mb-2 block">Email</Label>
+                <Label htmlFor="reset-email" className="text-sm text-foreground/80 mb-2 block">Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     id="reset-email"
                     type="email"
                     placeholder="Digite seu email"
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-[#0a0a0a] border-[#2a2a2a] text-white placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-[#00C48C]"
+                    className="w-full pl-12 pr-4 py-3 bg-[#0a0a0a] border-[#2a2a2a] text-white placeholder:text-muted-foreground rounded-xl focus:ring-2 focus:ring-[#00C48C]"
                     required
                   />
                 </div>
@@ -849,7 +849,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                     setError(null);
                   }}
                   variant="outline"
-                  className="flex-1 py-3 bg-transparent border-[#2a2a2a] text-gray-300 hover:bg-[#0a0a0a] rounded-xl"
+                  className="flex-1 py-3 bg-transparent border-[#2a2a2a] text-foreground/80 hover:bg-[#0a0a0a] rounded-xl"
                 >
                   Cancelar
                 </Button>

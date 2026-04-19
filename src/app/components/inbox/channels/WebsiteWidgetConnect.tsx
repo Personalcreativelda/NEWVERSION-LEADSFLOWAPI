@@ -160,7 +160,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
                     >
                         <span className="text-xl">×</span>
                     </button>
@@ -289,7 +289,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                             <div className="flex gap-3">
                                 <button
                                     onClick={onClose}
-                                    className="flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    className="flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                     style={{ borderColor: 'hsl(var(--border))' }}
                                 >
                                     Cancelar
@@ -297,7 +297,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                                 <button
                                     onClick={handleSubmit}
                                     disabled={loading || !formData.name.trim()}
-                                    className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <>
@@ -359,7 +359,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
 
                             <button
                                 onClick={() => { setStep('success'); }}
-                                className="w-full px-4 py-3 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 transition-colors"
+                                className="w-full px-4 py-3 rounded-lg text-sm font-medium text-white bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
                             >
                                 Concluir
                             </button>

@@ -68,17 +68,17 @@ export default function EnviarEmailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="bg-white rounded-2xl max-w-lg w-full shadow-lg animate-in zoom-in-95 duration-200">
+      <DialogContent className="bg-card text-foreground rounded-2xl max-w-lg w-full shadow-xl border border-border animate-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <DialogHeader className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
+        <DialogHeader className="px-5 py-4 border-b border-border flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-100 rounded-lg">
               <Mail className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <DialogTitle className="text-lg text-gray-900">Enviar Email</DialogTitle>
-              <p className="text-xs text-gray-700 dark:text-gray-300 mt-0.5">Para: {leadNome}</p>
+              <DialogTitle className="text-lg text-foreground">Enviar Email</DialogTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">Para: {leadNome}</p>
             </div>
           </div>
           <DialogDescription className="sr-only">
@@ -86,10 +86,10 @@ export default function EnviarEmailModal({
           </DialogDescription>
           <button
             onClick={handleClose}
-            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
             disabled={loading}
           >
-            <X className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </DialogHeader>
 
@@ -97,7 +97,7 @@ export default function EnviarEmailModal({
         <div className="px-5 py-4 space-y-4">
           
           {/* Info do Lead */}
-          <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+          <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
             <div className="flex items-center gap-2">
               <Mail className="w-4 h-4 text-purple-600" />
               <div className="flex-1">
@@ -109,7 +109,7 @@ export default function EnviarEmailModal({
 
           {/* Assunto */}
           <div className="space-y-2">
-            <Label htmlFor="assunto" className="text-sm font-medium text-gray-700">
+            <Label htmlFor="assunto" className="text-sm font-medium text-foreground">
               Assunto
             </Label>
             <Input
@@ -125,7 +125,7 @@ export default function EnviarEmailModal({
 
           {/* Mensagem */}
           <div className="space-y-2">
-            <Label htmlFor="mensagem" className="text-sm font-medium text-gray-700">
+            <Label htmlFor="mensagem" className="text-sm font-medium text-foreground">
               Mensagem
             </Label>
             <Textarea
@@ -137,7 +137,7 @@ export default function EnviarEmailModal({
               rows={8}
               className="w-full resize-none"
             />
-            <p className="text-xs text-gray-700 dark:text-gray-300">
+            <p className="text-xs text-muted-foreground">
               {mensagem.length} caracteres
             </p>
           </div>
@@ -145,7 +145,7 @@ export default function EnviarEmailModal({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-gray-200 flex gap-3 justify-end">
+        <div className="px-5 py-3 border-t border-border flex gap-3 justify-end">
           <Button
             variant="outline"
             onClick={handleClose}

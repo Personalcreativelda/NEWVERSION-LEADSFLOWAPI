@@ -103,24 +103,24 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
   const inicial = (lead.nome || '?').charAt(0).toUpperCase();
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-card rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-lg dark:shadow-purple-500/20 dark:border dark:border-purple-500/30">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-card text-foreground rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-xl border border-border">
         
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-200 dark:border-purple-500/30 flex justify-between items-center">
+        <div className="px-6 py-5 border-b border-border flex justify-between items-center">
           <div>
-            <h2 className="text-xl text-gray-900 dark:text-white font-semibold">
+            <h2 className="text-xl text-foreground font-semibold">
               💬 Chat com {lead?.nome || 'Lead'}
             </h2>
-            <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {lead?.telefone || 'Sem telefone'}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-lg hover:bg-gray-100 dark:hover:bg-purple-500/20 flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
           >
-            <X className="w-5 h-5 text-gray-500 dark:text-gray-700 dark:text-gray-300" />
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
 
@@ -141,7 +141,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
           {/* Mensagens */}
           <div className="flex-1 overflow-y-auto bg-[#e5ddd5] p-4 space-y-3">
             {mensagens.length === 0 ? (
-              <div className="text-center text-gray-700 dark:text-gray-300 py-8">
+              <div className="text-center text-muted-foreground py-8">
                 <p className="text-sm">Conversa iniciada</p>
               </div>
             ) : (
@@ -153,12 +153,12 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
                   <div
                     className={`max-w-[70%] rounded-lg px-4 py-2 ${
                       msg.tipo === 'sent'
-                        ? 'bg-[#dcf8c6] text-gray-900'
-                        : 'bg-white text-gray-900'
+                        ? 'bg-[#dcf8c6] dark:bg-[#1a4731] text-gray-900 dark:text-gray-100'
+                        : 'bg-card text-foreground border border-border'
                     }`}
                   >
                     <div className="text-sm whitespace-pre-wrap break-words">{msg.texto}</div>
-                    <div className="text-[11px] text-gray-700 dark:text-gray-300 mt-1 text-right">
+                    <div className="text-[11px] text-muted-foreground mt-1 text-right">
                       {msg.hora}
                     </div>
                   </div>
@@ -169,7 +169,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
           </div>
 
           {/* Input de Mensagem */}
-          <div className="bg-white border-t border-gray-200 p-3 flex gap-2">
+          <div className="bg-card border-t border-border p-3 flex gap-2">
             <input
               type="text"
               value={mensagem}
@@ -177,7 +177,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
               onKeyPress={handleKeyPress}
               placeholder="Digite uma mensagem..."
               disabled={enviando}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+              className="flex-1 px-4 py-2 border border-border rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm bg-background text-foreground placeholder:text-muted-foreground"
             />
             <button
               onClick={handleEnviar}

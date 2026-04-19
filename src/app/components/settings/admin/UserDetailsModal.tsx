@@ -149,7 +149,7 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 sm:p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="bg-card border border-border sm:rounded-2xl rounded-t-2xl shadow-2xl w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden">

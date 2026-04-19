@@ -3,7 +3,7 @@ import { ChannelsList } from '../../inbox/channels/ChannelsList';
 
 export default function InboxSettings() {
     return (
-        <div className="h-full flex flex-col overflow-hidden" style={{ backgroundColor: 'hsl(var(--card))' }}>
+        <div className="h-full min-w-0 flex flex-col overflow-hidden" style={{ backgroundColor: 'hsl(var(--card))' }}>
             {/* Header */}
             <div
                 className="px-6 py-4 border-b"

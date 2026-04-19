@@ -1,6 +1,7 @@
 import {
     Home, Users, MessageSquare, Workflow, BarChart3,
-    CheckSquare, Zap, Crown, Settings, Shield, User
+    CheckSquare, Megaphone, Crown, Settings, Shield, User, Zap,
+    Radio, Bot, PhoneCall, Globe, RefreshCcw
 } from 'lucide-react';
 
 export interface SidebarItemConfig {
@@ -8,6 +9,7 @@ export interface SidebarItemConfig {
     labelKey: string;
     icon: any;
     path: string;
+    sectionLabel?: string; // Section header rendered above this item
     isDynamic?: boolean; // Para indicar que os filhos são carregados dinamicamente
     isDropdown?: boolean; // Para indicar que é um dropdown expansível
     children?: {
@@ -21,43 +23,21 @@ export interface SidebarItemConfig {
 
 export const sidebarConfig: SidebarItemConfig[] = [
     { id: 'dashboard', labelKey: 'dashboard', icon: Home, path: '/dashboard' },
-    {
-        id: 'inbox',
-        labelKey: 'inbox',
-        icon: MessageSquare,
-        path: '/dashboard/inbox',
-        children: [
-            // Conversas (sempre visível)
-            { 
-                id: 'inbox-conversations', 
-                labelKey: 'conversas', 
-                path: '/dashboard/inbox'
-            },
-            // Canais (dropdown dinâmico)
-            { 
-                id: 'inbox-channels', 
-                labelKey: 'canais', 
-                path: '/dashboard/inbox',
-                isDynamic: true // Os canais serão carregados via API
-            },
-            // Status (dropdown dinâmico)
-            { 
-                id: 'inbox-status', 
-                labelKey: 'status', 
-                path: '/dashboard/inbox',
-                isDynamic: true // Os status serão fixos mas com dropdown
-            },
-            // Separador (opcional)
-            { id: 'inbox-settings', labelKey: 'configuracoesInbox', path: '/dashboard/inbox/settings' },
-            { id: 'inbox-automations', labelKey: 'regrasAutomacao', path: '/dashboard/inbox/automations' },
-        ]
-    },
+    // Comunicação
+    { id: 'inbox', labelKey: 'inbox', icon: MessageSquare, path: '/dashboard/inbox', sectionLabel: 'Comunicação' },
+    { id: 'inbox-settings', labelKey: 'canais', icon: Radio, path: '/dashboard/inbox/settings' },
     { id: 'leads', labelKey: 'contactos', icon: Users, path: '/dashboard/leads' },
-    { id: 'funnel', labelKey: 'salesFunnel', icon: Workflow, path: '/dashboard/funnel' },
+    // Vendas
+    { id: 'funnel', labelKey: 'salesFunnel', icon: Workflow, path: '/dashboard/funnel', sectionLabel: 'Vendas' },
+    { id: 'campaigns', labelKey: 'campaigns', icon: Megaphone, path: '/dashboard/campaigns' },
     { id: 'analytics', labelKey: 'analytics', icon: BarChart3, path: '/dashboard/analytics' },
     { id: 'tasks', labelKey: 'tasksFollowup', icon: CheckSquare, path: '/dashboard/tasks' },
-    { id: 'campaigns', labelKey: 'campaigns', icon: Zap, path: '/dashboard/campaigns' },
-    { id: 'plan', labelKey: 'plan', icon: Crown, path: '/dashboard/plan' },
+    // Automação
+    { id: 'ai-assistants', labelKey: 'aiAssistants', icon: Bot, path: '/dashboard/ai-assistants', sectionLabel: 'Automação' },
+    { id: 'voice-agents', labelKey: 'voiceAgents', icon: PhoneCall, path: '/dashboard/voice-agents' },
+    { id: 'webhook', labelKey: 'webhook', icon: Globe, path: '/dashboard/automations' },
+    // Configurações
+    { id: 'plan', labelKey: 'plan', icon: Crown, path: '/dashboard/plan', sectionLabel: 'Configurações' },
     { id: 'integrations', labelKey: 'integrations', icon: Settings, path: '/dashboard/integrations' },
     { id: 'security', labelKey: 'security', icon: Shield, path: '/dashboard/security' },
     { id: 'account', labelKey: 'accountSettings', icon: User, path: '/dashboard/account' },

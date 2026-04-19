@@ -1,34 +1,40 @@
-// INBOX: Background pattern do chat similar ao WhatsApp
+// INBOX: WhatsApp Web-style chat background
 import React from 'react';
 
 interface ChatBackgroundProps {
     children: React.ReactNode;
     className?: string;
+    scrollRef?: React.RefObject<HTMLElement | null>;
 }
 
-export function ChatBackground({ children, className = '' }: ChatBackgroundProps) {
+export function ChatBackground({ children, className = '', scrollRef }: ChatBackgroundProps) {
     return (
         <div 
-            className={`relative ${className}`}
-            style={{
-                backgroundColor: 'hsl(var(--chat-bg))',
-            }}
+            ref={scrollRef as React.RefObject<HTMLDivElement>}
+            className={`relative bg-[#efeae2] dark:bg-[#0b141a] ${className}`}
         >
-            {/* Pattern Background */}
+            {/* WhatsApp-style doodle pattern overlay */}
             <div 
-                className="absolute inset-0 opacity-[0.03] dark:opacity-[0.02] pointer-events-none"
+                className="absolute inset-0 pointer-events-none opacity-[0.06] dark:opacity-[0.04]"
                 style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-                    backgroundSize: '60px 60px',
+                    backgroundImage: [
+                        `radial-gradient(circle, rgba(17,27,33,0.8) 0.8px, transparent 0.8px)`,
+                        `radial-gradient(circle, rgba(17,27,33,0.5) 0.5px, transparent 0.5px)`,
+                    ].join(', '),
+                    backgroundSize: '32px 32px, 48px 48px',
+                    backgroundPosition: '0 0, 16px 16px',
                 }}
             />
-            
-            {/* WhatsApp-like doodle pattern */}
+            {/* Dark-mode pattern (light dots on dark bg) */}
             <div 
-                className="absolute inset-0 opacity-[0.015] dark:opacity-[0.01] pointer-events-none"
+                className="absolute inset-0 pointer-events-none hidden dark:block opacity-[0.04]"
                 style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z'/%3E%3C/g%3E%3C/svg%3E")`,
-                    backgroundSize: '100px 100px',
+                    backgroundImage: [
+                        `radial-gradient(circle, rgba(233,237,239,0.9) 0.8px, transparent 0.8px)`,
+                        `radial-gradient(circle, rgba(233,237,239,0.6) 0.5px, transparent 0.5px)`,
+                    ].join(', '),
+                    backgroundSize: '32px 32px, 48px 48px',
+                    backgroundPosition: '0 0, 16px 16px',
                 }}
             />
             

@@ -21,7 +21,7 @@ export function LogoWithText({ size = 40, showText = true }: LogoProps & { showT
     <div className="flex items-center gap-2">
       <Logo size={size} />
       {showText && (
-        <span className="text-gray-900 dark:text-white">
+        <span className="text-foreground">
           LeadFlow CRM
         </span>
       )}

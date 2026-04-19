@@ -589,7 +589,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                     </div>
                     <button
                         onClick={onClose}
-                        className="transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                        className="transition-colors p-1 rounded-full hover:bg-muted/50"
                         style={{ color: 'hsl(var(--muted-foreground))' }}
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -649,8 +649,8 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 disabled={loading || !instanceName.trim()}
                                 className={`w-full py-3 px-4 rounded-lg font-medium text-white shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2
                                     ${loading || !instanceName.trim()
-                                        ? 'bg-gray-400 cursor-not-allowed opacity-70'
-                                        : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'
+                                        ? 'bg-muted-foreground/70 cursor-not-allowed opacity-70'
+                                        : 'bg-green-600 text-white hover:bg-green-700 transition-all duration-150'
                                     }`}
                             >
                                 {loading ? (
@@ -690,7 +690,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 ) : (
                                     <div className="w-64 h-64 flex flex-col items-center justify-center">
                                         <Loader2 className="w-12 h-12 animate-spin text-green-500 mb-3" />
-                                        <span className="text-sm text-gray-500">Carregando QR Code...</span>
+                                        <span className="text-sm text-muted-foreground">Carregando QR Code...</span>
                                     </div>
                                 )}
                             </div>
@@ -761,7 +761,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                             setStep('success');
                                             toast.success('WhatsApp conectado com sucesso! 🎉');
                                         }}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 transition-colors"
+                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-all duration-150"
                                     >
                                         <CheckCircle className="w-4 h-4" />
                                         Concluir Conexão
@@ -770,7 +770,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                     <button
                                         onClick={handleRefreshQR}
                                         disabled={loading}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                         style={{ 
                                             borderColor: 'hsl(var(--border))',
                                             color: 'hsl(var(--foreground))'

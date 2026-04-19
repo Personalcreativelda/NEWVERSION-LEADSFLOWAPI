@@ -39,7 +39,7 @@ export class ErrorBoundary extends Component<Props, State> {
             }
 
             return (
-                <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+                <div className="min-h-screen flex items-center justify-center bg-muted/50 p-4">
                     <div className="bg-white rounded-lg shadow-xl p-8 max-w-2xl w-full border border-red-100">
                         <h1 className="text-2xl font-bold text-red-600 mb-4 flex items-center gap-2">
                             <span className="text-3xl">⚠️</span> Something went wrong
@@ -69,7 +69,7 @@ export class ErrorBoundary extends Component<Props, State> {
                                     window.localStorage.clear();
                                     window.location.reload();
                                 }}
-                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+                                className="px-4 py-2 border border-border text-foreground/80 rounded hover:bg-muted/50 transition-colors"
                                 type="button"
                             >
                                 Clear Cache & Reload

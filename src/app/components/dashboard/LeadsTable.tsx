@@ -20,7 +20,7 @@ const renderOriginWithIcon = (origem: string | undefined, channelSource?: string
   // Se for vazio ou "-", mostrar unknown
   if (!channel || channel === '-') {
     return (
-      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-500">
+      <div className="flex items-center gap-2 text-muted-foreground">
         <span className="text-sm">unknown</span>
       </div>
     );
@@ -28,7 +28,7 @@ const renderOriginWithIcon = (origem: string | undefined, channelSource?: string
 
   let icon = null;
   let label = '';
-  let colorClass = 'text-gray-600 dark:text-gray-400';
+  let colorClass = 'text-muted-foreground';
 
   // Match patterns for each channel type
   if (channel.includes('whatsapp') || channel.includes('wpp')) {
@@ -53,12 +53,12 @@ const renderOriginWithIcon = (origem: string | undefined, channelSource?: string
     label = 'SMS';
   } else if (channel.includes('email') || channel.includes('mail') || channel.includes('@')) {
     icon = <Mail className="w-4 h-4" />;
-    colorClass = 'text-purple-600 dark:text-purple-400';
+    colorClass = 'text-primary';
     label = 'Email';
   } else {
     // Unknown channel - show the raw text with a generic icon
     return (
-      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-500">
+      <div className="flex items-center gap-2 text-muted-foreground">
         <MessageCircle className="w-4 h-4" />
         <span className="text-sm capitalize">{rawChannel}</span>
       </div>
@@ -332,25 +332,25 @@ export default function LeadsTable({
   };
 
   return (
-    <div className="bg-card dark:bg-card rounded-2xl border border-border dark:border-border shadow-[0_2px_8px_-4px_rgba(15,23,42,0.12)] dark:shadow-[0_2px_8px_-4px_rgba(15,23,42,0.4)] overflow-hidden">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
 
       {/* Header da Tabela - Desktop e Mobile com layouts diferentes */}
-      <div className="px-4 md:px-6 py-4 border-b border-border dark:border-border bg-card dark:bg-card">
+      <div className="px-4 md:px-5 py-4 border-b border-border">
 
         {/* Layout Mobile */}
         <div className="block md:hidden space-y-3">
           {/* Título */}
-          <h3 className="text-foreground dark:text-foreground">Tabela de Leads</h3>
+          <h3 className="text-foreground font-semibold">Tabela de Leads</h3>
 
           {/* Campo de Busca */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               value={busca}
               onChange={(e) => handleBuscaChange(e.target.value)}
               placeholder="Buscar leads..."
-              className="w-full pl-9 pr-4 py-2 border border-input dark:border-input rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+              className="w-full pl-9 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all duration-150"
             />
           </div>
 
@@ -359,9 +359,9 @@ export default function LeadsTable({
             {onNovoLead && (
               <button
                 onClick={handleNovoLeadClick}
-                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isAdicionarBlocked
-                    ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-all duration-150 shadow-sm ${isAdicionarBlocked
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                    : 'bg-primary hover:opacity-90 text-primary-foreground active:scale-[0.97]'
                   }`}
                 title={isAdicionarBlocked ? 'Plano bloqueado' : leadsLimitReached ? 'Limite de leads atingido — clique para fazer upgrade' : 'Adicionar Leads'}
               >
@@ -373,7 +373,7 @@ export default function LeadsTable({
               <button
                 onClick={onRefresh}
                 disabled={loading}
-                className="flex items-center justify-center min-w-[40px] h-10 px-3 bg-card dark:bg-card border border-border dark:border-border hover:bg-muted dark:hover:bg-muted text-foreground dark:text-foreground rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center min-w-[40px] h-10 px-3 bg-card border border-border hover:bg-muted text-foreground rounded-lg transition-all duration-150 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Atualizar"
               >
                 <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -383,7 +383,7 @@ export default function LeadsTable({
             {onExport && (
               <button
                 onClick={onExport}
-                className="flex items-center justify-center min-w-[40px] h-10 px-3 bg-card dark:bg-card border border-border dark:border-border hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:border-emerald-500 text-foreground dark:text-foreground hover:text-emerald-600 dark:hover:text-emerald-400 rounded-lg transition-colors shadow-sm"
+                className="flex items-center justify-center min-w-[40px] h-10 px-3 bg-card border border-border hover:bg-emerald-500/10 hover:border-emerald-500/50 text-foreground hover:text-emerald-600 dark:hover:text-emerald-400 rounded-lg transition-all duration-150 shadow-sm"
                 title="Exportar"
               >
                 <Download className="w-5 h-5" />
@@ -393,9 +393,9 @@ export default function LeadsTable({
             {onImport && (
               <button
                 onClick={() => onImport?.()}
-                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isBlocked
-                    ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed border border-border dark:border-border'
-                    : 'bg-card dark:bg-card border border-border dark:border-border hover:bg-muted dark:hover:bg-muted/50 hover:border-blue-500 text-foreground dark:text-foreground hover:text-blue-600 dark:hover:text-blue-400'
+                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-all duration-150 shadow-sm ${isBlocked
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed border border-border'
+                    : 'bg-card border border-border hover:bg-muted/50 hover:border-blue-500/50 text-foreground hover:text-blue-600 dark:hover:text-blue-400'
                   }`}
                 title={isBlocked ? 'Plano bloqueado' : 'Importar'}
               >
@@ -406,9 +406,9 @@ export default function LeadsTable({
             {onImportWhatsApp && (
               <button
                 onClick={() => onImportWhatsApp?.()}
-                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isBlocked
-                    ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed border border-border dark:border-border'
-                    : 'bg-card dark:bg-card border border-border dark:border-border hover:bg-muted dark:hover:bg-muted/50 hover:border-green-500 text-foreground dark:text-foreground hover:text-green-600 dark:hover:text-green-400'
+                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-all duration-150 shadow-sm ${isBlocked
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed border border-border'
+                    : 'bg-card border border-border hover:bg-muted/50 hover:border-green-500/50 text-foreground hover:text-green-600 dark:hover:text-green-400'
                   }`}
                 title={isBlocked ? 'Plano bloqueado' : 'Importar do WhatsApp'}
               >
@@ -419,9 +419,9 @@ export default function LeadsTable({
             {onCampaigns && (
               <button
                 onClick={() => onCampaigns?.()}
-                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-colors shadow-sm ${isCampaignsBlocked
-                    ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                className={`flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-all duration-150 shadow-sm ${isCampaignsBlocked
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                    : 'bg-primary hover:opacity-90 text-primary-foreground active:scale-[0.97]'
                   }`}
                 title={isCampaignsBlocked ? (campaignsLimitReached ? 'Limite de campanhas atingido' : 'Plano bloqueado') : 'Campanhas'}
               >
@@ -434,17 +434,17 @@ export default function LeadsTable({
         {/* Layout Desktop */}
         <div className="hidden md:block">
           <div className="flex justify-between items-center gap-4 mb-3">
-            <h3 className="text-foreground dark:text-foreground font-semibold">Tabela de Leads</h3>
+            <h3 className="text-foreground font-semibold">Tabela de Leads</h3>
 
             {/* Campo de Busca */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
                 value={busca}
                 onChange={(e) => handleBuscaChange(e.target.value)}
                 placeholder="Buscar leads..."
-                className="pl-9 pr-4 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+                className="pl-9 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all duration-150"
               />
             </div>
           </div>
@@ -455,9 +455,9 @@ export default function LeadsTable({
               <button
                 onClick={handleNovoLeadClick}
                 className={`inline-flex items-center gap-2 px-4 py-2 ${isAdicionarBlocked
-                    ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  } rounded-lg transition-colors shadow-sm`}
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                    : 'bg-primary hover:opacity-90 text-primary-foreground active:scale-[0.97]'
+                  } rounded-lg transition-all duration-150 shadow-sm`}
                 title={isAdicionarBlocked ? 'Plano bloqueado' : leadsLimitReached ? 'Limite de leads atingido — clique para fazer upgrade' : undefined}
               >
                 <Plus className="w-4 h-4" />
@@ -468,7 +468,7 @@ export default function LeadsTable({
             {selectedLeads.size > 0 && onDeleteMultiple && (
               <button
                 onClick={handleDeleteSelected}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all duration-150 shadow-sm active:scale-[0.97]"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Deletar Selecionados ({selectedLeads.size})</span>
@@ -478,7 +478,7 @@ export default function LeadsTable({
             {selectedLeads.size > 0 && (
               <button
                 onClick={() => setSelectedLeads(new Set())}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-card dark:bg-card border border-border dark:border-border hover:bg-muted dark:hover:bg-muted text-foreground dark:text-foreground rounded-lg transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border hover:bg-muted text-foreground rounded-lg transition-all duration-150 shadow-sm"
               >
                 <Square className="w-4 h-4" />
                 <span>Limpar Seleção</span>
@@ -489,7 +489,7 @@ export default function LeadsTable({
               <button
                 onClick={onRefresh}
                 disabled={loading}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-card dark:bg-card border border-border dark:border-border hover:bg-muted dark:hover:bg-muted text-foreground dark:text-foreground rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border hover:bg-muted text-foreground rounded-lg transition-all duration-150 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 <span>Atualizar</span>
@@ -499,7 +499,7 @@ export default function LeadsTable({
             {onExport && (
               <button
                 onClick={onExport}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-card dark:bg-card border border-border dark:border-border hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:border-emerald-500 text-foreground dark:text-foreground hover:text-emerald-600 dark:hover:text-emerald-400 rounded-lg transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border hover:bg-emerald-500/10 hover:border-emerald-500/50 text-foreground hover:text-emerald-600 dark:hover:text-emerald-400 rounded-lg transition-all duration-150 shadow-sm"
               >
                 <Download className="w-4 h-4" />
                 <span>Exportar</span>
@@ -509,9 +509,9 @@ export default function LeadsTable({
             {onImport && (
               <button
                 onClick={() => onImport?.()}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-sm ${isBlocked
-                    ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed border border-border dark:border-border'
-                    : 'bg-card dark:bg-card border border-border dark:border-border hover:bg-muted dark:hover:bg-muted/50 hover:border-blue-500 text-foreground dark:text-foreground hover:text-blue-600 dark:hover:text-blue-400'
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-150 shadow-sm ${isBlocked
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed border border-border'
+                    : 'bg-card border border-border hover:bg-muted/50 hover:border-blue-500/50 text-foreground hover:text-blue-600 dark:hover:text-blue-400'
                   }`}
               >
                 <Upload className="w-4 h-4" />
@@ -522,9 +522,9 @@ export default function LeadsTable({
             {onImportWhatsApp && (
               <button
                 onClick={() => onImportWhatsApp?.()}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-sm ${isBlocked
-                    ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed border border-border dark:border-border'
-                    : 'bg-card dark:bg-card border border-border dark:border-border hover:bg-muted dark:hover:bg-muted/50 hover:border-green-500 text-foreground dark:text-foreground hover:text-green-600 dark:hover:text-green-400'
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-150 shadow-sm ${isBlocked
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed border border-border'
+                    : 'bg-card border border-border hover:bg-muted/50 hover:border-green-500/50 text-foreground hover:text-green-600 dark:hover:text-green-400'
                   }`}
               >
                 <WhatsAppIcon className="w-4 h-4" />
@@ -536,9 +536,9 @@ export default function LeadsTable({
               <button
                 onClick={() => onCampaigns?.()}
                 className={`inline-flex items-center gap-2 px-4 py-2 ${isCampaignsBlocked
-                    ? 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground cursor-not-allowed'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
-                  } rounded-lg transition-colors shadow-sm`}
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                    : 'bg-primary hover:opacity-90 text-primary-foreground active:scale-[0.97]'
+                  } rounded-lg transition-all duration-150 shadow-sm`}
               >
                 <Megaphone className="w-4 h-4" />
                 <span>Campanhas</span>
@@ -555,11 +555,11 @@ export default function LeadsTable({
             className="sticky top-0 z-10 shadow-[0_1px_4px_rgba(15,23,42,0.05)] dark:shadow-[0_1px_4px_rgba(15,23,42,0.3)]"
             style={{ backgroundColor: 'hsl(var(--card))' }}
           >
-            <tr className="border-b-2 border-border dark:border-border">
+            <tr className="border-b border-border">
               <th className="px-4 py-4 text-left" style={{ width: '50px' }}>
                 <button
                   onClick={toggleSelectAll}
-                  className="p-1 rounded hover:bg-muted dark:hover:bg-muted transition-colors"
+                  className="p-1 rounded-md hover:bg-muted transition-colors"
                   title={allSelected ? 'Desmarcar todos' : 'Selecionar todos'}
                 >
                   {allSelected ? (
@@ -569,28 +569,28 @@ export default function LeadsTable({
                   )}
                 </button>
               </th>
-              <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-muted-foreground dark:text-muted-foreground">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Data
               </th>
-              <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-muted-foreground dark:text-muted-foreground">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Nome
               </th>
-              <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-muted-foreground dark:text-muted-foreground">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Email
               </th>
-              <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-muted-foreground dark:text-muted-foreground">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Telefone
               </th>
-              <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-muted-foreground dark:text-muted-foreground">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Interesse
               </th>
-              <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-muted-foreground dark:text-muted-foreground">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Origem
               </th>
-              <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-muted-foreground dark:text-muted-foreground">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Status
               </th>
-              <th className="px-6 py-4 text-left text-xs uppercase tracking-wider text-muted-foreground dark:text-muted-foreground" style={{ width: '140px' }}>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground" style={{ width: '140px' }}>
                 Ações
               </th>
             </tr>
@@ -598,7 +598,7 @@ export default function LeadsTable({
           <tbody>
             {leadsExibidos.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-500 dark:text-gray-400">
+                <td colSpan={9} className="px-6 py-12 text-center text-muted-foreground">
                   Nenhum lead encontrado. Adicione seu primeiro lead!
                 </td>
               </tr>
@@ -610,11 +610,11 @@ export default function LeadsTable({
                 return (
                   <tr
                     key={displayIndex}
-                    className={`border-b border-border dark:border-border transition-colors ${isSelected
-                        ? 'bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+                    className={`border-b border-border transition-colors duration-100 group ${isSelected
+                        ? 'bg-blue-500/5 hover:bg-blue-500/10'
                         : lead.marcado_email
-                          ? 'bg-purple-50 dark:bg-purple-900/10 hover:bg-purple-100 dark:hover:bg-purple-900/20'
-                          : 'hover:bg-muted dark:hover:bg-muted/50'
+                          ? 'bg-primary/5 hover:bg-primary/10'
+                          : 'hover:bg-muted/50'
                       }`}
                     // onMouseEnter={() => setHoveredRow(displayIndex)}
                     // onMouseLeave={() => setHoveredRow(null)}
@@ -622,7 +622,7 @@ export default function LeadsTable({
                     <td className="px-4 py-4">
                       <button
                         onClick={() => toggleSelectLead(leadIndex)}
-                        className="p-1 rounded hover:bg-muted dark:hover:bg-muted transition-colors"
+                        className="p-1 rounded-md hover:bg-muted transition-colors"
                         title={isSelected ? 'Desmarcar' : 'Selecionar'}
                       >
                         {isSelected ? (
@@ -632,10 +632,10 @@ export default function LeadsTable({
                         )}
                       </button>
                     </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground dark:text-muted-foreground">
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
                       {formatDate(lead.data)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-foreground dark:text-foreground">
+                    <td className="px-4 py-3 text-sm text-foreground">
                       <div className="flex items-center gap-3">
                         {/* Avatar colorido com iniciais */}
                         <Avatar className="h-8 w-8 flex-shrink-0">
@@ -651,7 +651,7 @@ export default function LeadsTable({
                         <div className="flex flex-col">
                           <span className="font-medium">{lead.nome || '-'}</span>
                           {lead.marcado_email && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded text-xs w-fit">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-xs w-fit">
                               <Mail className="w-3 h-3" />
                               Email
                             </span>
@@ -659,46 +659,46 @@ export default function LeadsTable({
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground dark:text-muted-foreground">
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
                       {lead.email ? (
                         <a href={`mailto:${lead.email}`} className="text-blue-600 dark:text-blue-400 hover:underline">
                           {lead.email}
                         </a>
                       ) : (
-                        <span className="text-muted-foreground dark:text-muted-foreground">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground dark:text-muted-foreground">
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
                       {lead.telefone || '-'}
                     </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground dark:text-muted-foreground">
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
                       {lead.interesse || '-'}
                     </td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-4 py-3 text-sm">
                       {renderOriginWithIcon(lead.origem, lead.channelSource)}
                     </td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-4 py-3 text-sm">
                       {getStatusBadge(lead.status)}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1.5">
                         <button
                           onClick={() => onChat(lead.id)}
-                          className="p-2 border border-border dark:border-border rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 hover:border-green-500 hover:text-green-600 dark:hover:text-green-400 transition-all"
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-green-600 dark:hover:text-green-400 hover:bg-green-500/10 transition-all duration-150 opacity-0 group-hover:opacity-100"
                           title="WhatsApp"
                         >
                           <MessageCircle className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => onEdit(lead.id)}
-                          className="p-2 border border-border dark:border-border rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/30 hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400 transition-all"
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-500/10 transition-all duration-150 opacity-0 group-hover:opacity-100"
                           title="Editar"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => onDelete(lead.id)}
-                          className="p-2 border border-border dark:border-border rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-500 hover:text-red-600 dark:hover:text-red-400 transition-all"
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-all duration-150 opacity-0 group-hover:opacity-100"
                           title="Deletar"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -715,8 +715,8 @@ export default function LeadsTable({
 
       {/* Paginação */}
       {totalPaginas > 1 && (
-        <div className="px-6 py-4 border-t border-border dark:border-border flex items-center justify-between">
-          <div className="text-sm text-muted-foreground dark:text-muted-foreground">
+        <div className="px-5 py-3 border-t border-border flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
             Mostrando {indexInicio + 1} a {Math.min(indexFim, leadsFiltrados.length)} de {leadsFiltrados.length} leads
           </div>
 
@@ -724,7 +724,7 @@ export default function LeadsTable({
             <button
               onClick={() => irParaPagina(paginaAtual - 1)}
               disabled={paginaAtual === 1}
-              className="px-3 py-1 rounded-lg border border-border dark:border-border bg-card dark:bg-card text-foreground dark:text-foreground hover:bg-muted dark:hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150"
             >
               ‹
             </button>
@@ -734,11 +734,11 @@ export default function LeadsTable({
                 key={index}
                 onClick={() => typeof botao === 'number' && irParaPagina(botao)}
                 disabled={botao === '...'}
-                className={`px-3 py-1 rounded-lg border transition-colors ${botao === paginaAtual
-                    ? 'bg-blue-600 border-blue-600 text-white'
+                className={`px-3 py-1 rounded-lg border transition-all duration-150 ${botao === paginaAtual
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                     : botao === '...'
-                      ? 'border-transparent text-muted-foreground dark:text-muted-foreground cursor-default'
-                      : 'border-border dark:border-border bg-card dark:bg-card text-foreground dark:text-foreground hover:bg-muted dark:hover:bg-muted'
+                      ? 'border-transparent text-muted-foreground cursor-default'
+                      : 'border-border bg-card text-foreground hover:bg-muted'
                   }`}
               >
                 {botao}
@@ -748,7 +748,7 @@ export default function LeadsTable({
             <button
               onClick={() => irParaPagina(paginaAtual + 1)}
               disabled={paginaAtual === totalPaginas}
-              className="px-3 py-1 rounded-lg border border-border dark:border-border bg-card dark:bg-card text-foreground dark:text-foreground hover:bg-muted dark:hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150"
             >
               ›
             </button>

@@ -48,7 +48,7 @@ export default function CampaignResultsModal({
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="w-12 h-12 text-green-600 dark:text-green-400 animate-spin mb-4" />
-            <p className="text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Enviando mensagens... Aguarde
             </p>
           </div>
@@ -56,10 +56,10 @@ export default function CampaignResultsModal({
           <div className="space-y-6">
             {/* Summary Cards */}
             <div className="grid grid-cols-3 gap-4">
-              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+              <div className="bg-muted/50 rounded-xl p-4 border border-border">
                 <div className="text-center">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalCount}</p>
+                  <p className="text-xs text-muted-foreground mb-1">Total</p>
+                  <p className="text-2xl font-bold text-foreground">{totalCount}</p>
                 </div>
               </div>
               
@@ -81,14 +81,14 @@ export default function CampaignResultsModal({
             {/* Progress Bar */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span className="text-sm font-medium text-foreground/80">
                   Taxa de Sucesso
                 </span>
                 <span className="text-sm font-bold text-green-600 dark:text-green-400">
                   {successPercentage.toFixed(1)}%
                 </span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+              <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full transition-all duration-700"
                   style={{ width: `${successPercentage}%` }}
@@ -98,7 +98,7 @@ export default function CampaignResultsModal({
 
             {/* Results List */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+              <h4 className="text-sm font-semibold text-foreground mb-3">
                 Detalhes dos Envios
               </h4>
               <ScrollArea className="h-[300px] pr-4">
@@ -121,10 +121,10 @@ export default function CampaignResultsModal({
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        <p className="text-sm font-medium text-foreground truncate">
                           {result.nome}
                         </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-muted-foreground">
                           {result.telefone}
                         </p>
                         {result.error && (
@@ -146,7 +146,7 @@ export default function CampaignResultsModal({
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
               <Button variant="outline" onClick={onClose}>
                 Fechar
               </Button>

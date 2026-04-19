@@ -77,8 +77,8 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-white rounded-2xl max-w-lg w-full shadow-lg">
-        <DialogHeader className="px-5 py-4 border-b border-gray-200 flex justify-between items-center">
+      <DialogContent className="bg-card text-foreground rounded-2xl max-w-lg w-full shadow-xl border border-border">
+        <DialogHeader className="px-5 py-4 border-b border-border flex justify-between items-center">
           <div className="flex items-center gap-3">
             {status === 'online' ? (
               <Wifi className="w-5 h-5 text-green-600" />
@@ -87,7 +87,7 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
             ) : (
               <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
             )}
-            <DialogTitle className="text-lg text-gray-900">
+            <DialogTitle className="text-lg text-foreground">
               Status do Backend
             </DialogTitle>
           </div>
@@ -96,9 +96,9 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
           </DialogDescription>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
           >
-            <X className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </DialogHeader>
 
@@ -106,10 +106,10 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
           {/* Status Card */}
           <div className={`p-4 rounded-xl border-2 ${
             status === 'online' 
-              ? 'bg-green-50 border-green-200'
+              ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800'
               : status === 'offline'
-              ? 'bg-red-50 border-red-200'
-              : 'bg-blue-50 border-blue-200'
+              ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800'
+              : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800'
           }`}>
             <div className="flex items-center gap-3">
               {status === 'checking' ? (
@@ -120,12 +120,12 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
                 <AlertCircle className="w-8 h-8 text-red-600" />
               )}
               <div>
-                <h3 className="font-semibold text-gray-900">
+                <h3 className="font-semibold text-foreground">
                   {status === 'checking' && 'Verificando conexão...'}
                   {status === 'online' && '✅ Backend Online'}
                   {status === 'offline' && '❌ Backend Offline'}
                 </h3>
-                <p className="text-sm text-gray-700 dark:text-gray-300">
+                <p className="text-sm text-muted-foreground">
                   {status === 'checking' && 'Aguarde...'}
                   {status === 'online' && `${leadsCount} leads encontrados no banco de dados`}
                   {status === 'offline' && 'Não foi possível conectar ao servidor'}
@@ -135,9 +135,9 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
           </div>
 
           {/* Auth Status */}
-          <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="p-3 bg-muted/50 rounded-lg border border-border">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-700 dark:text-gray-300">Token de autenticação:</span>
+              <span className="text-sm text-muted-foreground">Token de autenticação:</span>
               <span className={`text-sm font-medium ${hasAuth ? 'text-green-600' : 'text-red-600'}`}>
                 {hasAuth ? '✅ Presente' : '❌ Ausente'}
               </span>
@@ -157,10 +157,10 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
           {/* Info Box */}
           <div className={`p-4 border rounded-lg ${
             status === 'online' 
-              ? 'bg-blue-50 border-blue-200' 
-              : 'bg-orange-50 border-orange-200'
+              ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800' 
+              : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800'
           }`}>
-            <p className={`text-xs ${status === 'online' ? 'text-blue-900' : 'text-orange-900'}`}>
+            <p className={`text-xs ${status === 'online' ? 'text-blue-800 dark:text-blue-300' : 'text-amber-800 dark:text-amber-300'}`}>
               <strong>💡 O que isso significa:</strong><br/>
               {status === 'online' && '• Seu backend Supabase está funcionando corretamente'}
               {status === 'online' && <><br/>• Todos os dados estão sendo salvos no banco de dados real</>}
@@ -169,7 +169,7 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
               {status === 'offline' && <><br/>• ⚠️ Importações e exclusões NÃO estão funcionando</>}
               {status === 'offline' && <><br/><br/><strong>🚀 Como resolver:</strong></>}
               {status === 'offline' && <><br/>1. Abra o terminal na pasta do projeto</>}
-              {status === 'offline' && <><br/>2. Execute: <code className="bg-orange-100 px-1 rounded">chmod +x deploy-backend.sh && ./deploy-backend.sh</code></>}
+              {status === 'offline' && <><br/>2. Execute: <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">chmod +x deploy-backend.sh && ./deploy-backend.sh</code></>}
               {status === 'offline' && <><br/>3. Aguarde o deploy completar</>}
               {status === 'offline' && <><br/>4. Clique em "Verificar Novamente"</>}
             </p>

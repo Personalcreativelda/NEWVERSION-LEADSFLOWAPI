@@ -24,7 +24,7 @@ export function UpgradeButton({
       onClick={onClick}
       size={size}
       variant={variant}
-      className={`bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 ${className}`}
+      className={`bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 border-0 ${className}`}
     >
       {showIcon && <Zap className="w-4 h-4 mr-2" />}
       Upgrade
@@ -58,7 +58,7 @@ export function UpgradeIconButton({ onClick, tooltip }: { onClick?: () => void; 
             onClick={onClick}
             size="icon"
             variant="ghost"
-            className="h-8 w-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+            className="h-8 w-8 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
           >
             <Zap className="w-4 h-4" />
           </Button>

@@ -23,8 +23,6 @@ interface MessageInputProps {
     conversationId?: string;
     disabled?: boolean;
     isSending?: boolean;
-    droppedFile?: File | null;
-    onDroppedFileProcessed?: () => void;
 }
 
 interface SelectedFile {
@@ -33,7 +31,7 @@ interface SelectedFile {
     type: 'image' | 'video' | 'audio' | 'document';
 }
 
-export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversationId, disabled, isSending, droppedFile, onDroppedFileProcessed }: MessageInputProps) {
+export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversationId, disabled, isSending }: MessageInputProps) {
     const [content, setContent] = useState('');
     const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -69,18 +67,6 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    // Process file dropped from ChatPanel drag & drop
-    useEffect(() => {
-        if (!droppedFile) return;
-        let type: SelectedFile['type'] = 'document';
-        if (droppedFile.type.startsWith('image/')) type = 'image';
-        else if (droppedFile.type.startsWith('video/')) type = 'video';
-        else if (droppedFile.type.startsWith('audio/')) type = 'audio';
-        const preview = (type === 'image' || type === 'video') ? URL.createObjectURL(droppedFile) : null;
-        setSelectedFile({ file: droppedFile, preview, type });
-        onDroppedFileProcessed?.();
-    }, [droppedFile]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Cleanup on unmount
     useEffect(() => {
@@ -349,7 +335,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     const showRecordingMode = isRecording || audioBlob;
 
     return (
-        <div className="transition-colors" style={{ backgroundColor: 'hsl(var(--card))' }}>
+        <div className="transition-colors bg-card">
             {/* Hidden file inputs */}
             <input
                 ref={fileInputRef}
@@ -369,21 +355,17 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
             {/* Recording Mode UI */}
             {showRecordingMode && (
                 <div 
-                    className="mx-2 mb-2 p-3 rounded-xl border flex items-center gap-3"
-                    style={{ 
-                        backgroundColor: isRecording ? 'hsl(var(--destructive)/0.1)' : 'hsl(var(--muted))',
-                        borderColor: isRecording ? 'hsl(var(--destructive)/0.3)' : 'hsl(var(--border))'
-                    }}
+                    className={`mx-2 mb-2 p-3 rounded-xl border flex items-center gap-3 ${isRecording ? 'bg-destructive/10 border-destructive/30' : 'bg-muted border-border'}`}
                 >
                     {isRecording ? (
                         <>
                             {/* Recording indicator */}
                             <div className="flex items-center gap-2 flex-1">
                                 <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                                <span className="text-sm font-medium" style={{ color: 'hsl(var(--foreground))' }}>
+                                <span className="text-sm font-medium text-foreground">
                                     Gravando...
                                 </span>
-                                <span className="text-sm font-mono" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                <span className="text-sm font-mono text-muted-foreground">
                                     {formatTime(recordingTime)}
                                 </span>
                             </div>
@@ -409,10 +391,10 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                             {/* Audio preview */}
                             <div className="flex items-center gap-2 flex-1">
                                 <Mic size={20} className="text-blue-500" />
-                                <span className="text-sm font-medium" style={{ color: 'hsl(var(--foreground))' }}>
+                                <span className="text-sm font-medium text-foreground">
                                     Áudio gravado
                                 </span>
-                                <span className="text-sm font-mono" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                <span className="text-sm font-mono text-muted-foreground">
                                     {formatTime(recordingTime)}
                                 </span>
                             </div>
@@ -445,11 +427,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
             {/* File preview */}
             {selectedFile && (
                 <div 
-                    className="mx-2 mb-2 p-3 rounded-xl border flex items-center gap-3"
-                    style={{ 
-                        backgroundColor: 'hsl(var(--muted))',
-                        borderColor: 'hsl(var(--border))'
-                    }}
+                    className="mx-2 mb-2 p-3 rounded-xl border border-border bg-muted flex items-center gap-3"
                 >
                     {/* Preview or icon */}
                     <div className="flex-shrink-0">
@@ -465,10 +443,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                                 className="w-16 h-16 object-cover rounded-lg"
                             />
                         ) : (
-                            <div 
-                                className="w-16 h-16 flex items-center justify-center rounded-lg"
-                                style={{ backgroundColor: 'hsl(var(--primary)/0.1)' }}
-                            >
+                            <div className="w-16 h-16 flex items-center justify-center rounded-lg bg-primary/10">
                                 {getFileIcon(selectedFile.type)}
                             </div>
                         )}
@@ -476,16 +451,10 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
 
                     {/* File info */}
                     <div className="flex-1 min-w-0">
-                        <p 
-                            className="font-medium text-sm truncate"
-                            style={{ color: 'hsl(var(--foreground))' }}
-                        >
+                        <p className="font-medium text-sm truncate text-foreground">
                             {selectedFile.file.name}
                         </p>
-                        <p 
-                            className="text-xs"
-                            style={{ color: 'hsl(var(--muted-foreground))' }}
-                        >
+                        <p className="text-xs text-muted-foreground">
                             {formatFileSize(selectedFile.file.size)} • {selectedFile.type.toUpperCase()}
                         </p>
                     </div>
@@ -494,7 +463,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                     <button
                         onClick={clearSelectedFile}
                         disabled={isBusy}
-                        className="p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors"
+                        className="p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20 text-muted-foreground/70 hover:text-red-500 transition-colors"
                     >
                         <X size={18} />
                     </button>
@@ -508,29 +477,23 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                     <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={disabled || isBusy || showRecordingMode}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all disabled:opacity-50"
+                        className="p-2 rounded-lg transition-all duration-150 disabled:opacity-50 hover:bg-muted text-muted-foreground"
                         title="Anexar arquivo"
                     >
-                        <Paperclip size={20} />
+                        <Paperclip size={18} />
                     </button>
                     <button
                         onClick={() => imageInputRef.current?.click()}
                         disabled={disabled || isBusy || showRecordingMode}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all disabled:opacity-50"
+                        className="p-2 rounded-lg transition-all duration-150 disabled:opacity-50 hover:bg-muted text-muted-foreground"
                         title="Enviar imagem"
                     >
-                        <ImageIcon size={20} />
+                        <ImageIcon size={18} />
                     </button>
                 </div>
 
                 {/* Input Container */}
-                <div 
-                    className="flex-1 min-w-0 rounded-2xl border focus-within:border-blue-500/50 focus-within:ring-4 focus-within:ring-blue-500/5 transition-all flex items-center px-4 py-1.5 relative"
-                    style={{ 
-                        backgroundColor: 'hsl(var(--muted))',
-                        borderColor: 'hsl(var(--border))'
-                    }}
-                >
+                <div className="flex-1 min-w-0 rounded-2xl border border-border bg-muted focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/5 transition-all duration-150 flex items-center px-4 py-1.5 relative">
                     <textarea
                         ref={textareaRef}
                         value={content}
@@ -544,8 +507,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                         disabled={disabled || isBusy || showRecordingMode}
                         placeholder={selectedFile ? "Adicione uma legenda (opcional)..." : showRecordingMode ? "Gravando áudio..." : "Escreva sua mensagem..."}
                         rows={1}
-                        className="w-full bg-transparent border-none focus:ring-0 text-sm resize-none max-h-[120px] py-1.5 scrollbar-none outline-none overflow-y-auto"
-                        style={{ color: 'hsl(var(--foreground))' }}
+                        className="w-full bg-transparent border-none focus:ring-0 text-sm text-foreground resize-none max-h-[120px] py-1.5 scrollbar-none outline-none overflow-y-auto"
                     />
                     
                     {/* Emoji Button with Picker */}
@@ -556,7 +518,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                                 setShowEmojiPicker(!showEmojiPicker);
                             }}
                             disabled={disabled || showRecordingMode}
-                            className="p-1.5 text-gray-400 hover:text-yellow-500 rounded-full transition-colors disabled:opacity-50"
+                            className="p-1.5 text-muted-foreground/70 hover:text-yellow-500 rounded-full transition-colors disabled:opacity-50"
                             type="button"
                         >
                             <Smile size={20} />
@@ -565,11 +527,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                         {/* Emoji Picker Dropdown */}
                         {showEmojiPicker && (
                             <div 
-                                className="absolute bottom-full right-0 mb-2 p-3 rounded-xl border shadow-xl z-[100] w-[280px]"
-                                style={{ 
-                                    backgroundColor: 'hsl(var(--card))',
-                                    borderColor: 'hsl(var(--border))'
-                                }}
+                                className="absolute bottom-full right-0 mb-2 p-3 rounded-xl border border-border shadow-xl bg-card z-[100] w-[280px]"
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 <div className="grid grid-cols-8 gap-1">
@@ -578,7 +536,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                                             key={index}
                                             onClick={() => insertEmoji(emoji)}
                                             type="button"
-                                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-xl transition-colors flex items-center justify-center"
+                                            className="p-2 hover:bg-muted/50 rounded-lg text-xl transition-colors flex items-center justify-center"
                                         >
                                             {emoji}
                                         </button>
@@ -595,8 +553,8 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                         <button
                             onClick={handleSendWithFile}
                             disabled={disabled || isBusy}
-                            className={`p-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition-all active:scale-95 flex items-center justify-center
-                                ${(disabled || isBusy) ? 'opacity-50 cursor-not-allowed' : ''}
+                            className={`p-2.5 rounded-xl text-white transition-all active:scale-95 flex items-center justify-center
+                                ${(disabled || isBusy) ? 'opacity-50 cursor-not-allowed bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}
                             `}
                         >
                             {isBusy ? (
@@ -609,11 +567,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                         <button
                             onClick={startRecording}
                             disabled={disabled}
-                            className="p-2.5 rounded-xl transition-all active:scale-95 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                            style={{ 
-                                backgroundColor: 'hsl(var(--muted))',
-                                color: 'hsl(var(--muted-foreground))'
-                            }}
+                            className="p-2.5 rounded-xl transition-all duration-150 active:scale-95 hover:bg-blue-50 dark:hover:bg-blue-900/20 bg-muted text-muted-foreground"
                             title="Gravar áudio"
                         >
                             <Mic size={20} />

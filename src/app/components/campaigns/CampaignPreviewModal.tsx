@@ -121,9 +121,9 @@ export default function CampaignPreviewModal({
     if (file.type.startsWith('image/')) {
       return <ImageIcon className="w-5 h-5 text-blue-500" />;
     } else if (file.type.startsWith('video/')) {
-      return <Film className="w-5 h-5 text-purple-500" />;
+      return <Film className="w-5 h-5 text-primary" />;
     } else {
-      return <FileText className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
+      return <FileText className="w-5 h-5 text-muted-foreground" />;
     }
   };
 
@@ -157,14 +157,14 @@ export default function CampaignPreviewModal({
                 {sampleName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
               </div>
               <div>
-                <p className="font-semibold text-gray-900 dark:text-white">{sampleName}</p>
-                <p className="text-xs text-gray-600 dark:text-gray-500 dark:text-gray-400">Online</p>
+                <p className="font-semibold text-foreground">{sampleName}</p>
+                <p className="text-xs text-muted-foreground">Online</p>
               </div>
             </div>
 
             {/* Message Bubble */}
             <div className="bg-card rounded-lg rounded-tl-none p-4 shadow-md">
-              <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
+              <p className="text-sm text-foreground whitespace-pre-wrap">
                 {personalizedMessage}
               </p>
               
@@ -172,7 +172,7 @@ export default function CampaignPreviewModal({
               {attachments.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {attachments.map((file, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                    <div key={index} className="flex items-center gap-2 p-2 bg-muted/50 rounded">
                       {file.type.startsWith('image/') ? (
                         <img 
                           src={URL.createObjectURL(file)} 
@@ -180,15 +180,15 @@ export default function CampaignPreviewModal({
                           className="w-12 h-12 object-cover rounded"
                         />
                       ) : (
-                        <div className="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded flex items-center justify-center">
+                        <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
                           {getFileIcon(file)}
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                        <p className="text-xs font-medium text-foreground truncate">
                           {file.name}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-muted-foreground">
                           {formatFileSize(file.size)}
                         </p>
                       </div>
@@ -197,7 +197,7 @@ export default function CampaignPreviewModal({
                 </div>
               )}
 
-              <p className="text-xs text-gray-500 dark:text-gray-400 text-right mt-2">
+              <p className="text-xs text-muted-foreground text-right mt-2">
                 {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
@@ -210,18 +210,18 @@ export default function CampaignPreviewModal({
     return (
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         {/* Email Header */}
-        <div className="border-b border-border p-4 bg-gray-50 dark:bg-gray-900">
+        <div className="border-b border-border p-4 bg-muted/50">
           <div className="flex items-start justify-between mb-2">
             <div>
-              <p className="font-semibold text-gray-900 dark:text-white">{subject || 'Sem assunto'}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="font-semibold text-foreground">{subject || 'Sem assunto'}</p>
+              <p className="text-sm text-muted-foreground mt-1">
                 De: Sua Empresa &lt;contato@empresa.com&gt;
               </p>
-              <p className="text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 Para: {sampleName} &lt;{sampleEmail}&gt;
               </p>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground">
               {new Date().toLocaleDateString('pt-BR')}
             </p>
           </div>
@@ -230,20 +230,20 @@ export default function CampaignPreviewModal({
         {/* Email Body */}
         <div className="p-6">
           <div className="prose dark:prose-invert max-w-none">
-            <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
+            <p className="text-foreground whitespace-pre-wrap">
               {personalizedMessage}
             </p>
           </div>
 
           {/* Email Attachments */}
           {attachments.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <div className="mt-6 pt-6 border-t border-border">
+              <p className="text-sm font-medium text-foreground/80 mb-3">
                 Anexos ({attachments.length})
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {attachments.map((file, index) => (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div key={index} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border">
                     {file.type.startsWith('image/') ? (
                       <img 
                         src={URL.createObjectURL(file)} 
@@ -251,15 +251,15 @@ export default function CampaignPreviewModal({
                         className="w-12 h-12 object-cover rounded"
                       />
                     ) : (
-                      <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
+                      <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
                         {getFileIcon(file)}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      <p className="text-sm font-medium text-foreground truncate">
                         {file.name}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         {formatFileSize(file.size)}
                       </p>
                     </div>
@@ -288,7 +288,7 @@ export default function CampaignPreviewModal({
         <div className="space-y-6">
           {/* Campaign Preview */}
           <div>
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <h4 className="text-sm font-medium text-foreground/80 mb-3">
               Prévia da Mensagem
             </h4>
             {renderPreview()}
@@ -296,7 +296,7 @@ export default function CampaignPreviewModal({
 
           {/* File Upload Section */}
           <div>
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <h4 className="text-sm font-medium text-foreground/80 mb-3">
               Anexos da Campanha
             </h4>
             
@@ -320,16 +320,16 @@ export default function CampaignPreviewModal({
               className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
                 dragActive
                   ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                  : 'border-gray-300 dark:border-gray-600 hover:border-green-400 dark:hover:border-green-500'
+                  : 'border-border hover:border-green-400 dark:hover:border-green-500'
               }`}
             >
               <Upload className={`w-12 h-12 mx-auto mb-3 ${
-                dragActive ? 'text-green-500' : 'text-gray-400 dark:text-gray-600 dark:text-gray-400'
+                dragActive ? 'text-green-500' : 'text-muted-foreground/70'
               }`} />
-              <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+              <p className="text-sm font-medium text-foreground mb-1">
                 Clique ou arraste arquivos para adicionar
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 Imagens, vídeos, PDFs e documentos até 16MB
               </p>
             </div>
@@ -337,13 +337,13 @@ export default function CampaignPreviewModal({
             {/* Attachments List */}
             {attachments.length > 0 && (
               <div className="mt-4 space-y-2">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <p className="text-sm font-medium text-foreground/80">
                   Arquivos Anexados ({attachments.length})
                 </p>
                 {attachments.map((file, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+                    className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border"
                   >
                     {file.type.startsWith('image/') ? (
                       <img
@@ -352,15 +352,15 @@ export default function CampaignPreviewModal({
                         className="w-14 h-14 object-cover rounded"
                       />
                     ) : (
-                      <div className="w-14 h-14 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
+                      <div className="w-14 h-14 bg-muted rounded flex items-center justify-center">
                         {getFileIcon(file)}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 dark:text-white truncate">
+                      <p className="font-medium text-foreground truncate">
                         {file.name}
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-muted-foreground">
                         {formatFileSize(file.size)}
                       </p>
                     </div>
@@ -391,7 +391,7 @@ export default function CampaignPreviewModal({
               toast.success('Prévia confirmada! Pronta para enviar.');
               onClose();
             }}
-            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+            className="bg-green-600 text-white hover:bg-green-700 transition-all duration-150"
           >
             Confirmar e Enviar
           </Button>

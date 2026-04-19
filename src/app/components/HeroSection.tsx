@@ -80,7 +80,7 @@ export default function HeroSection({ onGetStarted }: HeroSectionProps) {
             </h1>
 
             {/* Subtitle */}
-            <p className="text-gray-400 mb-8 text-base sm:text-lg lg:text-xl leading-relaxed max-w-2xl mx-auto">
+            <p className="text-muted-foreground/70 mb-8 text-base sm:text-lg lg:text-xl leading-relaxed max-w-2xl mx-auto">
               Automatize seu funil de vendas, acompanhe cada interação e converta mais leads com
               o poder da inteligência artificial.
             </p>
@@ -92,7 +92,7 @@ export default function HeroSection({ onGetStarted }: HeroSectionProps) {
                 'Configure em menos de 5 minutos',
                 'Suporte 24/7 em português'
               ].map((benefit, index) => (
-                <div key={index} className="flex items-center gap-3 text-gray-300 justify-center">
+                <div key={index} className="flex items-center gap-3 text-foreground/80 justify-center">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center">
                     <Check className="w-3 h-3 text-green-400" />
                   </div>
@@ -115,7 +115,7 @@ export default function HeroSection({ onGetStarted }: HeroSectionProps) {
               <Button
                 variant="outline"
                 size="lg"
-                className="border-2 border-gray-600 text-gray-300 hover:bg-white/5 hover:border-gray-500 transition-all duration-200 text-base sm:text-lg px-8 py-6 font-semibold bg-transparent"
+                className="border-2 border-border text-foreground/80 hover:bg-white/5 hover:border-border transition-all duration-200 text-base sm:text-lg px-8 py-6 font-semibold bg-transparent"
                 onClick={handleDemoClick}
               >
                 <Play className="w-5 h-5 mr-2" />
@@ -124,18 +124,18 @@ export default function HeroSection({ onGetStarted }: HeroSectionProps) {
             </div>
 
             {/* Stats - Centered */}
-            <div className="grid grid-cols-3 gap-4 sm:gap-8 pt-6 border-t border-gray-800 max-w-xl mx-auto">
+            <div className="grid grid-cols-3 gap-4 sm:gap-8 pt-6 border-t border-border max-w-xl mx-auto">
               <div className="text-center">
                 <div className="text-2xl sm:text-3xl text-white mb-1 font-bold">10k+</div>
-                <div className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm font-medium">Clientes</div>
+                <div className="text-muted-foreground text-xs sm:text-sm font-medium">Clientes</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl sm:text-3xl text-white mb-1 font-bold">95%</div>
-                <div className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm font-medium">Satisfação</div>
+                <div className="text-muted-foreground text-xs sm:text-sm font-medium">Satisfação</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl sm:text-3xl text-white mb-1 font-bold">24/7</div>
-                <div className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm font-medium">Suporte</div>
+                <div className="text-muted-foreground text-xs sm:text-sm font-medium">Suporte</div>
               </div>
             </div>
           </div>
@@ -156,10 +156,10 @@ export default function HeroSection({ onGetStarted }: HeroSectionProps) {
                 <div 
                   className="w-full h-auto rounded-xl shadow-[0_25px_70px_-20px_rgba(147,51,234,0.5)] border border-purple-500/30 hover:border-purple-500/50 transition-all duration-300 bg-gradient-to-br from-gray-800 to-gray-900 min-h-96 flex items-center justify-center"
                 >
-                  <div className="text-center text-gray-500 dark:text-gray-400">
+                  <div className="text-center text-muted-foreground">
                     <div className="text-6xl mb-4">📊</div>
                     <p className="text-lg font-semibold">LeadsFlow Dashboard</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Interface em tempo real</p>
+                    <p className="text-sm text-muted-foreground">Interface em tempo real</p>
                   </div>
                 </div>
               </div>

@@ -74,7 +74,7 @@ export default function ModernHeader({
             <div className="hidden md:flex items-center gap-2">
               <Button 
                 onClick={onNovoLead} 
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all hover:opacity-90"
+                className="px-5 py-2.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 dark:bg-[#252525] dark:text-[#e6e6e6] dark:border dark:border-white/[0.09] dark:hover:bg-[#2e2e2e]"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Novo Lead
@@ -83,7 +83,7 @@ export default function ModernHeader({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
-                    className="px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white transition-all hover:opacity-90"
+                    className="px-5 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-all duration-150"
                   >
                     <Send className="w-4 h-4 mr-2" />
                     Campanhas
@@ -105,7 +105,7 @@ export default function ModernHeader({
                     onClick={onEmailMarketing} 
                     className="px-4 py-3 rounded-lg cursor-pointer hover:bg-muted dark:hover:bg-muted"
                   >
-                    <Mail className="w-4 h-4 mr-3 text-purple-600 dark:text-purple-400" />
+                    <Mail className="w-4 h-4 mr-3 text-primary" />
                     <div>
                       <div className="font-medium text-sm">Email Marketing</div>
                       <div className="text-xs text-muted-foreground">Criar campanhas de email</div>
@@ -120,7 +120,7 @@ export default function ModernHeader({
               <Button 
                 onClick={onNovoLead} 
                 size="sm"
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 dark:bg-[#252525] dark:text-[#e6e6e6] dark:border dark:border-white/[0.09] dark:hover:bg-[#2e2e2e]"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Lead
@@ -155,7 +155,7 @@ export default function ModernHeader({
             {/* Avatar with Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="relative rounded-full ring-2 ring-gray-200 dark:ring-gray-700 hover:ring-blue-500 dark:hover:ring-blue-400 transition-all">
+                <button className="relative rounded-full ring-2 ring-border hover:ring-blue-500 dark:hover:ring-blue-400 transition-all">
                   <Avatar className="h-9 w-9">
                     <AvatarImage src={user?.avatar_url} alt={user?.name || 'User'} />
                     <AvatarFallback className="text-sm bg-blue-600 text-white">
@@ -213,7 +213,7 @@ export default function ModernHeader({
       {/* Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-opacity"
+          className="fixed inset-0 bg-black/60 z-50 transition-opacity"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -226,7 +226,7 @@ export default function ModernHeader({
       >
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex items-center justify-between p-6 border-b border-border">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                 <Zap className="w-5 h-5 text-white" />
@@ -239,7 +239,7 @@ export default function ModernHeader({
               onClick={() => setIsSidebarOpen(false)}
               className="p-2 rounded-lg hover:bg-muted transition-colors"
             >
-              <X className="w-5 h-5 text-gray-600 dark:text-gray-500 dark:text-gray-400" />
+              <X className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
 
@@ -267,7 +267,7 @@ export default function ModernHeader({
             </button>
 
             {/* Mobile: Show campaign buttons */}
-            <div className="md:hidden pt-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
+            <div className="md:hidden pt-4 border-t border-border space-y-2">
               <button 
                 onClick={() => {
                   onNovoLead();
@@ -293,7 +293,7 @@ export default function ModernHeader({
                   onEmailMarketing();
                   setIsSidebarOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-primary hover:brightness-110 text-white font-medium transition-colors"
               >
                 <Mail className="w-5 h-5" />
                 Email Marketing
@@ -302,7 +302,7 @@ export default function ModernHeader({
           </nav>
 
           {/* Sidebar Footer */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+          <div className="p-4 border-t border-border">
             <button 
               onClick={() => {
                 onSettings();
@@ -327,7 +327,7 @@ export default function ModernHeader({
       {/* Settings Panel Overlay */}
       {isSettingsPanelOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-opacity"
+          className="fixed inset-0 bg-black/60 z-50 transition-opacity"
           onClick={() => setIsSettingsPanelOpen(false)}
         />
       )}
@@ -348,7 +348,7 @@ export default function ModernHeader({
               onClick={() => setIsSettingsPanelOpen(false)}
               className="p-2 rounded-lg hover:bg-muted transition-colors"
             >
-              <X className="w-5 h-5 text-gray-600 dark:text-gray-500 dark:text-gray-400" />
+              <X className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
 
@@ -442,4 +442,5 @@ export default function ModernHeader({
     </>
   );
 }
+
 

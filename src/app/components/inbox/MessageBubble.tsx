@@ -6,9 +6,15 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
 interface MessageBubbleProps {
     message: MessageWithSender;
+    /** First message in a consecutive same-direction group (topmost visually) */
+    isFirstInGroup?: boolean;
+    /** Last message in a consecutive same-direction group (bottommost visually, closest to input) */
+    isLastInGroup?: boolean;
+    /** Message is part of a multi-message group */
+    isGrouped?: boolean;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, isFirstInGroup = true, isLastInGroup = true, isGrouped = false }: MessageBubbleProps) {
     const isOut = message.direction === 'out';
     const [imageError, setImageError] = useState(false);
     const [useProxy, setUseProxy] = useState(false);
@@ -40,23 +46,23 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         switch (status) {
             case 'pending':
                 return (
-                    <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 text-[rgba(17,27,33,0.35)] dark:text-[rgba(233,237,239,0.45)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 );
             case 'sent':
                 return (
-                    <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 text-[rgba(17,27,33,0.35)] dark:text-[rgba(233,237,239,0.45)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                 );
             case 'delivered':
                 return (
                     <div className="flex -space-x-1">
-                        <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3 h-3 text-[rgba(17,27,33,0.35)] dark:text-[rgba(233,237,239,0.45)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3 h-3 text-[rgba(17,27,33,0.35)] dark:text-[rgba(233,237,239,0.45)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
@@ -64,10 +70,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             case 'read':
                 return (
                     <div className="flex -space-x-1">
-                        <svg className="w-3 h-3 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        <svg className="w-3 h-3 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
@@ -144,30 +150,27 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     // Detectar se é mensagem automática (AI assistant)
     const isAutomated = (message.metadata as any)?.automated === true || (message.metadata as any)?.source === 'ai_assistant';
 
-    // Group: extract sender name from metadata
-    const groupSenderName = (message.metadata as any)?.sender_name;
-    const isGroupMessage = (message.metadata as any)?.is_group_message;
+    // Bubble corner rounding: grouped messages get tighter corners on the grouping side
+    const bubbleRounding = isGrouped && !isLastInGroup
+        ? isOut ? 'rounded-lg rounded-br-[4px]' : 'rounded-lg rounded-bl-[4px]'
+        : isOut ? 'rounded-lg rounded-br-[4px]' : 'rounded-lg rounded-bl-[4px]';
 
     return (
-        <div className={`flex w-full mb-2 px-4 ${isOut ? 'justify-end' : 'justify-start'}`}>
+        <div className={`flex w-full ${isOut ? 'justify-end' : 'justify-start'} ${isLastInGroup ? 'mb-[6px]' : 'mb-[2px]'}`}>
             <div
-                className={`relative max-w-[75%] min-w-[100px] rounded-lg px-3 py-2 shadow-sm text-sm leading-relaxed
-          ${isOut
-                        ? 'rounded-br-none'
-                        : 'rounded-bl-none border'
-                    }`}
-                style={isOut
-                    ? { backgroundColor: 'hsl(161 84% 36%)', color: '#ffffff' }
-                    : { backgroundColor: 'hsl(var(--card))', color: 'hsl(var(--foreground))', borderColor: 'hsl(var(--border))' }
-                }
+                style={{
+                    maxWidth: '65%',
+                    minWidth: 80,
+                    padding: '6px 10px 8px',
+                    fontSize: '14.2px',
+                    lineHeight: '1.35',
+                }}
+                className={`relative ${bubbleRounding} shadow-sm ${
+                    isOut
+                        ? 'bg-[#d9fdd3] text-[#111b21] dark:bg-[#005c4b] dark:text-[#e9edef]'
+                        : 'bg-white text-[#111b21] dark:bg-[#202c33] dark:text-[#e9edef]'
+                }`}
             >
-                {/* Group Message: Sender Name */}
-                {isGroupMessage && groupSenderName && !isOut && (
-                    <div className="text-xs font-semibold mb-1 text-blue-500 dark:text-blue-400">
-                        {groupSenderName}
-                    </div>
-                )}
-
                 {/* Media Content */}
                 {hasValidMedia && (
                     <div className="mb-2">
@@ -184,8 +187,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                                 href={message.media_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-2 p-3 rounded cursor-pointer hover:opacity-80"
-                                style={{ backgroundColor: isOut ? 'rgba(0,0,0,0.2)' : 'hsl(var(--muted))' }}
+                                className={`flex items-center gap-2 p-3 rounded-xl cursor-pointer ${isOut ? 'bg-[#c5f0c0] hover:bg-[#b4e4af] dark:bg-[#04493e] dark:hover:bg-[#03392f]' : 'bg-gray-100 hover:bg-gray-200 dark:bg-[#182229] dark:hover:opacity-80'}`}
                             >
                                 <svg className="w-5 h-5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -219,11 +221,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 download={fileName || undefined}
-                                className="flex items-center gap-2 p-2 rounded"
-                                style={isOut
-                                    ? { backgroundColor: 'rgba(0,0,0,0.2)', color: '#ffffff' }
-                                    : { backgroundColor: 'hsl(var(--accent))', color: 'hsl(214 80% 42%)' }
-                                }
+                                className={`flex items-center gap-2 p-2.5 rounded-xl ${isOut ? 'bg-[#c5f0c0] text-[#111b21] dark:bg-[#04493e] dark:text-[#e9edef]' : 'bg-gray-100 text-[#111b21] dark:bg-[#182229] dark:text-[#e9edef]'}`}
                             >
                                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -245,10 +243,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 )}
 
                 {/* Metadata */}
-                <div
-                    className="flex justify-end items-center gap-1 mt-1 text-[10px]"
-                    style={{ color: isOut ? 'rgba(255,255,255,0.7)' : 'hsl(var(--muted-foreground))' }}
-                >
+                <div className={`flex justify-end items-center gap-1 mt-1 text-[11px] text-[rgba(17,27,33,0.45)] dark:text-[rgba(233,237,239,0.55)]`}>
                     {isAutomated && (
                         <span className="flex items-center gap-0.5 opacity-70">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

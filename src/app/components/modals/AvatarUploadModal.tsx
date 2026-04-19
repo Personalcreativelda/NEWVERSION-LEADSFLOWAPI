@@ -74,7 +74,7 @@ export default function AvatarUploadModal({
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity"
+                className="fixed inset-0 z-[60] bg-black/60 transition-opacity"
                 onClick={onClose}
                 aria-hidden="true"
             />
@@ -91,12 +91,7 @@ export default function AvatarUploadModal({
                         <button
                             onClick={onClose}
                             disabled={uploading}
-                            className={`p-2 rounded-lg transition-colors ${uploading
-                                    ? 'opacity-50 cursor-not-allowed'
-                                    : isDark
-                                        ? 'hover:bg-gray-800 text-gray-400 hover:text-gray-200'
-                                        : 'hover:bg-gray-100 text-gray-400 hover:text-gray-600'
-                                }`}
+                            className={`p-2 rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -109,7 +104,7 @@ export default function AvatarUploadModal({
                                 <img
                                     src={preview}
                                     alt="Preview"
-                                    className="w-32 h-32 rounded-full object-cover border-4 border-gray-200 dark:border-gray-700"
+                                    className="w-32 h-32 rounded-full object-cover border-4 border-border"
                                 />
                                 {uploading && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
@@ -119,12 +114,9 @@ export default function AvatarUploadModal({
                             </div>
                         ) : (
                             <div
-                                className={`w-32 h-32 rounded-full flex items-center justify-center border-4 ${isDark
-                                        ? 'bg-gray-800 border-gray-700'
-                                        : 'bg-gray-100 border-gray-200'
-                                    }`}
+                                className="w-32 h-32 rounded-full flex items-center justify-center border-4 bg-muted border-border"
                             >
-                                <Upload className="w-12 h-12 text-gray-400" />
+                                <Upload className="w-12 h-12 text-muted-foreground" />
                             </div>
                         )}
                     </div>
@@ -139,12 +131,7 @@ export default function AvatarUploadModal({
                             className="hidden"
                         />
                         <div
-                            className={`w-full py-3 px-4 rounded-lg border-2 border-dashed text-center cursor-pointer transition-colors ${uploading
-                                    ? 'opacity-50 cursor-not-allowed'
-                                    : isDark
-                                        ? 'border-gray-700 hover:border-blue-500 hover:bg-blue-900/20'
-                                        : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
-                                }`}
+                            className={`w-full py-3 px-4 rounded-lg border-2 border-dashed text-center cursor-pointer transition-colors border-border hover:border-primary hover:bg-accent/30 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             {uploading ? (
                                 <div className="flex items-center justify-center gap-2">
@@ -157,10 +144,7 @@ export default function AvatarUploadModal({
                                     <span className="text-sm font-medium">
                                         Clique para selecionar imagem
                                     </span>
-                                    <span
-                                        className={`block text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'
-                                            }`}
-                                    >
+                                    <span className="block text-xs mt-1 text-muted-foreground">
                                         JPG, PNG ou WEBP • Máximo 5MB
                                     </span>
                                 </>

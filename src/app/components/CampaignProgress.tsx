@@ -39,7 +39,7 @@ export default function CampaignProgress({
         <div className="bg-card rounded-lg p-8 max-w-md w-full mx-4">
           <div className="text-center">
             <Loader className="w-12 h-12 text-[#10B981] animate-spin mx-auto mb-4" />
-            <p className="text-gray-600 dark:text-gray-500 dark:text-gray-400">Carregando status...</p>
+            <p className="text-muted-foreground">Carregando status...</p>
           </div>
         </div>
       </div>
@@ -52,10 +52,10 @@ export default function CampaignProgress({
         <div className="bg-card rounded-lg p-8 max-w-md w-full mx-4">
           <div className="text-center">
             <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            <h3 className="text-lg font-semibold text-foreground mb-2">
               Erro ao carregar status
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+            <p className="text-muted-foreground mb-4">{error}</p>
             <Button onClick={onClose} variant="outline">
               Fechar
             </Button>
@@ -84,10 +84,10 @@ export default function CampaignProgress({
             {isCompleted && <CheckCircle className="w-6 h-6 text-green-500" />}
             {(isFailed || isCancelled) && <XCircle className="w-6 h-6 text-red-500" />}
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-xl font-semibold text-foreground">
                 {campaignName}
               </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 {isSending && 'Enviando mensagens...'}
                 {isCompleted && 'Envio concluído!'}
                 {isFailed && 'Envio falhou'}
@@ -97,24 +97,24 @@ export default function CampaignProgress({
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="text-muted-foreground/70 hover:text-muted-foreground transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
         {/* Progress Bar */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-6 border-b border-border">
           <div className="mb-3">
             <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-600 dark:text-gray-500 dark:text-gray-400">
+              <span className="text-muted-foreground">
                 {status.sentCount + status.errorCount} / {status.totalRecipients} processados
               </span>
-              <span className="font-semibold text-gray-900 dark:text-white">
+              <span className="font-semibold text-foreground">
                 {status.percentage}%
               </span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+            <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
               <div
                 className={`h-3 rounded-full transition-all duration-500 ${
                   isCompleted ? 'bg-green-500' :
@@ -169,7 +169,7 @@ export default function CampaignProgress({
         {/* Recipients List */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900 dark:text-white">
+            <h3 className="font-semibold text-foreground">
               Destinatários ({status.totalRecipients})
             </h3>
             <button
@@ -185,7 +185,7 @@ export default function CampaignProgress({
               {status.recipients.map((recipient, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
                 >
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                     {recipient.status === 'sent' && (
@@ -195,16 +195,16 @@ export default function CampaignProgress({
                       <Loader className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0" />
                     )}
                     {recipient.status === 'pending' && (
-                      <Clock className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                      <Clock className="w-5 h-5 text-muted-foreground/70 flex-shrink-0" />
                     )}
                     {recipient.status === 'error' && (
                       <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      <p className="text-sm font-medium text-foreground truncate">
                         {recipient.name || recipient.phone}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         {recipient.phone}
                       </p>
                       {recipient.errorMessage && (
@@ -214,7 +214,7 @@ export default function CampaignProgress({
                       )}
                     </div>
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                  <div className="text-xs text-muted-foreground ml-2">
                     {recipient.status === 'sent' && recipient.sentAt && (
                       <span>{new Date(recipient.sentAt).toLocaleTimeString('pt-BR')}</span>
                     )}
@@ -229,7 +229,7 @@ export default function CampaignProgress({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+        <div className="p-6 border-t border-border bg-muted/50">
           <div className="flex gap-3">
             {isSending && onCancel && (
               <Button
@@ -250,7 +250,7 @@ export default function CampaignProgress({
             )}
           </div>
           {isCompleted && (
-            <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-3">
+            <p className="text-center text-xs text-muted-foreground mt-3">
               Esta janela fechará automaticamente em alguns segundos
             </p>
           )}

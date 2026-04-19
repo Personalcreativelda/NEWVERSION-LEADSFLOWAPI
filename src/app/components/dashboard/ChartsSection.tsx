@@ -311,7 +311,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
       )}
       
       {/* Primeira linha - 2 gráficos */}
-      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 lg:gap-5">
+      <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))' }}>
         
         {/* Gráfico de Origem - HORIZONTAL como Engajamento */}
         <div className="bg-card dark:bg-card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-border dark:border-border shadow-sm hover:shadow-md transition-all duration-300">
@@ -370,7 +370,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
               </ResponsiveContainer>
               
               {/* Tabela com ícones de canal, valores e percentuais */}
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-4 pt-4 border-t border-border">
                 <div className="space-y-1">
                   {origemChartData.map((item, index) => {
                     const percentage = leads.length > 0 ? ((item.value / leads.length) * 100).toFixed(1) : '0';
@@ -405,9 +405,9 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center h-[350px] text-gray-400 dark:text-gray-600 dark:text-gray-400">
+            <div className="flex items-center justify-center h-[350px] text-muted-foreground">
               <div className="text-center">
-                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
@@ -475,7 +475,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
       </div>
 
       {/* Segunda linha - 2 gráficos */}
-      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 lg:gap-5">
+      <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))' }}>
         
         {/* Status dos Leads (Pizza) */}
         <div className="bg-card dark:bg-card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-border dark:border-border shadow-sm hover:shadow-md transition-all duration-300">
@@ -520,7 +520,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
               </ResponsiveContainer>
               
               {/* Legenda Customizada - LIMPA E ORGANIZADA */}
-              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-6 pt-4 border-t border-border">
                 <div className="grid grid-cols-3 gap-x-4 gap-y-3">
                   {statusChartData.map((entry, index) => (
                     <div key={`legend-${index}`} className="flex items-center gap-2">
@@ -537,7 +537,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center h-[350px] text-gray-400 dark:text-gray-600 dark:text-gray-400">
+            <div className="flex items-center justify-center h-[350px] text-muted-foreground">
               <div className="text-center">
                 <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -570,7 +570,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
               </div>
               <div className="bg-muted/40 dark:bg-muted/20 rounded-xl p-3 text-center">
                 <p className="text-xs text-muted-foreground mb-1">Taxa de Abertura</p>
-                <p className="text-xl font-bold text-purple-500">{engagementData.totals.openRate}%</p>
+                <p className="text-xl font-bold text-primary">{engagementData.totals.openRate}%</p>
               </div>
               <div className="bg-muted/40 dark:bg-muted/20 rounded-xl p-3 text-center">
                 <p className="text-xs text-muted-foreground mb-1">Taxa de Resposta</p>

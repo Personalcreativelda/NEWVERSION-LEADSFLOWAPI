@@ -388,7 +388,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                     </div>
                     <button 
                         onClick={onClose}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
                     >
                         <span className="text-xl">×</span>
                     </button>
@@ -611,7 +611,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <button
                                     onClick={onClose}
-                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                     style={{ borderColor: 'hsl(var(--border))' }}
                                 >
                                     Cancelar
@@ -619,7 +619,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                 <button
                                     onClick={validateToken}
                                     disabled={loading || !accessToken.trim()}
-                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg text-sm font-medium text-white bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <>

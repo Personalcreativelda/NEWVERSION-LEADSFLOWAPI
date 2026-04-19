@@ -71,13 +71,13 @@ export default function PlanEnforcementModal({
   return (
     <>
       {/* Full-screen dimmed overlay — dismissible */}
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm" onClick={onClose}>
-        <div className="bg-[#0f0f0f] border border-[#1e1e1e] rounded-2xl shadow-2xl p-8 max-w-md w-full text-center relative" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70" onClick={onClose}>
+        <div className="bg-card text-foreground border border-border rounded-2xl shadow-2xl p-8 max-w-md w-full text-center relative" onClick={e => e.stopPropagation()}>
 
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-gray-600 hover:text-gray-300 transition-colors"
+            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Fechar"
           >
             <X className="w-5 h-5" />
@@ -89,12 +89,12 @@ export default function PlanEnforcementModal({
           </div>
 
           {/* Title */}
-          <h2 className="text-2xl font-bold text-white mb-3">
+          <h2 className="text-2xl font-bold text-foreground mb-3">
             {TITLES[code] ?? 'Acesso Bloqueado'}
           </h2>
 
           {/* Message */}
-          <p className="text-gray-400 mb-8 leading-relaxed text-sm">
+          <p className="text-muted-foreground mb-8 leading-relaxed text-sm">
             {message ?? 'Faça upgrade do seu plano para continuar usando a plataforma.'}
           </p>
 
@@ -128,7 +128,7 @@ export default function PlanEnforcementModal({
             {isExpiredOrOverdue && hasPaidPlan && (
               <button
                 onClick={() => setShowUpgrade(true)}
-                className="w-full py-2.5 border border-[#2a2a2a] hover:border-[#3a3a3a] text-gray-400 hover:text-gray-200 text-sm font-medium rounded-xl transition-colors"
+                className="w-full py-2.5 border border-border hover:border-muted-foreground/50 text-muted-foreground hover:text-foreground text-sm font-medium rounded-xl transition-colors"
               >
                 Ver outros planos
               </button>
@@ -136,7 +136,7 @@ export default function PlanEnforcementModal({
           </div>
 
           {/* Fine print */}
-          <p className="mt-6 text-xs text-gray-600">
+          <p className="mt-6 text-xs text-muted-foreground">
             Você ainda pode visualizar seus dados. Para criar ou editar, renove seu plano.
           </p>
         </div>

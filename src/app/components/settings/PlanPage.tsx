@@ -207,7 +207,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
             {diasRestantes !== null && diasRestantes <= 7 && currentPlan !== 'free' && (
               <button
                 onClick={onUpgrade}
-                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-medium transition-all shadow-lg text-sm"
+                className="px-5 py-2.5 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 rounded-lg font-medium transition-all shadow-lg text-sm"
               >
                 {diasRestantes === 0 ? 'Renovar Agora' : 'Renovar'}
               </button>
@@ -326,7 +326,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                       </Button>
                       <Button
                         onClick={() => handleSelectPlan(plan.id)}
-                        className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/50 transition-all duration-200 hover:scale-105"
+                        className="w-full bg-primary text-primary-foreground hover:opacity-90 transition-all duration-200 hover:scale-105"
                         size="sm"
                       >
                         Renovar Plano
@@ -335,7 +335,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                   ) : (
                     <Button
                       onClick={() => handleSelectPlan(plan.id)}
-                      className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/50 transition-all duration-200 hover:scale-105"
+                      className="w-full bg-primary text-primary-foreground hover:opacity-90 transition-all duration-200 hover:scale-105"
                     >
                       Selecionar Plano
                     </Button>

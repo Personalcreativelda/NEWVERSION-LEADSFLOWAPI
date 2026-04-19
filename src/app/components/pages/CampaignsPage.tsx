@@ -964,7 +964,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
       <div className="relative">
         <button
           onClick={() => setDropdownOpen(isOpen ? null : campaign.id)}
-          className="w-8 h-8 flex items-center justify-center text-gray-400 dark:text-gray-600 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-150"
+          className="w-8 h-8 flex items-center justify-center text-muted-foreground/70 hover:text-muted-foreground hover:bg-muted/50 rounded-lg transition-all duration-150"
         >
           <MoreVertical className="w-5 h-5" />
         </button>
@@ -975,12 +975,12 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
               className="fixed inset-0 z-10"
               onClick={() => setDropdownOpen(null)}
             />
-            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-card rounded-lg shadow-lg border border-gray-200 dark:border-border py-1 z-20">
+            <div className="absolute right-0 mt-2 w-56 bg-card rounded-lg shadow-lg border border-border py-1 z-20">
               {(campaign.status === 'active' || campaign.status === 'paused') && (
                 <>
                   <button
                     onClick={() => handleEditCampaign(campaign)}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
                     <span>Editar Campanha</span>
@@ -991,7 +991,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                       setSelectedCampaign(campaign);
                       setDropdownOpen(null);
                     }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <BarChart3 className="w-4 h-4" />
                     <span>Ver Detalhes</span>
@@ -1002,19 +1002,19 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                       setSelectedCampaign(campaign);
                       setDropdownOpen(null);
                     }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <FileText className="w-4 h-4" />
                     <span>Ver Mensagem</span>
                   </button>
                   <button
                     onClick={() => handleDuplicateCampaign(campaign)}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <Copy className="w-4 h-4" />
                     <span>Duplicar</span>
                   </button>
-                  <div className="border-t border-gray-100 dark:border-border my-1"></div>
+                  <div className="border-t border-border my-1"></div>
                   <button
                     onClick={() => handleResendFailed(campaign)}
                     className="w-full text-left px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-3 transition-colors"
@@ -1022,10 +1022,10 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     <Send className="w-4 h-4" />
                     <span>Reenviar Falhados</span>
                   </button>
-                  <div className="border-t border-gray-100 dark:border-border my-1"></div>
+                  <div className="border-t border-border my-1"></div>
                   <button
                     onClick={() => handleExportData(campaign)}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <FileDown className="w-4 h-4" />
                     <span>Exportar Dados</span>
@@ -1036,7 +1036,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                       setSelectedCampaign(campaign);
                       setDropdownOpen(null);
                     }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <Bell className="w-4 h-4" />
                     <span>Configurar Alertas</span>
@@ -1052,14 +1052,14 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                       setSelectedCampaign(campaign);
                       setDropdownOpen(null);
                     }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <FileText className="w-4 h-4" />
                     <span>Ver Mensagem</span>
                   </button>
                   <button
                     onClick={() => handleDuplicateCampaign(campaign)}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <Copy className="w-4 h-4" />
                     <span>Duplicar</span>
@@ -1069,12 +1069,12 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                       alert('Alterar horário de envio');
                       setDropdownOpen(null);
                     }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <Calendar className="w-4 h-4" />
                     <span>Alterar Horário</span>
                   </button>
-                  <div className="border-t border-gray-100 dark:border-border my-1"></div>
+                  <div className="border-t border-border my-1"></div>
                   <button
                     onClick={() => handleDeleteCampaign(campaign.id, campaign.name)}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
@@ -1089,7 +1089,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 <>
                   <button
                     onClick={() => handleViewReport(campaign)}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <BarChart3 className="w-4 h-4" />
                     <span>Ver Relatório</span>
@@ -1100,19 +1100,19 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                       setSelectedCampaign(campaign);
                       setDropdownOpen(null);
                     }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <FileText className="w-4 h-4" />
                     <span>Ver Mensagem</span>
                   </button>
                   <button
                     onClick={() => handleDuplicateCampaign(campaign)}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <Copy className="w-4 h-4" />
                     <span>Duplicar</span>
                   </button>
-                  <div className="border-t border-gray-100 dark:border-border my-1"></div>
+                  <div className="border-t border-border my-1"></div>
                   <button
                     onClick={() => handleDeleteCampaign(campaign.id, campaign.name)}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
@@ -1127,7 +1127,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 <>
                   <button
                     onClick={() => handleEditCampaign(campaign)}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
                     <span>Editar Campanha</span>
@@ -1138,19 +1138,19 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                       setSelectedCampaign(campaign);
                       setDropdownOpen(null);
                     }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <FileText className="w-4 h-4" />
                     <span>Ver Mensagem</span>
                   </button>
                   <button
                     onClick={() => handleDuplicateCampaign(campaign)}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <Copy className="w-4 h-4" />
                     <span>Duplicar</span>
                   </button>
-                  <div className="border-t border-gray-100 dark:border-border my-1"></div>
+                  <div className="border-t border-border my-1"></div>
                   <button
                     onClick={() => handleDeleteCampaign(campaign.id, campaign.name)}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
@@ -1176,7 +1176,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
               <div className="relative flex-1 sm:flex-none">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-600 dark:text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/70 w-5 h-5" />
                 <Input
                   type="text"
                   placeholder="Buscar campanhas..."
@@ -1185,7 +1185,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   className="pl-10 pr-4 py-2 w-full sm:w-80 focus:ring-2 focus:ring-[#10B981] !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
                 />
               </div>
-              <Button variant="outline" className="flex items-center justify-center space-x-2 border-gray-300 dark:border-border text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800">
+              <Button variant="outline" className="flex items-center justify-center space-x-2 border-border text-muted-foreground hover:bg-muted/50">
                 <Filter className="w-4 h-4" />
                 <span>Filtros</span>
               </Button>
@@ -1217,7 +1217,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 }
                 setChannelSelectorOpen(true);
               }}
-              className="bg-[#10B981] hover:bg-green-600 text-white font-medium shadow-sm flex items-center justify-center space-x-2 w-full sm:w-auto"
+              className="font-medium shadow-sm flex items-center justify-center space-x-2 w-full sm:w-auto"
             >
               <Plus className="w-4 h-4" />
               <span>Nova Campanha</span>
@@ -1227,18 +1227,18 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
         {/* Channel Tabs */}
         <div className="mb-6 md:mb-8">
-          <div className="border-b border-gray-200 dark:border-border overflow-x-auto scrollbar-hide">
+          <div className="border-b border-border overflow-x-auto scrollbar-hide">
             <nav className="flex space-x-4 md:space-x-8 min-w-max">
               <button
                 onClick={() => setActiveTab('whatsapp')}
                 className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'whatsapp'
                   ? 'border-[#10B981] text-[#10B981]'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-[#10B981]'
+                  : 'border-transparent text-muted-foreground hover:text-[#10B981]'
                   }`}
               >
                 <MessageCircle className="w-4 h-4" />
                 <span>WhatsApp</span>
-                <span className={`${activeTab === 'whatsapp' ? 'bg-[#10B981]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
+                <span className={`${activeTab === 'whatsapp' ? 'bg-[#10B981]' : 'bg-muted text-muted-foreground'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
                   {campaigns.filter(c => c.type === 'whatsapp').length}
                 </span>
               </button>
@@ -1246,12 +1246,12 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 onClick={() => setActiveTab('email')}
                 className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'email'
                   ? 'border-[#3B82F6] text-[#3B82F6]'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-[#3B82F6]'
+                  : 'border-transparent text-muted-foreground hover:text-[#3B82F6]'
                   }`}
               >
                 <Mail className="w-4 h-4" />
                 <span>Email</span>
-                <span className={`${activeTab === 'email' ? 'bg-[#3B82F6]' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
+                <span className={`${activeTab === 'email' ? 'bg-[#3B82F6]' : 'bg-muted text-muted-foreground'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
                   {campaigns.filter(c => c.type === 'email').length}
                 </span>
               </button>
@@ -1259,13 +1259,13 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 onClick={() => setActiveTab('sms')}
                 className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'sms'
                   ? 'border-[#F22F46] text-[#F22F46]'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-[#F22F46]'
+                  : 'border-transparent text-muted-foreground hover:text-[#F22F46]'
                   }`}
               >
                 <MessageSquare className="w-4 h-4" />
                 <span>SMS</span>
                 <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                  activeTab === 'sms' ? 'bg-[#F22F46] text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                  activeTab === 'sms' ? 'bg-[#F22F46] text-white' : 'bg-muted text-muted-foreground'
                 }`}>
                   {campaigns.filter(c => c.type === 'sms').length}
                 </span>
@@ -1281,7 +1281,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
             {isLoadingCampaigns && (
               <div className="text-center py-20">
                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#10B981] mb-4"></div>
-                <p className="text-gray-600 dark:text-gray-400">Carregando campanhas...</p>
+                <p className="text-muted-foreground">Carregando campanhas...</p>
               </div>
             )}
 
@@ -1292,7 +1292,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <PlayCircle className="w-5 h-5 text-[#10B981]" />
                     <span>Campanhas Ativas</span>
-                    <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({activeCampaigns.length})</span>
+                    <span className="text-sm font-normal text-muted-foreground">({activeCampaigns.length})</span>
                   </h3>
                   {activeCampaigns.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -1319,7 +1319,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                           </div>
 
                           <div className="mb-4">
-                            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+                            <div className="flex justify-between text-sm text-muted-foreground mb-2">
                               <span>{campaign.sent?.toLocaleString()} / {campaign.totalRecipients.toLocaleString()} enviadas</span>
                               <span>{campaign.progress}%</span>
                             </div>
@@ -1333,35 +1333,35 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
                           <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                             <div>
-                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Entregues</span>
-                              <p className="font-semibold text-gray-900 dark:text-white">{campaign.delivered?.toLocaleString()}</p>
+                              <span className="text-muted-foreground">Entregues</span>
+                              <p className="font-semibold text-foreground">{campaign.delivered?.toLocaleString()}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Visualizadas</span>
-                              <p className="font-semibold text-gray-900 dark:text-white">{campaign.read?.toLocaleString()}</p>
+                              <span className="text-muted-foreground">Visualizadas</span>
+                              <p className="font-semibold text-foreground">{campaign.read?.toLocaleString()}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Tempo restante</span>
-                              <p className="font-semibold text-gray-900 dark:text-white">{formatMinutes(campaign.estimatedTime || 0)}</p>
+                              <span className="text-muted-foreground">Tempo restante</span>
+                              <p className="font-semibold text-foreground">{formatMinutes(campaign.estimatedTime || 0)}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Taxa de entrega</span>
-                              <p className="font-semibold text-gray-900 dark:text-white">{campaign.deliveryRate}%</p>
+                              <span className="text-muted-foreground">Taxa de entrega</span>
+                              <p className="font-semibold text-foreground">{campaign.deliveryRate}%</p>
                             </div>
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="flex gap-2 pt-4 border-t border-gray-100 dark:border-border">
+                          <div className="flex gap-2 pt-4 border-t border-border">
                             <button
                               onClick={() => handlePauseCampaign(campaign.id)}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-all duration-200"
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-foreground/80 bg-card border border-border rounded-lg hover:bg-muted/50 hover:border-border transition-all duration-200"
                             >
                               <Pause className="w-4 h-4" />
                               <span>Pausar</span>
                             </button>
                             <button
                               onClick={() => handleCancelCampaign(campaign)}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-gray-700 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-800 transition-all duration-200"
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-card border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-800 transition-all duration-200"
                             >
                               <X className="w-4 h-4" />
                               <span>Cancelar</span>
@@ -1382,7 +1382,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <Clock className="w-5 h-5 text-[#F59E0B]" />
                     <span>Campanhas Agendadas</span>
-                    <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({scheduledCampaigns.length})</span>
+                    <span className="text-sm font-normal text-muted-foreground">({scheduledCampaigns.length})</span>
                   </h3>
                   {scheduledCampaigns.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -1399,7 +1399,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                                 <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
                                 <div className="flex items-center space-x-2">
                                   <Calendar className="w-4 h-4 text-[#F59E0B]" />
-                                  <span className={`text-sm ${!hasValidDate ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-500 dark:text-gray-400'}`}>
+                                  <span className={`text-sm ${!hasValidDate ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'}`}>
                                     {formattedDate}
                                   </span>
                                 </div>
@@ -1429,17 +1429,17 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             </div>
 
                             {/* Action Buttons - Scheduled */}
-                            <div className="flex gap-2 pt-4 border-t border-gray-100 dark:border-border">
+                            <div className="flex gap-2 pt-4 border-t border-border">
                               <button
                                 onClick={() => handleEditCampaign(campaign)}
-                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-700 border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200"
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-card border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200"
                               >
                                 <Edit2 className="w-4 h-4" />
                                 <span>Editar</span>
                               </button>
                               <button
                                 onClick={() => handleSendNow(campaign.id, campaign.name, campaign.type)}
-                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#10B981] border border-transparent rounded-lg hover:bg-[#059669] transition-all duration-200 shadow-sm hover:shadow"
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-foreground bg-primary border border-transparent rounded-lg hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow"
                               >
                                 <Send className="w-4 h-4" />
                                 <span>Enviar</span>
@@ -1461,7 +1461,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <Save className="w-5 h-5 text-blue-500" />
                     <span>Campanhas Salvas (Rascunhos)</span>
-                    <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({draftCampaigns.length})</span>
+                    <span className="text-sm font-normal text-muted-foreground">({draftCampaigns.length})</span>
                   </h3>
                   {draftCampaigns.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -1472,7 +1472,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                               <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
                               <div className="flex items-center space-x-2">
                                 <FileText className="w-4 h-4 text-blue-500" />
-                                <span className="text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">
+                                <span className="text-sm text-muted-foreground">
                                   {campaign.createdAt ? formatDate(campaign.createdAt) : 'Sem data'}
                                 </span>
                               </div>
@@ -1481,31 +1481,31 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                           </div>
 
                           <div className="mb-4">
-                            <div className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-900/10 border-gray-200 dark:border-gray-900/30">
+                            <div className="border rounded-lg p-3 bg-muted/50 border-border">
                               <div className="flex items-center space-x-2 mb-1">
-                                <Users className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-400">
+                                <Users className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-sm font-medium text-foreground/80">
                                   {campaign.totalRecipients.toLocaleString()} destinatários
                                 </span>
                               </div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                              <p className="text-sm text-muted-foreground">
                                 Pronto para envio
                               </p>
                             </div>
                           </div>
 
                           {/* Action Buttons - Draft */}
-                          <div className="flex gap-2 pt-4 border-t border-gray-100 dark:border-border">
+                          <div className="flex gap-2 pt-4 border-t border-border">
                             <button
                               onClick={() => handleEditCampaign(campaign)}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-700 border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200"
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-card border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200"
                             >
                               <Edit2 className="w-4 h-4" />
                               <span>Editar</span>
                             </button>
                             <button
                               onClick={() => handleSendNow(campaign.id, campaign.name, campaign.type)}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-[#10B981] border border-transparent rounded-lg hover:bg-[#059669] transition-all duration-200 shadow-sm hover:shadow"
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-foreground bg-primary border border-transparent rounded-lg hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow"
                             >
                               <Send className="w-4 h-4" />
                               <span>Enviar</span>
@@ -1526,7 +1526,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
                     <span>Campanhas Concluídas</span>
-                    <span className="text-sm font-normal text-gray-500 dark:text-gray-500 dark:text-gray-400">({completedCampaigns.length})</span>
+                    <span className="text-sm font-normal text-muted-foreground">({completedCampaigns.length})</span>
                   </h3>
                   {completedCampaigns.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -1537,7 +1537,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                               <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
                               <div className="flex items-center space-x-2">
                                 <CalendarCheck className="w-4 h-4 text-green-500" />
-                                <span className="text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">{formatDate(campaign.completedDate!)}</span>
+                                <span className="text-sm text-muted-foreground">{formatDate(campaign.completedDate!)}</span>
                               </div>
                             </div>
                             <DropdownMenu campaign={campaign} />
@@ -1545,20 +1545,20 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
                           <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                             <div>
-                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Total enviadas</span>
-                              <p className="font-semibold text-gray-900 dark:text-white">{campaign.sent?.toLocaleString()}</p>
+                              <span className="text-muted-foreground">Total enviadas</span>
+                              <p className="font-semibold text-foreground">{campaign.sent?.toLocaleString()}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Taxa de entrega</span>
+                              <span className="text-muted-foreground">Taxa de entrega</span>
                               <p className="font-semibold text-green-600 dark:text-green-400">{campaign.deliveryRate}%</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Visualizações</span>
-                              <p className="font-semibold text-gray-900 dark:text-white">{campaign.read?.toLocaleString()}</p>
+                              <span className="text-muted-foreground">Visualizações</span>
+                              <p className="font-semibold text-foreground">{campaign.read?.toLocaleString()}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">Respostas</span>
-                              <p className="font-semibold text-gray-900 dark:text-white">{campaign.replies?.toLocaleString()}</p>
+                              <span className="text-muted-foreground">Respostas</span>
+                              <p className="font-semibold text-foreground">{campaign.replies?.toLocaleString()}</p>
                             </div>
                           </div>
 
@@ -1566,7 +1566,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             onClick={() => handleViewReport(campaign)}
                             variant="outline"
                             size="sm"
-                            className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 border-0 font-medium"
+                            className="w-full bg-muted hover:bg-muted text-foreground/80 border-0 font-medium"
                           >
                             <BarChart3 className="w-4 h-4 mr-2" />
                             Ver Relatório Completo
@@ -1587,7 +1587,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                       <XCircle className="w-5 h-5 text-red-500" />
                       <span>Campanhas Falhadas</span>
-                      <span className="text-sm font-normal text-gray-500 dark:text-gray-400">({failedCampaigns.length})</span>
+                      <span className="text-sm font-normal text-muted-foreground">({failedCampaigns.length})</span>
                     </h3>
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                       {failedCampaigns.map((campaign) => (
@@ -1605,19 +1605,19 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
                           <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                             <div>
-                              <span className="text-gray-500 dark:text-gray-400">Enviadas</span>
-                              <p className="font-semibold text-gray-900 dark:text-white">{campaign.sent?.toLocaleString() ?? 0}</p>
+                              <span className="text-muted-foreground">Enviadas</span>
+                              <p className="font-semibold text-foreground">{campaign.sent?.toLocaleString() ?? 0}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-400">Falhadas</span>
+                              <span className="text-muted-foreground">Falhadas</span>
                               <p className="font-semibold text-red-600 dark:text-red-400">{campaign.failed?.toLocaleString() ?? 0}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-400">Total previsto</span>
-                              <p className="font-semibold text-gray-900 dark:text-white">{campaign.totalRecipients?.toLocaleString() ?? 0}</p>
+                              <span className="text-muted-foreground">Total previsto</span>
+                              <p className="font-semibold text-foreground">{campaign.totalRecipients?.toLocaleString() ?? 0}</p>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-400">Taxa de entrega</span>
+                              <span className="text-muted-foreground">Taxa de entrega</span>
                               <p className="font-semibold text-red-600 dark:text-red-400">{campaign.deliveryRate ?? 0}%</p>
                             </div>
                           </div>

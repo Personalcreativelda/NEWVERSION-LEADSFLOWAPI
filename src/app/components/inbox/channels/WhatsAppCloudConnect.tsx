@@ -138,7 +138,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                     </div>
                     <button
                         onClick={onClose}
-                        className="transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                        className="transition-colors p-1 rounded-full hover:bg-muted/50"
                         style={{ color: 'hsl(var(--muted-foreground))' }}
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -211,7 +211,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
 
                             <button
                                 onClick={() => setStep('form')}
-                                className="w-full py-3 px-4 rounded-lg font-medium text-white shadow-lg transition-all bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
+                                className="w-full py-3 px-4 rounded-lg font-medium text-white shadow-sm transition-all bg-green-600 hover:bg-green-700"
                             >
                                 Continuar Configuração
                             </button>
@@ -319,7 +319,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                     <button
                                         onClick={generateVerifyToken}
                                         type="button"
-                                        className="px-3 py-2 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                        className="px-3 py-2 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                         style={{ 
                                             borderColor: 'hsl(var(--border))',
                                             color: 'hsl(var(--foreground))'
@@ -353,8 +353,8 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                     disabled={loading || !formData.name.trim() || !formData.phoneNumberId.trim() || !formData.accessToken.trim()}
                                     className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-white shadow-lg transition-all flex items-center justify-center gap-2
                                         ${loading || !formData.name.trim() || !formData.phoneNumberId.trim() || !formData.accessToken.trim()
-                                            ? 'bg-gray-400 cursor-not-allowed opacity-70'
-                                            : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'
+                                            ? 'bg-muted-foreground/70 cursor-not-allowed opacity-70'
+                                            : 'bg-green-600 text-white hover:bg-green-700 transition-all duration-150'
                                         }`}
                                 >
                                     {loading ? (
@@ -411,7 +411,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                         </code>
                                         <button
                                             onClick={() => copyToClipboard(webhookUrl)}
-                                            className="p-2 rounded-lg border transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                            className="p-2 rounded-lg border transition-colors hover:bg-muted/50"
                                             style={{ borderColor: 'hsl(var(--border))' }}
                                         >
                                             {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />}
@@ -435,7 +435,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                         </code>
                                         <button
                                             onClick={() => copyToClipboard(formData.verifyToken || 'leadflow_verify')}
-                                            className="p-2 rounded-lg border transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                            className="p-2 rounded-lg border transition-colors hover:bg-muted/50"
                                             style={{ borderColor: 'hsl(var(--border))' }}
                                         >
                                             <Copy className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />
@@ -475,7 +475,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
 
                             <button
                                 onClick={() => setStep('success')}
-                                className="w-full py-3 px-4 rounded-lg font-medium text-white shadow-lg transition-all bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
+                                className="w-full py-3 px-4 rounded-lg font-medium text-white shadow-sm transition-all bg-green-600 hover:bg-green-700"
                             >
                                 Concluir Configuração
                             </button>

@@ -171,7 +171,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
                     >
                         <span className="text-xl" style={{ color: 'hsl(var(--muted-foreground))' }}>×</span>
                     </button>
@@ -187,10 +187,10 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 {step === 'webhook' ? '1' : <Check className="w-4 h-4" />}
                             </div>
                             <div className={`flex-1 h-1 rounded ${
-                                step === 'token' ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+                                step === 'token' ? 'bg-blue-600' : 'bg-muted '
                             }`} />
                             <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
-                                step === 'token' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                                step === 'token' ? 'bg-blue-600 text-white' : 'bg-muted  text-muted-foreground'
                             }`}>
                                 2
                             </div>
@@ -321,7 +321,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <button
                                     onClick={onClose}
-                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                     style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
                                 >
                                     Cancelar
@@ -437,7 +437,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                             setStep('webhook');
                                             setError(null);
                                         }}
-                                        className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center gap-2"
+                                        className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50 flex items-center justify-center gap-2"
                                         style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
                                     >
                                         <ArrowLeft className="w-4 h-4" />

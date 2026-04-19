@@ -35,18 +35,18 @@ export const ActivatePlanModal: React.FC<ActivatePlanModalProps> = ({
   if (!user) return null;
 
   const selectableCardBase = "p-4 rounded-xl border-2 transition-all text-left w-full relative group";
-  const selectedPlanCardClass = "border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.05)] shadow-sm";
-  const unselectedPlanCardClass = "border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-border";
+  const selectedPlanCardClass = "border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/10 shadow-sm";
+  const unselectedPlanCardClass = "border-border bg-muted/50 hover:bg-muted hover:border-border";
   const selectablePillBase = "px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 active:scale-95";
-  const selectedPillClass = "border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-md";
-  const unselectedPillClass = "border-border bg-background text-foreground hover:bg-muted hover:border-border-foreground/20";
+  const selectedPillClass = "border-blue-600 dark:border-blue-500 bg-blue-600 dark:bg-blue-500 text-white shadow-md";
+  const unselectedPillClass = "border-border bg-card text-foreground hover:bg-muted";
   const mutedTextClass = "text-sm text-muted-foreground";
-  const tinyMutedTextClass = "text-[10px] text-muted-foreground/80";
+  const tinyMutedTextClass = "text-[10px] text-muted-foreground/70";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-[hsl(var(--background))/0.85] transition-colors" onClick={onClose} />
-      <div className="relative modal-panel border rounded-2xl max-w-md w-full p-6">
+      <div className="absolute inset-0 bg-gray-900/85 dark:bg-black/85 transition-colors" onClick={onClose} />
+      <div className="relative bg-card border border-border rounded-2xl max-w-md w-full p-6">
         <h3 className="text-lg font-bold text-foreground mb-4">
           Ativar Plano - {user.email}
         </h3>
@@ -64,8 +64,8 @@ export const ActivatePlanModal: React.FC<ActivatePlanModalProps> = ({
                   selectedPlan === 'business' ? selectedPlanCardClass : unselectedPlanCardClass
                 }`}
               >
-                <div className="flex items-center gap-2 mb-1 text-foreground">
-                  <Rocket className="w-4 h-4 text-[hsl(var(--primary))]" />
+                <div className="flex items-center gap-2 mb-1 text-gray-900 dark:text-white">
+                  <Rocket className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span className="font-medium">Business</span>
                 </div>
                 <p className={tinyMutedTextClass}>$20/mês ou $100/ano</p>
@@ -78,7 +78,7 @@ export const ActivatePlanModal: React.FC<ActivatePlanModalProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1 text-foreground">
-                  <Crown className="w-4 h-4 text-[hsl(var(--primary))]" />
+                  <Crown className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span className="font-medium">Enterprise</span>
                 </div>
                 <p className={tinyMutedTextClass}>$59/mês ou $200/ano</p>
@@ -117,11 +117,11 @@ export const ActivatePlanModal: React.FC<ActivatePlanModalProps> = ({
           <div className="bg-muted rounded-lg p-3">
             <p className={`${mutedTextClass} mb-1`}>Resumo:</p>
             <p className="text-sm font-medium text-foreground">
-              Plano: <span className="text-[hsl(var(--primary))]">{selectedPlan}</span>
+              Plano: <span className="text-blue-600 dark:text-blue-400">{selectedPlan}</span>
             </p>
             <p className="text-sm font-medium text-foreground">
               Expira em:{' '}
-              <span className="text-[hsl(var(--primary))]">
+              <span className="text-blue-600 dark:text-blue-400">
                 {new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000).toLocaleDateString(
                   'pt-BR'
                 )}
@@ -216,18 +216,18 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative modal-panel border w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh]">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative bg-card border border-border w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh]">
         {/* Drag handle (mobile) */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
-          <div className="w-10 h-1 rounded-full bg-border" />
+          <div className="w-10 h-1 rounded-full bg-muted" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Bell className="w-4 h-4 text-primary" />
+            <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
               <h3 className="text-base font-bold text-foreground">Notificações do Admin</h3>
@@ -250,7 +250,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
               <div
                 key={key}
                 className={`flex items-start gap-4 p-4 rounded-xl border transition-all ${
-                  checked ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/30'
+                  checked ? 'border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/10' : 'border-border bg-muted/50'
                 }`}
               >
                 <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0 mt-0.5`}>
@@ -279,7 +279,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
         </div>
 
         {/* Footer actions */}
-        <div className="flex gap-3 px-5 py-4 border-t shrink-0">
+        <div className="flex gap-3 px-5 py-4 border-t border-border shrink-0">
           <Button onClick={onClose} variant="outline" className="flex-1">
             Cancelar
           </Button>

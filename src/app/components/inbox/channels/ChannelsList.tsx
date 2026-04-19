@@ -1,7 +1,6 @@
 // INBOX: Lista e gestão de canais com UI Moderna inspirada no Chatwoot
 import React, { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
-import { usePlanLimits } from '../../../hooks/usePlanLimits';
 import { ChannelCard } from './ChannelCard';
 import { WhatsAppConnect } from './WhatsAppConnect';
 import { WhatsAppCloudConnect } from './WhatsAppCloudConnect';
@@ -28,10 +27,7 @@ import {
     Plus,
     Settings,
     ChevronDown,
-    ChevronRight,
-    Lock,
-    Zap,
-    AlertTriangle
+    ChevronRight
 } from 'lucide-react';
 
 // Configuração dos canais disponíveis para conexão
@@ -108,7 +104,7 @@ const AVAILABLE_CHANNELS = [
         name: 'API',
         description: 'Crie um canal personalizado',
         icon: Code,
-        color: 'text-gray-500',
+        color: 'text-muted-foreground',
         available: false
     }
 ];
@@ -116,7 +112,6 @@ const AVAILABLE_CHANNELS = [
 export function ChannelsList() {
     const [channels, setChannels] = useState<Channel[]>([]);
     const [loading, setLoading] = useState(true);
-    const planLimits = usePlanLimits();
     const [modalOpen, setModalOpen] = useState(false);
     const [cloudModalOpen, setCloudModalOpen] = useState(false);
     const [telegramModalOpen, setTelegramModalOpen] = useState(false);
@@ -167,10 +162,7 @@ export function ChannelsList() {
         }
     };
 
-    const isAtChannelLimit = !planLimits.canAddChannel(channels.length);
-
     const handleConnect = (channelId: string) => {
-        if (isAtChannelLimit) return; // silently blocked — UI already shows the limit banner
         setEditingChannel(null); // Criar novo, não editar
         if (channelId === 'whatsapp') {
             setModalOpen(true);
@@ -196,12 +188,7 @@ export function ChannelsList() {
     };
 
     const handleDelete = async (channel: Channel) => {
-        const confirmed = await confirm(`Remover canal ${channel.name}?`, {
-            title: 'Remover canal',
-            confirmLabel: 'Remover',
-            variant: 'danger',
-        });
-        if (!confirmed) return;
+        if (!confirm(`Remover canal ${channel.name}?`)) return;
         try {
             await channelsApi.delete(channel.id);
             setChannels(prev => prev.filter(c => c.id !== channel.id));
@@ -226,7 +213,7 @@ export function ChannelsList() {
 
     return (
         <div
-            className="h-full flex flex-col md:flex-row rounded-xl border overflow-hidden"
+            className="h-full min-w-0 flex flex-col md:flex-row rounded-xl border overflow-hidden"
             style={{
                 backgroundColor: 'hsl(var(--background))',
                 borderColor: 'hsl(var(--border))'
@@ -296,10 +283,10 @@ export function ChannelsList() {
                                     ac => ac.id === c.type || (c.type === 'whatsapp' && ac.id === 'whatsapp')
                                 );
                                 const ChannelIcon = channelConfig?.icon || MessageSquare;
-                                const iconColor = channelConfig?.color || 'text-gray-500';
+                                const iconColor = channelConfig?.color || 'text-muted-foreground';
 
                                 return (
-                                    <div key={c.id} className="flex items-center gap-2 text-sm group py-1.5 px-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" style={{ color: 'hsl(var(--foreground))' }}>
+                                    <div key={c.id} className="flex items-center gap-2 text-sm group py-1.5 px-2 rounded-lg hover:bg-muted/50 transition-colors" style={{ color: 'hsl(var(--foreground))' }}>
                                         <ChannelIcon className={`w-4 h-4 flex-shrink-0 ${iconColor}`} />
                                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${c.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
                                         <span className="truncate flex-1">{c.name}</span>
@@ -307,7 +294,7 @@ export function ChannelsList() {
                                         {c.type !== 'whatsapp' && (
                                             <button
                                                 onClick={() => openEditModal(c)}
-                                                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+                                                className="p-1 rounded hover:bg-muted transition-all"
                                                 title="Configurações do canal"
                                             >
                                                 <Settings className="w-3.5 h-3.5" style={{ color: 'hsl(var(--muted-foreground))' }} />
@@ -333,7 +320,7 @@ export function ChannelsList() {
                             <span className="w-1.5 h-6 bg-green-500 rounded-full"></span>
                             Canais Conectados
                         </h2>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             {channels.map(channel => (
                                 <ChannelCard
                                     key={channel.id}
@@ -350,52 +337,10 @@ export function ChannelsList() {
 
                 {/* Grid de Seleção (Estilo Chatwoot) */}
                 <div>
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
-                            <span className={`w-1.5 h-6 rounded-full ${isAtChannelLimit ? 'bg-amber-500' : 'bg-blue-500'}`}></span>
-                            Adicionar Novo Canal
-                        </h2>
-                        <span
-                            className="text-xs font-medium px-2.5 py-1 rounded-full border"
-                            style={{
-                                color: isAtChannelLimit ? 'hsl(38 92% 50%)' : 'hsl(var(--muted-foreground))',
-                                borderColor: isAtChannelLimit ? 'hsl(38 92% 50% / 0.4)' : 'hsl(var(--border))',
-                                backgroundColor: isAtChannelLimit ? 'hsl(38 92% 50% / 0.1)' : 'transparent',
-                            }}
-                        >
-                            {channels.length} / {planLimits.limitLabel.channels} canais
-                        </span>
-                    </div>
-
-                    {/* Inline limit-reached banner — no modal popup */}
-                    {isAtChannelLimit && (
-                        <div
-                            className="mb-6 p-4 rounded-xl border flex items-start gap-4"
-                            style={{
-                                backgroundColor: 'hsl(38 92% 50% / 0.08)',
-                                borderColor: 'hsl(38 92% 50% / 0.35)',
-                            }}
-                        >
-                            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'hsl(38 92% 50%)' }} />
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold" style={{ color: 'hsl(38 92% 50%)' }}>Limite de canais atingido</p>
-                                <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                    Você está usando {channels.length} de {planLimits.limitLabel.channels} canal(es) disponível(is) no plano{' '}
-                                    <span className="font-medium capitalize">{planLimits.plan}</span>.
-                                    Remova um canal existente ou faça upgrade para adicionar mais.
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => planLimits.openUpgradeModal()}
-                                className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                                style={{ backgroundColor: 'hsl(38 92% 50%)', color: '#000' }}
-                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 40%)')}
-                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 50%)')}
-                            >
-                                <Zap size={13} /> Fazer Upgrade
-                            </button>
-                        </div>
-                    )}
+                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
+                        <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
+                        Adicionar Novo Canal
+                    </h2>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {AVAILABLE_CHANNELS.map((item) => {
@@ -404,29 +349,19 @@ export function ChannelsList() {
                                 <button
                                     key={item.id}
                                     onClick={() => handleConnect(item.id)}
-                                    disabled={isAtChannelLimit}
-                                    className={`group relative flex flex-col items-start p-6 border rounded-xl transition-all text-left ${
-                                        isAtChannelLimit
-                                            ? 'opacity-50 cursor-not-allowed'
-                                            : 'hover:border-blue-500 hover:shadow-md'
-                                    }`}
+                                    className="group flex flex-col items-start p-5 border rounded-lg hover:border-foreground/20 hover:shadow-sm transition-all duration-150 text-left active:scale-[0.98]"
                                     style={{ 
                                         backgroundColor: 'hsl(var(--card))',
                                         borderColor: 'hsl(var(--border))'
                                     }}
                                 >
-                                    {isAtChannelLimit && (
-                                        <div className="absolute top-3 right-3">
-                                            <Lock size={14} style={{ color: 'hsl(38 92% 50%)' }} />
-                                        </div>
-                                    )}
                                     <div 
-                                        className={`p-3 rounded-lg mb-4 ${!isAtChannelLimit ? 'group-hover:scale-110' : ''} transition-transform ${item.color}`}
+                                        className="p-2.5 rounded-lg mb-3 group-hover:scale-105 transition-transform duration-150"
                                         style={{ backgroundColor: 'hsl(var(--muted))' }}
                                     >
-                                        <Icon size={24} />
+                                        <Icon size={22} className={item.color} />
                                     </div>
-                                    <h3 className="font-bold mb-1" style={{ color: 'hsl(var(--foreground))' }}>
+                                    <h3 className="font-semibold text-sm mb-0.5" style={{ color: 'hsl(var(--foreground))' }}>
                                         {item.name}
                                     </h3>
                                     <p className="text-xs leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
@@ -438,16 +373,16 @@ export function ChannelsList() {
 
                         {/* Coming Soon Card */}
                         <div 
-                            className="flex flex-col items-start p-6 border border-dashed rounded-xl opacity-60"
+                            className="flex flex-col items-start p-5 border border-dashed rounded-lg opacity-50"
                             style={{ borderColor: 'hsl(var(--border))' }}
                         >
                             <div 
-                                className="p-3 rounded-lg mb-4"
+                                className="p-2.5 rounded-lg mb-3"
                                 style={{ backgroundColor: 'hsl(var(--muted))' }}
                             >
-                                <Plus size={24} style={{ color: 'hsl(var(--muted-foreground))' }} />
+                                <Plus size={22} style={{ color: 'hsl(var(--muted-foreground))' }} />
                             </div>
-                            <h3 className="font-bold mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                            <h3 className="font-semibold text-sm mb-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 Em breve! 🚀
                             </h3>
                             <p className="text-xs leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>

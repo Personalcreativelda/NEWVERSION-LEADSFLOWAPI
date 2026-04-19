@@ -247,13 +247,13 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
       {...attributes}
       {...listeners}
       className={`group relative rounded-2xl p-3 mb-3 cursor-move transition-all duration-200 border ${isDragging ? 'opacity-50 scale-95 shadow-2xl z-50 ring-2 ring-white/10' : 'opacity-100'
-        } ${isDark
-          ? 'hover:brightness-110 border-white/5 shadow-lg shadow-black/20'
-          : 'hover:bg-gray-50 border-gray-100 shadow-sm hover:shadow-md'
+        } ${isDragging
+          ? 'opacity-50 scale-95 shadow-2xl z-50 ring-2 ring-border/30'
+          : 'opacity-100 hover:bg-muted/30 border-border shadow-sm hover:shadow-md'
         }`}
       style={{
         ...style,
-        backgroundColor: isDark ? '#1A1A1A' : 'hsl(var(--card))'
+        backgroundColor: 'hsl(var(--card))'
       }}
     >
       {/* Header: Avatar + Nome + Menu */}
@@ -268,11 +268,11 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className={`font-bold text-sm truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <p className="font-bold text-sm truncate text-foreground">
               {lead.nome}
             </p>
             {lead.empresa && (
-              <p className={`text-[10px] uppercase tracking-wide truncate ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              <p className="text-[10px] uppercase tracking-wide truncate text-muted-foreground">
                 {lead.empresa}
               </p>
             )}
@@ -285,17 +285,16 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 w-7 p-0 flex-shrink-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-400'
-                }`}
+              className="h-7 w-7 p-0 flex-shrink-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/50 text-muted-foreground/70"
               onClick={(e) => e.stopPropagation()}
             >
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className={isDark ? 'bg-[#1A1A1A] border-white/10' : ''}>
+          <DropdownMenuContent align="end" className="bg-card border-border">
             <DropdownMenuItem
               onClick={(e) => { e.stopPropagation(); onEdit?.(lead); }}
-              className={isDark ? 'text-white hover:bg-white/10' : ''}
+              className="text-foreground"
             >
               <Edit2 className="h-3.5 w-3.5 mr-2" />
               Editar
@@ -329,7 +328,7 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
             const originLabel = originConfig?.label || lead.origem;
             return (
               <span
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${isDark ? 'bg-white/5 text-gray-400' : 'bg-gray-100 text-gray-600'}`}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground`}
                 title={`Origem: ${originLabel}`}
               >
                 <OriginIcon className={`h-3 w-3 ${iconColor}`} />
@@ -356,26 +355,24 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-1.5 min-w-0">
           {lead.telefone && (
-            <span className={`text-xs truncate ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+            <span className="text-xs truncate text-muted-foreground">
               {lead.telefone}
             </span>
           )}
         </div>
         {hasDealValue && (
-          <Badge variant="outline" className={`px-1.5 py-0 h-5 text-[10px] font-bold border-0 ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
-            }`}>
+          <Badge variant="outline" className="px-1.5 py-0 h-5 text-[10px] font-bold border-0 bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
             {formatCurrency(dealValue, currency)}
           </Badge>
         )}
       </div>
 
       {/* Ícones de ação - Separados e Justificados */}
-      <div className={`flex items-center justify-between gap-1 pt-2 border-t border-dashed ${isDark ? 'border-white/10' : 'border-gray-100'}`}>
+      <div className={`flex items-center justify-between gap-1 pt-2 border-t border-dashed border-border`}>
         {/* Chamada */}
         <button
           onClick={(e) => { e.stopPropagation(); onCall?.(lead); }}
-          className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-gray-500 hover:text-blue-400' : 'hover:bg-blue-50 text-gray-400 hover:text-blue-600'
-            }`}
+          className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors text-muted-foreground hover:bg-blue-50 dark:hover:bg-white/10 hover:text-blue-600 dark:hover:text-blue-400"
           title="Ligar"
         >
           <Phone className="h-3.5 w-3.5" />
@@ -384,8 +381,7 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
         {/* WhatsApp */}
         <button
           onClick={(e) => { e.stopPropagation(); onWhatsApp?.(lead); }}
-          className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-gray-500 hover:text-green-400' : 'hover:bg-green-50 text-gray-400 hover:text-green-600'
-            }`}
+          className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors text-muted-foreground hover:bg-green-50 dark:hover:bg-white/10 hover:text-green-600 dark:hover:text-green-400"
           title="WhatsApp"
         >
           <MessageCircle className="h-3.5 w-3.5" />
@@ -394,8 +390,7 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
         {/* Notas */}
         <button
           onClick={(e) => { e.stopPropagation(); onViewDetails?.(lead, 'notas'); }}
-          className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-gray-500 hover:text-yellow-400' : 'hover:bg-yellow-50 text-gray-400 hover:text-yellow-600'
-            }`}
+          className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors text-muted-foreground hover:bg-yellow-50 dark:hover:bg-white/10 hover:text-yellow-600 dark:hover:text-yellow-400"
           title="Notas"
         >
           <StickyNote className="h-3.5 w-3.5" />
@@ -404,8 +399,7 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
         {/* Agendamentos */}
         <button
           onClick={(e) => { e.stopPropagation(); onViewDetails?.(lead, 'agendamentos'); }}
-          className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-gray-500 hover:text-purple-400' : 'hover:bg-purple-50 text-gray-400 hover:text-purple-600'
-            }`}
+          className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors text-muted-foreground hover:bg-purple-50 dark:hover:bg-white/10 hover:text-purple-600 dark:hover:text-purple-400"
           title="Agendamentos"
         >
           <Calendar className="h-3.5 w-3.5" />
@@ -414,8 +408,7 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
         {/* Histórico */}
         <button
           onClick={(e) => { e.stopPropagation(); onViewDetails?.(lead, 'historico'); }}
-          className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-gray-500 hover:text-orange-400' : 'hover:bg-orange-50 text-gray-400 hover:text-orange-600'
-            }`}
+          className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors text-muted-foreground hover:bg-orange-50 dark:hover:bg-white/10 hover:text-orange-600 dark:hover:text-orange-400"
           title="Histórico"
         >
           <MessageSquare className="h-3.5 w-3.5" />
@@ -424,9 +417,10 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
         {/* Valor - destacado se tem valor */}
         <button
           onClick={(e) => { e.stopPropagation(); onViewDetails?.(lead, 'valor'); }}
-          className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${hasDealValue
-            ? 'text-emerald-400 bg-emerald-500/20'
-            : isDark ? 'hover:bg-white/10 text-gray-500' : 'hover:bg-emerald-50 text-gray-400'
+          className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
+            hasDealValue
+              ? 'text-emerald-400 bg-emerald-500/20'
+              : 'text-muted-foreground hover:bg-emerald-50 dark:hover:bg-white/10'
             }`}
           title="Valor do negócio"
         >
@@ -436,9 +430,9 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
 
       {/* Mobile Dropdown - Mover para outro estágio */}
       {stages.length > 0 && onMoveToStage && (
-        <div className="md:hidden mt-3 pt-2 border-t border-dashed" style={{borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}}>
+        <div className="md:hidden mt-3 pt-2 border-t border-dashed border-border/40">
           <div className="flex items-center gap-2">
-            <MoveRight className={`h-3.5 w-3.5 flex-shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            <MoveRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
             <select
               value={stage.id}
               onChange={(e) => {
@@ -449,11 +443,7 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
                 }
               }}
               onClick={(e) => e.stopPropagation()}
-              className={`flex-1 text-xs px-2 py-1 rounded-lg border transition-colors ${
-                isDark 
-                  ? 'bg-slate-800 border-slate-600 text-white hover:border-slate-500' 
-                  : 'bg-white border-gray-300 text-gray-900 hover:border-gray-400'
-              }`}
+              className="flex-1 text-xs px-2 py-1 rounded-lg border transition-colors bg-card border-border text-foreground"
             >
               {stages.map((s: FunnelStage) => (
                 <option key={s.id} value={s.id}>
@@ -537,8 +527,8 @@ const FunnelColumn = memo(({
           } ${isExpanded ? 'w-full' : 'w-[50px] shadow-sm'
           } border-0`}
         style={{
-          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.02)' : 'hsl(var(--card))',
-          borderColor: isDark ? 'hsl(var(--border))' : 'hsl(var(--border))'
+          backgroundColor: 'hsl(var(--card))',
+          borderColor: 'hsl(var(--border))'
         }}
       >
         {isExpanded ? (
@@ -547,8 +537,8 @@ const FunnelColumn = memo(({
             <div 
               className="flex items-center justify-between px-3 py-3 mb-1 flex-shrink-0 border-b rounded-t-xl h-[60px]"
               style={{
-                backgroundColor: isDark ? 'transparent' : 'hsl(var(--card))',
-                borderColor: isDark ? 'hsl(var(--border))' : 'hsl(var(--border))'
+                backgroundColor: 'hsl(var(--card))',
+                borderColor: 'hsl(var(--border))'
               }}
             >
               <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -1055,9 +1045,8 @@ export default function SalesFunnel({
                   {stats.total.toLocaleString('pt-BR')}
                 </p>
               </div>
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 ${isDark ? 'bg-purple-500/10 group-hover:bg-purple-500/20' : 'bg-purple-100 group-hover:bg-purple-200'
-                }`}>
-                <BarChart3 className={`w-7 h-7 ${isDark ? 'text-purple-400' : 'text-purple-600'}`} />
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 bg-purple-100 dark:bg-purple-500/10 group-hover:bg-purple-200 dark:group-hover:bg-purple-500/20">
+                <BarChart3 className="w-7 h-7 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
           </div>
@@ -1073,9 +1062,8 @@ export default function SalesFunnel({
                   {stats.inProgress.toLocaleString('pt-BR')}
                 </p>
               </div>
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 ${isDark ? 'bg-yellow-500/10 group-hover:bg-yellow-500/20' : 'bg-yellow-100 group-hover:bg-yellow-200'
-                }`}>
-                <Clock className={`w-7 h-7 ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`} />
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 bg-yellow-100 dark:bg-yellow-500/10 group-hover:bg-yellow-200 dark:group-hover:bg-yellow-500/20">
+                <Clock className="w-7 h-7 text-yellow-600 dark:text-yellow-400" />
               </div>
             </div>
           </div>
@@ -1091,9 +1079,8 @@ export default function SalesFunnel({
                   {stats.converted.toLocaleString('pt-BR')}
                 </p>
               </div>
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 ${isDark ? 'bg-green-500/10 group-hover:bg-green-500/20' : 'bg-green-100 group-hover:bg-green-200'
-                }`}>
-                <CheckCircle2 className={`w-7 h-7 ${isDark ? 'text-green-400' : 'text-green-600'}`} />
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 bg-green-100 dark:bg-green-500/10 group-hover:bg-green-200 dark:group-hover:bg-green-500/20">
+                <CheckCircle2 className="w-7 h-7 text-green-600 dark:text-green-400" />
               </div>
             </div>
           </div>
@@ -1109,9 +1096,8 @@ export default function SalesFunnel({
                   {stats.conversionRate}%
                 </p>
               </div>
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 ${isDark ? 'bg-orange-500/10 group-hover:bg-orange-500/20' : 'bg-orange-100 group-hover:bg-orange-200'
-                }`}>
-                <TrendingUp className={`w-7 h-7 ${isDark ? 'text-orange-400' : 'text-orange-600'}`} />
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 bg-orange-100 dark:bg-orange-500/10 group-hover:bg-orange-200 dark:group-hover:bg-orange-500/20">
+                <TrendingUp className="w-7 h-7 text-orange-600 dark:text-orange-400" />
               </div>
             </div>
           </div>
@@ -1127,9 +1113,8 @@ export default function SalesFunnel({
                   {formatCurrency(stats.pipelineValue, currency)}
                 </p>
               </div>
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 ${isDark ? 'bg-emerald-500/10 group-hover:bg-emerald-500/20' : 'bg-emerald-100 group-hover:bg-emerald-200'
-                }`}>
-                <DollarSign className={`w-7 h-7 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 bg-emerald-100 dark:bg-emerald-500/10 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-500/20">
+                <DollarSign className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
           </div>
@@ -1137,15 +1122,15 @@ export default function SalesFunnel({
 
         {/* Stage Editor Modal */}
         {showStageEditor && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className={`w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl m-4 ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-gray-200'}`}>
-              <div className={`sticky top-0 z-10 flex items-center justify-between p-4 border-b ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
-                <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl m-4 bg-card border border-border">
+              <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-card border-border">
+                <h3 className="text-lg font-semibold text-foreground">
                   Personalizar Etapas do Funil
                 </h3>
                 <button
                   onClick={() => setShowStageEditor(false)}
-                  className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                  className="p-2 rounded-lg transition-colors hover:bg-muted/50 text-muted-foreground"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1153,8 +1138,8 @@ export default function SalesFunnel({
 
               <div className="p-4 space-y-4">
                 {/* Template Selector */}
-                <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/30 border-slate-700' : 'bg-gray-50/50 border-gray-200'}`}>
-                  <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <div className="p-4 rounded-xl border bg-muted/50 border-border">
+                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
                     <Settings className="w-4 h-4" />
                     Templates Prontos
                   </h4>
@@ -1174,16 +1159,13 @@ export default function SalesFunnel({
                               setStages(template.stages);
                             }
                           }}
-                          className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all hover:scale-105 ${isDark
-                            ? 'bg-slate-800/50 border-slate-600 hover:border-slate-500 hover:bg-slate-700/50'
-                            : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                            }`}
+                          className="flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all hover:scale-105 bg-card border-border hover:bg-muted/50"
                         >
                           <TemplateIcon className={`w-6 h-6 ${template.iconColor}`} />
-                          <span className={`text-xs font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          <span className="text-xs font-medium text-foreground">
                             {template.name}
                           </span>
-                          <span className={`text-[10px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          <span className="text-[10px] text-muted-foreground">
                             {template.stages.length} etapas
                           </span>
                         </button>
@@ -1193,7 +1175,7 @@ export default function SalesFunnel({
                 </div>
 
                 {/* Divider */}
-                <div className={`flex items-center gap-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                <div className="flex items-center gap-3 text-muted-foreground">
                   <div className="flex-1 h-px bg-current opacity-20" />
                   <span className="text-xs font-medium">ou personalize</span>
                   <div className="flex-1 h-px bg-current opacity-20" />
@@ -1204,7 +1186,7 @@ export default function SalesFunnel({
                 {stages.map((stage, index) => (
                   <div
                     key={stage.id}
-                    className={`flex items-center gap-3 p-3 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50 border-gray-200'}`}
+                    className="flex items-center gap-3 p-3 rounded-xl border bg-muted/50 border-border"
                   >
                     <div className={`w-4 h-4 rounded-full ${stage.color}`} />
                     <input
@@ -1215,10 +1197,7 @@ export default function SalesFunnel({
                         newStages[index] = { ...stage, label: e.target.value };
                         setStages(newStages);
                       }}
-                      className={`flex-1 px-3 py-2 rounded-lg border text-sm ${isDark
-                        ? 'bg-slate-700 border-slate-600 text-white'
-                        : 'bg-white border-gray-300 text-gray-900'
-                        }`}
+                      className="flex-1 px-3 py-2 rounded-lg border text-sm bg-card border-border text-foreground"
                     />
                     <select
                       value={stage.color}
@@ -1233,10 +1212,7 @@ export default function SalesFunnel({
                           setStages(newStages);
                         }
                       }}
-                      className={`px-3 py-2 rounded-lg border text-sm ${isDark
-                        ? 'bg-slate-700 border-slate-600 text-white'
-                        : 'bg-white border-gray-300 text-gray-900'
-                        }`}
+                      className="px-3 py-2 rounded-lg border text-sm bg-card border-border text-foreground"
                     >
                       {STAGE_COLORS.map(color => (
                         <option key={color.color} value={color.color}>
@@ -1250,7 +1226,7 @@ export default function SalesFunnel({
                           const newStages = stages.filter((_, i) => i !== index);
                           setStages(newStages);
                         }}
-                        className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-red-900/30 text-red-400' : 'hover:bg-red-50 text-red-500'}`}
+                        className="p-2 rounded-lg transition-colors hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -1273,32 +1249,26 @@ export default function SalesFunnel({
                       },
                     ]);
                   }}
-                  className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed transition-colors ${isDark
-                    ? 'border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
-                    : 'border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-500'
-                    }`}
+                  className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed transition-colors border-border text-muted-foreground/70 hover:text-muted-foreground"
                 >
                   <Plus className="w-4 h-4" />
                   Adicionar Etapa
                 </button>
               </div>
 
-              <div className={`sticky bottom-0 flex items-center justify-between p-4 border-t ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
+              <div className="sticky bottom-0 flex items-center justify-between p-4 border-t bg-card border-border">
                 <button
                   onClick={() => {
                     setStages(DEFAULT_FUNNEL_STAGES);
                     localStorage.removeItem('funnelStages');
                   }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDark
-                    ? 'text-slate-400 hover:text-white hover:bg-slate-800'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                    }`}
+                  className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 >
                   Restaurar Padrão
                 </button>
                 <button
                   onClick={() => setShowStageEditor(false)}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
                 >
                   Fechar
                 </button>
@@ -1309,15 +1279,15 @@ export default function SalesFunnel({
 
         {/* Single Stage Edit Modal */}
         {editingStage && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className={`w-full max-w-md rounded-2xl shadow-2xl m-4 ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-gray-200'}`}>
-              <div className={`flex items-center justify-between p-4 border-b ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
-                <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="w-full max-w-md rounded-2xl shadow-2xl m-4 bg-card border border-border">
+              <div className="flex items-center justify-between p-4 border-b bg-card border-border">
+                <h3 className="text-lg font-semibold text-foreground">
                   Editar Etapa
                 </h3>
                 <button
                   onClick={() => setEditingStage(null)}
-                  className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                  className="p-2 rounded-lg transition-colors hover:bg-muted/50 text-muted-foreground"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1325,22 +1295,19 @@ export default function SalesFunnel({
 
               <div className="p-4 space-y-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-2 text-foreground/80">
                     Nome da Etapa
                   </label>
                   <input
                     type="text"
                     value={editingStage.label}
                     onChange={(e) => setEditingStage({ ...editingStage, label: e.target.value })}
-                    className={`w-full px-3 py-2 rounded-lg border text-sm ${isDark
-                      ? 'bg-slate-700 border-slate-600 text-white'
-                      : 'bg-white border-gray-300 text-gray-900'
-                      }`}
+                    className="w-full px-3 py-2 rounded-lg border text-sm bg-card border-border text-foreground"
                   />
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-2 text-foreground/80">
                     Cor
                   </label>
                   <div className="grid grid-cols-3 gap-2">
@@ -1350,11 +1317,11 @@ export default function SalesFunnel({
                         onClick={() => setEditingStage({ ...editingStage, ...colorConfig })}
                         className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all ${editingStage.color === colorConfig.color
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                          : isDark ? 'border-slate-600 hover:border-slate-500' : 'border-gray-200 hover:border-gray-300'
+                          : 'border-border'
                           }`}
                       >
                         <div className={`w-4 h-4 rounded-full ${colorConfig.color}`}></div>
-                        <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
+                        <span className="text-xs text-foreground/80">
                           {colorConfig.name}
                         </span>
                       </button>
@@ -1363,13 +1330,10 @@ export default function SalesFunnel({
                 </div>
               </div>
 
-              <div className={`flex items-center justify-end gap-2 p-4 border-t ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
+              <div className="flex items-center justify-end gap-2 p-4 border-t bg-card border-border">
                 <button
                   onClick={() => setEditingStage(null)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDark
-                    ? 'text-slate-400 hover:text-white hover:bg-slate-800'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                    }`}
+                  className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 >
                   Cancelar
                 </button>
@@ -1385,17 +1349,17 @@ export default function SalesFunnel({
         )}
 
         {/* Funil de Vendas - Layout Responsivo */}
-        <Card className={`rounded-xl border overflow-hidden flex-1 ${isDark ? 'bg-transparent border-slate-700/30' : 'bg-transparent border-gray-200'}`}>
+        <Card className="rounded-xl border overflow-hidden flex-1 bg-transparent border-border">
 
           <div
-            className={`relative w-full p-6 h-full ${isDark ? 'bg-transparent' : 'bg-transparent'}`}
+            className="relative w-full p-6 h-full bg-transparent"
           >
             {/* Container com scroll horizontal responsivo */}
             <div
               className="overflow-x-auto overflow-y-hidden smooth-scroll snap-container h-full"
               style={{
                 scrollbarWidth: 'thin',
-                scrollbarColor: isDark ? '#475569 #1e293b' : '#cbd5e1 #f1f5f9',
+                scrollbarColor: '#94a3b8 #e2e8f0',
                 WebkitOverflowScrolling: 'touch'
               }}
             >
@@ -1460,13 +1424,12 @@ export default function SalesFunnel({
 
                 <DragOverlay dropAnimation={null}>
                   {activeLead ? (
-                    <div className={`rounded-xl p-4 shadow-lg opacity-95 max-w-[280px] rotate-3 border-2 border-blue-500 backdrop-blur-sm ${isDark ? 'bg-[#1E293B]' : 'bg-white'
-                      }`}>
-                      <p className={`text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-gray-900'}`}>
+                    <div className="rounded-xl p-4 shadow-lg opacity-95 max-w-[280px] rotate-3 border-2 border-blue-500 backdrop-blur-sm bg-card">
+                      <p className="text-sm font-semibold text-foreground">
                         {activeLead.nome}
                       </p>
                       {activeLead.empresa && (
-                        <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                        <p className="text-xs mt-1 text-muted-foreground">
                           {activeLead.empresa}
                         </p>
                       )}

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import type { Channel } from '../../../types/inbox';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
-import { Trash2, CheckCircle2, XCircle, MessageCircle, Pencil, X, Check, Send, Facebook, Instagram, Mail, Globe, Cloud, Smartphone, Settings } from 'lucide-react';
+import { RefreshCw, Trash2, CheckCircle2, XCircle, Loader2, MessageCircle, Pencil, X, Check, Send, Facebook, Instagram, Mail, Globe, Cloud, Smartphone, Settings } from 'lucide-react';
 
 interface ChannelCardProps {
     channel: Channel;
@@ -15,6 +15,7 @@ interface ChannelCardProps {
 }
 
 export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loading }: ChannelCardProps) {
+    const [syncing, setSyncing] = useState(false);
     const [expanded, setExpanded] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(channel.name);
@@ -82,7 +83,7 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
             case 'website':
                 return 'bg-purple-500 text-white';            case 'twilio_sms':
                 return 'bg-teal-500 text-white';            default:
-                return 'bg-gray-500 text-white';
+                return 'bg-muted-foreground text-white';
         }
     };
 
@@ -110,10 +111,10 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'active': return 'bg-green-500';
-            case 'inactive': return 'bg-gray-400';
+            case 'inactive': return 'bg-muted-foreground/70';
             case 'error': return 'bg-red-500';
             case 'connecting': return 'bg-yellow-500';
-            default: return 'bg-gray-400';
+            default: return 'bg-muted-foreground/70';
         }
     };
 
@@ -127,13 +128,21 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
         }
     };
 
-    const handleDisconnect = async () => {
-        const confirmed = await confirm('Deseja realmente desconectar este canal?', {
-            title: 'Desconectar canal',
-            confirmLabel: 'Desconectar',
-            variant: 'warning',
-        });
-        if (!confirmed) return;
+    const handleSync = async () => {
+        try {
+            setSyncing(true);
+            await channelsApi.sync(channel.id);
+            toast.success('Canal sincronizado!');
+            onSync(channel);
+        } catch (error) {
+            toast.error('Erro ao sincronizar');
+        } finally {
+            setSyncing(false);
+        }
+    };
+
+    const handleDisconnect = () => {
+        if (!confirm('Deseja realmente desconectar este canal?')) return;
         onDelete(channel);
     };
 
@@ -180,7 +189,7 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                                 e.stopPropagation();
                                 onEdit(channel);
                             }}
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
                             title="Configurações do canal"
                         >
                             <Settings className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />
@@ -231,31 +240,31 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                                     <span style={{ color: 'hsl(var(--muted-foreground))' }}>API não oficial</span>
                                 </div>
                                 {channel.credentials.instance_name && (
-                                    <div className="text-xs min-w-0" style={{ color: 'hsl(var(--foreground))' }}>
+                                    <div className="text-xs flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
                                         <span style={{ color: 'hsl(var(--muted-foreground))' }}>Instância: </span>
                                         {isEditing ? (
-                                            <div className="flex items-center gap-1 mt-1">
+                                            <div className="flex items-center gap-1">
                                                 <input
                                                     type="text"
                                                     value={editName}
                                                     onChange={(e) => setEditName(e.target.value)}
-                                                    className="px-2 py-1 text-xs rounded border font-mono w-full"
+                                                    className="px-2 py-1 text-xs rounded border font-mono"
                                                     style={{ borderColor: 'hsl(var(--border))', backgroundColor: 'hsl(var(--background))' }}
                                                     autoFocus
                                                 />
                                                 <button onClick={() => { if (onRename && editName.trim()) onRename(channel, editName.trim()); setIsEditing(false); }}
-                                                    className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600 flex-shrink-0">
+                                                    className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600">
                                                     <Check className="w-3 h-3" />
                                                 </button>
                                                 <button onClick={() => { setEditName(channel.name); setIsEditing(false); }}
-                                                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 flex-shrink-0">
+                                                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600">
                                                     <X className="w-3 h-3" />
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center gap-1 min-w-0 mt-0.5">
-                                                <code className="font-mono truncate block max-w-full">{channel.credentials.instance_name || channel.credentials.instance_id}</code>
-                                                <button onClick={() => setIsEditing(true)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex-shrink-0" title="Editar nome">
+                                            <div className="flex items-center gap-1">
+                                                <code className="font-mono">{channel.credentials.instance_name || channel.credentials.instance_id}</code>
+                                                <button onClick={() => setIsEditing(true)} className="p-1 hover:bg-muted/50 rounded" title="Editar nome">
                                                     <Pencil className="w-3 h-3" style={{ color: 'hsl(var(--muted-foreground))' }} />
                                                 </button>
                                             </div>
@@ -374,10 +383,17 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                     {/* Actions */}
                     <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex gap-2">
-                            {(channel.status === 'error' || channel.status === 'inactive') && (
+                            <button onClick={handleSync} disabled={syncing || loading}
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-muted/50"
+                                style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}>
+                                {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                {syncing ? 'Sincronizando...' : 'Sincronizar'}
+                            </button>
+
+                            {(channel.status === 'error' || channel.status === 'inactive') && channel.type === 'whatsapp' && (
                                 <button onClick={() => onEdit(channel)} disabled={loading}
                                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors">
-                                    {channel.type === 'whatsapp' ? 'Reconectar' : 'Conectar'}
+                                    Reconectar
                                 </button>
                             )}
                         </div>
@@ -389,13 +405,11 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                                 Apagar
                             </button>
 
-                            {(channel.status === 'active' || channel.status === 'connecting') && (
-                                <button onClick={handleDisconnect} disabled={loading}
-                                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors">
-                                    <XCircle className="w-4 h-4" />
-                                    Desconectar
-                                </button>
-                            )}
+                            <button onClick={handleDisconnect} disabled={loading}
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors">
+                                <XCircle className="w-4 h-4" />
+                                Desconectar
+                            </button>
                         </div>
                     </div>
                 </div>

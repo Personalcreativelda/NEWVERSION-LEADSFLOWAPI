@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-    ChevronRight, ChevronDown, Inbox, Hash, Tag, AtSign, Bell, Settings, Bot, PhoneCall, Zap,
+    ChevronRight, Inbox, Hash, Tag, AtSign, Bell, Settings, Bot, PhoneCall, Zap,
     MessageCircle, Instagram, Facebook, Send, Mail, Cloud, Globe, Plus,
     Edit2, Trash2, UserPlus, ArrowRightLeft, Smartphone
 } from 'lucide-react';
@@ -106,7 +106,7 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
             case 'twilio':
                 return 'text-teal-500';
             default:
-                return 'text-gray-500';
+                return 'text-muted-foreground';
         }
     };
 
@@ -248,12 +248,7 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
         const typeLabel = tag.type === 'funnel' ? 'etapa do funil' : tag.type === 'lead_tag' ? 'tag' : 'etiqueta';
         const confirmMsg = `Tem certeza que deseja remover a ${typeLabel} "${tag.name}"?\n\nOs leads não serão afetados.`;
         
-        const confirmed = await confirm(confirmMsg, {
-            title: 'Remover etiqueta',
-            confirmLabel: 'Remover',
-            variant: 'danger',
-        });
-        if (!confirmed) {
+        if (!window.confirm(confirmMsg)) {
             console.log('[InboxTreeMenu] Delete cancelled by user');
             return;
         }
@@ -387,315 +382,23 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
     if (!isExpanded) return null;
 
     return (
-        <div className="ml-2 mt-1 space-y-1">
-            {/* 1. Todas as conversas */}
+        <div className="mt-0.5 space-y-0.5">
+            {/* Conversas */}
             <button
                 onClick={handleConversationsClick}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                    isAllConversationsActive
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                        : 'hover:bg-white/10'
-                }`}
-                style={!isAllConversationsActive ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
+                className={`sidebar-nav-subitem w-full flex items-center gap-2.5 px-3 py-[6px] rounded-md text-[14px] transition-all duration-150 ${isAllConversationsActive ? 'active' : ''}`}
             >
-                <Inbox className="w-5 h-5" />
-                <span className="flex-1 text-left font-medium">{t.conversas || 'Conversas'}</span>
+                <Inbox className="w-4 h-4 flex-shrink-0" />
+                <span className="flex-1 text-left">{t.conversas || 'Conversas'}</span>
             </button>
 
-            {/* 2. Menções */}
-            <button
-                onClick={handleMentionsClick}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                    isMentionsActive
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                        : 'hover:bg-white/10'
-                }`}
-                style={!isMentionsActive ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
-            >
-                <AtSign className="w-5 h-5" />
-                <span className="flex-1 text-left font-medium">{t.mentions || 'Menções'}</span>
-            </button>
-
-            {/* 3. Não atendidas */}
-            <button
-                onClick={handleUnattendedClick}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                    isUnattendedActive
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                        : 'hover:bg-white/10'
-                }`}
-                style={!isUnattendedActive ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
-            >
-                <Bell className="w-5 h-5" />
-                <span className="flex-1 text-left font-medium">{t.unattended || 'Não atendidas'}</span>
-            </button>
-
-            {/* 4. Canais - Dropdown */}
-            <div>
-                <button
-                    onClick={() => setShowChannels(!showChannels)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                        filters.channel ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
-                    } hover:bg-white/10`}
-                    style={{ color: 'hsl(var(--sidebar-foreground) / 0.8)' }}
-                >
-                    {showChannels ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                    <Hash className="w-5 h-5" />
-                    <span className="flex-1 text-left font-medium">{t.canais || 'Canais'}</span>
-                    {filters.channel && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-500">1</span>
-                    )}
-                </button>
-
-                {showChannels && (
-                    <div className="ml-6 mt-1 space-y-0.5 relative">
-                        {/* Linha vertical para os itens do dropdown Canais */}
-                        {channels.length > 0 && (
-                            <div 
-                                className="absolute left-[7px] top-0 bottom-0 w-[1px] opacity-20"
-                                style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
-                            />
-                        )}
-                        {loadingChannels ? (
-                            <div className="px-3 py-2 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Carregando...
-                            </div>
-                        ) : channels.length === 0 ? (
-                            <div className="px-3 py-2 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Nenhum canal conectado
-                            </div>
-                        ) : (
-                            channels.map((channel, index) => {
-                                const ChannelIcon = getChannelIcon(channel.type);
-                                const channelColor = getChannelColor(channel.type);
-                                const isChannelActive = filters.channel === channel.id;
-                                return (
-                                    <div key={channel.id} className="relative flex items-center">
-                                        {/* Linha horizontal conectando ao item */}
-                                        <div
-                                            className="absolute left-[7px] w-[8px] h-[1px] opacity-20"
-                                            style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
-                                        />
-                                        <button
-                                            onClick={() => handleChannelClick(channel.id)}
-                                            className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
-                                                isChannelActive
-                                                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                                                    : 'hover:bg-white/10'
-                                            }`}
-                                            style={!isChannelActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
-                                        >
-                                            <ChannelIcon className={`w-4 h-4 flex-shrink-0 ${channelColor}`} />
-                                            <span className="truncate">{channel.name || channel.type}</span>
-                                        </button>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* 5. Etiquetas - Dropdown */}
-            <div>
-                <button
-                    onClick={() => setShowTags(!showTags)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                        filters.tag ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
-                    } hover:bg-white/10`}
-                    style={{ color: 'hsl(var(--sidebar-foreground) / 0.8)' }}
-                >
-                    {showTags ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                    <Tag className="w-5 h-5" />
-                    <span className="flex-1 text-left font-medium">{t.tags || 'Etiquetas'}</span>
-                    {filters.tag && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-500">1</span>
-                    )}
-                </button>
-
-                {showTags && (
-                    <div className="ml-6 mt-1 space-y-0.5 relative">
-                        {/* Linha vertical para os itens do dropdown Etiquetas */}
-                        {tags.length > 0 && (
-                            <div 
-                                className="absolute left-[7px] top-0 bottom-0 w-[1px] opacity-20"
-                                style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
-                            />
-                        )}
-                        {loadingTags ? (
-                            <div className="px-3 py-2 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Carregando...
-                            </div>
-                        ) : tags.length === 0 ? (
-                            <div className="px-3 py-2 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Nenhuma etiqueta criada
-                            </div>
-                        ) : (
-                            <>
-                                {/* Etapas do Funil */}
-                                {tags.filter(t => t.type === 'funnel').length > 0 && (
-                                    <>
-                                        <div className="px-3 pt-1 pb-0.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                            Funil de Vendas
-                                        </div>
-                                        {tags.filter(t => t.type === 'funnel').map((tag) => {
-                                            const isTagActive = filters.tag === tag.id;
-                                            return (
-                                                <div key={tag.id} className="relative flex items-center">
-                                                    <div className="absolute left-[7px] w-[8px] h-[1px] opacity-20" style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }} />
-                                                    <button
-                                                        onClick={() => handleTagClick(tag.id)}
-                                                        onContextMenu={(e) => handleTagContextMenu(e, tag)}
-                                                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
-                                                            isTagActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'hover:bg-white/10'
-                                                        }`}
-                                                        style={!isTagActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
-                                                    >
-                                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#6B7280' }} />
-                                                        <span className="truncate">{tag.name}</span>
-                                                        {tag.count !== undefined && (
-                                                            <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${tag.color || '#6B7280'}20`, color: tag.color || '#6B7280' }}>
-                                                                {tag.count}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                    </>
-                                )}
-
-                                {/* Tags dos Leads */}
-                                {tags.filter(t => t.type === 'lead_tag').length > 0 && (
-                                    <>
-                                        <div className="px-3 pt-2 pb-0.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                            Tags dos Leads
-                                        </div>
-                                        {tags.filter(t => t.type === 'lead_tag').map((tag) => {
-                                            const isTagActive = filters.tag === tag.id;
-                                            return (
-                                                <div key={tag.id} className="relative flex items-center">
-                                                    <div className="absolute left-[7px] w-[8px] h-[1px] opacity-20" style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }} />
-                                                    <button
-                                                        onClick={() => handleTagClick(tag.id)}
-                                                        onContextMenu={(e) => handleTagContextMenu(e, tag)}
-                                                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
-                                                            isTagActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'hover:bg-white/10'
-                                                        }`}
-                                                        style={!isTagActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
-                                                    >
-                                                        <Tag className="w-3 h-3 flex-shrink-0" style={{ color: tag.color || '#3B82F6' }} />
-                                                        <span className="truncate">{tag.name}</span>
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                    </>
-                                )}
-
-                                {/* Etiquetas da Conversa */}
-                                {tags.filter(t => t.type === 'conversation').length > 0 && (
-                                    <>
-                                        <div className="px-3 pt-2 pb-0.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                            Etiquetas de Conversa
-                                        </div>
-                                        {tags.filter(t => t.type === 'conversation').map((tag) => {
-                                            const isTagActive = filters.tag === tag.id;
-                                            return (
-                                                <div key={tag.id} className="relative flex items-center">
-                                                    <div className="absolute left-[7px] w-[8px] h-[1px] opacity-20" style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }} />
-                                                    <button
-                                                        onClick={() => handleTagClick(tag.id)}
-                                                        onContextMenu={(e) => handleTagContextMenu(e, tag)}
-                                                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 ${
-                                                            isTagActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'hover:bg-white/10'
-                                                        }`}
-                                                        style={!isTagActive ? { color: 'hsl(var(--sidebar-foreground) / 0.7)' } : {}}
-                                                    >
-                                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#3B82F6' }} />
-                                                        {tag.icon && <span className="text-xs">{tag.icon}</span>}
-                                                        <span className="truncate">{tag.name}</span>
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                    </>
-                                )}
-                            </>
-                        )}
-                        {/* Botão para criar nova etiqueta */}
-                        <div className="relative flex items-center px-1 pt-1">
-                            {/* Linha horizontal conectando ao item */}
-                            <div
-                                className="absolute left-[7px] w-[8px] h-[1px] opacity-20"
-                                style={{ backgroundColor: 'hsl(var(--sidebar-foreground))' }}
-                            />
-                            <button
-                                onClick={() => onNavigate('inbox-settings')}
-                                className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ml-4 hover:bg-white/10 text-blue-500"
-                            >
-                                <Plus className="w-4 h-4 flex-shrink-0" />
-                                <span className="truncate text-xs">{t.newTag || 'Nova Etiqueta'}</span>
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* 6. Configurações */}
+            {/* Canais (configurações de canais) */}
             <button
                 onClick={() => onNavigate('inbox-settings')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                    currentPage === 'inbox-settings'
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                        : 'hover:bg-white/10'
-                }`}
-                style={currentPage !== 'inbox-settings' ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
+                className={`sidebar-nav-subitem w-full flex items-center gap-2.5 px-3 py-[6px] rounded-md text-[14px] transition-all duration-150 ${currentPage === 'inbox-settings' ? 'active' : ''}`}
             >
-                <Settings className="w-5 h-5" />
-                <span className="flex-1 text-left font-medium">{t.inboxSettings || 'Configurações'}</span>
-            </button>
-
-            {/* 7. Assistentes IA */}
-            <button
-                onClick={() => onNavigate('ai-assistants')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                    currentPage === 'ai-assistants'
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                        : 'hover:bg-white/10'
-                }`}
-                style={currentPage !== 'ai-assistants' ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
-            >
-                <Bot className="w-5 h-5" />
-                <span className="flex-1 text-left font-medium">{t.aiAssistants || 'Assistentes IA'}</span>
-            </button>
-
-            {/* 7.5. Agentes de Voz */}
-            <button
-                onClick={() => onNavigate('voice-agents')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                    currentPage === 'voice-agents'
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                        : 'hover:bg-white/10'
-                }`}
-                style={currentPage !== 'voice-agents' ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
-            >
-                <PhoneCall className="w-5 h-5" />
-                <span className="flex-1 text-left font-medium">{t.voiceAgents || 'Agentes de Voz'}</span>
-            </button>
-
-            {/* 8. Automação */}
-            <button
-                onClick={() => onNavigate('automations')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                    currentPage === 'automations'
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                        : 'hover:bg-white/10'
-                }`}
-                style={currentPage !== 'automations' ? { color: 'hsl(var(--sidebar-foreground) / 0.8)' } : {}}
-            >
-                <Zap className="w-5 h-5" />
-                <span className="flex-1 text-left font-medium">{t.automations || 'Automação'}</span>
+                <Hash className="w-4 h-4 flex-shrink-0" />
+                <span className="flex-1 text-left">{t.canais || 'Canais'}</span>
             </button>
 
             {/* ====== RIGHT-CLICK CONTEXT MENU ====== */}
@@ -722,7 +425,7 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                     {/* Edit */}
                     <button
                         onClick={handleEditTag}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/10 transition-colors"
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors"
                         style={{ color: 'hsl(var(--popover-foreground))' }}
                     >
                         <Edit2 className="w-4 h-4" />
@@ -733,7 +436,7 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                     {(contextMenu.tag.type === 'funnel' || contextMenu.tag.type === 'lead_tag') && (
                         <button
                             onClick={handleAddLeads}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/10 transition-colors"
+                            className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors"
                             style={{ color: 'hsl(var(--popover-foreground))' }}
                         >
                             <UserPlus className="w-4 h-4" />
@@ -746,7 +449,7 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                         <div className="relative">
                             <button
                                 onClick={() => setShowMoveSubmenu(!showMoveSubmenu)}
-                                className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/10 transition-colors"
+                                className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors"
                                 style={{ color: 'hsl(var(--popover-foreground))' }}
                             >
                                 <ArrowRightLeft className="w-4 h-4" />
@@ -767,7 +470,7 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
                                         <button
                                             key={target.id}
                                             onClick={() => handleMoveLeadsTo(target)}
-                                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-white/10 transition-colors"
+                                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted transition-colors"
                                             style={{ color: 'hsl(var(--popover-foreground))' }}
                                         >
                                             <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: target.color || '#6B7280' }} />
@@ -837,3 +540,4 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
         </div>
     );
 }
+

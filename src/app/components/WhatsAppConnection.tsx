@@ -446,8 +446,8 @@ export function WhatsAppConnection() {
                   </>
                 ) : (
                   <>
-                    <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                    <span className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">Desconectado</span>
+                    <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-muted-foreground text-xs sm:text-sm">Desconectado</span>
                   </>
                 )}
               </div>
@@ -552,15 +552,15 @@ export function WhatsAppConnection() {
                     <span>Conectando... Aguarde!</span>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-4">
+                  <p className="text-sm text-foreground/80 mt-4">
                     Aguardando escaneamento...
                   </p>
                 )}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center p-16 bg-gray-50 rounded-lg">
-                <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-2" />
-                <p className="text-sm text-gray-700 dark:text-gray-300">Gerando QR Code...</p>
+              <div className="flex flex-col items-center justify-center p-16 bg-muted/50 rounded-lg">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground/70 mb-2" />
+                <p className="text-sm text-foreground/80">Gerando QR Code...</p>
               </div>
             )}
 

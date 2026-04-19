@@ -282,7 +282,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                     <li>Em "Messaging Configuration", configure:</li>
                                     <li className="ml-4">
                                         <strong>Webhook URL:</strong>
-                                        <code className="block bg-white dark:bg-gray-900 p-1 rounded mt-1 text-[10px] sm:text-xs break-all">
+                                        <code className="block bg-card p-1 rounded mt-1 text-[10px] sm:text-xs break-all">
                                             {window.location.origin}/api/webhooks/twilio/sms
                                         </code>
                                     </li>

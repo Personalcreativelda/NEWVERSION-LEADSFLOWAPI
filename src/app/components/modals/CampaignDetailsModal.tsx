@@ -251,8 +251,8 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
   const failures = campaign.metadata?.failures || [];
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white dark:bg-black text-slate-900 dark:text-slate-100 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-200 dark:border-zinc-800">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-card text-foreground rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border">
         {/* Header */}
         <div className="bg-gradient-to-r from-[#10B981] to-green-600 px-6 py-5 flex items-center justify-between text-white shrink-0 shadow-lg">
           <div>
@@ -276,14 +276,14 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
               <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Informações Gerais</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-slate-50 dark:bg-zinc-900 p-4 rounded-xl border border-slate-200/60 dark:border-zinc-800/60">
-                <p className="text-xs font-semibold text-slate-500 dark:text-zinc-500 uppercase mb-2">Canal</p>
+              <div className="bg-muted/50 p-4 rounded-xl border border-border dark:border-zinc-800/60">
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Canal</p>
                 <p className="text-base font-bold flex items-center gap-2">
                   {campaign.type === 'whatsapp' ? '📱 WhatsApp' : campaign.type === 'email' ? '📧 Email' : '💬 SMS'}
                 </p>
               </div>
-              <div className="bg-slate-50 dark:bg-zinc-900 p-4 rounded-xl border border-slate-200/60 dark:border-zinc-800/60">
-                <p className="text-xs font-semibold text-slate-500 dark:text-zinc-500 uppercase mb-2">Status</p>
+              <div className="bg-muted/50 p-4 rounded-xl border border-border dark:border-zinc-800/60">
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Status</p>
                 <p className="text-base font-bold flex items-center gap-2">
                   {campaign.status === 'active' && <><span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" /> Ativa</>}
                   {campaign.status === 'completed' && <><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Concluída</>}
@@ -293,8 +293,8 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
                 </p>
               </div>
               {campaign.completedDate && (
-                <div className="bg-slate-50 dark:bg-zinc-900 p-4 rounded-xl border border-slate-200/60 dark:border-zinc-800/60 sm:col-span-2">
-                  <p className="text-xs font-semibold text-slate-500 dark:text-zinc-500 uppercase mb-2">Data de Conclusão</p>
+                <div className="bg-muted/50 p-4 rounded-xl border border-border dark:border-zinc-800/60 sm:col-span-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Data de Conclusão</p>
                   <p className="text-base font-bold text-primary">{formatDate(campaign.completedDate)}</p>
                 </div>
               )}

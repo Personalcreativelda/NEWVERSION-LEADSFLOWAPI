@@ -63,50 +63,50 @@ export default function StatsCards({ totalLeads, leadsNovosHoje, leadsFechados, 
       title: 'Leads Novos',
       value: leadsNovos.toLocaleString(),
       icon: TrendingUp,
-      iconBg: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
-      iconColor: 'text-blue-600 dark:text-blue-300',
+      iconBg: 'bg-blue-500/10',
+      iconColor: 'text-blue-600 dark:text-blue-400',
     },
     {
       title: 'Em Negociação',
       value: leadsEmNegociacao.toLocaleString(),
       icon: Target,
-      iconBg: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
-      iconColor: 'text-orange-600 dark:text-orange-300',
+      iconBg: 'bg-orange-500/10',
+      iconColor: 'text-orange-600 dark:text-orange-400',
     },
     {
       title: 'Qualificados',
       value: leadsQualificados.toLocaleString(),
       icon: CheckCircle2,
-      iconBg: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
-      iconColor: 'text-purple-600 dark:text-purple-300',
+      iconBg: 'bg-purple-500/10',
+      iconColor: 'text-purple-600 dark:text-purple-400',
     },
     {
       title: 'Leads Perdidos',
       value: leadsPerdidos.toLocaleString(),
       icon: XCircle,
-      iconBg: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
-      iconColor: 'text-red-600 dark:text-red-300',
+      iconBg: 'bg-red-500/10',
+      iconColor: 'text-red-600 dark:text-red-400',
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
+    <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (
           <div
             key={index}
-            className="rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-5 border shadow-sm hover:shadow-md transition-all duration-300 bg-card dark:bg-card border-border dark:border-border"
+            className="rounded-xl p-5 transition-all duration-200 bg-card border border-border enterprise-card enterprise-card-secondary"
           >
-            <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
-              <div className={`w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl ${stat.iconBg} flex items-center justify-center flex-shrink-0`}>
-                <Icon className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${stat.iconColor}`} />
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg ${stat.iconBg} flex items-center justify-center flex-shrink-0`}>
+                <Icon className={`w-5 h-5 ${stat.iconColor}`} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground dark:text-foreground mb-0.5">
+                <p className="text-2xl font-semibold text-foreground tracking-tight">
                   {stat.value}
                 </p>
-                <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground dark:text-muted-foreground truncate">
+                <p className="text-xs text-muted-foreground truncate">
                   {stat.title}
                 </p>
               </div>

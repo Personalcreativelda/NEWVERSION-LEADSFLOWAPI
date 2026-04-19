@@ -40,8 +40,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
       value: totalLeads.toLocaleString(),
       label: 'Total de Leads',
       icon: Database,
-      iconColor: '#B794F6', // Roxo
-      bgColor: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
+      iconColor: '#B794F6',
       badge: badgeTotalLeads,
       progressColor: '#B794F6',
       progress: progressTotalLeads,
@@ -51,8 +50,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
       value: leadsNovosHoje.toLocaleString(),
       label: 'Leads Captados Hoje',
       icon: TrendingUp,
-      iconColor: '#5B9FED', // Azul
-      bgColor: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
+      iconColor: '#5B9FED',
       badge: badgeLeadsHoje,
       progressColor: '#5B9FED',
       progress: progressLeadsHoje,
@@ -62,8 +60,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
       value: leadsFechados.toLocaleString(),
       label: 'Leads Convertidos',
       icon: CheckCircle2,
-      iconColor: '#00D9A3', // Verde
-      bgColor: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
+      iconColor: '#00D9A3',
       badge: badgeConvertidos,
       progressColor: '#00D9A3',
       progress: progressConvertidos,
@@ -73,8 +70,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
       value: `${taxaConversao}%`,
       label: 'Taxa de Conversão',
       icon: Target,
-      iconColor: '#FFA26B', // Laranja
-      bgColor: 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
+      iconColor: '#FFA26B',
       badge: badgeTaxaConversao,
       progressColor: '#FFA26B',
       progress: parseFloat(taxaConversao),
@@ -82,47 +78,52 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 lg:gap-5 xl:gap-6">
+    <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
       {stats.map((stat, index) => {
         const Icon = stat.icon;
+        const isPrimary = index === 0;
         return (
           <div
             key={index}
             id={stat.id}
-            className="relative bg-card dark:bg-card rounded-xl sm:rounded-2xl p-3 sm:p-5 lg:p-6 border border-border dark:border-border shadow-sm hover:shadow-md transition-all duration-300"
+            className={`relative rounded-xl p-5 transition-all duration-200 group bg-card border border-border enterprise-card ${
+              isPrimary ? 'enterprise-card-primary' : 'enterprise-card-secondary'
+            }`}
+            style={isPrimary ? { transform: 'scale(1.02)' } : undefined}
           >
-            {/* Badge de percentagem no topo direito */}
-            <div className="flex items-start justify-between gap-2 sm:gap-3 mb-2 sm:mb-4">
-              {/* Ícone com cor de acento */}
+            {/* Header: icon + badge */}
+            <div className="flex items-center justify-between mb-4">
               <div 
-                className={`w-9 h-9 sm:w-11 sm:h-11 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl ${stat.bgColor} flex items-center justify-center shadow-lg`}
-                style={{ boxShadow: `0 8px 16px ${stat.iconColor}20` }}
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: `${stat.iconColor}15` }}
               >
-                <Icon className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" style={{ color: stat.iconColor }} />
+                <Icon className="w-5 h-5" style={{ color: stat.iconColor }} />
               </div>
               
-              {/* Badge verde */}
-              <span className="px-1.5 sm:px-2 lg:px-2.5 py-0.5 sm:py-1 bg-[#00D9A3]/10 text-[#00D9A3] rounded-full text-[9px] sm:text-[10px] lg:text-xs font-semibold">
+              <span 
+                className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                style={{ backgroundColor: `${stat.progressColor}12`, color: stat.progressColor }}
+              >
                 {stat.badge}
               </span>
             </div>
 
-            {/* Valor grande */}
-            <div className="mb-1">
-              <span className="text-xl sm:text-2xl lg:text-3xl font-bold leading-tight text-foreground dark:text-foreground">
+            {/* Value */}
+            <div className="mb-0.5">
+              <span className="text-2xl sm:text-3xl font-semibold leading-tight text-foreground tracking-tight">
                 {stat.value}
               </span>
             </div>
 
             {/* Label */}
-            <p className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground mb-2 sm:mb-4 truncate">
+            <p className="text-xs text-muted-foreground mb-3">
               {stat.label}
             </p>
 
-            {/* Barra de progresso colorida */}
-            <div className="w-full bg-muted dark:bg-muted rounded-full h-1.5 sm:h-2 overflow-hidden">
+            {/* Progress bar */}
+            <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
               <div
-                className="h-full rounded-full transition-all duration-700"
+                className="h-full rounded-full transition-all duration-700 ease-out"
                 style={{ 
                   width: `${Math.min(100, stat.progress)}%`,
                   backgroundColor: stat.progressColor

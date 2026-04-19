@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useConversations } from './useConversations';
 import { useMessages } from './useMessages';
 import { useWebSocket } from './useWebSocket';
+import { patchCachedMessage, patchCachedMessageStatus } from './useMessageCache';
 import type { ConversationWithDetails } from '../types/inbox';
 
 interface UseInboxOptions {
@@ -67,6 +68,7 @@ export function useInbox(options: UseInboxOptions = {}) {
         error: messagesError,
         sending,
         messagesEndRef,
+        scrollContainerRef,
         sendMessage,
         sendAudio,
         addMessage,
@@ -93,6 +95,9 @@ export function useInbox(options: UseInboxOptions = {}) {
             // Adicionar mensagem à lista se for da conversa atual
             if (data.conversationId === selectedConversation?.id) {
                 addMessage(data.message);
+            } else {
+                // Not the active chat — write to cache so it's there instantly on switch
+                patchCachedMessage(data.conversationId, data.message);
             }
 
             // Tocar som se for mensagem recebida (IN)
@@ -109,6 +114,9 @@ export function useInbox(options: UseInboxOptions = {}) {
 
             if (data.conversationId === selectedConversation?.id) {
                 updateMessageStatus(data.messageId, data.status);
+            } else {
+                // Update status in cache for non-active chats too
+                patchCachedMessageStatus(data.conversationId, data.messageId, data.status);
             }
         }, [selectedConversation?.id, updateMessageStatus]),
 
@@ -202,6 +210,7 @@ export function useInbox(options: UseInboxOptions = {}) {
         messagesError,
         sending,
         messagesEndRef,
+        scrollContainerRef,
         sendMessage: handleSendMessage,
         sendAudio,
         refreshMessages,

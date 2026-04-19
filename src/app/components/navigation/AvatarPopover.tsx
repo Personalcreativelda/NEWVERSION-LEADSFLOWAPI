@@ -34,9 +34,9 @@ export default function AvatarPopover({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="relative flex items-center rounded-lg p-1.5 transition-all focus:outline-none group hover:bg-muted">
-          <Avatar className="h-8 w-8 ring-2 transition-all ring-border group-hover:ring-purple-500">
+          <Avatar className="h-8 w-8 ring-2 transition-all ring-border group-hover:ring-primary">
             <AvatarImage src={user?.avatar_url} alt={user?.name || 'User'} />
-            <AvatarFallback className="text-xs bg-gradient-to-br from-purple-500 to-blue-600 text-white font-semibold">
+            <AvatarFallback className="text-xs bg-primary text-primary-foreground font-semibold">
               {user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
             </AvatarFallback>
           </Avatar>
@@ -59,7 +59,7 @@ export default function AvatarPopover({
           onClick={onSettings} 
           className="px-3 py-2.5 rounded-lg cursor-pointer hover:bg-muted focus:bg-muted text-foreground"
         >
-          <Settings className="w-4 h-4 mr-3 text-purple-500" />
+          <Settings className="w-4 h-4 mr-3 text-primary" />
           <span className="text-sm">{t.accountSettings}</span>
         </DropdownMenuItem>
         

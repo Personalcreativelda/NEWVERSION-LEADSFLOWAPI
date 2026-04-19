@@ -81,7 +81,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
       total: limites.leads,
       percentual: percLeads,
       icon: Users,
-      iconBg: isLeadsEsgotado ? 'bg-red-500/10 border border-red-500/30 shadow-sm dark:bg-red-500/20 dark:border-red-500/30 dark:shadow-none backdrop-blur-sm' : 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
+      iconBg: isLeadsEsgotado ? 'bg-red-500/10' : 'bg-muted',
       iconColor: isLeadsEsgotado ? 'text-red-500 dark:text-red-400' : 'text-cyan-600 dark:text-cyan-300',
       colors: getCircleColor(percLeads),
       esgotado: isLeadsEsgotado,
@@ -94,7 +94,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
       total: limites.mensagens,
       percentual: percMensagens,
       icon: MessageSquare,
-      iconBg: isMensagensEsgotado ? 'bg-red-500/10 border border-red-500/30 shadow-sm dark:bg-red-500/20 dark:border-red-500/30 dark:shadow-none backdrop-blur-sm' : 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
+      iconBg: isMensagensEsgotado ? 'bg-red-500/10' : 'bg-muted',
       iconColor: isMensagensEsgotado ? 'text-red-500 dark:text-red-400' : 'text-amber-600 dark:text-amber-300',
       colors: getCircleColor(percMensagens),
       esgotado: isMensagensEsgotado,
@@ -107,7 +107,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
       total: limites.envios,
       percentual: percEnvios,
       icon: Mail,
-      iconBg: isEnviosEsgotado ? 'bg-red-500/10 border border-red-500/30 shadow-sm dark:bg-red-500/20 dark:border-red-500/30 dark:shadow-none backdrop-blur-sm' : 'bg-white/90 border border-border/40 shadow-sm dark:bg-white/10 dark:border-white/10 dark:shadow-none backdrop-blur-sm',
+      iconBg: isEnviosEsgotado ? 'bg-red-500/10' : 'bg-muted',
       iconColor: isEnviosEsgotado ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-300',
       colors: getCircleColor(percEnvios),
       esgotado: isEnviosEsgotado,
@@ -130,7 +130,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
           fill="none"
           stroke="currentColor"
           strokeWidth="8"
-          className="text-slate-200 dark:text-neutral-700"
+          className="text-muted-foreground/20"
         />
         {/* Progress circle */}
         <circle
@@ -152,13 +152,13 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
   return (
     <div id="plan-limits-card" className="space-y-4">
       {/* Header com botão de atualizar limites e botão de abrir modal de upgrade */}
-      <div id="dashboard-welcome" className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4">
-        <div className="flex flex-wrap gap-3 items-center w-full md:w-auto">
+      <div id="dashboard-welcome" className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2 items-center w-full md:w-auto">
           {onRefresh && (
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="w-full md:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-purple-500/20 dark:hover:bg-purple-500/30 text-gray-700 dark:text-purple-300 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 border border-transparent dark:border-purple-500/30"
+              className="w-full md:w-auto px-4 py-2 bg-secondary hover:bg-secondary/80 text-foreground/80 rounded-lg transition-all duration-150 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 border border-border"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               <span>{refreshing ? 'Atualizando...' : 'Atualizar Limites'}</span>
@@ -168,10 +168,10 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
 
         <button
           onClick={onUpgrade}
-          className={`w-full md:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2 ${algumLimiteEsgotado ? 'hidden' : ''}`}
+          className={`w-full md:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-all duration-150 text-sm font-medium flex items-center justify-center gap-2 shadow-sm hover:shadow-md ${algumLimiteEsgotado ? 'hidden' : ''}`}
         >
           <Crown className="w-4 h-4" />
-          Upgrade
+          <span>Fazer Upgrade</span>
         </button>
       </div>
 
@@ -191,7 +191,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
           </div>
           <button
             onClick={onUpgrade}
-            className="w-full sm:w-auto px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
+            className="w-full sm:w-auto px-6 py-2.5 bg-destructive hover:opacity-90 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
           >
             <Crown className="w-4 h-4" />
             Renovar Plano
@@ -215,7 +215,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
           </div>
           <button
             onClick={onUpgrade}
-            className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25"
+            className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
           >
             <Crown className="w-4 h-4" />
             Regularizar
@@ -241,7 +241,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
           </div>
           <button
             onClick={onUpgrade}
-            className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25"
+            className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
           >
             <Crown className="w-4 h-4" />
             Renovar Agora
@@ -267,7 +267,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
           </div>
           <button
             onClick={onUpgrade}
-            className="w-full sm:w-auto px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
+            className="w-full sm:w-auto px-6 py-2.5 bg-destructive hover:opacity-90 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
           >
             <Crown className="w-4 h-4" />
             Upgrade Agora
@@ -276,29 +276,29 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
       )}
 
       {/* Grid de Cards Horizontais com Círculos */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-5">
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
         {limitCards.map((card, index) => {
           const Icon = card.icon;
           
           return (
             <div
               key={index}
-              className={`bg-card dark:bg-card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-5 border shadow-sm transition-all duration-300 ${
+              className={`bg-card rounded-xl p-4 sm:p-5 border shadow-sm transition-all duration-200 ${
                 card.esgotado 
-                  ? 'border-red-500/60 dark:border-red-500/50 shadow-red-500/20 hover:shadow-red-500/30 ring-1 ring-red-500/20' 
-                  : 'border-border dark:border-border hover:shadow-lg hover:shadow-purple-500/10 dark:hover:border-purple-500/40'
+                  ? 'border-red-500/40 ring-1 ring-red-500/20' 
+                  : 'border-border hover:shadow-md'
               }`}
             >
               {/* Header com ícone */}
-              <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-                <div className={`w-10 h-10 sm:w-11 sm:h-11 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl ${card.iconBg} flex items-center justify-center flex-shrink-0`}>
-                  <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${card.iconColor}`} />
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${card.esgotado ? 'bg-red-500/10' : 'bg-muted'}`}>
+                  <Icon className={`w-5 h-5 ${card.iconColor}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className={`text-xs sm:text-sm font-medium truncate ${card.esgotado ? 'text-red-500 dark:text-red-400' : 'text-foreground dark:text-foreground'}`}>
+                  <h4 className={`text-sm font-medium truncate ${card.esgotado ? 'text-red-500 dark:text-red-400' : 'text-foreground'}`}>
                     {card.title}
                   </h4>
-                  <p className={`text-[10px] sm:text-xs ${card.esgotado ? 'text-red-400 dark:text-red-400 font-semibold' : 'text-muted-foreground dark:text-muted-foreground'}`}>
+                  <p className={`text-xs ${card.esgotado ? 'text-red-400 font-semibold' : 'text-muted-foreground'}`}>
                     {card.label}
                   </p>
                 </div>
@@ -308,24 +308,24 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
               <div className="flex items-center justify-between">
                 {/* Valores */}
                 <div>
-                  <div className="flex items-baseline gap-1 mb-0.5 sm:mb-1">
-                    <span className={`text-xl sm:text-2xl lg:text-3xl font-bold ${card.esgotado ? 'text-red-500 dark:text-red-400' : 'text-foreground dark:text-foreground'}`}>
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className={`text-2xl font-bold ${card.esgotado ? 'text-red-500 dark:text-red-400' : 'text-foreground'}`}>
                       {card.total === -1 ? '∞' : card.restante.toLocaleString()}
                     </span>
-                    <span className={`text-xs sm:text-sm ${card.esgotado ? 'text-red-400/70' : 'text-muted-foreground'}`}>
+                    <span className={`text-xs ${card.esgotado ? 'text-red-400/70' : 'text-muted-foreground'}`}>
                       / {card.total === -1 ? '∞' : card.total.toLocaleString()}
                     </span>
                   </div>
                   {card.esgotado ? (
                     <button
                       onClick={onUpgrade}
-                      className="mt-1 px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-[10px] sm:text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 animate-pulse"
+                      className="mt-1 px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
                     >
                       <Crown className="w-3 h-3" />
                       Fazer Upgrade
                     </button>
                   ) : (
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Restantes
                     </p>
                   )}
@@ -335,7 +335,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
                 <div className="relative flex-shrink-0">
                   <CircularProgress percentage={card.percentual} colors={card.colors} />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className={`text-sm sm:text-base lg:text-lg font-bold ${card.colors.text}`}>
+                    <span className={`text-sm font-bold ${card.colors.text}`}>
                       {Math.round(card.percentual)}%
                     </span>
                   </div>

@@ -263,7 +263,7 @@ export function GroupDetailsPanel({ conversation, onClose }: GroupDetailsPanelPr
                         key={member.jid || idx}
                         className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted transition-all"
                       >
-                        <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-gray-400 to-gray-500">
+                        <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-muted-foreground/70 to-muted-foreground">
                           {member.profile_picture ? (
                             <img src={member.profile_picture} alt="" className="w-8 h-8 rounded-full object-cover" />
                           ) : (

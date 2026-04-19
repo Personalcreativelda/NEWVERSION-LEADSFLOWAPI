@@ -695,7 +695,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   };
 
   const integrationInputClass =
-    "mt-1.5 h-11 text-sm rounded-lg border border-gray-200 dark:border-gray-800 !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 dark:shadow-none shadow-sm focus-visible:border-primary focus-visible:ring-primary/15";
+    "mt-1.5 h-11 text-sm rounded-lg border border-border !bg-card !text-foreground dark:shadow-none shadow-sm focus-visible:border-primary focus-visible:ring-primary/15";
   const integrationIconClass =
     "w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted border border-border";
   const infoBlockClass =
@@ -703,7 +703,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   const currentUrlBannerClass =
     "px-3 py-2 rounded-md border border-border bg-muted text-xs text-muted-foreground break-all font-mono";
   const n8nInputClass =
-    "mt-1.5 h-11 text-sm rounded-lg border border-gray-200 dark:border-gray-800 dark:shadow-none shadow-sm !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 placeholder:text-gray-500 focus-visible:border-cyan-500 focus-visible:ring-cyan-500/15 dark:placeholder:text-gray-400";
+    "mt-1.5 h-11 text-sm rounded-lg border border-border dark:shadow-none shadow-sm !bg-card !text-foreground placeholder:text-muted-foreground focus-visible:border-cyan-500 focus-visible:ring-cyan-500/15";
 
   const integrations = [
     {
@@ -793,21 +793,21 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-300">
+                    <p className="text-sm text-muted-foreground">
                       {integration.description}
                     </p>
                   </div>
                 </div>
                 {isExpanded ? (
-                  <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  <ChevronUp className="w-5 h-5 text-muted-foreground/70 flex-shrink-0" />
                 ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  <ChevronDown className="w-5 h-5 text-muted-foreground/70 flex-shrink-0" />
                 )}
               </button>
 
               {/* Expanded Content */}
               {isExpanded && (
-                <div className="px-6 pb-6 border-t border-gray-200 dark:border-gray-800 pt-6 relative">
+                <div className="px-6 pb-6 border-t border-border pt-6 relative">
 
                   {/* Webhook Content */}
                   {integration.id === 'webhook' && (
@@ -853,7 +853,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             placeholder="smtp.gmail.com"
                             className="mt-1.5"
                           />
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Ex: smtp.gmail.com, smtp.hostinger.com
                           </p>
                         </div>
@@ -869,7 +869,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             placeholder="587"
                             className="mt-1.5"
                           />
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Comum: 587 (TLS), 465 (SSL), 25 (Padrão)
                           </p>
                         </div>
@@ -885,7 +885,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             placeholder="seu@email.com"
                             className="mt-1.5"
                           />
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Email usado para autenticação SMTP
                           </p>
                         </div>
@@ -901,7 +901,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             placeholder="••••••••"
                             className="mt-1.5"
                           />
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Senha do email ou senha de aplicativo
                           </p>
                         </div>
@@ -917,7 +917,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             placeholder="contato@seudominio.com"
                             className="mt-1.5"
                           />
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Este email aparecerá como o remetente das campanhas
                           </p>
                         </div>
@@ -933,13 +933,13 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             placeholder="Sua Empresa"
                             className="mt-1.5"
                           />
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Nome que aparecerá na caixa de entrada do cliente
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center justify-between">
-                        <div className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
+                        <div className="text-xs text-muted-foreground">
                           {smtpHost && smtpPort && smtpUser && smtpPassword ? (
                             <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3" />
@@ -956,10 +956,10 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         <Button
                           onClick={handleSaveSmtp}
                           disabled={smtpSaveState !== 'idle'}
-                          className={`${smtpSaveState === 'saved'
+                          className={`text-primary-foreground transition-all duration-300 ${smtpSaveState === 'saved'
                             ? 'bg-green-600 hover:bg-green-700'
-                            : 'bg-purple-600 hover:bg-purple-700'
-                            } text-white transition-all duration-300`}
+                            : 'bg-primary hover:opacity-90'
+                            }`}
                         >
                           {smtpSaveState === 'loading' && (
                             <>
@@ -987,10 +987,10 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           <BarChart3 className="w-4 h-4 text-primary" />
                           📊 Rastreie Conversões no Meta Ads
                         </h4>
-                        <p className="text-xs text-muted-foreground dark:text-gray-300">
+                        <p className="text-xs text-muted-foreground">
                           Configure o Meta Pixel (Facebook Pixel) para rastrear eventos de conversão quando um lead for marcado como "Convertido" na sua CRM.
                         </p>
-                        <p className="text-xs text-muted-foreground dark:text-gray-300">
+                        <p className="text-xs text-muted-foreground">
                           Evento disparado automaticamente:
                           <code className="ml-2 bg-card px-1.5 py-0.5 rounded text-xs font-semibold text-foreground">Lead</code>
                         </p>
@@ -1003,7 +1003,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             Pixel padrão do dashboard
                           </h4>
                           <div className={currentUrlBannerClass}>{dashboardPixelEnv}</div>
-                          <p className="text-xs text-muted-foreground dark:text-gray-300">
+                          <p className="text-xs text-muted-foreground">
                             Definido via variável de ambiente. Atualize aqui apenas o pixel específico do usuário.
                           </p>
                         </div>
@@ -1022,7 +1022,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           placeholder="123456789012345"
                           className={`${integrationInputClass} font-mono`}
                         />
-                        <p className="text-xs text-muted-foreground dark:text-gray-300">
+                        <p className="text-xs text-muted-foreground">
                           Encontre seu Pixel ID no Gerenciador de Eventos do Meta Business Suite
                         </p>
                       </div>
@@ -1031,7 +1031,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         <h4 className="text-sm font-semibold text-foreground">
                           ℹ️ Como funciona
                         </h4>
-                        <ul className="text-xs text-muted-foreground dark:text-gray-300 space-y-1.5">
+                        <ul className="text-xs text-muted-foreground space-y-1.5">
                           <li>• Quando você marcar um lead como "Convertido", o pixel dispara automaticamente</li>
                           <li>• O evento "Lead" é enviado para o Meta com os dados do lead</li>
                           <li>• Você pode ver as conversões no Gerenciador de Anúncios</li>
@@ -1058,10 +1058,10 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           <Eye className="w-4 h-4 text-primary" />
                           📈 Rastreie Conversões no Google Analytics
                         </h4>
-                        <p className="text-xs text-muted-foreground dark:text-gray-300">
+                        <p className="text-xs text-muted-foreground">
                           Configure o Google Analytics 4 (GA4) para rastrear eventos de conversão quando um lead for marcado como "Convertido" na sua CRM.
                         </p>
-                        <p className="text-xs text-muted-foreground dark:text-gray-300">
+                        <p className="text-xs text-muted-foreground">
                           Evento disparado automaticamente:
                           <code className="ml-2 bg-card px-1.5 py-0.5 rounded text-xs font-semibold text-foreground">generate_lead</code>
                         </p>
@@ -1080,7 +1080,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           placeholder="G-XXXXXXXXXX"
                           className={`${integrationInputClass} font-mono`}
                         />
-                        <p className="text-xs text-muted-foreground dark:text-gray-300">
+                        <p className="text-xs text-muted-foreground">
                           Encontre seu Measurement ID no Google Analytics (Admin → Data Streams)
                         </p>
                       </div>
@@ -1089,7 +1089,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         <h4 className="text-sm font-semibold text-foreground">
                           ℹ️ Como funciona
                         </h4>
-                        <ul className="text-xs text-muted-foreground dark:text-gray-300 space-y-1.5">
+                        <ul className="text-xs text-muted-foreground space-y-1.5">
                           <li>• Quando você marcar um lead como "Convertido", o evento é disparado automaticamente</li>
                           <li>• O evento "generate_lead" é enviado para o GA4 com os dados do lead</li>
                           <li>• Você pode ver as conversões em Relatórios → Eventos no GA4</li>
@@ -1118,7 +1118,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           Configure as URLs dos webhooks do N8N para integração com sua planilha Google Sheets.
                         </h4>
                         <p className="text-xs text-cyan-800 dark:text-cyan-200">
-                          As URLs devem ter o formato: <code className="bg-white dark:bg-gray-950 px-1.5 py-0.5 rounded text-cyan-900 dark:text-cyan-100">https://seu-n8n.com/webhook/nome</code>
+                          As URLs devem ter o formato: <code className="bg-card px-1.5 py-0.5 rounded text-cyan-900 dark:text-cyan-100">https://seu-n8n.com/webhook/nome</code>
                         </p>
                       </div>
 
@@ -1153,7 +1153,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           placeholder="https://seu-n8n.com/webhook/listar-leads"
                           className={n8nInputClass}
                         />
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        <p className="text-xs text-muted-foreground mt-2">
                           Endpoint para cadastrar leads em tempo real a partir de planilhas externas (Google Sheets, Excel, etc.) via N8N
                         </p>
                       </div>
@@ -1188,7 +1188,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           placeholder="https://seu-n8n.com/webhook/importar-whatsapp"
                           className={n8nInputClass}
                         />
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        <p className="text-xs text-muted-foreground mt-2">
                           Endpoint POST para importar contatos do WhatsApp. Envia: {`{ "instancia": "leadflow_userId", "userId": "id", "action": "listar-contatos" }`}
                         </p>
                       </div>
@@ -1199,7 +1199,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             handleSaveN8nWebhook();
                             handleSaveN8nWhatsAppImportUrl();
                           }}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white"
                         >
                           <Save className="w-4 h-4 mr-2" />
                           Salvar Todos

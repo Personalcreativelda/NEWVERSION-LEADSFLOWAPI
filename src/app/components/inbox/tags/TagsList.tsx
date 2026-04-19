@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { conversationTagsApi } from '../../../services/api/inbox';
-import { useConfirm } from '../../ui/ConfirmDialog';
 import { Plus, Trash2, Edit2, GripVertical, Loader } from 'lucide-react';
 import TagCreateModal from './TagCreateModal';
 import TagEditModal from './TagEditModal';
@@ -66,12 +65,7 @@ export default function TagsList() {
     };
 
     const handleDeleteTag = async (tagId: string) => {
-        const confirmed = await confirm('Tem certeza que deseja deletar esta etiqueta? As conversas não serão afetadas.', {
-            title: 'Excluir etiqueta',
-            confirmLabel: 'Excluir',
-            variant: 'danger',
-        });
-        if (!confirmed) {
+        if (!window.confirm('Tem certeza que deseja deletar esta etiqueta? As conversas não serão afetadas.')) {
             return;
         }
         try {
@@ -126,7 +120,7 @@ export default function TagsList() {
     };
 
     const getTagColor = (color?: string): string => {
-        if (!color) return 'bg-gray-500';
+        if (!color) return 'bg-muted-foreground';
         
         // Se for hex color
         if (color.startsWith('#')) {
@@ -138,7 +132,7 @@ export default function TagsList() {
             return color;
         }
         
-        return 'bg-gray-500';
+        return 'bg-muted-foreground';
     };
 
     if (loading) {

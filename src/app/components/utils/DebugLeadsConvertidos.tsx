@@ -74,19 +74,19 @@ export function DebugLeadsConvertidos() {
           {/* Estatísticas */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white p-3 rounded border border-blue-200">
-              <div className="text-xs text-gray-600 dark:text-gray-400">Total de Leads</div>
-              <div className="text-2xl font-bold text-gray-800">{data.total}</div>
+              <div className="text-xs text-muted-foreground">Total de Leads</div>
+              <div className="text-2xl font-bold text-foreground">{data.total}</div>
             </div>
             <div className="bg-white p-3 rounded border border-blue-200">
-              <div className="text-xs text-gray-600 dark:text-gray-400">Convertidos</div>
+              <div className="text-xs text-muted-foreground">Convertidos</div>
               <div className="text-2xl font-bold text-green-600">{data.convertidos}</div>
             </div>
             <div className="bg-white p-3 rounded border border-blue-200">
-              <div className="text-xs text-gray-600 dark:text-gray-400">Com convertedAt</div>
+              <div className="text-xs text-muted-foreground">Com convertedAt</div>
               <div className="text-2xl font-bold text-blue-600">{data.comConvertedAt}</div>
             </div>
             <div className="bg-white p-3 rounded border border-blue-200">
-              <div className="text-xs text-gray-600 dark:text-gray-400">Sem convertedAt</div>
+              <div className="text-xs text-muted-foreground">Sem convertedAt</div>
               <div className="text-2xl font-bold text-red-600">{data.semConvertedAt}</div>
             </div>
           </div>
@@ -120,7 +120,7 @@ export function DebugLeadsConvertidos() {
           {/* Detalhes dos primeiros leads */}
           {data.details && data.details.length > 0 && (
             <div className="bg-white p-3 rounded border border-blue-200">
-              <h4 className="font-semibold text-sm mb-2 text-gray-700">
+              <h4 className="font-semibold text-sm mb-2 text-foreground/80">
                 Amostra (Primeiros 10 Leads Convertidos):
               </h4>
               <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -136,7 +136,7 @@ export function DebugLeadsConvertidos() {
                     <div className="font-semibold">
                       #{idx + 1}: {lead.nome}
                     </div>
-                    <div className="grid grid-cols-2 gap-1 mt-1 text-gray-700 dark:text-gray-300">
+                    <div className="grid grid-cols-2 gap-1 mt-1 text-foreground/80">
                       <div>Status: {lead.status}</div>
                       <div>ID: {lead.id.substring(0, 8)}...</div>
                       <div className={lead.hasCreatedAt ? 'text-green-600' : 'text-red-600'}>
@@ -147,7 +147,7 @@ export function DebugLeadsConvertidos() {
                       </div>
                     </div>
                     {lead.convertedAt && (
-                      <div className="text-gray-600 dark:text-gray-400 mt-1">
+                      <div className="text-muted-foreground mt-1">
                         Convertido em: {new Date(lead.convertedAt).toLocaleString('pt-BR')}
                       </div>
                     )}

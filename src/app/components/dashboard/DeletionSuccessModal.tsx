@@ -22,7 +22,7 @@ export default function DeletionSuccessModal({
   const isSuccess = errorCount === 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-card rounded-2xl shadow-lg max-w-md w-full p-8 animate-scale-in">
         {/* Ícone */}
         <div className="flex justify-center mb-6">
@@ -38,21 +38,21 @@ export default function DeletionSuccessModal({
         </div>
 
         {/* Título */}
-        <h2 className="text-center text-gray-900 dark:text-white mb-4">
+        <h2 className="text-center text-foreground mb-4">
           {isSuccess ? 'Deleção Concluída!' : 'Deleção Parcial'}
         </h2>
 
         {/* Mensagem */}
         <div className="text-center mb-6">
           {isSuccess ? (
-            <p className="text-gray-600 dark:text-gray-500 dark:text-gray-400">
+            <p className="text-muted-foreground">
               <span className="text-green-600 dark:text-green-400">
                 {deletedCount} lead(s)
               </span>{' '}
               foram deletados permanentemente do servidor.
             </p>
           ) : (
-            <p className="text-gray-600 dark:text-gray-500 dark:text-gray-400">
+            <p className="text-muted-foreground">
               <span className="text-green-600 dark:text-green-400">
                 {deletedCount} lead(s)
               </span>{' '}
@@ -68,17 +68,17 @@ export default function DeletionSuccessModal({
         {/* Estatísticas */}
         <div className="bg-muted rounded-xl p-4 mb-6 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600 dark:text-gray-500 dark:text-gray-400">Total antes:</span>
-            <span className="text-gray-900 dark:text-white">{totalBefore} leads</span>
+            <span className="text-muted-foreground">Total antes:</span>
+            <span className="text-foreground">{totalBefore} leads</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600 dark:text-gray-500 dark:text-gray-400">Deletados:</span>
+            <span className="text-muted-foreground">Deletados:</span>
             <span className="text-red-600 dark:text-red-400">-{deletedCount} leads</span>
           </div>
-          <div className="h-px bg-gray-200 dark:bg-gray-600"></div>
+          <div className="h-px bg-border"></div>
           <div className="flex justify-between">
-            <span className="text-gray-900 dark:text-white">Total agora:</span>
-            <span className="text-gray-900 dark:text-white">{totalAfter} leads</span>
+            <span className="text-foreground">Total agora:</span>
+            <span className="text-foreground">{totalAfter} leads</span>
           </div>
         </div>
 

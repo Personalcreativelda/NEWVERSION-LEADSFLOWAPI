@@ -45,7 +45,7 @@ const EMAIL_PROVIDERS = [
         id: 'custom',
         name: 'Outro Provedor (SMTP)',
         icon: '⚙️',
-        color: 'from-gray-500 to-gray-700',
+        color: 'from-muted-foreground to-muted-foreground',
         smtp: { host: '', port: '587', secure: false },
         imap: { host: '', port: '993', secure: true },
         note: 'Configure manualmente os dados do seu servidor SMTP/IMAP.'
@@ -222,7 +222,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
                     >
                         <span className="text-xl">×</span>
                     </button>
@@ -349,7 +349,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                     <button
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted/50"
                                     >
                                         {showPassword ? <EyeOff className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} /> : <Eye className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />}
                                     </button>
@@ -397,7 +397,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                         type="checkbox"
                                         checked={formData.smtp_secure}
                                         onChange={(e) => setFormData(prev => ({ ...prev, smtp_secure: e.target.checked }))}
-                                        className="rounded border-gray-300"
+                                        className="rounded border-border"
                                     />
                                     <span className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>SSL/TLS</span>
                                 </label>
@@ -444,7 +444,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                         type="checkbox"
                                         checked={formData.imap_secure}
                                         onChange={(e) => setFormData(prev => ({ ...prev, imap_secure: e.target.checked }))}
-                                        className="rounded border-gray-300"
+                                        className="rounded border-border"
                                     />
                                     <span className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>SSL/TLS</span>
                                 </label>
@@ -461,7 +461,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                 {!isEditing && (
                                     <button
                                         onClick={() => { setStep('provider'); setError(null); }}
-                                        className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                        className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                         style={{ borderColor: 'hsl(var(--border))' }}
                                     >
                                         Voltar
@@ -470,7 +470,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                 <button
                                     onClick={handleSubmit}
                                     disabled={loading || !formData.name.trim() || !formData.email.trim() || !formData.password.trim() || !formData.smtp_host.trim()}
-                                    className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <>

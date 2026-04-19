@@ -49,8 +49,8 @@ export default function InboxPage({
     };
 
     return (
-        <div className="h-full w-full flex flex-col overflow-hidden" style={{ maxWidth: 'none' }}>
-            <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="h-full w-full min-w-0 flex flex-col overflow-hidden" style={{ maxWidth: 'none' }}>
+            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
                 {renderContent()}
             </div>
         </div>

@@ -265,7 +265,7 @@ export function ChatWidget({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-full shadow-lg transition-all hover:scale-110"
+        className="fixed bottom-6 right-6 z-50 bg-primary hover:brightness-110 text-primary-foreground p-4 rounded-full shadow-lg transition-all hover:scale-110"
         aria-label="Abrir chat"
       >
         <MessageCircle className="h-6 w-6" />
@@ -278,7 +278,7 @@ export function ChatWidget({
 
   return (
     <div
-      className={`fixed z-50 bg-white dark:bg-gray-900 shadow-lg flex flex-col ${
+      className={`fixed z-50 bg-card shadow-lg flex flex-col ${
         isMobile
           ? 'inset-0'
           : isExpanded
@@ -287,17 +287,17 @@ export function ChatWidget({
       }`}
     >
       {/* Header */}
-      <div className="bg-slate-800 dark:bg-slate-900 text-white px-4 py-3 rounded-t-2xl flex items-center justify-between border-b border-slate-700">
+      <div className="bg-card text-white px-4 py-3 rounded-t-2xl flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="bg-purple-600 p-2 rounded-full">
+            <div className="bg-primary p-2 rounded-full">
               <MessageCircle className="h-5 w-5" />
             </div>
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-slate-800 rounded-full"></span>
+            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full"></span>
           </div>
           <div>
             <h3 className="font-semibold text-sm">Assistente LeadsFlow</h3>
-            <p className="text-xs text-slate-400">● Online • Resposta em ~30s</p>
+            <p className="text-xs text-muted-foreground/70">● Online • Resposta em ~30s</p>
           </div>
         </div>
 
@@ -305,7 +305,7 @@ export function ChatWidget({
           {!isMobile && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1.5 hover:bg-slate-700 rounded transition-colors"
+              className="p-1.5 hover:bg-muted rounded transition-colors"
               aria-label={isExpanded ? 'Minimizar' : 'Expandir'}
             >
               {isExpanded ? (
@@ -318,7 +318,7 @@ export function ChatWidget({
           
           <button
             onClick={handleClearChat}
-            className="p-1.5 hover:bg-slate-700 rounded transition-colors"
+            className="p-1.5 hover:bg-muted rounded transition-colors"
             aria-label="Limpar conversa"
             title="Limpar conversa"
           >
@@ -327,7 +327,7 @@ export function ChatWidget({
 
           <button
             onClick={() => setIsOpen(false)}
-            className="p-1.5 hover:bg-slate-700 rounded transition-colors"
+            className="p-1.5 hover:bg-muted rounded transition-colors"
             aria-label="Fechar chat"
           >
             <X className="h-4 w-4" />
@@ -338,7 +338,7 @@ export function ChatWidget({
       {/* Messages Area */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-gray-50 dark:bg-gray-800"
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-muted/50"
       >
         {messages.map((message) => (
           <ChatMessage

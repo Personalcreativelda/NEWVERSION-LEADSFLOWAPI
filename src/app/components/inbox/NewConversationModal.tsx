@@ -101,7 +101,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
             {/* Overlay */}
             <div 
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                className="absolute inset-0 bg-black/60"
                 onClick={onClose}
             />
 
@@ -126,7 +126,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                     </h2>
                     <button
                         onClick={onClose}
-                        className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="p-1 rounded-lg hover:bg-muted/50 transition-colors"
                         disabled={loading}
                     >
                         <X className="w-5 h-5" style={{ color: 'hsl(var(--muted-foreground))' }} />
@@ -240,7 +240,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                 type="button"
                                 onClick={onClose}
                                 disabled={loading}
-                                className="flex-1 px-4 py-2.5 rounded-lg border font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                                className="flex-1 px-4 py-2.5 rounded-lg border font-medium transition-colors hover:bg-muted/50"
                                 style={{
                                     borderColor: 'hsl(var(--border))',
                                     color: 'hsl(var(--foreground))'
@@ -306,7 +306,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                     <button
                                         key={lead.id}
                                         onClick={() => handleSelectLead(lead)}
-                                        className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-b"
+                                        className="w-full p-4 flex items-center gap-3 hover:bg-muted/50/50 transition-colors border-b"
                                         style={{ borderColor: 'hsl(var(--border))' }}
                                     >
                                         {lead.avatar_url ? (
