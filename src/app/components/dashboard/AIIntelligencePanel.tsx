@@ -60,7 +60,7 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
       <div className="bg-card border border-border rounded-2xl p-5 h-full flex flex-col">
         <div className="flex items-center gap-2 mb-4">
           <Brain className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">IA Insights</span>
+          <span className="text-sm font-semibold text-foreground">Motor de Vendas</span>
         </div>
         <div className="space-y-2">
           {[1, 2, 3].map(i => (
@@ -81,7 +81,7 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
           <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
             <Brain className="w-3.5 h-3.5 text-primary" />
           </div>
-          <span className="text-sm font-semibold text-foreground">IA Insights</span>
+          <span className="text-sm font-semibold text-foreground">Motor de Vendas</span>
           {(stats.hot_count ?? 0) > 0 && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[10px] font-semibold">
               <Flame className="w-2.5 h-2.5" />
@@ -103,7 +103,7 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
         <div className="flex flex-col items-center justify-center flex-1 text-center py-6">
           <Brain className="w-8 h-8 text-muted-foreground/40 mb-2" />
           <p className="text-xs text-muted-foreground">Nenhum dado de IA ainda.</p>
-          <p className="text-[11px] text-muted-foreground/70 mt-0.5">Abra Remarketing → IA Insights para analisar.</p>
+          <p className="text-[11px] text-muted-foreground/70 mt-0.5">Abra Remarketing → Motor de Vendas para analisar.</p>
         </div>
       ) : (
         <div className="space-y-4">

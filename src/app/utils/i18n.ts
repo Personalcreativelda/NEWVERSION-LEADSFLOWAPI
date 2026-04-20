@@ -19,6 +19,7 @@ export interface Translations {
   campaigns: string;
   marketing: string;
   remarketing: string;
+  aiInsights: string;
   plan: string;
   integrations: string;
   security: string;
@@ -104,6 +105,7 @@ export const translations: Record<Language, Translations> = {
     campaigns: 'Campanhas',
     marketing: 'Marketing',
     remarketing: 'Remarketing',
+    aiInsights: 'Motor de Vendas',
     assistants: 'Assistentes IA',
     plan: 'Plano',
     integrations: 'Integrações',
@@ -189,6 +191,7 @@ export const translations: Record<Language, Translations> = {
     campaigns: 'Campaigns',
     marketing: 'Marketing',
     remarketing: 'Remarketing',
+    aiInsights: 'Sales Engine',
     plan: 'Plan',
     integrations: 'Integrations',
     security: 'Security',
@@ -273,6 +276,7 @@ export const translations: Record<Language, Translations> = {
     campaigns: 'Campañas',
     marketing: 'Marketing',
     remarketing: 'Remarketing',
+    aiInsights: 'Motor de Ventas',
     plan: 'Plan',
     integrations: 'Integraciones',
     security: 'Seguridad',
@@ -356,6 +360,7 @@ export const translations: Record<Language, Translations> = {
     campaigns: 'Campagnes',
     marketing: 'Marketing',
     remarketing: 'Remarketing',
+    aiInsights: 'Moteur de Ventes',
     plan: 'Plan',
     integrations: 'Intégrations',
     security: 'Sécurité',

@@ -32,6 +32,7 @@ import AccountSettingsPage from './settings/AccountSettingsPage';
 import AdminPage from './settings/AdminPage';
 import CampaignsPage from './pages/CampaignsPage';
 import RemarketingPage from './pages/RemarketingPage';
+import AIInsightsPage from './pages/AIInsightsPage';
 import InboxPage from './pages/InboxPage';
 
 // Modal imports
@@ -2168,7 +2169,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   onFilterChange={handleAplicarFiltros}
                 />
 
-                {/* Seção de Leads Recentes + IA Insights */}
+                {/* Seção de Leads Recentes + Motor de Vendas */}
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
                   <div className="xl:col-span-2 flex flex-col">
                     <RecentLeadsSection
@@ -2181,7 +2182,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   </div>
                   <div className="xl:col-span-1 flex flex-col">
                     <AIIntelligencePanel
-                      onNavigateToRemarketing={() => setCurrentPage('remarketing')}
+                      onNavigateToRemarketing={() => setCurrentPage('ai-insights')}
                     />
                   </div>
                 </div>
@@ -2307,6 +2308,10 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
             {currentPage === 'remarketing' && (
               <RemarketingPage />
+            )}
+
+            {currentPage === 'ai-insights' && (
+              <AIInsightsPage />
             )}
 
             {(currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'voice-agents' || currentPage === 'automations') && (

@@ -22,6 +22,7 @@ const pathToPageId: Record<string, string> = {
   '/dashboard/tasks': 'tasks',
   '/dashboard/campaigns': 'campaigns',
   '/dashboard/remarketing': 'remarketing',
+  '/dashboard/ai-insights': 'ai-insights',
   '/dashboard/plan': 'plan',
   '/dashboard/integrations': 'integrations',
   '/dashboard/security': 'security',

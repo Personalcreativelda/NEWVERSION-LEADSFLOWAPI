@@ -9,6 +9,7 @@ import { WhatsAppService } from '../services/whatsapp.service';
 import { ChannelsService } from '../services/channels.service';
 import { leadTrackingService } from '../services/lead-tracking.service';
 import { activityService } from '../services/activity.service';
+import { flowExecutionService } from '../services/flow-execution.service';
 import { query as dbQuery } from '../database/connection';
 
 const router = Router();
@@ -138,6 +139,7 @@ router.put('/funnel-stage/rename', async (req, res, next) => {
 /**
  * PUT /api/leads/funnel-stage/add-leads
  * Add specific leads to a funnel stage (set their status)
+ * This also triggers any active remarketing flows for this stage
  */
 router.put('/funnel-stage/add-leads', async (req, res, next) => {
   try {
@@ -155,6 +157,16 @@ router.put('/funnel-stage/add-leads', async (req, res, next) => {
     );
 
     console.log(`[LeadsAPI] ✅ ${result.rowCount} leads added to funnel stage "${status}"`);
+
+    // Trigger remarketing flows for each lead (fire and forget)
+    if (result.rowCount && result.rowCount > 0) {
+      for (const leadId of leadIds) {
+        flowExecutionService.triggerFlowsForLead(user.id, leadId, 'funnel_stage', status).catch(err => {
+          console.error(`[LeadsAPI] Error triggering flows for lead ${leadId}:`, err);
+        });
+      }
+    }
+
     res.json({ success: true, updated: result.rowCount });
   } catch (error) {
     next(error);

@@ -150,6 +150,8 @@ class ApiClient {
     leadScore: (leadId: string) => this.request<any>(`/api/ai-remarketing/lead/${leadId}/score`),
     generateMessage: (data: { leadId: string; tone?: string; goal?: string; channel?: string }) =>
       this.request<any>('/api/ai-remarketing/generate-message', { method: 'POST', body: JSON.stringify(data) }),
+    sendMessage: (data: { leadId: string; content: string; channel?: string }) =>
+      this.request<any>('/api/ai-remarketing/send-message', { method: 'POST', body: JSON.stringify(data) }),
   };
 
   messages = {

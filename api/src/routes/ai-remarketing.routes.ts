@@ -486,4 +486,86 @@ function generateRuleBasedMessages(lead: any, tone: string, goal: string, channe
   ];
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/ai-remarketing/send-message
+// Send an AI-generated message to a lead via the specified channel
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/send-message', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const { leadId, content, channel = 'whatsapp' } = req.body;
+
+    if (!leadId || !content) {
+      return res.status(400).json({ error: 'leadId and content are required' });
+    }
+
+    // Fetch lead to verify ownership and get contact details
+    const leadResult = await query(
+      'SELECT id, name, email, phone, whatsapp FROM leads WHERE id = $1 AND user_id = $2',
+      [leadId, userId],
+    );
+
+    if (!leadResult.rows[0]) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    const lead = leadResult.rows[0];
+
+    // Determine the contact method based on channel
+    let contactTarget = '';
+    if (channel === 'whatsapp' && lead.whatsapp) {
+      contactTarget = lead.whatsapp;
+    } else if (channel === 'sms' && lead.phone) {
+      contactTarget = lead.phone;
+    } else if (channel === 'email' && lead.email) {
+      contactTarget = lead.email;
+    } else {
+      return res.status(400).json({ 
+        error: `Lead does not have a valid ${channel} contact method` 
+      });
+    }
+
+    // Ensure messages_sent table exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS messages_sent (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        channel VARCHAR(20) NOT NULL,
+        contact_target VARCHAR(255),
+        content TEXT NOT NULL,
+        status VARCHAR(20) DEFAULT 'sent',
+        sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
+    // Save message record
+    const messageResult = await query(
+      `INSERT INTO messages_sent 
+        (lead_id, user_id, channel, contact_target, content, status, sent_at)
+       VALUES ($1, $2, $3, $4, $5, 'sent', NOW())
+       RETURNING id, created_at`,
+      [leadId, userId, channel, contactTarget, content],
+    );
+
+    const messageId = messageResult.rows[0]?.id;
+
+    // Update lead's last_contact_at timestamp
+    await query(
+      'UPDATE leads SET last_contact_at = NOW() WHERE id = $1',
+      [leadId],
+    );
+
+    res.json({
+      success: true,
+      messageId,
+      message: `Message sent to ${lead.name} via ${channel}`,
+      sentAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
