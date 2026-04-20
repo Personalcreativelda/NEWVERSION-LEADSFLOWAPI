@@ -46,6 +46,9 @@ interface DbUser {
   subscription_expires_at?: string;
   plan_expires_at?: string;
   plan_activated_at?: string;
+  two_factor_enabled?: boolean;
+  two_factor_secret?: string;
+  two_factor_backup_codes?: string[];
 }
 
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
