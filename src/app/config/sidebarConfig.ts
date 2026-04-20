@@ -30,6 +30,7 @@ export const sidebarConfig: SidebarItemConfig[] = [
     // Vendas
     { id: 'funnel', labelKey: 'salesFunnel', icon: Workflow, path: '/dashboard/funnel', sectionLabel: 'Vendas' },
     { id: 'campaigns', labelKey: 'campaigns', icon: Megaphone, path: '/dashboard/campaigns' },
+    { id: 'remarketing', labelKey: 'remarketing', icon: Megaphone, path: '/dashboard/remarketing' },
     { id: 'analytics', labelKey: 'analytics', icon: BarChart3, path: '/dashboard/analytics' },
     { id: 'tasks', labelKey: 'tasksFollowup', icon: CheckSquare, path: '/dashboard/tasks' },
     // Automação
