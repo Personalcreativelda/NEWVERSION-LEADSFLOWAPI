@@ -144,6 +144,14 @@ class ApiClient {
       this.request<void>(`/api/remarketing/${id}`, { method: 'DELETE' }),
   };
 
+  aiRemarketing = {
+    insights: () => this.request<any>('/api/ai-remarketing/insights'),
+    analyze: () => this.request<any>('/api/ai-remarketing/analyze', { method: 'POST' }),
+    leadScore: (leadId: string) => this.request<any>(`/api/ai-remarketing/lead/${leadId}/score`),
+    generateMessage: (data: { leadId: string; tone?: string; goal?: string; channel?: string }) =>
+      this.request<any>('/api/ai-remarketing/generate-message', { method: 'POST', body: JSON.stringify(data) }),
+  };
+
   messages = {
     list: (params?: Record<string, string | number | boolean | null | undefined>) =>
       this.request(`/api/messages${this.buildQuery(params)}`),

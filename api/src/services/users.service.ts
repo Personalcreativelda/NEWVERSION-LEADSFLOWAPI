@@ -71,6 +71,7 @@ interface DbUserRow {
   plan_expires_at?: string | null;
   plan_activated_at?: string | null;
   plan_limits?: Record<string, number> | null;
+  db_plan_limits?: Record<string, number> | null;
 }
 
 interface UsageCounts {
@@ -171,9 +172,12 @@ const buildProfileResponse = (user: DbUserRow, usage?: UsageCounts) => {
     plan_activated_at: user.plan_activated_at || null,
     planActivatedAt: user.plan_activated_at || null,
     isTrial: false,
-    // Prefer plan_limits stored on user row (set during subscription/sync), fall back to hardcoded map
+    // Priority: user.plan_limits (set at subscription) > plans table limits > hardcoded fallback
     limits: (() => {
-      const fallback = getPlanLimits(plan);
+      const hardcoded = getPlanLimits(plan);
+      const fromPlansTable = (user.db_plan_limits && typeof user.db_plan_limits === 'object' && Object.keys(user.db_plan_limits).length > 0)
+        ? user.db_plan_limits : null;
+      const fallback = fromPlansTable || hardcoded;
       const db = (user.plan_limits && typeof user.plan_limits === 'object' && Object.keys(user.plan_limits).length > 0)
         ? user.plan_limits : null;
       return {
@@ -194,7 +198,12 @@ const buildProfileResponse = (user: DbUserRow, usage?: UsageCounts) => {
 
 export const getUserProfile = async (userId: string) => {
   const result = await query(
-    'SELECT id, email, name, avatar_url, plan, subscription_plan, subscription_status, plan_expires_at, plan_activated_at, plan_limits FROM users WHERE id = $1',
+    `SELECT u.id, u.email, u.name, u.avatar_url, u.plan, u.subscription_plan, u.subscription_status,
+            u.plan_expires_at, u.plan_activated_at, u.plan_limits,
+            p.limits AS db_plan_limits
+     FROM users u
+     LEFT JOIN plans p ON p.id = LOWER(COALESCE(u.plan, 'free')) AND p.is_active = true
+     WHERE u.id = $1`,
     [userId]
   );
 

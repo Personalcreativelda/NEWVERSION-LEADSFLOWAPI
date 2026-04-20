@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search, MoreVertical } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, MoreVertical, Crown, UserCheck, UserX, Trash2, Eye } from 'lucide-react';
 import { Input } from '../../ui/input';
 import { Button } from '../../ui/button';
 
@@ -50,6 +50,24 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
   onViewDetails,
   plansPricing = [],
 }) => {
+  const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuUserId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const getDaysRemaining = (expiresAt?: string, plan?: string): number | null => {
+    if (!expiresAt || plan === 'free') return null;
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  };
   const getPlanBadge = (plan: string) => {
     const planData = plansPricing.find(p => p.id === plan);
     const planLabel = planData?.name || plan.charAt(0).toUpperCase() + plan.slice(1);
@@ -169,19 +187,22 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   Receita Mensal
                 </th>
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Expira em
+                </th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Ações
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-card">{loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
                     Carregando usuários...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
                     Nenhum usuário encontrado
                   </td>
                 </tr>
@@ -228,13 +249,59 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                       {calculateMonthlyRevenue(user)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {(() => {
+                        const days = getDaysRemaining(user.planExpiresAt, user.plan);
+                        if (days === null) return <span className="text-muted-foreground">—</span>;
+                        if (days < 0) return <span className="text-red-500 font-medium">Expirado</span>;
+                        if (days <= 7) return <span className="text-amber-500 font-medium">{days}d</span>;
+                        return <span className="text-foreground">{days}d</span>;
+                      })()}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => onViewDetails?.(user.id)}
-                        className="p-2 hover:bg-muted rounded-lg transition-colors"
-                      >
-                        <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                      </button>
+                      <div className="relative" ref={openMenuUserId === user.id ? menuRef : undefined}>
+                        <button
+                          onClick={() => setOpenMenuUserId(openMenuUserId === user.id ? null : user.id)}
+                          className="p-2 hover:bg-muted rounded-lg transition-colors"
+                        >
+                          <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                        {openMenuUserId === user.id && (
+                          <div className="absolute right-0 mt-1 w-48 bg-card border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+                            <button
+                              onClick={() => { onViewDetails?.(user.id); setOpenMenuUserId(null); }}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+                            >
+                              <Eye className="w-4 h-4 text-muted-foreground" />
+                              Ver Detalhes
+                            </button>
+                            <button
+                              onClick={() => { onActivatePlan(user); setOpenMenuUserId(null); }}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+                            >
+                              <Crown className="w-4 h-4 text-indigo-500" />
+                              Mudar Plano
+                            </button>
+                            <button
+                              onClick={() => { onSuspendUser(user.id, user.status); setOpenMenuUserId(null); }}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+                            >
+                              {user.status === 'suspended'
+                                ? <UserCheck className="w-4 h-4 text-green-500" />
+                                : <UserX className="w-4 h-4 text-amber-500" />}
+                              {user.status === 'suspended' ? 'Ativar Usuário' : 'Suspender'}
+                            </button>
+                            <div className="border-t border-border my-1" />
+                            <button
+                              onClick={() => { onDeleteUser(user.id, user.email); setOpenMenuUserId(null); }}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Excluir Usuário
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

@@ -15,7 +15,7 @@ import { AdminMarketingTab } from './admin/AdminMarketingTab';
 import { AdminDashboardTab } from './admin/AdminDashboardTab';
 
 import { UserDetailsModal } from './admin/UserDetailsModal';
-import { ActivatePlanModal, NotificationSettingsModal } from './admin/AdminModals';
+import { ActivatePlanModal, NotificationSettingsModal, AddUserModal } from './admin/AdminModals';
 import { useConfirm } from '../ui/ConfirmDialog';
 
 interface User {
@@ -64,8 +64,10 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
     paymentNotifications: true,
     expirationNotifications: true,
     suspensionNotifications: true,
+    notificationEmail: '',
   });
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [filterPlan, setFilterPlan] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'activity' | 'marketing' | 'settings'>('dashboard');
   const [activities, setActivities] = useState<any[]>([]);
@@ -365,10 +367,7 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
               <p className="text-sm text-muted-foreground">Gerencie todos os usuários da plataforma</p>
             </div>
             <Button
-              onClick={() => {
-                // TODO: Add create user modal
-                toast.info('Funcionalidade em desenvolvimento');
-              }}
+              onClick={() => setShowAddUserModal(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               Adicionar Usuário
@@ -459,6 +458,16 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
       )}
 
       {/* Modals — always rendered regardless of active tab */}
+      {showAddUserModal && (
+        <AddUserModal
+          onClose={() => setShowAddUserModal(false)}
+          onCreated={() => {
+            toast.success('Usuário criado com sucesso!');
+            loadUsers();
+          }}
+        />
+      )}
+
       {showActivateModal && (
         <ActivatePlanModal
           user={selectedUser}

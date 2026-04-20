@@ -259,15 +259,6 @@ ${body}
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Marketing para Usuários</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Envie emails para segmentos de usuários diretamente pela plataforma
-          </p>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Composer */}
         <div className="lg:col-span-2 space-y-5">

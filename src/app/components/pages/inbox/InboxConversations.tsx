@@ -774,6 +774,7 @@ export default function InboxConversations({
                             onClose={toggleDetailsPanel}
                             isEditingExternal={isEditingLead}
                             onEditingChange={setIsEditingLead}
+                            onSendMessage={sendMessage}
                         />
                     </div>
                 </>
@@ -796,6 +797,7 @@ export default function InboxConversations({
                             onClose={toggleDetailsPanel}
                             isEditingExternal={isEditingLead}
                             onEditingChange={setIsEditingLead}
+                            onSendMessage={sendMessage}
                         />
                     </div>
                 </>

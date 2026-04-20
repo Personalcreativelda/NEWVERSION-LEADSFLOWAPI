@@ -121,7 +121,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
     const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
     return (
-      <svg className="w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 -rotate-90" viewBox="0 0 100 100">
+      <svg className="w-20 h-20 -rotate-90" viewBox="0 0 100 100">
         {/* Background circle - claro no modo claro, escuro no modo escuro */}
         <circle
           cx="50"
@@ -276,7 +276,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
       )}
 
       {/* Grid de Cards Horizontais com Círculos */}
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
         {limitCards.map((card, index) => {
           const Icon = card.icon;
           

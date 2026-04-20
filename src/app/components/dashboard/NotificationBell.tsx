@@ -605,8 +605,8 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
                               </span>
                             </div>
 
-                            {/* ✅ BOTÕES DE AÇÃO - Aparecem no hover (desktop) / Sempre visíveis (mobile) */}
-                            <div className="flex items-center gap-2 pt-2 notification-actions-mobile opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            {/* ✅ BOTÕES DE AÇÃO - Sempre visíveis */}
+                            <div className="flex items-center gap-2 pt-2 notification-actions-mobile transition-opacity duration-200">
                               {/* Botão principal (Ver Lead, Ver Tarefa, etc) */}
                               {notification.actionLabel && notification.actionUrl && (
                                 <Button

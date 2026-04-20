@@ -314,6 +314,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     context_window_enabled: cfg.context_window_enabled !== false,
     context_window_messages: cfg.context_window_messages ?? 10,
     memory_enabled: cfg.memory_enabled !== false,
+    funnel_tracking_enabled: cfg.funnel_tracking_enabled !== false,
   });
 
   // Open config modal — fetch fresh data to avoid stale cached config
@@ -1236,6 +1237,29 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       <span
                         className="inline-block rounded-full bg-white shadow transition-transform"
                         style={{ width: 18, height: 18, transform: configValues.memory_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Funnel tracking toggle */}
+                  <div className="flex items-start justify-between gap-4 pt-3 border-t border-border">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">Movimentação automática do funil</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        O assistente avança leads pelo funil com base nas conversas
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!configValues.funnel_tracking_enabled}
+                      onClick={() => setConfigValues({ ...configValues, funnel_tracking_enabled: !configValues.funnel_tracking_enabled })}
+                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                      style={{ width: 44, height: 24, background: configValues.funnel_tracking_enabled ? '#2563eb' : '#6b7280' }}
+                    >
+                      <span
+                        className="inline-block rounded-full bg-white shadow transition-transform"
+                        style={{ width: 18, height: 18, transform: configValues.funnel_tracking_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
                       />
                     </button>
                   </div>

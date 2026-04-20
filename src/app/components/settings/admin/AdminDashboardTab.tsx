@@ -105,8 +105,8 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h2 className="text-3xl font-semibold text-foreground">Dashboard</h2>
-        <p className="text-muted-foreground mt-1">Visão geral da plataforma</p>
+        <h2 className="text-3xl font-semibold text-foreground">Financeiro</h2>
+        <p className="text-muted-foreground mt-1">Visão geral das finanças</p>
       </div>
 
       {/* Stat Cards */}

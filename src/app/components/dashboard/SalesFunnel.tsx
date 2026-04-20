@@ -285,7 +285,7 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 w-7 p-0 flex-shrink-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/50 text-muted-foreground/70"
+              className="h-7 w-7 p-0 flex-shrink-0 rounded-full transition-opacity hover:bg-muted/50 text-muted-foreground/70"
               onClick={(e) => e.stopPropagation()}
             >
               <MoreVertical className="h-4 w-4" />

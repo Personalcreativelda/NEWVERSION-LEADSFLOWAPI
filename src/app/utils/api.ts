@@ -555,6 +555,11 @@ export const authApi = {
         body: JSON.stringify({ email, password }),
       });
 
+      // 2FA required — return temp token for second step
+      if (data?.requires_2fa) {
+        return { requires_2fa: true as const, temp_token: data.temp_token as string };
+      }
+
       const session = data?.session;
       const user = data?.user;
 
@@ -569,7 +574,7 @@ export const authApi = {
       startSessionExpiryTimer();
 
       return {
-        success: true,
+        success: true as const,
         user: {
           id: user.id,
           email: user.email,
@@ -593,6 +598,28 @@ export const authApi = {
 
       throw error;
     }
+  },
+
+  verify2FALogin: async (tempToken: string, code: string) => {
+    const data = await apiCall('/auth/login/2fa', {
+      method: 'POST',
+      body: JSON.stringify({ temp_token: tempToken, code }),
+    });
+
+    const session = data?.session;
+    const user = data?.user;
+
+    if (!session?.access_token || !user?.id) {
+      throw new Error('Resposta inválida do servidor.');
+    }
+
+    localStorage.setItem('leadflow_access_token', session.access_token);
+    if (session.refresh_token) {
+      localStorage.setItem('leadflow_refresh_token', session.refresh_token);
+    }
+    startSessionExpiryTimer();
+
+    return { success: true as const, user: { id: user.id, email: user.email } };
   },
 
   signout: async () => {

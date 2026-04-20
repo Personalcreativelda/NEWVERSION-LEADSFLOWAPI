@@ -119,7 +119,7 @@ export default function RecentLeadsSection({
   }
 
   return (
-    <div className="bg-card rounded-xl p-5 border border-border shadow-sm">
+    <div className="bg-card rounded-xl p-5 border border-border shadow-sm h-full flex flex-col">
       <h3 className="text-foreground font-semibold text-base mb-4">
         Leads Recentes
       </h3>
@@ -172,7 +172,7 @@ export default function RecentLeadsSection({
               </div>
 
               {/* Botões de Ação */}
-              <div className="flex flex-wrap gap-0.5 self-stretch sm:ml-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+              <div className="flex flex-wrap gap-0.5 self-stretch sm:ml-1 transition-opacity duration-150">
                 {onEdit && (
                   <button
                     className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-blue-500 transition-colors flex-shrink-0"

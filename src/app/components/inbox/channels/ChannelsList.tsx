@@ -32,6 +32,15 @@ import {
 
 // Configuração dos canais disponíveis para conexão
 // Ordem: WhatsApp primeiro, depois Facebook, Instagram, Telegram e outros
+const CHANNEL_SVG: Record<string, string> = {
+    whatsapp: '/channel icon/whatsapp-whats-app-svgrepo-com.svg',
+    whatsapp_cloud: '/channel icon/whatsapp-whats-app-svgrepo-com.svg',
+    facebook: '/channel icon/messenger-facebook-svgrepo-com.svg',
+    instagram: '/channel icon/instagram-1-svgrepo-com.svg',
+    telegram: '/channel icon/telegram-svgrepo-com.svg',
+    email: '/channel icon/gmail-svgrepo-com.svg',
+};
+
 const AVAILABLE_CHANNELS = [
     {
         id: 'whatsapp',
@@ -345,6 +354,7 @@ export function ChannelsList() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {AVAILABLE_CHANNELS.map((item) => {
                             const Icon = item.icon;
+                            const svgSrc = CHANNEL_SVG[item.id];
                             return (
                                 <button
                                     key={item.id}
@@ -359,7 +369,11 @@ export function ChannelsList() {
                                         className="p-2.5 rounded-lg mb-3 group-hover:scale-105 transition-transform duration-150"
                                         style={{ backgroundColor: 'hsl(var(--muted))' }}
                                     >
-                                        <Icon size={22} className={item.color} />
+                                        {svgSrc ? (
+                                            <img src={svgSrc} alt={item.name} width={36} height={36} className="object-contain" />
+                                        ) : (
+                                            <Icon size={36} className={item.color} />
+                                        )}
                                     </div>
                                     <h3 className="font-semibold text-sm mb-0.5" style={{ color: 'hsl(var(--foreground))' }}>
                                         {item.name}

@@ -310,8 +310,8 @@ export default function NavigationSidebar({
         ref={sidebarRef}
         className={`sidebar-root flex flex-col flex-shrink-0 ${
           isMobile
-            ? `fixed top-0 left-0 z-[950] h-screen w-64 transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`
-            : `fixed top-0 left-0 h-screen z-[100] ${isResizing ? '' : 'transition-[width] duration-200 ease-out'}`
+            ? `fixed top-0 left-0 z-[10000] h-screen w-64 transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`
+            : `fixed top-0 left-0 h-screen z-[10000] ${isResizing ? '' : 'transition-[width] duration-200 ease-out'}`
         }`}
         style={!isMobile ? { width: computedWidth } : undefined}
       >

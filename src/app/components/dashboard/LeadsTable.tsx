@@ -549,8 +549,8 @@ export default function LeadsTable({
       </div>
 
       {/* Wrapper da Tabela */}
-      <div className="overflow-x-auto overflow-y-auto max-h-[600px]">
-        <table className="w-full min-w-[900px]">
+      <div className="overflow-x-auto overflow-y-auto max-h-[480px] sm:max-h-[600px]">
+        <table className="w-full min-w-[700px] sm:min-w-[900px]">
           <thead
             className="sticky top-0 z-10 shadow-[0_1px_4px_rgba(15,23,42,0.05)] dark:shadow-[0_1px_4px_rgba(15,23,42,0.3)]"
             style={{ backgroundColor: 'hsl(var(--card))' }}
@@ -684,21 +684,21 @@ export default function LeadsTable({
                       <div className="flex gap-1.5">
                         <button
                           onClick={() => onChat(lead.id)}
-                          className="p-1.5 rounded-md text-muted-foreground hover:text-green-600 dark:hover:text-green-400 hover:bg-green-500/10 transition-all duration-150 opacity-0 group-hover:opacity-100"
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-green-600 dark:hover:text-green-400 hover:bg-green-500/10 transition-all duration-150"
                           title="WhatsApp"
                         >
                           <MessageCircle className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => onEdit(lead.id)}
-                          className="p-1.5 rounded-md text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-500/10 transition-all duration-150 opacity-0 group-hover:opacity-100"
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-500/10 transition-all duration-150"
                           title="Editar"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => onDelete(lead.id)}
-                          className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-all duration-150 opacity-0 group-hover:opacity-100"
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-all duration-150"
                           title="Deletar"
                         >
                           <Trash2 className="w-4 h-4" />

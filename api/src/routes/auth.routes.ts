@@ -12,6 +12,7 @@ import {
   resetPasswordWithToken,
   setupDemoAccount,
   setupAdminAccount,
+  verify2FALogin,
 } from '../services/auth.service';
 import { googleOAuthService } from '../services/google-oauth.service';
 import { activityService } from '../services/activity.service';
@@ -184,15 +185,33 @@ router.post('/login', async (req, res, next) => {
     }
 
     const data = await loginWithEmail(email, password);
+
+    // If 2FA is required, return temp token without logging activity
+    if ('requires_2fa' in data && data.requires_2fa) {
+      return res.json(data);
+    }
     
     // 📝 Log activity
     void activityService.logActivity({
-      userId: data.user.id,
+      userId: (data as any).user.id,
       type: 'login',
       description: `Login via Email: ${email}`,
       metadata: { ip: req.ip }
     });
 
+    return res.json(data);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/login/2fa', async (req, res, next) => {
+  try {
+    const { temp_token, code } = req.body;
+    if (!temp_token || !code) {
+      return res.status(400).json({ error: 'Token e código são obrigatórios' });
+    }
+    const data = await verify2FALogin(temp_token, code);
     return res.json(data);
   } catch (error) {
     return next(error);

@@ -38,7 +38,9 @@ export const MARKETPLACE_TEMPLATES = [
             auto_respond: true,
             max_tokens: 500,
             temperature: 0.7,
-            monthly_message_limit: 200
+            monthly_message_limit: 200,
+            funnel_tracking_enabled: true,
+            ai_funnel_detection: false
         }
     },
     {
@@ -72,7 +74,9 @@ Identificar o interesse real do cliente, entender a necessidade e agendar uma re
             auto_respond: true,
             max_tokens: 400,
             temperature: 0.6,
-            monthly_message_limit: 200
+            monthly_message_limit: 200,
+            funnel_tracking_enabled: true,
+            ai_funnel_detection: true
         }
     },
     {
@@ -108,7 +112,9 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
             auto_respond: true,
             max_tokens: 600,
             temperature: 0.4,
-            monthly_message_limit: 200
+            monthly_message_limit: 200,
+            funnel_tracking_enabled: false,
+            ai_funnel_detection: false
         }
     }
 ];

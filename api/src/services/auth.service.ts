@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import * as speakeasy from 'speakeasy';
 import { query } from '../database/connection';
 import { config } from '../config/env';
 import { emailService } from './email.service';
@@ -159,8 +160,13 @@ export class AuthService {
     const requiresConfirmation = process.env.REQUIRE_EMAIL_CONFIRMATION === 'true';
 
     const result = await query(
-      `INSERT INTO users (email, password_hash, name, email_verified, is_active)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO users (email, password_hash, name, email_verified, is_active, plan_limits)
+       VALUES ($1, $2, $3, $4, $5,
+         COALESCE(
+           (SELECT limits FROM plans WHERE id = 'free' AND is_active = true LIMIT 1),
+           '{"leads": 100, "messages": 100, "massMessages": 200}'::jsonb
+         )
+       )
        RETURNING *`,
       [email, passwordHash, name, !requiresConfirmation, true]
     );
@@ -231,6 +237,52 @@ export class AuthService {
       throw error;
     }
 
+    // Check if 2FA is enabled — return temp token instead of full session
+    if (user.two_factor_enabled) {
+      const tempToken = jwt.sign(
+        { user_id: user.id, purpose: 'two_factor_login' },
+        config.jwtSecret,
+        { expiresIn: '5m' }
+      );
+      return { requires_2fa: true as const, temp_token: tempToken };
+    }
+
+    const session = await this.createSession(user);
+    return buildSessionResponse(user, session);
+  }
+
+  async verify2FALogin(tempToken: string, code: string) {
+    let payload: { user_id: string; purpose: string };
+    try {
+      payload = jwt.verify(tempToken, config.jwtSecret) as { user_id: string; purpose: string };
+    } catch {
+      throw new Error('Token inválido ou expirado. Faça login novamente.');
+    }
+
+    if (payload.purpose !== 'two_factor_login') {
+      throw new Error('Token inválido.');
+    }
+
+    const user = await this.getUserById(payload.user_id);
+    if (!user || !user.is_active) {
+      throw new Error('Usuário não encontrado.');
+    }
+
+    if (!user.two_factor_enabled || !user.two_factor_secret) {
+      throw new Error('2FA não está ativado.');
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: user.two_factor_secret as string,
+      encoding: 'base32',
+      token: code.replace(/\s/g, ''),
+      window: 2,
+    });
+
+    if (!verified) {
+      throw new Error('Código 2FA inválido. Verifique seu aplicativo autenticador.');
+    }
+
     const session = await this.createSession(user);
     return buildSessionResponse(user, session);
   }
@@ -248,8 +300,13 @@ export class AuthService {
       const passwordHash = await bcrypt.hash(randomPassword, 12);
 
       const result = await query(
-        `INSERT INTO users (email, password_hash, name, avatar_url, email_verified, is_active)
-         VALUES ($1, $2, $3, $4, true, true)
+        `INSERT INTO users (email, password_hash, name, avatar_url, email_verified, is_active, plan_limits)
+         VALUES ($1, $2, $3, $4, true, true,
+           COALESCE(
+             (SELECT limits FROM plans WHERE id = 'free' AND is_active = true LIMIT 1),
+             '{"leads": 100, "messages": 100, "massMessages": 200}'::jsonb
+           )
+         )
          RETURNING *`,
         [email, passwordHash, data.name || null, data.avatar_url || null]
       );
@@ -540,6 +597,7 @@ export class AuthService {
 const authService = new AuthService();
 
 export const loginWithEmail = (email: string, password: string) => authService.login(email, password);
+export const verify2FALogin = (tempToken: string, code: string) => authService.verify2FALogin(tempToken, code);
 export const loginWithOAuth = (data: { email: string; name?: string; avatar_url?: string; provider: string }) =>
   authService.loginWithOAuth(data);
 export const registerWithEmail = (email: string, password: string, metadata?: Record<string, any>) =>

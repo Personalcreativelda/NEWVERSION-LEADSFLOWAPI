@@ -70,12 +70,27 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
   const [resendStatus, setResendStatus] = useState<'idle' | 'loading'>('idle');
   const [resendFeedback, setResendFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [pendingCredentials, setPendingCredentials] = useState<{ email: string; password: string } | null>(null);
+
+  // Rate limiting
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_SECONDS = 30;
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockUntil, setLockUntil] = useState<number | null>(null);
+  const [lockCountdown, setLockCountdown] = useState(0);
+
+  // 2FA
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [twoFACode, setTwoFACode] = useState('');
+  const [twoFATempToken, setTwoFATempToken] = useState('');
+  const [twoFAStatus, setTwoFAStatus] = useState<'idle' | 'loading'>('idle');
+  const [twoFAError, setTwoFAError] = useState<string | null>(null);
   
   // ✅ REF para foco em erros (acessibilidade)
   const errorRef = useRef<HTMLDivElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const verificationInputRef = useRef<HTMLInputElement>(null);
+  const twoFAInputRef = useRef<HTMLInputElement>(null);
 
   // Add keyboard listener
   useEffect(() => {
@@ -123,6 +138,28 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
       return () => clearTimeout(timeout);
     }
   }, [verificationModalOpen]);
+
+  // Lockout countdown
+  useEffect(() => {
+    if (!lockUntil) return;
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
+      setLockCountdown(remaining);
+      if (remaining === 0) {
+        setLockUntil(null);
+        setFailedAttempts(0);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockUntil]);
+
+  // Focus 2FA input when modal opens
+  useEffect(() => {
+    if (show2FAModal) {
+      const timeout = setTimeout(() => twoFAInputRef.current?.focus(), 120);
+      return () => clearTimeout(timeout);
+    }
+  }, [show2FAModal]);
 
   // ✅ VALIDAÇÃO DE EMAIL
   const validateEmail = (email: string): boolean => {
@@ -268,6 +305,13 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
     setError(null);
     setLoading(true);
 
+    // Rate limit check
+    if (lockUntil && Date.now() < lockUntil) {
+      setError({ message: `Muitas tentativas incorretas. Aguarde ${lockCountdown}s para tentar novamente.`, type: 'rate_limit' });
+      setLoading(false);
+      return;
+    }
+
     if (!validateForm()) {
       setLoading(false);
       return;
@@ -277,7 +321,21 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
 
     try {
       const response = await authApi.signin(trimmedEmail, password);
+
+      // 2FA required
+      if ('requires_2fa' in response && response.requires_2fa) {
+        setTwoFATempToken(response.temp_token);
+        setTwoFACode('');
+        setTwoFAError(null);
+        setTwoFAStatus('idle');
+        setShow2FAModal(true);
+        setLoading(false);
+        return;
+      }
+
       if (response.success) {
+        setFailedAttempts(0);
+        setLockUntil(null);
         setVerificationModalOpen(false);
         setPendingCredentials(null);
         setVerificationFeedback(null);
@@ -311,10 +369,19 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
           errorMessage.includes('Email ou senha incorretos') ||
           normalizedMessage.includes('wrong password') ||
           normalizedMessage.includes('senha incorreta')) {
-        setError({
-          message: 'Email ou senha incorretos. Verifique suas credenciais e tente novamente.',
-          type: 'invalid_credentials',
-        });
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+        if (newAttempts >= MAX_ATTEMPTS) {
+          const until = Date.now() + LOCKOUT_SECONDS * 1000;
+          setLockUntil(until);
+          setLockCountdown(LOCKOUT_SECONDS);
+          setError({ message: `Muitas tentativas incorretas. Aguarde ${LOCKOUT_SECONDS} segundos para tentar novamente.`, type: 'rate_limit' });
+        } else {
+          setError({
+            message: `Email ou senha incorretos. ${MAX_ATTEMPTS - newAttempts} tentativa${MAX_ATTEMPTS - newAttempts === 1 ? '' : 's'} restante${MAX_ATTEMPTS - newAttempts === 1 ? '' : 's'}.`,
+            type: 'invalid_credentials',
+          });
+        }
       } else if (errorMessage.includes('não encontrado') || errorMessage.includes('not found')) {
         setError({ message: 'Email não encontrado. Por favor, crie uma conta clicando em "Criar conta".', type: 'not_found' });
       } else if (errorMessage.includes('Backend indisponível') || errorMessage.includes('servidor')) {
@@ -428,6 +495,26 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
     }
   };
 
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = twoFACode.trim();
+    if (trimmed.length < 6) { setTwoFAError('Digite os 6 dígitos do seu autenticador.'); return; }
+    setTwoFAStatus('loading');
+    setTwoFAError(null);
+    try {
+      const response = await authApi.verify2FALogin(twoFATempToken, trimmed);
+      if (response.success) {
+        setShow2FAModal(false);
+        setFailedAttempts(0);
+        setLockUntil(null);
+        onSuccess();
+      }
+    } catch (err: any) {
+      setTwoFAError(err.message || 'Código inválido. Tente novamente.');
+      setTwoFAStatus('idle');
+    }
+  };
+
   const handleVerificationResend = async () => {
     if (!verificationEmail || resendStatus === 'loading') {
       return;
@@ -465,66 +552,92 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
 
   return (
     <div className="min-h-screen flex bg-[#0a0a0a] relative">
-      {/* Left Column - Slideshow */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-[#111111] overflow-hidden">
-        {/* Slides */}
-        {SLIDES.map((slide, i) => (
-          <div
-            key={i}
-            className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
-            style={{
-              backgroundImage: `url(${slide.image})`,
-              opacity: i === currentSlide ? 1 : 0,
-            }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a]/95 via-[#111111]/90 to-[#0a0a0a]/95" />
-          </div>
-        ))}
+      {/* Left Column - Premium Visual */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden" style={{ background: '#07100d' }}>
+        {/* Dot grid pattern */}
+        <div className="absolute inset-0" style={{
+          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
+        }} />
 
-        {/* Content — logo + text + indicators all centered */}
-        <div className="relative z-10 flex flex-col items-center justify-center w-full px-12 text-center">
-          {SLIDES.map((slide, i) => (
-            <div
-              key={i}
-              className="absolute px-12 text-center transition-all duration-700"
-              style={{
-                opacity: i === currentSlide ? 1 : 0,
-                transform: i === currentSlide ? 'translateY(0)' : 'translateY(12px)',
-                pointerEvents: i === currentSlide ? 'auto' : 'none',
-              }}
-            >
-              {/* Logo centered above title */}
-              <div className="flex justify-center mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-[#00C48C] rounded-xl flex items-center justify-center shadow-lg shadow-[#00C48C]/30">
-                    <Zap className="w-7 h-7 text-white" />
-                  </div>
-                  <span className="text-white text-3xl font-semibold">LeadsFlow</span>
-                </div>
-              </div>
+        {/* Brand glow orbs */}
+        <div className="absolute" style={{
+          top: '10%', left: '-5%',
+          width: '560px', height: '560px',
+          background: 'radial-gradient(circle, rgba(0,196,140,0.13) 0%, transparent 65%)',
+        }} />
+        <div className="absolute" style={{
+          bottom: '5%', right: '-10%',
+          width: '380px', height: '380px',
+          background: 'radial-gradient(circle, rgba(0,196,140,0.07) 0%, transparent 65%)',
+        }} />
 
-              <h2 className="text-white text-5xl font-semibold mb-4 leading-tight whitespace-pre-line">
-                {slide.title}
-              </h2>
-              <p className="text-muted-foreground/70 text-lg max-w-md">
-                {slide.subtitle}
-              </p>
+        {/* Right edge separator */}
+        <div className="absolute inset-y-0 right-0 w-px bg-white/5" />
 
-              {/* Slide Indicators — inline, below description */}
-              <div className="flex justify-center gap-2 mt-10">
-                {SLIDES.map((_, j) => (
-                  <button
-                    key={j}
-                    onClick={() => setCurrentSlide(j)}
-                    className={`h-1 rounded-full transition-all duration-300 ${
-                      j === currentSlide ? 'w-8 bg-[#00C48C]' : 'w-8 bg-white/20'
-                    }`}
-                    aria-label={`Slide ${j + 1}`}
-                  />
-                ))}
-              </div>
+        {/* Content */}
+        <div className="relative z-10 flex flex-col justify-between w-full p-14 h-full">
+
+          {/* Logo */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-[#00C48C] rounded-lg flex items-center justify-center shadow-lg shadow-[#00C48C]/40">
+              <Zap className="w-5 h-5 text-white" />
             </div>
-          ))}
+            <span className="text-white text-xl font-semibold tracking-tight">LeadsFlow</span>
+          </div>
+
+          {/* Slide content */}
+          <div className="relative min-h-[280px] flex items-center">
+            {SLIDES.map((slide, i) => (
+              <div
+                key={i}
+                className="absolute inset-0 flex flex-col justify-center transition-all duration-700"
+                style={{
+                  opacity: i === currentSlide ? 1 : 0,
+                  transform: i === currentSlide ? 'translateY(0)' : 'translateY(18px)',
+                  pointerEvents: i === currentSlide ? 'auto' : 'none',
+                }}
+              >
+                <h2 className="text-white text-[2.6rem] font-semibold leading-snug mb-4 whitespace-pre-line tracking-tight">
+                  {slide.title}
+                </h2>
+                <p className="text-zinc-400 text-base leading-relaxed max-w-[300px]">
+                  {slide.subtitle}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom: stats + indicators */}
+          <div className="space-y-7">
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: '10k+', label: 'Leads gerenciados' },
+                { value: '98%', label: 'Taxa de entrega' },
+                { value: '5★', label: 'Avaliação média' },
+              ].map((stat) => (
+                <div key={stat.label} className="px-4 py-3.5 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div className="text-white text-xl font-bold mb-0.5">{stat.value}</div>
+                  <div className="text-zinc-500 text-xs">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Slide indicators */}
+            <div className="flex gap-2">
+              {SLIDES.map((_, j) => (
+                <button
+                  key={j}
+                  onClick={() => setCurrentSlide(j)}
+                  className={`h-[2px] rounded-full transition-all duration-500 ${
+                    j === currentSlide ? 'w-10 bg-[#00C48C]' : 'w-4 bg-white/15 hover:bg-white/30'
+                  }`}
+                  aria-label={`Slide ${j + 1}`}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -540,11 +653,11 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
           </div>
 
           {/* Mobile card wrapper */}
-          <div className="bg-[#111111] border border-[#2a2a2a] rounded-3xl p-6 sm:p-8 lg:p-0 lg:bg-transparent lg:border-0 lg:rounded-none">
+          <div className="bg-[#0d0d0d] border border-zinc-800 rounded-3xl p-6 sm:p-8 lg:p-0 lg:bg-transparent lg:border-0 lg:rounded-none">
           {/* Title */}
           <div className="mb-8">
-            <h1 className="text-white text-3xl sm:text-4xl font-semibold mb-1">Entrar na conta</h1>
-            <p className="text-muted-foreground text-sm mt-2">Bem-vindo de volta</p>
+            <h1 className="text-white text-3xl sm:text-4xl font-semibold mb-2 tracking-tight">Entrar na conta</h1>
+            <p className="text-zinc-500 text-sm">Bem-vindo de volta</p>
           </div>
 
           {/* ✅ ALERTA DE ERRO MELHORADO */}
@@ -578,11 +691,11 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
           {/* Email Login Form */}
           <form onSubmit={handleEmailLogin} className="space-y-5 mb-6">
             <div>
-              <Label htmlFor="email" className="text-sm font-medium text-foreground/80 mb-2 block">
+              <Label htmlFor="email" className="text-sm font-medium text-zinc-200 mb-2 block">
                 Email
               </Label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-muted-foreground pointer-events-none" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-zinc-500 pointer-events-none" />
                 <Input
                   ref={emailRef}
                   id="email"
@@ -590,10 +703,11 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                   placeholder="Digite seu email"
                   value={email}
                   onChange={(e) => handleEmailChange(e.target.value)}
-                  className={`w-full pl-12 pr-4 h-14 text-base bg-[#1a1a1a] text-white placeholder:text-muted-foreground rounded-2xl border focus:ring-2 focus:ring-[#00C48C]/40 transition-all ${
+                  style={{ color: '#fff', caretColor: '#00C48C' }}
+                  className={`w-full pl-12 pr-4 h-14 text-base bg-zinc-900 placeholder:text-zinc-600 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-[#00C48C]/20 ${
                     fieldErrors.email
-                      ? 'border-red-500/50 focus:border-red-500'
-                      : 'border-[#2a2a2a] focus:border-[#00C48C]'
+                      ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20'
+                      : 'border-zinc-700 focus:border-[#00C48C]'
                   }`}
                   required
                   aria-invalid={!!fieldErrors.email}
@@ -610,7 +724,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
+                <Label htmlFor="password" className="text-sm font-medium text-zinc-200">
                   Senha
                 </Label>
                 <button
@@ -622,7 +736,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                 </button>
               </div>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-muted-foreground pointer-events-none" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-zinc-500 pointer-events-none" />
                 <Input
                   ref={passwordRef}
                   id="password"
@@ -630,10 +744,11 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                   placeholder="Digite sua senha"
                   value={password}
                   onChange={(e) => handlePasswordChange(e.target.value)}
-                  className={`w-full pl-12 pr-14 h-14 text-base bg-[#1a1a1a] text-white placeholder:text-muted-foreground rounded-2xl border focus:ring-2 focus:ring-[#00C48C]/40 transition-all ${
+                  style={{ color: '#fff', caretColor: '#00C48C' }}
+                  className={`w-full pl-12 pr-14 h-14 text-base bg-zinc-900 placeholder:text-zinc-600 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-[#00C48C]/20 ${
                     fieldErrors.password
-                      ? 'border-red-500/50 focus:border-red-500'
-                      : 'border-[#2a2a2a] focus:border-[#00C48C]'
+                      ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20'
+                      : 'border-zinc-700 focus:border-[#00C48C]'
                   }`}
                   required
                   aria-invalid={!!fieldErrors.password}
@@ -642,7 +757,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -657,15 +772,24 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
 
             <Button
               type="submit"
-              disabled={loading}
-              className="w-full h-14 text-base bg-[#00C48C] hover:bg-[#00a576] text-white font-semibold rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-[#00C48C]/20"
+              disabled={loading || (lockUntil !== null && Date.now() < lockUntil)}
+              style={{
+                background: loading ? '#00a576' : 'linear-gradient(135deg, #00C48C 0%, #00a576 100%)',
+                boxShadow: loading ? 'none' : '0 4px 24px rgba(0,196,140,0.28)',
+              }}
+              className="w-full h-14 text-base text-white font-semibold rounded-xl transition-all hover:brightness-110 hover:shadow-[0_6px_28px_rgba(0,196,140,0.38)] active:scale-[0.985] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {loading ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Entrando...</span> : 'Entrar'}
+              {loading
+                ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Entrando...</span>
+                : lockUntil && Date.now() < lockUntil
+                  ? `Aguarde ${lockCountdown}s`
+                  : <span className="flex items-center gap-2">Entrar <span className="opacity-70 text-lg leading-none">→</span></span>
+              }
             </Button>
           </form>
 
           {/* Link criar conta */}
-          <p className="text-center text-muted-foreground/70 text-sm mt-4 mb-2">
+          <p className="text-center text-zinc-500 text-sm mt-4 mb-2">
             Não tem uma conta?{' '}
             <button
               onClick={onSwitchToSignup}
@@ -676,12 +800,12 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
           </p>
 
           {/* Divider */}
-          <div className="relative mb-6">
+          <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#2a2a2a]"></div>
+              <div className="w-full border-t border-zinc-800"></div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-[#0a0a0a] text-muted-foreground">Ou continue com</span>
+            <div className="relative flex justify-center text-xs">
+              <span className="px-3 bg-[#0a0a0a] text-zinc-600 uppercase tracking-wider font-medium">ou continue com</span>
             </div>
           </div>
 
@@ -690,7 +814,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
             type="button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full h-14 mb-6 text-base bg-card hover:bg-muted/50 text-foreground font-medium rounded-2xl flex items-center justify-center gap-3 border border-border transition-all hover:scale-[1.01] active:scale-[0.99] shadow-sm"
+            className="w-full h-14 mb-6 text-base bg-white hover:bg-zinc-100 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-3 transition-all hover:shadow-lg active:scale-[0.985] shadow-sm disabled:opacity-50"
           >
             <GoogleIcon />
             <span>Entrar com Google</span>
@@ -725,14 +849,14 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                 <Mail className="w-6 h-6 text-[#00C48C]" />
               </div>
               <h3 className="text-white text-2xl font-semibold">Confirmar email</h3>
-              <p className="text-sm text-muted-foreground/70">
-                Digite o código enviado para <span className="text-foreground/90 font-medium">{verificationEmail}</span> para concluir o acesso.
+              <p className="text-sm text-zinc-400">
+                Digite o código enviado para <span className="text-white font-medium">{verificationEmail}</span> para concluir o acesso.
               </p>
             </div>
 
             <form onSubmit={handleVerificationSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="verification-code" className="text-sm text-foreground/80 mb-2 block">
+                <Label htmlFor="verification-code" className="text-sm text-zinc-400 mb-2 block">
                   Código de verificação
                 </Label>
                 <Input
@@ -743,7 +867,8 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
                   maxLength={6}
-                  className="w-full px-4 py-3 bg-[#0a0a0a] border-[#2a2a2a] text-white placeholder:text-muted-foreground rounded-xl focus:ring-2 focus:ring-[#00C48C] focus:border-[#00C48C] tracking-widest text-center"
+                  style={{ color: '#fff', caretColor: '#00C48C' }}
+                  className="w-full px-4 py-3 bg-[#0a0a0a] border-[#2a2a2a] placeholder:text-zinc-600 rounded-xl focus:ring-2 focus:ring-[#00C48C] focus:border-[#00C48C] tracking-widest text-center"
                 />
               </div>
 
@@ -789,7 +914,57 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                 setResendStatus('idle');
                 setVerificationStatus('idle');
               }}
-              className="text-sm text-muted-foreground hover:text-foreground"
+              className="text-sm text-zinc-500 hover:text-white"
+            >
+              Cancelar e voltar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2FA Modal */}
+      {show2FAModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="w-full max-w-sm bg-[#0d0d0d] border border-zinc-800 rounded-2xl shadow-2xl p-8 space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 mx-auto rounded-full bg-[#00C48C]/10 border border-[#00C48C]/20 flex items-center justify-center">
+                <Lock className="w-5 h-5 text-[#00C48C]" />
+              </div>
+              <h3 className="text-white text-xl font-semibold">Verificação em dois fatores</h3>
+              <p className="text-zinc-400 text-sm">Abra o seu app autenticador e insira o código de 6 dígitos.</p>
+            </div>
+            <form onSubmit={handle2FASubmit} className="space-y-4">
+              <Input
+                ref={twoFAInputRef}
+                inputMode="numeric"
+                placeholder="000000"
+                value={twoFACode}
+                onChange={(e) => { setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6)); setTwoFAError(null); }}
+                maxLength={6}
+                style={{ color: '#fff', caretColor: '#00C48C' }}
+                className="w-full px-4 h-14 text-center text-2xl tracking-[0.5em] bg-zinc-900 border border-zinc-700 placeholder:text-zinc-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00C48C]/20 focus:border-[#00C48C] transition-all"
+              />
+              {twoFAError && (
+                <p className="text-sm text-red-400 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />{twoFAError}
+                </p>
+              )}
+              <Button
+                type="submit"
+                disabled={twoFAStatus === 'loading' || twoFACode.length < 6}
+                style={{ background: 'linear-gradient(135deg, #00C48C 0%, #00a576 100%)', boxShadow: '0 4px 24px rgba(0,196,140,0.25)' }}
+                className="w-full h-12 text-white font-semibold rounded-xl transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {twoFAStatus === 'loading'
+                  ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Verificando...</span>
+                  : 'Verificar'
+                }
+              </Button>
+            </form>
+            <button
+              type="button"
+              onClick={() => { setShow2FAModal(false); setTwoFACode(''); setTwoFAError(null); }}
+              className="w-full text-sm text-zinc-500 hover:text-white transition-colors"
             >
               Cancelar e voltar
             </button>
@@ -803,7 +978,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
           <div className="bg-[#1a1a1a] rounded-2xl shadow-lg p-10 max-w-md w-full space-y-6 border border-[#2a2a2a]">
             <div className="text-center space-y-2">
               <h3 className="text-white text-2xl font-semibold">Recuperar Senha</h3>
-              <p className="text-muted-foreground/70 text-sm">
+              <p className="text-zinc-400 text-sm">
                 Digite seu email para receber o código de recuperação
               </p>
             </div>
@@ -825,7 +1000,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
 
             <form onSubmit={(e) => { e.preventDefault(); handleForgotPassword(); }} className="space-y-4">
               <div>
-                <Label htmlFor="reset-email" className="text-sm text-foreground/80 mb-2 block">Email</Label>
+                <Label htmlFor="reset-email" className="text-sm text-zinc-400 mb-2 block">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
@@ -834,7 +1009,8 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                     placeholder="Digite seu email"
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-[#0a0a0a] border-[#2a2a2a] text-white placeholder:text-muted-foreground rounded-xl focus:ring-2 focus:ring-[#00C48C]"
+                    style={{ color: '#fff', caretColor: '#00C48C' }}
+                    className="w-full pl-12 pr-4 py-3 bg-[#0a0a0a] border-[#2a2a2a] placeholder:text-zinc-600 rounded-xl focus:ring-2 focus:ring-[#00C48C]"
                     required
                   />
                 </div>

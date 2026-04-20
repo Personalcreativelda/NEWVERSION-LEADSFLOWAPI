@@ -165,6 +165,12 @@ export class AssistantProcessorService {
                 });
             }
 
+            // 10. Movimentar funil de vendas automaticamente (assíncrono, não bloqueia)
+            const funnelTrackingEnabled = config.funnel_tracking_enabled !== false;
+            if (funnelTrackingEnabled) {
+                void this.detectAndUpdateFunnelStage(ctx, aiResponse.content, activeAssistant, availableProviders, model);
+            }
+
             return true;
         } catch (error: any) {
             console.error('[AssistantProcessor] Erro ao processar mensagem:', error.message);
@@ -602,6 +608,285 @@ export class AssistantProcessorService {
             throw new Error(`Facebook Messenger API error: ${err}`);
         }
         console.log(`[AssistantProcessor] Resposta enviada via Facebook Messenger para ${recipientId}`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FUNIL DE VENDAS AUTOMÁTICO
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Ordem numérica dos estágios para comparar progressão
+     */
+    private readonly FUNNEL_ORDER: Record<string, number> = {
+        novo: 0,
+        contatado: 1,
+        qualificado: 2,
+        negociacao: 3,
+        convertido: 4,
+        perdido: -1,
+    };
+
+    /**
+     * Detecção rule-based de novo estágio do funil com base na mensagem do usuário.
+     * Retorna o novo status ou null se não há mudança.
+     * Só avança o funil (ou move para 'perdido') — nunca retrocede.
+     */
+    private detectFunnelStageFromMessage(userMessage: string, currentStatus: string): string | null {
+        // Normalizar: minúsculas + remover acentos
+        const msg = userMessage
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+
+        const currentOrder = this.FUNNEL_ORDER[currentStatus] ?? 0;
+
+        // ── PERDIDO — maior prioridade (exceto se já convertido) ──────────────
+        if (currentStatus !== 'convertido') {
+            const lostSignals = [
+                'nao quero', 'nao tenho interesse', 'sem interesse', 'nao me interessa',
+                'cancela', 'cancele', 'desisto', 'desistir', 'nao vou mais', 'nao vou comprar',
+                'por enquanto nao', 'nao e pra mim', 'nao e para mim',
+                'obrigado mas nao', 'nao obrigado', 'nao preciso',
+                'dispensado', 'nao da', 'nao vai dar', 'deixa pra la', 'esquece',
+                'nao estou interessado', 'nao quero mais',
+            ];
+            if (lostSignals.some(s => msg.includes(s))) {
+                console.log(`[FunnelAI] Sinal de PERDA detectado na mensagem`);
+                return 'perdido';
+            }
+        }
+
+        // ── CONVERTIDO ────────────────────────────────────────────────────────
+        if (currentOrder < 4) {
+            const convertedSignals = [
+                'ja paguei', 'paguei', 'comprei', 'contratei', 'ja contratei',
+                'fiz o pagamento', 'realizei o pagamento', 'ta feito', 'ta pago',
+                'finalizei', 'fechei', 'assinei', 'assinado o contrato',
+                'confirmei o pagamento', 'confirmado', 'efetuei o pagamento',
+                'ja assine', 'ja assinei',
+            ];
+            if (convertedSignals.some(s => msg.includes(s))) {
+                console.log(`[FunnelAI] Sinal de CONVERSÃO detectado na mensagem`);
+                return 'convertido';
+            }
+        }
+
+        // ── NEGOCIAÇÃO ────────────────────────────────────────────────────────
+        if (currentOrder < 3) {
+            const negSignals = [
+                'quero contratar', 'vamos fechar', 'pode fechar', 'me manda proposta',
+                'manda a proposta', 'quero a proposta', 'envia o contrato',
+                'me manda o contrato', 'como faço para contratar', 'como faço pra contratar',
+                'como pago', 'como faço para pagar', 'como faco pra pagar',
+                'boleto', 'pix', 'cartao de credito', 'parcelado', 'parcelamento',
+                'forma de pagamento', 'formas de pagamento', 'link de pagamento',
+                'me manda o link', 'link pra pagar', 'vou fechar', 'quero fechar',
+                'topei', 'aceito', 'concordo com o valor', 'ta bom o preco',
+                'fechado', 'vamos fazer', 'quero assinar', 'vou assinar',
+                'pode me mandar o contrato', 'pode enviar o contrato',
+            ];
+            if (negSignals.some(s => msg.includes(s))) {
+                console.log(`[FunnelAI] Sinal de NEGOCIAÇÃO detectado na mensagem`);
+                return 'negociacao';
+            }
+        }
+
+        // ── QUALIFICADO ───────────────────────────────────────────────────────
+        if (currentOrder < 2) {
+            const qualSignals = [
+                'quanto custa', 'qual o preco', 'qual o valor', 'quanto e',
+                'me interessa', 'tenho interesse', 'gostaria de saber', 'gostaria de ver',
+                'quero saber mais', 'pode me contar mais', 'me conta mais',
+                'como funciona', 'pode me explicar', 'pode explicar',
+                'quero agendar', 'agendar demonstracao', 'quero ver uma demo',
+                'posso ver', 'quero ver', 'me fala mais', 'fala mais sobre',
+                'preciso disso', 'e exatamente o que preciso', 'parece interessante',
+                'me interessa muito', 'quero mais informacoes', 'mais informacoes',
+                'pode me enviar mais', 'tem mais detalhes', 'quero detalhes',
+                'qual o plano', 'quais os planos', 'tem plano', 'opcoes de plano',
+            ];
+            if (qualSignals.some(s => msg.includes(s))) {
+                console.log(`[FunnelAI] Sinal de QUALIFICAÇÃO detectado na mensagem`);
+                return 'qualificado';
+            }
+        }
+
+        // ── CONTATADO — simples: se o lead era 'novo', agora está 'contatado' ─
+        if (currentStatus === 'novo') {
+            return 'contatado';
+        }
+
+        return null; // Sem mudança detectada
+    }
+
+    /**
+     * Orquestra a detecção e atualização do funil de vendas.
+     * Busca o lead associado à conversa, detecta o novo estágio,
+     * atualiza o banco e emite evento WebSocket.
+     */
+    private async detectAndUpdateFunnelStage(
+        ctx: IncomingMessageContext,
+        aiReply: string,
+        assistant: any,
+        providers: ProviderConfig[],
+        model?: string
+    ): Promise<void> {
+        try {
+            // 1. Buscar lead associado à conversa
+            const convResult = await query(
+                `SELECT c.lead_id, l.status as current_status, l.name as lead_name
+                 FROM conversations c
+                 JOIN leads l ON l.id = c.lead_id
+                 WHERE c.id = $1 AND c.user_id = $2
+                 LIMIT 1`,
+                [ctx.conversationId, ctx.userId]
+            );
+
+            if (!convResult.rows[0] || !convResult.rows[0].lead_id) {
+                return; // Conversa sem lead vinculado
+            }
+
+            const { lead_id, current_status, lead_name } = convResult.rows[0];
+            const safeStatus = current_status || 'novo';
+
+            // Não mexer em leads já finalizados (a menos que detecte conversão)
+            if (safeStatus === 'convertido' && ctx.messageContent.toLowerCase().indexOf('paguei') === -1) {
+                return;
+            }
+
+            // 2. Detecção rule-based (primária — sempre roda)
+            let detectedStatus = this.detectFunnelStageFromMessage(ctx.messageContent, safeStatus);
+
+            // 3. Se não detectou mudança E o assistente tem AI funnel ativo, usar IA
+            const config = assistant.config || {};
+            const aiEnhancedFunnel = config.ai_funnel_detection !== false && providers.length > 0;
+
+            if (!detectedStatus && aiEnhancedFunnel && safeStatus !== 'convertido') {
+                detectedStatus = await this.classifyFunnelWithAI(
+                    ctx.messageContent,
+                    aiReply,
+                    safeStatus,
+                    providers,
+                    model
+                );
+            }
+
+            if (!detectedStatus || detectedStatus === safeStatus) {
+                return; // Sem mudança
+            }
+
+            // 4. Validar progressão (nunca retroceder, exceto para 'perdido')
+            const currentOrder = this.FUNNEL_ORDER[safeStatus] ?? 0;
+            const newOrder = this.FUNNEL_ORDER[detectedStatus] ?? 0;
+
+            if (detectedStatus !== 'perdido' && newOrder <= currentOrder) {
+                console.log(`[FunnelAI] Estágio detectado (${detectedStatus}) não avança o funil (atual: ${safeStatus}), ignorando.`);
+                return;
+            }
+
+            // 5. Atualizar lead no banco
+            await query(
+                `UPDATE leads SET status = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3`,
+                [detectedStatus, lead_id, ctx.userId]
+            );
+
+            console.log(`[FunnelAI] ✅ Lead "${lead_name}" movido: ${safeStatus} → ${detectedStatus}`);
+
+            // 6. Emitir WebSocket para atualização em tempo real no dashboard
+            try {
+                const wsService = getWebSocketService();
+                if (wsService) {
+                    (wsService as any).io?.to(`user:${ctx.userId}`).emit('lead_funnel_update', {
+                        leadId: lead_id,
+                        leadName: lead_name,
+                        previousStatus: safeStatus,
+                        newStatus: detectedStatus,
+                        conversationId: ctx.conversationId,
+                        triggeredBy: 'ai_assistant',
+                        assistantName: assistant.assistant_name,
+                        timestamp: new Date().toISOString(),
+                    });
+                }
+            } catch (wsErr: any) {
+                console.warn('[FunnelAI] Falha ao emitir WebSocket de funil:', wsErr.message);
+            }
+
+            // 7. Salvar log da ação do funil na conversa (como mensagem de sistema)
+            const statusLabels: Record<string, string> = {
+                contatado: 'Contatado',
+                qualificado: 'Qualificado',
+                negociacao: 'Em Negociação',
+                convertido: 'Convertido',
+                perdido: 'Perdido',
+            };
+            const newLabel = statusLabels[detectedStatus] || detectedStatus;
+            const prevLabel = statusLabels[safeStatus] || safeStatus;
+
+            await query(
+                `INSERT INTO messages (user_id, conversation_id, direction, channel, content, status, metadata)
+                 VALUES ($1, $2, 'out', $3, $4, 'sent', $5)`,
+                [
+                    ctx.userId,
+                    ctx.conversationId,
+                    ctx.channelType,
+                    `🤖 Assistente moveu lead de "${prevLabel}" para "${newLabel}" com base na conversa.`,
+                    JSON.stringify({ source: 'funnel_automation', is_system: true, previous_status: safeStatus, new_status: detectedStatus }),
+                ]
+            );
+
+        } catch (err: any) {
+            console.error('[FunnelAI] Erro ao processar funil:', err.message);
+        }
+    }
+
+    /**
+     * Classificação do estágio do funil usando IA (chamada leve, ~50 tokens).
+     * Só é chamado quando a detecção por palavras-chave não encontra sinal claro.
+     */
+    private async classifyFunnelWithAI(
+        userMessage: string,
+        assistantReply: string,
+        currentStatus: string,
+        providers: ProviderConfig[],
+        model?: string
+    ): Promise<string | null> {
+        try {
+            const classificationMessages: AIMessage[] = [
+                {
+                    role: 'system',
+                    content: `Você é um classificador de estágio de funil de vendas. Analise a última mensagem do cliente e classifique em qual estágio de funil ele está.
+
+Estágios possíveis:
+- contatado: cliente respondeu mas sem interesse claro ainda
+- qualificado: cliente demonstrou interesse, perguntou preço, pediu mais informações
+- negociacao: cliente quer fechar, pediu proposta/contrato/link de pagamento
+- convertido: cliente confirmou que pagou/comprou/contratou
+- perdido: cliente disse que não quer mais
+- sem_mudanca: não há sinal claro de mudança de estágio
+
+Estágio atual: ${currentStatus}
+Responda APENAS com uma das palavras: contatado, qualificado, negociacao, convertido, perdido, sem_mudanca`,
+                },
+                {
+                    role: 'user',
+                    content: `Mensagem do cliente: "${userMessage.substring(0, 500)}"`,
+                },
+            ];
+
+            const response = await aiService.generateResponseWithFallback(classificationMessages, providers, model);
+            const result = response.content?.trim().toLowerCase().replace(/[^a-z_]/g, '');
+
+            const validStages = ['contatado', 'qualificado', 'negociacao', 'convertido', 'perdido'];
+            if (result && validStages.includes(result)) {
+                console.log(`[FunnelAI] Classificação IA: ${currentStatus} → ${result}`);
+                return result;
+            }
+
+            return null;
+        } catch (err: any) {
+            console.warn('[FunnelAI] Falha na classificação IA de funil:', err.message);
+            return null;
+        }
     }
 }
 

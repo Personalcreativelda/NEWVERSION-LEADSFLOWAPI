@@ -1,7 +1,7 @@
 import {
     Home, Users, MessageSquare, Workflow, BarChart3,
     CheckSquare, Megaphone, Crown, Settings, Shield, User, Zap,
-    Radio, Bot, PhoneCall, Globe, RefreshCcw
+    Radio, Bot, PhoneCall, Globe, RefreshCcw, Target
 } from 'lucide-react';
 
 export interface SidebarItemConfig {
@@ -30,7 +30,7 @@ export const sidebarConfig: SidebarItemConfig[] = [
     // Vendas
     { id: 'funnel', labelKey: 'salesFunnel', icon: Workflow, path: '/dashboard/funnel', sectionLabel: 'Vendas' },
     { id: 'campaigns', labelKey: 'campaigns', icon: Megaphone, path: '/dashboard/campaigns' },
-    { id: 'remarketing', labelKey: 'remarketing', icon: Megaphone, path: '/dashboard/remarketing' },
+    { id: 'remarketing', labelKey: 'remarketing', icon: Target, path: '/dashboard/remarketing' },
     { id: 'analytics', labelKey: 'analytics', icon: BarChart3, path: '/dashboard/analytics' },
     { id: 'tasks', labelKey: 'tasksFollowup', icon: CheckSquare, path: '/dashboard/tasks' },
     // Automação
@@ -40,6 +40,5 @@ export const sidebarConfig: SidebarItemConfig[] = [
     // Configurações
     { id: 'plan', labelKey: 'plan', icon: Crown, path: '/dashboard/plan', sectionLabel: 'Configurações' },
     { id: 'integrations', labelKey: 'integrations', icon: Settings, path: '/dashboard/integrations' },
-    { id: 'security', labelKey: 'security', icon: Shield, path: '/dashboard/security' },
     { id: 'account', labelKey: 'accountSettings', icon: User, path: '/dashboard/account' },
 ];

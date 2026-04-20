@@ -78,7 +78,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
   ];
 
   return (
-    <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         const isPrimary = index === 0;
@@ -86,7 +86,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
           <div
             key={index}
             id={stat.id}
-            className={`relative rounded-xl p-5 transition-all duration-200 group bg-card border border-border enterprise-card ${
+            className={`relative rounded-xl p-3 sm:p-5 transition-all duration-200 group bg-card border border-border enterprise-card ${
               isPrimary ? 'enterprise-card-primary' : 'enterprise-card-secondary'
             }`}
             style={isPrimary ? { transform: 'scale(1.02)' } : undefined}

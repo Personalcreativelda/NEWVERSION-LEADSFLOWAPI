@@ -1,5 +1,5 @@
-import React from 'react';
-import { Rocket, Crown, Bell, Check, X, UserPlus, TrendingUp, CreditCard, AlertTriangle, ShieldOff } from 'lucide-react';
+import React, { useState } from 'react';
+import { Rocket, Crown, Bell, Check, X, UserPlus, TrendingUp, CreditCard, AlertTriangle, ShieldOff, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Switch } from '../../ui/switch';
@@ -155,6 +155,7 @@ interface NotificationSettingsModalProps {
     paymentNotifications: boolean;
     expirationNotifications: boolean;
     suspensionNotifications: boolean;
+    notificationEmail?: string;
   };
   setSettings: (settings: any) => void;
   onClose: () => void;
@@ -273,8 +274,20 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
           <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 border border-border mt-2">
             <Bell className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              As notificações aparecem no <strong>sino do painel admin</strong>. Entrega por e-mail estará disponível em breve.
+              As notificações aparecem no <strong>sino do painel admin</strong>. Configure um email abaixo para receber alertas por e-mail também.
             </p>
+          </div>
+
+          {/* Notification email */}
+          <div className="space-y-1.5">
+            <label className="block text-sm font-semibold text-foreground">Email para Notificações</label>
+            <p className="text-xs text-muted-foreground">Receba alertas no email informado quando os eventos acima ocorrerem.</p>
+            <Input
+              type="email"
+              placeholder="admin@seudominio.com"
+              value={settings.notificationEmail || ''}
+              onChange={(e) => setSettings({ ...settings, notificationEmail: e.target.value })}
+            />
           </div>
         </div>
 
@@ -285,6 +298,174 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
           </Button>
           <Button onClick={onSave} disabled={loading} className="flex-1">
             {loading ? 'Salvando...' : 'Salvar'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// AddUserModal
+// ==========================================
+interface AddUserModalProps {
+  onClose: () => void;
+  onCreated: () => void;
+}
+
+export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }) => {
+  const [form, setForm] = useState({ name: '', email: '', password: '', plan: 'free', expirationDays: 30 });
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const set = (field: string, value: any) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleSubmit = async () => {
+    setError(null);
+    if (!form.email || !form.password) { setError('Email e senha são obrigatórios'); return; }
+    if (form.password.length < 6) { setError('Senha deve ter ao menos 6 caracteres'); return; }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          plan: form.plan,
+          expirationDays: form.plan !== 'free' ? form.expirationDays : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Erro ao criar usuário'); return; }
+      onCreated();
+      onClose();
+    } catch (e: any) {
+      setError(e.message || 'Erro ao criar usuário');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectableCardBase = "p-3 rounded-xl border-2 transition-all text-left w-full";
+  const selectedCard = "border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/10";
+  const unselectedCard = "border-border bg-muted/50 hover:bg-muted";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="absolute inset-0 bg-gray-900/85 dark:bg-black/85" onClick={onClose} />
+      <div className="relative bg-card border border-border rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <UserPlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-foreground">Adicionar Usuário</h3>
+              <p className="text-xs text-muted-foreground">Criar conta manualmente</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Nome <span className="text-muted-foreground font-normal">(opcional)</span></label>
+            <Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Nome completo" />
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Email <span className="text-red-500">*</span></label>
+            <Input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="usuario@exemplo.com" />
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Senha <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                value={form.password}
+                onChange={e => set('password', e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Plan */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Plano</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(['free', 'business', 'enterprise'] as const).map(p => (
+                <button key={p} onClick={() => set('plan', p)} className={`${selectableCardBase} ${form.plan === p ? selectedCard : unselectedCard}`}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    {p === 'free' && <Check className="w-3.5 h-3.5 text-gray-500" />}
+                    {p === 'business' && <Rocket className="w-3.5 h-3.5 text-blue-500" />}
+                    {p === 'enterprise' && <Crown className="w-3.5 h-3.5 text-purple-500" />}
+                    <span className="text-sm font-medium text-foreground capitalize">{p}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Expiration (only for paid plans) */}
+          {form.plan !== 'free' && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Duração (dias)</label>
+              <div className="grid grid-cols-4 gap-2 mb-2">
+                {[30, 90, 180, 365].map(d => (
+                  <button
+                    key={d}
+                    onClick={() => set('expirationDays', d)}
+                    className={`py-1.5 rounded-lg border text-sm font-medium transition-all ${form.expirationDays === d ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-card text-foreground hover:bg-muted'}`}
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
+              <Input
+                type="number"
+                value={form.expirationDays}
+                onChange={e => set('expirationDays', parseInt(e.target.value) || 30)}
+                placeholder="Dias personalizados"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Expira em: <span className="font-medium text-foreground">{new Date(Date.now() + form.expirationDays * 86400000).toLocaleDateString('pt-BR')}</span>
+              </p>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 mt-6">
+          <Button onClick={onClose} variant="outline" className="flex-1">Cancelar</Button>
+          <Button onClick={handleSubmit} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+            {loading ? 'Criando...' : 'Criar Usuário'}
           </Button>
         </div>
       </div>

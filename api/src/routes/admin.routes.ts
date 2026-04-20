@@ -7,6 +7,7 @@ import { planExpirationService } from '../services/plan-expiration.service';
 import { activityService } from '../services/activity.service';
 import { notificationsService } from '../services/notifications.service';
 import nodemailer from 'nodemailer';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 
@@ -794,6 +795,65 @@ router.post('/broadcast/email', requireAuth, requireAdmin, async (req: Authentic
     res.json({ success: true, sent, total: recipients.length, errors: errors.slice(0, 10) });
   } catch (error: any) {
     console.error('[Admin] Error broadcasting email:', error);
+    next(error);
+  }
+});
+
+// ==========================================
+// POST /admin/create-user - Criar novo usuário
+// ==========================================
+router.post('/create-user', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { name, email, password, plan = 'free', expirationDays } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Formato de email inválido' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Senha deve ter ao menos 6 caracteres' });
+    }
+
+    // Check if email already exists
+    const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase().trim()]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'Email já cadastrado' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    let planExpiresAt: string | null = null;
+    if (plan !== 'free' && expirationDays) {
+      const expires = new Date();
+      expires.setDate(expires.getDate() + Number(expirationDays));
+      planExpiresAt = expires.toISOString();
+    }
+
+    const result = await query(
+      `INSERT INTO users (email, password_hash, name, email_verified, is_active, plan, plan_expires_at, plan_limits)
+       VALUES ($1, $2, $3, true, true, $4, $5,
+         COALESCE(
+           (SELECT limits FROM plans WHERE id = $4 AND is_active = true LIMIT 1),
+           (SELECT limits FROM plans WHERE id = 'free' AND is_active = true LIMIT 1),
+           '{"leads": 100, "messages": 100, "massMessages": 200}'::jsonb
+         )
+       )
+       RETURNING id, email, name, plan, plan_expires_at, created_at`,
+      [email.toLowerCase().trim(), passwordHash, name?.trim() || null, plan, planExpiresAt]
+    );
+
+    const newUser = result.rows[0];
+    console.log(`[Admin] User created: ${newUser.email} (plan: ${plan})`);
+
+    res.json({ success: true, user: newUser });
+  } catch (error: any) {
+    console.error('[Admin] Error creating user:', error);
     next(error);
   }
 });

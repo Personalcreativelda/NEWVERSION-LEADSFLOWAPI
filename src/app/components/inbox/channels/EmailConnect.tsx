@@ -17,7 +17,7 @@ const EMAIL_PROVIDERS = [
     {
         id: 'gmail',
         name: 'Gmail',
-        icon: '📧',
+        icon: '/channel icon/gmail-svgrepo-com.svg',
         color: 'from-red-500 to-orange-500',
         smtp: { host: 'smtp.gmail.com', port: '587', secure: false },
         imap: { host: 'imap.gmail.com', port: '993', secure: true },
@@ -26,7 +26,7 @@ const EMAIL_PROVIDERS = [
     {
         id: 'outlook',
         name: 'Microsoft / Outlook',
-        icon: '📨',
+        icon: '/channel icon/outlook-svgrepo-com.svg',
         color: 'from-blue-500 to-blue-700',
         smtp: { host: 'smtp.office365.com', port: '587', secure: false },
         imap: { host: 'outlook.office365.com', port: '993', secure: true },
@@ -35,7 +35,7 @@ const EMAIL_PROVIDERS = [
     {
         id: 'yahoo',
         name: 'Yahoo Mail',
-        icon: '💜',
+        icon: '/channel icon/yahoo-svgrepo-com.svg',
         color: 'from-purple-500 to-purple-700',
         smtp: { host: 'smtp.mail.yahoo.com', port: '587', secure: false },
         imap: { host: 'imap.mail.yahoo.com', port: '993', secure: true },
@@ -243,8 +243,12 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                         backgroundColor: 'hsl(var(--background))'
                                     }}
                                 >
-                                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${provider.color} flex items-center justify-center text-2xl flex-shrink-0`}>
-                                        {provider.icon}
+                                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${provider.color} flex items-center justify-center flex-shrink-0`}>
+                                        {provider.icon.startsWith('/') ? (
+                                            <img src={provider.icon} alt={provider.name} width={36} height={36} className="object-contain" />
+                                        ) : (
+                                            <span className="text-2xl">{provider.icon}</span>
+                                        )}
                                     </div>
                                     <div className="flex-1 text-left">
                                         <h3 className="font-semibold text-sm" style={{ color: 'hsl(var(--foreground))' }}>

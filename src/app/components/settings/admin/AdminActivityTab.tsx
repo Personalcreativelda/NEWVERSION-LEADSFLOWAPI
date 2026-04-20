@@ -27,27 +27,7 @@ export const AdminActivityTab: React.FC<ActivityTabProps> = ({
 }) => {
   return (
     <div className="space-y-8">
-      {/* Activity Table - full width */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-foreground">Fluxo de Atividade</h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRefreshActivities}
-            disabled={activitiesLoading}
-            className="gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${activitiesLoading ? 'animate-spin' : ''}`} />
-            Atualizar
-          </Button>
-        </div>
-        <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
-          <AdminActivityFeed activities={activities} users={users} loading={activitiesLoading} />
-        </div>
-      </div>
-
-      {/* Active Users Sidebar - below the table */}
+      {/* Active Users - above the activity feed */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -148,6 +128,29 @@ export const AdminActivityTab: React.FC<ActivityTabProps> = ({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Activity Feed - below online users */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="w-5 h-5 text-blue-500" />
+            <h2 className="text-xl font-bold text-foreground">Atividades Recentes</h2>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefreshActivities}
+            disabled={activitiesLoading}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${activitiesLoading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
+        </div>
+        <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
+          <AdminActivityFeed activities={activities} users={users} loading={activitiesLoading} />
+        </div>
       </div>
     </div>
   );

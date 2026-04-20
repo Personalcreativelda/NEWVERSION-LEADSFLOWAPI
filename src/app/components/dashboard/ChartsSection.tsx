@@ -311,7 +311,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
       )}
       
       {/* Primeira linha - 2 gráficos */}
-      <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
         
         {/* Gráfico de Origem - HORIZONTAL como Engajamento */}
         <div className="bg-card dark:bg-card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-border dark:border-border shadow-sm hover:shadow-md transition-all duration-300">
@@ -475,7 +475,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
       </div>
 
       {/* Segunda linha - 2 gráficos */}
-      <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
         
         {/* Status dos Leads (Pizza) */}
         <div className="bg-card dark:bg-card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-border dark:border-border shadow-sm hover:shadow-md transition-all duration-300">

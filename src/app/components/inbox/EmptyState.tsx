@@ -30,16 +30,16 @@ export function EmptyState({ onOpenSettings }: EmptyStateProps) {
             </button>
 
             <div className="mt-10 flex items-center gap-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                <div className="flex items-center gap-2">
+                    <img src="/channel icon/whatsapp-whats-app-svgrepo-com.svg" alt="WhatsApp" width={24} height={24} className="object-contain" />
                     WhatsApp
                 </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 bg-pink-500 rounded-full" />
+                <div className="flex items-center gap-2">
+                    <img src="/channel icon/instagram-1-svgrepo-com.svg" alt="Instagram" width={24} height={24} className="object-contain" />
                     Instagram
                 </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                <div className="flex items-center gap-2">
+                    <img src="/channel icon/messenger-facebook-svgrepo-com.svg" alt="Facebook" width={24} height={24} className="object-contain" />
                     Facebook
                 </div>
             </div>

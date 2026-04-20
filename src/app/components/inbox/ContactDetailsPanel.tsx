@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { X, Mail, Phone, Building2, Calendar, FileText, User, Loader2, AlertCircle, Edit2, Save, Camera, Check, Upload, StickyNote, ChevronDown, Clock, MessageSquare, Briefcase, ListTodo } from 'lucide-react';
+import { X, Mail, Phone, Building2, Calendar, FileText, User, Loader2, AlertCircle, Edit2, Save, Camera, Check, Upload, StickyNote, ChevronDown, Clock, MessageSquare, Briefcase, ListTodo, Plus, Trash2, Send, Zap, Target, Copy, Pencil, GripVertical } from 'lucide-react';
 import { leadsApi, scheduledConversationsApi, leadNotesApi } from '../../utils/api';
-import { Lead } from '../../types';
+import { Lead, LeadNote } from '../../types';
 import { toast } from 'sonner';
+import api from '../../../lib/api';
 
 interface Conversation {
   id: string;
@@ -30,7 +31,46 @@ interface ContactDetailsPanelProps {
   onClose: () => void;
   isEditingExternal?: boolean;
   onEditingChange?: (editing: boolean) => void;
+  onSendMessage?: (content: string) => Promise<void>;
 }
+
+// Quick message templates
+interface QuickMessage {
+  id: string;
+  label: string;
+  icon: string;
+  text: string;
+}
+
+const DEFAULT_QUICK_MESSAGES: QuickMessage[] = [
+  { id: '1', label: 'Saudação', icon: '👋', text: 'Olá {{nome}}! Tudo bem? Como posso te ajudar hoje?' },
+  { id: '2', label: 'Follow-up', icon: '🔄', text: 'Oi {{nome}}, passando para saber se teve oportunidade de analisar nossa proposta. Estou à disposição!' },
+  { id: '3', label: 'Proposta', icon: '📋', text: 'Olá {{nome}}! Preparei uma proposta personalizada para {{empresa}}. Posso enviar os detalhes agora?' },
+  { id: '4', label: 'Agradecimento', icon: '🙏', text: 'Muito obrigado pelo seu tempo, {{nome}}! Qualquer dúvida, estou disponível.' },
+  { id: '5', label: 'Reagendamento', icon: '📅', text: 'Oi {{nome}}, vi que não conseguimos conversar. Quer agendar um novo horário que seja melhor para você?' },
+  { id: '6', label: 'Desconto', icon: '💰', text: 'Olá {{nome}}! Tenho uma condição especial para {{empresa}} que é válida até o final desta semana. Posso compartilhar?' },
+];
+
+const QUICK_MESSAGES_STORAGE_KEY = 'leadsflow_quick_messages';
+
+const loadQuickMessages = (): QuickMessage[] => {
+  try {
+    const saved = localStorage.getItem(QUICK_MESSAGES_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Error loading quick messages:', e);
+  }
+  return DEFAULT_QUICK_MESSAGES;
+};
+
+const saveQuickMessages = (messages: QuickMessage[]) => {
+  localStorage.setItem(QUICK_MESSAGES_STORAGE_KEY, JSON.stringify(messages));
+};
+
+const EMOJI_OPTIONS = ['👋', '🔄', '📋', '🙏', '📅', '💰', '🎯', '🚀', '💬', '⭐', '🔔', '📞', '✅', '🎁', '📊', '🤝'];
 
 // Default funnel stages (fallback)
 const DEFAULT_STATUS_OPTIONS = [
@@ -60,7 +100,7 @@ const loadStatusOptions = () => {
   return DEFAULT_STATUS_OPTIONS;
 };
 
-export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, onEditingChange }: ContactDetailsPanelProps) {
+export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, onEditingChange, onSendMessage }: ContactDetailsPanelProps) {
   const contact = conversation.contact;
   const leadId = conversation.lead_id || conversation.metadata?.leadId || contact.leadId || contact.id;
   
@@ -93,6 +133,29 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
   // Schedules and tasks list
   const [schedules, setSchedules] = useState<any[]>([]);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
+
+  // Quick notes
+  const [notes, setNotes] = useState<LeadNote[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [newNote, setNewNote] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+  const noteInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Remarketing flows
+  const [remarketingFlows, setRemarketingFlows] = useState<any[]>([]);
+  const [loadingFlows, setLoadingFlows] = useState(false);
+  const [enrollingFlowId, setEnrollingFlowId] = useState<string | null>(null);
+  const [sendingMsgId, setSendingMsgId] = useState<string | null>(null);
+
+  // Editable quick messages
+  const [quickMessages, setQuickMessages] = useState<QuickMessage[]>(() => loadQuickMessages());
+  const [editingMessages, setEditingMessages] = useState(false);
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editMsgLabel, setEditMsgLabel] = useState('');
+  const [editMsgText, setEditMsgText] = useState('');
+  const [editMsgIcon, setEditMsgIcon] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
   // Edit form state
   const [editName, setEditName] = useState('');
@@ -164,6 +227,161 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
   useEffect(() => {
     fetchSchedules();
   }, [fetchSchedules]);
+
+  // Fetch quick notes
+  const fetchNotes = useCallback(async () => {
+    if (!leadId) return;
+    setLoadingNotes(true);
+    try {
+      const data = await leadNotesApi.getAll(leadId);
+      setNotes(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching notes:', err);
+      setNotes([]);
+    } finally {
+      setLoadingNotes(false);
+    }
+  }, [leadId]);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
+
+  // Fetch remarketing flows
+  useEffect(() => {
+    const fetchFlows = async () => {
+      setLoadingFlows(true);
+      try {
+        const flows = await api.remarketing.list();
+        setRemarketingFlows(Array.isArray(flows) ? flows.filter((f: any) => f.status === 'active') : []);
+      } catch {
+        setRemarketingFlows([]);
+      } finally {
+        setLoadingFlows(false);
+      }
+    };
+    fetchFlows();
+  }, []);
+
+  // Resolve template variables
+  const resolveTemplate = useCallback((template: string) => {
+    return template
+      .replace(/\{\{nome\}\}/g, editName?.split(' ')[0] || 'Cliente')
+      .replace(/\{\{empresa\}\}/g, editCompany || 'sua empresa');
+  }, [editName, editCompany]);
+
+  const handleSendQuickMessage = async (msg: QuickMessage) => {
+    if (!onSendMessage) {
+      handleCopyMessage(msg);
+      return;
+    }
+    if (sendingMsgId) return;
+    const resolved = resolveTemplate(msg.text);
+    setSendingMsgId(msg.id);
+    try {
+      await onSendMessage(resolved);
+      toast.success('Mensagem enviada!');
+    } catch (err) {
+      console.error('[QuickMessage] Erro ao enviar:', err);
+      toast.error('Erro ao enviar mensagem');
+    } finally {
+      setSendingMsgId(null);
+    }
+  };
+
+  const handleCopyMessage = (msg: QuickMessage) => {
+    const resolved = resolveTemplate(msg.text);
+    navigator.clipboard.writeText(resolved);
+    toast.success('Copiado!');
+  };
+
+  // Editable quick messages handlers
+  const handleStartEditMsg = (msg: QuickMessage) => {
+    setEditingMsgId(msg.id);
+    setEditMsgLabel(msg.label);
+    setEditMsgText(msg.text);
+    setEditMsgIcon(msg.icon);
+    setShowEmojiPicker(false);
+  };
+
+  const handleSaveEditMsg = () => {
+    if (!editingMsgId || !editMsgLabel.trim() || !editMsgText.trim()) return;
+    const updated = quickMessages.map(m =>
+      m.id === editingMsgId ? { ...m, label: editMsgLabel.trim(), text: editMsgText.trim(), icon: editMsgIcon } : m
+    );
+    setQuickMessages(updated);
+    saveQuickMessages(updated);
+    setEditingMsgId(null);
+    toast.success('Mensagem atualizada!');
+  };
+
+  const handleDeleteMsg = (id: string) => {
+    const updated = quickMessages.filter(m => m.id !== id);
+    setQuickMessages(updated);
+    saveQuickMessages(updated);
+    if (editingMsgId === id) setEditingMsgId(null);
+    toast.success('Mensagem removida');
+  };
+
+  const handleAddNewMsg = () => {
+    const newId = Date.now().toString();
+    const newMsg: QuickMessage = { id: newId, label: 'Nova mensagem', icon: '💬', text: 'Olá {{nome}}! ' };
+    const updated = [...quickMessages, newMsg];
+    setQuickMessages(updated);
+    saveQuickMessages(updated);
+    handleStartEditMsg(newMsg);
+  };
+
+  const handleResetMessages = () => {
+    setQuickMessages(DEFAULT_QUICK_MESSAGES);
+    saveQuickMessages(DEFAULT_QUICK_MESSAGES);
+    setEditingMsgId(null);
+    toast.success('Mensagens restauradas ao padrão');
+  };
+
+  const handleEnrollRemarketing = async (flow: any) => {
+    setEnrollingFlowId(flow.id);
+    try {
+      await api.remarketing.update(flow.id, {
+        enrolled_leads: (flow.enrolled_leads || 0) + 1,
+      });
+      setRemarketingFlows(prev =>
+        prev.map(f => f.id === flow.id ? { ...f, enrolled_leads: (f.enrolled_leads || 0) + 1 } : f)
+      );
+      toast.success(`${editName || 'Lead'} adicionado ao fluxo "${flow.name}"`);
+    } catch {
+      toast.error('Erro ao adicionar ao fluxo');
+    } finally {
+      setEnrollingFlowId(null);
+    }
+  };
+
+  const handleAddNote = async () => {
+    const trimmed = newNote.trim();
+    if (!trimmed || !leadId || savingNote) return;
+    setSavingNote(true);
+    try {
+      const created = await leadNotesApi.create(leadId, trimmed);
+      setNotes(prev => [created, ...prev]);
+      setNewNote('');
+    } catch (err) {
+      toast.error('Erro ao guardar nota');
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    setDeletingNoteId(noteId);
+    try {
+      await leadNotesApi.delete(noteId);
+      setNotes(prev => prev.filter(n => n.id !== noteId));
+    } catch (err) {
+      toast.error('Erro ao apagar nota');
+    } finally {
+      setDeletingNoteId(null);
+    }
+  };
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -678,6 +896,66 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               </div>
             </div>
 
+            {/* Quick Notes Card */}
+            <div className="rounded-xl border border-border/60 overflow-hidden">
+              <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40 flex items-center justify-between">
+                <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <StickyNote className="w-3 h-3" />
+                  Notas Rápidas
+                </h5>
+                {loadingNotes && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+              </div>
+
+              {/* Existing notes */}
+              {notes.length > 0 && (
+                <div className="divide-y divide-border/30 max-h-48 overflow-y-auto">
+                  {notes.map((note) => (
+                    <div key={note.id} className="group flex items-start gap-2 px-3 py-2.5 hover:bg-muted/30 transition-colors">
+                      <p className="flex-1 text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap break-words min-w-0">
+                        {note.content}
+                      </p>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => handleDeleteNote(note.id)}
+                          disabled={deletingNoteId === note.id}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded text-muted-foreground hover:text-red-400 disabled:opacity-50"
+                        >
+                          {deletingNoteId === note.id
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <Trash2 className="w-3 h-3" />}
+                        </button>
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                          {new Date(note.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add note input */}
+              <div className="p-2.5 border-t border-border/30">
+                <div className="flex gap-2 items-end">
+                  <textarea
+                    ref={noteInputRef}
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddNote(); } }}
+                    placeholder="Adicionar nota... (Enter para guardar)"
+                    rows={2}
+                    className="flex-1 px-2.5 py-2 rounded-lg text-xs border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all placeholder:text-muted-foreground/50"
+                  />
+                  <button
+                    onClick={handleAddNote}
+                    disabled={!newNote.trim() || savingNote}
+                    className="p-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 transition-all flex-shrink-0"
+                  >
+                    {savingNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Notes Card */}
             {editNotes && (
               <div className="rounded-xl border border-border/60 overflow-hidden">
@@ -688,6 +966,193 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 </div>
                 <div className="px-3 py-3 text-sm leading-relaxed text-foreground/80">
                   {editNotes}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Messages Card */}
+            <div className="rounded-xl border border-border/60 overflow-hidden">
+              <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40 flex items-center justify-between">
+                <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <Zap className="w-3 h-3" />
+                  Mensagens Rápidas
+                </h5>
+                <div className="flex items-center gap-1">
+                  {editingMessages && (
+                    <button
+                      onClick={handleResetMessages}
+                      className="text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
+                      title="Restaurar padrão"
+                    >
+                      Resetar
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setEditingMessages(!editingMessages); setEditingMsgId(null); }}
+                    className={`p-1 rounded transition-colors ${editingMessages ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
+                    title={editingMessages ? 'Concluir edição' : 'Editar mensagens'}
+                  >
+                    {editingMessages ? <Check className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Edit mode: editing a specific message */}
+              {editingMessages && editingMsgId && (
+                <div className="p-2.5 border-b border-border/30 bg-muted/20 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-sm hover:bg-muted transition-colors"
+                      >
+                        {editMsgIcon}
+                      </button>
+                      {showEmojiPicker && (
+                        <div className="absolute top-full left-0 mt-1 p-1.5 bg-popover border border-border rounded-lg shadow-lg z-50 grid grid-cols-4 gap-0.5 w-36">
+                          {EMOJI_OPTIONS.map((emoji) => (
+                            <button
+                              key={emoji}
+                              onClick={() => { setEditMsgIcon(emoji); setShowEmojiPicker(false); }}
+                              className="w-7 h-7 rounded hover:bg-muted flex items-center justify-center text-sm transition-colors"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      value={editMsgLabel}
+                      onChange={(e) => setEditMsgLabel(e.target.value)}
+                      placeholder="Nome da mensagem"
+                      className="flex-1 px-2 py-1.5 rounded-lg text-xs border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <textarea
+                    value={editMsgText}
+                    onChange={(e) => setEditMsgText(e.target.value)}
+                    placeholder="Texto da mensagem... Use {{nome}} e {{empresa}} como variáveis"
+                    rows={3}
+                    className="w-full px-2.5 py-2 rounded-lg text-xs border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                  />
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-muted-foreground">Variáveis: {'{{nome}}'}, {'{{empresa}}'}</p>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => setEditingMsgId(null)}
+                        className="px-2.5 py-1 rounded-md text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleSaveEditMsg}
+                        disabled={!editMsgLabel.trim() || !editMsgText.trim()}
+                        className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 transition-all"
+                      >
+                        Salvar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className={`p-2 ${editingMessages ? 'space-y-1' : 'grid grid-cols-2 gap-1.5'}`}>
+                {quickMessages.map((msg) => (
+                  <div key={msg.id} className="group relative">
+                    {editingMessages ? (
+                      <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors">
+                        <span className="text-sm flex-shrink-0">{msg.icon}</span>
+                        <span className="text-xs font-medium text-foreground/80 flex-1 truncate">{msg.label}</span>
+                        <button
+                          onClick={() => handleStartEditMsg(msg)}
+                          className={`p-1 rounded transition-colors ${editingMsgId === msg.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                          title="Editar"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMsg(msg.id)}
+                          className="p-1 rounded text-muted-foreground hover:text-red-400 transition-colors"
+                          title="Remover"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleSendQuickMessage(msg)}
+                          disabled={sendingMsgId === msg.id}
+                          className="w-full text-left px-2.5 py-2 rounded-lg text-xs font-medium transition-all hover:bg-primary/10 border border-transparent hover:border-primary/20 flex items-center gap-2 text-foreground/80 disabled:opacity-50"
+                          title={resolveTemplate(msg.text)}
+                        >
+                          <span className="text-sm flex-shrink-0">{msg.icon}</span>
+                          <span className="truncate">{msg.label}</span>
+                          {sendingMsgId === msg.id && <Loader2 className="w-3 h-3 animate-spin ml-auto flex-shrink-0" />}
+                        </button>
+                        <button
+                          onClick={() => handleCopyMessage(msg)}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-foreground transition-opacity"
+                          title="Copiar mensagem"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Add new message button in edit mode */}
+              {editingMessages && (
+                <div className="px-2 pb-2">
+                  <button
+                    onClick={handleAddNewMsg}
+                    className="w-full py-1.5 rounded-lg text-[10px] font-medium text-muted-foreground hover:text-foreground border border-dashed border-border/60 hover:border-primary/30 flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <Plus className="w-3 h-3" /> Adicionar mensagem
+                  </button>
+                </div>
+              )}
+
+              {!onSendMessage && !editingMessages && (
+                <div className="px-3 pb-2">
+                  <p className="text-[10px] text-muted-foreground text-center">Clique para copiar</p>
+                </div>
+              )}
+            </div>
+
+            {/* Remarketing Flows Card */}
+            {remarketingFlows.length > 0 && (
+              <div className="rounded-xl border border-border/60 overflow-hidden">
+                <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40">
+                  <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <Target className="w-3 h-3" />
+                    Remarketing
+                  </h5>
+                </div>
+                <div className="divide-y divide-border/30 max-h-40 overflow-y-auto">
+                  {remarketingFlows.map((flow) => (
+                    <div key={flow.id} className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted/30 transition-colors">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                        <Target className="w-3.5 h-3.5 text-emerald-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate text-foreground">{flow.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{flow.enrolled_leads || 0} leads</p>
+                      </div>
+                      <button
+                        onClick={() => handleEnrollRemarketing(flow)}
+                        disabled={enrollingFlowId === flow.id}
+                        className="px-2 py-1 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors disabled:opacity-50 flex items-center gap-1 flex-shrink-0"
+                      >
+                        {enrollingFlowId === flow.id
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <><Plus className="w-3 h-3" /> Adicionar</>}
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

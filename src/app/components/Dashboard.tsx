@@ -12,6 +12,7 @@ import PlanoWidget from './dashboard/PlanoWidget';
 import RecentLeadsSection from './dashboard/RecentLeadsSection';
 import SalesFunnel from './dashboard/SalesFunnel';
 import AdvancedAnalytics from './dashboard/AdvancedAnalytics';
+import AIIntelligencePanel from './dashboard/AIIntelligencePanel';
 
 // Navigation components
 import RefactoredHeader from './navigation/RefactoredHeader';
@@ -62,6 +63,7 @@ import { notifyTourAvailable } from '../utils/notificationHelpers';
 import { leadsApi, userApi, integrationsApi } from '../utils/api';
 import { conversationsApi } from '../services/api/inbox';
 import { useLeadsAutoRefresh } from '../hooks/useLeadsAutoRefresh';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { useConfirm } from './ui/ConfirmDialog';
 import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
 
@@ -584,6 +586,28 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     onRefresh: carregarLeads,
     enabled: currentPage === 'dashboard' || currentPage === 'leads',
     interval: 15000,
+  });
+
+  // Escutar eventos de movimentação de funil em tempo real (via assistente IA)
+  useWebSocket({
+    onLeadFunnelUpdate: (data) => {
+      // Atualizar lead na lista local sem precisar de nova requisição
+      setLeads(prev => prev.map(lead =>
+        lead.id === data.leadId ? { ...lead, status: data.newStatus } : lead
+      ));
+
+      const statusLabels: Record<string, string> = {
+        contatado: 'Contatado',
+        qualificado: 'Qualificado',
+        negociacao: 'Em Negociação',
+        convertido: 'Convertido',
+        perdido: 'Perdido',
+      };
+      const newLabel = statusLabels[data.newStatus] || data.newStatus;
+      toast.success(`🤖 ${data.assistantName || 'Assistente IA'} moveu "${data.leadName}" para ${newLabel}`, {
+        duration: 5000,
+      });
+    },
   });
 
   // Check if user can perform action based on limits
@@ -2099,11 +2123,11 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
             <div className={`w-full min-w-0 ${
               currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
                 ? 'h-full flex-1 min-h-0 max-w-none px-0 py-0 overflow-hidden'
-                : 'max-w-[1720px] mx-auto px-6 sm:px-8 lg:px-10 py-8'
+                : 'max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-10 py-4 sm:py-6 lg:py-8'
             }`}>
             {/* Renderizar conteúdo baseado na página atual */}
             {currentPage === 'dashboard' && (
-              <div className="space-y-8">
+              <div className="space-y-4 sm:space-y-6 lg:space-y-8">
                 {/* Widget de Planos */}
                 <PlanoWidget
                   limites={limites}
@@ -2144,14 +2168,23 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   onFilterChange={handleAplicarFiltros}
                 />
 
-                {/* Seção de Leads Recentes */}
-                <RecentLeadsSection
-                  leads={leads}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onChat={handleChat}
-                  onSendEmail={handleSendEmail}
-                />
+                {/* Seção de Leads Recentes + IA Insights */}
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
+                  <div className="xl:col-span-2 flex flex-col">
+                    <RecentLeadsSection
+                      leads={leads}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onChat={handleChat}
+                      onSendEmail={handleSendEmail}
+                    />
+                  </div>
+                  <div className="xl:col-span-1 flex flex-col">
+                    <AIIntelligencePanel
+                      onNavigateToRemarketing={() => setCurrentPage('remarketing')}
+                    />
+                  </div>
+                </div>
                 
                 {/* Barra de Filtros */}
                 <FilterBar
@@ -2404,7 +2437,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
             )}
 
             {currentPage === 'security' && (
-              <SecurityPage user={user} />
+              <AccountSettingsPage user={user} onUpdateUser={onUserUpdate} initialTab="security" />
             )}
 
             {currentPage === 'account' && (
