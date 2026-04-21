@@ -94,20 +94,16 @@ export default function AIInsightsPage() {
   const handleGenerateMessage = async (lead: LeadInsight) => {
     try {
       setGeneratingFor(lead.id);
-      // Gerar 3 mensagens diferentes
-      const suggestions: string[] = [];
-      for (let i = 0; i < 3; i++) {
-        const res = await api.aiRemarketing.generateMessage({
-          leadId: lead.id,
-          tone: i === 0 ? 'friendly' : i === 1 ? 'professional' : 'urgent',
-          goal: 'follow-up',
-          channel: lead.recommended_channel || 'whatsapp'
-        });
-        if (res?.suggestions?.[0]) {
-          suggestions.push(res.suggestions[0]);
-        }
-      }
-      
+      // Uma chamada retorna 3 sugestões diferentes
+      const res = await api.aiRemarketing.generateMessage({
+        leadId: lead.id,
+        tone: 'friendly',
+        goal: 'follow-up',
+        channel: lead.recommended_channel || 'whatsapp'
+      });
+
+      const suggestions: string[] = res?.suggestions || [];
+
       if (suggestions.length > 0) {
         setMessages(prev => ({
           ...prev,

@@ -9,6 +9,7 @@ import { errorMiddleware } from './middleware/error.middleware';
 import { initDatabase } from './database/init';
 import { campaignScheduler } from './services/campaign-scheduler.service';
 import { campaignCleanupService } from './services/campaign-cleanup.service';
+import { inactivityScheduler } from './services/inactivity-scheduler.service';
 // INBOX: Importar WebSocket service e Email Polling
 import { initializeWebSocket } from './services/websocket.service';
 import { emailPollingService } from './services/email-polling.service';
@@ -90,6 +91,9 @@ initDatabase().then(() => {
   // ✅ Iniciar serviço de limpeza automática de campanhas
   campaignCleanupService.start();
   console.log('[Leadflow API] Campaign cleanup service iniciado ✅');
+
+  // ✅ Iniciar verificação de inatividade de leads (flows de remarketing)
+  inactivityScheduler.start();
 
   // INBOX: Criar HTTP server e inicializar WebSocket
   const server = http.createServer(app);

@@ -1,6 +1,17 @@
 import { Router } from 'express';
 import { authMiddleware, type AuthenticatedRequest } from '../middleware/auth.middleware';
 import { query } from '../database/connection';
+import { WhatsAppService } from '../services/whatsapp.service';
+import { ChannelsService } from '../services/channels.service';
+import { ConversationsService } from '../services/conversations.service';
+import { MessagesService } from '../services/messages.service';
+import { FlowExecutionService } from '../services/flow-execution.service';
+
+const whatsappService = new WhatsAppService();
+const channelsService = new ChannelsService();
+const conversationsService = new ConversationsService();
+const messagesService = new MessagesService();
+const flowExecutionService = new FlowExecutionService();
 
 const router = Router();
 router.use(authMiddleware);
@@ -189,6 +200,12 @@ router.post('/analyze', async (req: AuthenticatedRequest, res, next) => {
         ],
       );
       analyzed++;
+
+      // 🔥 Fire lead_score trigger flows when score is significant (≥ 20 to avoid noise)
+      if (s.engagement_score >= 20) {
+        flowExecutionService.triggerFlowsForLead(userId, lead.id, 'lead_score', String(s.engagement_score))
+          .catch(err => console.error('[AIAnalyze] lead_score trigger error:', (err as any).message));
+      }
     }
 
     res.json({ success: true, analyzed });
@@ -511,56 +528,109 @@ router.post('/send-message', async (req: AuthenticatedRequest, res, next) => {
 
     const lead = leadResult.rows[0];
 
-    // Determine the contact method based on channel
+    // Determine the contact number (phone is fallback for whatsapp)
     let contactTarget = '';
-    if (channel === 'whatsapp' && lead.whatsapp) {
-      contactTarget = lead.whatsapp;
-    } else if (channel === 'sms' && lead.phone) {
-      contactTarget = lead.phone;
-    } else if (channel === 'email' && lead.email) {
-      contactTarget = lead.email;
-    } else {
-      return res.status(400).json({ 
-        error: `Lead does not have a valid ${channel} contact method` 
+    if (channel === 'whatsapp') {
+      contactTarget = lead.whatsapp || lead.phone || '';
+    } else if (channel === 'sms') {
+      contactTarget = lead.phone || '';
+    } else if (channel === 'email') {
+      contactTarget = lead.email || '';
+    }
+
+    if (!contactTarget) {
+      return res.status(400).json({
+        error: `Lead não possui contato válido para o canal ${channel}`,
       });
     }
 
-    // Ensure messages_sent table exists
-    await query(`
-      CREATE TABLE IF NOT EXISTS messages_sent (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
-        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-        channel VARCHAR(20) NOT NULL,
-        contact_target VARCHAR(255),
-        content TEXT NOT NULL,
-        status VARCHAR(20) DEFAULT 'sent',
-        sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      )
-    `);
+    // Find user's connected WhatsApp channel
+    let whatsappChannel: any = null;
+    if (channel === 'whatsapp') {
+      const whatsappChannels = await channelsService.findByType('whatsapp', userId);
+      whatsappChannel = whatsappChannels.find(
+        (c: any) => c.status === 'connected' || c.status === 'active',
+      );
 
-    // Save message record
-    const messageResult = await query(
-      `INSERT INTO messages_sent 
-        (lead_id, user_id, channel, contact_target, content, status, sent_at)
-       VALUES ($1, $2, $3, $4, $5, 'sent', NOW())
-       RETURNING id, created_at`,
-      [leadId, userId, channel, contactTarget, content],
-    );
+      if (!whatsappChannel) {
+        const cloudChannels = await channelsService.findByType('whatsapp_cloud', userId);
+        whatsappChannel = cloudChannels.find(
+          (c: any) => c.status === 'connected' || c.status === 'active' || c.status === 'pending',
+        );
+      }
 
-    const messageId = messageResult.rows[0]?.id;
+      if (!whatsappChannel) {
+        return res.status(400).json({
+          error: 'Nenhum canal WhatsApp ativo encontrado. Conecte o WhatsApp primeiro.',
+        });
+      }
 
-    // Update lead's last_contact_at timestamp
-    await query(
-      'UPDATE leads SET last_contact_at = NOW() WHERE id = $1',
-      [leadId],
-    );
+      const instanceId =
+        whatsappChannel.credentials?.instance_id ||
+        whatsappChannel.credentials?.instance_name;
+
+      if (!instanceId) {
+        return res.status(400).json({ error: 'Canal WhatsApp não tem instância configurada' });
+      }
+
+      // Actually send via Evolution API
+      await whatsappService.sendMessage({
+        instanceId,
+        number: contactTarget,
+        text: content,
+      });
+    }
+
+    // Build remoteJid for inbox
+    const cleanPhone = contactTarget.replace(/\D/g, '');
+    const remoteJid = contactTarget.includes('@')
+      ? contactTarget
+      : `${cleanPhone}@s.whatsapp.net`;
+
+    // Find or create conversation so message appears in inbox
+    let conversationId: string | null = null;
+    if (whatsappChannel) {
+      try {
+        const conversation = await conversationsService.findOrCreate(
+          userId,
+          whatsappChannel.id,
+          remoteJid,
+          leadId,
+          { contact_name: lead.name, phone: cleanPhone },
+        );
+        conversationId = conversation.id;
+      } catch (convErr) {
+        console.warn('[AI-Remarketing] Could not find/create conversation:', convErr);
+      }
+    }
+
+    // Save message to inbox messages table so it appears in inbox
+    let savedMessage: any = null;
+    try {
+      savedMessage = await messagesService.create(
+        {
+          conversation_id: conversationId,
+          lead_id: leadId,
+          direction: 'out',
+          channel,
+          content,
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          metadata: { remote_jid: remoteJid, phone: cleanPhone, source: 'motor_de_vendas' },
+        },
+        userId,
+      );
+    } catch (msgErr) {
+      console.warn('[AI-Remarketing] Could not save message to inbox:', msgErr);
+    }
+
+    // Update lead's last_contact_at
+    await query('UPDATE leads SET last_contact_at = NOW() WHERE id = $1', [leadId]);
 
     res.json({
       success: true,
-      messageId,
-      message: `Message sent to ${lead.name} via ${channel}`,
+      messageId: savedMessage?.id,
+      message: `Mensagem enviada para ${lead.name} via ${channel}`,
       sentAt: new Date().toISOString(),
     });
   } catch (err) {

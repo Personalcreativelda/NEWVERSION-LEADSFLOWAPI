@@ -257,6 +257,16 @@ router.put('/lead-tag/add-leads', async (req, res, next) => {
     );
 
     console.log(`[LeadsAPI] ✅ Tag "${tag}" added to ${result.rowCount} leads`);
+
+    // 🔁 Fire tag trigger flows for each lead (fire and forget)
+    if (result.rowCount && result.rowCount > 0) {
+      for (const leadId of leadIds) {
+        flowExecutionService.triggerFlowsForLead(user.id, leadId, 'tag', tag).catch(err => {
+          console.error(`[LeadsAPI] Error triggering tag flows for lead ${leadId}:`, err);
+        });
+      }
+    }
+
     res.json({ success: true, updated: result.rowCount });
   } catch (error) {
     next(error);
@@ -445,6 +455,20 @@ router.put('/:id', async (req, res, next) => {
         leadId: lead.id,
         metadata: { oldStatus: oldLead.status, newStatus: req.body.status }
       });
+
+      // 🔁 Disparar flows de remarketing ativos para este lead (fire and forget)
+      flowExecutionService.triggerFlowsForLead(
+        user.id, req.params.id, 'funnel_stage', req.body.status,
+      ).catch(err => {
+        console.error(`[LeadsAPI] Error triggering funnel_stage flows:`, err);
+      });
+
+      // 🛒 Also fire purchase trigger when lead is converted
+      if (req.body.status === 'convertido') {
+        flowExecutionService.triggerFlowsForLead(user.id, req.params.id, 'purchase', 'convertido').catch(err => {
+          console.error(`[LeadsAPI] Error triggering purchase flows:`, err);
+        });
+      }
     }
 
     res.json(lead);

@@ -168,12 +168,12 @@ const STEP_COLORS: Record<ActionType, string> = {
   condition: 'text-orange-500 bg-orange-500/10',
 };
 
-const TRIGGER_OPTIONS: { value: TriggerType; label: string }[] = [
-  { value: 'inactivity',   label: 'Inatividade' },
-  { value: 'funnel_stage', label: 'Etapa do funil' },
-  { value: 'tag',          label: 'Tag aplicada' },
-  { value: 'purchase',     label: 'Compra realizada' },
-  { value: 'lead_score',   label: 'Lead score' },
+const TRIGGER_OPTIONS: { value: TriggerType; label: string; description: string }[] = [
+  { value: 'funnel_stage', label: 'Etapa do funil',     description: 'Dispara quando o lead é movido para a etapa escolhida.' },
+  { value: 'tag',          label: 'Tag aplicada',       description: 'Dispara quando a tag especificada é adicionada ao lead.' },
+  { value: 'inactivity',   label: 'Inatividade',        description: 'Dispara automaticamente quando o lead não é contactado há X dias (verificação a cada 6h).' },
+  { value: 'purchase',     label: 'Compra realizada',   description: 'Dispara quando o lead é marcado como Convertido no funil.' },
+  { value: 'lead_score',   label: 'Motor de Vendas',    description: 'Dispara quando o Motor de Vendas calcula um score ≥ X ao analisar os leads.' },
 ];
 
 const ACTION_OPTIONS: { value: ActionType; label: string }[] = [
@@ -185,35 +185,116 @@ const ACTION_OPTIONS: { value: ActionType; label: string }[] = [
   { value: 'condition',  label: 'Condição (bifurcação)' },
 ];
 
+// ─── Funnel stages (match backend valid statuses) ────────────────────────────
+
+const FUNNEL_STAGES = [
+  { value: 'novo',        label: 'Novo Lead' },
+  { value: 'contatado',   label: 'Contatado' },
+  { value: 'qualificado', label: 'Qualificado' },
+  { value: 'negociacao',  label: 'Em Negociação' },
+  { value: 'convertido',  label: 'Convertido' },
+  { value: 'perdido',     label: 'Perdido' },
+];
+
+// Auto-generate step label from its config
+function stepLabel(type: ActionType, config: Record<string, any> = {}): string {
+  switch (type) {
+    case 'whatsapp':   return config.message   ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem WhatsApp';
+    case 'email':      return config.subject   ? `Email: ${config.subject}` : 'Enviar Email';
+    case 'wait':       return config.duration  ? `Aguardar ${config.duration} ${config.unit ?? 'dia(s)'}` : 'Aguardar';
+    case 'tag':        return config.tag       ? `Tag: ${config.tag}` : 'Aplicar Tag';
+    case 'move_stage': return config.stage     ? `Mover para "${FUNNEL_STAGES.find(s => s.value === config.stage)?.label ?? config.stage}"` : 'Mover Etapa';
+    case 'condition':  return config.condition ? `${config.condition}?` : 'Condição';
+    default:           return 'Ação';
+  }
+}
+
 // ─── Edit Modal ───────────────────────────────────────────────────────────────
 
 interface EditModalProps {
   flow: RemarketingFlow;
+  isNew?: boolean;
   onSave: (updated: RemarketingFlow) => void;
   onClose: () => void;
 }
 
-function EditModal({ flow, onSave, onClose }: EditModalProps) {
-  const [name, setName] = useState(flow.name);
+function EditModal({ flow, isNew = false, onSave, onClose }: EditModalProps) {
+  const [name,        setName]        = useState(flow.name);
   const [description, setDescription] = useState(flow.description);
-  const [trigger, setTrigger] = useState<TriggerType>(flow.trigger);
-  const [triggerLabel, setTriggerLabel] = useState(flow.triggerLabel);
-  const [steps, setSteps] = useState<FlowStep[]>(flow.steps.map(s => ({ ...s })));
+  const [trigger,     setTrigger]     = useState<TriggerType>(flow.trigger);
+  const [steps,       setSteps]       = useState<FlowStep[]>(flow.steps.map(s => ({ ...s, config: s.config ?? {} })));
 
+  // Trigger-specific config state (parsed from existing triggerLabel on first render)
+  const [triggerStage, setTriggerStage] = useState<string>(() => {
+    if (flow.trigger !== 'funnel_stage') return 'novo';
+    const match = FUNNEL_STAGES.find(s => flow.triggerLabel.toLowerCase().includes(s.label.toLowerCase()));
+    return match?.value ?? 'novo';
+  });
+  const [triggerDays,  setTriggerDays]  = useState<string>(() => {
+    const m = flow.triggerLabel.match(/\+(\d+)/);
+    return m ? m[1] : '3';
+  });
+  const [triggerTag,   setTriggerTag]   = useState<string>(() => {
+    const m = flow.triggerLabel.match(/Tag:\s*(.+)/i);
+    return m ? m[1].trim() : '';
+  });
+  const [triggerScore, setTriggerScore] = useState<string>(() => {
+    const m = flow.triggerLabel.match(/(\d+)/);
+    return m ? m[1] : '80';
+  });
+
+  // Derive triggerLabel from structured config
+  const computedTriggerLabel = (): string => {
+    switch (trigger) {
+      case 'funnel_stage': {
+        const stageName = FUNNEL_STAGES.find(s => s.value === triggerStage)?.label ?? triggerStage;
+        return `${stageName} +${triggerDays || '3'} dias`;
+      }
+      case 'inactivity':  return `Inatividade +${triggerDays || '7'} dias`;
+      case 'tag':         return triggerTag ? `Tag: ${triggerTag}` : 'Tag aplicada';
+      case 'lead_score':  return `Score ≥ ${triggerScore || '80'}`;
+      case 'purchase':    return 'Compra realizada';
+      default:            return trigger;
+    }
+  };
+
+  const handleChangeTrigger = (val: TriggerType) => {
+    setTrigger(val);
+    // reset days to sensible default per type
+    if (val === 'inactivity') setTriggerDays('7');
+    if (val === 'funnel_stage') setTriggerDays('3');
+  };
+
+  // ── Step helpers ──────────────────────────────────────────────────────────
   const addStep = () => {
-    setSteps(prev => [...prev, { id: `s-${Date.now()}`, type: 'whatsapp', label: 'Nova ação' }]);
+    setSteps(prev => [...prev, { id: `s-${Date.now()}`, type: 'whatsapp', label: 'Mensagem WhatsApp', config: {} }]);
   };
 
   const removeStep = (id: string) => setSteps(prev => prev.filter(s => s.id !== id));
 
-  const updateStep = (id: string, field: keyof FlowStep, value: string) => {
-    setSteps(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
+  const updateStepType = (id: string, type: ActionType) => {
+    setSteps(prev => prev.map(s => {
+      if (s.id !== id) return s;
+      const config = {};
+      return { ...s, type, config, label: stepLabel(type, config) };
+    }));
+  };
+
+  const updateStepConfig = (id: string, key: string, value: string) => {
+    setSteps(prev => prev.map(s => {
+      if (s.id !== id) return s;
+      const config = { ...(s.config ?? {}), [key]: value };
+      return { ...s, config, label: stepLabel(s.type, config) };
+    }));
   };
 
   const handleSave = () => {
     if (!name.trim()) return;
-    onSave({ ...flow, name: name.trim(), description, trigger, triggerLabel, steps });
+    onSave({ ...flow, name: name.trim(), description, trigger, triggerLabel: computedTriggerLabel(), steps });
   };
+
+  const inputCls = 'flex-1 h-8 px-2 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary';
+  const selectCls = 'h-8 px-2 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
@@ -224,8 +305,8 @@ function EditModal({ flow, onSave, onClose }: EditModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-2">
-            <Pencil className="w-4 h-4 text-muted-foreground" />
-            <h2 className="font-semibold text-foreground text-sm">Editar Flow</h2>
+            {isNew ? <Plus className="w-4 h-4 text-muted-foreground" /> : <Pencil className="w-4 h-4 text-muted-foreground" />}
+            <h2 className="font-semibold text-foreground text-sm">{isNew ? 'Novo Flow' : 'Editar Flow'}</h2>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-4 h-4" />
@@ -258,31 +339,87 @@ function EditModal({ flow, onSave, onClose }: EditModalProps) {
           </div>
 
           {/* Trigger */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <label className="text-xs font-medium text-foreground">Gatilho</label>
-            <div className="flex gap-2">
-              <select
-                value={trigger}
-                onChange={e => {
-                  const val = e.target.value as TriggerType;
-                  setTrigger(val);
-                  setTriggerLabel(TRIGGER_OPTIONS.find(o => o.value === val)?.label ?? val);
-                }}
-                className="flex-1 h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                {TRIGGER_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+            <select
+              value={trigger}
+              onChange={e => handleChangeTrigger(e.target.value as TriggerType)}
+              className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {TRIGGER_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+
+            {/* Trigger description */}
+            <p className="text-[11px] text-muted-foreground flex items-start gap-1">
+              <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
+              {TRIGGER_OPTIONS.find(o => o.value === trigger)?.description}
+            </p>
+
+            {/* Context-aware trigger detail */}
+            {trigger === 'funnel_stage' && (
+              <div className="flex gap-2 items-center">
+                <select
+                  value={triggerStage}
+                  onChange={e => setTriggerStage(e.target.value)}
+                  className="flex-1 h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {FUNNEL_STAGES.map(s => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-xs text-muted-foreground">parado há +</span>
+                  <input
+                    type="number" min="1" value={triggerDays}
+                    onChange={e => setTriggerDays(e.target.value)}
+                    className="w-14 h-9 px-2 rounded-lg border border-border bg-background text-sm text-center text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <span className="text-xs text-muted-foreground">dias</span>
+                </div>
+              </div>
+            )}
+            {trigger === 'inactivity' && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Lead inativo há mais de</span>
+                <input
+                  type="number" min="1" value={triggerDays}
+                  onChange={e => setTriggerDays(e.target.value)}
+                  className="w-16 h-8 px-2 rounded-lg border border-border bg-background text-sm text-center text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <span className="text-xs text-muted-foreground">dias</span>
+              </div>
+            )}
+            {trigger === 'tag' && (
               <input
-                value={triggerLabel}
-                onChange={e => setTriggerLabel(e.target.value)}
-                className="w-36 h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="Ex: +7 dias"
+                value={triggerTag}
+                onChange={e => setTriggerTag(e.target.value)}
+                placeholder="Nome da tag (ex: cliente-vip)"
+                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               />
-            </div>
+            )}
+            {trigger === 'lead_score' && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Score mínimo ≥</span>
+                <input
+                  type="number" min="1" max="100" value={triggerScore}
+                  onChange={e => setTriggerScore(e.target.value)}
+                  className="w-20 h-8 px-2 rounded-lg border border-border bg-background text-sm text-center text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <span className="text-xs text-muted-foreground">pontos (0–100)</span>
+              </div>
+            )}
+            {trigger === 'purchase' && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <Info className="w-3 h-3" />
+                Dispara automaticamente quando marcar o lead como <strong>Convertido</strong> no Kanban ou no perfil do lead.
+              </p>
+            )}
+            {/* Preview */}
             <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-              <Info className="w-3 h-3" /> O detalhe à direita é o rótulo exibido no card (ex: "+7 dias", "≥ 80").
+              <Info className="w-3 h-3 flex-shrink-0" />
+              Rótulo no card: <span className="font-medium text-foreground ml-1">{computedTriggerLabel()}</span>
             </p>
           </div>
 
@@ -300,35 +437,98 @@ function EditModal({ flow, onSave, onClose }: EditModalProps) {
             {steps.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-3">Nenhum passo. Adicione acima.</p>
             )}
-            {steps.map((step, i) => {
+            {steps.map((step) => {
               const StepIcon = STEP_ICONS[step.type];
               const colorClass = STEP_COLORS[step.type];
+              const cfg = step.config ?? {};
               return (
-                <div key={step.id} className="flex items-center gap-2">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${colorClass}`}>
-                    <StepIcon className="w-3.5 h-3.5" />
+                <div key={step.id} className="flex flex-col gap-1.5 rounded-lg border border-border p-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${colorClass}`}>
+                      <StepIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <select
+                      value={step.type}
+                      onChange={e => updateStepType(step.id, e.target.value as ActionType)}
+                      className={`${selectCls} flex-1`}
+                    >
+                      {ACTION_OPTIONS.map(o => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => removeStep(step.id)}
+                      className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <select
-                    value={step.type}
-                    onChange={e => updateStep(step.id, 'type', e.target.value)}
-                    className="w-40 h-8 px-2 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    {ACTION_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                  <input
-                    value={step.label}
-                    onChange={e => updateStep(step.id, 'label', e.target.value)}
-                    className="flex-1 h-8 px-2 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                    placeholder="Descrição da ação"
-                  />
-                  <button
-                    onClick={() => removeStep(step.id)}
-                    className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+
+                  {/* Type-specific config */}
+                  {step.type === 'whatsapp' && (
+                    <textarea
+                      rows={2}
+                      value={cfg.message ?? ''}
+                      onChange={e => updateStepConfig(step.id, 'message', e.target.value)}
+                      placeholder="Digite a mensagem WhatsApp…"
+                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                    />
+                  )}
+                  {step.type === 'email' && (
+                    <input
+                      value={cfg.subject ?? ''}
+                      onChange={e => updateStepConfig(step.id, 'subject', e.target.value)}
+                      placeholder="Assunto do email"
+                      className={`${inputCls} w-full`}
+                    />
+                  )}
+                  {step.type === 'wait' && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number" min="1"
+                        value={cfg.duration ?? ''}
+                        onChange={e => updateStepConfig(step.id, 'duration', e.target.value)}
+                        placeholder="1"
+                        className={`${selectCls} w-20`}
+                      />
+                      <select
+                        value={cfg.unit ?? 'dias'}
+                        onChange={e => updateStepConfig(step.id, 'unit', e.target.value)}
+                        className={selectCls}
+                      >
+                        <option value="horas">horas</option>
+                        <option value="dias">dias</option>
+                        <option value="semanas">semanas</option>
+                      </select>
+                    </div>
+                  )}
+                  {step.type === 'tag' && (
+                    <input
+                      value={cfg.tag ?? ''}
+                      onChange={e => updateStepConfig(step.id, 'tag', e.target.value)}
+                      placeholder="Nome da tag (ex: cliente-vip)"
+                      className={`${inputCls} w-full`}
+                    />
+                  )}
+                  {step.type === 'move_stage' && (
+                    <select
+                      value={cfg.stage ?? 'negociacao'}
+                      onChange={e => updateStepConfig(step.id, 'stage', e.target.value)}
+                      className={`${selectCls} w-full`}
+                    >
+                      {FUNNEL_STAGES.map(s => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                  )}
+                  {step.type === 'condition' && (
+                    <input
+                      value={cfg.condition ?? ''}
+                      onChange={e => updateStepConfig(step.id, 'condition', e.target.value)}
+                      placeholder="Ex: Respondeu a mensagem"
+                      className={`${inputCls} w-full`}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -364,36 +564,71 @@ export default function RemarketingPage() {
   }, []);
 
   // ── Load on mount: try API, fall back to localStorage ────────────────────
+  const fetchFlows = useCallback(async (silent = false) => {
+    try {
+      const data = await api.remarketing.list();
+      const mapped: RemarketingFlow[] = data.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        status: r.status,
+        trigger: r.trigger_type,
+        triggerLabel: r.trigger_label,
+        steps: Array.isArray(r.steps) ? r.steps : [],
+        enrolledLeads: r.enrolled_leads ?? 0,
+        conversions: r.conversions ?? 0,
+        createdAt: r.created_at,
+        templateId: r.template_id,
+      }));
+      const local = loadLocal();
+      const merged = mapped.length > 0 ? mapped : local;
+      setFlows(merged);
+      if (mapped.length > 0) saveLocal(mapped);
+      return { mapped, local };
+    } catch {
+      if (!silent) setFlows(loadLocal());
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const data = await api.remarketing.list();
-        if (cancelled) return;
-        const mapped: RemarketingFlow[] = data.map((r: any) => ({
-          id: r.id,
-          name: r.name,
-          description: r.description,
-          status: r.status,
-          trigger: r.trigger_type,
-          triggerLabel: r.trigger_label,
-          steps: Array.isArray(r.steps) ? r.steps : [],
-          enrolledLeads: r.enrolled_leads ?? 0,
-          conversions: r.conversions ?? 0,
-          createdAt: r.created_at,
-          templateId: r.template_id,
-        }));
-        setFlows(mapped);
-        saveLocal(mapped);
-      } catch {
-        // Backend unavailable — load from localStorage
-        if (!cancelled) setFlows(loadLocal());
-      } finally {
-        if (!cancelled) setLoading(false);
+      const result = await fetchFlows();
+      if (cancelled) return;
+
+      // Sync local-only flows (temp ids) to backend
+      if (result && result.mapped.length === 0 && result.local.length > 0) {
+        for (const f of result.local) {
+          if (!f.id.startsWith('flow-')) continue;
+          try {
+            const created = await api.remarketing.create({
+              name: f.name,
+              description: f.description,
+              status: f.status,
+              trigger_type: f.trigger,
+              trigger_label: f.triggerLabel,
+              steps: f.steps,
+              template_id: f.templateId,
+            });
+            setFlows(prev => {
+              const next = prev.map(x => x.id === f.id ? { ...x, id: created.id, createdAt: created.created_at } : x);
+              saveLocal(next);
+              return next;
+            });
+          } catch { /* keep local id */ }
+        }
       }
+      if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [fetchFlows]);
+
+  // ── Auto-refresh stats (enrolled_leads / conversions) every 30s ──────────
+  useEffect(() => {
+    const id = setInterval(() => { fetchFlows(true); }, 30_000);
+    return () => clearInterval(id);
+  }, [fetchFlows]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleUseTemplate = async (template: typeof TEMPLATES[0]) => {
@@ -474,7 +709,44 @@ export default function RemarketingPage() {
     } catch { /* keep local copy */ }
   };
 
+  const handleCreateBlank = () => {
+    const blank: RemarketingFlow = {
+      id: `flow-${Date.now()}`,
+      name: '',
+      description: '',
+      status: 'draft',
+      trigger: 'inactivity',
+      triggerLabel: '',
+      steps: [],
+      enrolledLeads: 0,
+      conversions: 0,
+      createdAt: new Date().toISOString(),
+    };
+    setEditingFlow(blank);
+  };
+
   const handleSaveEdit = async (updated: RemarketingFlow) => {
+    // New flow (created blank) — add to list
+    const isNew = !flows.some(f => f.id === updated.id);
+    if (isNew) {
+      updateFlows(prev => [updated, ...prev]);
+      setActiveTab('flows');
+      setEditingFlow(null);
+      try {
+        const created = await api.remarketing.create({
+          name: updated.name,
+          description: updated.description,
+          status: updated.status,
+          trigger_type: updated.trigger,
+          trigger_label: updated.triggerLabel,
+          steps: updated.steps,
+        });
+        updateFlows(prev => prev.map(f =>
+          f.id === updated.id ? { ...f, id: created.id, createdAt: created.created_at } : f
+        ));
+      } catch { /* persisted locally */ }
+      return;
+    }
     updateFlows(prev => prev.map(f => f.id === updated.id ? updated : f));
     setEditingFlow(null);
     try {
@@ -504,10 +776,16 @@ export default function RemarketingPage() {
               Crie flows automáticos que re-engajam leads com base no comportamento no funil
             </p>
           </div>
-          <Button onClick={() => setActiveTab('templates')} className="gap-2 flex-shrink-0">
-            <Plus className="w-4 h-4" />
-            Novo Flow
-          </Button>
+          <div className="flex gap-2 flex-shrink-0">
+            <Button variant="outline" onClick={() => setActiveTab('templates')} className="gap-2">
+              <Layers className="w-4 h-4" />
+              Templates
+            </Button>
+            <Button onClick={handleCreateBlank} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Novo Flow
+            </Button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -733,6 +1011,7 @@ export default function RemarketingPage() {
     {editingFlow && (
       <EditModal
         flow={editingFlow}
+        isNew={!flows.some(f => f.id === editingFlow.id)}
         onSave={handleSaveEdit}
         onClose={() => setEditingFlow(null)}
       />
