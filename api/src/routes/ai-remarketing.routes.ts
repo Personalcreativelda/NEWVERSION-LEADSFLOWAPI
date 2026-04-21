@@ -694,7 +694,11 @@ router.post('/send-message', async (req: AuthenticatedRequest, res, next) => {
 
     const conversation = convResult.rows[0];
     const channelType: string = conversation?.channel_type || 'whatsapp';
-    const credentials: any = conversation?.credentials || {};
+    // Parse credentials defensively (jsonb comes as object, but fallback for text/varchar columns)
+    let credentials: any = conversation?.credentials || {};
+    if (typeof credentials === 'string') {
+      try { credentials = JSON.parse(credentials); } catch (_) { credentials = {}; }
+    }
     const recipientId: string = conversation?.remote_jid || '';
     const conversationId: string | null = conversation?.id || null;
 
@@ -771,8 +775,16 @@ router.post('/send-message', async (req: AuthenticatedRequest, res, next) => {
         return res.status(400).json({ error: 'Nenhum canal WhatsApp ativo encontrado. Conecte o WhatsApp primeiro.' });
       }
 
-      const creds = whatsappChannel.credentials || credentials;
-      if (channelType === 'whatsapp_cloud') {
+      // Parse channel credentials defensively
+      let creds: any = whatsappChannel.credentials || credentials;
+      if (typeof creds === 'string') {
+        try { creds = JSON.parse(creds); } catch (_) { creds = {}; }
+      }
+
+      const detectedChannelType: string = whatsappChannel.channel_type || whatsappChannel.type || channelType;
+      console.log(`[MotorVendas] WhatsApp path: detectedChannelType=${detectedChannelType} creds keys=${Object.keys(creds).join(',')}`);
+
+      if (detectedChannelType === 'whatsapp_cloud') {
         // Cloud API
         const phoneNumberId = creds.phone_number_id;
         const accessToken = creds.access_token;
@@ -798,9 +810,11 @@ router.post('/send-message', async (req: AuthenticatedRequest, res, next) => {
         }
       } else {
         // Evolution API
-        const instanceId = creds.instance_id || creds.instance_name;
+        // Accept any key variant stored in credentials
+        const instanceId = creds.instance_id || creds.instance_name || creds.instanceId || creds.instanceName || creds.instance;
+        console.log(`[MotorVendas] Evolution API instanceId=${instanceId} number=${contactTarget}`);
         if (!instanceId) {
-          return res.status(400).json({ error: 'Canal WhatsApp não tem instância configurada' });
+          return res.status(400).json({ error: 'Canal WhatsApp não tem instância configurada. Verifique as credenciais do canal.' });
         }
         await whatsappService.sendMessage({ instanceId, number: contactTarget, text: content });
       }

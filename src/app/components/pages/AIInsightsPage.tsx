@@ -58,7 +58,7 @@ export default function AIInsightsPage() {
   const [sendingStates, setSendingStates] = useState<Record<string, SendingState>>({});
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
 
-  // ── Ícone e label do canal ────────────────────────────────────────────────
+  // ── Ícone, label e badge do canal ─────────────────────────────────────────
   const getChannelInfo = (channel?: string) => {
     switch (channel) {
       case 'facebook':    return { icon: <Facebook className="w-3.5 h-3.5" />, label: 'Facebook', color: 'bg-blue-600' };
@@ -68,6 +68,16 @@ export default function AIInsightsPage() {
       case 'whatsapp_cloud': return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
       default:            return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
     }
+  };
+
+  const ChannelBadge = ({ channel }: { channel?: string }) => {
+    const { icon, label, color } = getChannelInfo(channel);
+    return (
+      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white ${color} flex-shrink-0`}>
+        {icon}
+        {label}
+      </span>
+    );
   };
 
   const loadInsights = useCallback(async () => {
@@ -350,8 +360,9 @@ export default function AIInsightsPage() {
                       <div key={lead.id} className="bg-gradient-to-br from-emerald-50/50 to-emerald-50/20 dark:from-emerald-950/20 dark:to-emerald-950/5 border-2 border-emerald-200/50 dark:border-emerald-800/30 rounded-lg p-4 space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                               <span className="font-bold text-foreground truncate">{lead.name}</span>
+                              <ChannelBadge channel={lead.recommended_channel} />
                               <span className="text-xs font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full whitespace-nowrap">
                                 {lead.conversion_probability}% chance
                               </span>
@@ -565,8 +576,9 @@ export default function AIInsightsPage() {
                         <div key={lead.id} className="bg-gradient-to-br from-red-50/50 to-red-50/20 dark:from-red-950/20 dark:to-red-950/5 border-2 border-red-200/50 dark:border-red-800/30 rounded-lg p-4 space-y-3">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <span className="font-bold text-foreground truncate">{lead.name}</span>
+                                <ChannelBadge channel={lead.recommended_channel} />
                                 <span className="text-xs font-bold bg-red-500/20 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full whitespace-nowrap">
                                   {lead.risk_level === 'high' ? 'Crítico' : 'Médio'}
                                 </span>
@@ -794,7 +806,10 @@ export default function AIInsightsPage() {
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-foreground truncate">{lead.name}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                            <p className="text-xs font-bold text-foreground truncate">{lead.name}</p>
+                            <ChannelBadge channel={lead.recommended_channel} />
+                          </div>
                           <p className="text-[10px] text-muted-foreground">{lead.conversion_probability}% conversão</p>
                         </div>
                       </div>
