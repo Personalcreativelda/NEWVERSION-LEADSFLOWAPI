@@ -48,6 +48,18 @@ interface ConvStats {
   responseRate: number;      // 0-100: % de msgs inbound que receberam resposta
 }
 
+/** Mapeia o campo 'source' do lead para o canal de comunicação correto */
+function mapSourceToChannel(source?: string | null): string | null {
+  if (!source) return null;
+  const s = source.toLowerCase();
+  if (s.includes('facebook') || s.includes('fb') || s.includes('messenger')) return 'facebook';
+  if (s.includes('instagram') || s.includes('ig_')) return 'instagram';
+  if (s.includes('telegram')) return 'telegram';
+  if (s.includes('whatsapp') || s.includes('wapp') || s === 'wa') return 'whatsapp';
+  if (s.includes('email') || s.includes('mail')) return 'email';
+  return null;
+}
+
 function daysSince(date: Date | null | undefined): number {
   if (!date) return 999;
   return Math.floor((Date.now() - new Date(date).getTime()) / 86_400_000);
@@ -137,8 +149,10 @@ function scoreOneLead(lead: any, convStats?: ConvStats): {
   else if (status === 'convertido')  next_best_action = 'Iniciar onboarding / upsell';
   else next_best_action = 'Revisar perfil e planejar abordagem';
 
-  // ─ Recommended channel — usar canal real da conversa, se disponível ────
-  const recommended_channel = convStats?.channelType ||
+  // ─ Recommended channel — usar canal real da conversa > source do funil > telefone/email ────
+  const recommended_channel =
+    convStats?.channelType ||
+    mapSourceToChannel(lead.source) ||
     (lead.whatsapp || lead.phone ? 'whatsapp' : lead.email ? 'email' : 'whatsapp');
 
   // ─ Best contact time ─────────────────────────────────────────────────────
@@ -195,7 +209,7 @@ router.post('/analyze', async (req: AuthenticatedRequest, res, next) => {
     `);
 
     const leadsResult = await query(
-      `SELECT id, name, status, score, tags, deal_value, phone, whatsapp, email, last_contact_at
+      `SELECT id, name, status, score, tags, deal_value, phone, whatsapp, email, last_contact_at, source
        FROM leads WHERE user_id = $1 AND status != 'perdido' OR (status = 'perdido' AND last_contact_at > NOW() - INTERVAL '30 days')`,
       [userId],
     );
@@ -330,7 +344,7 @@ router.get('/insights', async (req: AuthenticatedRequest, res, next) => {
     if (parseInt(countResult.rows[0]?.cnt ?? '0') === 0) {
       // Trigger inline analysis (same logic as POST /analyze)
       const leadsResult = await query(
-        `SELECT id, name, status, score, tags, deal_value, phone, whatsapp, email, last_contact_at
+        `SELECT id, name, status, score, tags, deal_value, phone, whatsapp, email, last_contact_at, source
          FROM leads WHERE user_id = $1`,
         [userId],
       );
@@ -386,9 +400,18 @@ router.get('/insights', async (req: AuthenticatedRequest, res, next) => {
     const hotResult = await query(
       `SELECT l.id, l.name, l.email, l.phone, l.whatsapp, l.status, l.deal_value, l.last_contact_at,
               s.engagement_score, s.conversion_probability, s.intent, s.next_best_action,
-              s.recommended_channel, s.best_contact_time
+              s.best_contact_time,
+              LOWER(COALESCE(real_ch.channel_type, l.source, s.recommended_channel)) AS recommended_channel
        FROM leads l
        JOIN lead_ai_scores s ON s.lead_id = l.id AND s.user_id = l.user_id
+       LEFT JOIN LATERAL (
+         SELECT ch.type AS channel_type
+         FROM conversations conv
+         JOIN channels ch ON ch.id = conv.channel_id
+         WHERE conv.lead_id = l.id AND conv.user_id = l.user_id
+         ORDER BY conv.last_message_at DESC NULLS LAST
+         LIMIT 1
+       ) real_ch ON true
        WHERE l.user_id = $1
          AND s.engagement_score >= 60
          AND l.status NOT IN ('perdido', 'convertido')
@@ -401,9 +424,17 @@ router.get('/insights', async (req: AuthenticatedRequest, res, next) => {
     const riskResult = await query(
       `SELECT l.id, l.name, l.email, l.phone, l.whatsapp, l.status, l.deal_value, l.last_contact_at,
               s.engagement_score, s.conversion_probability, s.risk_level, s.next_best_action,
-              s.recommended_channel
+              LOWER(COALESCE(real_ch.channel_type, l.source, s.recommended_channel)) AS recommended_channel
        FROM leads l
        JOIN lead_ai_scores s ON s.lead_id = l.id AND s.user_id = l.user_id
+       LEFT JOIN LATERAL (
+         SELECT ch.type AS channel_type
+         FROM conversations conv
+         JOIN channels ch ON ch.id = conv.channel_id
+         WHERE conv.lead_id = l.id AND conv.user_id = l.user_id
+         ORDER BY conv.last_message_at DESC NULLS LAST
+         LIMIT 1
+       ) real_ch ON true
        WHERE l.user_id = $1
          AND s.risk_level IN ('medium', 'high')
          AND l.status NOT IN ('perdido', 'convertido')
@@ -415,10 +446,19 @@ router.get('/insights', async (req: AuthenticatedRequest, res, next) => {
     // ── Recommended Actions: top priority next actions ─────────────────────
     const actionsResult = await query(
       `SELECT l.id, l.name, l.status, l.deal_value, l.last_contact_at,
-              s.next_best_action, s.recommended_channel, s.best_contact_time,
-              s.engagement_score, s.conversion_probability, s.intent
+              s.next_best_action, s.best_contact_time,
+              s.engagement_score, s.conversion_probability, s.intent,
+              LOWER(COALESCE(real_ch.channel_type, l.source, s.recommended_channel)) AS recommended_channel
        FROM leads l
        JOIN lead_ai_scores s ON s.lead_id = l.id AND s.user_id = l.user_id
+       LEFT JOIN LATERAL (
+         SELECT ch.type AS channel_type
+         FROM conversations conv
+         JOIN channels ch ON ch.id = conv.channel_id
+         WHERE conv.lead_id = l.id AND conv.user_id = l.user_id
+         ORDER BY conv.last_message_at DESC NULLS LAST
+         LIMIT 1
+       ) real_ch ON true
        WHERE l.user_id = $1
          AND l.status NOT IN ('perdido', 'convertido')
          AND s.next_best_action IS NOT NULL
@@ -816,7 +856,26 @@ router.post('/send-message', async (req: AuthenticatedRequest, res, next) => {
         if (!instanceId) {
           return res.status(400).json({ error: 'Canal WhatsApp não tem instância configurada. Verifique as credenciais do canal.' });
         }
-        await whatsappService.sendMessage({ instanceId, number: contactTarget, text: content });
+        try {
+          await whatsappService.sendMessage({ instanceId, number: contactTarget, text: content });
+        } catch (waErr: any) {
+          const errMsg: string = waErr?.message || '';
+          if (errMsg.includes('Connection Closed') || errMsg.includes('connection closed')) {
+            return res.status(503).json({
+              error: 'WhatsApp desconectado',
+              detail: 'A instância do WhatsApp está desconectada. Acesse Configurações > Canais e reconecte o WhatsApp.',
+              instanceId,
+            });
+          }
+          if (errMsg.includes('500') || errMsg.includes('Internal Server Error')) {
+            return res.status(503).json({
+              error: 'Erro no servidor WhatsApp',
+              detail: 'O servidor Evolution API retornou um erro interno. Tente reconectar a instância.',
+              instanceId,
+            });
+          }
+          throw waErr; // re-throw outros erros
+        }
       }
     }
 

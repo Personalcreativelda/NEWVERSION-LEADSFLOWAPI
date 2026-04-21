@@ -60,14 +60,14 @@ export default function AIInsightsPage() {
 
   // ── Ícone, label e badge do canal ─────────────────────────────────────────
   const getChannelInfo = (channel?: string) => {
-    switch (channel) {
-      case 'facebook':    return { icon: <Facebook className="w-3.5 h-3.5" />, label: 'Facebook', color: 'bg-blue-600' };
-      case 'instagram':   return { icon: <Instagram className="w-3.5 h-3.5" />, label: 'Instagram', color: 'bg-pink-600' };
-      case 'telegram':    return { icon: <Send className="w-3.5 h-3.5" />, label: 'Telegram', color: 'bg-sky-500' };
-      case 'email':       return { icon: <Mail className="w-3.5 h-3.5" />, label: 'Email', color: 'bg-gray-600' };
-      case 'whatsapp_cloud': return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
-      default:            return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
-    }
+    const ch = (channel || '').toLowerCase().trim();
+    if (ch === 'facebook' || ch === 'messenger' || ch.includes('facebook')) return { icon: <Facebook className="w-3.5 h-3.5" />, label: 'Facebook', color: 'bg-blue-600' };
+    if (ch === 'instagram' || ch.includes('instagram'))  return { icon: <Instagram className="w-3.5 h-3.5" />, label: 'Instagram', color: 'bg-pink-600' };
+    if (ch === 'telegram' || ch.includes('telegram'))    return { icon: <Send className="w-3.5 h-3.5" />, label: 'Telegram', color: 'bg-sky-500' };
+    if (ch === 'email' || ch.includes('email'))          return { icon: <Mail className="w-3.5 h-3.5" />, label: 'Email', color: 'bg-gray-600' };
+    if (ch === 'whatsapp_cloud')                         return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
+    if (ch === 'whatsapp' || ch.includes('whatsapp') || ch.includes('wapp')) return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
+    return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
   };
 
   const ChannelBadge = ({ channel }: { channel?: string }) => {
@@ -204,7 +204,13 @@ export default function AIInsightsPage() {
         toast.error('Erro ao enviar mensagem');
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Erro ao enviar mensagem. Tente novamente.');
+      // Mostrar mensagem específica para WhatsApp desconectado
+      const errData = err?.response?.data;
+      if (errData?.error === 'WhatsApp desconectado' || errData?.error === 'Erro no servidor WhatsApp') {
+        toast.error(`⚠️ ${errData.detail || errData.error}`, { duration: 6000 });
+      } else {
+        toast.error(errData?.detail || errData?.error || 'Erro ao enviar mensagem. Tente novamente.');
+      }
       setSendingStates(prev => ({
         ...prev,
         [lead.id]: { leadId: lead.id, isSending: false }
