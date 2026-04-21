@@ -3,7 +3,7 @@ import {
   Brain, RefreshCw, Flame, TrendingDown, TrendingUp, Star,
   Sparkles, CheckCircle2, Calendar, Target, MessageSquare, Mail,
   Zap, AlertCircle, ArrowRight, Lightbulb, Activity, Copy, Send,
-  ChevronDown, ChevronUp, Edit3, X
+  ChevronDown, ChevronUp, Edit3, X, Instagram, Facebook, Phone
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
@@ -57,6 +57,18 @@ export default function AIInsightsPage() {
   const [messages, setMessages] = useState<Record<string, MessageState>>({});
   const [sendingStates, setSendingStates] = useState<Record<string, SendingState>>({});
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
+
+  // ── Ícone e label do canal ────────────────────────────────────────────────
+  const getChannelInfo = (channel?: string) => {
+    switch (channel) {
+      case 'facebook':    return { icon: <Facebook className="w-3.5 h-3.5" />, label: 'Facebook', color: 'bg-blue-600' };
+      case 'instagram':   return { icon: <Instagram className="w-3.5 h-3.5" />, label: 'Instagram', color: 'bg-pink-600' };
+      case 'telegram':    return { icon: <Send className="w-3.5 h-3.5" />, label: 'Telegram', color: 'bg-sky-500' };
+      case 'email':       return { icon: <Mail className="w-3.5 h-3.5" />, label: 'Email', color: 'bg-gray-600' };
+      case 'whatsapp_cloud': return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
+      default:            return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
+    }
+  };
 
   const loadInsights = useCallback(async () => {
     try {
@@ -149,11 +161,10 @@ export default function AIInsightsPage() {
         [lead.id]: { leadId: lead.id, isSending: true }
       }));
 
-      // Enviar mensagem de verdade via API
+      // Enviar mensagem de verdade via API — backend detecta o canal automaticamente
       const res = await api.aiRemarketing.sendMessage({
         leadId: lead.id,
         content: contentToSend,
-        channel: lead.recommended_channel || 'whatsapp'
       });
       
       if (res?.success) {
@@ -162,7 +173,8 @@ export default function AIInsightsPage() {
           [lead.id]: { leadId: lead.id, isSending: false, sentAt: new Date() }
         }));
 
-        toast.success(`✓ Mensagem enviada para ${lead.name} com sucesso!`);
+        const chInfo = getChannelInfo(res.channel);
+        toast.success(`✓ Mensagem enviada para ${lead.name} via ${chInfo.label}!`);
         
         // Limpar estado após 3 segundos
         setTimeout(() => {
@@ -478,7 +490,7 @@ export default function AIInsightsPage() {
                               <div className="flex gap-2 pt-2">
                                 <Button
                                   size="sm"
-                                  className="flex-1 h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                                  className={`flex-1 h-7 text-xs gap-1.5 text-white font-semibold ${getChannelInfo(lead.recommended_channel).color} hover:opacity-90`}
                                   onClick={() => handleSendMessage(lead)}
                                   disabled={sendingStates[lead.id]?.isSending}
                                 >
@@ -494,8 +506,8 @@ export default function AIInsightsPage() {
                                     </>
                                   ) : (
                                     <>
-                                      <Send className="w-3.5 h-3.5" />
-                                      Enviar
+                                      {getChannelInfo(lead.recommended_channel).icon}
+                                      Enviar via {getChannelInfo(lead.recommended_channel).label}
                                     </>
                                   )}
                                 </Button>
@@ -700,7 +712,7 @@ export default function AIInsightsPage() {
                                 <div className="flex gap-2 pt-2">
                                   <Button
                                     size="sm"
-                                    className="flex-1 h-7 text-xs gap-1.5 bg-red-600 hover:bg-red-700 text-white font-semibold"
+                                    className={`flex-1 h-7 text-xs gap-1.5 text-white font-semibold ${getChannelInfo(lead.recommended_channel).color} hover:opacity-90`}
                                     onClick={() => handleSendMessage(lead)}
                                     disabled={sendingStates[lead.id]?.isSending}
                                   >
@@ -716,8 +728,8 @@ export default function AIInsightsPage() {
                                       </>
                                     ) : (
                                       <>
-                                        <Send className="w-3.5 h-3.5" />
-                                        Enviar
+                                        {getChannelInfo(lead.recommended_channel).icon}
+                                        Enviar via {getChannelInfo(lead.recommended_channel).label}
                                       </>
                                     )}
                                   </Button>
@@ -801,7 +813,7 @@ export default function AIInsightsPage() {
                           </p>
                           <Button
                             size="sm"
-                            className="w-full gap-1.5 h-7 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground"
+                            className={`w-full gap-1.5 h-7 text-xs font-semibold text-white ${getChannelInfo(lead.recommended_channel).color} hover:opacity-90`}
                             onClick={() => handleSendMessage(lead)}
                             disabled={sendingStates[lead.id]?.isSending}
                           >
@@ -817,8 +829,8 @@ export default function AIInsightsPage() {
                               </>
                             ) : (
                               <>
-                                <Send className="w-3.5 h-3.5" />
-                                Enviar
+                                {getChannelInfo(lead.recommended_channel).icon}
+                                Enviar via {getChannelInfo(lead.recommended_channel).label}
                               </>
                             )}
                           </Button>

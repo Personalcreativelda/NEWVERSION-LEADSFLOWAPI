@@ -2,20 +2,26 @@
 import React from 'react';
 import { ConversationItem } from './ConversationItem';
 import type { ConversationWithDetails } from '../../types/inbox';
-import { Loader2, Inbox } from 'lucide-react';
+import { Loader2, Inbox, CheckSquare, Square } from 'lucide-react';
 
 interface ConversationListProps {
     conversations: ConversationWithDetails[];
     selectedId: string | null;
     onSelect: (conversation: ConversationWithDetails) => void;
     loading: boolean;
+    isSelectMode?: boolean;
+    selectedIds?: Set<string>;
+    onToggleSelect?: (id: string) => void;
 }
 
 export function ConversationList({
     conversations,
     selectedId,
     onSelect,
-    loading
+    loading,
+    isSelectMode = false,
+    selectedIds = new Set(),
+    onToggleSelect,
 }: ConversationListProps) {
 
     if (loading && conversations.length === 0) {
@@ -48,12 +54,34 @@ export function ConversationList({
     return (
         <div className="overflow-x-hidden">
             {conversations.map((conversation) => (
-                <ConversationItem
-                    key={conversation.id}
-                    conversation={conversation}
-                    isSelected={selectedId === conversation.id}
-                    onClick={() => onSelect(conversation)}
-                />
+                <div key={conversation.id} className="relative flex items-center">
+                    {isSelectMode && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onToggleSelect?.(conversation.id); }}
+                            className="absolute left-2 z-10 p-1 rounded transition-colors text-muted-foreground hover:text-primary"
+                        >
+                            {selectedIds.has(conversation.id)
+                                ? <CheckSquare size={16} className="text-primary" />
+                                : <Square size={16} />
+                            }
+                        </button>
+                    )}
+                    <div
+                        className={`flex-1 min-w-0 transition-all duration-150 ${isSelectMode ? 'pl-8' : ''} ${isSelectMode && selectedIds.has(conversation.id) ? 'bg-primary/5' : ''}`}
+                    >
+                        <ConversationItem
+                            conversation={conversation}
+                            isSelected={!isSelectMode && selectedId === conversation.id}
+                            onClick={() => {
+                                if (isSelectMode) {
+                                    onToggleSelect?.(conversation.id);
+                                } else {
+                                    onSelect(conversation);
+                                }
+                            }}
+                        />
+                    </div>
+                </div>
             ))}
 
             {loading && conversations.length > 0 && (

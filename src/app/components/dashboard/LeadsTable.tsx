@@ -236,6 +236,21 @@ export default function LeadsTable({
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (leads.length === 0) return;
+    const confirmed = await confirm(`Tem certeza que deseja apagar TODOS os ${leads.length} contatos? Esta ação não pode ser desfeita.`, {
+      title: 'Apagar todos os contatos',
+      confirmLabel: 'Apagar Todos',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    if (onDeleteMultiple) {
+      const allIds = leads.map(l => l.id).filter(Boolean);
+      onDeleteMultiple(allIds);
+      setSelectedLeads(new Set());
+    }
+  };
+
   const allSelected = leadsExibidos.length > 0 && selectedLeads.size === leadsExibidos.length;
 
   // Funções de navegação
@@ -428,6 +443,16 @@ export default function LeadsTable({
                 <Megaphone className="w-5 h-5" />
               </button>
             )}
+
+            {selectedLeads.size > 0 && onDeleteMultiple && (
+              <button
+                onClick={allSelected ? handleDeleteAll : handleDeleteSelected}
+                className="flex items-center justify-center min-w-[40px] h-10 px-3 rounded-lg transition-all duration-150 shadow-sm bg-red-600 hover:bg-red-500 text-white"
+                title={allSelected ? `Apagar Todos (${leads.length})` : `Deletar Selecionados (${selectedLeads.size})`}
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -466,23 +491,22 @@ export default function LeadsTable({
             )}
 
             {selectedLeads.size > 0 && onDeleteMultiple && (
-              <button
-                onClick={handleDeleteSelected}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all duration-150 shadow-sm active:scale-[0.97]"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Deletar Selecionados ({selectedLeads.size})</span>
-              </button>
-            )}
-
-            {selectedLeads.size > 0 && (
-              <button
-                onClick={() => setSelectedLeads(new Set())}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border hover:bg-muted text-foreground rounded-lg transition-all duration-150 shadow-sm"
-              >
-                <Square className="w-4 h-4" />
-                <span>Limpar Seleção</span>
-              </button>
+              <>
+                <button
+                  onClick={allSelected ? handleDeleteAll : handleDeleteSelected}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all duration-150 shadow-sm active:scale-[0.97]"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{allSelected ? `Apagar Todos (${leads.length})` : `Deletar Selecionados (${selectedLeads.size})`}</span>
+                </button>
+                <button
+                  onClick={() => setSelectedLeads(new Set())}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border hover:bg-muted text-foreground rounded-lg transition-all duration-150 shadow-sm"
+                >
+                  <Square className="w-4 h-4" />
+                  <span>Limpar Seleção</span>
+                </button>
+              </>
             )}
 
             {onRefresh && (

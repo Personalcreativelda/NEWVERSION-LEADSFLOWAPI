@@ -36,12 +36,24 @@ const STATUS_CONV_PROB: Record<string, number> = {
   perdido: 0,
 };
 
+/** Dados reais de conversa do lead vindos do inbox */
+interface ConvStats {
+  channelType: string;   // whatsapp | facebook | telegram | instagram | email
+  channelId: string;
+  recipientId: string;   // remote_jid / PSID / chat_id / etc.
+  totalMessages: number;
+  inboundMessages: number;   // mensagens enviadas pelo lead
+  outboundMessages: number;  // mensagens enviadas pela empresa
+  daysSinceLastMsg: number;  // dias desde a última mensagem no inbox
+  responseRate: number;      // 0-100: % de msgs inbound que receberam resposta
+}
+
 function daysSince(date: Date | null | undefined): number {
   if (!date) return 999;
   return Math.floor((Date.now() - new Date(date).getTime()) / 86_400_000);
 }
 
-function scoreOneLead(lead: any): {
+function scoreOneLead(lead: any, convStats?: ConvStats): {
   engagement_score: number;
   conversion_probability: number;
   intent: string;
@@ -52,7 +64,9 @@ function scoreOneLead(lead: any): {
   ai_notes: string;
 } {
   const status = (lead.status || 'novo').toLowerCase();
-  const days = daysSince(lead.last_contact_at);
+  // Use inbox last message date if more recent than lead.last_contact_at
+  const leadDays = daysSince(lead.last_contact_at);
+  const days = convStats ? Math.min(leadDays, convStats.daysSinceLastMsg) : leadDays;
 
   // ─ Engagement score ─────────────────────────────────────────────────────
   const statusBase = (STATUS_SCORE[status] ?? 10) * 0.55;
@@ -67,9 +81,27 @@ function scoreOneLead(lead: any): {
     (lead.whatsapp || lead.phone ? 4 : 0) +
     (lead.email                  ? 3 : 0);
 
+  // ─ Inbox activity bonus ──────────────────────────────────────────────────
+  let inboxBonus = 0;
+  if (convStats) {
+    inboxBonus += 5; // tem conversa ativa
+    if (convStats.totalMessages >= 20)     inboxBonus += 12;
+    else if (convStats.totalMessages >= 10) inboxBonus += 8;
+    else if (convStats.totalMessages >= 5)  inboxBonus += 4;
+    if (convStats.inboundMessages > 0)      inboxBonus += 5; // lead enviou msgs
+    if (convStats.responseRate >= 80)       inboxBonus += 6;
+    else if (convStats.responseRate >= 50)  inboxBonus += 3;
+    // Inbox mais recente que last_contact_at — recalcular bônus
+    if (convStats.daysSinceLastMsg < leadDays) {
+      const d = convStats.daysSinceLastMsg;
+      const extraRecency = (d < 1 ? 30 : d < 3 ? 22 : d < 7 ? 12 : d < 14 ? 5 : 0) - recency;
+      inboxBonus += Math.max(0, extraRecency);
+    }
+  }
+
   const engagement_score = Math.min(
     100,
-    Math.round(statusBase + recency + valuePts + tagPts + contactPts),
+    Math.round(statusBase + recency + valuePts + tagPts + contactPts + inboxBonus),
   );
 
   // ─ Conversion probability ────────────────────────────────────────────────
@@ -105,9 +137,9 @@ function scoreOneLead(lead: any): {
   else if (status === 'convertido')  next_best_action = 'Iniciar onboarding / upsell';
   else next_best_action = 'Revisar perfil e planejar abordagem';
 
-  // ─ Recommended channel ────────────────────────────────────────────────────
-  const recommended_channel =
-    lead.whatsapp || lead.phone ? 'whatsapp' : lead.email ? 'email' : 'whatsapp';
+  // ─ Recommended channel — usar canal real da conversa, se disponível ────
+  const recommended_channel = convStats?.channelType ||
+    (lead.whatsapp || lead.phone ? 'whatsapp' : lead.email ? 'email' : 'whatsapp');
 
   // ─ Best contact time ─────────────────────────────────────────────────────
   const best_contact_time =
@@ -118,7 +150,8 @@ function scoreOneLead(lead: any): {
   // ─ AI notes ──────────────────────────────────────────────────────────────
   const ai_notes =
     `Score: ${engagement_score}/100 | Conversão: ${conversion_probability}% | ` +
-    `Último contato: ${days > 998 ? 'nunca' : `há ${days}d`} | Status: ${status}`;
+    `Último contato: ${days > 998 ? 'nunca' : `há ${days}d`} | Status: ${status}` +
+    (convStats ? ` | Canal: ${convStats.channelType} | Msgs: ${convStats.totalMessages}` : '');
 
   return {
     engagement_score,
@@ -172,9 +205,55 @@ router.post('/analyze', async (req: AuthenticatedRequest, res, next) => {
       return res.json({ success: true, analyzed: 0 });
     }
 
+    // ── Buscar stats de inbox para todos os leads de uma vez ───────────────
+    const convStatsResult = await query(
+      `SELECT DISTINCT ON (conv.lead_id)
+         conv.lead_id,
+         ch.type                                            AS channel_type,
+         ch.id                                             AS channel_id,
+         conv.remote_jid,
+         COUNT(m.id)::int                                  AS total_messages,
+         COUNT(m.id) FILTER (WHERE m.direction = 'in')::int AS inbound_messages,
+         COUNT(m.id) FILTER (WHERE m.direction = 'out')::int AS outbound_messages,
+         COALESCE(
+           EXTRACT(EPOCH FROM (NOW() - MAX(m.created_at))) / 86400,
+           999
+         )::float                                          AS days_since_last_msg,
+         CASE
+           WHEN COUNT(m.id) FILTER (WHERE m.direction = 'in') = 0 THEN 0
+           ELSE ROUND(
+             100.0 * COUNT(m.id) FILTER (WHERE m.direction = 'out') /
+             NULLIF(COUNT(m.id) FILTER (WHERE m.direction = 'in'), 0)
+           )
+         END::int                                          AS response_rate
+       FROM conversations conv
+       JOIN channels ch ON ch.id = conv.channel_id
+       LEFT JOIN messages m ON m.conversation_id = conv.id
+       WHERE conv.user_id = $1 AND conv.lead_id IS NOT NULL
+       GROUP BY conv.lead_id, ch.type, ch.id, conv.remote_jid, conv.last_message_at
+       ORDER BY conv.lead_id, conv.last_message_at DESC NULLS LAST`,
+      [userId],
+    );
+
+    const convStatsMap = new Map<string, ConvStats>();
+    for (const row of convStatsResult.rows) {
+      if (!convStatsMap.has(row.lead_id)) {
+        convStatsMap.set(row.lead_id, {
+          channelType: row.channel_type,
+          channelId: row.channel_id,
+          recipientId: row.remote_jid,
+          totalMessages: Number(row.total_messages),
+          inboundMessages: Number(row.inbound_messages),
+          outboundMessages: Number(row.outbound_messages),
+          daysSinceLastMsg: Number(row.days_since_last_msg),
+          responseRate: Number(row.response_rate),
+        });
+      }
+    }
+
     let analyzed = 0;
     for (const lead of leads) {
-      const s = scoreOneLead(lead);
+      const s = scoreOneLead(lead, convStatsMap.get(lead.id));
       await query(
         `INSERT INTO lead_ai_scores
            (lead_id, user_id, engagement_score, conversion_probability, intent, risk_level,
@@ -255,8 +334,41 @@ router.get('/insights', async (req: AuthenticatedRequest, res, next) => {
          FROM leads WHERE user_id = $1`,
         [userId],
       );
+
+      // Batch fetch conv stats for inline scoring
+      const inlineConvResult = await query(
+        `SELECT DISTINCT ON (conv.lead_id)
+           conv.lead_id, ch.type AS channel_type, ch.id AS channel_id, conv.remote_jid,
+           COUNT(m.id)::int AS total_messages,
+           COUNT(m.id) FILTER (WHERE m.direction = 'in')::int AS inbound_messages,
+           COUNT(m.id) FILTER (WHERE m.direction = 'out')::int AS outbound_messages,
+           COALESCE(EXTRACT(EPOCH FROM (NOW() - MAX(m.created_at))) / 86400, 999)::float AS days_since_last_msg,
+           CASE WHEN COUNT(m.id) FILTER (WHERE m.direction = 'in') = 0 THEN 0
+                ELSE ROUND(100.0 * COUNT(m.id) FILTER (WHERE m.direction = 'out') /
+                     NULLIF(COUNT(m.id) FILTER (WHERE m.direction = 'in'), 0))
+           END::int AS response_rate
+         FROM conversations conv
+         JOIN channels ch ON ch.id = conv.channel_id
+         LEFT JOIN messages m ON m.conversation_id = conv.id
+         WHERE conv.user_id = $1 AND conv.lead_id IS NOT NULL
+         GROUP BY conv.lead_id, ch.type, ch.id, conv.remote_jid, conv.last_message_at
+         ORDER BY conv.lead_id, conv.last_message_at DESC NULLS LAST`,
+        [userId],
+      );
+      const inlineConvMap = new Map<string, ConvStats>();
+      for (const row of inlineConvResult.rows) {
+        if (!inlineConvMap.has(row.lead_id)) {
+          inlineConvMap.set(row.lead_id, {
+            channelType: row.channel_type, channelId: row.channel_id,
+            recipientId: row.remote_jid, totalMessages: Number(row.total_messages),
+            inboundMessages: Number(row.inbound_messages), outboundMessages: Number(row.outbound_messages),
+            daysSinceLastMsg: Number(row.days_since_last_msg), responseRate: Number(row.response_rate),
+          });
+        }
+      }
+
       for (const lead of leadsResult.rows) {
-        const s = scoreOneLead(lead);
+        const s = scoreOneLead(lead, inlineConvMap.get(lead.id));
         await query(
           `INSERT INTO lead_ai_scores
              (lead_id, user_id, engagement_score, conversion_probability, intent, risk_level,
@@ -382,9 +494,22 @@ router.get('/lead/:leadId/score', async (req: AuthenticatedRequest, res, next) =
 router.post('/generate-message', async (req: AuthenticatedRequest, res, next) => {
   try {
     const userId = req.user!.id;
-    const { leadId, tone = 'friendly', goal = 'follow-up', channel = 'whatsapp' } = req.body;
+    const { leadId, tone = 'friendly', goal = 'follow-up', channel: channelHint = 'whatsapp' } = req.body;
 
     if (!leadId) return res.status(400).json({ error: 'leadId is required' });
+
+    // Detect actual channel from conversation history
+    const convChannelResult = await query(
+      `SELECT ch.type AS channel_type
+       FROM conversations conv
+       JOIN channels ch ON ch.id = conv.channel_id
+       WHERE conv.lead_id = $1 AND conv.user_id = $2
+         AND ch.status IN ('connected', 'active', 'pending')
+       ORDER BY conv.last_message_at DESC NULLS LAST
+       LIMIT 1`,
+      [leadId, userId],
+    );
+    const channel = convChannelResult.rows[0]?.channel_type || channelHint;
 
     // Fetch lead + user's OpenAI key
     const [leadRes, userRes] = await Promise.all([
@@ -404,34 +529,61 @@ router.post('/generate-message', async (req: AuthenticatedRequest, res, next) =>
     const openaiKey = userRes.rows[0]?.openai_api_key;
 
     const days = daysSince(lead.last_contact_at);
+    const channelLabel: Record<string, string> = {
+      whatsapp: 'WhatsApp', facebook: 'Facebook Messenger',
+      instagram: 'Instagram', telegram: 'Telegram', email: 'E-mail',
+    };
+
+    // Fetch inbox stats for richer context
+    const inboxStatsResult = await query(
+      `SELECT
+         COUNT(m.id)::int AS total_msgs,
+         COUNT(m.id) FILTER (WHERE m.direction = 'in')::int AS inbound,
+         COUNT(m.id) FILTER (WHERE m.direction = 'out')::int AS outbound,
+         MAX(m.created_at) AS last_msg_at
+       FROM conversations conv
+       JOIN messages m ON m.conversation_id = conv.id
+       WHERE conv.lead_id = $1 AND conv.user_id = $2`,
+      [leadId, userId],
+    );
+    const inboxStats = inboxStatsResult.rows[0];
+    const totalMsgs = Number(inboxStats?.total_msgs ?? 0);
+    const inboxDays = inboxStats?.last_msg_at
+      ? daysSince(new Date(inboxStats.last_msg_at))
+      : days;
+
     const context = [
       `Nome: ${lead.name || 'Lead'}`,
       `Status no funil: ${lead.status || 'novo'}`,
-      `Último contato: ${days > 998 ? 'nunca' : `há ${days} dias`}`,
+      `Último contato registrado: ${Math.min(days, inboxDays) > 998 ? 'nunca' : `há ${Math.min(days, inboxDays)} dias`}`,
       lead.deal_value ? `Valor do negócio: R$ ${lead.deal_value}` : null,
       lead.company   ? `Empresa: ${lead.company}` : null,
       lead.intent    ? `Intenção detectada pela IA: ${lead.intent}` : null,
+      totalMsgs > 0  ? `Histórico de conversas: ${totalMsgs} mensagens (${inboxStats?.inbound ?? 0} do lead, ${inboxStats?.outbound ?? 0} enviadas)` : null,
+      `Canal de origem: ${channelLabel[channel] || channel}`,
     ].filter(Boolean).join('\n');
 
     // If no OpenAI key, return rule-based suggestions
     if (!openaiKey) {
       const suggestions = generateRuleBasedMessages(lead, tone, goal, channel);
-      return res.json({ success: true, suggestions, powered_by: 'rules' });
+      return res.json({ success: true, suggestions, channel, powered_by: 'rules' });
     }
 
     // Use OpenAI
-    const prompt = `Você é um especialista em vendas B2C/B2B no Brasil. Gere 3 mensagens de ${channel === 'whatsapp' ? 'WhatsApp' : 'email'} diferentes para o seguinte lead:
+    const prompt = `Você é um especialista em vendas B2C/B2B no Brasil. Gere 3 mensagens diferentes para o seguinte lead:
 
 ${context}
 
 Tom: ${tone === 'friendly' ? 'amigável e próximo' : tone === 'formal' ? 'profissional e formal' : 'urgente e direto'}
 Objetivo: ${goal === 'follow-up' ? 'fazer follow-up e manter o interesse' : goal === 'close' ? 'fechar a venda' : goal === 'recover' ? 'recuperar lead inativo' : 'qualificar interesse'}
-Canal: ${channel}
+Canal: ${channelLabel[channel] || channel}
+
+${channel === 'email' ? 'Formato: assunto curto + corpo do email.' : 'As mensagens devem ser curtas e naturais para mensageiro instantâneo (máx 3 parágrafos).'}
 
 Responda APENAS com um JSON no formato:
 {"suggestions": ["mensagem 1", "mensagem 2", "mensagem 3"]}
 
-As mensagens devem ser naturais, curtas (máx 3 parágrafos), personalizadas pelo nome e contexto.`;
+Personalize pelo nome e contexto. Adapte o tom para o canal ${channelLabel[channel] || channel}.`;
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -461,6 +613,7 @@ As mensagens devem ser naturais, curtas (máx 3 parágrafos), personalizadas pel
     res.json({
       success: true,
       suggestions: parsed.suggestions || generateRuleBasedMessages(lead, tone, goal, channel),
+      channel,
       powered_by: 'openai',
     });
   } catch (err) {
@@ -505,106 +658,155 @@ function generateRuleBasedMessages(lead: any, tone: string, goal: string, channe
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/ai-remarketing/send-message
-// Send an AI-generated message to a lead via the specified channel
+// Send an AI-generated message to a lead via the correct channel (auto-detected)
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/send-message', async (req: AuthenticatedRequest, res, next) => {
   try {
     const userId = req.user!.id;
-    const { leadId, content, channel = 'whatsapp' } = req.body;
+    const { leadId, content } = req.body;
 
     if (!leadId || !content) {
       return res.status(400).json({ error: 'leadId and content are required' });
     }
 
-    // Fetch lead to verify ownership and get contact details
+    // Fetch lead
     const leadResult = await query(
       'SELECT id, name, email, phone, whatsapp FROM leads WHERE id = $1 AND user_id = $2',
       [leadId, userId],
     );
-
     if (!leadResult.rows[0]) {
       return res.status(404).json({ error: 'Lead not found' });
     }
-
     const lead = leadResult.rows[0];
 
-    // Determine the contact number (phone is fallback for whatsapp)
-    let contactTarget = '';
-    if (channel === 'whatsapp') {
-      contactTarget = lead.whatsapp || lead.phone || '';
-    } else if (channel === 'sms') {
-      contactTarget = lead.phone || '';
-    } else if (channel === 'email') {
-      contactTarget = lead.email || '';
-    }
+    // ── Detectar o canal real do lead via histórico de conversas ──────────
+    const convResult = await query(
+      `SELECT conv.id, conv.remote_jid, conv.channel_id, conv.metadata,
+              ch.type AS channel_type, ch.credentials
+       FROM conversations conv
+       JOIN channels ch ON ch.id = conv.channel_id
+       WHERE conv.lead_id = $1 AND conv.user_id = $2
+         AND ch.status IN ('connected', 'active', 'pending')
+       ORDER BY conv.last_message_at DESC NULLS LAST
+       LIMIT 1`,
+      [leadId, userId],
+    );
 
-    if (!contactTarget) {
-      return res.status(400).json({
-        error: `Lead não possui contato válido para o canal ${channel}`,
-      });
-    }
+    const conversation = convResult.rows[0];
+    const channelType: string = conversation?.channel_type || 'whatsapp';
+    const credentials: any = conversation?.credentials || {};
+    const recipientId: string = conversation?.remote_jid || '';
+    const conversationId: string | null = conversation?.id || null;
 
-    // Find user's connected WhatsApp channel
-    let whatsappChannel: any = null;
-    if (channel === 'whatsapp') {
-      const whatsappChannels = await channelsService.findByType('whatsapp', userId);
-      whatsappChannel = whatsappChannels.find(
-        (c: any) => c.status === 'connected' || c.status === 'active',
+    console.log(`[MotorVendas] Enviando para ${lead.name} via ${channelType} | recipientId: ${recipientId}`);
+
+    // ── Roteamento por canal ──────────────────────────────────────────────
+    if (channelType === 'facebook') {
+      const accessToken = credentials.access_token || credentials.page_access_token;
+      if (!accessToken) {
+        return res.status(400).json({ error: 'Canal Facebook não tem token configurado' });
+      }
+      const fbRes = await fetch(
+        `https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(accessToken)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recipient: { id: recipientId }, message: { text: content } }),
+        },
       );
-
-      if (!whatsappChannel) {
-        const cloudChannels = await channelsService.findByType('whatsapp_cloud', userId);
-        whatsappChannel = cloudChannels.find(
-          (c: any) => c.status === 'connected' || c.status === 'active' || c.status === 'pending',
-        );
+      if (!fbRes.ok) {
+        const errText = await fbRes.text();
+        throw new Error(`Facebook API error: ${errText}`);
       }
 
-      if (!whatsappChannel) {
-        return res.status(400).json({
-          error: 'Nenhum canal WhatsApp ativo encontrado. Conecte o WhatsApp primeiro.',
-        });
+    } else if (channelType === 'instagram') {
+      const accessToken = credentials.access_token;
+      if (!accessToken) {
+        return res.status(400).json({ error: 'Canal Instagram não tem token configurado' });
       }
-
-      const instanceId =
-        whatsappChannel.credentials?.instance_id ||
-        whatsappChannel.credentials?.instance_name;
-
-      if (!instanceId) {
-        return res.status(400).json({ error: 'Canal WhatsApp não tem instância configurada' });
-      }
-
-      // Actually send via Evolution API
-      await whatsappService.sendMessage({
-        instanceId,
-        number: contactTarget,
-        text: content,
+      const igRes = await fetch(`https://graph.facebook.com/v18.0/me/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ recipient: { id: recipientId }, message: { text: content } }),
       });
-    }
+      if (!igRes.ok) {
+        const errText = await igRes.text();
+        throw new Error(`Instagram API error: ${errText}`);
+      }
 
-    // Build remoteJid for inbox
-    const cleanPhone = contactTarget.replace(/\D/g, '');
-    const remoteJid = contactTarget.includes('@')
-      ? contactTarget
-      : `${cleanPhone}@s.whatsapp.net`;
+    } else if (channelType === 'telegram') {
+      const botToken = credentials.bot_token;
+      if (!botToken) {
+        return res.status(400).json({ error: 'Canal Telegram não tem token configurado' });
+      }
+      const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: recipientId, text: content }),
+      });
+      if (!tgRes.ok) {
+        const errText = await tgRes.text();
+        throw new Error(`Telegram API error: ${errText}`);
+      }
 
-    // Find or create conversation so message appears in inbox
-    let conversationId: string | null = null;
-    if (whatsappChannel) {
-      try {
-        const conversation = await conversationsService.findOrCreate(
-          userId,
-          whatsappChannel.id,
-          remoteJid,
-          leadId,
-          { contact_name: lead.name, phone: cleanPhone },
+    } else {
+      // ── WhatsApp (Evolution API ou Cloud API) ─────────────────────────
+      const contactTarget = lead.whatsapp || lead.phone || recipientId.replace(/@.*$/, '');
+      if (!contactTarget) {
+        return res.status(400).json({ error: 'Lead não possui número de telefone para envio via WhatsApp' });
+      }
+
+      // Preferir canal já identificado; se não, buscar qualquer ativo
+      let whatsappChannel: any = conversation || null;
+      if (!whatsappChannel) {
+        const channels = await channelsService.findByType('whatsapp', userId);
+        whatsappChannel = channels.find((c: any) => ['connected','active'].includes(c.status));
+        if (!whatsappChannel) {
+          const cloudChannels = await channelsService.findByType('whatsapp_cloud', userId);
+          whatsappChannel = cloudChannels.find((c: any) => ['connected','active','pending'].includes(c.status));
+        }
+      }
+
+      if (!whatsappChannel) {
+        return res.status(400).json({ error: 'Nenhum canal WhatsApp ativo encontrado. Conecte o WhatsApp primeiro.' });
+      }
+
+      const creds = whatsappChannel.credentials || credentials;
+      if (channelType === 'whatsapp_cloud') {
+        // Cloud API
+        const phoneNumberId = creds.phone_number_id;
+        const accessToken = creds.access_token;
+        if (!phoneNumberId || !accessToken) {
+          return res.status(400).json({ error: 'Canal WhatsApp Cloud sem credenciais configuradas' });
+        }
+        const cloudRes = await fetch(
+          `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              to: contactTarget.replace(/\D/g, ''),
+              type: 'text',
+              text: { body: content },
+            }),
+          },
         );
-        conversationId = conversation.id;
-      } catch (convErr) {
-        console.warn('[AI-Remarketing] Could not find/create conversation:', convErr);
+        if (!cloudRes.ok) {
+          const errText = await cloudRes.text();
+          throw new Error(`WhatsApp Cloud API error: ${errText}`);
+        }
+      } else {
+        // Evolution API
+        const instanceId = creds.instance_id || creds.instance_name;
+        if (!instanceId) {
+          return res.status(400).json({ error: 'Canal WhatsApp não tem instância configurada' });
+        }
+        await whatsappService.sendMessage({ instanceId, number: contactTarget, text: content });
       }
     }
 
-    // Save message to inbox messages table so it appears in inbox
+    // ── Salvar mensagem no inbox ───────────────────────────────────────────
     let savedMessage: any = null;
     try {
       savedMessage = await messagesService.create(
@@ -612,25 +814,26 @@ router.post('/send-message', async (req: AuthenticatedRequest, res, next) => {
           conversation_id: conversationId,
           lead_id: leadId,
           direction: 'out',
-          channel,
+          channel: channelType,
           content,
           status: 'sent',
           sent_at: new Date().toISOString(),
-          metadata: { remote_jid: remoteJid, phone: cleanPhone, source: 'motor_de_vendas' },
+          metadata: { source: 'motor_de_vendas', channel_type: channelType, recipient_id: recipientId },
         },
         userId,
       );
     } catch (msgErr) {
-      console.warn('[AI-Remarketing] Could not save message to inbox:', msgErr);
+      console.warn('[MotorVendas] Could not save message to inbox:', msgErr);
     }
 
-    // Update lead's last_contact_at
+    // Atualizar last_contact_at do lead
     await query('UPDATE leads SET last_contact_at = NOW() WHERE id = $1', [leadId]);
 
     res.json({
       success: true,
       messageId: savedMessage?.id,
-      message: `Mensagem enviada para ${lead.name} via ${channel}`,
+      channel: channelType,
+      message: `Mensagem enviada para ${lead.name} via ${channelType}`,
       sentAt: new Date().toISOString(),
     });
   } catch (err) {

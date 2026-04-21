@@ -367,12 +367,16 @@ export class AssistantProcessorService {
      * Retorna o external_id da mensagem enviada (para dedup no webhook Evolution)
      */
     private async sendReply(ctx: IncomingMessageContext, text: string): Promise<string | null> {
-        // ✅ VALIDAÇÃO: Verificar se o contactPhone é válido antes de enviar
-        if (!isValidPhoneNumber(ctx.contactPhone)) {
+        // ✅ VALIDAÇÃO: Para WhatsApp, verificar se o contactPhone é válido (número de telefone).
+        // Canais não-WhatsApp usam IDs de plataforma (PSID, chat_id, etc.) que não seguem
+        // o formato de telefone — por isso a validação só se aplica ao WhatsApp.
+        const isWhatsAppChannel = ctx.channelType === 'whatsapp' || ctx.channelType === 'whatsapp_cloud';
+        if (isWhatsAppChannel && !isValidPhoneNumber(ctx.contactPhone)) {
             throw new Error(`❌ Número de contato inválido para resposta do assistente: ${ctx.contactPhone}`);
         }
 
         // ✅ VALIDAÇÃO: Verificar se não está respondendo para si mesmo (loop infinito)
+        // (Apenas para WhatsApp onde o botPhone faz sentido)
         let credentials = ctx.credentials || {};
         // Safe-parse se credentials vier como string
         if (typeof credentials === 'string') {

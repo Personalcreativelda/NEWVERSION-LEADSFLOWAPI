@@ -8,7 +8,7 @@ import {
     Search, Filter, Plus, X, Wifi, WifiOff, RefreshCw,
     PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
     Maximize2, Minimize2, ChevronLeft, ChevronRight,
-    Tag, Users, Settings2
+    Tag, Users, Settings2, Trash2, CheckSquare, Square
 } from 'lucide-react';
 import { ChatPanel } from '../../inbox/ChatPanel';
 import { EmptyState } from '../../inbox/EmptyState';
@@ -61,6 +61,8 @@ export default function InboxConversations({
     const [showNewConversationModal, setShowNewConversationModal] = useState(false);
     const [isCreatingConversation, setIsCreatingConversation] = useState(false);
     const [isEditingLead, setIsEditingLead] = useState(false);
+    const [isSelectMode, setIsSelectMode] = useState(false);
+    const [selectedConvIds, setSelectedConvIds] = useState<Set<string>>(new Set());
 
     // ── WhatsApp-style quick filter tabs ──────────────────────
     type QuickFilter = 'all' | 'unread' | 'tags' | 'groups';
@@ -177,6 +179,43 @@ export default function InboxConversations({
             console.error('Erro ao deletar conversa:', error);
             alert('Erro ao apagar conversa. Tente novamente.');
         }
+    };
+
+    const toggleSelectMode = () => {
+        setIsSelectMode(prev => !prev);
+        setSelectedConvIds(new Set());
+    };
+
+    const toggleSelectConv = (id: string) => {
+        setSelectedConvIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedConvIds.size === filteredConversations.length) {
+            setSelectedConvIds(new Set());
+        } else {
+            setSelectedConvIds(new Set(filteredConversations.map(c => c.id)));
+        }
+    };
+
+    const handleDeleteSelected = async () => {
+        if (selectedConvIds.size === 0) return;
+        const count = selectedConvIds.size;
+        if (!window.confirm(`Tem certeza que deseja apagar ${count} conversa(s) selecionada(s)? Esta ação não pode ser desfeita.`)) return;
+        const ids = Array.from(selectedConvIds);
+        for (const id of ids) {
+            try { await conversationsApi.delete(id); } catch (e) { console.error('Erro ao deletar conversa:', id, e); }
+        }
+        if (selectedConversation && selectedConvIds.has(selectedConversation.id)) {
+            selectConversation(null);
+        }
+        setSelectedConvIds(new Set());
+        setIsSelectMode(false);
+        await refreshConversations();
     };
 
     const handleSelectLead = async (lead: any) => {
@@ -431,6 +470,13 @@ export default function InboxConversations({
                                                 <Plus size={14} />
                                             </button>
                                             <button
+                                                onClick={toggleSelectMode}
+                                                className={`p-1.5 rounded-lg transition-colors ${isSelectMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:bg-muted'}`}
+                                                title={isSelectMode ? 'Cancelar seleção' : 'Selecionar conversas'}
+                                            >
+                                                <CheckSquare size={14} />
+                                            </button>
+                                            <button
                                                 onClick={toggleConversationList}
                                                 className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
                                                 title="Recolher lista"
@@ -439,6 +485,41 @@ export default function InboxConversations({
                                             </button>
                                         </div>
                                     </div>
+
+                                    {/* Selection toolbar */}
+                                    {isSelectMode && (
+                                        <div className="flex items-center gap-1.5 mb-2 px-1 py-1.5 rounded-lg bg-muted/60 border border-border">
+                                            <button
+                                                onClick={toggleSelectAll}
+                                                className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+                                                title={selectedConvIds.size === filteredConversations.length ? 'Desmarcar todos' : 'Selecionar todos'}
+                                            >
+                                                {selectedConvIds.size === filteredConversations.length && filteredConversations.length > 0
+                                                    ? <CheckSquare size={14} className="text-primary" />
+                                                    : <Square size={14} />
+                                                }
+                                            </button>
+                                            <span className="text-[11px] text-muted-foreground flex-1">
+                                                {selectedConvIds.size > 0 ? `${selectedConvIds.size} selecionada(s)` : 'Selecionar tudo'}
+                                            </span>
+                                            {selectedConvIds.size > 0 && (
+                                                <button
+                                                    onClick={handleDeleteSelected}
+                                                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors"
+                                                >
+                                                    <Trash2 size={12} />
+                                                    Apagar
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={toggleSelectMode}
+                                                className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+                                                title="Cancelar"
+                                            >
+                                                <X size={13} />
+                                            </button>
+                                        </div>
+                                    )}
 
                                     {/* Search */}
                                     <div className="relative">
@@ -544,6 +625,9 @@ export default function InboxConversations({
                                         selectedId={selectedConversation?.id || null}
                                         onSelect={selectConversation}
                                         loading={conversationsLoading}
+                                        isSelectMode={isSelectMode}
+                                        selectedIds={selectedConvIds}
+                                        onToggleSelect={toggleSelectConv}
                                     />
                                 </div>
                             </>
@@ -588,8 +672,45 @@ export default function InboxConversations({
                                 <button onClick={() => setShowNewConversationModal(true)} className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors">
                                     <Plus size={18} />
                                 </button>
+                                <button
+                                    onClick={toggleSelectMode}
+                                    className={`p-2 rounded-lg transition-colors ${isSelectMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:bg-muted'}`}
+                                    title={isSelectMode ? 'Cancelar seleção' : 'Selecionar conversas'}
+                                >
+                                    <CheckSquare size={18} />
+                                </button>
                             </div>
                         </div>
+
+                        {/* Mobile selection toolbar */}
+                        {isSelectMode && (
+                            <div className="flex items-center gap-2 mb-2 px-2 py-2 rounded-lg bg-muted/60 border border-border">
+                                <button
+                                    onClick={toggleSelectAll}
+                                    className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    {selectedConvIds.size === filteredConversations.length && filteredConversations.length > 0
+                                        ? <CheckSquare size={16} className="text-primary" />
+                                        : <Square size={16} />
+                                    }
+                                </button>
+                                <span className="text-xs text-muted-foreground flex-1">
+                                    {selectedConvIds.size > 0 ? `${selectedConvIds.size} selecionada(s)` : 'Selecionar tudo'}
+                                </span>
+                                {selectedConvIds.size > 0 && (
+                                    <button
+                                        onClick={handleDeleteSelected}
+                                        className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors"
+                                    >
+                                        <Trash2 size={14} />
+                                        Apagar
+                                    </button>
+                                )}
+                                <button onClick={toggleSelectMode} className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors">
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                             <input
@@ -685,6 +806,9 @@ export default function InboxConversations({
                             selectedId={selectedConversation?.id || null}
                             onSelect={selectConversation}
                             loading={conversationsLoading}
+                            isSelectMode={isSelectMode}
+                            selectedIds={selectedConvIds}
+                            onToggleSelect={toggleSelectConv}
                         />
                     </div>
                 </div>
@@ -710,18 +834,6 @@ export default function InboxConversations({
                         layoutControls={
                             !isMobile ? (
                                 <div className="flex items-center gap-0.5">
-                                    {/* Toggle conversation list */}
-                                    <button
-                                        onClick={toggleConversationList}
-                                        className="p-1.5 rounded-md text-muted-foreground hover:bg-muted transition-colors"
-                                        title={layout.conversationListCollapsed ? 'Mostrar lista' : 'Ocultar lista'}
-                                    >
-                                        {layout.conversationListCollapsed
-                                            ? <PanelLeftOpen size={15} />
-                                            : <PanelLeftClose size={15} />
-                                        }
-                                    </button>
-
                                     {/* Focus mode */}
                                     <button
                                         onClick={toggleFocusMode}
