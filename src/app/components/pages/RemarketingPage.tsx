@@ -5,6 +5,7 @@ import {
   ChevronRight, Play, Pause, Copy, Trash2, BarChart3, ArrowRight,
   Tag, ShoppingCart, UserCheck, AlertCircle,
   Layers, Repeat2, Target, Pencil, X, GripVertical, Info,
+  Instagram, Facebook, Send,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
@@ -22,7 +23,7 @@ function saveLocal(flows: RemarketingFlow[]) {
 
 type FlowStatus = 'active' | 'paused' | 'draft';
 type TriggerType = 'funnel_stage' | 'tag' | 'inactivity' | 'purchase' | 'lead_score';
-type ActionType = 'whatsapp' | 'email' | 'wait' | 'tag' | 'move_stage' | 'condition';
+type ActionType = 'whatsapp' | 'facebook' | 'instagram' | 'telegram' | 'email' | 'wait' | 'tag' | 'move_stage' | 'condition';
 
 interface FlowStep {
   id: string;
@@ -157,10 +158,16 @@ const STEP_ICONS: Record<ActionType, React.ElementType> = {
   tag: Tag,
   move_stage: GitBranch,
   condition: Filter,
+  facebook: Facebook,
+  instagram: Instagram,
+  telegram: Send,
 };
 
 const STEP_COLORS: Record<ActionType, string> = {
   whatsapp: 'text-emerald-500 bg-emerald-500/10',
+  facebook: 'text-blue-600 bg-blue-600/10',
+  instagram: 'text-pink-500 bg-pink-500/10',
+  telegram: 'text-sky-500 bg-sky-500/10',
   email: 'text-blue-500 bg-blue-500/10',
   wait: 'text-amber-500 bg-amber-500/10',
   tag: 'text-violet-500 bg-violet-500/10',
@@ -178,6 +185,9 @@ const TRIGGER_OPTIONS: { value: TriggerType; label: string; description: string 
 
 const ACTION_OPTIONS: { value: ActionType; label: string }[] = [
   { value: 'whatsapp',   label: 'Mensagem WhatsApp' },
+  { value: 'facebook',   label: 'Mensagem Facebook' },
+  { value: 'instagram',  label: 'Mensagem Instagram' },
+  { value: 'telegram',   label: 'Mensagem Telegram' },
   { value: 'email',      label: 'Enviar Email' },
   { value: 'wait',       label: 'Aguardar' },
   { value: 'tag',        label: 'Aplicar Tag' },
@@ -200,6 +210,9 @@ const FUNNEL_STAGES = [
 function stepLabel(type: ActionType, config: Record<string, any> = {}): string {
   switch (type) {
     case 'whatsapp':   return config.message   ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem WhatsApp';
+    case 'facebook':   return config.message   ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Facebook';
+    case 'instagram':  return config.message   ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Instagram';
+    case 'telegram':   return config.message   ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Telegram';
     case 'email':      return config.subject   ? `Email: ${config.subject}` : 'Enviar Email';
     case 'wait':       return config.duration  ? `Aguardar ${config.duration} ${config.unit ?? 'dia(s)'}` : 'Aguardar';
     case 'tag':        return config.tag       ? `Tag: ${config.tag}` : 'Aplicar Tag';
@@ -465,12 +478,16 @@ function EditModal({ flow, isNew = false, onSave, onClose }: EditModalProps) {
                   </div>
 
                   {/* Type-specific config */}
-                  {step.type === 'whatsapp' && (
+                  {(step.type === 'whatsapp' || step.type === 'facebook' || step.type === 'instagram' || step.type === 'telegram') && (
                     <textarea
                       rows={2}
                       value={cfg.message ?? ''}
                       onChange={e => updateStepConfig(step.id, 'message', e.target.value)}
-                      placeholder="Digite a mensagem WhatsApp…"
+                      placeholder={`Digite a mensagem ${
+                        step.type === 'facebook' ? 'Facebook' :
+                        step.type === 'instagram' ? 'Instagram' :
+                        step.type === 'telegram' ? 'Telegram' : 'WhatsApp'
+                      }…`}
                       className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                     />
                   )}

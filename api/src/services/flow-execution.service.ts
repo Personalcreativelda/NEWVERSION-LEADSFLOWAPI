@@ -253,6 +253,18 @@ export class FlowExecutionService {
         await this.stepWhatsapp(config, ctx);
         break;
 
+      case 'facebook':
+        await this.stepWhatsapp({ ...config, _forceChannel: 'facebook' }, { ...ctx, channelType: 'facebook' });
+        break;
+
+      case 'instagram':
+        await this.stepWhatsapp({ ...config, _forceChannel: 'instagram' }, { ...ctx, channelType: 'instagram' });
+        break;
+
+      case 'telegram':
+        await this.stepWhatsapp({ ...config, _forceChannel: 'telegram' }, { ...ctx, channelType: 'telegram' });
+        break;
+
       case 'email':
         await this.stepEmail(config, ctx);
         break;

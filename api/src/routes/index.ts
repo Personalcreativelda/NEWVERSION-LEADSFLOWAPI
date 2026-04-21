@@ -32,6 +32,7 @@ import leadsTrackingRoutes from './leads-tracking.routes';
 import conversationTagsRoutes from './conversation-tags.routes';
 // Groups: Importar rotas de gerenciamento de grupos WhatsApp
 import groupsRoutes from './groups.routes';
+import aiRemarketingRoutes from './ai-remarketing.routes';
 // Plan enforcement middleware (blocks writes when plan is expired or lead limit reached)
 import { requireAuth } from '../middleware/auth.middleware';
 import { planEnforcement } from '../middleware/plan-enforcement.middleware';
@@ -69,6 +70,7 @@ router.use('/user-webhooks', withPlan, userWebhooksRoutes);
 router.use('/lead-notes', withPlan, leadNotesRoutes);
 router.use('/scheduled-conversations', withPlan, scheduledConversationsRoutes);
 router.use('/groups', withPlan, groupsRoutes);
+router.use('/ai-remarketing', withPlan, aiRemarketingRoutes);
 
 // ── Settings / admin (auth required, plan NOT enforced) ──────────────────────
 router.use('/users', usersRoutes);
