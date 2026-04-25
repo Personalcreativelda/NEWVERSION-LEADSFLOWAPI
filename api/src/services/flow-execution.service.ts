@@ -686,8 +686,6 @@ export class FlowExecutionService {
           leadId: ctx.leadId,
           leadName: ctx.leadName,
           newStatus: stage,
-          triggeredBy: 'remarketing_flow',
-          assistantName: 'Robô de Remarketing'
         });
       }
 

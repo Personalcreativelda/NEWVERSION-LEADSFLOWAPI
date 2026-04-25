@@ -169,11 +169,12 @@ export class AssistantProcessorService {
                     try {
                         console.log(`[AssistantProcessor] 🎙️ Gerando Áudio Mágico (ElevenLabs) para a resposta...`);
                         const voiceId = config.audio_voice_id || 'EXAVITQu4vr4xnSDxMaL'; // Default: Sarah
-                        audioBase64 = await aiService.generateElevenLabsAudio(
+                        const audioBuffer = await aiService.generateElevenLabsAudio(
                             aiResponse.content,
                             voiceId,
                             elevenLabsApiKey
                         );
+                        audioBase64 = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
                         console.log(`[AssistantProcessor] ✅ Áudio Mágico gerado com sucesso!`);
                     } catch (audioErr: any) {
                         console.error(`[AssistantProcessor] ❌ Erro ao gerar áudio ElevenLabs (Fallback para texto):`, audioErr.message);
