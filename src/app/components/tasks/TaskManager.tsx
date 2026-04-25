@@ -29,6 +29,7 @@ import {
 import { format, isAfter, isBefore, isToday, isPast, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from "sonner";
+import { useWebSocket } from '../../hooks/useWebSocket';
 
 interface Task {
   id: string;
@@ -99,6 +100,27 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   useEffect(() => {
     localStorage.setItem('leadsflow_tasks', JSON.stringify(tasks));
   }, [tasks]);
+
+  // Ouvir WebSocket para tarefas criadas automaticamente pelo Assistente de IA
+  useWebSocket({
+    onAiTaskCreated: ({ task }) => {
+      setTasks(prev => {
+        // Evitar duplicatas
+        if (prev.find(t => t.id === task.id)) return prev;
+        const updated = [task, ...prev];
+        localStorage.setItem('leadsflow_tasks', JSON.stringify(updated));
+        return updated;
+      });
+      toast.success(
+        `📅 Agendamento detectado automaticamente!`,
+        {
+          description: task.title,
+          duration: 6000,
+          action: { label: 'Ver Tarefas', onClick: () => {} },
+        }
+      );
+    },
+  });
 
   // Filtrar tarefas
   const filteredTasks = tasks.filter(task => {
@@ -382,6 +404,12 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                             <Badge variant="outline" className="gap-1">
                               <User className="w-3 h-3" />
                               {task.leadName}
+                            </Badge>
+                          )}
+
+                          {(task as any).source === 'ai_assistant' && (
+                            <Badge className="gap-1 bg-violet-100 text-violet-700 border-violet-200">
+                              🤖 IA
                             </Badge>
                           )}
 

@@ -115,23 +115,28 @@ export class LeadsService {
   }
 
   async findAll(userId: string, filters?: any) {
-    let sql = 'SELECT * FROM leads WHERE user_id = $1';
+    let sql = `
+      SELECT l.*, s.engagement_score AS lead_score 
+      FROM leads l
+      LEFT JOIN lead_ai_scores s ON s.lead_id = l.id
+      WHERE l.user_id = $1
+    `;
     const params: any[] = [userId];
     let paramIndex = 2;
 
     if (filters?.status) {
-      sql += ` AND status = $${paramIndex}`;
+      sql += ` AND l.status = $${paramIndex}`;
       params.push(filters.status);
       paramIndex++;
     }
 
     if (filters?.search) {
-      sql += ` AND (name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR phone ILIKE $${paramIndex})`;
+      sql += ` AND (l.name ILIKE $${paramIndex} OR l.email ILIKE $${paramIndex} OR l.phone ILIKE $${paramIndex})`;
       params.push(`%${filters.search}%`);
       paramIndex++;
     }
 
-    sql += ' ORDER BY created_at DESC';
+    sql += ' ORDER BY l.created_at DESC';
 
     if (filters?.limit) {
       sql += ` LIMIT $${paramIndex}`;

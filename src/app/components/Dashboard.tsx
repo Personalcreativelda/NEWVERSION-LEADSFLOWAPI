@@ -592,9 +592,11 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   // Escutar eventos de movimentação de funil em tempo real (via assistente IA)
   useWebSocket({
     onLeadFunnelUpdate: (data) => {
+      console.log('[Dashboard] Recebido lead_funnel_update via WebSocket:', data);
+      
       // Atualizar lead na lista local sem precisar de nova requisição
       setLeads(prev => prev.map(lead =>
-        lead.id === data.leadId ? { ...lead, status: data.newStatus } : lead
+        String(lead.id) === String(data.leadId) ? { ...lead, status: data.newStatus } : lead
       ));
 
       const statusLabels: Record<string, string> = {
@@ -605,7 +607,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         perdido: 'Perdido',
       };
       const newLabel = statusLabels[data.newStatus] || data.newStatus;
-      toast.success(`🤖 ${data.assistantName || 'Assistente IA'} moveu "${data.leadName}" para ${newLabel}`, {
+      toast.success(`🤖 ${data.assistantName || 'Assistente IA'} moveu "${data.leadName || 'Lead'}" para ${newLabel}`, {
         duration: 5000,
       });
     },

@@ -96,6 +96,9 @@ class ApiClient {
       this.request('/api/leads/lead-tag/add-leads', {
         method: 'PUT', body: JSON.stringify({ tag, leadIds })
       }),
+    /** Returns distinct statuses in the user's funnel: [{ value, count }] */
+    funnelStages: () =>
+      this.request<{ value: string; count: number }[]>('/api/leads/funnel-stages'),
   };
 
   contacts = {

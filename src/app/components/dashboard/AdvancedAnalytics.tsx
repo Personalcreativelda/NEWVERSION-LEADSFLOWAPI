@@ -67,18 +67,24 @@ const getStatusColor = (status: string, index: number = 0): string => {
 // Cores antigas para outros gráficos (manter compatibilidade)
 const PIE_COLORS = ['#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444', '#10B981', '#EC4899'];
 
-// ✅ MAPEAMENTO DE CORES ESPECÍFICAS POR ORIGEM
+// ✅ MAPEAMENTO DE CORES ESPECÍFICAS POR ORIGEM COM ALTO CONTRASTE E BELEZA
 const ORIGEM_COLORS: Record<string, string> = {
-  'whatsapp': '#00D9A3',     // Verde turquesa
-  'indicacao': '#FFA26B',    // Laranja
-  'instagram': '#FF6B9D',    // Rosa
-  'facebook': '#5B9FED',     // Azul
-  'site': '#B794F6',         // Roxo
-  'google': '#FFD93D',       // Amarelo
-  'linkedin': '#5B9FED',     // Azul
-  'email': '#B794F6',        // Roxo
-  'telefone': '#00D9A3',     // Verde
-  'outros': '#A0A0B2',       // Cinza
+  'whatsapp': '#22C55E',     // Verde vibrante
+  'whatsapp_cloud': '#14B8A6', // Teal/Ciano escuro
+  'facebook': '#3B82F6',     // Azul brilhante
+  'instagram': '#EC4899',    // Rosa vibrante
+  'telegram': '#8B5CF6',     // Roxo/Indigo
+  'email': '#F59E0B',        // Âmbar
+  'website': '#D946EF',      // Fúcsia
+  'site': '#D946EF',         // Fúcsia
+  'twilio': '#EF4444',       // Vermelho vibrante
+  'indicacao': '#F97316',    // Laranja
+  'campaign': '#EAB308',     // Amarelo
+  'n8n': '#FF6D5A',          // Coral
+  'google': '#F43F5E',       // Rose
+  'linkedin': '#0284C7',     // Azul claro
+  'telefone': '#84CC16',     // Verde limão
+  'outros': '#94A3B8',       // Cinza
 };
 
 // ✅ LABELS AMIGÁVEIS PARA ORIGENS
@@ -631,9 +637,14 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
             </p>
           </div>
           <ResponsiveContainer width="100%" height={380}>
-            <BarChart data={topOrigins} layout="vertical" margin={{ top: 10, right: 60, left: 10, bottom: 10 }}>
+            <BarChart data={topOrigins} layout="vertical" margin={{ top: 10, right: 60, left: 10, bottom: 10 }} barSize={32} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#E5E7EB'} />
-              <XAxis type="number" stroke={isDark ? '#9CA3AF' : '#6B7280'} />
+              <XAxis 
+                type="number" 
+                domain={[0, Math.max(leads.length, 1)]}
+                stroke={isDark ? '#9CA3AF' : '#6B7280'} 
+                hide={true} // Ocultar o eixo X para focar nos números das barras
+              />
               <YAxis dataKey="name" type="category" width={100} stroke={isDark ? '#9CA3AF' : '#6B7280'} />
               <Tooltip
                 contentStyle={{

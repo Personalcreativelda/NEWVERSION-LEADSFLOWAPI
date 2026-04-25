@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { X, Mail, Phone, Building2, Calendar, FileText, User, Loader2, AlertCircle, Edit2, Save, Camera, Check, Upload, StickyNote, ChevronDown, Clock, MessageSquare, Briefcase, ListTodo, Plus, Trash2, Send, Zap, Target, Copy, Pencil, GripVertical } from 'lucide-react';
+import { X, Mail, Phone, Building2, Calendar, FileText, User, Loader2, AlertCircle, Edit2, Save, Camera, Check, Upload, StickyNote, ChevronDown, Clock, MessageSquare, Briefcase, ListTodo, Plus, Trash2, Send, Zap, Target, Copy, Pencil, GripVertical, BrainCircuit } from 'lucide-react';
 import { leadsApi, scheduledConversationsApi, leadNotesApi } from '../../utils/api';
 import { Lead, LeadNote } from '../../types';
 import { toast } from 'sonner';
@@ -140,7 +140,20 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
   const [newNote, setNewNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [aiSentiment, setAiSentiment] = useState<'positivo' | 'neutro' | 'frustrado' | null>(null);
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Listen for AI sentiment updates
+  useEffect(() => {
+    const handleSentimentUpdate = (e: CustomEvent) => {
+      if (e.detail.conversationId === conversation.id) {
+        setAiSentiment(e.detail.sentiment);
+      }
+    };
+    window.addEventListener('ai-sentiment-updated', handleSentimentUpdate as EventListener);
+    return () => window.removeEventListener('ai-sentiment-updated', handleSentimentUpdate as EventListener);
+  }, [conversation.id]);
 
   // Remarketing flows
   const [remarketingFlows, setRemarketingFlows] = useState<any[]>([]);
@@ -385,6 +398,32 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleGenerateSummary = async () => {
+    if (!conversation.id) return;
+    setGeneratingSummary(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3200';
+      const res = await fetch(`${API_URL}/api/inbox/conversations/${conversation.id}/summarize`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('leadflow_access_token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (res.ok) {
+        toast.success('Resumo gerado com sucesso!');
+        fetchNotes(); // Recarrega as notas para exibir o novo resumo
+      } else {
+        const errorData = await res.json();
+        toast.error(errorData.error || 'Erro ao gerar resumo');
+      }
+    } catch (err) {
+      toast.error('Erro na comunicação com o servidor.');
+    } finally {
+      setGeneratingSummary(false);
+    }
   };
 
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -818,6 +857,20 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               
               <h4 className="font-semibold text-sm mt-3 text-foreground">{editName}</h4>
               
+              {/* Sentiment Indicator */}
+              {aiSentiment && (
+                <div className="flex items-center justify-center mt-1 mb-1">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                    aiSentiment === 'positivo' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                    aiSentiment === 'frustrado' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
+                    'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+                  }`}>
+                    {aiSentiment === 'positivo' ? '🟢 Positivo' :
+                     aiSentiment === 'frustrado' ? '🔴 Frustrado' : '🟡 Neutro'}
+                  </span>
+                </div>
+              )}
+              
               {/* Position or "Customer since" */}
               <p className="text-[11px] mt-0.5 text-muted-foreground">
                 {editPosition || (formatDate(createdAt) ? `Cliente desde ${formatDate(createdAt)}` : 'Lead')}
@@ -896,6 +949,38 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               </div>
             </div>
 
+            {/* AI Summary Card */}
+            <div className="rounded-xl border border-purple-500/30 overflow-hidden bg-gradient-to-br from-purple-500/5 to-transparent">
+              <div className="px-3 py-2.5 border-b border-purple-500/20 flex items-center justify-between">
+                <h5 className="text-[10px] font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                  <BrainCircuit className="w-3.5 h-3.5" />
+                  Resumo Inteligente IA
+                </h5>
+              </div>
+              <div className="p-3">
+                <button
+                  onClick={handleGenerateSummary}
+                  disabled={generatingSummary}
+                  className="w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white transition-all shadow-sm shadow-purple-500/20 disabled:opacity-70"
+                >
+                  {generatingSummary ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Analisando Conversa...
+                    </>
+                  ) : (
+                    <>
+                      <BrainCircuit className="w-3.5 h-3.5" />
+                      Gerar Briefing do Lead
+                    </>
+                  )}
+                </button>
+                <p className="text-[10px] text-center mt-2 text-muted-foreground">
+                  Lê as últimas mensagens e extrai o perfil e o próximo passo. O resumo será salvo nas Notas.
+                </p>
+              </div>
+            </div>
+
             {/* Quick Notes Card */}
             <div className="rounded-xl border border-border/60 overflow-hidden">
               <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40 flex items-center justify-between">
@@ -909,11 +994,22 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               {/* Existing notes */}
               {notes.length > 0 && (
                 <div className="divide-y divide-border/30 max-h-48 overflow-y-auto">
-                  {notes.map((note) => (
-                    <div key={note.id} className="group flex items-start gap-2 px-3 py-2.5 hover:bg-muted/30 transition-colors">
-                      <p className="flex-1 text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap break-words min-w-0">
-                        {note.content}
-                      </p>
+                  {notes.map((note) => {
+                    const isAiSummary = note.content.startsWith('[Resumo IA]');
+                    const displayContent = isAiSummary ? note.content.replace('[Resumo IA]', '').trim() : note.content;
+                    return (
+                    <div key={note.id} className={`group flex items-start gap-2 px-3 py-2.5 hover:bg-muted/30 transition-colors ${isAiSummary ? 'bg-purple-500/5' : ''}`}>
+                      <div className="flex-1 min-w-0">
+                        {isAiSummary && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-600 dark:text-purple-400 mb-1">
+                            <BrainCircuit className="w-3 h-3" />
+                            Gerado por IA
+                          </span>
+                        )}
+                        <p className={`text-sm leading-relaxed whitespace-pre-wrap break-words min-w-0 ${isAiSummary ? 'text-foreground font-medium' : 'text-foreground/80'}`}>
+                          {displayContent}
+                        </p>
+                      </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
                         <button
                           onClick={() => handleDeleteNote(note.id)}
@@ -929,7 +1025,8 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                         </span>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

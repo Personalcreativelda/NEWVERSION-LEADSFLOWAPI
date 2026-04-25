@@ -172,6 +172,23 @@ export class WebSocketService {
     }
 
     /**
+     * Emitir atualização de funil de vendas (Kanban)
+     */
+    emitLeadFunnelUpdate(userId: string, data: {
+        leadId: string;
+        leadName?: string;
+        previousStatus?: string;
+        newStatus: string;
+        timestamp?: string;
+    }) {
+        console.log(`[WebSocket] Emitindo atualização de funil para usuário ${userId}: ${data.newStatus}`);
+        this.io.to(`user:${userId}`).emit('lead_funnel_update', {
+            ...data,
+            timestamp: data.timestamp || new Date().toISOString()
+        });
+    }
+
+    /**
      * Verificar se usuário está conectado
      */
     isUserConnected(userId: string): boolean {
@@ -197,6 +214,17 @@ export class WebSocketService {
                 connections: sockets.size
             }))
         };
+    }
+
+    /**
+     * Emitir evento genérico para um usuário específico (usado pelo AssistantProcessor)
+     */
+    emitToUser(userId: string, event: string, data: any) {
+        console.log(`[WebSocket] Emitindo evento "${event}" para usuário ${userId}`);
+        this.io.to(`user:${userId}`).emit(event, {
+            ...data,
+            timestamp: new Date().toISOString()
+        });
     }
 }
 

@@ -81,26 +81,26 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     'telefone': Phone,
   };
 
-  // Mapeamento de cores específicas por origem (canais)
+  // Mapeamento de cores específicas por origem (canais) com alta distinção
   const origemColors: Record<string, string> = {
-    'whatsapp': '#25D366',     // Verde WhatsApp
-    'whatsapp_cloud': '#128C7E', // Verde escuro WhatsApp Cloud
-    'facebook': '#1877F2',     // Azul Facebook
-    'instagram': '#E4405F',    // Rosa Instagram
-    'telegram': '#0088CC',     // Azul Telegram
-    'email': '#06B6D4',        // Ciano
-    'website': '#8B5CF6',      // Roxo
-    'site': '#8B5CF6',         // Roxo
-    'twilio': '#F22F46',       // Vermelho Twilio
-    'twilio_sms': '#F22F46',   // Vermelho Twilio
-    'sms': '#F22F46',          // Vermelho Twilio
-    'indicacao': '#FFA26B',    // Laranja
-    'campaign': '#F59E0B',     // Amarelo/Laranja
-    'n8n': '#FF6D5A',          // Laranja N8N
-    'google': '#FFD93D',       // Amarelo
-    'linkedin': '#0A66C2',     // Azul LinkedIn
-    'telefone': '#10B981',     // Verde
-    'outros': '#A0A0B2',       // Cinza
+    'whatsapp': '#22C55E',     // Verde vibrante (WhatsApp)
+    'whatsapp_cloud': '#14B8A6', // Teal/Ciano escuro (Distinto do verde)
+    'facebook': '#3B82F6',     // Azul brilhante (Facebook)
+    'instagram': '#EC4899',    // Rosa vibrante (Instagram)
+    'telegram': '#8B5CF6',     // Roxo/Indigo (Distinto do azul do Facebook)
+    'email': '#F59E0B',        // Âmbar/Laranja amarelado
+    'website': '#D946EF',      // Fúcsia
+    'site': '#D946EF',         // Fúcsia
+    'twilio': '#EF4444',       // Vermelho vibrante
+    'twilio_sms': '#EF4444',   // Vermelho vibrante
+    'sms': '#EF4444',          // Vermelho vibrante
+    'indicacao': '#F97316',    // Laranja
+    'campaign': '#EAB308',     // Amarelo
+    'n8n': '#FF6D5A',          // Coral
+    'google': '#F43F5E',       // Rose (Vermelho rosado)
+    'linkedin': '#0284C7',     // Azul claro (LinkedIn)
+    'telefone': '#84CC16',     // Verde limão (Distinto do WhatsApp)
+    'outros': '#94A3B8',       // Slate/Cinza azulado
   };
 
   // ✅ Processar dados para gráfico de origem com useMemo
@@ -334,9 +334,11 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
                 <BarChart data={origemChartData} layout="vertical" margin={{ top: 10, right: 60, left: 50, bottom: 10 }} barSize={24} barCategoryGap="15%">
                   <XAxis 
                     type="number"
+                    domain={[0, Math.max(leads.length, 1)]}
                     tick={{ fill: '#9ca3af', fontSize: 10 }}
                     stroke="#e5e7eb"
                     className="dark:stroke-neutral-700"
+                    hide={true} // Ocultar o eixo X para um visual mais limpo, já que os números estão na frente
                   />
                   <YAxis 
                     type="category"

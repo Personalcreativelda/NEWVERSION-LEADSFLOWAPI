@@ -12,6 +12,7 @@ import { TwilioSMSService } from '../services/twilio-sms.service';
 import { getWebSocketService } from '../services/websocket.service';
 import { webhookDispatcher } from '../services/webhook-dispatcher.service';
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
+import { AIService, getAvailableProviders } from '../services/ai.service';
 
 const router = Router();
 
@@ -46,6 +47,7 @@ const whatsappService = new WhatsAppService();
 const channelsService = new ChannelsService();
 const leadsService = new LeadsService();
 const conversationsService = new ConversationsService();
+const aiService = new AIService();
 
 // Helper function to generate instance name from user ID (legacy/fallback)
 const getUserInstanceName = (userId: string): string => {
@@ -2259,6 +2261,225 @@ router.get('/media-proxy', async (req, res) => {
   } catch (error: any) {
     console.error('[Media Proxy] Error:', error.message);
     res.status(500).json({ error: 'Failed to proxy media' });
+  }
+});
+
+// Transcrever áudio de uma mensagem via OpenAI Whisper
+router.post('/messages/:id/transcribe', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const messageId = req.params.id;
+    const { query: dbQuery } = require('../database/connection');
+    
+    // Verificar se a mensagem existe e se pertence a uma conversa do usuário
+    const msgResult = await dbQuery(`
+      SELECT m.*, c.user_id 
+      FROM messages m
+      JOIN conversations c ON m.conversation_id = c.id
+      WHERE m.id = $1 AND c.user_id = $2
+    `, [messageId, user.id]);
+
+    if (msgResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    const message = msgResult.rows[0];
+    if (message.media_type !== 'audio' || !message.media_url) {
+      return res.status(400).json({ error: 'Mensagem não é um áudio válido.' });
+    }
+
+    // Verificar se a chave da OpenAI está configurada
+    const openaiKey = process.env.OPENAI_API_KEY?.trim();
+    if (!openaiKey) {
+      return res.status(400).json({ error: 'OPENAI_API_KEY não configurada no servidor.' });
+    }
+
+    // Usar o AIService para transcrever
+    const text = await aiService.transcribeAudio(message.media_url, openaiKey);
+
+    // Salvar o resultado no metadata da mensagem
+    const metadata = typeof message.metadata === 'object' && message.metadata !== null ? message.metadata : {};
+    metadata.transcription = text;
+
+    await dbQuery(`UPDATE messages SET metadata = $1 WHERE id = $2`, [JSON.stringify(metadata), messageId]);
+
+    res.json({ success: true, text });
+  } catch (error) {
+    console.error('[Inbox Transcribe] Error:', error);
+    next(error);
+  }
+});
+
+// Gerar resumo de uma conversa com IA
+router.post('/conversations/:id/summarize', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const conversationId = req.params.id;
+    const { query: dbQuery } = require('../database/connection');
+
+    // Buscar a conversa para garantir acesso e pegar o leadId
+    const convResult = await dbQuery(
+      'SELECT id, lead_id FROM conversations WHERE id = $1 AND user_id = $2',
+      [conversationId, user.id]
+    );
+
+    if (convResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    const leadId = convResult.rows[0].lead_id;
+
+    // Buscar histórico de mensagens
+    const history = await aiService.getConversationHistory(conversationId, 50);
+    if (history.length === 0) {
+      return res.status(400).json({ error: 'Não há histórico suficiente para resumir.' });
+    }
+
+    // Buscar provedores disponíveis
+    const providers = getAvailableProviders();
+    if (providers.length === 0) {
+      return res.status(400).json({ error: 'Nenhum provedor de IA configurado no servidor.' });
+    }
+
+    // Prompt
+    const prompt = [
+      {
+        role: 'system',
+        content: `Você é um assistente sênior de vendas especializado em criar resumos rápidos.
+Analise o histórico da conversa e crie um "Briefing" super direto e profissional focado em:
+1) Perfil/Desejo do cliente; 2) Qual foi o último status/acordo; 3) Próximo passo sugerido.
+Verifique também se o cliente ou o assistente concordaram em fazer um acompanhamento/ligação futura.
+
+Responda EXATAMENTE neste formato JSON:
+{
+  "summary": "Seu resumo em até 100 palavras",
+  "has_scheduling": boolean (true se houver promessa de contato futuro),
+  "scheduled_date": "YYYY-MM-DDTHH:mm:ssZ" (melhor estimativa da data/hora acordada, ou null),
+  "scheduling_description": "Ligar para confirmar proposta" (ou null)
+}`
+      },
+      ...history
+    ];
+
+    const response = await aiService.generateResponseWithFallback(prompt as any, providers);
+    let result = { summary: "", has_scheduling: false, scheduled_date: null, scheduling_description: null };
+    
+    try {
+      const cleanJson = response.content.replace(/```json/g, '').replace(/```/g, '').trim();
+      result = JSON.parse(cleanJson);
+    } catch (e) {
+      result.summary = response.content;
+    }
+
+    const summaryText = result.summary || "Resumo não disponível.";
+
+    // Se tiver lead_id, salva como nota no perfil do Lead
+    if (leadId) {
+      await dbQuery(
+        `INSERT INTO lead_notes (user_id, lead_id, content) VALUES ($1, $2, $3)`,
+        [user.id, leadId, `[Resumo IA] ${summaryText}`]
+      );
+    }
+
+    // Se houver agendamento detectado
+    if (result.has_scheduling && result.scheduled_date) {
+      // Garantir que a tabela existe
+      await dbQuery(`
+        CREATE TABLE IF NOT EXISTS scheduled_conversations (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID REFERENCES users(id),
+          lead_id UUID REFERENCES leads(id),
+          conversation_id UUID REFERENCES conversations(id),
+          scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          description TEXT,
+          status VARCHAR(50) DEFAULT 'pending',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `);
+
+      await dbQuery(
+        `INSERT INTO scheduled_conversations (user_id, lead_id, conversation_id, scheduled_at, description)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [user.id, leadId, conversationId, result.scheduled_date, result.scheduling_description || 'Agendamento automático IA']
+      );
+    }
+
+    res.json({ success: true, summary: summaryText, scheduling: result.has_scheduling ? result : null });
+  } catch (error) {
+    console.error('[Inbox Summarize] Error:', error);
+    next(error);
+  }
+});
+
+// Copiloto IA: Gerar sugestão de resposta (Smart Reply) com Análise de Sentimento
+router.post('/conversations/:id/draft-reply', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const conversationId = req.params.id;
+    const { query: dbQuery } = require('../database/connection');
+
+    // Buscar a conversa
+    const convResult = await dbQuery(
+      'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
+      [conversationId, user.id]
+    );
+
+    if (convResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    // Buscar histórico de mensagens
+    const history = await aiService.getConversationHistory(conversationId, 20); // 20 últimas mensagens
+    if (history.length === 0) {
+      return res.status(400).json({ error: 'Não há histórico suficiente para gerar uma sugestão.' });
+    }
+
+    // Buscar provedores disponíveis
+    const providers = getAvailableProviders();
+    if (providers.length === 0) {
+      return res.status(400).json({ error: 'Nenhum provedor de IA configurado no servidor.' });
+    }
+
+    // Prompt
+    const prompt = [
+      {
+        role: 'system',
+        content: `Você é um Copiloto de Vendas (Smart Reply) embutido no CRM. 
+Seu objetivo é analisar as últimas mensagens e formular uma resposta altamente persuasiva e empática para o atendente humano enviar. 
+Além disso, analise o sentimento atual do cliente (positivo, neutro ou frustrado).
+
+RESPONDA EXATAMENTE NESTE FORMATO JSON (NÃO use markdown nem crases de código, retorne SOMENTE o JSON puro):
+{
+  "suggested_reply": "Sua resposta persuasiva, curta e direta, pronta para envio.",
+  "sentiment": "positivo" | "neutro" | "frustrado"
+}`
+      },
+      ...history
+    ];
+
+    const response = await aiService.generateResponseWithFallback(prompt as any, providers);
+    
+    // Tentar fazer o parse do JSON
+    let result = { suggested_reply: "", sentiment: "neutro" };
+    try {
+      // Limpar blocos de código se houver
+      const cleanJson = response.content.replace(/```json/g, '').replace(/```/g, '').trim();
+      result = JSON.parse(cleanJson);
+    } catch (e) {
+      // Fallback: se a IA falhar em retornar JSON, retorna o texto puro
+      result.suggested_reply = response.content;
+    }
+
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('[Inbox Draft Reply] Error:', error);
+    next(error);
   }
 });
 

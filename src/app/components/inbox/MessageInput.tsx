@@ -12,7 +12,8 @@ import {
     Video,
     Music,
     Square,
-    Trash2
+    Trash2,
+    Sparkles
 } from 'lucide-react';
 import { inboxApi, UploadResponse } from '../../services/api/inbox';
 
@@ -39,6 +40,9 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     const [recordingTime, setRecordingTime] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [isGeneratingReply, setIsGeneratingReply] = useState(false);
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3200';
     
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -226,6 +230,32 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         } catch (error) {
             setContent(messageToSend); // Restore if failed
             console.error('Failed to send', error);
+        }
+    };
+
+    const handleDraftReply = async () => {
+        if (!conversationId || disabled || isSending) return;
+        setIsGeneratingReply(true);
+        try {
+            const res = await fetch(`${API_URL}/api/inbox/conversations/${conversationId}/draft-reply`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('leadflow_access_token')}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setContent(data.suggested_reply);
+                
+                // Dispatch event to update sentiment in ContactDetailsPanel if needed
+                if (data.sentiment) {
+                    window.dispatchEvent(new CustomEvent('ai-sentiment-updated', { detail: { conversationId, sentiment: data.sentiment } }));
+                }
+            } else {
+                alert('Erro ao gerar resposta com IA.');
+            }
+        } catch (err) {
+            alert('Erro ao comunicar com o servidor.');
+        } finally {
+            setIsGeneratingReply(false);
         }
     };
 
@@ -510,8 +540,21 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                         className="w-full bg-transparent border-none focus:ring-0 text-sm text-foreground resize-none max-h-[120px] py-1.5 scrollbar-none outline-none overflow-y-auto"
                     />
                     
-                    {/* Emoji Button with Picker */}
-                    <div className="relative flex-shrink-0" ref={emojiPickerRef}>
+                    {/* Emoji and AI Buttons */}
+                    <div className="relative flex-shrink-0 flex items-center gap-1" ref={emojiPickerRef}>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleDraftReply();
+                            }}
+                            disabled={disabled || showRecordingMode || isGeneratingReply}
+                            className={`p-1.5 rounded-full transition-colors disabled:opacity-50 ${isGeneratingReply ? 'text-purple-500 animate-pulse' : 'text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/20'}`}
+                            title="Gerar resposta com IA"
+                            type="button"
+                        >
+                            <Sparkles size={20} />
+                        </button>
+                        
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();

@@ -38,7 +38,7 @@ const CHANNEL_SVG: Record<string, string> = {
     facebook: '/channel icon/messenger-facebook-svgrepo-com.svg',
     instagram: '/channel icon/instagram-1-svgrepo-com.svg',
     telegram: '/channel icon/telegram-svgrepo-com.svg',
-    email: '/channel icon/gmail-svgrepo-com.svg',
+    email: '/channel icon/google-svgrepo-com.svg',
 };
 
 const AVAILABLE_CHANNELS = [

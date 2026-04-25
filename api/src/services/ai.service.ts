@@ -487,4 +487,81 @@ export class AIService {
             }
         }
     }
+
+    /**
+     * Transcreve um arquivo de áudio usando OpenAI Whisper
+     */
+    async transcribeAudio(audioUrl: string, apiKey: string): Promise<string> {
+        try {
+            console.log('[AIService] Baixando áudio para transcrição:', audioUrl);
+            const audioResponse = await fetch(audioUrl);
+            if (!audioResponse.ok) {
+                throw new Error(`Falha ao baixar áudio: ${audioResponse.statusText}`);
+            }
+
+            const audioBlob = await audioResponse.blob();
+            
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'audio.ogg'); // Whisper requires a filename
+            formData.append('model', 'whisper-1');
+            formData.append('language', 'pt'); // Optimize for Portuguese
+
+            console.log('[AIService] Enviando áudio para OpenAI Whisper...');
+            const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: formData as any
+            });
+
+            if (!whisperResponse.ok) {
+                const errorData = await whisperResponse.text();
+                throw new Error(`Erro na API Whisper: ${whisperResponse.status} - ${errorData}`);
+            }
+
+            const data = await whisperResponse.json();
+            return data.text || '';
+        } catch (error: any) {
+            console.error('[AIService] Erro na transcrição:', error.message);
+            throw new Error(`Falha na transcrição: ${error.message}`);
+        }
+    }
+
+    // ==========================================
+    // AUDIO GENERATION (ELEVENLABS)
+    // ==========================================
+    async generateElevenLabsAudio(text: string, voiceId: string, apiKey: string): Promise<Buffer> {
+        try {
+            console.log(`[AIService] Gerando áudio via ElevenLabs (Voice: ${voiceId})...`);
+            
+            const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'audio/mpeg',
+                    'xi-api-key': apiKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    text: text,
+                    model_id: "eleven_multilingual_v2",
+                    voice_settings: {
+                        stability: 0.5,
+                        similarity_boost: 0.75
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`ElevenLabs API Error: ${response.status} - ${errorText}`);
+            }
+
+            const arrayBuffer = await response.arrayBuffer();
+            return Buffer.from(arrayBuffer);
+        } catch (error: any) {
+            console.error('[AIService] Erro na geração de áudio ElevenLabs:', error.message);
+            throw new Error(`Falha na geração de áudio: ${error.message}`);
+        }
+    }
 }

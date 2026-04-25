@@ -43,6 +43,7 @@
     "@radix-ui/react-tooltip": "*",
     "@supabase/supabase-js": "*",
     "@vitejs/plugin-react": "*",
+    "@xyflow/react": "^12.10.2",
     "axios": "^1.13.4",
     "class-variance-authority": "*",
     "clsx": "*",

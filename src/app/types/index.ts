@@ -22,6 +22,7 @@ export interface Lead {
   updatedAt?: string;
   convertedAt?: string;
   empresa?: string;
+  lead_score?: number | null;
 }
 
 export interface LeadNote {

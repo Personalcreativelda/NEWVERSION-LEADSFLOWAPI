@@ -5,7 +5,7 @@ import {
   Zap, X, Check, Loader2,
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash,
-  Brain, Smartphone, Cloud, History, Lock, AlertTriangle
+  Brain, Smartphone, Cloud, History, Lock, AlertTriangle, Mic, Volume2
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -118,6 +118,45 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
   const [premiumModalReason, setPremiumModalReason] = useState<'marketplace' | 'custom_limit'>('marketplace');
+
+  // ElevenLabs voices
+  const [elevenLabsVoices, setElevenLabsVoices] = useState<Array<{ voice_id: string; name: string }>>([]);
+  const [voicesLoading, setVoicesLoading] = useState(false);
+
+  // Load ElevenLabs voices dynamically from the API
+  const loadElevenLabsVoices = useCallback(async () => {
+    setVoicesLoading(true);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+      const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
+      const response = await fetch(`${apiUrl}/api/assistants/elevenlabs-voices`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setElevenLabsVoices(data.voices || []);
+      } else {
+        // Fallback to built-in voices if API fails
+        setElevenLabsVoices([
+          { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah (Feminina)' },
+          { voice_id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam (Masculino)' },
+          { voice_id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli (Feminina)' },
+          { voice_id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold (Masculino)' },
+          { voice_id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh (Masculino)' },
+          { voice_id: 'ErXwobaYiN019PkySvjV', name: 'Antoni (Masculino)' },
+        ]);
+      }
+    } catch {
+      setElevenLabsVoices([
+        { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah (Feminina)' },
+        { voice_id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam (Masculino)' },
+        { voice_id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli (Feminina)' },
+        { voice_id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold (Masculino)' },
+      ]);
+    } finally {
+      setVoicesLoading(false);
+    }
+  }, []);
 
   // Modal states
   const [connectModalOpen, setConnectModalOpen] = useState(false);
@@ -315,6 +354,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     context_window_messages: cfg.context_window_messages ?? 10,
     memory_enabled: cfg.memory_enabled !== false,
     funnel_tracking_enabled: cfg.funnel_tracking_enabled !== false,
+    audio_enabled: cfg.audio_enabled === true,
+    audio_voice_id: cfg.audio_voice_id || 'EXAVITQu4vr4xnSDxMaL',
   });
 
   // Open config modal — fetch fresh data to avoid stale cached config
@@ -323,6 +364,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     setConfigValues(normalizeConfig(userAssistant.config || {}));
     setSelectedChannelIds(userAssistant.channel_ids || []);
     setConfigModalOpen(true);
+    // Load ElevenLabs voices when opening config modal
+    if (elevenLabsVoices.length === 0) loadElevenLabsVoices();
     // Re-fetch fresh config in background (updates modal if data differs)
     setConfigLoadingFresh(true);
     try {
@@ -1263,6 +1306,82 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       />
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* 🎙️ ElevenLabs — Respostas em Áudio Mágico */}
+              <div className="p-4 rounded-lg border bg-muted/30 border-border">
+                <div className="flex items-center gap-2 mb-4">
+                  <Mic className="w-4 h-4 text-violet-500" />
+                  <h4 className="text-sm font-semibold text-foreground">Áudio Mágico (ElevenLabs)</h4>
+                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-500 font-medium border border-violet-500/20">
+                    WhatsApp
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Toggle */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">Responder em áudio quando receber áudio</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Quando o cliente enviar um áudio, o assistente responde com voz gerada por IA
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!configValues.audio_enabled}
+                      onClick={() => setConfigValues({ ...configValues, audio_enabled: !configValues.audio_enabled })}
+                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                      style={{ width: 44, height: 24, background: configValues.audio_enabled ? '#7c3aed' : '#6b7280' }}
+                    >
+                      <span
+                        className="inline-block rounded-full bg-white shadow transition-transform"
+                        style={{ width: 18, height: 18, transform: configValues.audio_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Voice selector (only shown if audio_enabled) */}
+                  {configValues.audio_enabled && (
+                    <div className="pt-3 border-t border-border">
+                      <label className="block text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <Volume2 className="w-3.5 h-3.5" />
+                        Voz padrão do assistente
+                      </label>
+                      {voicesLoading ? (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando vozes da ElevenLabs...
+                        </div>
+                      ) : (
+                        <select
+                          value={configValues.audio_voice_id || 'EXAVITQu4vr4xnSDxMaL'}
+                          onChange={(e) => setConfigValues({ ...configValues, audio_voice_id: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
+                        >
+                          {elevenLabsVoices.length > 0
+                            ? elevenLabsVoices.map(v => (
+                                <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
+                              ))
+                            : (
+                              <>
+                                <option value="EXAVITQu4vr4xnSDxMaL">Sarah (Feminina)</option>
+                                <option value="pNInz6obpgDQGcFmaJgB">Adam (Masculino)</option>
+                                <option value="MF3mGyEYCl7XYWbV9V6O">Elli (Feminina)</option>
+                                <option value="VR6AewLTigWG4xSOukaG">Arnold (Masculino)</option>
+                                <option value="TxGEqnHWrfWFTfGW9XjX">Josh (Masculino)</option>
+                              </>
+                            )
+                          }
+                        </select>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
+                        <Mic className="w-3 h-3 text-violet-400" />
+                        Vozes carregadas diretamente da sua conta ElevenLabs
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 

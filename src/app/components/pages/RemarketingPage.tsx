@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../../lib/api';
+import { toast } from 'sonner';
 import {
   GitBranch, Plus, Zap, Mail, MessageSquare, Clock, Filter,
   ChevronRight, Play, Pause, Copy, Trash2, BarChart3, ArrowRight,
   Tag, ShoppingCart, UserCheck, AlertCircle,
   Layers, Repeat2, Target, Pencil, X, GripVertical, Info,
-  Instagram, Facebook, Send,
+  Instagram, Facebook, Send, Split, Mic,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
@@ -23,7 +24,7 @@ function saveLocal(flows: RemarketingFlow[]) {
 
 type FlowStatus = 'active' | 'paused' | 'draft';
 type TriggerType = 'funnel_stage' | 'tag' | 'inactivity' | 'purchase' | 'lead_score';
-type ActionType = 'whatsapp' | 'facebook' | 'instagram' | 'telegram' | 'email' | 'wait' | 'tag' | 'move_stage' | 'condition';
+type ActionType = 'whatsapp' | 'facebook' | 'instagram' | 'telegram' | 'email' | 'wait' | 'tag' | 'move_stage' | 'condition' | 'ab_test' | 'dynamic_audio';
 
 interface FlowStep {
   id: string;
@@ -161,6 +162,8 @@ const STEP_ICONS: Record<ActionType, React.ElementType> = {
   facebook: Facebook,
   instagram: Instagram,
   telegram: Send,
+  ab_test: Split,
+  dynamic_audio: Mic,
 };
 
 const STEP_COLORS: Record<ActionType, string> = {
@@ -173,31 +176,35 @@ const STEP_COLORS: Record<ActionType, string> = {
   tag: 'text-violet-500 bg-violet-500/10',
   move_stage: 'text-cyan-500 bg-cyan-500/10',
   condition: 'text-orange-500 bg-orange-500/10',
+  ab_test: 'text-rose-500 bg-rose-500/10',
+  dynamic_audio: 'text-purple-500 bg-purple-500/10',
 };
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; description: string }[] = [
-  { value: 'funnel_stage', label: 'Etapa do funil',     description: 'Dispara quando o lead é movido para a etapa escolhida.' },
-  { value: 'tag',          label: 'Tag aplicada',       description: 'Dispara quando a tag especificada é adicionada ao lead.' },
-  { value: 'inactivity',   label: 'Inatividade',        description: 'Dispara automaticamente quando o lead não é contactado há X dias (verificação a cada 6h).' },
-  { value: 'purchase',     label: 'Compra realizada',   description: 'Dispara quando o lead é marcado como Convertido no funil.' },
-  { value: 'lead_score',   label: 'Motor de Vendas',    description: 'Dispara quando o Motor de Vendas calcula um score ≥ X ao analisar os leads.' },
+  { value: 'funnel_stage', label: 'Etapa do funil', description: 'Dispara quando o lead é movido para a etapa escolhida.' },
+  { value: 'tag', label: 'Tag aplicada', description: 'Dispara quando a tag especificada é adicionada ao lead.' },
+  { value: 'inactivity', label: 'Inatividade', description: 'Dispara automaticamente quando o lead não é contactado há X dias (verificação a cada 6h).' },
+  { value: 'purchase', label: 'Compra realizada', description: 'Dispara quando o lead é marcado como Convertido no funil.' },
+  { value: 'lead_score', label: 'Motor de Vendas', description: 'Dispara quando o Motor de Vendas calcula um score ≥ X ao analisar os leads.' },
 ];
 
 const ACTION_OPTIONS: { value: ActionType; label: string }[] = [
-  { value: 'whatsapp',   label: 'Mensagem WhatsApp' },
-  { value: 'facebook',   label: 'Mensagem Facebook' },
-  { value: 'instagram',  label: 'Mensagem Instagram' },
-  { value: 'telegram',   label: 'Mensagem Telegram' },
-  { value: 'email',      label: 'Enviar Email' },
-  { value: 'wait',       label: 'Aguardar' },
-  { value: 'tag',        label: 'Aplicar Tag' },
+  { value: 'whatsapp', label: 'Mensagem WhatsApp' },
+  { value: 'facebook', label: 'Mensagem Facebook' },
+  { value: 'instagram', label: 'Mensagem Instagram' },
+  { value: 'telegram', label: 'Mensagem Telegram' },
+  { value: 'email', label: 'Enviar Email' },
+  { value: 'wait', label: 'Aguardar' },
+  { value: 'tag', label: 'Aplicar Tag' },
   { value: 'move_stage', label: 'Mover Etapa' },
-  { value: 'condition',  label: 'Condição (bifurcação)' },
+  { value: 'condition', label: 'Condição (bifurcação)' },
+  { value: 'ab_test', label: 'Teste A/B (Mensagens)' },
+  { value: 'dynamic_audio', label: 'Áudio Mágico (IA ElevenLabs)' },
 ];
 
-// ─── Funnel stages (match backend valid statuses) ────────────────────────────
+// ─── Funnel stages fallback (used when API is unavailable) ──────────────────
 
-const FUNNEL_STAGES = [
+const DEFAULT_FUNNEL_STAGES = [
   { value: 'novo',        label: 'Novo Lead' },
   { value: 'contatado',   label: 'Contatado' },
   { value: 'qualificado', label: 'Qualificado' },
@@ -206,19 +213,24 @@ const FUNNEL_STAGES = [
   { value: 'perdido',     label: 'Perdido' },
 ];
 
+// Keep a module-level alias so non-component helpers can still resolve labels
+let FUNNEL_STAGES = DEFAULT_FUNNEL_STAGES;
+
 // Auto-generate step label from its config
 function stepLabel(type: ActionType, config: Record<string, any> = {}): string {
   switch (type) {
-    case 'whatsapp':   return config.message   ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem WhatsApp';
-    case 'facebook':   return config.message   ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Facebook';
-    case 'instagram':  return config.message   ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Instagram';
-    case 'telegram':   return config.message   ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Telegram';
-    case 'email':      return config.subject   ? `Email: ${config.subject}` : 'Enviar Email';
-    case 'wait':       return config.duration  ? `Aguardar ${config.duration} ${config.unit ?? 'dia(s)'}` : 'Aguardar';
-    case 'tag':        return config.tag       ? `Tag: ${config.tag}` : 'Aplicar Tag';
-    case 'move_stage': return config.stage     ? `Mover para "${FUNNEL_STAGES.find(s => s.value === config.stage)?.label ?? config.stage}"` : 'Mover Etapa';
-    case 'condition':  return config.condition ? `${config.condition}?` : 'Condição';
-    default:           return 'Ação';
+    case 'whatsapp': return config.message ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem WhatsApp';
+    case 'facebook': return config.message ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Facebook';
+    case 'instagram': return config.message ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Instagram';
+    case 'telegram': return config.message ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Telegram';
+    case 'email': return config.subject ? `Email: ${config.subject}` : 'Enviar Email';
+    case 'wait': return config.duration ? `Aguardar ${config.duration} ${config.unit ?? 'dia(s)'}` : 'Aguardar';
+    case 'tag': return config.tag ? `Tag: ${config.tag}` : 'Aplicar Tag';
+    case 'move_stage': return config.stage ? `Mover para "${FUNNEL_STAGES.find(s => s.value === config.stage)?.label ?? config.stage}"` : 'Mover Etapa';
+    case 'condition': return config.condition ? `${config.condition}?` : 'Condição';
+    case 'ab_test': return 'Teste A/B (50/50)';
+    case 'dynamic_audio': return config.text ? `Áudio IA: ${config.text.slice(0, 30)}...` : 'Áudio Mágico IA';
+    default: return 'Ação';
   }
 }
 
@@ -229,25 +241,32 @@ interface EditModalProps {
   isNew?: boolean;
   onSave: (updated: RemarketingFlow) => void;
   onClose: () => void;
+  /** Live funnel stages fetched from the API */
+  funnelStages: { value: string; label: string }[];
 }
 
-function EditModal({ flow, isNew = false, onSave, onClose }: EditModalProps) {
-  const [name,        setName]        = useState(flow.name);
+function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditModalProps) {
+  const [name, setName] = useState(flow.name);
   const [description, setDescription] = useState(flow.description);
-  const [trigger,     setTrigger]     = useState<TriggerType>(flow.trigger);
-  const [steps,       setSteps]       = useState<FlowStep[]>(flow.steps.map(s => ({ ...s, config: s.config ?? {} })));
+  const [trigger, setTrigger] = useState<TriggerType>(flow.trigger);
+  const [steps, setSteps] = useState<FlowStep[]>(flow.steps.map(s => ({ ...s, config: s.config ?? {} })));
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
 
   // Trigger-specific config state (parsed from existing triggerLabel on first render)
   const [triggerStage, setTriggerStage] = useState<string>(() => {
-    if (flow.trigger !== 'funnel_stage') return 'novo';
-    const match = FUNNEL_STAGES.find(s => flow.triggerLabel.toLowerCase().includes(s.label.toLowerCase()));
-    return match?.value ?? 'novo';
+    if (flow.trigger !== 'funnel_stage') return funnelStages[0]?.value ?? 'novo';
+    // Match by raw value first (new format: 'negociacao +3 dias')
+    const byValue = funnelStages.find(s => flow.triggerLabel.toLowerCase().startsWith(s.value.toLowerCase()));
+    if (byValue) return byValue.value;
+    // Match by label (old format: 'Em Negociação +3 dias')
+    const byLabel = funnelStages.find(s => flow.triggerLabel.toLowerCase().includes(s.label.toLowerCase()));
+    return byLabel?.value ?? funnelStages[0]?.value ?? 'novo';
   });
-  const [triggerDays,  setTriggerDays]  = useState<string>(() => {
+  const [triggerDays, setTriggerDays] = useState<string>(() => {
     const m = flow.triggerLabel.match(/\+(\d+)/);
     return m ? m[1] : '3';
   });
-  const [triggerTag,   setTriggerTag]   = useState<string>(() => {
+  const [triggerTag, setTriggerTag] = useState<string>(() => {
     const m = flow.triggerLabel.match(/Tag:\s*(.+)/i);
     return m ? m[1].trim() : '';
   });
@@ -256,18 +275,20 @@ function EditModal({ flow, isNew = false, onSave, onClose }: EditModalProps) {
     return m ? m[1] : '80';
   });
 
-  // Derive triggerLabel from structured config
+  // Derive triggerLabel from structured config.
+  // IMPORTANT: for funnel_stage we store the RAW DB value (e.g. 'negociacao +3 dias')
+  // so the backend can match it with a simple ILIKE comparison.
+  // The display helper normalizeTriggerLabel() converts it to human-readable.
   const computedTriggerLabel = (): string => {
     switch (trigger) {
-      case 'funnel_stage': {
-        const stageName = FUNNEL_STAGES.find(s => s.value === triggerStage)?.label ?? triggerStage;
-        return `${stageName} +${triggerDays || '3'} dias`;
-      }
-      case 'inactivity':  return `Inatividade +${triggerDays || '7'} dias`;
-      case 'tag':         return triggerTag ? `Tag: ${triggerTag}` : 'Tag aplicada';
-      case 'lead_score':  return `Score ≥ ${triggerScore || '80'}`;
-      case 'purchase':    return 'Compra realizada';
-      default:            return trigger;
+      case 'funnel_stage':
+        // store raw value: 'negociacao +3 dias'
+        return `${triggerStage} +${triggerDays || '3'} dias`;
+      case 'inactivity': return `Inatividade +${triggerDays || '7'} dias`;
+      case 'tag': return triggerTag ? `Tag: ${triggerTag}` : 'Tag aplicada';
+      case 'lead_score': return `Score ≥ ${triggerScore || '80'}`;
+      case 'purchase': return 'Compra realizada';
+      default: return trigger;
     }
   };
 
@@ -280,7 +301,9 @@ function EditModal({ flow, isNew = false, onSave, onClose }: EditModalProps) {
 
   // ── Step helpers ──────────────────────────────────────────────────────────
   const addStep = () => {
-    setSteps(prev => [...prev, { id: `s-${Date.now()}`, type: 'whatsapp', label: 'Mensagem WhatsApp', config: {} }]);
+    const id = `s-${Date.now()}`;
+    setSteps(prev => [...prev, { id, type: 'whatsapp', label: 'Mensagem WhatsApp', config: {} }]);
+    setExpandedStepId(id);
   };
 
   const removeStep = (id: string) => setSteps(prev => prev.filter(s => s.id !== id));
@@ -378,7 +401,7 @@ function EditModal({ flow, isNew = false, onSave, onClose }: EditModalProps) {
                   onChange={e => setTriggerStage(e.target.value)}
                   className="flex-1 h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 >
-                  {FUNNEL_STAGES.map(s => (
+                  {funnelStages.map(s => (
                     <option key={s.value} value={s.value}>{s.label}</option>
                   ))}
                 </select>
@@ -454,97 +477,159 @@ function EditModal({ flow, isNew = false, onSave, onClose }: EditModalProps) {
               const StepIcon = STEP_ICONS[step.type];
               const colorClass = STEP_COLORS[step.type];
               const cfg = step.config ?? {};
+              const isExpanded = expandedStepId === step.id;
+              const stepTypeLabel = ACTION_OPTIONS.find(o => o.value === step.type)?.label || 'Ação';
+
               return (
-                <div key={step.id} className="flex flex-col gap-1.5 rounded-lg border border-border p-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${colorClass}`}>
-                      <StepIcon className="w-3.5 h-3.5" />
+                <div key={step.id} className={`flex flex-col rounded-lg border transition-all ${isExpanded ? 'border-primary ring-1 ring-primary/20 shadow-sm' : 'border-border hover:border-primary/50'}`}>
+                  {/* Header (Click to expand) */}
+                  <div 
+                    className="flex items-center gap-3 p-2.5 cursor-pointer"
+                    onClick={() => setExpandedStepId(isExpanded ? null : step.id)}
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${colorClass}`}>
+                      <StepIcon className="w-4 h-4" />
                     </div>
-                    <select
-                      value={step.type}
-                      onChange={e => updateStepType(step.id, e.target.value as ActionType)}
-                      className={`${selectCls} flex-1`}
-                    >
-                      {ACTION_OPTIONS.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
+                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                      <div className="text-sm font-medium text-foreground leading-tight">{stepTypeLabel}</div>
+                      {!isExpanded && (
+                        <div className="text-xs text-muted-foreground truncate mt-0.5">
+                          {stepLabel(step.type, cfg)}
+                        </div>
+                      )}
+                    </div>
                     <button
-                      onClick={() => removeStep(step.id)}
-                      className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+                      onClick={(e) => { e.stopPropagation(); removeStep(step.id); }}
+                      className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex-shrink-0 p-1.5 rounded-md"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
 
-                  {/* Type-specific config */}
-                  {(step.type === 'whatsapp' || step.type === 'facebook' || step.type === 'instagram' || step.type === 'telegram') && (
-                    <textarea
-                      rows={2}
-                      value={cfg.message ?? ''}
-                      onChange={e => updateStepConfig(step.id, 'message', e.target.value)}
-                      placeholder={`Digite a mensagem ${
-                        step.type === 'facebook' ? 'Facebook' :
-                        step.type === 'instagram' ? 'Instagram' :
-                        step.type === 'telegram' ? 'Telegram' : 'WhatsApp'
-                      }…`}
-                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-                    />
-                  )}
-                  {step.type === 'email' && (
-                    <input
-                      value={cfg.subject ?? ''}
-                      onChange={e => updateStepConfig(step.id, 'subject', e.target.value)}
-                      placeholder="Assunto do email"
-                      className={`${inputCls} w-full`}
-                    />
-                  )}
-                  {step.type === 'wait' && (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number" min="1"
-                        value={cfg.duration ?? ''}
-                        onChange={e => updateStepConfig(step.id, 'duration', e.target.value)}
-                        placeholder="1"
-                        className={`${selectCls} w-20`}
-                      />
-                      <select
-                        value={cfg.unit ?? 'dias'}
-                        onChange={e => updateStepConfig(step.id, 'unit', e.target.value)}
-                        className={selectCls}
-                      >
-                        <option value="horas">horas</option>
-                        <option value="dias">dias</option>
-                        <option value="semanas">semanas</option>
-                      </select>
+                  {/* Expanded Body */}
+                  {isExpanded && (
+                    <div className="p-3 pt-0 border-t border-border/50 bg-muted/10 flex flex-col gap-3 rounded-b-lg mt-1">
+                      <div className="pt-3">
+                        <select
+                          value={step.type}
+                          onChange={e => updateStepType(step.id, e.target.value as ActionType)}
+                          className={`${selectCls} w-full`}
+                        >
+                          {ACTION_OPTIONS.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Type-specific config */}
+                      {(step.type === 'whatsapp' || step.type === 'facebook' || step.type === 'instagram' || step.type === 'telegram') && (
+                        <textarea
+                          rows={2}
+                          value={cfg.message ?? ''}
+                          onChange={e => updateStepConfig(step.id, 'message', e.target.value)}
+                          placeholder={`Digite a mensagem ${step.type === 'facebook' ? 'Facebook' :
+                              step.type === 'instagram' ? 'Instagram' :
+                                step.type === 'telegram' ? 'Telegram' : 'WhatsApp'
+                            }…`}
+                          className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                        />
+                      )}
+                      {step.type === 'ab_test' && (
+                        <div className="flex flex-col gap-2">
+                          <textarea
+                            rows={2}
+                            value={cfg.messageA ?? ''}
+                            onChange={e => updateStepConfig(step.id, 'messageA', e.target.value)}
+                            placeholder="Variante A (50% dos leads)..."
+                            className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                          />
+                          <textarea
+                            rows={2}
+                            value={cfg.messageB ?? ''}
+                            onChange={e => updateStepConfig(step.id, 'messageB', e.target.value)}
+                            placeholder="Variante B (50% dos leads)..."
+                            className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                          />
+                        </div>
+                      )}
+                      {step.type === 'dynamic_audio' && (
+                        <div className="flex flex-col gap-2">
+                          <textarea
+                            rows={2}
+                            value={cfg.text ?? ''}
+                            onChange={e => updateStepConfig(step.id, 'text', e.target.value)}
+                            placeholder="Digite o texto que a IA vai falar (use {{nome}} para personalizar)..."
+                            className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                          />
+                          <select
+                            value={cfg.voiceId ?? 'EXAVITQu4vr4xnSDxMaL'}
+                            onChange={e => updateStepConfig(step.id, 'voiceId', e.target.value)}
+                            className={`${selectCls} w-full`}
+                          >
+                            <option value="EXAVITQu4vr4xnSDxMaL">Voz Feminina (Sarah)</option>
+                            <option value="pNInz6obpgDQGcFmaJcg">Voz Masculina (Adam)</option>
+                            <option value="MF3mGyEYCl7XYWbV9V6O">Voz Feminina (Elli)</option>
+                            <option value="VR6AewLTigWG4xSOukaG">Voz Masculina (Arnold)</option>
+                          </select>
+                        </div>
+                      )}
+                      {step.type === 'email' && (
+                        <input
+                          value={cfg.subject ?? ''}
+                          onChange={e => updateStepConfig(step.id, 'subject', e.target.value)}
+                          placeholder="Assunto do email"
+                          className={`${inputCls} w-full`}
+                        />
+                      )}
+                      {step.type === 'wait' && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number" min="1"
+                            value={cfg.duration ?? ''}
+                            onChange={e => updateStepConfig(step.id, 'duration', e.target.value)}
+                            placeholder="1"
+                            className={`${selectCls} w-20`}
+                          />
+                          <select
+                            value={cfg.unit ?? 'dias'}
+                            onChange={e => updateStepConfig(step.id, 'unit', e.target.value)}
+                            className={selectCls}
+                          >
+                            <option value="minutos">minutos</option>
+                            <option value="horas">horas</option>
+                            <option value="dias">dias</option>
+                            <option value="semanas">semanas</option>
+                          </select>
+                        </div>
+                      )}
+                      {step.type === 'tag' && (
+                        <input
+                          value={cfg.tag ?? ''}
+                          onChange={e => updateStepConfig(step.id, 'tag', e.target.value)}
+                          placeholder="Nome da tag (ex: cliente-vip)"
+                          className={`${inputCls} w-full`}
+                        />
+                      )}
+                      {step.type === 'move_stage' && (
+                        <select
+                          value={cfg.stage ?? 'negociacao'}
+                          onChange={e => updateStepConfig(step.id, 'stage', e.target.value)}
+                          className={`${selectCls} w-full`}
+                        >
+                          {FUNNEL_STAGES.map(s => (
+                            <option key={s.value} value={s.value}>{s.label}</option>
+                          ))}
+                        </select>
+                      )}
+                      {step.type === 'condition' && (
+                        <input
+                          value={cfg.condition ?? ''}
+                          onChange={e => updateStepConfig(step.id, 'condition', e.target.value)}
+                          placeholder="Ex: Respondeu a mensagem"
+                          className={`${inputCls} w-full`}
+                        />
+                      )}
                     </div>
-                  )}
-                  {step.type === 'tag' && (
-                    <input
-                      value={cfg.tag ?? ''}
-                      onChange={e => updateStepConfig(step.id, 'tag', e.target.value)}
-                      placeholder="Nome da tag (ex: cliente-vip)"
-                      className={`${inputCls} w-full`}
-                    />
-                  )}
-                  {step.type === 'move_stage' && (
-                    <select
-                      value={cfg.stage ?? 'negociacao'}
-                      onChange={e => updateStepConfig(step.id, 'stage', e.target.value)}
-                      className={`${selectCls} w-full`}
-                    >
-                      {FUNNEL_STAGES.map(s => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
-                      ))}
-                    </select>
-                  )}
-                  {step.type === 'condition' && (
-                    <input
-                      value={cfg.condition ?? ''}
-                      onChange={e => updateStepConfig(step.id, 'condition', e.target.value)}
-                      placeholder="Ex: Respondeu a mensagem"
-                      className={`${inputCls} w-full`}
-                    />
                   )}
                 </div>
               );
@@ -570,6 +655,37 @@ export default function RemarketingPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<typeof TEMPLATES[0] | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingFlow, setEditingFlow] = useState<RemarketingFlow | null>(null);
+
+  // ── Dynamic funnel stages from the real leads table ───────────────────────
+  const [funnelStages, setFunnelStages] = useState<{ value: string; label: string }[]>(DEFAULT_FUNNEL_STAGES);
+
+  useEffect(() => {
+    api.leads.funnelStages()
+      .then(rows => {
+        const LABEL_MAP: Record<string, string> = {
+          novo: 'Novo Lead',
+          contatado: 'Contatado',
+          qualificado: 'Qualificado',
+          negociacao: 'Em Negociação',
+          convertido: 'Convertido',
+          perdido: 'Perdido',
+        };
+
+        // Start with all defaults, then add any custom stages from the API not already in defaults
+        const defaultValues = new Set(DEFAULT_FUNNEL_STAGES.map(s => s.value));
+        const extra = (rows || [])
+          .filter(r => !defaultValues.has(r.value))
+          .map(r => ({
+            value: r.value,
+            label: LABEL_MAP[r.value] ?? (r.value.charAt(0).toUpperCase() + r.value.slice(1)),
+          }));
+
+        const merged = [...DEFAULT_FUNNEL_STAGES, ...extra];
+        setFunnelStages(merged);
+        FUNNEL_STAGES = merged;
+      })
+      .catch(() => { /* keep defaults */ });
+  }, []);
 
   // ── Persist helper — keeps localStorage in sync with every state update ──
   const updateFlows = useCallback((updater: (prev: RemarketingFlow[]) => RemarketingFlow[]) => {
@@ -761,7 +877,12 @@ export default function RemarketingPage() {
         updateFlows(prev => prev.map(f =>
           f.id === updated.id ? { ...f, id: created.id, createdAt: created.created_at } : f
         ));
-      } catch { /* persisted locally */ }
+      } catch (err: any) {
+        console.error('[Remarketing] ❌ Falha ao salvar flow na API:', err);
+        // Show the real error so we can diagnose it
+        const msg = err?.message || JSON.stringify(err);
+        toast.error(`Flow salvo localmente. Erro da API: ${msg}`);
+      }
       return;
     }
     updateFlows(prev => prev.map(f => f.id === updated.id ? updated : f));
@@ -774,265 +895,305 @@ export default function RemarketingPage() {
         trigger_label: updated.triggerLabel,
         steps: updated.steps,
       });
-    } catch { /* persisted locally */ }
+    } catch (err: any) {
+      console.error('[Remarketing] ❌ Falha ao atualizar flow na API:', err);
+      const msg = err?.message || JSON.stringify(err);
+      toast.error(`Erro ao salvar no servidor: ${msg}`);
+    }
+  };
+
+  // ── Force-sync localStorage flows → DB ───────────────────────────────────
+  const [syncing, setSyncing] = useState(false);
+  const syncToDB = async () => {
+    setSyncing(true);
+    let ok = 0, fail = 0;
+    for (const f of flows) {
+      // Only push flows that still have a local temp ID
+      if (!f.id.startsWith('flow-')) continue;
+      try {
+        const created = await api.remarketing.create({
+          name: f.name,
+          description: f.description,
+          status: f.status,
+          trigger_type: f.trigger,
+          trigger_label: f.triggerLabel,
+          steps: f.steps,
+        });
+        updateFlows(prev => prev.map(x =>
+          x.id === f.id ? { ...x, id: created.id, createdAt: created.created_at } : x
+        ));
+        ok++;
+      } catch (err: any) {
+        console.error('[Remarketing] Sync error for flow', f.name, err);
+        fail++;
+      }
+    }
+    setSyncing(false);
+    if (ok > 0) toast.success(`${ok} flow(s) sincronizados com o servidor!`);
+    if (fail > 0) toast.error(`${fail} flow(s) falharam — veja o console para detalhes.`);
+    if (ok === 0 && fail === 0) toast.info('Todos os flows já estão no servidor.');
+    fetchFlows(true);
   };
 
   return (
     <>
-    <div className="min-h-screen bg-background">
-      <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8 space-y-6">
+      <div className="min-h-screen bg-background">
+        <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8 space-y-6">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-semibold text-foreground tracking-tight flex items-center gap-2.5">
-              <Repeat2 className="w-6 h-6 text-muted-foreground" />
-              Remarketing
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Crie flows automáticos que re-engajam leads com base no comportamento no funil
-            </p>
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-xl md:text-2xl font-semibold text-foreground tracking-tight flex items-center gap-2.5">
+                <Repeat2 className="w-6 h-6 text-muted-foreground" />
+                Remarketing
+              </h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Crie flows automáticos que re-engajam leads com base no comportamento no funil
+              </p>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              <Button variant="outline" onClick={syncToDB} disabled={syncing} className="gap-2" title="Sincronizar flows locais com o banco de dados">
+                <Target className="w-4 h-4" />
+                {syncing ? 'Sincronizando…' : 'Sincronizar'}
+              </Button>
+              <Button variant="outline" onClick={() => setActiveTab('templates')} className="gap-2">
+                <Layers className="w-4 h-4" />
+                Templates
+              </Button>
+              <Button onClick={handleCreateBlank} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Novo Flow
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2 flex-shrink-0">
-            <Button variant="outline" onClick={() => setActiveTab('templates')} className="gap-2">
-              <Layers className="w-4 h-4" />
-              Templates
-            </Button>
-            <Button onClick={handleCreateBlank} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Novo Flow
-            </Button>
+
+
+          {/* Tabs */}
+          <div className="flex gap-1 border-b border-border">
+            {(['flows', 'templates'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${activeTab === tab
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+              >
+                {tab === 'flows' && `Meus Flows (${flows.length})`}
+                {tab === 'templates' && 'Templates'}
+              </button>
+            ))}
           </div>
-        </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 border-b border-border">
-          {(['flows', 'templates'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
-                activeTab === tab
-                  ? 'border-foreground text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {tab === 'flows' && `Meus Flows (${flows.length})`}
-              {tab === 'templates' && 'Templates'}
-            </button>
-          ))}
-        </div>
-
-        {/* ── FLOWS TAB ── */}
-        {activeTab === 'flows' && (
-          <>
-            {loading ? (
-              <div className="flex items-center justify-center py-20">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : flows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-                  <GitBranch className="w-7 h-7 text-muted-foreground" />
+          {/* ── FLOWS TAB ── */}
+          {activeTab === 'flows' && (
+            <>
+              {loading ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
-                <h3 className="text-base font-semibold text-foreground mb-1">Nenhum flow criado</h3>
-                <p className="text-sm text-muted-foreground mb-5 max-w-xs">
-                  Crie seu primeiro flow de remarketing a partir de um template ou do zero.
-                </p>
-                <Button onClick={() => setActiveTab('templates')} className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  Explorar Templates
-                </Button>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {flows.map(flow => {
-                  const convRate = flow.enrolledLeads > 0
-                    ? Math.round((flow.conversions / flow.enrolledLeads) * 100)
-                    : 0;
-                  return (
-                    <div key={flow.id} className="bg-card border border-border rounded-xl p-5 hover:border-border/80 transition-all">
-                      <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                        {/* Left */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <span className="font-semibold text-foreground text-sm">{flow.name}</span>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                              flow.status === 'active' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
-                              flow.status === 'paused' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
-                              'bg-muted text-muted-foreground'
-                            }`}>
-                              <div className={`w-1.5 h-1.5 rounded-full ${
-                                flow.status === 'active' ? 'bg-emerald-500 animate-pulse' :
-                                flow.status === 'paused' ? 'bg-amber-500' : 'bg-muted-foreground'
-                              }`} />
-                              {flow.status === 'active' ? 'Ativo' : flow.status === 'paused' ? 'Pausado' : 'Rascunho'}
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground mb-3">{flow.description}</p>
+              ) : flows.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
+                    <GitBranch className="w-7 h-7 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-base font-semibold text-foreground mb-1">Nenhum flow criado</h3>
+                  <p className="text-sm text-muted-foreground mb-5 max-w-xs">
+                    Crie seu primeiro flow de remarketing a partir de um template ou do zero.
+                  </p>
+                  <Button onClick={() => setActiveTab('templates')} className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Explorar Templates
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {flows.map(flow => {
+                    const convRate = flow.enrolledLeads > 0
+                      ? Math.round((flow.conversions / flow.enrolledLeads) * 100)
+                      : 0;
+                    return (
+                      <div key={flow.id} className="bg-card border border-border rounded-xl p-5 hover:border-border/80 transition-all">
+                        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                          {/* Left */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-semibold text-foreground text-sm">{flow.name}</span>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${flow.status === 'active' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                                  flow.status === 'paused' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                                    'bg-muted text-muted-foreground'
+                                }`}>
+                                <div className={`w-1.5 h-1.5 rounded-full ${flow.status === 'active' ? 'bg-emerald-500 animate-pulse' :
+                                    flow.status === 'paused' ? 'bg-amber-500' : 'bg-muted-foreground'
+                                  }`} />
+                                {flow.status === 'active' ? 'Ativo' : flow.status === 'paused' ? 'Pausado' : 'Rascunho'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-3">{flow.description}</p>
 
-                          {/* Trigger pill */}
-                          <div className="flex items-center gap-1.5 mb-3">
-                            <Zap className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">Gatilho:</span>
-                            <span className="text-xs font-medium text-foreground">{flow.triggerLabel}</span>
+                            {/* Trigger pill */}
+                            <div className="flex items-center gap-1.5 mb-3">
+                              <Zap className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">Gatilho:</span>
+                              <span className="text-xs font-medium text-foreground">{flow.triggerLabel}</span>
+                            </div>
+
+                            {/* Step trail */}
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {flow.steps.map((step, i) => {
+                                const StepIcon = STEP_ICONS[step.type];
+                                const colorClass = STEP_COLORS[step.type];
+                                return (
+                                  <React.Fragment key={step.id}>
+                                    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium ${colorClass}`}>
+                                      <StepIcon className="w-3 h-3" />
+                                      <span className="hidden sm:inline">{step.label.split(':')[0]}</span>
+                                    </div>
+                                    {i < flow.steps.length - 1 && (
+                                      <ArrowRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
+                                    )}
+                                  </React.Fragment>
+                                );
+                              })}
+                            </div>
                           </div>
 
-                          {/* Step trail */}
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {flow.steps.map((step, i) => {
-                              const StepIcon = STEP_ICONS[step.type];
-                              const colorClass = STEP_COLORS[step.type];
-                              return (
-                                <React.Fragment key={step.id}>
-                                  <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium ${colorClass}`}>
-                                    <StepIcon className="w-3 h-3" />
-                                    <span className="hidden sm:inline">{step.label.split(':')[0]}</span>
-                                  </div>
-                                  {i < flow.steps.length - 1 && (
-                                    <ArrowRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
-                                  )}
-                                </React.Fragment>
-                              );
-                            })}
+                          {/* Stats */}
+                          <div className="flex sm:flex-col gap-4 sm:gap-2 sm:items-end flex-shrink-0">
+                            <div className="text-center sm:text-right">
+                              <p className="text-xs text-muted-foreground">Inscritos</p>
+                              <p className="text-lg font-semibold text-foreground">{flow.enrolledLeads}</p>
+                            </div>
+                            <div className="text-center sm:text-right">
+                              <p className="text-xs text-muted-foreground">Conversão</p>
+                              <p className="text-lg font-semibold text-foreground">{convRate}%</p>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Stats */}
-                        <div className="flex sm:flex-col gap-4 sm:gap-2 sm:items-end flex-shrink-0">
-                          <div className="text-center sm:text-right">
-                            <p className="text-xs text-muted-foreground">Inscritos</p>
-                            <p className="text-lg font-semibold text-foreground">{flow.enrolledLeads}</p>
-                          </div>
-                          <div className="text-center sm:text-right">
-                            <p className="text-xs text-muted-foreground">Conversão</p>
-                            <p className="text-lg font-semibold text-foreground">{convRate}%</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5"
-                          onClick={() => handleToggleStatus(flow.id)}
-                        >
-                          {flow.status === 'active'
-                            ? <><Pause className="w-3.5 h-3.5" /> Pausar</>
-                            : <><Play className="w-3.5 h-3.5" /> Ativar</>
-                          }
-                        </Button>
-                        <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setEditingFlow(flow)}>
-                          <Pencil className="w-3.5 h-3.5" />
-                          <span className="text-xs">Editar</span>
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleDuplicate(flow)}>
-                          <Copy className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleDelete(flow.id)}>
-                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                        </Button>
-                        <div className="ml-auto">
-                          <Button size="sm" variant="ghost" className="gap-1.5 text-xs text-muted-foreground">
-                            <BarChart3 className="w-3.5 h-3.5" />
-                            Análise
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5"
+                            onClick={() => handleToggleStatus(flow.id)}
+                          >
+                            {flow.status === 'active'
+                              ? <><Pause className="w-3.5 h-3.5" /> Pausar</>
+                              : <><Play className="w-3.5 h-3.5" /> Ativar</>
+                            }
                           </Button>
+                          <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setEditingFlow(flow)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span className="text-xs">Editar</span>
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleDuplicate(flow)}>
+                            <Copy className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleDelete(flow.id)}>
+                            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                          </Button>
+                          <div className="ml-auto">
+                            <Button size="sm" variant="ghost" className="gap-1.5 text-xs text-muted-foreground">
+                              <BarChart3 className="w-3.5 h-3.5" />
+                              Análise
+                            </Button>
+                          </div>
                         </div>
                       </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── TEMPLATES TAB ── */}
+          {activeTab === 'templates' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {TEMPLATES.map(template => {
+                  const Icon = template.icon;
+                  return (
+                    <div
+                      key={template.id}
+                      className="bg-card border border-border rounded-xl p-5 flex flex-col hover:border-foreground/20 hover:shadow-sm transition-all cursor-pointer group"
+                      onClick={() => setSelectedTemplate(template)}
+                    >
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${template.bg}`}>
+                          <Icon className={`w-5 h-5 ${template.color}`} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground text-sm">{template.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{template.description}</p>
+                        </div>
+                      </div>
+
+                      {/* Trigger */}
+                      <div className="flex items-center gap-1.5 mb-3">
+                        <Zap className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-[11px] text-muted-foreground">{template.triggerLabel}</span>
+                      </div>
+
+                      {/* Step count */}
+                      <div className="flex items-center gap-1 mb-4 flex-wrap">
+                        {template.steps.map((step, i) => {
+                          const StepIcon = STEP_ICONS[step.type];
+                          const colorClass = STEP_COLORS[step.type];
+                          return (
+                            <React.Fragment key={step.id}>
+                              <div className={`w-6 h-6 rounded-md flex items-center justify-center ${colorClass}`}>
+                                <StepIcon className="w-3 h-3" />
+                              </div>
+                              {i < template.steps.length - 1 && (
+                                <ChevronRight className="w-3 h-3 text-muted-foreground/30" />
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                        <span className="text-[11px] text-muted-foreground ml-1">{template.steps.length} etapas</span>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        className="mt-auto gap-1.5 w-full"
+                        onClick={(e) => { e.stopPropagation(); handleUseTemplate(template); }}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Usar Template
+                      </Button>
                     </div>
                   );
                 })}
               </div>
-            )}
-          </>
-        )}
 
-        {/* ── TEMPLATES TAB ── */}
-        {activeTab === 'templates' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {TEMPLATES.map(template => {
-                const Icon = template.icon;
-                return (
-                  <div
-                    key={template.id}
-                    className="bg-card border border-border rounded-xl p-5 flex flex-col hover:border-foreground/20 hover:shadow-sm transition-all cursor-pointer group"
-                    onClick={() => setSelectedTemplate(template)}
-                  >
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${template.bg}`}>
-                        <Icon className={`w-5 h-5 ${template.color}`} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-foreground text-sm">{template.name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{template.description}</p>
-                      </div>
-                    </div>
-
-                    {/* Trigger */}
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <Zap className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-[11px] text-muted-foreground">{template.triggerLabel}</span>
-                    </div>
-
-                    {/* Step count */}
-                    <div className="flex items-center gap-1 mb-4 flex-wrap">
-                      {template.steps.map((step, i) => {
-                        const StepIcon = STEP_ICONS[step.type];
-                        const colorClass = STEP_COLORS[step.type];
-                        return (
-                          <React.Fragment key={step.id}>
-                            <div className={`w-6 h-6 rounded-md flex items-center justify-center ${colorClass}`}>
-                              <StepIcon className="w-3 h-3" />
-                            </div>
-                            {i < template.steps.length - 1 && (
-                              <ChevronRight className="w-3 h-3 text-muted-foreground/30" />
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                      <span className="text-[11px] text-muted-foreground ml-1">{template.steps.length} etapas</span>
-                    </div>
-
-                    <Button
-                      size="sm"
-                      className="mt-auto gap-1.5 w-full"
-                      onClick={(e) => { e.stopPropagation(); handleUseTemplate(template); }}
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Usar Template
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Coming soon notice */}
-            <div className="rounded-xl border border-border bg-muted/30 p-5 flex items-start gap-3">
-              <AlertCircle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Editor visual em breve</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Estamos desenvolvendo um construtor visual drag-and-drop ao estilo ManyChat, com condições, delays, A/B testing e integração direta com o funil de vendas.
-                </p>
+              {/* Coming soon notice */}
+              <div className="rounded-xl border border-border bg-muted/30 p-5 flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Editor visual em breve</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Estamos desenvolvendo um construtor visual drag-and-drop ao estilo ManyChat, com condições, delays, A/B testing e integração direta com o funil de vendas.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </main>
-    </div>
+          )}
+        </main>
+      </div>
 
-    {/* Edit modal */}
-    {editingFlow && (
-      <EditModal
-        flow={editingFlow}
-        isNew={!flows.some(f => f.id === editingFlow.id)}
-        onSave={handleSaveEdit}
-        onClose={() => setEditingFlow(null)}
-      />
-    )}
+      {/* Edit modal */}
+      {editingFlow && (
+        <EditModal
+          flow={editingFlow}
+          isNew={!flows.some(f => f.id === editingFlow.id)}
+          onSave={handleSaveEdit}
+          onClose={() => setEditingFlow(null)}
+          funnelStages={funnelStages}
+        />
+      )}
     </>
   );
 }

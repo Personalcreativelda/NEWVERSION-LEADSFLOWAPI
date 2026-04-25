@@ -46,6 +46,52 @@ router.get('/slug/:slug', async (req, res, next) => {
     }
 });
 
+// GET /api/assistants/elevenlabs-voices - Retorna vozes disponíveis da ElevenLabs
+router.get('/elevenlabs-voices', authMiddleware, async (_req, res) => {
+    try {
+        const apiKey = process.env.ELEVENLABS_API_KEY;
+        if (!apiKey) {
+            // Retornar vozes padrão se chave não configurada
+            return res.json({ voices: [
+                { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah (Feminina)' },
+                { voice_id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam (Masculino)' },
+                { voice_id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli (Feminina)' },
+                { voice_id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold (Masculino)' },
+                { voice_id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh (Masculino)' },
+                { voice_id: 'ErXwobaYiN019PkySvjV', name: 'Antoni (Masculino)' },
+            ]});
+        }
+
+        const response = await fetch('https://api.elevenlabs.io/v1/voices', {
+            headers: { 'xi-api-key': apiKey }
+        });
+
+        if (!response.ok) {
+            throw new Error(`ElevenLabs API error: ${response.status}`);
+        }
+
+        const data: any = await response.json();
+        const voices = (data.voices || []).map((v: any) => ({
+            voice_id: v.voice_id,
+            name: v.name,
+            category: v.category,
+            labels: v.labels,
+            preview_url: v.preview_url,
+        }));
+
+        res.json({ voices });
+    } catch (error: any) {
+        console.error('[Assistants] Erro ao buscar vozes ElevenLabs:', error.message);
+        // Fallback com vozes padrão em caso de erro
+        res.json({ voices: [
+            { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah (Feminina)' },
+            { voice_id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam (Masculino)' },
+            { voice_id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli (Feminina)' },
+            { voice_id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold (Masculino)' },
+        ]});
+    }
+});
+
 // Rotas autenticadas
 router.use(authMiddleware);
 

@@ -232,6 +232,55 @@ export function MessageBubble({ message, isFirstInGroup = true, isLastInGroup = 
                                 </svg>
                             </a>
                         )}
+                        
+                        {/* Audio Transcription */}
+                        {effectiveMediaType === 'audio' && message.id && (
+                            <div className="mt-2">
+                                {(message.metadata as any)?.transcription ? (
+                                    <div className={`text-sm italic p-2 rounded-md ${isOut ? 'bg-[rgba(255,255,255,0.4)] dark:bg-[rgba(0,0,0,0.2)]' : 'bg-gray-50 dark:bg-[#182229]'} border-l-2 ${isOut ? 'border-green-600' : 'border-blue-500'}`}>
+                                        <span className="text-xs font-semibold not-italic mb-1 flex items-center gap-1 opacity-70">
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
+                                            Transcrição IA:
+                                        </span>
+                                        "{(message.metadata as any).transcription}"
+                                    </div>
+                                ) : (
+                                    <button 
+                                        onClick={async (e) => {
+                                            const btn = e.currentTarget;
+                                            btn.disabled = true;
+                                            const originalText = btn.innerHTML;
+                                            btn.innerHTML = '<span class="flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Transcrevendo...</span>';
+                                            try {
+                                                const res = await fetch(`${API_URL}/api/inbox/messages/${message.id}/transcribe`, {
+                                                    method: 'POST',
+                                                    headers: { 'Authorization': `Bearer ${localStorage.getItem('leadflow_access_token')}` }
+                                                });
+                                                if (res.ok) {
+                                                    const data = await res.json();
+                                                    if (!message.metadata) message.metadata = {};
+                                                    (message.metadata as any).transcription = data.text;
+                                                    // Trigger re-render by dispatching event or relying on polling
+                                                    window.dispatchEvent(new CustomEvent('inbox-refresh-requested'));
+                                                } else {
+                                                    throw new Error();
+                                                }
+                                            } catch (err) {
+                                                alert('Erro ao transcrever áudio.');
+                                                btn.disabled = false;
+                                                btn.innerHTML = originalText;
+                                            }
+                                        }}
+                                        className={`text-xs px-2 py-1 rounded border flex items-center gap-1 transition-colors ${isOut ? 'border-green-600/30 text-green-800 dark:text-green-200 hover:bg-green-600/10' : 'border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                    >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Transcrever Áudio
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 

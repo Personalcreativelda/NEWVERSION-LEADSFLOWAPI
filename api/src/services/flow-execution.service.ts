@@ -2,18 +2,20 @@ import { query as dbQuery } from '../database/connection';
 import { RemarketingService } from './remarketing.service';
 import { WhatsAppService } from './whatsapp.service';
 import { ChannelsService } from './channels.service';
+import { getWebSocketService } from './websocket.service';
+import { AIService } from './ai.service';
 import pino from 'pino';
 
 const logger = pino().child({ module: 'FlowExecutionService' });
 
 // Stage value → display label mapping (matches frontend FUNNEL_STAGES)
 const STAGE_LABEL: Record<string, string> = {
-  novo:        'Novo Lead',
-  contatado:   'Contatado',
+  novo: 'Novo Lead',
+  contatado: 'Contatado',
   qualificado: 'Qualificado',
-  negociacao:  'Em Negociação',
-  convertido:  'Convertido',
-  perdido:     'Perdido',
+  negociacao: 'Em Negociação',
+  convertido: 'Convertido',
+  perdido: 'Perdido',
 };
 
 interface ExecutionContext {
@@ -32,8 +34,9 @@ interface ExecutionContext {
 
 export class FlowExecutionService {
   private remarketingService = new RemarketingService();
-  private whatsappService    = new WhatsAppService();
-  private channelsService    = new ChannelsService();
+  private whatsappService = new WhatsAppService();
+  private channelsService = new ChannelsService();
+  private aiService = new AIService();
 
   /**
    * Check if there are any active flows triggered by this event
@@ -48,16 +51,28 @@ export class FlowExecutionService {
     try {
       let flowsResult;
 
+      console.log(`[FlowExecution] ▶ triggerFlowsForLead called:`, { userId, leadId, triggerType, triggerValue });
+
       if (triggerType === 'funnel_stage') {
-        // match trigger_label that starts with the stage name
         const stageLabel = STAGE_LABEL[triggerValue] ?? triggerValue;
+        console.log(`[FlowExecution] funnel_stage — triggerValue="${triggerValue}" stageLabel="${stageLabel}"`);
         flowsResult = await dbQuery(
-          `SELECT id, name, steps FROM remarketing_flows
+          `SELECT id, name, trigger_label, status FROM remarketing_flows
            WHERE user_id = $1 AND status = 'active'
            AND trigger_type = $2
-           AND trigger_label ILIKE $3 || '%'`,
-          [userId, triggerType, stageLabel],
+           AND (
+             trigger_label ILIKE $3 || '%'
+             OR trigger_label ILIKE $4 || '%'
+           )`,
+          [userId, triggerType, stageLabel, triggerValue],
         );
+        // Debug: also show ALL active funnel_stage flows to diagnose mismatch
+        const allFlows = await dbQuery(
+          `SELECT id, name, trigger_label, status FROM remarketing_flows WHERE user_id = $1 AND trigger_type = 'funnel_stage'`,
+          [userId],
+        );
+        console.log(`[FlowExecution] All funnel_stage flows for user:`, allFlows.rows);
+        console.log(`[FlowExecution] Matched flows (label="${stageLabel}" OR raw="${triggerValue}"):`, flowsResult.rows);
 
       } else if (triggerType === 'inactivity' || triggerType === 'lead_score') {
         // triggerValue = numeric value (days inactive / actual score)
@@ -67,7 +82,7 @@ export class FlowExecutionService {
         flowsResult = await dbQuery(
           `SELECT id, name, steps FROM remarketing_flows
            WHERE user_id = $1 AND status = 'active' AND trigger_type = $2
-           AND CAST(regexp_replace(trigger_label, '[^0-9]', '', 'g') AS INTEGER) <= $3`,
+           AND CAST(NULLIF(regexp_replace(trigger_label, '[^0-9]', '', 'g'), '') AS INTEGER) <= $3`,
           [userId, triggerType, numVal],
         );
 
@@ -90,9 +105,10 @@ export class FlowExecutionService {
       }
 
       if (!flowsResult.rows || flowsResult.rows.length === 0) {
-        logger.debug(`[FlowExecution] No active flows found for ${triggerType}="${triggerValue}"`);
+        console.log(`[FlowExecution] ✗ No active ${triggerType} flows matched triggerValue="${triggerValue}" — nothing to do`);
         return;
       }
+      console.log(`[FlowExecution] ✓ Found ${flowsResult.rows.length} matching flow(s): ${flowsResult.rows.map((r: any) => r.name).join(', ')}`);
 
       // Get lead details for variable replacement
       const leadResult = await dbQuery(
@@ -126,13 +142,13 @@ export class FlowExecutionService {
       );
       if (convResult.rows?.[0]) {
         const row = convResult.rows[0];
-        conversationId  = row.id;
-        remoteJid       = row.remote_jid;
-        channelId       = row.channel_id;
-        channelType     = row.channel_type;
+        conversationId = row.id;
+        remoteJid = row.remote_jid;
+        channelId = row.channel_id;
+        channelType = row.channel_type;
         channelCredentials = row.channel_credentials;
         if (channelCredentials && typeof channelCredentials === 'string') {
-          try { channelCredentials = JSON.parse(channelCredentials); } catch (_) {}
+          try { channelCredentials = JSON.parse(channelCredentials); } catch (_) { }
         }
       } else if (lead.phone) {
         // No conversation yet — default to WhatsApp with the lead's phone
@@ -141,37 +157,61 @@ export class FlowExecutionService {
 
       logger.info(`[FlowExecution] Executing ${flowsResult.rows.length} flows for lead "${lead.name || leadId}"`);
 
-      // Ensure enrollment-dedup table exists (idempotent)
-      await dbQuery(`
-        CREATE TABLE IF NOT EXISTS flow_enrollments (
-          id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          flow_id     UUID NOT NULL,
-          lead_id     UUID NOT NULL,
-          user_id     UUID NOT NULL,
-          enrolled_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-        CREATE INDEX IF NOT EXISTS idx_flow_enrollments ON flow_enrollments(flow_id, lead_id, enrolled_at DESC);
-      `).catch(() => {}); // ignore if already exists
+      // ── Ensure dedup table exists (two separate statements to avoid multi-query issues) ──
+      try {
+        await dbQuery(`
+          CREATE TABLE IF NOT EXISTS flow_enrollments (
+            id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            flow_id     UUID NOT NULL,
+            lead_id     UUID NOT NULL,
+            user_id     UUID NOT NULL,
+            enrolled_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `);
+        await dbQuery(`
+          CREATE INDEX IF NOT EXISTS idx_flow_enrollments
+          ON flow_enrollments(flow_id, lead_id, enrolled_at DESC)
+        `);
+      } catch (_) { /* table / index already exists — safe to ignore */ }
 
-      // Increment enrolled_leads and record enrollment (with dedup)
+      // ── Increment enrolled_leads and record enrollment (with dedup) ──────────
       for (const flowRow of flowsResult.rows) {
-        // Dedup: skip if this lead was enrolled in this flow within the last 12h
-        const dupeRes = await dbQuery(
-          `SELECT 1 FROM flow_enrollments
-           WHERE flow_id = $1 AND lead_id = $2
-           AND enrolled_at > NOW() - INTERVAL '12 hours' LIMIT 1`,
-          [flowRow.id, leadId],
-        );
-        if (dupeRes.rows?.length > 0) {
+        // Dedup check — wrapped in try-catch so a missing table never blocks enrollment
+        let isDuplicate = false;
+        try {
+          const dupeRes = await dbQuery(
+            `SELECT 1 FROM flow_enrollments
+             WHERE flow_id = $1 AND lead_id = $2
+             AND enrolled_at > NOW() - INTERVAL '12 hours' LIMIT 1`,
+            [flowRow.id, leadId],
+          );
+          isDuplicate = (dupeRes.rows?.length ?? 0) > 0;
+        } catch (deupErr) {
+          // Table may not exist yet on first run — proceed with enrollment
+          logger.warn(`[FlowExecution] Dedup check skipped (${(deupErr as any).message})`);
+          isDuplicate = false;
+        }
+
+        if (isDuplicate) {
           logger.debug(`[FlowExecution] Skipping duplicate enrollment for flow ${flowRow.id} lead ${leadId}`);
           continue;
         }
-        dbQuery('UPDATE remarketing_flows SET enrolled_leads = enrolled_leads + 1 WHERE id = $1', [flowRow.id])
-          .catch(e => logger.warn(`[FlowExecution] Could not increment enrolled_leads: ${e.message}`));
-        dbQuery(
-          `INSERT INTO flow_enrollments (flow_id, lead_id, user_id) VALUES ($1, $2, $3)`,
-          [flowRow.id, leadId, userId],
-        ).catch(() => {});
+
+        // Increment counter and record enrollment (awaited to ensure it completes)
+        try {
+          await dbQuery(
+            'UPDATE remarketing_flows SET enrolled_leads = enrolled_leads + 1 WHERE id = $1',
+            [flowRow.id],
+          );
+        } catch (e) {
+          logger.warn(`[FlowExecution] Could not increment enrolled_leads: ${(e as any).message}`);
+        }
+        try {
+          await dbQuery(
+            `INSERT INTO flow_enrollments (flow_id, lead_id, user_id) VALUES ($1, $2, $3)`,
+            [flowRow.id, leadId, userId],
+          );
+        } catch (_) { /* ignore duplicate key on race condition */ }
       }
 
       // Execute each flow asynchronously (don't wait for response)
@@ -253,6 +293,10 @@ export class FlowExecutionService {
         await this.stepWhatsapp(config, ctx);
         break;
 
+      case 'dynamic_audio':
+        await this.stepDynamicAudio(config, ctx);
+        break;
+
       case 'facebook':
         await this.stepWhatsapp({ ...config, _forceChannel: 'facebook' }, { ...ctx, channelType: 'facebook' });
         break;
@@ -281,6 +325,18 @@ export class FlowExecutionService {
         logger.warn(`[FlowExecution] Condition steps not yet implemented`);
         break;
 
+      case 'ab_test':
+        const isVariantA = Math.random() < 0.5;
+        const chosenMessage = isVariantA ? config.messageA : config.messageB;
+        logger.info(`[FlowExecution] ⚖️ A/B Test evaluated to Variant ${isVariantA ? 'A' : 'B'}`);
+        if (chosenMessage) {
+          // Re-use the omnichannel send logic
+          await this.stepWhatsapp({ message: chosenMessage }, ctx);
+        } else {
+          logger.warn(`[FlowExecution] A/B Test missing message for Variant ${isVariantA ? 'A' : 'B'}`);
+        }
+        break;
+
       default:
         logger.warn(`[FlowExecution] Unknown step type: ${type}`);
     }
@@ -296,8 +352,9 @@ export class FlowExecutionService {
     if (config.unit) {
       const n = parseInt(String(config.duration ?? '1'), 10) || 1;
       const unitMap: Record<string, number> = {
-        horas:   3_600_000,
-        dias:   86_400_000,
+        minutos: 60_000,
+        horas: 3_600_000,
+        dias: 86_400_000,
         semanas: 604_800_000,
       };
       millis = n * (unitMap[config.unit] ?? 86_400_000);
@@ -307,6 +364,84 @@ export class FlowExecutionService {
     const label = config.unit ? `${config.duration ?? 1} ${config.unit}` : (config.duration || '24h');
     logger.info(`[FlowExecution] ⏳ Waiting ${label}...`);
     return new Promise(resolve => setTimeout(resolve, millis));
+  }
+
+  /**
+   * Generates dynamic audio using ElevenLabs and sends it via WhatsApp
+   */
+  private async stepDynamicAudio(config: any, ctx: ExecutionContext): Promise<void> {
+    const text = config.text || 'Olá, estou testando o áudio dinâmico.';
+    const resolvedText = this.replaceVariables(text, ctx);
+    const voiceId = config.voiceId || 'EXAVITQu4vr4xnSDxMaL'; // Default voice
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+
+    if (!apiKey) {
+      logger.error('[FlowExecution] ❌ ELEVENLABS_API_KEY não configurada no .env');
+      return;
+    }
+
+    try {
+      logger.info(`[FlowExecution] 🎙️ Generando áudio IA para lead ${ctx.leadId}...`);
+      const audioBuffer = await this.aiService.generateElevenLabsAudio(resolvedText, voiceId, apiKey);
+      const audioBase64 = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
+
+      const chType = ctx.channelType || 'whatsapp';
+      if (chType === 'whatsapp') {
+        let usedChannelId = ctx.channelId;
+        let credentials = ctx.channelCredentials;
+
+        if (!usedChannelId || !credentials) {
+          const allChannels = await this.channelsService.findAll(ctx.userId);
+          const waCh = allChannels.find(
+            (c: any) => (c.type === 'whatsapp' || c.channel_type === 'whatsapp') &&
+              (c.status === 'active' || c.status === 'connected')
+          );
+          if (!waCh) {
+            logger.warn(`[FlowExecution] No connected WhatsApp channel found for user ${ctx.userId}`);
+            return;
+          }
+          usedChannelId = waCh.id;
+          credentials = waCh.credentials;
+          if (credentials && typeof credentials === 'string') {
+            try { credentials = JSON.parse(credentials); } catch (_) { }
+          }
+        }
+        
+        const instanceId: string =
+          credentials?.instance_name || credentials?.instanceId || credentials?.instance_id ||
+          (await this._getInstanceName(usedChannelId!));
+        
+        const phone = ctx.leadPhone?.replace(/\D/g, '') ?? '';
+        if (!phone) {
+          logger.warn(`[FlowExecution] Cannot send audio: lead has no phone number`);
+          return;
+        }
+
+        await this.whatsappService.sendAudio({ instanceId, number: phone, audioBase64 });
+        logger.info(`[FlowExecution] ✅ Áudio IA enviado via Evolution API (instance: ${instanceId})`);
+        
+        // Save to inbox (simplified, similar to text)
+        let convId = ctx.conversationId;
+        if (!convId && ctx.remoteJid && usedChannelId) {
+          const look = await dbQuery(
+            `SELECT id FROM conversations WHERE lead_id = $1 AND user_id = $2 AND remote_jid = $3 ORDER BY updated_at DESC LIMIT 1`,
+            [ctx.leadId, ctx.userId, ctx.remoteJid]
+          );
+          if (look.rows?.[0]) convId = look.rows[0].id;
+        }
+        if (convId) {
+          await dbQuery(
+            `INSERT INTO messages (conversation_id, user_id, direction, channel, content, status) VALUES ($1, $2, 'out', $3, $4, 'sent')`,
+            [convId, ctx.userId, chType, '[Áudio Gerado por IA] ' + resolvedText]
+          );
+        }
+      } else {
+        logger.warn(`[FlowExecution] Canal ${chType} ainda não suporta envio de áudio nativo. Enviando texto como fallback.`);
+        await this.stepWhatsapp({ message: `[Áudio] ${resolvedText}` }, ctx);
+      }
+    } catch (err: any) {
+      logger.error(`[FlowExecution] Erro no Áudio IA: ${err.message}`);
+    }
   }
 
   /**
@@ -347,16 +482,16 @@ export class FlowExecutionService {
           const allChannels = await this.channelsService.findAll(ctx.userId);
           const waCh = allChannels.find(
             (c: any) => (c.type === 'whatsapp' || c.channel_type === 'whatsapp') &&
-                        (c.status === 'active' || c.status === 'connected'),
+              (c.status === 'active' || c.status === 'connected'),
           );
           if (!waCh) {
             logger.warn(`[FlowExecution] No connected WhatsApp channel found for user ${ctx.userId}`);
             return;
           }
           usedChannelId = waCh.id;
-          credentials   = waCh.credentials;
+          credentials = waCh.credentials;
           if (credentials && typeof credentials === 'string') {
-            try { credentials = JSON.parse(credentials); } catch (_) {}
+            try { credentials = JSON.parse(credentials); } catch (_) { }
           }
         }
         const instanceId: string =
@@ -403,13 +538,13 @@ export class FlowExecutionService {
   /** WhatsApp Business Cloud (Graph API) */
   private async _sendWhatsappCloud(text: string, ctx: ExecutionContext, creds: any): Promise<void> {
     const phoneNumberId = creds?.phone_number_id;
-    const accessToken   = creds?.access_token;
+    const accessToken = creds?.access_token;
     if (!phoneNumberId || !accessToken) {
       logger.warn(`[FlowExecution] WhatsApp Cloud: missing phone_number_id or access_token`);
       return;
     }
     const phone = ctx.leadPhone?.replace(/\D/g, '') ||
-                  ctx.remoteJid?.replace('@s.whatsapp.net', '') || '';
+      ctx.remoteJid?.replace('@s.whatsapp.net', '') || '';
     if (!phone) { logger.warn(`[FlowExecution] WhatsApp Cloud: no phone`); return; }
 
     const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
@@ -461,9 +596,9 @@ export class FlowExecutionService {
   /** Telegram Bot API */
   private async _sendTelegram(text: string, ctx: ExecutionContext, creds: any): Promise<void> {
     const botToken = creds?.bot_token || creds?.token;
-    const chatId   = ctx.remoteJid;
+    const chatId = ctx.remoteJid;
     if (!botToken) { logger.warn(`[FlowExecution] Telegram: no bot_token`); return; }
-    if (!chatId)   { logger.warn(`[FlowExecution] Telegram: no chatId (remoteJid)`); return; }
+    if (!chatId) { logger.warn(`[FlowExecution] Telegram: no chatId (remoteJid)`); return; }
 
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
@@ -543,6 +678,19 @@ export class FlowExecutionService {
       );
 
       logger.info(`[FlowExecution] ✅ Lead moved to "${stage}"`);
+
+      // 🚀 Emit real-time WebSocket event to update Kanban automatically
+      const ws = getWebSocketService();
+      if (ws) {
+        ws.emitLeadFunnelUpdate(ctx.userId, {
+          leadId: ctx.leadId,
+          leadName: ctx.leadName,
+          newStatus: stage,
+          triggeredBy: 'remarketing_flow',
+          assistantName: 'Robô de Remarketing'
+        });
+      }
+
     } catch (err) {
       logger.error(`[FlowExecution] Stage move error: ${(err as any).message}`);
       throw err;

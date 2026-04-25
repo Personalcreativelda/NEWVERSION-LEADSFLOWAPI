@@ -106,6 +106,40 @@ router.post('/normalize-statuses', async (req, res, next) => {
 });
 
 // ============================================
+// FUNNEL STAGES — dynamic list
+// ============================================
+
+/**
+ * GET /api/leads/funnel-stages
+ * Returns the distinct status values in use by this user's leads,
+ * ordered by lead count DESC. Used by the Remarketing trigger dropdown
+ * so it always reflects the real funnel stages instead of hardcoded values.
+ */
+router.get('/funnel-stages', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const result = await dbQuery(
+      `SELECT
+         LOWER(TRIM(status)) AS value,
+         COUNT(*)::int        AS count
+       FROM leads
+       WHERE user_id = $1
+         AND status IS NOT NULL
+         AND TRIM(status) != ''
+       GROUP BY LOWER(TRIM(status))
+       ORDER BY count DESC`,
+      [user.id],
+    );
+
+    res.json(result.rows); // [{ value: 'negociacao', count: 3 }, ...]
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
 // FUNNEL STAGE MANAGEMENT
 // ============================================
 
@@ -391,6 +425,18 @@ router.post('/', async (req, res, next) => {
       leadId: lead.id,
       metadata: { source: req.body.source }
     });
+
+    // 🔁 Trigger remarketing flows based on initial status of the new lead
+    if (lead.status && lead.status !== 'novo') {
+      flowExecutionService.triggerFlowsForLead(user.id, lead.id, 'funnel_stage', lead.status).catch(err => {
+        console.error(`[LeadsAPI] Error triggering funnel_stage flows on create:`, err);
+      });
+      if (lead.status === 'convertido') {
+        flowExecutionService.triggerFlowsForLead(user.id, lead.id, 'purchase', 'convertido').catch(err => {
+          console.error(`[LeadsAPI] Error triggering purchase flows on create:`, err);
+        });
+      }
+    }
 
     res.status(201).json(lead);
   } catch (error) {

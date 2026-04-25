@@ -336,7 +336,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
                   <CircularProgress percentage={card.percentual} colors={card.colors} />
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className={`text-sm font-bold ${card.colors.text}`}>
-                      {Math.round(card.percentual)}%
+                      {card.percentual === 0 ? '0' : Math.min(100, Math.ceil(card.percentual))}%
                     </span>
                   </div>
                 </div>

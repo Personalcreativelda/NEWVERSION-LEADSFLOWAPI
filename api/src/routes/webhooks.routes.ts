@@ -1660,8 +1660,13 @@ router.post('/evolution/messages', async (req, res) => {
 
     // Processar assistente de IA via fila (debounce + lock — evita greeting repetido e respostas duplicadas)
     // Só processar mensagens RECEBIDAS (isFromMe=false): evita loop infinito quando a própria IA envia
-    if (!isFromMe && messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
-      console.log('[Evolution Webhook] 🤖 Enfileirando mensagem para assistente IA...');
+    // Processar também áudios: a transcrição será feita dentro do assistantProcessor
+    const shouldProcessWithAI = !isFromMe && (
+      (messageContent && messageContent.trim() && !messageContent.startsWith('[')) ||
+      mediaType === 'audio'
+    );
+    if (shouldProcessWithAI) {
+      console.log('[Evolution Webhook] 🤖 Enfileirando mensagem para assistente IA...', mediaType === 'audio' ? '(ÁUDIO)' : '(TEXTO)');
       console.log('[Evolution Webhook]   - channelId:', channel.id);
       console.log('[Evolution Webhook]   - userId:', channel.user_id);
       console.log('[Evolution Webhook]   - conversationId:', conversation.id);
@@ -1681,6 +1686,9 @@ router.post('/evolution/messages', async (req, res) => {
           credentials: channel.credentials,
           // remoteJid resolvido para @s.whatsapp.net (preferred) ou original (@lid)
           remoteJid: resolvedJid || remoteJid,
+          // Passar tipo de mídia e URL para transcrição de áudio
+          mediaType: mediaType || undefined,
+          mediaUrl: mediaUrl || undefined,
         },
         (ctx) => assistantProcessor.processIncomingMessage(ctx)
       ).catch(err => {

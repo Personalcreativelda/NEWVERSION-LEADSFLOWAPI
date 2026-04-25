@@ -22,6 +22,8 @@ export interface IncomingMessageContext {
     messageContent: string;
     credentials?: any;        // credenciais do canal (instance_id, etc.)
     remoteJid?: string;       // JID completo do contato (ex: 5511999@s.whatsapp.net)
+    mediaType?: string;       // Tipo de mídia recebida (ex: 'audio', 'image')
+    mediaUrl?: string;        // URL da mídia (se armazenada no MinIO)
 }
 
 export class AssistantProcessorService {
@@ -107,6 +109,37 @@ export class AssistantProcessorService {
                 }
             }
 
+            // 4. Se for áudio, transcrever primeiro
+            if (ctx.mediaType === 'audio' && ctx.mediaUrl) {
+                console.log(`[AssistantProcessor] 🎙️ Áudio recebido, iniciando transcrição...`);
+                // Procurar por chave do OpenAI (necessária para Whisper)
+                const openAIProvider = availableProviders.find(p => p.provider === 'openai');
+                const openAIApiKey = openAIProvider?.apiKey || process.env.OPENAI_API_KEY;
+                
+                if (openAIApiKey) {
+                    try {
+                        const transcript = await aiService.transcribeAudio(ctx.mediaUrl, openAIApiKey);
+                        if (transcript && transcript.trim()) {
+                            console.log(`[AssistantProcessor] 📝 Áudio transcrito: "${transcript}"`);
+                            ctx.messageContent = transcript;
+                        } else {
+                            console.warn('[AssistantProcessor] ⚠️ Transcrição retornou texto vazio.');
+                        }
+                    } catch (err: any) {
+                        console.error('[AssistantProcessor] ❌ Erro ao transcrever áudio:', err.message);
+                        // Se falhar a transcrição e não houver texto, aborta
+                        if (!ctx.messageContent || ctx.messageContent.startsWith('[')) {
+                            return false;
+                        }
+                    }
+                } else {
+                    console.warn('[AssistantProcessor] ⚠️ Sem chave da OpenAI para transcrever áudio (Whisper). Abortando.');
+                    if (!ctx.messageContent || ctx.messageContent.startsWith('[')) {
+                        return false; // Não consegue processar áudio sem transcrição
+                    }
+                }
+            }
+
             // 4. Construir mensagens para IA
             const messages = await this.buildAIMessages(ctx, activeAssistant);
 
@@ -123,11 +156,36 @@ export class AssistantProcessorService {
 
             console.log(`[AssistantProcessor] Resposta gerada em ${responseTime}ms (${aiResponse.tokensUsed} tokens)`);
 
+            // 5.5. Verificar se deve responder com áudio (ElevenLabs)
+            // Regra: "eleve deve responder em audio quando o cliente manda audio"
+            let audioBase64: string | undefined = undefined;
+            const audioEnabled = config.audio_enabled === true;
+            
+            if (audioEnabled && ctx.mediaType === 'audio') {
+                const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
+                if (!elevenLabsApiKey) {
+                    console.warn('[AssistantProcessor] ⚠️ Resposta em áudio habilitada, mas ELEVENLABS_API_KEY não encontrada. Fallback para texto.');
+                } else {
+                    try {
+                        console.log(`[AssistantProcessor] 🎙️ Gerando Áudio Mágico (ElevenLabs) para a resposta...`);
+                        const voiceId = config.audio_voice_id || 'EXAVITQu4vr4xnSDxMaL'; // Default: Sarah
+                        audioBase64 = await aiService.generateElevenLabsAudio(
+                            aiResponse.content,
+                            voiceId,
+                            elevenLabsApiKey
+                        );
+                        console.log(`[AssistantProcessor] ✅ Áudio Mágico gerado com sucesso!`);
+                    } catch (audioErr: any) {
+                        console.error(`[AssistantProcessor] ❌ Erro ao gerar áudio ElevenLabs (Fallback para texto):`, audioErr.message);
+                    }
+                }
+            }
+
             // 6. Enviar resposta pelo canal (capturar externalId para dedup no webhook)
-            const externalMsgId = await this.sendReply(ctx, aiResponse.content);
+            const externalMsgId = await this.sendReply(ctx, aiResponse.content, audioBase64);
 
             // 7. Salvar mensagem de resposta no banco (com external_id para evitar duplicata via webhook)
-            await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId);
+            await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId, audioBase64 ? 'audio' : 'text');
 
             // 8. Registrar log do assistente
             try {
@@ -169,6 +227,18 @@ export class AssistantProcessorService {
             const funnelTrackingEnabled = config.funnel_tracking_enabled !== false;
             if (funnelTrackingEnabled) {
                 void this.detectAndUpdateFunnelStage(ctx, aiResponse.content, activeAssistant, availableProviders, model);
+            }
+
+            // 11. Detectar agendamentos/reuniões e criar tarefa automaticamente (assíncrono)
+            const schedulingEnabled = config.scheduling_enabled !== false; // ativo por padrão
+            if (schedulingEnabled) {
+                void this.detectAndCreateSchedulingTask(
+                    ctx,
+                    aiResponse.content,
+                    activeAssistant,
+                    availableProviders,
+                    model
+                );
             }
 
             return true;
@@ -366,7 +436,7 @@ export class AssistantProcessorService {
      * Envia resposta pelo canal correto
      * Retorna o external_id da mensagem enviada (para dedup no webhook Evolution)
      */
-    private async sendReply(ctx: IncomingMessageContext, text: string): Promise<string | null> {
+    private async sendReply(ctx: IncomingMessageContext, text: string, audioBase64?: string): Promise<string | null> {
         // ✅ VALIDAÇÃO: Para WhatsApp, verificar se o contactPhone é válido (número de telefone).
         // Canais não-WhatsApp usam IDs de plataforma (PSID, chat_id, etc.) que não seguem
         // o formato de telefone — por isso a validação só se aplica ao WhatsApp.
@@ -417,12 +487,23 @@ export class AssistantProcessorService {
                 for (const numberFormat of numberFormats) {
                     try {
                         console.log(`[AssistantProcessor] Tentando enviar para: ${numberFormat} (instance: ${instanceId})`);
-                        lastSentResult = await whatsappService.sendMessage({
-                            instanceId,
-                            number: numberFormat,
-                            text
-                        });
-                        console.log(`[AssistantProcessor] ✅ Mensagem enviada com sucesso para: ${numberFormat}`);
+                        
+                        if (audioBase64) {
+                            lastSentResult = await whatsappService.sendAudio({
+                                instanceId,
+                                number: numberFormat,
+                                audioBase64
+                            });
+                            console.log(`[AssistantProcessor] ✅ Áudio Mágico enviado com sucesso para: ${numberFormat}`);
+                        } else {
+                            lastSentResult = await whatsappService.sendMessage({
+                                instanceId,
+                                number: numberFormat,
+                                text
+                            });
+                            console.log(`[AssistantProcessor] ✅ Mensagem enviada com sucesso para: ${numberFormat}`);
+                        }
+                        
                         sent = true;
                         break;
                     } catch (err: any) {
@@ -489,11 +570,11 @@ export class AssistantProcessorService {
      * Salva mensagem de saída no banco
      * externalId: ID da mensagem retornado pela Evolution API (para dedup no webhook)
      */
-    private async saveOutgoingMessage(ctx: IncomingMessageContext, content: string, externalId?: string | null): Promise<void> {
+    private async saveOutgoingMessage(ctx: IncomingMessageContext, content: string, externalId?: string | null, mediaType?: string): Promise<void> {
         try {
             const result = await query(
-                `INSERT INTO messages (user_id, conversation_id, direction, channel, content, status, external_id, metadata)
-                 VALUES ($1, $2, 'out', $3, $4, 'sent', $5, $6)
+                `INSERT INTO messages (user_id, conversation_id, direction, channel, content, status, external_id, metadata, media_type)
+                 VALUES ($1, $2, 'out', $3, $4, 'sent', $5, $6, $7)
                  RETURNING *`,
                 [
                     ctx.userId,
@@ -501,7 +582,8 @@ export class AssistantProcessorService {
                     ctx.channelType,
                     content,
                     externalId || null,
-                    JSON.stringify({ source: 'ai_assistant', automated: true })
+                    JSON.stringify({ source: 'ai_assistant', automated: true }),
+                    mediaType || null
                 ]
             );
 
@@ -890,6 +972,172 @@ Responda APENAS com uma das palavras: contatado, qualificado, negociacao, conver
         } catch (err: any) {
             console.warn('[FunnelAI] Falha na classificação IA de funil:', err.message);
             return null;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // AGENDAMENTO AUTOMÁTICO DE REUNIÕES/TAREFAS
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Detecta intenção de agendamento na conversa e cria tarefa automaticamente.
+     * Emite evento WebSocket (ai_task_created) para o frontend criar a tarefa no TaskManager.
+     */
+    private async detectAndCreateSchedulingTask(
+        ctx: IncomingMessageContext,
+        aiReply: string,
+        assistant: any,
+        providers: ProviderConfig[],
+        model?: string
+    ): Promise<void> {
+        try {
+            // 1. Detecção rule-based rápida (evitar chamar IA desnecessariamente)
+            const combinedText = `${ctx.messageContent} ${aiReply}`.toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+            const schedulingKeywords = [
+                'agendar', 'agendamento', 'reuniao', 'marcar reuniao', 'marcar call',
+                'agendar call', 'agendar reuniao', 'videoconferencia', 'video chamada',
+                'meet', 'teams', 'zoom', 'chamada', 'horario disponivel', 'quando posso',
+                'que dia', 'que hora', 'disponibilidade', 'consulta', 'visita', 'demonstracao',
+                'demo', 'apresentacao', 'segunda', 'terca', 'quarta', 'quinta', 'sexta',
+                'amanha', 'semana que vem', 'proximo', 'as 9', 'as 10', 'as 11', 'as 14',
+                'as 15', 'as 16', 'as 17', 'confirmado para', 'marcado para', 'combinamos'
+            ];
+
+            const hasSchedulingIntent = schedulingKeywords.some(kw => combinedText.includes(kw));
+            if (!hasSchedulingIntent) return;
+
+            console.log('[AssistantProcessor] 📅 Intenção de agendamento detectada, extraindo detalhes...');
+
+            if (providers.length === 0) return;
+
+            // 2. Usar IA para extrair data/hora e contexto do agendamento
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const extractionMessages = [
+                {
+                    role: 'system' as const,
+                    content: `Você é um extrator de agendamentos. Analise a conversa e retorne um JSON válido com os campos:
+- has_scheduling: boolean (true SOMENTE se há agendamento concreto ou confirmação de data/hora)
+- task_title: string (título curto, ex: "Reunião com João Silva")
+- task_description: string (descrição breve do que foi agendado)
+- task_type: "meeting" | "call" | "follow-up" (tipo mais adequado)
+- scheduled_date: string | null (data ISO 8601, use ${todayStr} como hoje para calcular datas relativas)
+- priority: "low" | "medium" | "high" | "urgent"
+- contact_name: string (nome do contato se mencionado)
+
+Responda APENAS com o JSON, sem markdown ou texto adicional.`
+                },
+                {
+                    role: 'user' as const,
+                    content: `Cliente disse: "${ctx.messageContent.substring(0, 400)}"
+
+Assistente respondeu: "${aiReply.substring(0, 400)}"
+
+Contato: ${ctx.contactName || 'Desconhecido'}`,
+                }
+            ];
+
+            const response = await aiService.generateResponseWithFallback(extractionMessages, providers, model);
+            if (!response.content) return;
+
+            // 3. Parsear resposta da IA
+            let parsed: any;
+            try {
+                const clean = response.content.replace(/```json|```/g, '').trim();
+                parsed = JSON.parse(clean);
+            } catch {
+                console.warn('[Scheduling] Resposta IA não é JSON válido:', response.content.substring(0, 100));
+                return;
+            }
+
+            if (!parsed.has_scheduling) {
+                console.log('[Scheduling] IA determinou que não há agendamento concreto.');
+                return;
+            }
+
+            // 4. Buscar lead_id vinculado à conversa
+            let leadId: string | null = null;
+            let leadName = ctx.contactName || parsed.contact_name || 'Contato';
+            try {
+                const convResult = await query(
+                    `SELECT c.lead_id, l.name FROM conversations c LEFT JOIN leads l ON l.id = c.lead_id WHERE c.id = $1 LIMIT 1`,
+                    [ctx.conversationId]
+                );
+                if (convResult.rows[0]?.lead_id) {
+                    leadId = convResult.rows[0].lead_id;
+                    leadName = convResult.rows[0].name || leadName;
+                }
+            } catch { /* ignore */ }
+
+            // 5. Calcular data da tarefa
+            let dueDate: string;
+            if (parsed.scheduled_date) {
+                try {
+                    const d = new Date(parsed.scheduled_date);
+                    dueDate = isNaN(d.getTime()) ? new Date(Date.now() + 86400000).toISOString() : d.toISOString();
+                } catch {
+                    dueDate = new Date(Date.now() + 86400000).toISOString();
+                }
+            } else {
+                dueDate = new Date(Date.now() + 86400000).toISOString(); // Amanhã como fallback
+            }
+
+            // 6. Montar objeto da tarefa (mesmo formato do TaskManager frontend)
+            const task = {
+                id: `task-ai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                title: parsed.task_title || `Reunião com ${leadName}`,
+                description: parsed.task_description || `Agendamento detectado automaticamente pelo assistente de IA`,
+                leadId: leadId || undefined,
+                leadName: leadName,
+                type: parsed.task_type || 'meeting',
+                priority: parsed.priority || 'medium',
+                status: 'pending',
+                dueDate,
+                createdAt: new Date().toISOString(),
+                notes: `Criada automaticamente pelo assistente "${assistant.assistant_name}" com base na conversa com ${leadName}.`,
+                source: 'ai_assistant',
+            };
+
+            console.log(`[Scheduling] ✅ Tarefa criada: "${task.title}" para ${dueDate}`);
+
+            // 7. Gravar no banco de dados (tabela scheduled_conversations para persistência)
+            try {
+                await query(
+                    `INSERT INTO scheduled_conversations
+                     (user_id, conversation_id, lead_id, scheduled_date, scheduling_description, status, metadata)
+                     VALUES ($1, $2, $3, $4, $5, 'pending', $6)
+                     ON CONFLICT DO NOTHING`,
+                    [
+                        ctx.userId,
+                        ctx.conversationId,
+                        leadId,
+                        new Date(dueDate),
+                        task.title,
+                        JSON.stringify({ task, source: 'ai_assistant', assistant: assistant.assistant_name })
+                    ]
+                );
+                console.log('[Scheduling] 💾 Agendamento salvo no banco scheduled_conversations');
+            } catch (dbErr: any) {
+                if (dbErr.code !== '42P01') { // Ignorar se tabela não existe
+                    console.warn('[Scheduling] Erro ao salvar no banco:', dbErr.message);
+                }
+            }
+
+            // 8. Emitir WebSocket para o frontend criar a tarefa no localStorage (TaskManager)
+            try {
+                const wsService = getWebSocketService();
+                if (wsService) {
+                    wsService.emitToUser(ctx.userId, 'ai_task_created', { task });
+                    console.log(`[Scheduling] 📡 WebSocket emitido: ai_task_created → user ${ctx.userId}`);
+                }
+            } catch (wsErr: any) {
+                console.warn('[Scheduling] Falha ao emitir WebSocket:', wsErr.message);
+            }
+
+        } catch (err: any) {
+            console.warn('[Scheduling] Erro ao detectar agendamento (não crítico):', err.message);
         }
     }
 }

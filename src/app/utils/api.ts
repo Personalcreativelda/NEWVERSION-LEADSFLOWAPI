@@ -1010,6 +1010,7 @@ const mapLeadFromApi = (lead: any): Lead => {
     channelSource: lead.channel_source || lead.source || '',
     updatedAt: lead.updated_at,
     convertedAt: lead.converted_at,
+    lead_score: lead.lead_score ?? lead.engagement_score ?? null,
   };
 };
 

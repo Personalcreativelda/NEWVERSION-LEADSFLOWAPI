@@ -155,6 +155,7 @@ interface Lead {
   deal_value?: number;
   origem?: string;
   prioridade?: 'baixa' | 'media' | 'alta' | 'urgente';
+  lead_score?: number;
 }
 
 // Priority configurations
@@ -317,8 +318,8 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
         </DropdownMenu>
       </div>
 
-      {/* Origin + Priority badges */}
-      {(lead.origem || lead.prioridade) && (
+      {/* Origin + Priority + Score badges */}
+      {(lead.origem || lead.prioridade || typeof lead.lead_score === 'number') && (
         <div className="flex items-center gap-1.5 mb-2 px-1 flex-wrap">
           {lead.origem && (() => {
             const originKey = lead.origem.toLowerCase();
@@ -346,6 +347,20 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
                 return <PriorityIcon className="h-3 w-3" />;
               })()}
               <span>{PRIORITY_CONFIG[lead.prioridade].label}</span>
+            </span>
+          )}
+          {typeof lead.lead_score === 'number' && (
+            <span
+              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                lead.lead_score >= 80 
+                  ? 'bg-red-500/10 text-red-500' 
+                  : lead.lead_score >= 50 
+                    ? 'bg-amber-500/10 text-amber-500' 
+                    : 'bg-blue-500/10 text-blue-500'
+              }`}
+              title={`Engajamento: ${lead.lead_score} pts`}
+            >
+              {lead.lead_score >= 80 ? '🔥' : lead.lead_score >= 50 ? '🟡' : '🧊'} {lead.lead_score}
             </span>
           )}
         </div>
