@@ -205,8 +205,9 @@ export function useMessages(conversationId: string | null) {
             if (prev.some(m => m.id === message.id)) return prev;
             return [...prev, message];
         });
+        // scrollToBottom is stable (empty deps) — safe to call without adding to deps array
         setTimeout(() => scrollToBottom(), 50);
-    }, [scrollToBottom]);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     /** Update the upload progress displayed inside an optimistic message bubble. */
     const updateLocalMessageProgress = useCallback((tempId: string, progress: number) => {

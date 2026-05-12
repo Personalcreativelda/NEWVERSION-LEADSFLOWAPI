@@ -20,7 +20,7 @@ interface ChatPanelProps {
     messagesEndRef?: React.RefObject<HTMLDivElement>;
     onSendMessage?: (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string) => Promise<void>;
     onSendAudio?: (audioBlob: Blob) => Promise<void>;
-    onAddLocalMessage?: (message: import('../../types/inbox').MessageWithSender) => void;
+    onAddLocalMessage?: (message: MessageWithSender) => void;
     onUpdateLocalMessageProgress?: (tempId: string, progress: number) => void;
     onFailLocalMessage?: (tempId: string) => void;
     /** Optional layout control buttons rendered inside the chat header */
