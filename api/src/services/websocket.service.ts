@@ -11,9 +11,22 @@ export class WebSocketService {
     private connectedUsers: Map<string, Set<string>> = new Map(); // userId -> Set of socketIds
 
     constructor(httpServer: HttpServer) {
+        // Mirror the same origin-building logic as cors.middleware.ts
+        const isDev = process.env.NODE_ENV !== 'production';
+        const fromEnv = (process.env.CORS_ORIGINS || '')
+            .split(',')
+            .map(o => o.trim().replace(/\/$/, ''))
+            .filter(Boolean);
+        const appUrl = (process.env.APP_URL || '').trim().replace(/\/$/, '');
+        const wsOrigins = [
+            ...fromEnv,
+            ...(appUrl && appUrl.startsWith('http') ? [appUrl] : []),
+            ...(isDev ? ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173'] : []),
+        ].filter((v, i, a) => v && a.indexOf(v) === i);
+
         this.io = new Server(httpServer, {
             cors: {
-                origin: process.env.CORS_ORIGINS?.split(',').map(o => o.trim().replace(/\/$/, '')),
+                origin: wsOrigins.length > 0 ? wsOrigins : true,
                 credentials: true,
                 methods: ['GET', 'POST']
             },

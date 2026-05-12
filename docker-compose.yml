@@ -4,7 +4,7 @@ services:
   api:
     build: ./api
     ports:
-      - "${API_PORT:-4001}:4001"
+      - "${API_PORT:-4000}:4000"
     env_file: .env
     environment:
       - PG_HOST=${PG_HOST}
@@ -15,7 +15,7 @@ services:
       - PG_SSL=${PG_SSL:-false}
       - PORT=4000
       - JWT_SECRET=${JWT_SECRET}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,https://app.leadsflowapi.com}
       - EVOLUTION_API_URL=${EVOLUTION_API_URL:-}
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-}
       - SMTP_HOST=${SMTP_HOST:-}
