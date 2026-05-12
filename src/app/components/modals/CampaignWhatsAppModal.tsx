@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, us
 import {
   X, MessageSquare, Users, Send, Clock, Settings,
   Paperclip, Image as ImageIcon, ChevronDown, ChevronUp,
-  Smile, Bold, Italic, Link2, Check, Eye, Save, Trash2, Video, Smartphone, Play
+  Smile, Bold, Italic, Link2, Check, Eye, Save, Trash2, Video, Smartphone
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -24,7 +24,6 @@ interface Lead {
 }
 
 interface Attachment {
-  id: string;
   name: string;
   size: number;
   type: string;
@@ -33,8 +32,6 @@ interface Attachment {
   caption?: string;
   isExisting?: boolean;
   url?: string;
-  isLoading?: boolean;
-  uploadedUrl?: string;
 }
 
 interface CampaignWhatsAppModalProps {
@@ -93,8 +90,6 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const messageRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const variableDropdownRef = useRef<HTMLDivElement>(null);
-  // Rastreia uploads em background: id → Promise<url | null>
-  const uploadPromisesRef = useRef<Map<string, Promise<string | null>>>(new Map());
 
   // ✅ CARREGAR DADOS DA CAMPANHA AO EDITAR
   useEffect(() => {
@@ -152,16 +147,14 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             }
 
             return {
-              id: `existing-${index}-${url}`,
               name: fileName,
-              size: 0,
+              size: 0, // Não sabemos o tamanho, mas não é crítico
               type: mimeType,
-              file: new File([], fileName, { type: mimeType }),
-              preview: url,
+              file: new File([], fileName, { type: mimeType }), // Arquivo vazio placeholder
+              preview: url, // Usar a URL do MinIO como preview
               caption: '',
-              isExisting: true,
-              url: url,
-              uploadedUrl: url, // já está no servidor
+              isExisting: true, // Flag para indicar que já existe no servidor
+              url: url // Manter URL original
             };
           });
 
@@ -390,70 +383,69 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []) as File[];
     const validFiles = files.filter(file => {
+      // ✅ LIMITE GERAL: 16MB
       if (file.size > 16 * 1024 * 1024) {
         toast.error(`${file.name} excede 16MB`);
         return false;
       }
+
+      // ✅ LIMITE ESPECIAL PARA VÍDEOS: 5MB (para evitar demora no N8N)
+      if (file.type.startsWith('video/') && file.size > 5 * 1024 * 1024) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        toast.error(`🎥 Vídeo muito grande: ${file.name} (${sizeMB}MB)\n\n⚠️ Limite para vídeos: 5MB\n💡 Comprima em: handbrake.fr ou freeconvert.com`, { duration: 6000 });
+        return false;
+      }
+
       return true;
     });
 
-    if (validFiles.length === 0) return;
+    // ✅ Criar previews para imagens e vídeos
+    const processFiles = async () => {
+      const newAttachments = await Promise.all(
+        validFiles.map(async (file) => {
+          let preview: string | undefined;
 
-    // Preview instantâneo via object URL — sem bloquear a UI
-    const newAttachments: Attachment[] = validFiles.map(file => ({
-      id: `${Date.now()}-${Math.random()}`,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      file,
-      preview: (file.type.startsWith('image/') || file.type.startsWith('video/'))
-        ? URL.createObjectURL(file)
-        : undefined,
-      caption: '',
-      isLoading: true,
-    }));
+          // Se for imagem ou vídeo, criar preview
+          if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+            preview = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (e) => resolve(e.target?.result as string);
+              reader.readAsDataURL(file);
+            });
+          }
 
-    setAttachments(prev => [...prev, ...newAttachments]);
+          return {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            file,
+            preview, // ✅ URL de preview
+            caption: '', // ✅ Legenda vazia inicialmente
+          };
+        })
+      );
 
-    // Upload em background para cada arquivo — ao clicar Enviar já estará pronto
-    const token = localStorage.getItem('leadflow_access_token');
-    const apiUrl = (import.meta as any).env.VITE_API_URL;
+      setAttachments([...attachments, ...newAttachments]);
 
-    newAttachments.forEach(att => {
-      const uploadPromise: Promise<string | null> = (async () => {
-        try {
-          if (!token) return null;
-          const formData = new FormData();
-          formData.append('file', att.file);
-          const res = await fetch(`${apiUrl}/api/campaigns/upload-media`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData,
-          });
-          if (!res.ok) throw new Error('Upload failed');
-          const data = await res.json();
-          setAttachments(prev => prev.map(a =>
-            a.id === att.id ? { ...a, uploadedUrl: data.url, isLoading: false } : a
-          ));
-          return data.url as string;
-        } catch {
-          setAttachments(prev => prev.map(a =>
-            a.id === att.id ? { ...a, isLoading: false } : a
-          ));
-          return null;
+      if (newAttachments.length > 0) {
+        // ✅ Avisar sobre vídeos grandes
+        const videos = newAttachments.filter(a => a.type.startsWith('video/'));
+        if (videos.length > 0) {
+          const totalVideoSize = videos.reduce((sum, v) => sum + v.size, 0);
+          const totalVideoSizeMB = (totalVideoSize / (1024 * 1024)).toFixed(2);
+
+          if (totalVideoSize > 3 * 1024 * 1024) {
+            toast.warning(`⏳ ${videos.length} vídeo(s) anexado(s) (${totalVideoSizeMB}MB)\n\nO envio pode demorar alguns minutos...`, { duration: 4000 });
+          } else {
+            toast.success(`✅ ${newAttachments.length} arquivo(s) anexado(s)`);
+          }
+        } else {
+          toast.success(`✅ ${newAttachments.length} arquivo(s) anexado(s)`);
         }
-      })();
+      }
+    };
 
-      uploadPromisesRef.current.set(att.id, uploadPromise);
-    });
-
-    const isVideo = newAttachments.some(a => a.type.startsWith('video/'));
-    if (isVideo) {
-      const totalMB = (newAttachments.reduce((s, a) => s + a.size, 0) / (1024 * 1024)).toFixed(1);
-      toast.info(`📤 Preparando ${newAttachments.length} arquivo(s) (${totalMB}MB) em segundo plano...`, { duration: 3000 });
-    } else {
-      toast.success(`✅ ${newAttachments.length} arquivo(s) anexado(s)`);
-    }
+    processFiles();
   };
 
   const removeAttachment = (index: number) => {
@@ -1218,32 +1210,19 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         // ✅ MODO IMEDIATO: Salvar no banco e disparar via executor do backend
         console.log('[Campaign WhatsApp] 🚀 Modo imediato - salvando e disparando via backend...');
 
-        // 1. Resolver uploads — usa URL já pronta ou aguarda/faz fallback
+        // 1. Upload de arquivos novos (se houver)
         const uploadedMediaUrls: string[] = [];
         for (const attachment of attachments.filter(a => !a.isExisting)) {
-          if (attachment.uploadedUrl) {
-            // Já foi enviado em background enquanto o usuário configurava
-            uploadedMediaUrls.push(attachment.uploadedUrl);
-          } else {
-            // Upload ainda em andamento ou falhou — aguarda a promise ou faz nova tentativa
-            const pending = uploadPromisesRef.current.get(attachment.id);
-            const url = pending ? await pending : null;
-            if (url) {
-              uploadedMediaUrls.push(url);
-            } else {
-              // Fallback: enviar agora
-              const formData = new FormData();
-              formData.append('file', attachment.file);
-              const uploadResponse = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/upload-media`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData,
-              });
-              if (uploadResponse.ok) {
-                const uploadData = await uploadResponse.json();
-                uploadedMediaUrls.push(uploadData.url);
-              }
-            }
+          const formData = new FormData();
+          formData.append('file', attachment.file);
+          const uploadResponse = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/upload-media`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData,
+          });
+          if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json();
+            uploadedMediaUrls.push(uploadData.url);
           }
         }
 
@@ -1408,34 +1387,30 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       console.log('[Campaign Save] Arquivos novos:', newAttachments.length);
       console.log('[Campaign Save] Arquivos existentes:', existingUrls.length);
 
-      // Resolver uploads — usa URL já pronta ou aguarda/faz fallback
+      // Upload apenas dos arquivos novos para o MinIO
       const uploadedMediaUrls: string[] = [];
 
       for (const attachment of newAttachments) {
-        if (attachment.uploadedUrl) {
-          uploadedMediaUrls.push(attachment.uploadedUrl);
-          console.log('[Campaign Save] Usando URL pré-carregada:', attachment.uploadedUrl);
-        } else {
-          const pending = uploadPromisesRef.current.get(attachment.id);
-          const url = pending ? await pending : null;
-          if (url) {
-            uploadedMediaUrls.push(url);
-            console.log('[Campaign Save] Upload em background concluído:', url);
-          } else {
-            // Fallback: enviar agora
-            const formData = new FormData();
-            formData.append('file', attachment.file);
-            console.log('[Campaign Save] Fallback upload:', attachment.name);
-            const uploadResponse = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/upload-media`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${token}` },
-              body: formData,
-            });
-            if (!uploadResponse.ok) throw new Error(`Erro ao fazer upload de ${attachment.name}`);
-            const uploadData = await uploadResponse.json();
-            uploadedMediaUrls.push(uploadData.url);
-          }
+        const formData = new FormData();
+        formData.append('file', attachment.file);
+
+        console.log('[Campaign Save] Uploading file to MinIO:', attachment.name);
+
+        const uploadResponse = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/upload-media`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error(`Erro ao fazer upload de ${attachment.name}`);
         }
+
+        const uploadData = await uploadResponse.json();
+        uploadedMediaUrls.push(uploadData.url);
+        console.log('[Campaign Save] File uploaded:', uploadData.url);
       }
 
       // ✅ Combinar URLs existentes + novas
@@ -1926,30 +1901,15 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   <div className="mt-3 space-y-2">
                     {attachments.map((att, index) => (
                       <div key={index} className="border border-border rounded-lg p-3 bg-muted/50">
-                        {/* Info do arquivo + thumbnail de vídeo */}
+                        {/* ✅ Info do arquivo */}
                         <div className="flex items-center gap-3 mb-2">
-                          {att.type.startsWith('video/') && att.preview ? (
-                            <div className="relative w-16 h-12 rounded overflow-hidden flex-shrink-0 bg-black">
-                              <video src={att.preview} className="w-full h-full object-cover" muted />
-                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                                {att.isLoading ? (
-                                  <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                  <Play className="w-4 h-4 text-white fill-white" />
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-xl flex-shrink-0">
-                              {att.type.startsWith('image/') ? '🖼️' : '📄'}
-                            </span>
-                          )}
+                          <span className="text-xl">
+                            {att.type.startsWith('image/') ? '🖼️' :
+                              att.type.startsWith('video/') ? '🎥' : '📄'}
+                          </span>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium text-foreground/80 truncate">{att.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatFileSize(att.size)}
-                              {att.isLoading && <span className="ml-2 text-amber-500">carregando...</span>}
-                            </p>
+                            <p className="text-xs text-muted-foreground">{formatFileSize(att.size)}</p>
                           </div>
                           <button
                             type="button"
@@ -2041,45 +2001,20 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                       </div>
                     ))}
 
-                    {/* PREVIEW DE VÍDEOS COM LEGENDA */}
+                    {/* ✅ PREVIEW DE VÍDEOS COM LEGENDA */}
                     {attachments.filter(att => att.type.startsWith('video/')).map((att, i) => (
                       <div key={i} className="bg-[#DCF8C6] dark:bg-[#005C4B] rounded-lg shadow-sm overflow-hidden">
-                        {/* Vídeo — preview instantâneo + overlay de carregamento estilo WhatsApp */}
+                        {/* Vídeo */}
                         {att.preview && (
                           <div className="relative">
                             <video
                               src={att.preview}
                               className="w-full h-auto"
-                              controls={!att.isLoading}
-                              muted
+                              controls
                             />
-                            {att.isLoading ? (
-                              /* Overlay de upload estilo WhatsApp */
-                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
-                                <div className="relative w-14 h-14">
-                                  <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
-                                    <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="4" />
-                                    <circle
-                                      cx="28" cy="28" r="24"
-                                      fill="none" stroke="white" strokeWidth="4"
-                                      strokeLinecap="round"
-                                      strokeDasharray="150.8"
-                                      strokeDashoffset="37.7"
-                                      className="animate-spin"
-                                      style={{ animationDuration: '1s' }}
-                                    />
-                                  </svg>
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-3 h-3 bg-white rounded-sm" />
-                                  </div>
-                                </div>
-                                <span className="text-white text-xs mt-2 font-medium">Carregando...</span>
-                              </div>
-                            ) : (
-                              <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                                🎥 Vídeo
-                              </div>
-                            )}
+                            <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                              🎥 Vídeo
+                            </div>
                           </div>
                         )}
 

@@ -18,7 +18,7 @@ interface ChatPanelProps {
     messagesError?: string | null;
     sending?: boolean;
     messagesEndRef?: React.RefObject<HTMLDivElement>;
-    onSendMessage?: (content: string, mediaUrl?: string, mediaType?: string, displayUrl?: string, uploadPromise?: Promise<string | null>) => void;
+    onSendMessage?: (content: string, mediaUrl?: string, mediaType?: string) => Promise<void>;
     onSendAudio?: (audioBlob: Blob) => Promise<void>;
     /** Optional layout control buttons rendered inside the chat header */
     layoutControls?: React.ReactNode;
@@ -143,7 +143,7 @@ export function ChatPanel({
             {/* Input Area - Fixed */}
             <div className="flex-shrink-0 p-3 border-t transition-colors bg-[#f0f2f5] border-[rgba(17,27,33,0.08)] dark:bg-[#202c33] dark:border-[rgba(233,237,239,0.08)]">
                 <MessageInput
-                    onSendMessage={onSendMessage || (() => {})}
+                    onSendMessage={onSendMessage || (async () => {})}
                     onSendAudio={onSendAudio}
                     disabled={messagesLoading || !!messagesError}
                     onTyping={handleTyping}

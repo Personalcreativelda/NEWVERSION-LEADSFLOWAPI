@@ -18,13 +18,7 @@ import {
 import { inboxApi, UploadResponse } from '../../services/api/inbox';
 
 interface MessageInputProps {
-    onSendMessage: (
-        content: string,
-        mediaUrl?: string,
-        mediaType?: string,
-        displayUrl?: string,
-        uploadPromise?: Promise<string | null>
-    ) => void;
+    onSendMessage: (content: string, mediaUrl?: string, mediaType?: string) => Promise<void>;
     onTyping: (isTyping: boolean) => void;
     onSendAudio?: (audioBlob: Blob) => Promise<void>;
     conversationId?: string;
@@ -36,10 +30,6 @@ interface SelectedFile {
     file: File;
     preview: string | null;
     type: 'image' | 'video' | 'audio' | 'document';
-    isPreUploading?: boolean;
-    uploadedUrl?: string;
-    uploadMediaType?: string;
-    uploadError?: string;
 }
 
 export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversationId, disabled, isSending }: MessageInputProps) {
@@ -62,8 +52,6 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     const audioChunksRef = useRef<Blob[]>([]);
     const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const emojiPickerRef = useRef<HTMLDivElement>(null);
-    // Rastreia o upload em background: resolvido antes do envio
-    const pendingUploadRef = useRef<Promise<UploadResponse | null> | null>(null);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -228,15 +216,21 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         }
     };
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!content.trim() || disabled || isSending) return;
 
         const messageToSend = content;
         setContent('');
         if (textareaRef.current) textareaRef.current.style.height = 'auto';
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        onTyping(false);
-        onSendMessage(messageToSend);
+
+        try {
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            onTyping(false);
+            await onSendMessage(messageToSend);
+        } catch (error) {
+            setContent(messageToSend); // Restore if failed
+            console.error('Failed to send', error);
+        }
     };
 
     const handleDraftReply = async () => {
@@ -265,47 +259,31 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         }
     };
 
-    // Handle file selection — inicia upload em background imediatamente
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, isImageOnly: boolean = false) => {
+    // Handle file selection
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, isImageOnly: boolean = false) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // Determine file type
         let type: SelectedFile['type'] = 'document';
-        if (file.type.startsWith('image/')) type = 'image';
-        else if (file.type.startsWith('video/')) type = 'video';
-        else if (file.type.startsWith('audio/')) type = 'audio';
+        if (file.type.startsWith('image/')) {
+            type = 'image';
+        } else if (file.type.startsWith('video/')) {
+            type = 'video';
+        } else if (file.type.startsWith('audio/')) {
+            type = 'audio';
+        }
 
-        const preview = (type === 'image' || type === 'video')
-            ? URL.createObjectURL(file)
-            : null;
+        // Create preview for images and videos
+        let preview: string | null = null;
+        if (type === 'image' || type === 'video') {
+            preview = URL.createObjectURL(file);
+        }
 
-        // Mostra o arquivo imediatamente com estado de pré-upload
-        setSelectedFile({ file, preview, type, isPreUploading: true });
+        setSelectedFile({ file, preview, type });
+
+        // Clear the input
         e.target.value = '';
-
-        // Upload em background — pronto antes do usuário clicar Enviar
-        const uploadPromise: Promise<UploadResponse | null> = (async () => {
-            try {
-                console.log('[MessageInput] Iniciando upload:', file.name, (file.size / 1024 / 1024).toFixed(2) + 'MB');
-                const result = await inboxApi.uploadFile(file);
-                console.log('[MessageInput] Upload concluído:', result.url.substring(0, 60));
-                setSelectedFile(prev =>
-                    prev?.file === file
-                        ? { ...prev, uploadedUrl: result.url, uploadMediaType: result.media_type, isPreUploading: false }
-                        : prev
-                );
-                return result;
-            } catch (err: any) {
-                const msg = err?.response?.data?.error || err?.message || 'Erro desconhecido';
-                console.error('[MessageInput] Upload falhou:', msg, err);
-                setSelectedFile(prev =>
-                    prev?.file === file ? { ...prev, isPreUploading: false, uploadError: msg } : prev
-                );
-                return null;
-            }
-        })();
-
-        pendingUploadRef.current = uploadPromise;
     };
 
     // Clear selected file
@@ -313,50 +291,55 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         if (selectedFile?.preview) {
             URL.revokeObjectURL(selectedFile.preview);
         }
-        pendingUploadRef.current = null;
         setSelectedFile(null);
     };
 
-    // Enviar — arquivo aparece no chat IMEDIATAMENTE, upload continua em background sem bloquear
-    const handleSendWithFile = () => {
+    // Upload file and send message
+    const handleSendWithFile = async () => {
         if (!selectedFile && !content.trim()) return;
-        if (disabled || isUploading) return;
+        if (disabled || isSending || isUploading) return;
 
+        // Só enviar texto se o usuário digitou algo (legenda opcional)
         const messageToSend = content.trim();
-
-        // ── Capturar tudo ANTES de limpar o estado ──────────────────────────
         const fileToUpload = selectedFile;
-        const localPreview = fileToUpload?.preview ?? undefined;    // blob URL — não revogar, chat precisa dele
-        const mediaType = fileToUpload?.type;
-        const capturedUploadedUrl = fileToUpload?.uploadedUrl;      // URL real se upload já terminou
-        const capturedUploadMediaType = fileToUpload?.uploadMediaType;
-        const capturedUploadPromise = pendingUploadRef.current;     // Promise ainda em andamento
 
-        // ── Limpar UI imediatamente (SEM revogar o blob URL) ──
         setContent('');
         if (textareaRef.current) textareaRef.current.style.height = 'auto';
-        pendingUploadRef.current = null;
-        setSelectedFile(null);
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        onTyping(false);
 
-        if (fileToUpload) {
-            if (capturedUploadedUrl) {
-                // Upload concluído antes de clicar Enviar — instantâneo
-                onSendMessage(messageToSend, capturedUploadedUrl, capturedUploadMediaType || mediaType);
-            } else if (capturedUploadPromise) {
-                // Upload ainda em andamento — mostra blob URL no chat agora, URL real chega em background
-                const urlPromise = capturedUploadPromise.then(r => r?.url ?? null);
-                onSendMessage(messageToSend, undefined, mediaType, localPreview, urlPromise);
-            } else {
-                // Fallback: iniciar upload agora e mostrar blob URL no chat
-                const urlPromise: Promise<string | null> = inboxApi.uploadFile(fileToUpload.file)
-                    .then(r => r.url)
-                    .catch(() => null);
-                onSendMessage(messageToSend, undefined, mediaType, localPreview, urlPromise);
+        try {
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            onTyping(false);
+
+            let mediaUrl: string | undefined;
+            let mediaType: string | undefined;
+
+            // Upload file if present
+            if (fileToUpload) {
+                setIsUploading(true);
+                try {
+                    const uploadResult = await inboxApi.uploadFile(fileToUpload.file);
+                    mediaUrl = uploadResult.url;
+                    mediaType = uploadResult.media_type;
+                    console.log('[MessageInput] File uploaded:', uploadResult);
+                } catch (uploadError) {
+                    console.error('[MessageInput] Upload failed:', uploadError);
+                    throw new Error('Falha ao fazer upload do arquivo');
+                } finally {
+                    setIsUploading(false);
+                }
             }
-        } else {
-            onSendMessage(messageToSend);
+
+            // Clear file selection
+            clearSelectedFile();
+
+            // Send message with media
+            await onSendMessage(messageToSend, mediaUrl, mediaType);
+        } catch (error) {
+            // Restore content only if there was content
+            if (messageToSend) {
+                setContent(messageToSend);
+            }
+            console.error('Failed to send', error);
         }
     };
 
@@ -377,10 +360,9 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     };
 
-    const hasUploadError = !!selectedFile?.uploadError;
-    const canSend = (content.trim() || selectedFile) && !hasUploadError;
+    const canSend = content.trim() || selectedFile;
     const isBusy = isSending || isUploading;
-    const showRecordingMode = isRecording || !!audioBlob;
+    const showRecordingMode = isRecording || audioBlob;
 
     return (
         <div className="transition-colors bg-card">
@@ -474,40 +456,25 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
 
             {/* File preview */}
             {selectedFile && (
-                <div
+                <div 
                     className="mx-2 mb-2 p-3 rounded-xl border border-border bg-muted flex items-center gap-3"
                 >
                     {/* Preview or icon */}
-                    <div className="flex-shrink-0 relative">
+                    <div className="flex-shrink-0">
                         {selectedFile.preview && selectedFile.type === 'image' ? (
-                            <img
-                                src={selectedFile.preview}
-                                alt="Preview"
+                            <img 
+                                src={selectedFile.preview} 
+                                alt="Preview" 
                                 className="w-16 h-16 object-cover rounded-lg"
                             />
                         ) : selectedFile.preview && selectedFile.type === 'video' ? (
-                            <video
-                                src={selectedFile.preview}
+                            <video 
+                                src={selectedFile.preview} 
                                 className="w-16 h-16 object-cover rounded-lg"
-                                muted
                             />
                         ) : (
                             <div className="w-16 h-16 flex items-center justify-center rounded-lg bg-primary/10">
                                 {getFileIcon(selectedFile.type)}
-                            </div>
-                        )}
-                        {/* Overlay de upload em background */}
-                        {selectedFile.isPreUploading && (
-                            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50">
-                                <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                            </div>
-                        )}
-                        {/* Check quando upload terminou */}
-                        {!selectedFile.isPreUploading && selectedFile.uploadedUrl && (
-                            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
                             </div>
                         )}
                     </div>
@@ -519,19 +486,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                         </p>
                         <p className="text-xs text-muted-foreground">
                             {formatFileSize(selectedFile.file.size)} • {selectedFile.type.toUpperCase()}
-                            {selectedFile.isPreUploading && (
-                                <span className="ml-2 text-amber-500">enviando...</span>
-                            )}
-                            {!selectedFile.isPreUploading && selectedFile.uploadedUrl && (
-                                <span className="ml-2 text-green-500">pronto</span>
-                            )}
-                            {selectedFile.uploadError && (
-                                <span className="ml-2 text-red-500" title={selectedFile.uploadError}>⚠ falha no upload</span>
-                            )}
                         </p>
-                        {selectedFile.uploadError && (
-                            <p className="text-xs text-red-500 mt-0.5 leading-tight">{selectedFile.uploadError}</p>
-                        )}
                     </div>
 
                     {/* Remove button */}

@@ -69,15 +69,7 @@ class MinIOStorage implements StorageService {
         'X-Upload-Time': new Date().toISOString(),
       };
 
-      // Race the putObject against a 90-second timeout so a slow/unreachable MinIO
-      // doesn't hang the entire request indefinitely.
-      const uploadTimeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('MinIO upload timeout after 90s')), 90_000)
-      );
-      await Promise.race([
-        this.client.putObject(this.bucket, fileName, buffer, buffer.length, metadata),
-        uploadTimeout,
-      ]);
+      await this.client.putObject(this.bucket, fileName, buffer, buffer.length, metadata);
 
       const publicUrl = process.env.MINIO_PUBLIC_URL;
       let url: string;
@@ -99,9 +91,8 @@ class MinIOStorage implements StorageService {
       return url;
     } catch (error) {
       console.error('[MinIO] Upload failed:', error);
-      // Do NOT silently fall back to base64 — callers (especially WhatsApp sending)
-      // need a real HTTP URL. Let the error propagate so the caller can handle it cleanly.
-      throw error;
+      const base64 = buffer.toString('base64');
+      return `data:${mimetype};base64,${base64}`;
     }
   }
 

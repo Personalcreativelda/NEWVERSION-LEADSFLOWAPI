@@ -66,22 +66,14 @@ export function useMessages(conversationId: string | null) {
         }
     }, [conversationId]);
 
-    // Envio otimista — adiciona mensagem imediatamente e envia em background (não bloqueia a UI)
-    const sendMessage = useCallback((
-        content: string,
-        mediaUrl?: string,
-        mediaType?: string,
-        // displayUrl: blob URL local para mostrar no chat antes do upload terminar
-        displayUrl?: string,
-        // uploadPromise: resolve para a URL real quando o upload concluir
-        uploadPromise?: Promise<string | null>
-    ) => {
-        const hasMedia = mediaUrl || displayUrl || uploadPromise;
-        if (!conversationId || (!content.trim() && !hasMedia)) return;
+    // Envio otimista - mostra mensagem imediatamente
+    const sendMessage = useCallback(async (content: string, mediaUrl?: string, mediaType?: string) => {
+        // Permite envio de mídia sem texto
+        if (!conversationId || (!content.trim() && !mediaUrl)) return;
 
         const tempId = generateTempId();
-
-        // Mensagem otimista aparece IMEDIATAMENTE com blob URL
+        
+        // Criar mensagem otimista (temporária)
         const optimisticMessage: MessageWithSender = {
             id: tempId,
             user_id: '',
@@ -91,86 +83,55 @@ export function useMessages(conversationId: string | null) {
             campaign_id: null,
             direction: 'out',
             channel: 'whatsapp',
-            content: content.trim() || (hasMedia ? '📎 Mídia' : ''),
+            content: content.trim() || (mediaUrl ? '📎 Mídia' : ''),
             status: 'pending',
             sent_at: new Date().toISOString(),
-            media_url: displayUrl || mediaUrl,
+            media_url: mediaUrl,
             media_type: mediaType as 'audio' | 'video' | 'image' | 'document' | undefined,
             metadata: {},
             created_at: new Date().toISOString(),
         };
 
+        // Adicionar mensagem otimista imediatamente
         setMessages(prev => [...prev, optimisticMessage]);
-        setError(null);
         setTimeout(() => scrollToBottom(), 50);
 
-        // Fire-and-forget: upload + API em background, UI não fica bloqueada
-        void (async () => {
-            try {
-                let finalMediaUrl = mediaUrl;
+        try {
+            setSending(true);
+            setError(null);
 
-                // Se upload ainda está em andamento, espera (com timeout de segurança de 4 min)
-                if (uploadPromise && !mediaUrl) {
-                    console.log('[useMessages] Aguardando upload de mídia...', tempId);
-                    const safetyTimeout = new Promise<null>(resolve =>
-                        setTimeout(() => resolve(null), 240_000)
-                    );
-                    const result = await Promise.race([uploadPromise, safetyTimeout]);
-                    finalMediaUrl = result || undefined;
+            const message = await conversationsApi.sendMessage(conversationId, {
+                content: content.trim() || '',
+                media_url: mediaUrl,
+                media_type: mediaType
+            });
 
-                    if (!finalMediaUrl) {
-                        console.error('[useMessages] Upload falhou ou expirou:', tempId);
-                        setMessages(prev => prev.map(m =>
-                            m.id === tempId ? { ...m, status: 'failed' } : m
-                        ));
-                        setError('Falha no upload. Verifique se o servidor de armazenamento (MinIO) está configurado e acessível.');
-                        return;
-                    }
-
-                    console.log('[useMessages] Upload concluído, URL:', finalMediaUrl.substring(0, 60));
-                    // Troca blob URL pela URL real no chat
-                    setMessages(prev => prev.map(m =>
-                        m.id === tempId ? { ...m, media_url: finalMediaUrl } : m
-                    ));
-                }
-
-                console.log('[useMessages] Chamando API de envio...', { tempId, mediaUrl: finalMediaUrl?.substring(0, 60) });
-                setSending(true);
-                const message = await conversationsApi.sendMessage(conversationId, {
-                    content: content.trim() || '',
-                    media_url: finalMediaUrl,
-                    media_type: mediaType,
+            // Substituir mensagem temporária pela real + dedup
+            // (WebSocket pode ter adicionado a mensagem real antes da resposta da API)
+            setMessages(prev => {
+                const replaced = prev.map(m => 
+                    m.id === tempId ? { ...message, status: 'sent' as const } : m
+                );
+                // Remover duplicatas pelo ID real
+                const seen = new Set<string>();
+                return replaced.filter(m => {
+                    if (seen.has(m.id)) return false;
+                    seen.add(m.id);
+                    return true;
                 });
-                console.log('[useMessages] Mensagem enviada com sucesso:', message.id);
+            });
 
-                // Substituir temporária pela real + dedup
-                setMessages(prev => {
-                    const replaced = prev.map(m =>
-                        m.id === tempId ? { ...message, status: 'sent' as const } : m
-                    );
-                    const seen = new Set<string>();
-                    return replaced.filter(m => {
-                        if (seen.has(m.id)) return false;
-                        seen.add(m.id);
-                        return true;
-                    });
-                });
-
-                window.dispatchEvent(new CustomEvent('leadflow:usage-changed'));
-            } catch (err: any) {
-                console.error('[useMessages] Error sending:', err);
-                setMessages(prev => prev.map(m =>
-                    m.id === tempId ? { ...m, status: 'failed' } : m
-                ));
-                setError(err.message || 'Failed to send message');
-
-                if (err?.response?.status === 429 || err?.response?.data?.upgrade || err?.message?.includes('Limite')) {
-                    window.dispatchEvent(new CustomEvent('leadflow:show-upgrade'));
-                }
-            } finally {
-                setSending(false);
-            }
-        })();
+        } catch (err: any) {
+            console.error('[useMessages] Error sending:', err);
+            // Marcar mensagem como falha
+            setMessages(prev => prev.map(m => 
+                m.id === tempId ? { ...m, status: 'failed' } : m
+            ));
+            setError(err.message || 'Failed to send message');
+            throw err;
+        } finally {
+            setSending(false);
+        }
     }, [conversationId]);
 
     // Envio de áudio otimista
@@ -303,14 +264,15 @@ export function useMessages(conversationId: string | null) {
             });
         }
 
-        // 3. Fetch strategy — only load what's needed
+        // 3. Background refresh — silent if we had cache, blocking if first load
         if (cached && cached.length > 0 && isCacheFresh(conversationId)) {
-            // Cache is fresh (< 30s old) — use as-is, polling handles the rest
+            // Cache is fresh — skip fetch entirely, just do a silent poll soon
+            fetchMessages({ silent: true });
         } else if (cached && cached.length > 0) {
-            // Cache exists but stale — silent background refresh (no spinner)
+            // Have cache but stale — silent background refresh
             fetchMessages({ silent: true });
         } else {
-            // First ever load for this conversation — show spinner
+            // No cache at all — first ever load, show spinner
             fetchMessages();
         }
     }, [conversationId]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -61,15 +61,15 @@
     "react-day-picker": "*",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.55.0",
-    "react-is": "^18.3.1",
     "react-resizable-panels": "*",
     "react-router-dom": "*",
-    "recharts": "^2.15.3",
+    "recharts": "*",
     "socket.io-client": "^4.8.3",
     "sonner": "^2.0.3",
     "stripe": "*",
     "tailwind-merge": "*",
     "vaul": "*",
+    "vite": "*",
     "xlsx": "*"
   },
   "devDependencies": {

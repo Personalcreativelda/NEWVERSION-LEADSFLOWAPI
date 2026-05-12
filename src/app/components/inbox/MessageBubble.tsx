@@ -89,15 +89,12 @@ export function MessageBubble({ message, isFirstInGroup = true, isLastInGroup = 
         }
     };
 
-    // Verificar se a URL é válida (inclui blob: para mensagens otimistas durante upload)
+    // Verificar se a URL é válida
     const isValidMediaUrl = (url: string | undefined): boolean => {
         if (!url) return false;
-        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) return true;
+        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return true;
         return false;
     };
-
-    const isUploadingBlob = message.status === 'pending' && message.media_url?.startsWith('blob:');
-    const isFailed = message.status === 'failed';
 
     const hasValidMedia = isValidMediaUrl(message.media_url);
 
@@ -178,29 +175,13 @@ export function MessageBubble({ message, isFirstInGroup = true, isLastInGroup = 
                 {hasValidMedia && (
                     <div className="mb-2">
                         {(effectiveMediaType === 'image' || effectiveMediaType === 'sticker') && !imageError ? (
-                            <div className="relative rounded-md overflow-hidden">
-                                <img
-                                    src={imageUrl}
-                                    alt="Mídia"
-                                    className="w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                                    onClick={() => !isUploadingBlob && window.open(imageUrl, '_blank')}
-                                    onError={handleImageError}
-                                />
-                                {isUploadingBlob && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-md">
-                                        <div className="w-10 h-10 rounded-full border-4 border-white/30 border-t-white animate-spin" />
-                                        <span className="text-white text-xs mt-2 font-medium">A enviar...</span>
-                                    </div>
-                                )}
-                                {isFailed && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 rounded-md">
-                                        <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span className="text-white text-xs mt-1 font-medium">Falha ao enviar</span>
-                                    </div>
-                                )}
-                            </div>
+                            <img
+                                src={imageUrl}
+                                alt="Mídia"
+                                className="rounded-md w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                                onClick={() => window.open(imageUrl, '_blank')}
+                                onError={handleImageError}
+                            />
                         ) : (effectiveMediaType === 'image' || effectiveMediaType === 'sticker') && imageError ? (
                             <a
                                 href={message.media_url}
@@ -228,29 +209,12 @@ export function MessageBubble({ message, isFirstInGroup = true, isLastInGroup = 
                                 </a>
                             </audio>
                         ) : effectiveMediaType === 'video' ? (
-                            <div className="relative rounded-md overflow-hidden">
-                                <video
-                                    controls={!isUploadingBlob}
-                                    src={message.media_url}
-                                    className="w-full max-h-64"
-                                    preload="metadata"
-                                    muted={isUploadingBlob}
-                                />
-                                {isUploadingBlob && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
-                                        <div className="w-12 h-12 rounded-full border-4 border-white/30 border-t-white animate-spin" />
-                                        <span className="text-white text-xs mt-2 font-medium">A enviar...</span>
-                                    </div>
-                                )}
-                                {isFailed && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
-                                        <svg className="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span className="text-white text-xs mt-1 font-medium">Falha ao enviar</span>
-                                    </div>
-                                )}
-                            </div>
+                            <video
+                                controls
+                                src={message.media_url}
+                                className="rounded-md w-full max-h-64"
+                                preload="metadata"
+                            />
                         ) : (
                             <a
                                 href={message.media_url}
@@ -324,16 +288,6 @@ export function MessageBubble({ message, isFirstInGroup = true, isLastInGroup = 
                 {showTextContent && (
                     <div className="whitespace-pre-wrap break-words">
                         {message.content}
-                    </div>
-                )}
-
-                {/* Failed send indicator */}
-                {isFailed && !hasValidMedia && (
-                    <div className="flex items-center gap-1 mt-1 text-red-500 text-[11px]">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>Falha ao enviar</span>
                     </div>
                 )}
 
