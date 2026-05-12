@@ -13,14 +13,14 @@ import {
     AlertCircle
 } from 'lucide-react';
 import { inboxApi } from '../../services/api/inbox';
-import { useUploadQueue } from '../../hooks/useUploadQueue';
+import { useConversationUploadQueue } from '../../context/UploadQueueContext';
 import { AttachmentPreviewCard } from './AttachmentPreviewCard';
 
 interface MessageInputProps {
     onSendMessage: (content: string, mediaUrl?: string, mediaType?: string) => Promise<void>;
     onTyping: (isTyping: boolean) => void;
     onSendAudio?: (audioBlob: Blob) => Promise<void>;
-    conversationId?: string;
+    conversationId: string;
     disabled?: boolean;
     isSending?: boolean;
 }
@@ -39,7 +39,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         clearAttachments,
         allUploadsCompleted,
         isUploading,
-    } = useUploadQueue();
+    } = useConversationUploadQueue(conversationId);
     const [recordingTime, setRecordingTime] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);

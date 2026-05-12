@@ -148,7 +148,7 @@ export function ChatPanel({
                     disabled={messagesLoading || !!messagesError}
                     onTyping={handleTyping}
                     isSending={sending}
-                    conversationId={conversation?.id}
+                    conversationId={conversation.id}
                 />
             </div>
         </div>
