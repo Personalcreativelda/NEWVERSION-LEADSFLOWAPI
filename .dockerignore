@@ -1,16 +1,47 @@
+# Dependencies — never send to build context
 node_modules
+**/node_modules
+
+# Build outputs
+dist
+.dist
+**/dist
+
+# API server — not needed for frontend build
+api/
+
+# Git
+.git
+.gitignore
+.github
+
+# Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 
-# Build output
-.dist
-/dist
+# OS files
+.DS_Store
+Thumbs.db
 
-# Git metadata
-.git
-.gitignore
+# Editor / IDE
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# Local environment overrides
+# Environment overrides (ARGs are passed via --build-arg)
 .env.local
+.env.*.local
+
+# Test and documentation
+*.test.ts
+*.spec.ts
+**/__tests__
+coverage
+docs
+*.md

@@ -9,27 +9,19 @@ ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
 ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
 
-# Install dependencies based on the lockfile for reproducible builds
+# Install dependencies — clean npm cache in same layer to minimise image size
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --prefer-offline && npm cache clean --force
 
-# Copy application sources and build the production bundle
+# Copy only frontend sources (api/ is excluded via .dockerignore)
 COPY . .
 RUN npm run build
 
+# ── Production image ───────────────────────────────────────────────────────
 FROM node:20-alpine AS production
 WORKDIR /app
 
-ARG VITE_API_URL
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
-
-ENV VITE_API_URL=${VITE_API_URL}
-ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-
-# Lightweight static server for the built assets
-RUN npm install --global serve@14
+RUN npm install --global serve@14 && npm cache clean --force
 
 ENV NODE_ENV=production
 ENV PORT=3000

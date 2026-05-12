@@ -1,0 +1,40 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build output
+dist
+
+# Git
+.git
+.gitignore
+.github
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / Editor
+.DS_Store
+.vscode
+.idea
+
+# Environment files (use --build-arg or inject at runtime)
+.env.local
+.env.*.local
+
+# Test / docs
+*.test.ts
+*.spec.ts
+**/__tests__
+coverage
+docs
+*.md
+
+# Temp scripts (diagnostic / one-off files)
+tmp-*.js
+check*.js
+diagnostic.js
+direct_test.js
+setup-db.*
+db_report*
