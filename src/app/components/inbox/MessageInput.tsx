@@ -15,21 +15,30 @@ import {
 import { inboxApi } from '../../services/api/inbox';
 import { useConversationUploadQueue } from '../../context/UploadQueueContext';
 import { AttachmentPreviewCard } from './AttachmentPreviewCard';
+import type { MessageWithSender } from '../../types/inbox';
 
 interface MessageInputProps {
-    onSendMessage: (content: string, mediaUrl?: string, mediaType?: string) => Promise<void>;
+    onSendMessage: (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string) => Promise<void>;
     onTyping: (isTyping: boolean) => void;
     onSendAudio?: (audioBlob: Blob) => Promise<void>;
     conversationId: string;
     disabled?: boolean;
     isSending?: boolean;
+    onAddLocalMessage?: (message: MessageWithSender) => void;
+    onUpdateLocalMessageProgress?: (tempId: string, progress: number) => void;
+    onFailLocalMessage?: (tempId: string) => void;
 }
 
-export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversationId, disabled, isSending }: MessageInputProps) {
+export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversationId, disabled, isSending, onAddLocalMessage, onUpdateLocalMessageProgress, onFailLocalMessage }: MessageInputProps) {
     const [content, setContent] = useState('');
     const [isRecording, setIsRecording] = useState(false);
     const [uploadWarning, setUploadWarning] = useState(false);
     const [isSendingAudio, setIsSendingAudio] = useState(false);
+
+    // Tracks attachment IDs that have been "sent" as in-chat bubbles (detached from composer)
+    const detachedIdsRef = useRef<Set<string>>(new Set());
+    // Maps attachment ID → { tempId (bubble ID), caption }
+    const pendingSendsRef = useRef<Map<string, { tempId: string; caption: string }>>(new Map());
 
     const {
         attachments,
@@ -55,6 +64,33 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     const audioChunksRef = useRef<Blob[]>([]);
     const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+    // ── Watch attachment progress → update in-chat bubbles (WhatsApp style) ──
+    useEffect(() => {
+        for (const att of attachments) {
+            const pending = pendingSendsRef.current.get(att.id);
+            if (!pending) continue;
+
+            if (att.status === 'uploading' && att.uploadProgress !== undefined) {
+                onUpdateLocalMessageProgress?.(pending.tempId, att.uploadProgress);
+            } else if (att.status === 'uploaded' && att.uploadedUrl) {
+                // Upload done → fire the real API call and clean up
+                const { tempId, caption } = pending;
+                pendingSendsRef.current.delete(att.id);
+                detachedIdsRef.current.delete(att.id);
+                removeAttachment(att.id);
+                onSendMessage(caption, att.uploadedUrl, att.uploadedMediaType ?? undefined, tempId).catch(() => {
+                    onFailLocalMessage?.(tempId);
+                });
+            } else if (att.status === 'failed' || att.status === 'canceled') {
+                const { tempId } = pending;
+                pendingSendsRef.current.delete(att.id);
+                detachedIdsRef.current.delete(att.id);
+                removeAttachment(att.id);
+                onFailLocalMessage?.(tempId);
+            }
+        }
+    }, [attachments]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Auto-resize textarea
     useEffect(() => {
@@ -272,25 +308,93 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         e.target.value = '';
     };
 
-    // Send message (text + any uploaded attachments)
+    // Send message (text + any uploaded/uploading attachments)
     const handleSendWithFile = async () => {
         const hasText = content.trim();
         const hasAttachments = attachments.length > 0;
         if (!hasText && !hasAttachments) return;
         if (disabled || isSending) return;
 
-        // If attachments are still uploading, allow sending a text-only message
-        // but do NOT send the attachments yet — they will remain in the queue.
-        if (isUploading && !hasText) {
-            // Nothing to send: only uploading attachments, no caption yet
-            setUploadWarning(true);
-            setTimeout(() => setUploadWarning(false), 3000);
+        const caption = content.trim();
+
+        // Separate already-uploaded vs still-uploading attachments
+        const uploadedNow = attachments.filter((a) => a.status === 'uploaded' && !detachedIdsRef.current.has(a.id));
+        const uploadingNow = attachments.filter((a) => (a.status === 'uploading' || a.status === 'pending') && !detachedIdsRef.current.has(a.id));
+
+        // ── Detach uploading attachments → inject in-chat bubbles ──
+        if (uploadingNow.length > 0 && onAddLocalMessage) {
+            // Only first one gets the caption; rest are silent
+            uploadingNow.forEach((att, i) => {
+                const tempId = `temp_upload_${att.id}_${Date.now()}`;
+                const bubbleCaption = i === 0 ? caption : '';
+                pendingSendsRef.current.set(att.id, { tempId, caption: bubbleCaption });
+                detachedIdsRef.current.add(att.id);
+
+                // Determine preview src and media type
+                const localPreviewUrl = att.previewUrl ?? undefined;
+                const mediaType = att.fileType === 'image' ? 'image'
+                    : att.fileType === 'video' ? 'video'
+                    : att.fileType === 'audio' ? 'audio'
+                    : 'document';
+
+                onAddLocalMessage({
+                    id: tempId,
+                    user_id: '',
+                    conversation_id: conversationId,
+                    lead_id: null,
+                    contact_id: null,
+                    campaign_id: null,
+                    direction: 'out',
+                    channel: 'whatsapp',
+                    content: bubbleCaption || '',
+                    status: 'pending',
+                    sent_at: new Date().toISOString(),
+                    media_url: undefined,
+                    media_type: mediaType as 'audio' | 'video' | 'image' | 'document',
+                    metadata: {},
+                    created_at: new Date().toISOString(),
+                    localPreviewUrl,
+                    uploadProgress: att.uploadProgress ?? 0,
+                });
+            });
+
+            // Clear text input; the cards will disappear from composer via filter below
+            setContent('');
+            if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        }
+
+        // ── Send already-uploaded attachments immediately ──
+        if (uploadedNow.length > 0) {
+            const captionForUploaded = uploadingNow.length === 0 ? caption : '';
+            setContent('');
+            if (textareaRef.current) textareaRef.current.style.height = 'auto';
+            // Remove uploaded ones from queue
+            uploadedNow.forEach((a) => removeAttachment(a.id));
+
+            try {
+                if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                onTyping(false);
+                await onSendMessage(
+                    captionForUploaded,
+                    uploadedNow[0].uploadedUrl,
+                    uploadedNow[0].uploadedMediaType ?? undefined,
+                );
+                for (let i = 1; i < uploadedNow.length; i++) {
+                    await onSendMessage('', uploadedNow[i].uploadedUrl, uploadedNow[i].uploadedMediaType ?? undefined);
+                }
+            } catch (error) {
+                if (captionForUploaded) setContent(captionForUploaded);
+                console.error('Failed to send', error);
+            }
             return;
         }
 
-        if (isUploading && hasText) {
-            // Send just the text — leave the uploading attachments in the queue
-            const messageToSend = content.trim();
+        // ── Text-only send (no attachments ready) ──
+        if (!hasAttachments || uploadingNow.length > 0) {
+            // If we only had uploading attachments (already detached above) and no text beyond that, done
+            if (!hasText || uploadingNow.length > 0) return;
+
+            const messageToSend = caption;
             setContent('');
             if (textareaRef.current) textareaRef.current.style.height = 'auto';
             try {
@@ -301,54 +405,13 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                 setContent(messageToSend);
                 console.error('Failed to send', error);
             }
-            return;
-        }
-
-        const messageToSend = content.trim();
-        const uploadedAttachments = attachments.filter((a) => a.status === 'uploaded');
-
-        setContent('');
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
-        clearAttachments();
-
-        try {
-            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-            onTyping(false);
-
-            if (uploadedAttachments.length === 0) {
-                // Text-only message
-                await onSendMessage(messageToSend);
-            } else {
-                // First attachment carries the caption text
-                await onSendMessage(
-                    messageToSend,
-                    uploadedAttachments[0].uploadedUrl,
-                    uploadedAttachments[0].uploadedMediaType,
-                );
-                // Remaining attachments sent without caption
-                for (let i = 1; i < uploadedAttachments.length; i++) {
-                    await onSendMessage(
-                        '',
-                        uploadedAttachments[i].uploadedUrl,
-                        uploadedAttachments[i].uploadedMediaType,
-                    );
-                }
-            }
-        } catch (error) {
-            if (messageToSend) setContent(messageToSend);
-            console.error('Failed to send', error);
         }
     };
 
-    const canSend = content.trim() || attachments.length > 0;
-    const isBusy = isSending || isSendingAudio || (isUploading && attachments.length > 0);
+    const canSend = content.trim() || attachments.some(a => !detachedIdsRef.current.has(a.id));
+    const composerAttachments = attachments.filter(a => !detachedIdsRef.current.has(a.id));
+    const isBusy = isSending || isSendingAudio;
     const showRecordingMode = isRecording || audioBlob;
-
-    // Average progress across all actively-uploading attachments (for the send button ring)
-    const uploadingItems = attachments.filter((a) => a.status === 'uploading' || a.status === 'pending');
-    const avgUploadProgress = uploadingItems.length > 0
-        ? Math.round(uploadingItems.reduce((sum, a) => sum + a.uploadProgress, 0) / uploadingItems.length)
-        : 0;
 
     return (
         <div className="transition-colors bg-card">
@@ -443,7 +506,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
             )}
 
             {/* ── Attachment queue (WhatsApp-style cards) ── */}
-            {attachments.length > 0 && (
+            {composerAttachments.length > 0 && (
                 <div className="mx-2 mb-2 space-y-1.5">
                     {/* Upload warning */}
                     {uploadWarning && (
@@ -455,7 +518,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
 
                     {/* Scrollable horizontal card list */}
                     <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
-                        {attachments.map((att) => (
+                        {composerAttachments.map((att) => (
                             <AttachmentPreviewCard
                                 key={att.id}
                                 attachment={att}
@@ -563,14 +626,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                         <button
                             onClick={handleSendWithFile}
                             disabled={disabled || isSending}
-                            title={
-                                isUploading && !content.trim()
-                                    ? `A carregar ficheiro... (${avgUploadProgress}%)`
-                                    : isUploading
-                                    ? 'Enviar mensagem (o ficheiro envia quando terminar)'
-                                    : undefined
-                            }
-                            className={`relative p-2.5 rounded-xl text-white transition-all active:scale-95 flex items-center justify-center
+                            className={`p-2.5 rounded-xl text-white transition-all active:scale-95 flex items-center justify-center
                                 ${(disabled || isSending) ? 'opacity-50 cursor-not-allowed bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}
                             `}
                         >
@@ -578,26 +634,6 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                                 <Loader2 size={20} className="animate-spin" />
                             ) : (
                                 <Send size={20} className="ml-0.5" />
-                            )}
-                            {/* SVG progress ring — shows around the button while upload is in progress */}
-                            {isUploading && !isSending && (
-                                <svg
-                                    className="absolute inset-0 w-full h-full pointer-events-none"
-                                    viewBox="0 0 46 46"
-                                    style={{ transform: 'rotate(-90deg)' }}
-                                    aria-hidden="true"
-                                >
-                                    <circle cx="23" cy="23" r="20" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="3" />
-                                    <circle
-                                        cx="23" cy="23" r="20"
-                                        fill="none"
-                                        stroke="white"
-                                        strokeWidth="3"
-                                        strokeLinecap="round"
-                                        strokeDasharray={`${(avgUploadProgress / 100) * 125.6} 125.6`}
-                                        style={{ transition: 'stroke-dasharray 0.4s ease' }}
-                                    />
-                                </svg>
                             )}
                         </button>
                     ) : !showRecordingMode && (

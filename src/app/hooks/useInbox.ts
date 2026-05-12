@@ -72,6 +72,9 @@ export function useInbox(options: UseInboxOptions = {}) {
         sendMessage,
         sendAudio,
         addMessage,
+        addLocalMessage,
+        updateLocalMessageProgress,
+        failLocalMessage,
         updateMessageStatus,
         refreshMessages,
         scrollToBottom
@@ -168,11 +171,11 @@ export function useInbox(options: UseInboxOptions = {}) {
         }
     }, [markConversationAsRead, wsMarkAsRead]);
 
-    const handleSendMessage = useCallback(async (content: string, mediaUrl?: string, mediaType?: string) => {
+    const handleSendMessage = useCallback(async (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string) => {
         if (!selectedConversation) return;
 
         try {
-            await sendMessage(content, mediaUrl, mediaType);
+            await sendMessage(content, mediaUrl, mediaType, replaceTempId);
             // Notify App-level usage counters to refresh after a message is sent
             window.dispatchEvent(new CustomEvent('leadflow:usage-changed'));
         } catch (error: any) {
@@ -213,6 +216,9 @@ export function useInbox(options: UseInboxOptions = {}) {
         scrollContainerRef,
         sendMessage: handleSendMessage,
         sendAudio,
+        addLocalMessage,
+        updateLocalMessageProgress,
+        failLocalMessage,
         refreshMessages,
         scrollToBottom,
 

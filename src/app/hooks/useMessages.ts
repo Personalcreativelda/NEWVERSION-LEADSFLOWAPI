@@ -67,34 +67,41 @@ export function useMessages(conversationId: string | null) {
     }, [conversationId]);
 
     // Envio otimista - mostra mensagem imediatamente
-    const sendMessage = useCallback(async (content: string, mediaUrl?: string, mediaType?: string) => {
+    const sendMessage = useCallback(async (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string) => {
         // Permite envio de mídia sem texto
         if (!conversationId || (!content.trim() && !mediaUrl)) return;
 
-        const tempId = generateTempId();
+        const tempId = replaceTempId ?? generateTempId();
         
-        // Criar mensagem otimista (temporária)
-        const optimisticMessage: MessageWithSender = {
-            id: tempId,
-            user_id: '',
-            conversation_id: conversationId,
-            lead_id: null,
-            contact_id: null,
-            campaign_id: null,
-            direction: 'out',
-            channel: 'whatsapp',
-            content: content.trim() || (mediaUrl ? '📎 Mídia' : ''),
-            status: 'pending',
-            sent_at: new Date().toISOString(),
-            media_url: mediaUrl,
-            media_type: mediaType as 'audio' | 'video' | 'image' | 'document' | undefined,
-            metadata: {},
-            created_at: new Date().toISOString(),
-        };
-
-        // Adicionar mensagem otimista imediatamente
-        setMessages(prev => [...prev, optimisticMessage]);
-        setTimeout(() => scrollToBottom(), 50);
+        if (!replaceTempId) {
+            // Criar e injectar mensagem otimista nova
+            const optimisticMessage: MessageWithSender = {
+                id: tempId,
+                user_id: '',
+                conversation_id: conversationId,
+                lead_id: null,
+                contact_id: null,
+                campaign_id: null,
+                direction: 'out',
+                channel: 'whatsapp',
+                content: content.trim() || (mediaUrl ? '📎 Mídia' : ''),
+                status: 'pending',
+                sent_at: new Date().toISOString(),
+                media_url: mediaUrl,
+                media_type: mediaType as 'audio' | 'video' | 'image' | 'document' | undefined,
+                metadata: {},
+                created_at: new Date().toISOString(),
+            };
+            setMessages(prev => [...prev, optimisticMessage]);
+            setTimeout(() => scrollToBottom(), 50);
+        } else {
+            // Bubble já existe — actualizar para 'pending' com a URL real
+            setMessages(prev => prev.map(m =>
+                m.id === replaceTempId
+                    ? { ...m, status: 'pending', uploadProgress: undefined, media_url: mediaUrl, localPreviewUrl: undefined }
+                    : m
+            ));
+        }
 
         try {
             setSending(true);
@@ -188,6 +195,32 @@ export function useMessages(conversationId: string | null) {
             setSending(false);
         }
     }, [conversationId]);
+
+    /**
+     * Inject a locally-created message into the chat without hitting the API.
+     * Used to show an uploading-attachment bubble immediately in the chat.
+     */
+    const addLocalMessage = useCallback((message: MessageWithSender) => {
+        setMessages(prev => {
+            if (prev.some(m => m.id === message.id)) return prev;
+            return [...prev, message];
+        });
+        setTimeout(() => scrollToBottom(), 50);
+    }, [scrollToBottom]);
+
+    /** Update the upload progress displayed inside an optimistic message bubble. */
+    const updateLocalMessageProgress = useCallback((tempId: string, progress: number) => {
+        setMessages(prev =>
+            prev.map(m => m.id === tempId ? { ...m, uploadProgress: progress } : m)
+        );
+    }, []);
+
+    /** Mark a local-only message as failed (e.g. upload error). */
+    const failLocalMessage = useCallback((tempId: string) => {
+        setMessages(prev =>
+            prev.map(m => m.id === tempId ? { ...m, status: 'failed', uploadProgress: undefined } : m)
+        );
+    }, []);
 
     const addMessage = useCallback((message: MessageWithSender) => {
         // Write-through to cache for the conversation this message belongs to
@@ -337,6 +370,9 @@ export function useMessages(conversationId: string | null) {
         sendMessage,
         sendAudio,
         addMessage,
+        addLocalMessage,
+        updateLocalMessageProgress,
+        failLocalMessage,
         updateMessageStatus,
         refreshMessages: fetchMessages,
         scrollToBottom

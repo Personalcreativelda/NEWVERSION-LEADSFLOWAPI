@@ -43,6 +43,9 @@ export default function InboxConversations({
         scrollContainerRef,
         sendMessage,
         sendAudio,
+        addLocalMessage,
+        updateLocalMessageProgress,
+        failLocalMessage,
         wsConnected,
         lastUpdate
     } = useInbox();
@@ -830,6 +833,9 @@ export default function InboxConversations({
                         scrollContainerRef={scrollContainerRef}
                         onSendMessage={sendMessage}
                         onSendAudio={sendAudio}
+                        onAddLocalMessage={addLocalMessage}
+                        onUpdateLocalMessageProgress={updateLocalMessageProgress}
+                        onFailLocalMessage={failLocalMessage}
                         /* layout control buttons passed as slot */
                         layoutControls={
                             !isMobile ? (

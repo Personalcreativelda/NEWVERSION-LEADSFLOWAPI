@@ -181,6 +181,10 @@ export interface MessageWithSender extends Message {
         name: string;
         avatar_url?: string;
     };
+    /** Object URL for local preview while the attachment is still uploading (optimistic bubble) */
+    localPreviewUrl?: string;
+    /** 0–100 upload progress; only present while status === 'uploading' in an optimistic bubble */
+    uploadProgress?: number;
 }
 
 // WebSocket event types

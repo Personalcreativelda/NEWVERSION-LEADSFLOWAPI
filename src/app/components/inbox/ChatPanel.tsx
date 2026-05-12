@@ -18,8 +18,11 @@ interface ChatPanelProps {
     messagesError?: string | null;
     sending?: boolean;
     messagesEndRef?: React.RefObject<HTMLDivElement>;
-    onSendMessage?: (content: string, mediaUrl?: string, mediaType?: string) => Promise<void>;
+    onSendMessage?: (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string) => Promise<void>;
     onSendAudio?: (audioBlob: Blob) => Promise<void>;
+    onAddLocalMessage?: (message: import('../../types/inbox').MessageWithSender) => void;
+    onUpdateLocalMessageProgress?: (tempId: string, progress: number) => void;
+    onFailLocalMessage?: (tempId: string) => void;
     /** Optional layout control buttons rendered inside the chat header */
     layoutControls?: React.ReactNode;
     /** Ref to attach to the scroll container for position save/restore */
@@ -39,7 +42,10 @@ export function ChatPanel({
     onSendMessage,
     layoutControls,
     onSendAudio,
-    scrollContainerRef
+    scrollContainerRef,
+    onAddLocalMessage,
+    onUpdateLocalMessageProgress,
+    onFailLocalMessage
 }: ChatPanelProps) {
     const [isTyping, setIsTyping] = useState(false);
     const [searchHighlight, setSearchHighlight] = useState<string>('');
@@ -149,6 +155,9 @@ export function ChatPanel({
                     onTyping={handleTyping}
                     isSending={sending}
                     conversationId={conversation.id}
+                    onAddLocalMessage={onAddLocalMessage}
+                    onUpdateLocalMessageProgress={onUpdateLocalMessageProgress}
+                    onFailLocalMessage={onFailLocalMessage}
                 />
             </div>
         </div>

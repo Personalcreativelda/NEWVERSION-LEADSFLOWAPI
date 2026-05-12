@@ -1,6 +1,7 @@
 // INBOX: Componente de mensagem individual
 import React, { useState, useMemo } from 'react';
 import type { MessageWithSender } from '../../types/inbox';
+import { UploadProgressIndicator } from './UploadProgressIndicator';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -97,6 +98,9 @@ export function MessageBubble({ message, isFirstInGroup = true, isLastInGroup = 
     };
 
     const hasValidMedia = isValidMediaUrl(message.media_url);
+    // While uploading, localPreviewUrl is the blob URL to show as thumbnail
+    const isUploading = message.uploadProgress !== undefined;
+    const displayUrl = isUploading && message.localPreviewUrl ? message.localPreviewUrl : null;
 
     // URL da imagem: tentar original primeiro, depois proxy
     const imageUrl = useMemo(() => {
@@ -171,8 +175,46 @@ export function MessageBubble({ message, isFirstInGroup = true, isLastInGroup = 
                         : 'bg-white text-[#111b21] dark:bg-[#202c33] dark:text-[#e9edef]'
                 }`}
             >
+                {/* Upload-in-progress preview (WhatsApp style) */}
+                {isUploading && (
+                    <div className="mb-2">
+                        <div className="relative rounded-md overflow-hidden">
+                            {displayUrl && message.media_type !== 'audio' && message.media_type !== 'document' ? (
+                                message.media_type === 'video' ? (
+                                    <video
+                                        src={displayUrl}
+                                        className="w-full max-h-64 object-cover"
+                                        muted
+                                        preload="metadata"
+                                    />
+                                ) : (
+                                    <img
+                                        src={displayUrl}
+                                        alt="Enviando..."
+                                        className="w-full max-h-64 object-cover"
+                                    />
+                                )
+                            ) : (
+                                <div className="w-full h-32 bg-muted/60 rounded-md flex items-center justify-center">
+                                    <svg className="w-8 h-8 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                    </svg>
+                                </div>
+                            )}
+                            {/* Semi-transparent overlay with circular progress */}
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-md">
+                                <UploadProgressIndicator
+                                    progress={message.uploadProgress ?? 0}
+                                    size={48}
+                                    strokeWidth={3.5}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Media Content */}
-                {hasValidMedia && (
+                {hasValidMedia && !isUploading && (
                     <div className="mb-2">
                         {(effectiveMediaType === 'image' || effectiveMediaType === 'sticker') && !imageError ? (
                             <img
