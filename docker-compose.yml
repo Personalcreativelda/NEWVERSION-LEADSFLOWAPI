@@ -4,7 +4,7 @@ services:
   api:
     build: ./api
     ports:
-      - "${API_PORT:-4000}:4000"
+      - "${API_PORT:-4001}:4001"
     env_file: .env
     environment:
       - PG_HOST=${PG_HOST}
@@ -13,7 +13,7 @@ services:
       - PG_USER=${PG_USER}
       - PG_PASSWORD=${PG_PASSWORD}
       - PG_SSL=${PG_SSL:-false}
-      - PORT=4000
+      - PORT=4001
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
       - EVOLUTION_API_URL=${EVOLUTION_API_URL:-}

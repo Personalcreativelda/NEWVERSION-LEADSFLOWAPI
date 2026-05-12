@@ -20,6 +20,6 @@ RUN --mount=type=cache,target=/root/.npm \
 
 COPY --from=build /app/dist ./dist
 
-EXPOSE 4000
+EXPOSE 4001
 ENV NODE_ENV=production
 CMD ["node", "dist/index.js"]

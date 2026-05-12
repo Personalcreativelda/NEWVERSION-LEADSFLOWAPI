@@ -16,7 +16,7 @@ import { emailPollingService } from './services/email-polling.service';
 import { planExpirationService } from './services/plan-expiration.service';
 
 const app = express();
-const port = Number(process.env.PORT || 4000);
+const port = Number(process.env.PORT || 4001);
 
 app.use(helmet());
 app.use(corsMiddleware);
