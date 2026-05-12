@@ -7,15 +7,14 @@ import {
     Image as ImageIcon,
     Loader2,
     Mic,
-    X,
-    File,
-    Video,
-    Music,
     Square,
     Trash2,
-    Sparkles
+    Sparkles,
+    AlertCircle
 } from 'lucide-react';
-import { inboxApi, UploadResponse } from '../../services/api/inbox';
+import { inboxApi } from '../../services/api/inbox';
+import { useUploadQueue } from '../../hooks/useUploadQueue';
+import { AttachmentPreviewCard } from './AttachmentPreviewCard';
 
 interface MessageInputProps {
     onSendMessage: (content: string, mediaUrl?: string, mediaType?: string) => Promise<void>;
@@ -26,17 +25,20 @@ interface MessageInputProps {
     isSending?: boolean;
 }
 
-interface SelectedFile {
-    file: File;
-    preview: string | null;
-    type: 'image' | 'video' | 'audio' | 'document';
-}
-
 export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversationId, disabled, isSending }: MessageInputProps) {
     const [content, setContent] = useState('');
-    const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
-    const [isUploading, setIsUploading] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
+    const [uploadWarning, setUploadWarning] = useState(false);
+
+    const {
+        attachments,
+        addFiles,
+        removeAttachment,
+        retryUpload,
+        clearAttachments,
+        allUploadsCompleted,
+        isUploading,
+    } = useUploadQueue();
     const [recordingTime, setRecordingTime] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -259,109 +261,68 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         }
     };
 
-    // Handle file selection
-    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, isImageOnly: boolean = false) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        // Determine file type
-        let type: SelectedFile['type'] = 'document';
-        if (file.type.startsWith('image/')) {
-            type = 'image';
-        } else if (file.type.startsWith('video/')) {
-            type = 'video';
-        } else if (file.type.startsWith('audio/')) {
-            type = 'audio';
+    // Handle file selection — feeds files straight into the upload queue
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            addFiles(files);
         }
-
-        // Create preview for images and videos
-        let preview: string | null = null;
-        if (type === 'image' || type === 'video') {
-            preview = URL.createObjectURL(file);
-        }
-
-        setSelectedFile({ file, preview, type });
-
-        // Clear the input
+        // Reset input so the same file can be selected again
         e.target.value = '';
     };
 
-    // Clear selected file
-    const clearSelectedFile = () => {
-        if (selectedFile?.preview) {
-            URL.revokeObjectURL(selectedFile.preview);
-        }
-        setSelectedFile(null);
-    };
-
-    // Upload file and send message
+    // Send message (text + any uploaded attachments)
     const handleSendWithFile = async () => {
-        if (!selectedFile && !content.trim()) return;
-        if (disabled || isSending || isUploading) return;
+        const hasText = content.trim();
+        const hasAttachments = attachments.length > 0;
+        if (!hasText && !hasAttachments) return;
+        if (disabled || isSending) return;
 
-        // Só enviar texto se o usuário digitou algo (legenda opcional)
+        // Guard: don't send while files are still uploading
+        if (!allUploadsCompleted) {
+            setUploadWarning(true);
+            setTimeout(() => setUploadWarning(false), 3000);
+            return;
+        }
+
         const messageToSend = content.trim();
-        const fileToUpload = selectedFile;
+        const uploadedAttachments = attachments.filter((a) => a.status === 'uploaded');
 
         setContent('');
         if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        clearAttachments();
 
         try {
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
             onTyping(false);
 
-            let mediaUrl: string | undefined;
-            let mediaType: string | undefined;
-
-            // Upload file if present
-            if (fileToUpload) {
-                setIsUploading(true);
-                try {
-                    const uploadResult = await inboxApi.uploadFile(fileToUpload.file);
-                    mediaUrl = uploadResult.url;
-                    mediaType = uploadResult.media_type;
-                    console.log('[MessageInput] File uploaded:', uploadResult);
-                } catch (uploadError) {
-                    console.error('[MessageInput] Upload failed:', uploadError);
-                    throw new Error('Falha ao fazer upload do arquivo');
-                } finally {
-                    setIsUploading(false);
+            if (uploadedAttachments.length === 0) {
+                // Text-only message
+                await onSendMessage(messageToSend);
+            } else {
+                // First attachment carries the caption text
+                await onSendMessage(
+                    messageToSend,
+                    uploadedAttachments[0].uploadedUrl,
+                    uploadedAttachments[0].uploadedMediaType,
+                );
+                // Remaining attachments sent without caption
+                for (let i = 1; i < uploadedAttachments.length; i++) {
+                    await onSendMessage(
+                        '',
+                        uploadedAttachments[i].uploadedUrl,
+                        uploadedAttachments[i].uploadedMediaType,
+                    );
                 }
             }
-
-            // Clear file selection
-            clearSelectedFile();
-
-            // Send message with media
-            await onSendMessage(messageToSend, mediaUrl, mediaType);
         } catch (error) {
-            // Restore content only if there was content
-            if (messageToSend) {
-                setContent(messageToSend);
-            }
+            if (messageToSend) setContent(messageToSend);
             console.error('Failed to send', error);
         }
     };
 
-    // Get file icon based on type
-    const getFileIcon = (type: SelectedFile['type']) => {
-        switch (type) {
-            case 'image': return <ImageIcon size={24} />;
-            case 'video': return <Video size={24} />;
-            case 'audio': return <Music size={24} />;
-            default: return <File size={24} />;
-        }
-    };
-
-    // Format file size
-    const formatFileSize = (bytes: number): string => {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    };
-
-    const canSend = content.trim() || selectedFile;
-    const isBusy = isSending || isUploading;
+    const canSend = content.trim() || attachments.length > 0;
+    const isBusy = isSending || (isUploading && attachments.length > 0);
     const showRecordingMode = isRecording || audioBlob;
 
     return (
@@ -372,14 +333,16 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                 type="file"
                 className="hidden"
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,image/*,video/*,audio/*"
-                onChange={(e) => handleFileSelect(e, false)}
+                onChange={handleFileSelect}
+                multiple
             />
             <input
                 ref={imageInputRef}
                 type="file"
                 className="hidden"
                 accept="image/*"
-                onChange={(e) => handleFileSelect(e, true)}
+                onChange={handleFileSelect}
+                multiple
             />
 
             {/* Recording Mode UI */}
@@ -454,49 +417,28 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                 </div>
             )}
 
-            {/* File preview */}
-            {selectedFile && (
-                <div 
-                    className="mx-2 mb-2 p-3 rounded-xl border border-border bg-muted flex items-center gap-3"
-                >
-                    {/* Preview or icon */}
-                    <div className="flex-shrink-0">
-                        {selectedFile.preview && selectedFile.type === 'image' ? (
-                            <img 
-                                src={selectedFile.preview} 
-                                alt="Preview" 
-                                className="w-16 h-16 object-cover rounded-lg"
-                            />
-                        ) : selectedFile.preview && selectedFile.type === 'video' ? (
-                            <video 
-                                src={selectedFile.preview} 
-                                className="w-16 h-16 object-cover rounded-lg"
-                            />
-                        ) : (
-                            <div className="w-16 h-16 flex items-center justify-center rounded-lg bg-primary/10">
-                                {getFileIcon(selectedFile.type)}
-                            </div>
-                        )}
-                    </div>
+            {/* ── Attachment queue (WhatsApp-style cards) ── */}
+            {attachments.length > 0 && (
+                <div className="mx-2 mb-2 space-y-1.5">
+                    {/* Upload warning */}
+                    {uploadWarning && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-medium">
+                            <AlertCircle size={13} />
+                            Aguarde o upload terminar antes de enviar.
+                        </div>
+                    )}
 
-                    {/* File info */}
-                    <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate text-foreground">
-                            {selectedFile.file.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                            {formatFileSize(selectedFile.file.size)} • {selectedFile.type.toUpperCase()}
-                        </p>
+                    {/* Scrollable horizontal card list */}
+                    <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                        {attachments.map((att) => (
+                            <AttachmentPreviewCard
+                                key={att.id}
+                                attachment={att}
+                                onRemove={removeAttachment}
+                                onRetry={retryUpload}
+                            />
+                        ))}
                     </div>
-
-                    {/* Remove button */}
-                    <button
-                        onClick={clearSelectedFile}
-                        disabled={isBusy}
-                        className="p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/20 text-muted-foreground/70 hover:text-red-500 transition-colors"
-                    >
-                        <X size={18} />
-                    </button>
                 </div>
             )}
 
@@ -506,7 +448,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                 <div className="flex items-center gap-1 mb-1">
                     <button
                         onClick={() => fileInputRef.current?.click()}
-                        disabled={disabled || isBusy || showRecordingMode}
+                        disabled={disabled || isSending || showRecordingMode}
                         className="p-2 rounded-lg transition-all duration-150 disabled:opacity-50 hover:bg-muted text-muted-foreground"
                         title="Anexar arquivo"
                     >
@@ -514,7 +456,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                     </button>
                     <button
                         onClick={() => imageInputRef.current?.click()}
-                        disabled={disabled || isBusy || showRecordingMode}
+                        disabled={disabled || isSending || showRecordingMode}
                         className="p-2 rounded-lg transition-all duration-150 disabled:opacity-50 hover:bg-muted text-muted-foreground"
                         title="Enviar imagem"
                     >
@@ -534,8 +476,8 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                                 handleSendWithFile();
                             }
                         }}
-                        disabled={disabled || isBusy || showRecordingMode}
-                        placeholder={selectedFile ? "Adicione uma legenda (opcional)..." : showRecordingMode ? "Gravando áudio..." : "Escreva sua mensagem..."}
+                        disabled={disabled || isSending || showRecordingMode}
+                        placeholder={attachments.length > 0 ? "Adicione uma legenda (opcional)..." : showRecordingMode ? "Gravando áudio..." : "Escreva sua mensagem..."}
                         rows={1}
                         className="w-full bg-transparent border-none focus:ring-0 text-sm text-foreground resize-none max-h-[120px] py-1.5 scrollbar-none outline-none overflow-y-auto"
                     />
@@ -595,13 +537,16 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                     {canSend && !showRecordingMode ? (
                         <button
                             onClick={handleSendWithFile}
-                            disabled={disabled || isBusy}
+                            disabled={disabled || isSending}
+                            title={!allUploadsCompleted ? 'Aguarde o upload terminar' : undefined}
                             className={`p-2.5 rounded-xl text-white transition-all active:scale-95 flex items-center justify-center
-                                ${(disabled || isBusy) ? 'opacity-50 cursor-not-allowed bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}
+                                ${(disabled || isSending) ? 'opacity-50 cursor-not-allowed bg-blue-400' : !allUploadsCompleted ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'}
                             `}
                         >
-                            {isBusy ? (
+                            {isSending ? (
                                 <Loader2 size={20} className="animate-spin" />
+                            ) : isUploading ? (
+                                <Loader2 size={20} className="animate-spin opacity-70" />
                             ) : (
                                 <Send size={20} className="ml-0.5" />
                             )}
