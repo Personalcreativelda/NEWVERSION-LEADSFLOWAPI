@@ -2,7 +2,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --prefer-offline && npm cache clean --force
+RUN npm install --legacy-peer-deps && npm cache clean --force
 
 COPY . .
 RUN npm run build
@@ -12,7 +12,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production --prefer-offline && npm cache clean --force
+RUN npm install --omit=dev --legacy-peer-deps && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
 
