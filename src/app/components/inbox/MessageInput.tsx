@@ -279,10 +279,28 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         if (!hasText && !hasAttachments) return;
         if (disabled || isSending) return;
 
-        // Guard: don't send while files are still uploading (failed/canceled do not block)
-        if (isUploading) {
+        // If attachments are still uploading, allow sending a text-only message
+        // but do NOT send the attachments yet — they will remain in the queue.
+        if (isUploading && !hasText) {
+            // Nothing to send: only uploading attachments, no caption yet
             setUploadWarning(true);
             setTimeout(() => setUploadWarning(false), 3000);
+            return;
+        }
+
+        if (isUploading && hasText) {
+            // Send just the text — leave the uploading attachments in the queue
+            const messageToSend = content.trim();
+            setContent('');
+            if (textareaRef.current) textareaRef.current.style.height = 'auto';
+            try {
+                if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                onTyping(false);
+                await onSendMessage(messageToSend);
+            } catch (error) {
+                setContent(messageToSend);
+                console.error('Failed to send', error);
+            }
             return;
         }
 
@@ -325,6 +343,12 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     const canSend = content.trim() || attachments.length > 0;
     const isBusy = isSending || isSendingAudio || (isUploading && attachments.length > 0);
     const showRecordingMode = isRecording || audioBlob;
+
+    // Average progress across all actively-uploading attachments (for the send button ring)
+    const uploadingItems = attachments.filter((a) => a.status === 'uploading' || a.status === 'pending');
+    const avgUploadProgress = uploadingItems.length > 0
+        ? Math.round(uploadingItems.reduce((sum, a) => sum + a.uploadProgress, 0) / uploadingItems.length)
+        : 0;
 
     return (
         <div className="transition-colors bg-card">
@@ -425,7 +449,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                     {uploadWarning && (
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-medium">
                             <AlertCircle size={13} />
-                            Aguarde o upload terminar antes de enviar.
+                            Escreva uma legenda ou aguarde o upload para enviar o ficheiro.
                         </div>
                     )}
 
@@ -539,17 +563,41 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                         <button
                             onClick={handleSendWithFile}
                             disabled={disabled || isSending}
-                            title={isUploading ? 'Aguarde o upload terminar' : undefined}
-                            className={`p-2.5 rounded-xl text-white transition-all active:scale-95 flex items-center justify-center
-                                ${(disabled || isSending) ? 'opacity-50 cursor-not-allowed bg-blue-400' : isUploading ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'}
+                            title={
+                                isUploading && !content.trim()
+                                    ? `A carregar ficheiro... (${avgUploadProgress}%)`
+                                    : isUploading
+                                    ? 'Enviar mensagem (o ficheiro envia quando terminar)'
+                                    : undefined
+                            }
+                            className={`relative p-2.5 rounded-xl text-white transition-all active:scale-95 flex items-center justify-center
+                                ${(disabled || isSending) ? 'opacity-50 cursor-not-allowed bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}
                             `}
                         >
                             {isSending ? (
                                 <Loader2 size={20} className="animate-spin" />
-                            ) : isUploading ? (
-                                <Loader2 size={20} className="animate-spin opacity-70" />
                             ) : (
                                 <Send size={20} className="ml-0.5" />
+                            )}
+                            {/* SVG progress ring — shows around the button while upload is in progress */}
+                            {isUploading && !isSending && (
+                                <svg
+                                    className="absolute inset-0 w-full h-full pointer-events-none"
+                                    viewBox="0 0 46 46"
+                                    style={{ transform: 'rotate(-90deg)' }}
+                                    aria-hidden="true"
+                                >
+                                    <circle cx="23" cy="23" r="20" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="3" />
+                                    <circle
+                                        cx="23" cy="23" r="20"
+                                        fill="none"
+                                        stroke="white"
+                                        strokeWidth="3"
+                                        strokeLinecap="round"
+                                        strokeDasharray={`${(avgUploadProgress / 100) * 125.6} 125.6`}
+                                        style={{ transition: 'stroke-dasharray 0.4s ease' }}
+                                    />
+                                </svg>
                             )}
                         </button>
                     ) : !showRecordingMode && (
