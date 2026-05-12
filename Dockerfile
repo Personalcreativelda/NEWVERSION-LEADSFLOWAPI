@@ -11,7 +11,7 @@ ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
 
 # Install dependencies — clean npm cache in same layer to minimise image size
 COPY package*.json ./
-RUN npm ci --prefer-offline && npm cache clean --force
+RUN npm install --legacy-peer-deps && npm cache clean --force
 
 # Copy only frontend sources (api/ is excluded via .dockerignore)
 COPY . .
