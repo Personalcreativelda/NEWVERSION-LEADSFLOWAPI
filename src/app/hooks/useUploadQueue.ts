@@ -212,10 +212,14 @@ export function useUploadQueue(): UseUploadQueueReturn {
   // Derived state
   // ---------------------------------------------------------------------------
 
+  /** True when every attachment is in a terminal state: uploaded, canceled, or failed */
   const allUploadsCompleted =
     attachments.length === 0 ||
-    attachments.every((a) => a.status === 'uploaded' || a.status === 'canceled');
+    attachments.every(
+      (a) => a.status === 'uploaded' || a.status === 'canceled' || a.status === 'failed',
+    );
 
+  /** True while any attachment is still pending or actively uploading */
   const isUploading = attachments.some(
     (a) => a.status === 'uploading' || a.status === 'pending',
   );

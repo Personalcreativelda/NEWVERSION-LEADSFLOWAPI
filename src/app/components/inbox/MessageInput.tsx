@@ -29,6 +29,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     const [content, setContent] = useState('');
     const [isRecording, setIsRecording] = useState(false);
     const [uploadWarning, setUploadWarning] = useState(false);
+    const [isSendingAudio, setIsSendingAudio] = useState(false);
 
     const {
         attachments,
@@ -179,7 +180,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
             return;
         }
         
-        setIsUploading(true);
+        setIsSendingAudio(true);
         try {
             if (onSendAudio) {
                 await onSendAudio(audioBlob);
@@ -192,7 +193,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
             console.error('Failed to send audio:', error);
             alert('Erro ao enviar áudio. Tente novamente.');
         } finally {
-            setIsUploading(false);
+            setIsSendingAudio(false);
         }
     };
 
@@ -278,8 +279,8 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         if (!hasText && !hasAttachments) return;
         if (disabled || isSending) return;
 
-        // Guard: don't send while files are still uploading
-        if (!allUploadsCompleted) {
+        // Guard: don't send while files are still uploading (failed/canceled do not block)
+        if (isUploading) {
             setUploadWarning(true);
             setTimeout(() => setUploadWarning(false), 3000);
             return;
@@ -322,7 +323,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     };
 
     const canSend = content.trim() || attachments.length > 0;
-    const isBusy = isSending || (isUploading && attachments.length > 0);
+    const isBusy = isSending || isSendingAudio || (isUploading && attachments.length > 0);
     const showRecordingMode = isRecording || audioBlob;
 
     return (
@@ -538,9 +539,9 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                         <button
                             onClick={handleSendWithFile}
                             disabled={disabled || isSending}
-                            title={!allUploadsCompleted ? 'Aguarde o upload terminar' : undefined}
+                            title={isUploading ? 'Aguarde o upload terminar' : undefined}
                             className={`p-2.5 rounded-xl text-white transition-all active:scale-95 flex items-center justify-center
-                                ${(disabled || isSending) ? 'opacity-50 cursor-not-allowed bg-blue-400' : !allUploadsCompleted ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'}
+                                ${(disabled || isSending) ? 'opacity-50 cursor-not-allowed bg-blue-400' : isUploading ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'}
                             `}
                         >
                             {isSending ? (
