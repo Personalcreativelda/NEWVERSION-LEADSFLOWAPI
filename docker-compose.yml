@@ -4,7 +4,7 @@ services:
   api:
     build: ./api
     ports:
-      - "${API_PORT:-4000}:4000"
+      - "${API_PORT:-4001}:4001"
     env_file: .env
     environment:
       - PG_HOST=${PG_HOST}
