@@ -153,7 +153,8 @@ export const conversationsApi = {
     }): Promise<Message> {
         const { data } = await api.post<Message>(
             `/inbox/conversations/${conversationId}/send`,
-            payload
+            payload,
+            { timeout: 60_000 } // 60s — gives server time to forward media via Evolution API
         );
         return data;
     },
@@ -293,15 +294,15 @@ export const inboxApi = {
 
     /**
      * Faz upload de arquivo para o inbox (imagens, vídeos, documentos, áudio)
+     * Timeout: 3 min para vídeos grandes.
      */
     async uploadFile(file: File): Promise<UploadResponse> {
         const formData = new FormData();
         formData.append('file', file);
-        
+
         const { data } = await api.post<UploadResponse>('/inbox/upload', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 180_000, // 3 minutes — covers large videos on slow connections
         });
         return data;
     },

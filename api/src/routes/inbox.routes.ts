@@ -275,10 +275,33 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    // Inbox media MUST be stored at an HTTP URL — WhatsApp/Evolution API cannot accept data: URIs.
+    // Reject early if MinIO is not configured so the frontend shows a clear error instead of hanging.
+    const accessKey = process.env.MINIO_ACCESS_KEY || process.env.SERVICE_USER_MINIO;
+    const secretKey = process.env.MINIO_SECRET_KEY || process.env.SERVICE_PASSWORD_MINIO;
+    const minioConfigured = Boolean(process.env.MINIO_ENDPOINT && accessKey && secretKey);
+
+    if (!minioConfigured) {
+      console.error('[Inbox Upload] MinIO não configurado — impossível enviar arquivo via WhatsApp');
+      return res.status(503).json({
+        error: 'Armazenamento de arquivos não configurado. Configure o MinIO no servidor para enviar imagens e vídeos pelo WhatsApp.',
+        code: 'STORAGE_NOT_CONFIGURED',
+      });
+    }
+
     console.log('[Inbox Upload] Uploading file:', req.file.originalname, 'type:', req.file.mimetype, 'size:', req.file.size);
 
     const storageService = getStorageService();
     const mediaUrl = await storageService.uploadFile(req.file, 'inbox-media', user.id);
+
+    // Guard: if the upload silently fell back to a data: URI, reject it — WhatsApp can't use it
+    if (mediaUrl.startsWith('data:')) {
+      console.error('[Inbox Upload] MinIO upload failed — received data: URI fallback, rejecting');
+      return res.status(500).json({
+        error: 'Falha ao armazenar arquivo no servidor. Verifique as credenciais do MinIO.',
+        code: 'STORAGE_UPLOAD_FAILED',
+      });
+    }
 
     // Determine media type from mime type
     let mediaType = 'document';

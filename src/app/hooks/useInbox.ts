@@ -168,21 +168,16 @@ export function useInbox(options: UseInboxOptions = {}) {
         }
     }, [markConversationAsRead, wsMarkAsRead]);
 
-    const handleSendMessage = useCallback(async (content: string, mediaUrl?: string, mediaType?: string) => {
+    const handleSendMessage = useCallback((
+        content: string,
+        mediaUrl?: string,
+        mediaType?: string,
+        displayUrl?: string,
+        uploadPromise?: Promise<string | null>
+    ) => {
         if (!selectedConversation) return;
-
-        try {
-            await sendMessage(content, mediaUrl, mediaType);
-            // Notify App-level usage counters to refresh after a message is sent
-            window.dispatchEvent(new CustomEvent('leadflow:usage-changed'));
-        } catch (error: any) {
-            console.error('[useInbox] Erro ao enviar mensagem:', error);
-            // If plan limit reached, trigger upgrade modal
-            if (error?.response?.status === 429 || error?.response?.data?.upgrade || error?.message?.includes('Limite')) {
-                window.dispatchEvent(new CustomEvent('leadflow:show-upgrade'));
-            }
-            throw error;
-        }
+        // sendMessage is fire-and-forget — events and errors handled inside useMessages
+        sendMessage(content, mediaUrl, mediaType, displayUrl, uploadPromise);
     }, [selectedConversation, sendMessage]);
 
     const handleTyping = useCallback((isTyping: boolean) => {
