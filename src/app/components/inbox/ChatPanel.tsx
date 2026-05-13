@@ -4,6 +4,7 @@ import { ChatHeader } from './ChatHeader';
 import { ChatBackground } from './ChatBackground';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
+import { ForwardMessageModal } from './ForwardMessageModal';
 import type { ConversationWithDetails, MessageWithSender } from '../../types/inbox';
 import { Loader2 } from 'lucide-react';
 
@@ -23,6 +24,10 @@ interface ChatPanelProps {
     onAddLocalMessage?: (message: MessageWithSender) => void;
     onUpdateLocalMessageProgress?: (tempId: string, progress: number) => void;
     onFailLocalMessage?: (tempId: string) => void;
+    onDeleteMessage?: (messageId: string) => void;
+    onForwardMessage?: (message: MessageWithSender, targetIds: string[]) => Promise<void>;
+    /** List of all conversations — needed for the forward modal */
+    conversations?: ConversationWithDetails[];
     /** Optional layout control buttons rendered inside the chat header */
     layoutControls?: React.ReactNode;
     /** Ref to attach to the scroll container for position save/restore */
@@ -45,33 +50,41 @@ export function ChatPanel({
     scrollContainerRef,
     onAddLocalMessage,
     onUpdateLocalMessageProgress,
-    onFailLocalMessage
+    onFailLocalMessage,
+    onDeleteMessage,
+    onForwardMessage,
+    conversations = [],
 }: ChatPanelProps) {
     const [isTyping, setIsTyping] = useState(false);
     const [searchHighlight, setSearchHighlight] = useState<string>('');
+    const [forwardTarget, setForwardTarget] = useState<MessageWithSender | null>(null);
     const internalEndRef = useRef<HTMLDivElement>(null);
 
-    // Usar dados externos (do useInbox com WebSocket) se disponíveis
-    const messages = externalMessages || [];
+    const messages        = externalMessages || [];
     const messagesLoading = externalMessagesLoading ?? false;
-    const messagesError = externalMessagesError ?? null;
-    const sending = externalSending ?? false;
-    const messagesEndRef = externalMessagesEndRef || internalEndRef;
+    const messagesError   = externalMessagesError ?? null;
+    const sending         = externalSending ?? false;
+    const messagesEndRef  = externalMessagesEndRef || internalEndRef;
 
-    const handleTyping = (typing: boolean) => {
-        setIsTyping(typing);
-    };
+    const handleTyping = (typing: boolean) => { setIsTyping(typing); };
 
     const handleSearchInChat = useCallback((query: string) => {
         setSearchHighlight(query);
     }, []);
 
-    return (
-        <div
-            className="flex flex-col h-full max-h-full relative overflow-hidden bg-background"
-        >
+    const handleForwardDone = useCallback(
+        async (targetIds: string[]) => {
+            if (forwardTarget && onForwardMessage) {
+                await onForwardMessage(forwardTarget, targetIds);
+            }
+        },
+        [forwardTarget, onForwardMessage],
+    );
 
-            {/* Header - Fixed */}
+    return (
+        <div className="flex flex-col h-full max-h-full relative overflow-hidden bg-background">
+
+            {/* Header */}
             <div className="flex-shrink-0">
                 <ChatHeader
                     conversation={conversation}
@@ -83,7 +96,7 @@ export function ChatPanel({
                 />
             </div>
 
-            {/* Messages List - Scrollable with WhatsApp-like background */}
+            {/* Messages List */}
             <ChatBackground scrollRef={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
                 <div className="px-4 sm:px-6 py-4 flex flex-col-reverse min-h-full">
                     <div ref={messagesEndRef} />
@@ -91,11 +104,11 @@ export function ChatPanel({
                     {(() => {
                         const reversed = [...messages].reverse();
                         return reversed.map((message, i) => {
-                            const prevMsg = reversed[i + 1]; // visually above
-                            const nextMsg = reversed[i - 1]; // visually below
+                            const prevMsg       = reversed[i + 1];
+                            const nextMsg       = reversed[i - 1];
                             const isFirstInGroup = !prevMsg || prevMsg.direction !== message.direction;
-                            const isLastInGroup = !nextMsg || nextMsg.direction !== message.direction;
-                            const isGrouped = !isFirstInGroup || !isLastInGroup;
+                            const isLastInGroup  = !nextMsg || nextMsg.direction !== message.direction;
+                            const isGrouped      = !isFirstInGroup || !isLastInGroup;
                             return (
                                 <MessageBubble
                                     key={message.id}
@@ -103,6 +116,12 @@ export function ChatPanel({
                                     isFirstInGroup={isFirstInGroup}
                                     isLastInGroup={isLastInGroup}
                                     isGrouped={isGrouped}
+                                    onDelete={onDeleteMessage}
+                                    onForward={setForwardTarget}
+                                    onReply={(msg) => {
+                                        // Future: integrate reply quote into MessageInput
+                                        console.log('[ChatPanel] Reply to:', msg.id);
+                                    }}
                                 />
                             );
                         });
@@ -117,12 +136,7 @@ export function ChatPanel({
                     {!messagesLoading && messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center py-20 opacity-60">
                             <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
-                                <svg
-                                    className="w-10 h-10 text-muted-foreground"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
+                                <svg className="w-10 h-10 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
                             </div>
@@ -146,7 +160,7 @@ export function ChatPanel({
                 </div>
             )}
 
-            {/* Input Area - Fixed */}
+            {/* Input Area */}
             <div className="flex-shrink-0 p-3 border-t transition-colors bg-[#f0f2f5] border-[rgba(17,27,33,0.08)] dark:bg-[#202c33] dark:border-[rgba(233,237,239,0.08)]">
                 <MessageInput
                     onSendMessage={onSendMessage || (async () => {})}
@@ -160,6 +174,17 @@ export function ChatPanel({
                     onFailLocalMessage={onFailLocalMessage}
                 />
             </div>
+
+            {/* Forward Modal */}
+            {forwardTarget && (
+                <ForwardMessageModal
+                    message={forwardTarget}
+                    conversations={conversations}
+                    currentConversationId={conversation.id}
+                    onForward={handleForwardDone}
+                    onClose={() => setForwardTarget(null)}
+                />
+            )}
         </div>
     );
 }

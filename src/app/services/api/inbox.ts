@@ -197,6 +197,28 @@ export const conversationsApi = {
     async clearMessages(conversationId: string): Promise<{ success: boolean }> {
         const { data } = await api.delete(`/inbox/conversations/${conversationId}/messages`);
         return data;
+    },
+
+    /**
+     * Deleta uma mensagem individual
+     */
+    async deleteMessage(conversationId: string, messageId: string): Promise<{ success: boolean; messageId: string }> {
+        const { data } = await api.delete(`/inbox/conversations/${conversationId}/messages/${messageId}`);
+        return data;
+    },
+
+    /**
+     * Reencaminha uma mensagem para outra conversa
+     */
+    async forwardMessage(
+        targetConversationId: string,
+        payload: { content?: string; media_url?: string; media_type?: string }
+    ): Promise<Message> {
+        const { data } = await api.post<Message>(
+            `/inbox/conversations/${targetConversationId}/send`,
+            payload
+        );
+        return data;
     }
 };
 

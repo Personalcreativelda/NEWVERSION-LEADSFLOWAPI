@@ -42,6 +42,8 @@
     "@radix-ui/react-toggle-group": "*",
     "@radix-ui/react-tooltip": "*",
     "@supabase/supabase-js": "*",
+    "@tanstack/react-query": "^5.100.10",
+    "@tanstack/react-query-persist-client": "^5.100.10",
     "@vitejs/plugin-react": "*",
     "@xyflow/react": "^12.10.2",
     "axios": "^1.13.4",
@@ -52,6 +54,7 @@
     "embla-carousel-react": "*",
     "emoji-picker-react": "*",
     "hono": "*",
+    "idb-keyval": "^6.2.2",
     "input-otp": "*",
     "jspdf": "*",
     "lucide-react": "*",
@@ -70,7 +73,8 @@
     "tailwind-merge": "*",
     "vaul": "*",
     "vite": "*",
-    "xlsx": "*"
+    "xlsx": "*",
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",

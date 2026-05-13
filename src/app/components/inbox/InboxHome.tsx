@@ -8,7 +8,7 @@ interface InboxHomeProps {
 }
 
 export default function InboxHome({ onNavigate }: InboxHomeProps) {
-    const { selectedConversation, selectConversation } = useInbox();
+    const { conversations, selectedConversation, selectConversation, deleteMessage, forwardMessage } = useInbox();
 
     const handleOpenSettings = () => {
         if (onNavigate) {
@@ -21,6 +21,9 @@ export default function InboxHome({ onNavigate }: InboxHomeProps) {
             <ChatPanel
                 conversation={selectedConversation}
                 onBack={() => selectConversation({} as any)}
+                onDeleteMessage={deleteMessage}
+                onForwardMessage={forwardMessage}
+                conversations={conversations}
             />
         );
     }

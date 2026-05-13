@@ -361,6 +361,23 @@ export function useMessages(conversationId: string | null) {
         }
     }, [messages.length, scrollToBottom]);
 
+    const deleteMessage = useCallback(async (messageId: string) => {
+        if (!conversationId) return;
+        // Optimistic remove
+        setMessages((prev) => {
+            const next = prev.filter((m) => m.id !== messageId);
+            setCachedMessages(conversationId, next);
+            return next;
+        });
+        try {
+            await conversationsApi.deleteMessage(conversationId, messageId);
+        } catch (err) {
+            console.error('[useMessages] deleteMessage failed:', err);
+            // Rollback: re-fetch
+            fetchMessages({ silent: true });
+        }
+    }, [conversationId, fetchMessages]);
+
     return {
         messages,
         loading,
@@ -375,6 +392,7 @@ export function useMessages(conversationId: string | null) {
         updateLocalMessageProgress,
         failLocalMessage,
         updateMessageStatus,
+        deleteMessage,
         refreshMessages: fetchMessages,
         scrollToBottom
     };

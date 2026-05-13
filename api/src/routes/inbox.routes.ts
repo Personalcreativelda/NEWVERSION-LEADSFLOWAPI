@@ -1810,6 +1810,42 @@ router.delete('/conversations/:conversationId/messages', async (req, res, next) 
   }
 });
 
+// Delete a single message
+router.delete('/conversations/:conversationId/messages/:messageId', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { query: dbQuery } = require('../database/connection');
+    const { conversationId, messageId } = req.params;
+
+    // Verify conversation belongs to user
+    const conv = await dbQuery(
+      'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
+      [conversationId, user.id]
+    );
+    if (conv.rows.length === 0) {
+      return res.status(404).json({ error: 'Conversa não encontrada' });
+    }
+
+    // Delete the message (user_id check ensures ownership)
+    const result = await dbQuery(
+      'DELETE FROM messages WHERE id = $1 AND conversation_id = $2 RETURNING id',
+      [messageId, conversationId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mensagem não encontrada' });
+    }
+
+    console.log('[Inbox] Mensagem deletada:', messageId);
+    res.json({ success: true, messageId });
+  } catch (error) {
+    console.error('[Inbox] Erro ao deletar mensagem:', error);
+    next(error);
+  }
+});
+
 // Get unread count
 router.get('/unread-count', async (req, res, next) => {
   try {

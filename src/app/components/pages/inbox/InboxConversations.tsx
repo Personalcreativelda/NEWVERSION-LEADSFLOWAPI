@@ -46,6 +46,8 @@ export default function InboxConversations({
         addLocalMessage,
         updateLocalMessageProgress,
         failLocalMessage,
+        deleteMessage,
+        forwardMessage,
         wsConnected,
         lastUpdate
     } = useInbox();
@@ -880,6 +882,9 @@ export default function InboxConversations({
                         onAddLocalMessage={addLocalMessage}
                         onUpdateLocalMessageProgress={updateLocalMessageProgress}
                         onFailLocalMessage={failLocalMessage}
+                        onDeleteMessage={deleteMessage}
+                        onForwardMessage={forwardMessage}
+                        conversations={conversations}
                         /* layout control buttons passed as slot */
                         layoutControls={
                             !isMobile ? (
