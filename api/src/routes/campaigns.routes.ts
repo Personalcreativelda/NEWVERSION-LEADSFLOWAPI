@@ -2,13 +2,13 @@ import { Router } from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { CampaignsService } from '../services/campaigns.service';
-import { getStorageService } from '../services/storage.service';
+import { getStorageService, recordFileAttachment } from '../services/storage.service';
+import pool, { query } from '../database/connection';
 import { WhatsAppService } from '../services/whatsapp.service';
 import { ConversationsService } from '../services/conversations.service';
 import { ChannelsService } from '../services/channels.service';
 import { getWebSocketService } from '../services/websocket.service';
 import { notificationsService } from '../services/notifications.service';
-import { query } from '../database/connection';
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 
 const router = Router();
@@ -158,9 +158,18 @@ router.post('/upload-media', upload.single('file'), async (req, res, next) => {
 
     // Upload file to MinIO (or Base64) with user-specific folder
     const storage = getStorageService();
-    const fileUrl = await storage.uploadFile(file, 'campaigns', user.id);
+    const folderType = 'campaign-assets';
+    const fileUrl = await storage.uploadFile(file, folderType, user.id);
 
     console.log('[Campaigns] Media uploaded successfully:', fileUrl.substring(0, 100) + '...');
+
+    const bucketName = process.env.MINIO_BUCKET || 'leadflow-uploads';
+    const storageKey = fileUrl.split(`/${bucketName}/`)[1] ?? fileUrl;
+    await recordFileAttachment({
+      pool, userId: user.id, publicUrl: fileUrl, storageKey, bucket: bucketName,
+      fileName: file.originalname, mimeType: file.mimetype,
+      sizeBytes: file.size, folderType,
+    });
 
     // Derive media_type for compatibility with uploadService.ts
     let mediaType: string = 'document';
@@ -210,9 +219,16 @@ router.post('/presign-upload', async (req, res, next) => {
       return res.status(501).json({ error: 'Presigned uploads not available (MinIO not configured)' });
     }
 
-    const result = await storage.getPresignedUploadUrl(filename, contentType, 'campaigns', user.id);
+    const result = await storage.getPresignedUploadUrl(filename, contentType, 'campaign-assets', user.id);
 
     console.log('[Campaigns] Presigned URL generated for:', filename, '→', result.key);
+
+    // Record the attachment now (browser will PUT directly to MinIO; we won't see the response)
+    const bucketName = process.env.MINIO_BUCKET || 'leadflow-uploads';
+    await recordFileAttachment({
+      pool, userId: user.id, publicUrl: result.publicUrl, storageKey: result.key, bucket: bucketName,
+      fileName: filename, mimeType: contentType, sizeBytes: size ?? 0, folderType: 'campaign-assets',
+    });
 
     return res.json({
       success: true,
@@ -922,6 +938,7 @@ async function executeCampaignMessages(
           // Enviar mídia via Graph API se houver (only for free-form, templates carry their own media)
           if (!useTemplate && campaign.media_urls && campaign.media_urls.length > 0) {
             const hasCloudText = messageContent.trim().length > 0;
+            const cloudMediaAttachments: {url: string, caption: string}[] = campSettings.mediaAttachments || [];
             for (const mediaUrl of campaign.media_urls) {
               try {
                 const mediaType = mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) ? 'image' :
@@ -929,11 +946,14 @@ async function executeCampaignMessages(
                                  mediaUrl.match(/\.(pdf|doc|docx|xls|xlsx)/i) ? 'document' :
                                  mediaUrl.match(/\.(mp3|ogg|wav)/i) ? 'audio' : 'document';
 
+                const attMeta = cloudMediaAttachments.find((a: any) => a.url === mediaUrl);
+                const cloudCaption = attMeta?.caption || (hasCloudText ? '' : messageContent);
+
                 const mediaPayload: any = {
                   messaging_product: 'whatsapp',
                   to: cleanPhone,
                   type: mediaType,
-                  [mediaType]: { link: mediaUrl, caption: hasCloudText ? '' : messageContent }
+                  [mediaType]: { link: mediaUrl, caption: cloudCaption }
                 };
 
                 const mediaResponse = await fetch(cloudApiUrl, {
@@ -969,6 +989,7 @@ async function executeCampaignMessages(
 
           // Enviar mídia via Evolution API se houver
           if (hasEvoMedia) {
+            const evoMediaAttachments: {url: string, caption: string}[] = settings.mediaAttachments || [];
             for (const mediaUrl of campaign.media_urls!) {
               try {
                 const mediaType = mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) ? 'image' :
@@ -976,12 +997,15 @@ async function executeCampaignMessages(
                                  mediaUrl.match(/\.(pdf|doc|docx|xls|xlsx)/i) ? 'document' :
                                  mediaUrl.match(/\.(mp3|ogg|wav)/i) ? 'audio' : 'document';
 
+                const attMeta = evoMediaAttachments.find((a: any) => a.url === mediaUrl);
+                const evoCaption = attMeta?.caption || (hasEvoText ? '' : messageContent);
+
                 const mediaResult = await whatsappService.sendMedia({
                   instanceId: instanceId,
                   number: cleanPhone,
                   mediaUrl: mediaUrl,
                   mediaType: mediaType,
-                  caption: hasEvoText ? '' : messageContent
+                  caption: evoCaption
                 });
                 if (!sendResult) sendResult = mediaResult;
               } catch (mediaError: any) {

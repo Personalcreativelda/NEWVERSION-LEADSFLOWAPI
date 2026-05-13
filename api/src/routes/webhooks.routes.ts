@@ -932,7 +932,7 @@ router.post('/evolution/messages', async (req, res) => {
           buffer,
           filename,
           mediaMimetype || 'application/octet-stream',
-          'inbox-media',
+          'inbox-attachments',
           channel.user_id
         );
         console.log('[Evolution Webhook] Mídia uploaded para storage:', mediaUrl?.substring(0, 100));
@@ -986,7 +986,7 @@ router.post('/evolution/messages', async (req, res) => {
               };
               const ext = extMap2[mediaMimetype || ''] || (mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'bin');
               const filename = `whatsapp_${mediaType}_${Date.now()}.${ext}`;
-              mediaUrl = await storageService.uploadBuffer(buffer, filename, mediaMimetype || 'application/octet-stream', 'inbox-media', channel.user_id);
+              mediaUrl = await storageService.uploadBuffer(buffer, filename, mediaMimetype || 'application/octet-stream', 'inbox-attachments', channel.user_id);
               console.log('[Evolution Webhook] Mídia (via API) uploaded:', mediaUrl?.substring(0, 100));
             }
           }
@@ -1989,7 +1989,7 @@ router.post('/telegram/:botToken?', async (req, res) => {
 
               // 4. Upload para storage
               const storageService = getStorageService();
-              mediaUrl = await storageService.uploadBuffer(buffer, filename, contentType, 'inbox-media', channel.user_id);
+              mediaUrl = await storageService.uploadBuffer(buffer, filename, contentType, 'inbox-attachments', channel.user_id);
               console.log('[Telegram Webhook] Mídia uploaded:', mediaUrl?.substring(0, 100));
             }
           }
@@ -3497,7 +3497,7 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
                     mediaUrl = await storageService.uploadBuffer(
                       buffer, filename,
                       mediaMimetype || 'application/octet-stream',
-                      'inbox-media', channel.user_id
+                      'inbox-attachments', channel.user_id
                     );
                     console.log('[WhatsApp Cloud Webhook] Mídia uploaded:', mediaUrl?.substring(0, 100));
                   } else {

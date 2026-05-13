@@ -1219,6 +1219,14 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         const autoUploadedUrls = attachments.filter(a => !a.isExisting && a.uploadedUrl).map(a => a.uploadedUrl!);
         const allMediaUrls = [...existingUrls, ...autoUploadedUrls, ...uploadedMediaUrls];
 
+        // Construir mapa de caption por URL para preservar captions dos attachments
+        const newlyUploadedAtts = attachments.filter(a => !a.isExisting && !a.uploadedUrl);
+        const mediaAttachments = [
+          ...attachments.filter(a => a.isExisting && a.url).map(a => ({ url: a.url!, caption: a.caption || '' })),
+          ...attachments.filter(a => !a.isExisting && a.uploadedUrl).map(a => ({ url: a.uploadedUrl!, caption: a.caption || '' })),
+          ...uploadedMediaUrls.map((url, i) => ({ url, caption: newlyUploadedAtts[i]?.caption || '' })),
+        ];
+
         // ✅ Preparar dados para salvar no banco
         const campaignDataForDB = {
           name: campaignName,
@@ -1251,6 +1259,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             useTemplate: isCloudChannel ? useTemplate : false,
             templateName: isCloudChannel && useTemplate ? templateName.trim() : undefined,
             templateLanguage: isCloudChannel && useTemplate ? templateLanguage : undefined,
+            // Captions dos attachments preservadas para o executor
+            mediaAttachments,
           },
           media_urls: allMediaUrls,
           // Construir data com timezone local do usuário
@@ -1322,6 +1332,14 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         const autoUploadedUrls = attachments.filter(a => !a.isExisting && a.uploadedUrl).map(a => a.uploadedUrl!);
         const allMediaUrls = [...existingUrls, ...autoUploadedUrls, ...uploadedMediaUrls];
 
+        // Construir mapa de caption por URL para preservar captions dos attachments
+        const newlyUploadedAtts2 = attachments.filter(a => !a.isExisting && !a.uploadedUrl);
+        const mediaAttachments2 = [
+          ...attachments.filter(a => a.isExisting && a.url).map(a => ({ url: a.url!, caption: a.caption || '' })),
+          ...attachments.filter(a => !a.isExisting && a.uploadedUrl).map(a => ({ url: a.uploadedUrl!, caption: a.caption || '' })),
+          ...uploadedMediaUrls.map((url, i) => ({ url, caption: newlyUploadedAtts2[i]?.caption || '' })),
+        ];
+
         // 2. Salvar no Banco como 'pending' — o executor mudará para 'active'
         const campaignDataForDB = {
           name: campaignName,
@@ -1352,6 +1370,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             useTemplate: isCloudChannel ? useTemplate : false,
             templateName: isCloudChannel && useTemplate ? templateName.trim() : undefined,
             templateLanguage: isCloudChannel && useTemplate ? templateLanguage : undefined,
+            // Captions dos attachments preservadas para o executor
+            mediaAttachments: mediaAttachments2,
           },
           media_urls: allMediaUrls
         };
@@ -1509,6 +1529,13 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       // ✅ Combinar URLs existentes + novas
       const allMediaUrls = [...existingUrls, ...uploadedMediaUrls];
 
+      // Construir mapa de caption por URL para preservar captions dos attachments
+      const draftNewAtts = newAttachments;
+      const draftMediaAttachments = [
+        ...attachments.filter(a => a.isExisting && a.url).map(a => ({ url: a.url!, caption: a.caption || '' })),
+        ...uploadedMediaUrls.map((url, i) => ({ url, caption: draftNewAtts[i]?.caption || '' })),
+      ];
+
       // Preparar dados da campanha
       const campaignData = {
         name: campaignName || 'Nova Campanha WhatsApp',
@@ -1525,6 +1552,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           scheduleTime: scheduleMode === 'scheduled' ? scheduleTime : null,
           sendSpeed,
           recipientCount,
+          // Captions dos attachments preservadas para o executor
+          mediaAttachments: draftMediaAttachments,
         },
         media_urls: allMediaUrls,
         // Construir data com timezone local do usuário

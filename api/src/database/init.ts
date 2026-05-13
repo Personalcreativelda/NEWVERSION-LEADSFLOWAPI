@@ -265,6 +265,42 @@ const runPendingMigrations = async () => {
     console.warn('[DB] first_status_change_at migration warning:', error.message);
   }
 
+  // ── Migration: file_attachments (storage retention & lifecycle) ─────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS file_attachments (
+        id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id        UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        message_id     UUID         REFERENCES messages(id) ON DELETE SET NULL,
+        campaign_id    UUID         REFERENCES campaigns(id) ON DELETE SET NULL,
+        bucket         VARCHAR(255) NOT NULL DEFAULT 'leadflow-uploads',
+        storage_key    TEXT         NOT NULL,
+        public_url     TEXT         NOT NULL,
+        file_name      VARCHAR(500),
+        mime_type      VARCHAR(255),
+        size_bytes     BIGINT,
+        folder_type    VARCHAR(50)  NOT NULL,
+        is_temporary   BOOLEAN      NOT NULL DEFAULT true,
+        retention_days INTEGER,
+        expires_at     TIMESTAMPTZ,
+        deleted_at     TIMESTAMPTZ,
+        status         VARCHAR(20)  NOT NULL DEFAULT 'active'
+                         CHECK (status IN ('active', 'expired', 'deleted')),
+        created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_file_attachments_user_id    ON file_attachments(user_id);
+      CREATE INDEX IF NOT EXISTS idx_file_attachments_message_id ON file_attachments(message_id);
+      CREATE INDEX IF NOT EXISTS idx_file_attachments_expires_at ON file_attachments(expires_at) WHERE status = 'active';
+      CREATE INDEX IF NOT EXISTS idx_file_attachments_status     ON file_attachments(status);
+      CREATE INDEX IF NOT EXISTS idx_file_attachments_public_url ON file_attachments(public_url);
+      CREATE INDEX IF NOT EXISTS idx_file_attachments_created_at ON file_attachments(created_at DESC);
+    `);
+    console.log('[DB] ✅ file_attachments table created/verified');
+  } catch (error: any) {
+    console.warn('[DB] file_attachments migration warning:', error.message);
+  }
+
   // ── Migration 019: remarketing_flows ──────────────────────────────────────
   try {
     await pool.query(`

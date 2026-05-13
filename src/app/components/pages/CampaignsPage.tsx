@@ -20,6 +20,7 @@ import { useConfirm } from '../ui/ConfirmDialog';
 import { toast } from 'sonner';
 import { saveCampaignToDatabase, loadCampaignsFromDatabase, updateCampaignProgress } from '../../utils/campaignsHelper';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
+import { SkeletonCampaignSection, UpdatingBadge } from '../ui/skeletons';
 
 interface Lead {
   id: string;
@@ -653,36 +654,26 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
       variant: 'warning',
     });
     if (confirmed) {
-      try {
-        const token = localStorage.getItem('leadflow_access_token');
-        if (!token) {
-          toast.error('Você precisa estar autenticado');
-          return;
-        }
+      // Optimistic: remove imediatamente da UI
+      setCampaigns(prev => prev.filter(c => c.id !== campaign.id));
+      setDropdownOpen(null);
+      toast.success(`Campanha "${campaign.name}" cancelada!`);
 
-        const endpoint = campaign.type === 'email' ? 'email-campaigns' : 'campaigns';
-
-        // ✅ Deletar campanha do banco
-        const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/${endpoint}/${campaign.id}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Erro ao cancelar campanha');
-        }
-
-        // ✅ Recarregar campanhas do banco
-        await reloadCampaigns();
-
-        setDropdownOpen(null);
-        toast.success(`Campanha "${name}" cancelada!`);
-      } catch (error) {
+      // Sincronizar com banco em background
+      const token = localStorage.getItem('leadflow_access_token');
+      if (!token) return;
+      const endpoint = campaign.type === 'email' ? 'email-campaigns' : (campaign.type === 'sms' ? 'sms-campaigns' : 'campaigns');
+      fetch(`${(import.meta as any).env.VITE_API_URL}/api/${endpoint}/${campaign.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }).then(res => {
+        if (!res.ok) throw new Error('Erro ao cancelar campanha');
+      }).catch(error => {
         console.error('[CampaignsPage] Erro ao cancelar campanha:', error);
-        toast.error('Erro ao cancelar campanha');
-      }
+        // Restaurar campanha na UI em caso de falha
+        setCampaigns(prev => [campaign, ...prev]);
+        toast.error('Erro ao cancelar campanha — restaurado');
+      });
     }
   };
 
@@ -694,34 +685,28 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
       variant: 'danger',
     });
     if (confirmed) {
-      try {
-        const token = localStorage.getItem('leadflow_access_token');
-        if (!token) {
-          toast.error('Você precisa estar autenticado');
-          return;
-        }
+      // Optimistic: salvar snapshot e remover imediatamente da UI
+      const snapshot = campaigns.find(c => c.id === id) ?? null;
+      setCampaigns(prev => prev.filter(c => c.id !== id));
+      setDropdownOpen(null);
+      toast.success(`Campanha "${name}" excluída com sucesso!`);
 
-        // Deletar do banco de dados
-        const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/${id}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Erro ao excluir campanha');
-        }
-
-        // ✅ Recarregar campanhas do banco de dados
-        await reloadCampaigns();
-
-        setDropdownOpen(null);
-        toast.success(`Campanha "${name}" excluída com sucesso!`);
-      } catch (error) {
+      // Sincronizar com banco em background
+      const token = localStorage.getItem('leadflow_access_token');
+      if (!token) return;
+      const type = snapshot?.type;
+      const endpoint = type === 'email' ? 'email-campaigns' : (type === 'sms' ? 'sms-campaigns' : 'campaigns');
+      fetch(`${(import.meta as any).env.VITE_API_URL}/api/${endpoint}/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }).then(res => {
+        if (!res.ok) throw new Error('Erro ao excluir campanha');
+      }).catch(error => {
         console.error('[CampaignsPage] Erro ao deletar campanha:', error);
-        toast.error('Erro ao excluir campanha');
-      }
+        // Restaurar campanha na UI em caso de falha
+        if (snapshot) setCampaigns(prev => [snapshot, ...prev]);
+        toast.error('Erro ao excluir campanha — restaurado');
+      });
     }
   };
 
@@ -1160,6 +1145,52 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   </button>
                 </>
               )}
+
+              {campaign.status === 'failed' && (
+                <>
+                  <button
+                    onClick={() => handleViewReport(campaign)}
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    <span>Ver Relatório</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMessageModalOpen(true);
+                      setSelectedCampaign(campaign);
+                      setDropdownOpen(null);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Ver Mensagem</span>
+                  </button>
+                  <button
+                    onClick={() => handleDuplicateCampaign(campaign)}
+                    className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
+                  >
+                    <Copy className="w-4 h-4" />
+                    <span>Duplicar</span>
+                  </button>
+                  <div className="border-t border-border my-1"></div>
+                  <button
+                    onClick={() => handleResendFailed(campaign)}
+                    className="w-full text-left px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-3 transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Reenviar</span>
+                  </button>
+                  <div className="border-t border-border my-1"></div>
+                  <button
+                    onClick={() => handleDeleteCampaign(campaign.id, campaign.name)}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Excluir</span>
+                  </button>
+                </>
+              )}
             </div>
           </>
         )}
@@ -1277,17 +1308,23 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
         {/* WhatsApp, Email & SMS Content */}
         {(activeTab === 'whatsapp' || activeTab === 'email' || activeTab === 'sms') && (
           <div className="space-y-10">
-            {/* Loading State */}
-            {isLoadingCampaigns && (
-              <div className="text-center py-20">
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#10B981] mb-4"></div>
-                <p className="text-muted-foreground">Carregando campanhas...</p>
-              </div>
+
+            {/* Skeleton: first load with no cached data */}
+            {isLoadingCampaigns && campaigns.length === 0 && (
+              <>
+                <SkeletonCampaignSection count={3} />
+                <SkeletonCampaignSection count={2} />
+              </>
             )}
 
-            {/* Active Campaigns */}
-            {!isLoadingCampaigns && (
+            {/* Content: stale or fresh data */}
+            {(!isLoadingCampaigns || campaigns.length > 0) && (
               <>
+                {isLoadingCampaigns && (
+                  <div className="flex items-center justify-end">
+                    <UpdatingBadge />
+                  </div>
+                )}
                 <section>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <PlayCircle className="w-5 h-5 text-[#10B981]" />

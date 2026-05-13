@@ -4,6 +4,7 @@ import { Button } from '../ui/button';
 import { plansApi } from '../../utils/api';
 import { toast } from 'sonner';
 import PaymentMethodModal from '../modals/PaymentMethodModal';
+import { SkeletonPlanCards } from '../ui/skeletons';
 
 interface PlanPageProps {
   user: any;
@@ -258,10 +259,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
 
       {/* ── PLANOS ── */}
       {loading ? (
-        <div className="flex justify-center items-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          <span className="ml-3 text-muted-foreground">Carregando planos...</span>
-        </div>
+        <SkeletonPlanCards />
       ) : (
         <div className="grid md:grid-cols-3 gap-6">
           {plans.map((plan) => {

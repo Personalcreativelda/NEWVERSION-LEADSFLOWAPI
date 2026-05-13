@@ -5,6 +5,8 @@
 
 :root {
   --font-size: 16px;
+  --skeleton-base:      220 14% 91%;
+  --skeleton-highlight: 0   0%  100%;
   
   /* MODO CLARO - Clean neutral SaaS palette (ManyChat-inspired) */
   --background: 220 16% 96%;
@@ -83,6 +85,9 @@
 }
 
 .dark {
+  --skeleton-base:      220 6% 17%;
+  --skeleton-highlight: 220 6% 25%;
+
   /* MODO ESCURO - Enterprise neutral dark (Meta/WhatsApp inspired) */
   --background: 220 6% 10%;
   --foreground: 220 6% 93%;
@@ -1140,4 +1145,22 @@ main > div {
 @keyframes contentFadeIn {
   from { opacity: 0.92; transform: translateY(2px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Skeleton shimmer ────────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0%   { background-position: -800px 0; }
+  100% { background-position:  800px 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--skeleton-base))      0%,
+    hsl(var(--skeleton-highlight)) 50%,
+    hsl(var(--skeleton-base))      100%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.5s linear infinite;
 }

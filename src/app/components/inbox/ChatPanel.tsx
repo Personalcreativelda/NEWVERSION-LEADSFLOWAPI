@@ -6,7 +6,7 @@ import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import { ForwardMessageModal } from './ForwardMessageModal';
 import type { ConversationWithDetails, MessageWithSender } from '../../types/inbox';
-import { Loader2 } from 'lucide-react';
+import { SkeletonMessageBubble } from '../ui/skeletons';
 
 interface ChatPanelProps {
     conversation: ConversationWithDetails;
@@ -127,9 +127,13 @@ export function ChatPanel({
                         });
                     })()}
 
-                    {messagesLoading && (
-                        <div className="flex items-center justify-center py-10">
-                            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                    {messagesLoading && messages.length === 0 && (
+                        <div className="flex flex-col py-4">
+                            <SkeletonMessageBubble isOut={false} width="lg" />
+                            <SkeletonMessageBubble isOut={true} width="md" />
+                            <SkeletonMessageBubble isOut={false} width="sm" />
+                            <SkeletonMessageBubble isOut={true} width="lg" />
+                            <SkeletonMessageBubble isOut={false} width="md" />
                         </div>
                     )}
 

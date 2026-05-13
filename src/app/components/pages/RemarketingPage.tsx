@@ -9,6 +9,7 @@ import {
   Instagram, Facebook, Send, Split, Mic,
 } from 'lucide-react';
 import { Button } from '../ui/button';
+import { SkeletonFlowCard, UpdatingBadge } from '../ui/skeletons';
 
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
@@ -988,9 +989,9 @@ export default function RemarketingPage() {
           {/* ── FLOWS TAB ── */}
           {activeTab === 'flows' && (
             <>
-              {loading ? (
-                <div className="flex items-center justify-center py-20">
-                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              {loading && flows.length === 0 ? (
+                <div className="grid gap-4">
+                  {Array.from({ length: 3 }).map((_, i) => <SkeletonFlowCard key={i} />)}
                 </div>
               ) : flows.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -1007,6 +1008,12 @@ export default function RemarketingPage() {
                   </Button>
                 </div>
               ) : (
+                <>
+                  {loading && (
+                    <div className="flex items-center justify-end mb-2">
+                      <UpdatingBadge />
+                    </div>
+                  )}
                 <div className="grid gap-4">
                   {flows.map(flow => {
                     const convRate = flow.enrolledLeads > 0
@@ -1105,6 +1112,7 @@ export default function RemarketingPage() {
                     );
                   })}
                 </div>
+                </>
               )}
             </>
           )}

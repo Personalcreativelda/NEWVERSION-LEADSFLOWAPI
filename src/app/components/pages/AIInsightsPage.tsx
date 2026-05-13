@@ -8,6 +8,7 @@ import {
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
 import { api } from '../../../lib/api';
+import { SkeletonStatCardsRow, SkeletonInsightRow, UpdatingBadge } from '../ui/skeletons';
 
 interface AIInsightsStats {
   hot_count: number;
@@ -295,15 +296,23 @@ export default function AIInsightsPage() {
       </header>
 
       <main className="p-6 space-y-6 max-w-7xl mx-auto">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center space-y-3">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-sm text-muted-foreground">Analisando seus leads com IA...</p>
+        {loading && !insights ? (
+          <div className="space-y-6">
+            <SkeletonStatCardsRow count={4} />
+            <div className="space-y-3">
+              <div className="h-5 skeleton-shimmer rounded-md w-32" />
+              {Array.from({ length: 4 }).map((_, i) => <SkeletonInsightRow key={i} />)}
+            </div>
+            <div className="space-y-3">
+              <div className="h-5 skeleton-shimmer rounded-md w-28" />
+              {Array.from({ length: 3 }).map((_, i) => <SkeletonInsightRow key={i} />)}
             </div>
           </div>
         ) : insights ? (
           <>
+            {loading && (
+              <div className="flex justify-end"><UpdatingBadge /></div>
+            )}
             {/* AI Decision Summary */}
             <div className="bg-gradient-to-r from-purple-600/10 to-indigo-600/10 border border-purple-200/30 dark:border-purple-800/30 rounded-xl p-5 space-y-4">
               <div className="flex items-start gap-3">

@@ -300,8 +300,20 @@ export function MessageBubble({
                     </div>
                 )}
 
+                {/* Expired attachment */}
+                {(message.metadata as any)?.media_expired && !isUploading && (
+                    <div className={`mb-2 flex items-center gap-2 p-3 rounded-xl text-sm opacity-60
+                        ${isOut ? 'bg-[#c5f0c0] dark:bg-[#04493e]' : 'bg-gray-100 dark:bg-[#182229]'}`}>
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Este anexo já não está disponível.</span>
+                    </div>
+                )}
+
                 {/* Media Content */}
-                {hasValidMedia && !isUploading && (
+                {hasValidMedia && !isUploading && !(message.metadata as any)?.media_expired && (
                     <div className="mb-2">
                         {(effectiveMediaType === 'image' || effectiveMediaType === 'sticker') && !imageError ? (
                             <img

@@ -7,7 +7,8 @@ import { WhatsAppService } from '../services/whatsapp.service';
 import { ChannelsService } from '../services/channels.service';
 import { LeadsService } from '../services/leads.service';
 import { ConversationsService } from '../services/conversations.service';
-import { getStorageService } from '../services/storage.service';
+import { getStorageService, recordFileAttachment } from '../services/storage.service';
+import pool from '../database/connection';
 import { TwilioSMSService } from '../services/twilio-sms.service';
 import { getWebSocketService } from '../services/websocket.service';
 import { webhookDispatcher } from '../services/webhook-dispatcher.service';
@@ -278,7 +279,8 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
     console.log('[Inbox Upload] Uploading file:', req.file.originalname, 'type:', req.file.mimetype, 'size:', req.file.size);
 
     const storageService = getStorageService();
-    const mediaUrl = await storageService.uploadFile(req.file, 'inbox-media', user.id);
+    const folderType = 'inbox-attachments';
+    const mediaUrl = await storageService.uploadFile(req.file, folderType, user.id);
 
     // Determine media type from mime type
     let mediaType = 'document';
@@ -289,6 +291,16 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
     } else if (req.file.mimetype.startsWith('audio/')) {
       mediaType = 'audio';
     }
+
+    // Derive storage key from URL (key = path after /<bucket>/)
+    const bucketName = process.env.MINIO_BUCKET || 'leadflow-uploads';
+    const storageKey = mediaUrl.split(`/${bucketName}/`)[1] ?? mediaUrl;
+
+    await recordFileAttachment({
+      pool, userId: user.id, publicUrl: mediaUrl, storageKey, bucket: bucketName,
+      fileName: req.file.originalname, mimeType: req.file.mimetype,
+      sizeBytes: req.file.size, folderType,
+    });
 
     console.log('[Inbox Upload] File uploaded successfully:', mediaUrl, 'type:', mediaType);
 

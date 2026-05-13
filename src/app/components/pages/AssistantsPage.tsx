@@ -17,6 +17,7 @@ import { channelsApi } from '../../services/api/inbox';
 import type { Channel } from '../../types/inbox';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
 import { useConfirm } from '../ui/ConfirmDialog';
+import { SkeletonAssistantGrid } from '../ui/skeletons';
 
 interface AssistantsPageProps {
   isDark: boolean;
@@ -927,9 +928,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
+        <SkeletonAssistantGrid count={8} />
       ) : activeTab === 'marketplace' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredAssistants.map(assistant => renderAssistantCard(assistant, true))}

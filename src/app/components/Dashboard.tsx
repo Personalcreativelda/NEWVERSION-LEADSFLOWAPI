@@ -34,6 +34,7 @@ import CampaignsPage from './pages/CampaignsPage';
 import RemarketingPage from './pages/RemarketingPage';
 import AIInsightsPage from './pages/AIInsightsPage';
 import InboxPage from './pages/InboxPage';
+import { SkeletonStatCardsRow, UpdatingBadge, SkeletonFunnel, SkeletonLimitCards } from './ui/skeletons';
 
 // Modal imports
 import NovoLeadModal from './modals/NovoLeadModal';
@@ -2132,37 +2133,50 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
             {currentPage === 'dashboard' && (
               <div className="space-y-4 sm:space-y-6 lg:space-y-8">
                 {/* Widget de Planos */}
-                <PlanoWidget
-                  limites={limites}
-                  diasRestantes={diasRestantes}
-                  planExpiresAt={user?.plan_expires_at ?? null}
-                  subscriptionStatus={user?.subscription_status ?? null}
-                  onUpgrade={handleUpgrade}
-                  userPlan={user?.plan || 'free'}
-                  isTrial={user?.isTrial || false}
-                  onRefresh={onRefreshUser}
-                />
+                {loading && leads.length === 0 ? (
+                  <SkeletonLimitCards />
+                ) : (
+                  <PlanoWidget
+                    limites={limites}
+                    diasRestantes={diasRestantes}
+                    planExpiresAt={user?.plan_expires_at ?? null}
+                    subscriptionStatus={user?.subscription_status ?? null}
+                    onUpgrade={handleUpgrade}
+                    userPlan={user?.plan || 'free'}
+                    isTrial={user?.isTrial || false}
+                    onRefresh={onRefreshUser}
+                  />
+                )}
 
                 {/* Cards Principais de Estatísticas */}
-                <MainStatsCards
-                  totalLeads={stats.total}
-                  leadsNovosHoje={stats.novosHoje}
-                  leadsFechados={stats.convertidos}
-                  limiteLeads={limites.leads === -1 ? 999999 : limites.leads}
-                />
+                {loading && leads.length === 0 ? (
+                  <SkeletonStatCardsRow count={4} />
+                ) : (
+                  <>
+                    {loading && <div className="flex justify-end"><UpdatingBadge /></div>}
+                    <MainStatsCards
+                      totalLeads={stats.total}
+                      leadsNovosHoje={stats.novosHoje}
+                      leadsFechados={stats.convertidos}
+                      limiteLeads={limites.leads === -1 ? 999999 : limites.leads}
+                    />
+                  </>
+                )}
 
                 {/* Cards Secundários */}
-                <StatsCards
-                  totalLeads={stats.total}
-                  leadsNovosHoje={stats.novosHoje}
-                  leadsFechados={stats.convertidos}
-                  leads={leadsFiltradosPorFiltros}
-                  limites={limites}
-                  isDark={isDark}
-                />
+                {(!loading || leads.length > 0) && (
+                  <StatsCards
+                    totalLeads={stats.total}
+                    leadsNovosHoje={stats.novosHoje}
+                    leadsFechados={stats.convertidos}
+                    leads={leadsFiltradosPorFiltros}
+                    limites={limites}
+                    isDark={isDark}
+                  />
+                )}
 
                 {/* Gráficos de Insights */}
-                <ChartsSection 
+                <ChartsSection
                   key={`charts-${leads.length}-${leadsFiltradosPorFiltros.length}`}
                   leads={leadsFiltradosPorFiltros}
                   origens={origens}
@@ -2238,22 +2252,31 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                 </div>
                 
                 {/* Cards Principais de Estatísticas */}
-                <MainStatsCards
-                  totalLeads={stats.total}
-                  leadsNovosHoje={stats.novosHoje}
-                  leadsFechados={stats.convertidos}
-                  limiteLeads={limites.leads === -1 ? 999999 : limites.leads}
-                />
+                {loading && leads.length === 0 ? (
+                  <SkeletonStatCardsRow count={4} />
+                ) : (
+                  <>
+                    {loading && <div className="flex justify-end"><UpdatingBadge /></div>}
+                    <MainStatsCards
+                      totalLeads={stats.total}
+                      leadsNovosHoje={stats.novosHoje}
+                      leadsFechados={stats.convertidos}
+                      limiteLeads={limites.leads === -1 ? 999999 : limites.leads}
+                    />
+                  </>
+                )}
 
                 {/* Cards Secundários */}
-                <StatsCards
-                  totalLeads={stats.total}
-                  leadsNovosHoje={stats.novosHoje}
-                  leadsFechados={stats.convertidos}
-                  leads={leadsFiltradosPorFiltros}
-                  limites={limites}
-                  isDark={isDark}
-                />
+                {(!loading || leads.length > 0) && (
+                  <StatsCards
+                    totalLeads={stats.total}
+                    leadsNovosHoje={stats.novosHoje}
+                    leadsFechados={stats.convertidos}
+                    leads={leadsFiltradosPorFiltros}
+                    limites={limites}
+                    isDark={isDark}
+                  />
+                )}
 
                 {/* Seção de Leads Recentes */}
                 <RecentLeadsSection
@@ -2329,6 +2352,9 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
             {currentPage === 'funnel' && (
               <div className="space-y-5 sm:space-y-6 xl:space-y-8">
+                {loading && leads.length === 0 ? (
+                  <SkeletonFunnel />
+                ) : (
                 <SalesFunnel
                   leads={leads}
                   onUpdateLeadStatus={async (leadId, newStatus) => {
@@ -2401,6 +2427,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   }}
                   isDark={isDark}
                 />
+                )}
               </div>
             )}
 

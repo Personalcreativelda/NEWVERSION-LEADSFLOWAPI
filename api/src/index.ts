@@ -14,6 +14,7 @@ import { inactivityScheduler } from './services/inactivity-scheduler.service';
 import { initializeWebSocket } from './services/websocket.service';
 import { emailPollingService } from './services/email-polling.service';
 import { planExpirationService } from './services/plan-expiration.service';
+import { storageCleanupService } from './services/storage-cleanup.service';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -108,6 +109,10 @@ initDatabase().then(() => {
   // ✅ Iniciar verificação de expiração de planos
   planExpirationService.start();
   console.log('[Leadflow API] Plan expiration service iniciado ✅');
+
+  // ✅ Iniciar limpeza automática de arquivos expirados do MinIO
+  storageCleanupService.start();
+  console.log('[Leadflow API] Storage cleanup service iniciado ✅');
 
   server.listen(port, () => {
     console.log(`[Leadflow API] Listening on port ${port}`);

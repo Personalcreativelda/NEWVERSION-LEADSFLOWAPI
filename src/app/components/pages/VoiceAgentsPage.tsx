@@ -10,6 +10,7 @@ import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { voiceAgentsApi } from '../../services/api/voice-agents';
+import { SkeletonVoiceAgentGrid } from '../ui/skeletons';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
 import type {
   VoiceAgent,
@@ -862,9 +863,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className={`w-8 h-8 animate-spin text-muted-foreground`} />
-          </div>
+          <SkeletonVoiceAgentGrid count={6} />
         ) : filteredAgents.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <PhoneCall className={`w-16 h-16 mb-4 text-muted-foreground/70`} />

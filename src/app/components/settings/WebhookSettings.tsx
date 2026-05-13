@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { apiRequest } from '../../utils/api';
 import { Webhook, Copy, CheckCircle, AlertCircle } from 'lucide-react';
 import { WhatsAppConnection } from '../WhatsAppConnection';
+import { SkeletonWebhookForm } from '../ui/skeletons';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -57,11 +58,7 @@ export function WebhookSettings() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
-      </div>
-    );
+    return <SkeletonWebhookForm />;
   }
 
   return (

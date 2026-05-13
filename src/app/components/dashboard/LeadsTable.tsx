@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import type { Lead } from '../../types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { useConfirm } from '../ui/ConfirmDialog';
+import { SkeletonLeadRow } from '../ui/skeletons';
 
 // Ícone do WhatsApp
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -620,7 +621,11 @@ export default function LeadsTable({
             </tr>
           </thead>
           <tbody>
-            {leadsExibidos.length === 0 ? (
+            {loading && leadsExibidos.length === 0 ? (
+              <>
+                {Array.from({ length: 7 }).map((_, i) => <SkeletonLeadRow key={i} />)}
+              </>
+            ) : leadsExibidos.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-6 py-12 text-center text-muted-foreground">
                   Nenhum lead encontrado. Adicione seu primeiro lead!

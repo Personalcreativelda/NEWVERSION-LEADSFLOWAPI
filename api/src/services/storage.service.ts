@@ -1,9 +1,77 @@
 import type { Express } from 'express';
+import type { Pool } from 'pg';
 
 export interface PresignedUploadResult {
   presignedUrl: string;
   publicUrl: string;
   key: string;
+}
+
+// ── Retention configuration ───────────────────────────────────────────────────
+
+/** Days to keep files per folder type. null = permanent (never deleted). */
+export const RETENTION_DAYS: Record<string, number | null> = {
+  'inbox-attachments': parseInt(process.env.FILE_RETENTION_DAYS || '60'),
+  'email-attachments': parseInt(process.env.FILE_RETENTION_DAYS || '60'),
+  'campaign-assets':   parseInt(process.env.CAMPAIGN_RETENTION_DAYS || '90'),
+  'profile-images':    null,  // permanent
+  'company-logos':     null,  // permanent
+  'system-assets':     null,  // permanent
+  'avatars':           null,  // permanent (legacy name)
+  'campaigns':         parseInt(process.env.CAMPAIGN_RETENTION_DAYS || '90'), // legacy name
+};
+
+/** Folder types that are subject to automatic expiration. */
+export const TEMPORARY_FOLDERS = new Set([
+  'inbox-attachments',
+  'email-attachments',
+  'campaign-assets',
+  'campaigns',
+]);
+
+export function getRetentionDays(folderType: string): number | null {
+  return RETENTION_DAYS[folderType] ?? 60;
+}
+
+export function isTemporaryFolder(folderType: string): boolean {
+  return TEMPORARY_FOLDERS.has(folderType);
+}
+
+// ── recordFileAttachment helper ───────────────────────────────────────────────
+
+export interface RecordAttachmentOptions {
+  pool: Pool;
+  userId: string;
+  publicUrl: string;
+  storageKey: string;
+  bucket: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  folderType: string;
+  messageId?: string | null;
+  campaignId?: string | null;
+}
+
+export async function recordFileAttachment(opts: RecordAttachmentOptions): Promise<void> {
+  const { pool, userId, publicUrl, storageKey, bucket, fileName, mimeType, sizeBytes, folderType, messageId, campaignId } = opts;
+  const isTemp = isTemporaryFolder(folderType);
+  const days   = isTemp ? getRetentionDays(folderType) : null;
+  const expiresAt = isTemp && days ? `NOW() + INTERVAL '${days} days'` : 'NULL';
+
+  try {
+    await pool.query(
+      `INSERT INTO file_attachments
+         (user_id, message_id, campaign_id, bucket, storage_key, public_url,
+          file_name, mime_type, size_bytes, folder_type, is_temporary, retention_days, expires_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,${expiresAt})
+       ON CONFLICT DO NOTHING`,
+      [userId, messageId ?? null, campaignId ?? null, bucket, storageKey, publicUrl,
+       fileName, mimeType, sizeBytes, folderType, isTemp, days ?? null]
+    );
+  } catch {
+    // Non-fatal — file was uploaded; just couldn't record metadata
+  }
 }
 
 interface StorageService {
@@ -63,8 +131,44 @@ class MinIOStorage implements StorageService {
       } catch {
         // Older SDK versions may not support setBucketCors — non-fatal
       }
+      await this.applyLifecyclePolicy();
     } catch (error) {
       console.error('[MinIO] Error ensuring bucket:', error);
+    }
+  }
+
+  private async applyLifecyclePolicy() {
+    const inboxDays    = RETENTION_DAYS['inbox-attachments'] ?? 60;
+    const emailDays    = RETENTION_DAYS['email-attachments'] ?? 60;
+    const campaignDays = RETENTION_DAYS['campaign-assets']   ?? 90;
+
+    const rules = [
+      {
+        ID: 'expire-inbox-attachments',
+        Status: 'Enabled',
+        Filter: { Prefix: 'inbox-attachments/' },
+        Expiration: { Days: inboxDays },
+      },
+      {
+        ID: 'expire-email-attachments',
+        Status: 'Enabled',
+        Filter: { Prefix: 'email-attachments/' },
+        Expiration: { Days: emailDays },
+      },
+      {
+        ID: 'expire-campaign-assets',
+        Status: 'Enabled',
+        Filter: { Prefix: 'campaign-assets/' },
+        Expiration: { Days: campaignDays },
+      },
+    ];
+
+    try {
+      await this.client.setBucketLifecycle(this.bucket, { Rule: rules });
+      console.log(`[MinIO] Lifecycle policy applied — inbox/email: ${inboxDays}d, campaigns: ${campaignDays}d`);
+    } catch {
+      // Non-fatal: older MinIO versions or insufficient permissions
+      console.warn('[MinIO] Could not apply lifecycle policy (non-fatal)');
     }
   }
 

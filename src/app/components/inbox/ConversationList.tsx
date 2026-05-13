@@ -2,7 +2,8 @@
 import React from 'react';
 import { ConversationItem } from './ConversationItem';
 import type { ConversationWithDetails } from '../../types/inbox';
-import { Loader2, Inbox, CheckSquare, Square } from 'lucide-react';
+import { Inbox, CheckSquare, Square, Loader2 } from 'lucide-react';
+import { SkeletonConversationList } from '../ui/skeletons';
 
 interface ConversationListProps {
     conversations: ConversationWithDetails[];
@@ -25,14 +26,7 @@ export function ConversationList({
 }: ConversationListProps) {
 
     if (loading && conversations.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center p-10 space-y-3">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                <p className="text-xs font-medium text-muted-foreground">
-                    Sincronizando conversas...
-                </p>
-            </div>
-        );
+        return <SkeletonConversationList count={9} />;
     }
 
     if (!loading && conversations.length === 0) {

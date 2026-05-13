@@ -12,6 +12,7 @@ import { EmailConnect } from './EmailConnect';
 import { TwilioSMSConnect } from './TwilioSMSConnect';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
+import { SkeletonChannelGrid } from '../../ui/skeletons';
 import {
     Globe,
     Facebook,
@@ -322,8 +323,13 @@ export function ChannelsList() {
             {/* Main Content: Channel Grid */}
             <div className="flex-1 overflow-y-auto p-6 md:p-10">
 
+                {/* Loading skeleton */}
+                {loading && channels.length === 0 && (
+                    <SkeletonChannelGrid count={8} />
+                )}
+
                 {/* Seção de Canais Ativos (Cards completos) */}
-                {channels.length > 0 && (
+                {!loading && channels.length > 0 && (
                     <div className="mb-10">
                         <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
                             <span className="w-1.5 h-6 bg-green-500 rounded-full"></span>
@@ -345,7 +351,7 @@ export function ChannelsList() {
                 )}
 
                 {/* Grid de Seleção (Estilo Chatwoot) */}
-                <div>
+                {!loading && <div>
                     <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
                         <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
                         Adicionar Novo Canal
@@ -405,6 +411,7 @@ export function ChannelsList() {
                         </div>
                     </div>
                 </div>
+                }
 
             </div>
 
