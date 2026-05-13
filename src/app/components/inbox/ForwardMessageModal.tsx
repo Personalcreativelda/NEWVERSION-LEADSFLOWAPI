@@ -42,8 +42,15 @@ export function ForwardMessageModal({
         return conversations
             .filter((c) => c.id !== currentConversationId)
             .filter((c) => {
+                // Exclude groups
+                const jid = (c.metadata as any)?.jid || (c as any).remote_jid || '';
+                if (jid.includes('@g.us')) return false;
+                if ((c as any).is_group || (c.metadata as any)?.is_group || c.contact?.is_group) return false;
+                return true;
+            })
+            .filter((c) => {
                 if (!q) return true;
-                const name = (c.contact?.name || c.lead?.name || c.contact?.phone || '').toLowerCase();
+                const name = (c.contact?.name || (c as any).lead?.name || c.contact?.phone || '').toLowerCase();
                 return name.includes(q);
             });
     }, [conversations, currentConversationId, search]);

@@ -215,33 +215,6 @@ export function MessageBubble({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => { setHovered(false); }}
         >
-            {/* Hover action button (left side for received, right side for sent) */}
-            {canShowMenu && (
-                <div className={`flex items-center self-end mb-1 mx-1 transition-opacity ${(hovered || menuOpen) ? 'opacity-100' : 'opacity-0'}`}>
-                    {!isOut && (
-                        <div className="relative">
-                            <button
-                                ref={isOut ? undefined : chevronRef as any}
-                                onClick={() => setMenuOpen((v) => !v)}
-                                className="w-7 h-7 rounded-full bg-white dark:bg-[#233138] shadow flex items-center justify-center hover:bg-[#f0f2f5] dark:hover:bg-[#2a3942] transition-colors"
-                            >
-                                <ChevronDown className="w-4 h-4 text-[#667781]" />
-                            </button>
-                            {menuOpen && !isOut && (
-                                <MessageContextMenu
-                                    isOut={false}
-                                    onDelete={() => onDelete?.(message.id)}
-                                    onForward={() => onForward?.(message)}
-                                    onReply={() => onReply?.(message)}
-                                    onClose={() => setMenuOpen(false)}
-                                    anchorRef={chevronRef as any}
-                                />
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
-
             {/* Bubble */}
             <div
                 style={{ maxWidth: '65%', minWidth: 80, padding: '6px 10px 8px', fontSize: '14.2px', lineHeight: '1.35' }}
