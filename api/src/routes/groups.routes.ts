@@ -20,7 +20,7 @@ router.use(requireAuth);
  */
 router.get('/', async (req, res) => {
   try {
-    const userId = (req as any).userId;
+    const userId = (req as any).user?.id || (req as any).userId;
 
     const result = await query(
       `SELECT c.*,
@@ -57,7 +57,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/sync', async (req, res) => {
   try {
-    const userId = (req as any).userId;
+    const userId = (req as any).user?.id || (req as any).userId;
     const { channelId } = req.body;
 
     // Buscar canais WhatsApp com 3 tentativas em cascata
@@ -89,15 +89,34 @@ router.post('/sync', async (req, res) => {
         channels = sharedResult.rows;
       }
 
-      // Tentativa 3: qualquer canal WhatsApp ativo na plataforma (setup de instância partilhada)
+      // Tentativa 3: derivar nome da instância a partir do userId (padrão leadflow_{userId_underscores})
       if (channels.length === 0) {
-        const anyResult = await query(
-          `SELECT * FROM channels WHERE type = 'whatsapp' AND status NOT IN ('inactive', 'disconnected', 'deleted', 'error') ORDER BY created_at DESC LIMIT 20`,
-          []
-        );
-        channels = anyResult.rows;
-        if (channels.length > 0) {
-          console.log('[Groups Sync] Using shared WhatsApp instances:', channels.map((ch: any) => ch.name));
+        const derivedInstance = `leadflow_${userId.replace(/-/g, '_')}`;
+        console.log('[Groups Sync] Trying derived instance name:', derivedInstance);
+
+        // Verificar se a instância existe na Evolution API antes de criar o canal
+        try {
+          const statusCheck = await whatsappService.getStatus(derivedInstance) as any;
+          const isConnected = statusCheck?.state === 'open' || statusCheck?.instance?.state === 'open' || statusCheck?.connected === true;
+
+          if (isConnected || statusCheck) {
+            // Auto-criar o canal no DB para este user
+            const profileName = statusCheck?.instance?.profileName || statusCheck?.profileName || 'WhatsApp';
+            const newChannel = await channelsService.create({
+              type: 'whatsapp',
+              name: profileName,
+              status: isConnected ? 'active' : 'inactive',
+              credentials: {
+                instance_id: derivedInstance,
+                instance_name: derivedInstance,
+              },
+              settings: {}
+            }, userId);
+            channels = [newChannel];
+            console.log('[Groups Sync] Auto-created missing channel for user:', newChannel.id, derivedInstance);
+          }
+        } catch (err: any) {
+          console.log('[Groups Sync] Derived instance not found in Evolution API:', derivedInstance, err.message);
         }
       }
     }
@@ -200,7 +219,7 @@ router.post('/sync', async (req, res) => {
  */
 router.get('/:id/info', async (req, res) => {
   try {
-    const userId = (req as any).userId;
+    const userId = (req as any).user?.id || (req as any).userId;
     const conversationId = req.params.id;
 
     // Buscar conversa
@@ -294,7 +313,7 @@ router.get('/:id/info', async (req, res) => {
  */
 router.get('/:id/members', async (req, res) => {
   try {
-    const userId = (req as any).userId;
+    const userId = (req as any).user?.id || (req as any).userId;
     const conversationId = req.params.id;
 
     // Buscar conversa
@@ -350,7 +369,7 @@ router.get('/:id/members', async (req, res) => {
  */
 router.get('/:id/invite-link', async (req, res) => {
   try {
-    const userId = (req as any).userId;
+    const userId = (req as any).user?.id || (req as any).userId;
     const conversationId = req.params.id;
 
     const convResult = await query(
