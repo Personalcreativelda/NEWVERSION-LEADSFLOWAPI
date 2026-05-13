@@ -10,6 +10,8 @@ export const MAX_FILE_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
 export interface UploadOptions {
   onProgress: (percent: number) => void;
   signal?: AbortSignal;
+  /** Override the upload endpoint path. Defaults to '/inbox/upload'. */
+  endpoint?: string;
 }
 
 export interface UploadResult {
@@ -89,7 +91,8 @@ export function uploadAttachment(
 
     // --- send ---
     const token = localStorage.getItem('leadflow_access_token');
-    xhr.open('POST', `${BASE_URL}/inbox/upload`);
+    const endpointPath = options.endpoint ?? '/inbox/upload';
+    xhr.open('POST', `${BASE_URL}${endpointPath}`);
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     xhr.send(form);
   });

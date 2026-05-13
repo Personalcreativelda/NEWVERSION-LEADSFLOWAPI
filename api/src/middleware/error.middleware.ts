@@ -18,11 +18,19 @@ const mapPostgrestCodeToStatus = (code?: string): number => {
 
 export const errorMiddleware = (
   error: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ) => {
   console.error('[API] Unhandled error:', error);
+
+  // Ensure CORS headers are present on all error responses so browsers
+  // can read the error body instead of seeing a generic CORS failure.
+  const origin = req.headers.origin;
+  if (origin && !res.headersSent) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
 
   if (isPostgresError(error)) {
     return res.status(mapPostgrestCodeToStatus(error.code)).json({

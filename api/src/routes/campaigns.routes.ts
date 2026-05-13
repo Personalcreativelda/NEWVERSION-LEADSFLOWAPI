@@ -162,9 +162,16 @@ router.post('/upload-media', upload.single('file'), async (req, res, next) => {
 
     console.log('[Campaigns] Media uploaded successfully:', fileUrl.substring(0, 100) + '...');
 
+    // Derive media_type for compatibility with uploadService.ts
+    let mediaType: string = 'document';
+    if (file.mimetype.startsWith('image/')) mediaType = 'image';
+    else if (file.mimetype.startsWith('video/')) mediaType = 'video';
+    else if (file.mimetype.startsWith('audio/')) mediaType = 'audio';
+
     res.json({
       success: true,
       url: fileUrl,
+      media_type: mediaType,
       filename: file.originalname,
       mimetype: file.mimetype,
       size: file.size,

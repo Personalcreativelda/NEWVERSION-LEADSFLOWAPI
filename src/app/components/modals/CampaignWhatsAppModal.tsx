@@ -423,6 +423,58 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
   const recipientCount = getRecipientCount();
 
+  // ── Upload helper: starts (or retries) the XHR upload for a specific index ──
+  const startUploadForIndex = (index: number, file: File) => {
+    // Mark as uploading immediately
+    setAttachments(prev =>
+      prev.map((a, idx) =>
+        idx === index ? { ...a, uploadProgress: 0, uploadStatus: 'uploading' } : a
+      )
+    );
+
+    const attempt = (retries: number): Promise<void> =>
+      uploadAttachment(file, {
+        endpoint: '/campaigns/upload-media',
+        onProgress: (percent) => {
+          setAttachments(prev =>
+            prev.map((a, idx) =>
+              idx === index ? { ...a, uploadProgress: percent } : a
+            )
+          );
+        },
+      })
+        .then((result) => {
+          setAttachments(prev =>
+            prev.map((a, idx) =>
+              idx === index
+                ? { ...a, uploadProgress: 100, uploadStatus: 'done', uploadedUrl: result.url }
+                : a
+            )
+          );
+        })
+        .catch((err) => {
+          if (retries > 0) {
+            // Auto-retry once after 1.5 s (handles transient network/proxy errors)
+            return new Promise<void>((resolve) => setTimeout(resolve, 1500)).then(() =>
+              attempt(retries - 1)
+            );
+          }
+          setAttachments(prev =>
+            prev.map((a, idx) =>
+              idx === index ? { ...a, uploadStatus: 'error', uploadProgress: undefined } : a
+            )
+          );
+          console.error('[Campaign Upload] Failed after retry:', err);
+        });
+
+    attempt(1); // 1 automatic retry
+  };
+
+  const retryUpload = (index: number) => {
+    const att = attachments[index];
+    if (att?.file) startUploadForIndex(index, att.file);
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []) as File[];
     const validFiles = files.filter(file => {
@@ -464,35 +516,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       const startIndex = attachments.length;
       setAttachments(prev => [...prev, ...newAttachments]);
 
-      // Start XHR upload for each file and track progress
+      // Kick off upload for each new attachment
       newAttachments.forEach((att, i) => {
-        const attachmentIndex = startIndex + i;
-        uploadAttachment(att.file, {
-          onProgress: (percent) => {
-            setAttachments(prev =>
-              prev.map((a, idx) =>
-                idx === attachmentIndex ? { ...a, uploadProgress: percent } : a
-              )
-            );
-          },
-        })
-          .then((result) => {
-            setAttachments(prev =>
-              prev.map((a, idx) =>
-                idx === attachmentIndex
-                  ? { ...a, uploadProgress: 100, uploadStatus: 'done', uploadedUrl: result.url }
-                  : a
-              )
-            );
-          })
-          .catch(() => {
-            setAttachments(prev =>
-              prev.map((a, idx) =>
-                idx === attachmentIndex ? { ...a, uploadStatus: 'error', uploadProgress: undefined } : a
-              )
-            );
-            toast.error(`Erro ao enviar ${att.name}`);
-          });
+        startUploadForIndex(startIndex + i, att.file);
       });
     };
 
@@ -1970,7 +1996,15 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                           ) : att.uploadStatus === 'done' ? (
                             <Check className="w-4 h-4 text-[#25D366] flex-shrink-0" />
                           ) : att.uploadStatus === 'error' ? (
-                            <span className="text-xs text-red-500">Erro</span>
+                            <button
+                              type="button"
+                              onClick={() => retryUpload(index)}
+                              className="flex items-center gap-1 text-xs text-amber-500 hover:text-amber-600 px-1.5 py-0.5 rounded border border-amber-400/50 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+                              title="Tentar novamente"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              Tentar
+                            </button>
                           ) : null}
                           <button
                             type="button"
@@ -1999,6 +2033,14 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               <div className="h-full w-full bg-[#25D366] rounded-full" />
                             </div>
                             <p className="text-[10px] text-[#25D366] mt-0.5">Upload concluído</p>
+                          </div>
+                        )}
+                        {att.uploadStatus === 'error' && (
+                          <div className="mb-1">
+                            <div className="w-full h-1.5 bg-red-100 dark:bg-red-900/30 rounded-full overflow-hidden">
+                              <div className="h-full w-1/3 bg-red-500 rounded-full" />
+                            </div>
+                            <p className="text-[10px] text-red-500 mt-0.5">Falhou — clique em "Tentar" para reenviar</p>
                           </div>
                         )}
 
