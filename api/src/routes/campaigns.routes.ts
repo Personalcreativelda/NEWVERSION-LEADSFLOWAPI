@@ -890,28 +890,38 @@ async function executeCampaignMessages(
             sendResult = tplResult;
           } else {
             // ── Free-form text (warm contacts / 24h session window) ───────────
-            const textPayload = {
-              messaging_product: 'whatsapp',
-              to: cleanPhone,
-              type: 'text',
-              text: { body: messageContent }
-            };
+            const hasCloudText = messageContent.trim().length > 0;
+            const hasCloudMedia = !!(campaign.media_urls && campaign.media_urls.length > 0);
 
-            const textResponse = await fetch(cloudApiUrl, {
-              method: 'POST',
-              headers: cloudHeaders,
-              body: JSON.stringify(textPayload)
-            });
-
-            const textResult = await textResponse.json();
-            if (!textResponse.ok) {
-              throw new Error(`WhatsApp Cloud API error: ${textResult?.error?.message || JSON.stringify(textResult)}`);
+            if (!hasCloudText && !hasCloudMedia) {
+              throw new Error('Campanha sem conteúdo: defina uma mensagem ou adicione um ficheiro');
             }
-            sendResult = textResult;
+
+            if (hasCloudText) {
+              const textPayload = {
+                messaging_product: 'whatsapp',
+                to: cleanPhone,
+                type: 'text',
+                text: { body: messageContent }
+              };
+
+              const textResponse = await fetch(cloudApiUrl, {
+                method: 'POST',
+                headers: cloudHeaders,
+                body: JSON.stringify(textPayload)
+              });
+
+              const textResult = await textResponse.json();
+              if (!textResponse.ok) {
+                throw new Error(`WhatsApp Cloud API error: ${textResult?.error?.message || JSON.stringify(textResult)}`);
+              }
+              sendResult = textResult;
+            }
           }
 
           // Enviar mídia via Graph API se houver (only for free-form, templates carry their own media)
           if (!useTemplate && campaign.media_urls && campaign.media_urls.length > 0) {
+            const hasCloudText = messageContent.trim().length > 0;
             for (const mediaUrl of campaign.media_urls) {
               try {
                 const mediaType = mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) ? 'image' :
@@ -923,14 +933,18 @@ async function executeCampaignMessages(
                   messaging_product: 'whatsapp',
                   to: cleanPhone,
                   type: mediaType,
-                  [mediaType]: { link: mediaUrl }
+                  [mediaType]: { link: mediaUrl, caption: hasCloudText ? '' : messageContent }
                 };
 
-                await fetch(cloudApiUrl, {
+                const mediaResponse = await fetch(cloudApiUrl, {
                   method: 'POST',
                   headers: cloudHeaders,
                   body: JSON.stringify(mediaPayload)
                 });
+                if (!sendResult) {
+                  const mediaResult = await mediaResponse.json();
+                  if (mediaResponse.ok) sendResult = mediaResult;
+                }
               } catch (mediaError: any) {
                 console.warn(`[Campaigns Execute] Erro ao enviar mídia via Cloud: ${mediaError.message}`);
               }
@@ -938,28 +952,38 @@ async function executeCampaignMessages(
           }
         } else {
           // ===== WhatsApp Evolution API =====
-          sendResult = await whatsappService.sendMessage({
-            instanceId: instanceId,
-            number: cleanPhone,
-            text: messageContent
-          });
+          const hasEvoText = messageContent.trim().length > 0;
+          const hasEvoMedia = !!(campaign.media_urls && campaign.media_urls.length > 0);
+
+          if (!hasEvoText && !hasEvoMedia) {
+            throw new Error('Campanha sem conteúdo: defina uma mensagem ou adicione um ficheiro');
+          }
+
+          if (hasEvoText) {
+            sendResult = await whatsappService.sendMessage({
+              instanceId: instanceId,
+              number: cleanPhone,
+              text: messageContent
+            });
+          }
 
           // Enviar mídia via Evolution API se houver
-          if (campaign.media_urls && campaign.media_urls.length > 0) {
-            for (const mediaUrl of campaign.media_urls) {
+          if (hasEvoMedia) {
+            for (const mediaUrl of campaign.media_urls!) {
               try {
                 const mediaType = mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)/i) ? 'image' :
                                  mediaUrl.match(/\.(mp4|mpeg|mov|avi)/i) ? 'video' :
                                  mediaUrl.match(/\.(pdf|doc|docx|xls|xlsx)/i) ? 'document' :
                                  mediaUrl.match(/\.(mp3|ogg|wav)/i) ? 'audio' : 'document';
 
-                await whatsappService.sendMedia({
+                const mediaResult = await whatsappService.sendMedia({
                   instanceId: instanceId,
                   number: cleanPhone,
                   mediaUrl: mediaUrl,
                   mediaType: mediaType,
-                  caption: ''
+                  caption: hasEvoText ? '' : messageContent
                 });
+                if (!sendResult) sendResult = mediaResult;
               } catch (mediaError: any) {
                 console.warn(`[Campaigns Execute] Erro ao enviar mídia: ${mediaError.message}`);
               }
