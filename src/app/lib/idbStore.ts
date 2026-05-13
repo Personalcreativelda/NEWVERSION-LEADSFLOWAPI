@@ -8,7 +8,7 @@ import type { AttachmentFileType } from '../types/attachment';
 
 // ── Message cache store ───────────────────────────────────────────────────────
 
-const MESSAGE_STORE = createStore('leadflow-db', 'messages');
+const MESSAGE_STORE = createStore('leadflow-messages-db', 'messages');
 
 export interface IdbMessageEntry {
     messages: unknown[];
@@ -34,7 +34,7 @@ export async function idbDeleteMessages(conversationId: string): Promise<void> {
 
 // ── Upload queue persistence store ───────────────────────────────────────────
 
-const UPLOAD_STORE = createStore('leadflow-db', 'uploads');
+const UPLOAD_STORE = createStore('leadflow-uploads-db', 'uploads');
 const UPLOAD_KEY   = 'queue';
 
 export interface PersistedAttachment {

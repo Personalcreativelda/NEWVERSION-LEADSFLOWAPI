@@ -12,7 +12,7 @@ import { get, set, del, createStore } from 'idb-keyval';
 import type { Persister } from '@tanstack/react-query-persist-client';
 
 const IDB_KEY   = 'leadflow-query-cache-v1';
-const idbStore  = createStore('leadflow-db', 'query-cache');
+const idbStore  = createStore('leadflow-query-db', 'query-cache');
 
 export const idbPersister: Persister = {
     persistClient: async (client) => {

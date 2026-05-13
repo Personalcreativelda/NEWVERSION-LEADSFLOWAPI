@@ -18,12 +18,19 @@ import { assistantQueueService } from '../services/assistant-queue.service';
 import { webhookDispatcher } from '../services/webhook-dispatcher.service';
 // Storage: Importar para upload de mídia recebida
 import { getStorageService } from '../services/storage.service';
+import { requireAuth } from '../middleware/auth.middleware';
 
 const router = Router();
 const channelsService = new ChannelsService();
 const conversationsService = new ConversationsService();
 const leadsService = new LeadsService();
 const whatsappService = new WhatsAppService();
+
+// GET /webhooks/settings — user integration settings stub
+// Actual pixel/GA IDs are stored in localStorage by the frontend
+router.get('/settings', requireAuth, (_req, res) => {
+  res.json({ success: true, webhookSettings: {} });
+});
 
 // ✅ Webhook para N8N cadastrar novos leads
 router.post('/n8n/leads', async (req, res) => {

@@ -956,51 +956,14 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         return;
       }
 
-      // ✅ CONVERTER ARQUIVOS PARA BASE64 (com otimização para vídeos)
-      const attachmentsData = await Promise.all(
-        attachments.map(async (att) => {
-          // ✅ OTIMIZAÇÃO ESPECIAL PARA VÍDEOS
-          if (att.type.startsWith('video/')) {
-            const videoSizeMB = att.size / (1024 * 1024);
-            console.log(`[Campaign WhatsApp] 🎥 Processando vídeo: ${att.name} (${videoSizeMB.toFixed(2)}MB original)`);
-
-            // Se vídeo > 3MB, avisar que pode demorar
-            if (videoSizeMB > 3) {
-              console.warn(`[Campaign WhatsApp] ⚠️ Vídeo grande detectado! ${videoSizeMB.toFixed(2)}MB - Pode demorar...`);
-              toast.info(`⏳ Processando vídeo (${videoSizeMB.toFixed(2)}MB)...`, { duration: 2000 });
-            }
-          }
-
-          const base64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const result = reader.result as string;
-              const base64Data = result.split(',')[1];
-
-              // ✅ CALCULAR TAMANHO REAL DO BASE64 (para vídeos apenas)
-              if (att.type.startsWith('video/')) {
-                const base64SizeMB = (base64Data.length * 0.75) / (1024 * 1024);
-                const originalSizeMB = att.size / (1024 * 1024);
-                console.log(`[Campaign WhatsApp] 📊 Vídeo convertido:`);
-                console.log(`   • Tamanho original: ${originalSizeMB.toFixed(2)}MB`);
-                console.log(`   • Tamanho base64: ${base64SizeMB.toFixed(2)}MB`);
-                console.log(`   • Aumento: ${((base64SizeMB / originalSizeMB - 1) * 100).toFixed(1)}%`);
-              }
-
-              resolve(base64Data);
-            };
-            reader.readAsDataURL(att.file);
-          });
-
-          return {
-            name: att.name,
-            type: att.type,
-            size: att.size,
-            base64: base64,
-            caption: att.caption || undefined, // ✅ Incluir legenda se existir
-          };
-        })
-      );
+      // Preparar metadados dos anexos (URLs já disponíveis — base64 não é enviado)
+      const attachmentsData = attachments.map((att) => ({
+        name: att.name,
+        type: att.type,
+        size: att.size,
+        url: att.uploadedUrl,
+        caption: att.caption || undefined,
+      }));
 
       // ✅ MODO EDIÇÃO vs CRIAÇÃO
       const isEditing = !!editingCampaign;
@@ -1181,10 +1144,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           return;
         }
 
-        // ✅ Upload de arquivos novos para MinIO
+        // Upload de arquivos que ainda não foram enviados (uploadedUrl não definido)
         const uploadedMediaUrls: string[] = [];
 
-        for (const attachment of attachments.filter(a => !a.isExisting)) {
+        for (const attachment of attachments.filter(a => !a.isExisting && !a.uploadedUrl)) {
           const formData = new FormData();
           formData.append('file', attachment.file);
 
@@ -1205,9 +1168,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           console.log('[Campaign WhatsApp] ✅ Arquivo enviado:', uploadData.url);
         }
 
-        // ✅ Combinar URLs existentes + novas
+        // Combinar: URLs de anexos existentes + já auto-enviados + recém enviados
         const existingUrls = attachments.filter(a => a.isExisting && a.url).map(a => a.url!);
-        const allMediaUrls = [...existingUrls, ...uploadedMediaUrls];
+        const autoUploadedUrls = attachments.filter(a => !a.isExisting && a.uploadedUrl).map(a => a.uploadedUrl!);
+        const allMediaUrls = [...existingUrls, ...autoUploadedUrls, ...uploadedMediaUrls];
 
         // ✅ Preparar dados para salvar no banco
         const campaignDataForDB = {
@@ -1292,9 +1256,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         // ✅ MODO IMEDIATO: Salvar no banco e disparar via executor do backend
         console.log('[Campaign WhatsApp] 🚀 Modo imediato - salvando e disparando via backend...');
 
-        // 1. Upload de arquivos novos (se houver)
+        // 1. Upload de arquivos que ainda não foram auto-enviados (sem uploadedUrl)
         const uploadedMediaUrls: string[] = [];
-        for (const attachment of attachments.filter(a => !a.isExisting)) {
+        for (const attachment of attachments.filter(a => !a.isExisting && !a.uploadedUrl)) {
           const formData = new FormData();
           formData.append('file', attachment.file);
           const uploadResponse = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/upload-media`, {
@@ -1309,7 +1273,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         }
 
         const existingUrls = attachments.filter(a => a.isExisting && a.url).map(a => a.url!);
-        const allMediaUrls = [...existingUrls, ...uploadedMediaUrls];
+        const autoUploadedUrls = attachments.filter(a => !a.isExisting && a.uploadedUrl).map(a => a.uploadedUrl!);
+        const allMediaUrls = [...existingUrls, ...autoUploadedUrls, ...uploadedMediaUrls];
 
         // 2. Salvar no Banco como 'pending' — o executor mudará para 'active'
         const campaignDataForDB = {
