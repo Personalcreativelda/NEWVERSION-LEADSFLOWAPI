@@ -1,9 +1,16 @@
 import type { Express } from 'express';
 
+export interface PresignedUploadResult {
+  presignedUrl: string;
+  publicUrl: string;
+  key: string;
+}
+
 interface StorageService {
   uploadFile(file: Express.Multer.File, folder: string, userId?: string): Promise<string>;
   uploadBuffer(buffer: Buffer, filename: string, mimetype: string, folder: string, userId?: string): Promise<string>;
   deleteFile(url: string): Promise<void>;
+  getPresignedUploadUrl?(filename: string, contentType: string, folder: string, userId?: string): Promise<PresignedUploadResult>;
 }
 
 class MinIOStorage implements StorageService {
@@ -41,6 +48,20 @@ class MinIOStorage implements StorageService {
       const exists = await this.client.bucketExists(this.bucket);
       if (!exists) {
         await this.client.makeBucket(this.bucket, process.env.MINIO_REGION || 'us-east-1');
+      }
+      // Allow browser direct uploads (presigned PUT) from any origin
+      try {
+        await this.client.setBucketCors(this.bucket, [
+          {
+            AllowedOrigins: ['*'],
+            AllowedMethods: ['GET', 'PUT', 'POST', 'HEAD'],
+            AllowedHeaders: ['*'],
+            ExposeHeaders: ['ETag'],
+            MaxAgeSeconds: 86400,
+          },
+        ]);
+      } catch {
+        // Older SDK versions may not support setBucketCors — non-fatal
       }
     } catch (error) {
       console.error('[MinIO] Error ensuring bucket:', error);
@@ -94,6 +115,24 @@ class MinIOStorage implements StorageService {
       const base64 = buffer.toString('base64');
       return `data:${mimetype};base64,${base64}`;
     }
+  }
+
+  async getPresignedUploadUrl(filename: string, _contentType: string, folder: string, userId?: string): Promise<PresignedUploadResult> {
+    const timestamp = Date.now();
+    const sanitizedName = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const sanitizedUserId = userId ? userId.replace(/[^a-zA-Z0-9]/g, '_') : 'anon';
+    const key = `${folder}/users/${sanitizedUserId}/${timestamp}_${sanitizedName}`;
+
+    // Presigned PUT valid for 15 minutes
+    const presignedUrl: string = await this.client.presignedPutObject(this.bucket, key, 15 * 60);
+
+    // Public URL for serving the file after upload
+    const publicBase = process.env.MINIO_PUBLIC_URL
+      ? process.env.MINIO_PUBLIC_URL.replace(/\/$/, '')
+      : `${this.useSSL ? 'https' : 'http'}://${this.endpoint}`;
+    const publicUrl = `${publicBase}/${this.bucket}/${key}`;
+
+    return { presignedUrl, publicUrl, key };
   }
 
   async deleteFile(url: string): Promise<void> {

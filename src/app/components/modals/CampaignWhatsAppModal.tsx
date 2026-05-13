@@ -423,16 +423,62 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
   const recipientCount = getRecipientCount();
 
-  // ── Upload helper: starts (or retries) the XHR upload for a specific index ──
+  // ── Upload helper: presigned PUT to MinIO (bypasses nginx proxy) ──────────
   const startUploadForIndex = (index: number, file: File) => {
-    // Mark as uploading immediately
     setAttachments(prev =>
       prev.map((a, idx) =>
         idx === index ? { ...a, uploadProgress: 0, uploadStatus: 'uploading' } : a
       )
     );
 
-    const attempt = (retries: number): Promise<void> =>
+    const apiBase = ((import.meta as any).env.VITE_API_URL || '').replace(/\/api$/, '');
+    const token = localStorage.getItem('leadflow_access_token');
+
+    const doPresignedUpload = async (): Promise<void> => {
+      // 1. Ask API for a presigned PUT URL (tiny JSON request — no large body through nginx)
+      const presignRes = await fetch(`${apiBase}/api/campaigns/presign-upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }),
+      });
+
+      if (!presignRes.ok) throw new Error('presign-failed');
+      const { presignedUrl, publicUrl } = await presignRes.json() as { presignedUrl: string; publicUrl: string };
+
+      // 2. PUT directly to MinIO — no nginx in the way, real progress events
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            setAttachments(prev =>
+              prev.map((a, idx) =>
+                idx === index ? { ...a, uploadProgress: Math.round((e.loaded / e.total) * 100) } : a
+              )
+            );
+          }
+        });
+        xhr.addEventListener('load', () => {
+          // MinIO presigned PUT returns 200 on success
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`MinIO PUT ${xhr.status}`));
+        });
+        xhr.addEventListener('error', () => reject(new Error('Erro de rede (MinIO)')));
+        xhr.open('PUT', presignedUrl);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
+      });
+
+      setAttachments(prev =>
+        prev.map((a, idx) =>
+          idx === index ? { ...a, uploadProgress: 100, uploadStatus: 'done', uploadedUrl: publicUrl } : a
+        )
+      );
+    };
+
+    const doDirectUpload = (): Promise<void> =>
       uploadAttachment(file, {
         endpoint: '/campaigns/upload-media',
         onProgress: (percent) => {
@@ -442,32 +488,32 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             )
           );
         },
-      })
-        .then((result) => {
-          setAttachments(prev =>
-            prev.map((a, idx) =>
-              idx === index
-                ? { ...a, uploadProgress: 100, uploadStatus: 'done', uploadedUrl: result.url }
-                : a
-            )
-          );
-        })
-        .catch((err) => {
-          if (retries > 0) {
-            // Auto-retry once after 1.5 s (handles transient network/proxy errors)
-            return new Promise<void>((resolve) => setTimeout(resolve, 1500)).then(() =>
-              attempt(retries - 1)
-            );
-          }
-          setAttachments(prev =>
-            prev.map((a, idx) =>
-              idx === index ? { ...a, uploadStatus: 'error', uploadProgress: undefined } : a
-            )
-          );
-          console.error('[Campaign Upload] Failed after retry:', err);
-        });
+      }).then((result) => {
+        setAttachments(prev =>
+          prev.map((a, idx) =>
+            idx === index ? { ...a, uploadProgress: 100, uploadStatus: 'done', uploadedUrl: result.url } : a
+          )
+        );
+      });
 
-    attempt(1); // 1 automatic retry
+    doPresignedUpload()
+      .catch(() => {
+        console.warn('[Campaign Upload] Presigned upload failed, falling back to direct upload');
+        return doDirectUpload();
+      })
+      .catch((err) => {
+        // Retry direct upload once
+        return new Promise<void>((resolve) => setTimeout(resolve, 1500))
+          .then(() => doDirectUpload())
+          .catch(() => {
+            setAttachments(prev =>
+              prev.map((a, idx) =>
+                idx === index ? { ...a, uploadStatus: 'error', uploadProgress: undefined } : a
+              )
+            );
+            console.error('[Campaign Upload] All upload methods failed:', err);
+          });
+      });
   };
 
   const retryUpload = (index: number) => {

@@ -182,6 +182,50 @@ router.post('/upload-media', upload.single('file'), async (req, res, next) => {
   }
 });
 
+// Request a presigned PUT URL so the browser can upload directly to MinIO
+// (avoids routing large files through the nginx reverse proxy)
+router.post('/presign-upload', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { filename, contentType, size } = req.body as {
+      filename: string;
+      contentType: string;
+      size: number;
+    };
+
+    if (!filename || !contentType) {
+      return res.status(400).json({ error: 'filename e contentType são obrigatórios' });
+    }
+
+    if (size && size > 100 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Arquivo muito grande (máx 100 MB)' });
+    }
+
+    const storage = getStorageService();
+
+    if (!storage.getPresignedUploadUrl) {
+      // MinIO not configured — fall back so the client knows to use direct upload
+      return res.status(501).json({ error: 'Presigned uploads not available (MinIO not configured)' });
+    }
+
+    const result = await storage.getPresignedUploadUrl(filename, contentType, 'campaigns', user.id);
+
+    console.log('[Campaigns] Presigned URL generated for:', filename, '→', result.key);
+
+    return res.json({
+      success: true,
+      presignedUrl: result.presignedUrl,
+      publicUrl: result.publicUrl,
+      key: result.key,
+    });
+  } catch (error) {
+    console.error('[Campaigns] Error generating presigned URL:', error);
+    next(error);
+  }
+});
+
 // Add media URL to campaign
 router.post('/:id/add-media', async (req, res, next) => {
   try {
