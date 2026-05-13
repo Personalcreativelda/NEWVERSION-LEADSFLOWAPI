@@ -3,7 +3,7 @@ import { ConversationList } from '../../inbox/ConversationList';
 import { useInbox } from '../../../hooks/useInbox';
 import { useInboxFilters } from '../../../hooks/useInboxFilters';
 import { useInboxLayout } from '../../../hooks/useInboxLayout';
-import { conversationsApi, contactsApi } from '../../../services/api/inbox';
+import { conversationsApi, contactsApi, groupsApi } from '../../../services/api/inbox';
 import {
     Search, Filter, Plus, X, Wifi, WifiOff, RefreshCw,
     PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
@@ -88,6 +88,21 @@ export default function InboxConversations({
         return ['all', 'unread', 'tags', 'groups']; // default: show all
     });
     const [showFilterConfig, setShowFilterConfig] = useState(false);
+    const [isSyncingGroups, setIsSyncingGroups] = useState(false);
+
+    const syncGroupsFromEvolution = useCallback(async () => {
+        if (isSyncingGroups) return;
+        setIsSyncingGroups(true);
+        try {
+            const result = await groupsApi.sync();
+            await refreshConversations();
+            console.log('[Inbox] Grupos sincronizados:', result.total_synced);
+        } catch (error) {
+            console.error('[Inbox] Erro ao sincronizar grupos:', error);
+        } finally {
+            setIsSyncingGroups(false);
+        }
+    }, [isSyncingGroups, refreshConversations]);
 
     const toggleFilterVisibility = useCallback((id: QuickFilter) => {
         setVisibleFilterIds(prev => {
@@ -577,12 +592,27 @@ export default function InboxConversations({
                                         </button>
                                     </div>
 
+                                    {/* Sync groups button when Grupos tab is active */}
+                                    {quickFilter === 'groups' && (
+                                        <div className="mt-2">
+                                            <button
+                                                onClick={syncGroupsFromEvolution}
+                                                disabled={isSyncingGroups}
+                                                className="flex items-center gap-1.5 text-[11px] text-primary hover:text-primary/80 transition-colors disabled:opacity-60"
+                                            >
+                                                <RefreshCw size={11} className={isSyncingGroups ? 'animate-spin' : ''} />
+                                                {isSyncingGroups ? 'Sincronizando...' : 'Sincronizar grupos'}
+                                            </button>
+                                        </div>
+                                    )}
+
                                     {/* Filter customization dropdown */}
                                     {showFilterConfig && (
                                         <div className="mt-2 p-2 rounded-lg border border-border bg-card shadow-lg">
                                             <div className="flex items-center gap-1.5 mb-2 px-1">
                                                 <Settings2 size={11} className="text-muted-foreground" />
-                                                <span className="text-[11px] font-medium text-muted-foreground">Personalizar filtros</span>
+                                                <span className="text-[11px] font-medium text-muted-foreground flex-1">Personalizar filtros</span>
+                                                <button onClick={() => setShowFilterConfig(false)} className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"><X size={11} /></button>
                                             </div>
                                             {ALL_FILTER_OPTIONS.filter(f => f.id !== 'all').map(f => (
                                                 <label
@@ -765,11 +795,25 @@ export default function InboxConversations({
                             </button>
                         </div>
 
+                        {quickFilter === 'groups' && (
+                            <div className="mt-2">
+                                <button
+                                    onClick={syncGroupsFromEvolution}
+                                    disabled={isSyncingGroups}
+                                    className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-60"
+                                >
+                                    <RefreshCw size={12} className={isSyncingGroups ? 'animate-spin' : ''} />
+                                    {isSyncingGroups ? 'Sincronizando...' : 'Sincronizar grupos'}
+                                </button>
+                            </div>
+                        )}
+
                         {showFilterConfig && (
                             <div className="mt-2 p-2.5 rounded-lg border border-border bg-card shadow-lg">
                                 <div className="flex items-center gap-1.5 mb-2 px-1">
                                     <Settings2 size={12} className="text-muted-foreground" />
-                                    <span className="text-xs font-medium text-muted-foreground">Personalizar filtros</span>
+                                    <span className="text-xs font-medium text-muted-foreground flex-1">Personalizar filtros</span>
+                                    <button onClick={() => setShowFilterConfig(false)} className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"><X size={12} /></button>
                                 </div>
                                 {ALL_FILTER_OPTIONS.filter(f => f.id !== 'all').map(f => (
                                     <label

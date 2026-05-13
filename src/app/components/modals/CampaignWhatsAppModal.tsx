@@ -1,7 +1,7 @@
 // Campaign WhatsApp Modal - Versão Completa com Drag & Drop e Preview
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useMemo } from 'react';
 import {
-  X, MessageSquare, Users, Send, Clock, Settings,
+  X, MessageCircle, Send, Clock, Settings, RefreshCw,
   Paperclip, Image as ImageIcon, ChevronDown, ChevronUp,
   Smile, Bold, Italic, Link2, Check, Eye, Save, Trash2, Video, Smartphone
 } from 'lucide-react';
@@ -12,7 +12,8 @@ import { Textarea } from '../ui/textarea';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { toast } from "sonner";
 import EmojiPicker from 'emoji-picker-react';
-import { channelsApi } from '../../services/api/inbox';
+import { channelsApi, groupsApi } from '../../services/api/inbox';
+import { uploadAttachment } from '../../services/uploadService';
 
 interface Lead {
   id: string;
@@ -32,6 +33,9 @@ interface Attachment {
   caption?: string;
   isExisting?: boolean;
   url?: string;
+  uploadProgress?: number;
+  uploadStatus?: 'uploading' | 'done' | 'error';
+  uploadedUrl?: string;
 }
 
 interface CampaignWhatsAppModalProps {
@@ -48,9 +52,29 @@ interface CampaignWhatsAppModalProps {
 export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampaignCreated, onCampaignUpdated, editingCampaign, isDark = false }: CampaignWhatsAppModalProps) {
   const confirm = useConfirm();
   const [campaignName, setCampaignName] = useState('');
-  const [recipientMode, setRecipientMode] = useState<'all' | 'segments' | 'custom'>('all');
+  const [recipientMode, setRecipientMode] = useState<'all' | 'segments' | 'custom' | 'groups'>('all');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['novo']);
   const [customNumbers, setCustomNumbers] = useState('');
+  const [availableGroups, setAvailableGroups] = useState<any[]>([]);
+  const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [isSyncingGroups, setIsSyncingGroups] = useState(false);
+
+  const syncGroupsFromEvolution = async () => {
+    if (isSyncingGroups) return;
+    setIsSyncingGroups(true);
+    try {
+      await groupsApi.sync(selectedChannel || undefined);
+      const groups = await groupsApi.getAll();
+      setAvailableGroups(groups);
+      toast.success(`${groups.length} grupo(s) sincronizado(s)`);
+    } catch (error) {
+      console.error('Erro ao sincronizar grupos:', error);
+      toast.error('Erro ao sincronizar grupos');
+    } finally {
+      setIsSyncingGroups(false);
+    }
+  };
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [scheduleMode, setScheduleMode] = useState<'now' | 'scheduled'>('now');
@@ -331,6 +355,24 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
     fetchWhatsAppChannels();
   }, [isOpen]);
 
+  // ✅ BUSCAR GRUPOS WHATSAPP
+  useEffect(() => {
+    if (!isOpen || recipientMode !== 'groups') return;
+    const fetchGroups = async () => {
+      setLoadingGroups(true);
+      try {
+        const groups = await groupsApi.getAll();
+        setAvailableGroups(groups);
+      } catch (error) {
+        console.error('❌ Erro ao buscar grupos:', error);
+        toast.error('Erro ao carregar grupos WhatsApp');
+      } finally {
+        setLoadingGroups(false);
+      }
+    };
+    fetchGroups();
+  }, [isOpen, recipientMode]);
+
   // ✅ Status normalization + dynamic funnel stages
   const statusNormalize: Record<string, string> = {
     'new': 'novo', 'novos': 'novo',
@@ -374,6 +416,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         return selectedStatuses.includes(normalized);
       }).length;
     }
+    if (recipientMode === 'groups') return selectedGroupJids.length;
     const numbers = customNumbers.split(',').map(n => n.trim()).filter(n => n.length > 0);
     return numbers.length;
   };
@@ -383,66 +426,74 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []) as File[];
     const validFiles = files.filter(file => {
-      // ✅ LIMITE GERAL: 16MB
+      // ✅ LIMITE GERAL: 16MB (incluindo vídeos)
       if (file.size > 16 * 1024 * 1024) {
         toast.error(`${file.name} excede 16MB`);
         return false;
       }
-
-      // ✅ LIMITE ESPECIAL PARA VÍDEOS: 5MB (para evitar demora no N8N)
-      if (file.type.startsWith('video/') && file.size > 5 * 1024 * 1024) {
-        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-        toast.error(`🎥 Vídeo muito grande: ${file.name} (${sizeMB}MB)\n\n⚠️ Limite para vídeos: 5MB\n💡 Comprima em: handbrake.fr ou freeconvert.com`, { duration: 6000 });
-        return false;
-      }
-
       return true;
     });
 
-    // ✅ Criar previews para imagens e vídeos
+    // Reset input so same file can be re-added
+    e.target.value = '';
+
     const processFiles = async () => {
-      const newAttachments = await Promise.all(
+      const newAttachments: Attachment[] = await Promise.all(
         validFiles.map(async (file) => {
           let preview: string | undefined;
-
-          // Se for imagem ou vídeo, criar preview
           if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
             preview = await new Promise<string>((resolve) => {
               const reader = new FileReader();
-              reader.onload = (e) => resolve(e.target?.result as string);
+              reader.onload = (ev) => resolve(ev.target?.result as string);
               reader.readAsDataURL(file);
             });
           }
-
           return {
             name: file.name,
             size: file.size,
             type: file.type,
             file,
-            preview, // ✅ URL de preview
-            caption: '', // ✅ Legenda vazia inicialmente
+            preview,
+            caption: '',
+            uploadProgress: 0,
+            uploadStatus: 'uploading' as const,
           };
         })
       );
 
-      setAttachments([...attachments, ...newAttachments]);
+      const startIndex = attachments.length;
+      setAttachments(prev => [...prev, ...newAttachments]);
 
-      if (newAttachments.length > 0) {
-        // ✅ Avisar sobre vídeos grandes
-        const videos = newAttachments.filter(a => a.type.startsWith('video/'));
-        if (videos.length > 0) {
-          const totalVideoSize = videos.reduce((sum, v) => sum + v.size, 0);
-          const totalVideoSizeMB = (totalVideoSize / (1024 * 1024)).toFixed(2);
-
-          if (totalVideoSize > 3 * 1024 * 1024) {
-            toast.warning(`⏳ ${videos.length} vídeo(s) anexado(s) (${totalVideoSizeMB}MB)\n\nO envio pode demorar alguns minutos...`, { duration: 4000 });
-          } else {
-            toast.success(`✅ ${newAttachments.length} arquivo(s) anexado(s)`);
-          }
-        } else {
-          toast.success(`✅ ${newAttachments.length} arquivo(s) anexado(s)`);
-        }
-      }
+      // Start XHR upload for each file and track progress
+      newAttachments.forEach((att, i) => {
+        const attachmentIndex = startIndex + i;
+        uploadAttachment(att.file, {
+          onProgress: (percent) => {
+            setAttachments(prev =>
+              prev.map((a, idx) =>
+                idx === attachmentIndex ? { ...a, uploadProgress: percent } : a
+              )
+            );
+          },
+        })
+          .then((result) => {
+            setAttachments(prev =>
+              prev.map((a, idx) =>
+                idx === attachmentIndex
+                  ? { ...a, uploadProgress: 100, uploadStatus: 'done', uploadedUrl: result.url }
+                  : a
+              )
+            );
+          })
+          .catch(() => {
+            setAttachments(prev =>
+              prev.map((a, idx) =>
+                idx === attachmentIndex ? { ...a, uploadStatus: 'error', uploadProgress: undefined } : a
+              )
+            );
+            toast.error(`Erro ao enviar ${att.name}`);
+          });
+      });
     };
 
     processFiles();
@@ -831,6 +882,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       } else if (recipientMode === 'custom') {
         const numbers = customNumbers.split(',').map(n => n.trim()).filter(n => n.length > 0);
         recipients = numbers.map(phone => ({ phone, name: phone }));
+      } else if (recipientMode === 'groups') {
+        recipients = selectedGroupJids.map(jid => {
+          const group = availableGroups.find(g => g.remote_jid === jid);
+          return { phone: jid, name: group?.metadata?.group_name || group?.display_name || jid };
+        });
       }
 
       console.log('[Campaign WhatsApp] 📋 Total de destinatários preparados:', recipients.length);
@@ -1546,11 +1602,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-[#25D366] to-[#128C7E] px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-white" />
-            </div>
+            <MessageCircle className="w-6 h-6 text-white" />
             <div>
-              <h2 className="text-xl text-white font-bold">💬 NOVA CAMPANHA (WhatsApp)</h2>
+              <h2 className="text-xl text-white font-bold">NOVA CAMPANHA (WhatsApp)</h2>
               {autoSaveIndicator && (
                 <p className="text-xs text-white/80">💾 Auto-salvando...</p>
               )}
@@ -1901,7 +1955,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   <div className="mt-3 space-y-2">
                     {attachments.map((att, index) => (
                       <div key={index} className="border border-border rounded-lg p-3 bg-muted/50">
-                        {/* ✅ Info do arquivo */}
+                        {/* Info do arquivo */}
                         <div className="flex items-center gap-3 mb-2">
                           <span className="text-xl">
                             {att.type.startsWith('image/') ? '🖼️' :
@@ -1911,6 +1965,13 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                             <p className="text-xs font-medium text-foreground/80 truncate">{att.name}</p>
                             <p className="text-xs text-muted-foreground">{formatFileSize(att.size)}</p>
                           </div>
+                          {att.uploadStatus === 'uploading' ? (
+                            <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">{att.uploadProgress ?? 0}%</span>
+                          ) : att.uploadStatus === 'done' ? (
+                            <Check className="w-4 h-4 text-[#25D366] flex-shrink-0" />
+                          ) : att.uploadStatus === 'error' ? (
+                            <span className="text-xs text-red-500">Erro</span>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => removeAttachment(index)}
@@ -1919,6 +1980,27 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
+
+                        {/* Progress bar */}
+                        {att.uploadStatus === 'uploading' && (
+                          <div className="mb-2">
+                            <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#25D366] rounded-full transition-all duration-200"
+                                style={{ width: `${att.uploadProgress ?? 0}%` }}
+                              />
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">A enviar...</p>
+                          </div>
+                        )}
+                        {att.uploadStatus === 'done' && (
+                          <div className="mb-1">
+                            <div className="w-full h-1.5 bg-[#25D366]/20 rounded-full overflow-hidden">
+                              <div className="h-full w-full bg-[#25D366] rounded-full" />
+                            </div>
+                            <p className="text-[10px] text-[#25D366] mt-0.5">Upload concluído</p>
+                          </div>
+                        )}
 
                         {/* ✅ Campo de legenda para imagens e vídeos */}
                         {(att.type.startsWith('image/') || att.type.startsWith('video/')) && (
@@ -2177,11 +2259,70 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                       </div>
                     )}
                   </div>
+
+                  {/* Grupos */}
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <label className="flex items-center gap-3 p-2 hover:bg-muted/50 cursor-pointer transition-colors">
+                      <input
+                        type="radio"
+                        name="recipient"
+                        checked={recipientMode === 'groups'}
+                        onChange={() => setRecipientMode('groups')}
+                        className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
+                      />
+                      <span className="flex-1 text-sm text-foreground/80">
+                        Grupos WhatsApp
+                      </span>
+                    </label>
+
+                    {recipientMode === 'groups' && (
+                      <div className="px-2 pb-2 space-y-1 bg-muted/50">
+                        <div className="flex items-center justify-between pt-1 pb-0.5">
+                          <span className="text-xs text-muted-foreground">{availableGroups.length} grupo(s)</span>
+                          <button
+                            type="button"
+                            onClick={syncGroupsFromEvolution}
+                            disabled={isSyncingGroups || loadingGroups}
+                            className="flex items-center gap-1 text-xs text-[#25D366] hover:text-[#128C7E] transition-colors disabled:opacity-60"
+                          >
+                            <RefreshCw size={11} className={isSyncingGroups ? 'animate-spin' : ''} />
+                            {isSyncingGroups ? 'Sincronizando...' : 'Sincronizar'}
+                          </button>
+                        </div>
+                        {loadingGroups ? (
+                          <p className="text-xs text-muted-foreground py-2 pl-2">Carregando grupos...</p>
+                        ) : availableGroups.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2 pl-2">Nenhum grupo encontrado. Clique em Sincronizar.</p>
+                        ) : (
+                          availableGroups.map(group => {
+                            const jid = group.remote_jid;
+                            const name = group.metadata?.group_name || group.display_name || jid;
+                            return (
+                              <label key={jid} className="flex items-center gap-2 pl-7 py-1">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedGroupJids.includes(jid)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedGroupJids([...selectedGroupJids, jid]);
+                                    } else {
+                                      setSelectedGroupJids(selectedGroupJids.filter(j => j !== jid));
+                                    }
+                                  }}
+                                  className="w-3 h-3 text-[#25D366] focus:ring-[#25D366] rounded"
+                                />
+                                <span className="text-xs text-foreground/80">{name}</span>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Total */}
                 <div className="mt-2 flex items-center gap-2 text-[#25D366] bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg">
-                  <Users className="w-4 h-4" />
                   <span className="text-sm font-semibold">
                     Total: {recipientCount.toLocaleString()} destinatários
                   </span>

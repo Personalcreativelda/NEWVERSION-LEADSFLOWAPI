@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
        FROM conversations c
        LEFT JOIN channels ch ON c.channel_id = ch.id
        WHERE c.user_id = $1 
-         AND (c.is_group = true OR c.remote_jid LIKE '%@g.us')
+         AND (c.remote_jid LIKE '%@g.us' OR c.metadata->>'is_group' = 'true')
        ORDER BY c.last_message_at DESC NULLS LAST`,
       [userId]
     );
@@ -66,7 +66,7 @@ router.post('/sync', async (req, res) => {
       const ch = await channelsService.findById(channelId, userId);
       channels = ch ? [ch] : [];
     } else {
-      channels = await channelsService.findByType(userId, 'whatsapp');
+      channels = await channelsService.findByType('whatsapp', userId);
     }
 
     const activeChannels = channels.filter((ch: any) => ch.status === 'active');
@@ -120,7 +120,6 @@ router.post('/sync', async (req, res) => {
             await query(
               `UPDATE conversations 
                SET metadata = metadata || $1::jsonb,
-                   is_group = true,
                    updated_at = NOW()
                WHERE id = $2`,
               [JSON.stringify(metadata), existing.rows[0].id]
@@ -129,8 +128,8 @@ router.post('/sync', async (req, res) => {
           } else {
             // Criar nova conversa para o grupo
             await query(
-              `INSERT INTO conversations (user_id, channel_id, remote_jid, is_group, metadata, status)
-               VALUES ($1, $2, $3, true, $4, 'open')`,
+              `INSERT INTO conversations (user_id, channel_id, remote_jid, metadata, status)
+               VALUES ($1, $2, $3, $4, 'open')`,
               [userId, channel.id, groupJid, JSON.stringify(metadata)]
             );
             totalNew++;

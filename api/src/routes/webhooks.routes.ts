@@ -1041,10 +1041,10 @@ router.post('/evolution/messages', async (req, res) => {
         groupMetadata
       );
 
-      // Garantir flag is_group no banco
-      if (!conversation.is_group) {
+      // Garantir flag is_group nos metadados
+      if (!conversation.metadata?.is_group) {
         await query(
-          `UPDATE conversations SET is_group = true, updated_at = NOW() WHERE id = $1`,
+          `UPDATE conversations SET metadata = metadata || '{"is_group":true}'::jsonb, updated_at = NOW() WHERE id = $1`,
           [conversation.id]
         );
       }
@@ -1454,10 +1454,10 @@ router.post('/evolution/messages', async (req, res) => {
       conversationMetadata
     );
 
-    // Se é grupo, garantir que o flag is_group está setado no banco
-    if (isGroup && !conversation.is_group) {
+    // Se é grupo, garantir que o flag is_group está nos metadados
+    if (isGroup && !conversation.metadata?.is_group) {
       await query(
-        `UPDATE conversations SET is_group = true, updated_at = NOW() WHERE id = $1`,
+        `UPDATE conversations SET metadata = metadata || '{"is_group":true}'::jsonb, updated_at = NOW() WHERE id = $1`,
         [conversation.id]
       );
     }
