@@ -60,18 +60,51 @@ router.post('/sync', async (req, res) => {
     const userId = (req as any).userId;
     const { channelId } = req.body;
 
-    // Buscar canais WhatsApp ativos
-    let channels;
+    // Buscar canais WhatsApp com 3 tentativas em cascata
+    let channels: any[];
     if (channelId) {
       const ch = await channelsService.findById(channelId, userId);
-      channels = ch ? [ch] : [];
+      // Se não encontrado por user_id, tentar sem restrição de user (setup partilhado)
+      if (ch) {
+        channels = [ch];
+      } else {
+        const fallback = await query(`SELECT * FROM channels WHERE id = $1 AND type = 'whatsapp'`, [channelId]);
+        channels = fallback.rows;
+      }
     } else {
-      channels = await channelsService.findByType('whatsapp', userId);
+      // Tentativa 1: canais registados para este user
+      const ownedChannels = await channelsService.findAll(userId);
+      channels = ownedChannels.filter((ch: any) => ch.type === 'whatsapp');
+
+      // Tentativa 2: canais referenciados pelas conversas deste user
+      if (channels.length === 0) {
+        const sharedResult = await query(
+          `SELECT DISTINCT ch.*
+           FROM channels ch
+           INNER JOIN conversations c ON c.channel_id = ch.id
+           WHERE c.user_id = $1 AND ch.type = 'whatsapp'
+           LIMIT 20`,
+          [userId]
+        );
+        channels = sharedResult.rows;
+      }
+
+      // Tentativa 3: qualquer canal WhatsApp ativo na plataforma (setup de instância partilhada)
+      if (channels.length === 0) {
+        const anyResult = await query(
+          `SELECT * FROM channels WHERE type = 'whatsapp' AND status NOT IN ('inactive', 'disconnected', 'deleted', 'error') ORDER BY created_at DESC LIMIT 20`,
+          []
+        );
+        channels = anyResult.rows;
+        if (channels.length > 0) {
+          console.log('[Groups Sync] Using shared WhatsApp instances:', channels.map((ch: any) => ch.name));
+        }
+      }
     }
 
-    const activeChannels = channels.filter((ch: any) => ch.status === 'active');
+    const activeChannels = channels.filter((ch: any) => !['inactive', 'disconnected', 'deleted', 'error'].includes(ch.status));
     if (activeChannels.length === 0) {
-      return res.status(400).json({ error: 'Nenhum canal WhatsApp ativo encontrado' });
+      return res.status(400).json({ error: 'Nenhum canal WhatsApp conectado encontrado' });
     }
 
     let totalSynced = 0;
@@ -118,8 +151,9 @@ router.post('/sync', async (req, res) => {
           if (existing.rows.length > 0) {
             // Atualizar metadata do grupo existente
             await query(
-              `UPDATE conversations 
+              `UPDATE conversations
                SET metadata = metadata || $1::jsonb,
+                   is_group = true,
                    updated_at = NOW()
                WHERE id = $2`,
               [JSON.stringify(metadata), existing.rows[0].id]
@@ -128,8 +162,8 @@ router.post('/sync', async (req, res) => {
           } else {
             // Criar nova conversa para o grupo
             await query(
-              `INSERT INTO conversations (user_id, channel_id, remote_jid, metadata, status)
-               VALUES ($1, $2, $3, $4, 'open')`,
+              `INSERT INTO conversations (user_id, channel_id, remote_jid, is_group, metadata, status)
+               VALUES ($1, $2, $3, true, $4, 'open')`,
               [userId, channel.id, groupJid, JSON.stringify(metadata)]
             );
             totalNew++;

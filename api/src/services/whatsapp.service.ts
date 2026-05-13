@@ -875,7 +875,7 @@ export class WhatsAppService {
     console.log('[WhatsAppService] Fetching all groups for instance:', instanceId);
 
     const endpointsToTry = [
-      { url: `/group/fetchAllGroups/${instanceId}`, method: 'GET' },
+      { url: `/group/fetchAllGroups/${instanceId}?getParticipants=false`, method: 'GET' },
       { url: `/group/fetchAllGroups/${instanceId}`, method: 'POST', body: { getParticipants: false } },
       { url: `/group/findGroupInfos/${instanceId}`, method: 'GET' },
     ];

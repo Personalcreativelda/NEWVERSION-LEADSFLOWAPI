@@ -441,7 +441,7 @@ router.get('/conversations', async (req, res, next) => {
 
     // Transform to frontend format
     const conversations = dbConversations.map((conv: any) => {
-      const isGroupConv = conv.is_group || false;
+      const isGroupConv = conv.is_group || conv.metadata?.is_group || conv.remote_jid?.includes('@g.us') || false;
 
       // Display name: grupos usam group_name; indivíduos usam lead_name ou contact_name
       let displayName: string;

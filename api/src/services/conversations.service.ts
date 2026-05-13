@@ -82,11 +82,12 @@ export class ConversationsService {
         }
 
         // Criar nova conversa
+        const isGroup = remoteJid.includes('@g.us');
         result = await query(
-            `INSERT INTO conversations (user_id, lead_id, channel_id, remote_jid, metadata)
-       VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO conversations (user_id, lead_id, channel_id, remote_jid, is_group, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-            [userId, leadId || null, channelId, remoteJid, JSON.stringify(metadata || {})]
+            [userId, leadId || null, channelId, remoteJid, isGroup, JSON.stringify(metadata || {})]
         );
 
         return result.rows[0];
