@@ -301,6 +301,41 @@ const runPendingMigrations = async () => {
     console.warn('[DB] file_attachments migration warning:', error.message);
   }
 
+  // ── Migration 018: Preservar conversas quando canal é deletado ────────────
+  try {
+    // Tornar channel_id nullable (era NOT NULL antes)
+    await pool.query(`ALTER TABLE conversations ALTER COLUMN channel_id DROP NOT NULL`);
+    console.log('[DB] ✅ conversations.channel_id agora é nullable');
+  } catch (error: any) {
+    // Ignora se já for nullable
+    if (!error.message?.includes('does not exist') && !error.message?.includes('already')) {
+      console.warn('[DB] Migration 018 (nullable channel_id) warning:', error.message);
+    }
+  }
+
+  try {
+    // Trocar FK de ON DELETE CASCADE para ON DELETE SET NULL
+    await pool.query(`
+      ALTER TABLE conversations DROP CONSTRAINT IF EXISTS conversations_channel_id_fkey;
+      ALTER TABLE conversations
+        ADD CONSTRAINT conversations_channel_id_fkey
+        FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE SET NULL;
+    `);
+    console.log('[DB] ✅ conversations.channel_id FK alterado para ON DELETE SET NULL');
+  } catch (error: any) {
+    console.warn('[DB] Migration 018 (SET NULL FK) warning:', error.message);
+  }
+
+  try {
+    // Coluna para guardar info do canal deletado
+    await pool.query(`
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deleted_channel_info JSONB DEFAULT NULL;
+    `);
+    console.log('[DB] ✅ conversations.deleted_channel_info adicionada');
+  } catch (error: any) {
+    console.warn('[DB] Migration 018 (deleted_channel_info) warning:', error.message);
+  }
+
   // ── Migration 019: remarketing_flows ──────────────────────────────────────
   try {
     await pool.query(`

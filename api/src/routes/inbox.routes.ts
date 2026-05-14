@@ -345,7 +345,7 @@ router.get('/conversations', async (req, res, next) => {
     // STEP 1: Get conversations from database that have messages
     // This is the correct approach - like Chatwoot, only show conversations with actual history
     let sql = `
-      SELECT DISTINCT ON (c.id)
+      SELECT
         c.*,
         l.name as lead_name,
         l.email as lead_email,
@@ -414,7 +414,7 @@ router.get('/conversations', async (req, res, next) => {
       paramIndex++;
     }
 
-    sql += ` ORDER BY c.id, c.last_message_at DESC NULLS LAST`;
+    sql += ` ORDER BY c.last_message_at DESC NULLS LAST`;
     sql += ` LIMIT $${paramIndex}`;
     params.push(limit);
     paramIndex++;
