@@ -43,6 +43,7 @@ export function useInbox(options: UseInboxOptions = {}) {
 
     const refreshConversationsRef = useRef<() => void>(() => {});
     const refreshMessagesRef      = useRef<() => void>(() => {});
+    const conversationsRef        = useRef<ConversationWithDetails[]>([]);
 
     // ── Conversations (TanStack Query — cache + IDB persistence) ─────────────
     const {
@@ -62,6 +63,10 @@ export function useInbox(options: UseInboxOptions = {}) {
     useEffect(() => {
         refreshConversationsRef.current = refreshConversations;
     }, [refreshConversations]);
+
+    useEffect(() => {
+        conversationsRef.current = conversations;
+    }, [conversations]);
 
     // ── Derive selectedConversation ───────────────────────────────────────────
     // Priority: fresh data from list → persisted snapshot → null
@@ -132,7 +137,16 @@ export function useInbox(options: UseInboxOptions = {}) {
                     } else {
                         patchCachedMessage(data.conversationId, data.message);
                     }
-                    if (data.message.direction === 'in') playNotificationSound();
+                    if (data.message.direction === 'in') {
+                        const conv = conversationsRef.current.find((c) => c.id === data.conversationId);
+                        const isGroup = conv && (
+                            conv.metadata?.jid?.includes('@g.us') ||
+                            (conv as any).is_group ||
+                            conv.metadata?.is_group ||
+                            conv.contact?.is_group
+                        );
+                        if (!isGroup) playNotificationSound();
+                    }
                     addNewMessageToList(data.conversationId, data.message);
                 },
                 [selectedConversation?.id, addMessage, addNewMessageToList, playNotificationSound],
