@@ -59,6 +59,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
   const [showPreview, setShowPreview] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [campaignId, setCampaignId] = useState<string | null>(null);
+  const [resolvedSender, setResolvedSender] = useState<{ email: string; name: string; source: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const htmlInputRef = useRef<HTMLInputElement>(null);
@@ -104,6 +105,47 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
     setShowTemplates(false);
     toast.success('Modelo aplicado com sucesso!');
   };
+
+  // Resolve which SMTP/email source will be used (channel or integrations)
+  useEffect(() => {
+    if (!isOpen) return;
+    const token = localStorage.getItem('leadflow_access_token');
+    if (!token) return;
+    // Check active email channel
+    fetch(`${(import.meta as any).env.VITE_API_URL}/api/channels`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        // API returns array directly
+        const list: any[] = Array.isArray(data) ? data : (data?.channels || data?.data || []);
+        const emailChannel = list.find((ch: any) => ch.type === 'email' && ch.status === 'active');
+        if (emailChannel?.credentials?.email) {
+          setResolvedSender({
+            email: emailChannel.credentials.email,
+            name: emailChannel.credentials.from_name || emailChannel.name,
+            source: `Canal de email: ${emailChannel.name}`,
+          });
+          return;
+        }
+        // Fallback: check localStorage SMTP
+        const smtpHost = localStorage.getItem('smtp_host');
+        const smtpEmail = localStorage.getItem('smtp_from_email');
+        const smtpName = localStorage.getItem('smtp_from_name');
+        if (smtpHost && smtpEmail) {
+          setResolvedSender({ email: smtpEmail, name: smtpName || '', source: 'SMTP (Integrações)' });
+        } else {
+          setResolvedSender(null);
+        }
+      })
+      .catch(() => {
+        const smtpHost = localStorage.getItem('smtp_host');
+        const smtpEmail = localStorage.getItem('smtp_from_email');
+        if (smtpHost && smtpEmail) {
+          setResolvedSender({ email: smtpEmail, name: localStorage.getItem('smtp_from_name') || '', source: 'SMTP (Integrações)' });
+        }
+      });
+  }, [isOpen]);
 
   // ✅ Efeito para carregar dados da campanha ao editar
   useEffect(() => {
@@ -390,22 +432,8 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
       }
 
       // 2. DISPARAR ENVIO DIRETO PELO BACKEND
-      const smtp_settings = {
-        host: localStorage.getItem('smtp_host'),
-        port: localStorage.getItem('smtp_port'),
-        user: localStorage.getItem('smtp_user'),
-        pass: localStorage.getItem('smtp_password'),
-        fromEmail: localStorage.getItem('smtp_from_email'),
-        fromName: localStorage.getItem('smtp_from_name')
-      };
-
-      if (!smtp_settings.host || !smtp_settings.user || !smtp_settings.pass) {
-        toast.warning('⚠️ Campanha salva, mas configurações SMTP não encontradas.');
-        toast.info('Configure o SMTP em Ajustes > Integrações.');
-        setIsSending(false);
-        return;
-      }
-
+      // Backend resolves SMTP automatically: email channel → smtp_config settings → system SMTP env
+      // Do NOT pass smtp_settings from frontend to avoid using stale/wrong localStorage credentials
       if (scheduleMode === 'now') {
         const token = localStorage.getItem('leadflow_access_token');
         const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/email-campaigns/${activeCampaignId}/send`, {
@@ -414,7 +442,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ smtp_settings })
+          body: JSON.stringify({})
         });
 
         if (!response.ok) {
@@ -538,24 +566,10 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
     setIsSending(true);
 
     try {
-      const smtp_settings = {
-        host: localStorage.getItem('smtp_host'),
-        port: localStorage.getItem('smtp_port'),
-        user: localStorage.getItem('smtp_user'),
-        pass: localStorage.getItem('smtp_password'),
-        fromEmail: localStorage.getItem('smtp_from_email'),
-        fromName: localStorage.getItem('smtp_from_name')
-      };
-
-      if (!smtp_settings.host || !smtp_settings.user || !smtp_settings.pass) {
-        toast.error('⚠️ Configure o SMTP em Ajustes > Integrações antes de testar.');
-        setIsSending(false);
-        return;
-      }
-
       // 0. Processar anexos (subir para MinIO se necessário)
       const processedAttachments = await processAttachments(attachments);
 
+      // Backend resolves SMTP automatically: email channel → smtp_config settings → system SMTP env
       const token = localStorage.getItem('leadflow_access_token');
       const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/email-campaigns/test`, {
         method: 'POST',
@@ -564,7 +578,6 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          smtp_settings,
           subject,
           message: useHtml ? htmlContent : message,
           is_html: useHtml,
@@ -1065,9 +1078,16 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                   </div>
                   <div className="col-span-2 mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
                     <span className="text-muted-foreground">Enviando de:</span>
-                    <p className="font-semibold text-foreground text-xs truncate">
-                      {localStorage.getItem('smtp_from_name') || 'Não configurado'} ({localStorage.getItem('smtp_from_email') || 'Não configurado'})
-                    </p>
+                    {resolvedSender ? (
+                      <p className="font-semibold text-foreground text-xs truncate">
+                        {resolvedSender.name ? `${resolvedSender.name} <${resolvedSender.email}>` : resolvedSender.email}
+                        <span className="text-muted-foreground font-normal ml-1">({resolvedSender.source})</span>
+                      </p>
+                    ) : (
+                      <p className="font-semibold text-amber-600 dark:text-amber-400 text-xs">
+                        ⚠️ Nenhum canal de email ou SMTP configurado
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

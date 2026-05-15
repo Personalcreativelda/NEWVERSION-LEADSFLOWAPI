@@ -24,6 +24,7 @@ interface UseWebSocketOptions {
     onUserTyping?: (data: WebSocketEvents['user_typing']) => void;
     onLeadFunnelUpdate?: (data: { leadId: string; leadName: string; previousStatus: string; newStatus: string; conversationId: string; triggeredBy: string; assistantName: string; timestamp: string }) => void;
     onAiTaskCreated?: (data: { task: any; timestamp: string }) => void;
+    onNewConversation?: (data: { conversationId: string; conversation?: any; timestamp: string }) => void;
     onReconnect?: () => void; // Callback when reconnected
 }
 
@@ -124,6 +125,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             });
 
             socket.on('new_message', (data) => callbacksRef.current.onNewMessage?.(data));
+            socket.on('new_conversation', (data) => callbacksRef.current.onNewConversation?.(data));
             socket.on('message_status_update', (data) => callbacksRef.current.onMessageStatusUpdate?.(data));
             socket.on('conversation_update', (data) => callbacksRef.current.onConversationUpdate?.(data));
             socket.on('unread_count_update', (data) => callbacksRef.current.onUnreadCountUpdate?.(data));

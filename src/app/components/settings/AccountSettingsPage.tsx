@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Upload, User, Loader2, Shield, Key, Smartphone, Clock, Copy, Trash2, Plus, Eye, EyeOff, Lock } from 'lucide-react';
+import { Upload, User, Loader2, Shield, Key, Smartphone, Clock, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { toast } from "sonner";
 import { getApiBaseUrl } from '../../utils/api-client';
 import { useConfirm } from '../ui/ConfirmDialog';
+import { TeamSettingsPage } from './TeamSettingsPage';
 
 interface AccountSettingsPageProps {
   user: any;
@@ -25,7 +26,7 @@ interface ApiToken {
   created_at: string;
 }
 
-type TabType = 'avatar' | 'name' | 'security';
+type TabType = 'avatar' | 'name' | 'security' | 'team';
 
 export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: AccountSettingsPageProps) {
   const confirm = useConfirm();
@@ -248,9 +249,10 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
   };
 
   const tabs = [
-    { id: 'avatar' as TabType, label: 'Avatar', icon: Upload },
-    { id: 'name' as TabType, label: 'Nome', icon: User },
-    { id: 'security' as TabType, label: 'Segurança', icon: Shield },
+    { id: 'avatar'    as TabType, label: 'Avatar',    icon: Upload },
+    { id: 'name'      as TabType, label: 'Nome',      icon: User },
+    { id: 'security'  as TabType, label: 'Segurança', icon: Shield },
+    { id: 'team'      as TabType, label: 'Equipa',    icon: Users },
   ];
 
   return (
@@ -288,7 +290,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
       </div>
 
       {/* Tab Content */}
-      <div className={activeTab !== 'security' ? 'bg-card dark:bg-card rounded-xl border border-border dark:border-border p-6' : ''}>
+      <div className={activeTab !== 'security' && activeTab !== 'team' ? 'bg-card dark:bg-card rounded-xl border border-border dark:border-border p-6' : ''}>
         {activeTab === 'avatar' && (
           <div className="space-y-6">
             <div>
@@ -339,6 +341,10 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'team' && (
+          <TeamSettingsPage currentUser={user} />
         )}
 
         {activeTab === 'security' && (

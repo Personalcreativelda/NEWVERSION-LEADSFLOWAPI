@@ -230,6 +230,20 @@ export class WebSocketService {
     }
 
     /**
+     * Emitir nova conversa criada (primeiro contato de um número desconhecido)
+     */
+    emitNewConversation(userId: string, data: {
+        conversationId: string;
+        conversation?: any;
+    }) {
+        console.log(`[WebSocket] Emitindo nova conversa para usuário ${userId}: ${data.conversationId}`);
+        this.io.to(`user:${userId}`).emit('new_conversation', {
+            ...data,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    /**
      * Emitir evento genérico para um usuário específico (usado pelo AssistantProcessor)
      */
     emitToUser(userId: string, event: string, data: any) {

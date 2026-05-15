@@ -371,6 +371,362 @@ const runPendingMigrations = async () => {
   } catch (error: any) {
     console.warn('[DB] remarketing_flows migration warning:', error.message);
   }
+
+  // ── Migration 021: Team Inbox ─────────────────────────────────────────────
+  try {
+    // Colunas de atribuição em conversations
+    await pool.query(`
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS assignee_id  UUID REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS assigned_team VARCHAR(100) DEFAULT NULL;
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS assigned_at  TIMESTAMPTZ DEFAULT NULL;
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS assigned_by  UUID REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE conversations ADD COLUMN IF NOT EXISTS priority     VARCHAR(20)  NOT NULL DEFAULT 'normal';
+    `);
+    console.log('[DB] ✅ conversations team columns added');
+  } catch (error: any) {
+    console.warn('[DB] Migration 021 (conversations columns) warning:', error.message);
+  }
+
+  try {
+    // Ampliar status constraint para incluir 'resolved'
+    await pool.query(`
+      DO $$
+      BEGIN
+        ALTER TABLE conversations DROP CONSTRAINT IF EXISTS conversations_status_check;
+        ALTER TABLE conversations ADD CONSTRAINT conversations_status_check
+          CHECK (status IN ('open','pending','resolved','closed','snoozed'));
+      EXCEPTION WHEN others THEN
+        RAISE NOTICE 'conversations_status_check: %', SQLERRM;
+      END $$;
+    `);
+    console.log('[DB] ✅ conversations status constraint updated (resolved added)');
+  } catch (error: any) {
+    console.warn('[DB] Migration 021 (status constraint) warning:', error.message);
+  }
+
+  try {
+    // Índices
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_conversations_assignee_id ON conversations(assignee_id);
+      CREATE INDEX IF NOT EXISTS idx_conversations_priority    ON conversations(priority);
+    `);
+  } catch (error: any) {
+    console.warn('[DB] Migration 021 (indexes) warning:', error.message);
+  }
+
+  try {
+    // Tabela team_members
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS team_members (
+        id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+        owner_id     UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        user_id      UUID         REFERENCES users(id) ON DELETE SET NULL,
+        email        VARCHAR(255) NOT NULL,
+        name         VARCHAR(255) NOT NULL,
+        role         VARCHAR(50)  NOT NULL DEFAULT 'agent',
+        team         VARCHAR(100) DEFAULT NULL,
+        is_active    BOOLEAN      NOT NULL DEFAULT TRUE,
+        invited_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        accepted_at  TIMESTAMPTZ  DEFAULT NULL,
+        avatar_url   TEXT         DEFAULT NULL,
+        created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(owner_id, email)
+      );
+      CREATE INDEX IF NOT EXISTS idx_team_members_owner_id ON team_members(owner_id);
+      CREATE INDEX IF NOT EXISTS idx_team_members_user_id  ON team_members(user_id);
+    `);
+    console.log('[DB] ✅ team_members table created/verified');
+  } catch (error: any) {
+    console.warn('[DB] Migration 021 (team_members) warning:', error.message);
+  }
+
+  try {
+    // Tabela conversation_assignments (histórico)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversation_assignments (
+        id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id UUID        NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        user_id         UUID        NOT NULL,
+        assignee_id     UUID        REFERENCES users(id) ON DELETE SET NULL,
+        assigned_team   VARCHAR(100) DEFAULT NULL,
+        assigned_by     UUID        REFERENCES users(id) ON DELETE SET NULL,
+        note            TEXT        DEFAULT NULL,
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_conv_assignments_conv     ON conversation_assignments(conversation_id);
+      CREATE INDEX IF NOT EXISTS idx_conv_assignments_assignee ON conversation_assignments(assignee_id);
+    `);
+    console.log('[DB] ✅ conversation_assignments table created/verified');
+  } catch (error: any) {
+    console.warn('[DB] Migration 021 (conversation_assignments) warning:', error.message);
+  }
+
+  try {
+    // Tabela conversation_internal_notes
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversation_internal_notes (
+        id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id UUID        NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        author_id       UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content         TEXT        NOT NULL,
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_internal_notes_conv ON conversation_internal_notes(conversation_id);
+    `);
+    console.log('[DB] ✅ conversation_internal_notes table created/verified');
+  } catch (error: any) {
+    console.warn('[DB] Migration 021 (internal_notes) warning:', error.message);
+  }
+
+  try {
+    // Tabela conversation_activity_logs
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversation_activity_logs (
+        id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id UUID        NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        actor_id        UUID        REFERENCES users(id) ON DELETE SET NULL,
+        action          VARCHAR(100) NOT NULL,
+        metadata        JSONB       DEFAULT '{}',
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_conv  ON conversation_activity_logs(conversation_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_actor ON conversation_activity_logs(actor_id);
+    `);
+    console.log('[DB] ✅ conversation_activity_logs table created/verified');
+  } catch (error: any) {
+    console.warn('[DB] Migration 021 (activity_logs) warning:', error.message);
+  }
+
+  try {
+    // Tabela routing_rules (estrutura para automação futura)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS routing_rules (
+        id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        owner_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name        VARCHAR(255) NOT NULL,
+        is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+        priority    INTEGER      NOT NULL DEFAULT 0,
+        conditions  JSONB        NOT NULL DEFAULT '[]',
+        action_type VARCHAR(50)  NOT NULL DEFAULT 'assign_agent',
+        action_data JSONB        NOT NULL DEFAULT '{}',
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_routing_rules_owner ON routing_rules(owner_id);
+    `);
+    console.log('[DB] ✅ routing_rules table created/verified');
+  } catch (error: any) {
+    console.warn('[DB] Migration 021 (routing_rules) warning:', error.message);
+  }
+
+  // ── Migration 022: Workspaces + Workspace Invites (multi-tenant) ─────────────
+
+  try {
+    // workspaces: one per owner account (1-to-1 for now, extensible to N later)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS workspaces (
+        id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+        owner_id        UUID         NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        name            VARCHAR(255) NOT NULL,
+        avatar_url      TEXT         DEFAULT NULL,
+        plan            VARCHAR(50)  NOT NULL DEFAULT 'free',
+        plan_limits     JSONB        DEFAULT NULL,
+        plan_expires_at TIMESTAMPTZ  DEFAULT NULL,
+        settings        JSONB        NOT NULL DEFAULT '{}',
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_workspaces_owner_id ON workspaces(owner_id);
+    `);
+    console.log('[DB] ✅ workspaces table created/verified');
+  } catch (error: any) {
+    console.warn('[DB] Migration 022 (workspaces) warning:', error.message);
+  }
+
+  try {
+    // Backfill one workspace per existing user
+    await pool.query(`
+      INSERT INTO workspaces (owner_id, name, plan, plan_limits)
+      SELECT id,
+             COALESCE(NULLIF(TRIM(name), ''), email),
+             COALESCE(plan, subscription_plan, 'free'),
+             plan_limits
+      FROM users
+      ON CONFLICT (owner_id) DO NOTHING;
+    `);
+    console.log('[DB] ✅ workspaces backfilled from users');
+  } catch (error: any) {
+    console.warn('[DB] Migration 022 (workspaces backfill) warning:', error.message);
+  }
+
+  try {
+    // workspace_invites: token-based email invites
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS workspace_invites (
+        id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID         NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        email        VARCHAR(255) NOT NULL,
+        role         VARCHAR(50)  NOT NULL DEFAULT 'agent',
+        token        VARCHAR(255) NOT NULL UNIQUE,
+        status       VARCHAR(50)  NOT NULL DEFAULT 'pending'
+                     CHECK (status IN ('pending','accepted','expired','revoked')),
+        invited_by   UUID         REFERENCES users(id) ON DELETE SET NULL,
+        expires_at   TIMESTAMPTZ  NOT NULL DEFAULT (NOW() + INTERVAL '7 days'),
+        accepted_at  TIMESTAMPTZ  DEFAULT NULL,
+        accepted_by  UUID         REFERENCES users(id) ON DELETE SET NULL,
+        created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(workspace_id, email)
+      );
+      CREATE INDEX IF NOT EXISTS idx_workspace_invites_workspace ON workspace_invites(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_workspace_invites_token     ON workspace_invites(token);
+      CREATE INDEX IF NOT EXISTS idx_workspace_invites_email     ON workspace_invites(email);
+    `);
+    console.log('[DB] ✅ workspace_invites table created/verified');
+  } catch (error: any) {
+    console.warn('[DB] Migration 022 (workspace_invites) warning:', error.message);
+  }
+
+  try {
+    // Add workspace_id to team_members and backfill
+    await pool.query(`
+      ALTER TABLE team_members
+        ADD COLUMN IF NOT EXISTS workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE;
+    `);
+    await pool.query(`
+      UPDATE team_members tm
+      SET    workspace_id = w.id
+      FROM   workspaces w
+      WHERE  w.owner_id = tm.owner_id
+        AND  tm.workspace_id IS NULL;
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_team_members_workspace_id ON team_members(workspace_id);
+    `);
+    console.log('[DB] ✅ team_members.workspace_id added/backfilled');
+  } catch (error: any) {
+    console.warn('[DB] Migration 022 (team_members.workspace_id) warning:', error.message);
+  }
+
+  try {
+    // Add workspace_id to conversations and backfill
+    await pool.query(`
+      ALTER TABLE conversations
+        ADD COLUMN IF NOT EXISTS workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE;
+    `);
+    await pool.query(`
+      UPDATE conversations c
+      SET    workspace_id = w.id
+      FROM   workspaces w
+      WHERE  w.owner_id = c.user_id
+        AND  c.workspace_id IS NULL;
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_conversations_workspace_id ON conversations(workspace_id);
+    `);
+    console.log('[DB] ✅ conversations.workspace_id added/backfilled');
+  } catch (error: any) {
+    console.warn('[DB] Migration 022 (conversations.workspace_id) warning:', error.message);
+  }
+
+  try {
+    // Add status column to team_members for invite lifecycle
+    await pool.query(`
+      ALTER TABLE team_members
+        ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'active'
+        CHECK (status IN ('pending','active','inactive'));
+    `);
+    // Mark rows without user_id (never accepted) as pending
+    await pool.query(`
+      UPDATE team_members SET status = 'pending'
+      WHERE user_id IS NULL AND status = 'active';
+    `);
+    console.log('[DB] ✅ team_members.status added/backfilled');
+  } catch (error: any) {
+    console.warn('[DB] Migration 022 (team_members.status) warning:', error.message);
+  }
+
+  try {
+    // Add invited_by to team_members
+    await pool.query(`
+      ALTER TABLE team_members
+        ADD COLUMN IF NOT EXISTS invited_by UUID REFERENCES users(id) ON DELETE SET NULL;
+    `);
+    await pool.query(`
+      ALTER TABLE team_members
+        ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ DEFAULT NULL;
+    `);
+    // Backfill joined_at from accepted_at
+    await pool.query(`
+      UPDATE team_members SET joined_at = accepted_at WHERE accepted_at IS NOT NULL AND joined_at IS NULL;
+    `);
+    console.log('[DB] ✅ team_members.invited_by / joined_at added');
+  } catch (error: any) {
+    console.warn('[DB] Migration 022 (team_members invited_by/joined_at) warning:', error.message);
+  }
+
+  // Auto-create workspace when new users register (trigger)
+  try {
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION create_workspace_for_user()
+      RETURNS TRIGGER LANGUAGE plpgsql AS $$
+      BEGIN
+        INSERT INTO workspaces (owner_id, name, plan, plan_limits)
+        VALUES (
+          NEW.id,
+          COALESCE(NULLIF(TRIM(NEW.name), ''), NEW.email),
+          COALESCE(NEW.plan, NEW.subscription_plan, 'free'),
+          NEW.plan_limits
+        )
+        ON CONFLICT (owner_id) DO NOTHING;
+        RETURN NEW;
+      END;
+      $$;
+
+      DROP TRIGGER IF EXISTS trg_create_workspace_for_user ON users;
+      CREATE TRIGGER trg_create_workspace_for_user
+        AFTER INSERT ON users
+        FOR EACH ROW EXECUTE FUNCTION create_workspace_for_user();
+    `);
+    console.log('[DB] ✅ workspace auto-create trigger installed');
+  } catch (error: any) {
+    console.warn('[DB] Migration 022 (workspace trigger) warning:', error.message);
+  }
+
+  // Link pending team_members.user_id when matching user registers (trigger)
+  try {
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION link_pending_team_member()
+      RETURNS TRIGGER LANGUAGE plpgsql AS $$
+      BEGIN
+        UPDATE team_members
+        SET user_id   = NEW.id,
+            status    = 'active',
+            joined_at = NOW()
+        WHERE email = NEW.email
+          AND user_id IS NULL;
+
+        UPDATE workspace_invites
+        SET status      = 'accepted',
+            accepted_at = NOW(),
+            accepted_by = NEW.id
+        WHERE email = NEW.email
+          AND status = 'pending';
+
+        RETURN NEW;
+      END;
+      $$;
+
+      DROP TRIGGER IF EXISTS trg_link_pending_team_member ON users;
+      CREATE TRIGGER trg_link_pending_team_member
+        AFTER INSERT ON users
+        FOR EACH ROW EXECUTE FUNCTION link_pending_team_member();
+    `);
+    console.log('[DB] ✅ pending team member link trigger installed');
+  } catch (error: any) {
+    console.warn('[DB] Migration 022 (link pending member trigger) warning:', error.message);
+  }
 };
 
 export const initDatabase = async () => {

@@ -12,6 +12,7 @@ interface EmailChannel {
   id: string;
   user_id: string;
   name: string;
+  created_at: string;
   credentials: {
     email: string;
     password: string;
@@ -28,7 +29,7 @@ interface EmailChannel {
 class EmailPollingService {
   private intervalId: NodeJS.Timeout | null = null;
   private isPolling = false;
-  private pollIntervalMs = 60000; // Poll every 60 seconds
+  private pollIntervalMs = 30000; // Poll every 30 seconds
   private lastUids: Map<string, number> = new Map(); // channelId -> lastUID
 
   start() {
@@ -36,8 +37,8 @@ class EmailPollingService {
 
     console.log('[Email Polling] Starting email polling service...');
 
-    // Initial poll after 10 seconds
-    setTimeout(() => this.pollAllChannels(), 10000);
+    // Initial poll after 3 seconds
+    setTimeout(() => this.pollAllChannels(), 3000);
 
     // Then poll every interval
     this.intervalId = setInterval(() => this.pollAllChannels(), this.pollIntervalMs);
@@ -119,9 +120,8 @@ class EmailPollingService {
       try {
         // Get the last known UID for this channel
         let lastUid = this.lastUids.get(channel.id) || 0;
-        const isFirstSync = lastUid === 0;
 
-        // If first time, check what we already have in DB
+        // If first time, check what we already have in DB (e.g. after server restart)
         if (lastUid === 0) {
           const lastMsg = await query(
             `SELECT metadata->>'imap_uid' as uid FROM messages
@@ -135,34 +135,23 @@ class EmailPollingService {
           }
         }
 
-        let searchCriteria: string;
         let newCount = 0;
-        const maxMessages = isFirstSync && lastUid === 0 ? 20 : 100;
+        const maxMessages = 100;
         let processed = 0;
 
-        if (lastUid > 0) {
-          // Incremental sync: fetch only new messages after last known UID
-          searchCriteria = `${lastUid + 1}:*`;
-        } else {
-          // First time sync: fetch only recent emails (last 30 days)
-          // Use mailbox uidNext to calculate starting point for recent messages
-          const mailboxStatus = client.mailbox;
-          const uidNext = (mailboxStatus as any)?.uidNext || 0;
-
-          if (uidNext > 0) {
-            // Fetch only the last ~50 UIDs to find the 20 most recent
-            const startUid = Math.max(1, uidNext - 50);
-            searchCriteria = `${startUid}:*`;
-            console.log(`[Email Polling] First sync for ${channel.name}: fetching UIDs ${startUid}:* (uidNext: ${uidNext})`);
-          } else {
-            // Fallback: use date-based search for last 30 days
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            const dateStr = thirtyDaysAgo.toISOString().split('T')[0].replace(/-/g, '');
-            searchCriteria = '1:*';
-            console.log(`[Email Polling] First sync for ${channel.name}: fetching all (fallback)`);
-          }
+        if (lastUid === 0) {
+          // True first sync (no prior messages): set baseline at current uidNext so
+          // only emails that arrive AFTER this moment will be fetched.
+          // This prevents importing the user's entire email history.
+          const uidNext = (client.mailbox as any)?.uidNext || 1;
+          lastUid = Math.max(0, uidNext - 1);
+          this.lastUids.set(channel.id, lastUid);
+          console.log(`[Email Polling] Channel ${channel.name}: first sync baseline at UID ${lastUid} — watching for new emails`);
+          return; // Nothing to import right now; next poll will see new emails
         }
+
+        // Incremental sync: fetch only messages after the last known UID
+        const searchCriteria = `${lastUid + 1}:*`;
 
         for await (const msg of client.fetch(searchCriteria, {
           envelope: true,

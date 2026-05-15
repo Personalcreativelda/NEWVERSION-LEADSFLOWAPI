@@ -28,6 +28,7 @@ interface ChatHeaderProps {
     onEditLead?: () => void;
     onDeleteConversation?: () => void;
     onSearchInChat?: (query: string) => void;
+    onResolve?: () => void;
     layoutControls?: React.ReactNode;
 }
 
@@ -45,7 +46,7 @@ const CHANNEL_CONFIG: Record<string, { label: string; color: string; icon: React
     twilio: { label: 'SMS', color: '#0d9488', icon: Smartphone },
 };
 
-export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat, layoutControls }: ChatHeaderProps) {
+export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat, onResolve, layoutControls }: ChatHeaderProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -188,14 +189,26 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                     </div>
                 ) : (
                     <>
-                        {/* Resolve button (ManyChat-style) */}
-                        <button 
-                            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground hover:border-border/80"
-                            title="Resolver conversa"
-                        >
-                            <CheckCircle2 size={14} />
-                            Resolve
-                        </button>
+                        {/* Resolve / Reopen button (ManyChat-style) */}
+                        {conversation.status === 'resolved' ? (
+                            <button
+                                onClick={onResolve}
+                                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 transition-all duration-150 hover:bg-emerald-500/20"
+                                title="Reabrir conversa"
+                            >
+                                <CheckCircle2 size={14} />
+                                Reabrir
+                            </button>
+                        ) : (
+                            <button
+                                onClick={onResolve}
+                                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-muted-foreground transition-all duration-150 hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30"
+                                title="Resolver conversa"
+                            >
+                                <CheckCircle2 size={14} />
+                                Resolver
+                            </button>
+                        )}
 
                         <button 
                             onClick={() => setShowSearch(true)}

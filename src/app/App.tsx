@@ -15,6 +15,7 @@ import SettingsPage from './components/settings/SettingsPage';
 import AdminPage from './components/settings/AdminPage';
 import SetupTestUser from './components/SetupTestUser';
 import AgentCallPage from './components/pages/AgentCallPage';
+import AcceptInvitePage from './components/auth/AcceptInvitePage';
 import UpgradeModal from './components/modals/UpgradeModal';
 import PlanUpgradeSuccessModal from './components/modals/PlanUpgradeSuccessModal';
 import { MetaPixel } from './components/MetaPixel';
@@ -82,7 +83,7 @@ declare global {
 }
 
 // LeadsFlow SAAS - Main App Component
-type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'settings' | 'admin' | 'setup' | 'reset-password' | 'forgot-password' | 'agent-call';
+type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'settings' | 'admin' | 'setup' | 'reset-password' | 'forgot-password' | 'agent-call' | 'accept-invite';
 
 interface AppProps {
   initialPage?: Page;
@@ -106,6 +107,7 @@ const getPageFromPath = (): Page | null => {
     '/admin': 'admin',
     '/setup': 'setup',
     '/agent-call': 'agent-call',
+    '/accept-invite': 'accept-invite',
   };
 
   return pageMap[cleanPath] || null;
@@ -138,6 +140,7 @@ const setPagePath = (page: Page) => {
     'admin': '/admin',
     'setup': '/setup',
     'agent-call': '/agent-call',
+    'accept-invite': '/accept-invite',
     'landing': '/',
     'dashboard': '/',
   };
@@ -713,6 +716,13 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     try {
       console.log('[checkAuth] Starting authentication check...');
 
+      // Standalone public pages — never redirect away, just stop loading
+      const pageAtStart = getPageFromPath();
+      if (pageAtStart === 'accept-invite' || pageAtStart === 'agent-call') {
+        setLoading(false);
+        return;
+      }
+
       // Skip auth check if we're in an OAuth callback - let the OAuth handler process first
       const hash = window.location.hash;
       if (hash.startsWith('#oauth_callback')) {
@@ -746,11 +756,11 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
           // Navigate to the page the user originally requested, if it requires auth
           // Public pages (login, signup, landing) are redirected to dashboard
           const pageFromUrl = getPageFromPath();
-          const authRequiredPages: Page[] = ['dashboard', 'settings', 'admin', 'agent-call'];
-          if (pageFromUrl === 'agent-call') {
-            // agent-call is standalone, don't change page
+          // Standalone pages — never override, they handle their own flow
+          if (pageFromUrl === 'agent-call' || pageFromUrl === 'accept-invite') {
             return;
           }
+          const authRequiredPages: Page[] = ['dashboard', 'settings', 'admin'];
           if (pageFromUrl && authRequiredPages.includes(pageFromUrl)) {
             setCurrentPage(pageFromUrl);
           } else {
@@ -793,6 +803,10 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
         return;
       }
 
+      // Don't redirect if already on a standalone public page
+      const currentPageFromUrl = getPageFromPath();
+      if (currentPageFromUrl === 'accept-invite' || currentPageFromUrl === 'agent-call') return;
+
       console.log('[checkAuth] No authentication found, redirecting to home');
       setCurrentPage(homePage);
     } catch (error) {
@@ -832,6 +846,13 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
   useEffect(() => {
     const initialize = async () => {
       console.log('[Initialize] Starting... OAUTH_PROCESSED:', OAUTH_PROCESSED);
+
+      // Never interfere with standalone public pages
+      const initPageFromUrl = getPageFromPath();
+      if (initPageFromUrl === 'accept-invite' || initPageFromUrl === 'agent-call') {
+        setLoading(false);
+        return;
+      }
 
       // If OAuth was already processed on script load, load user and go to dashboard
       if (OAUTH_PROCESSED) {
@@ -954,9 +975,12 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     }
   };
 
-  // Agent call page is standalone - render it immediately without auth loading
+  // Standalone pages — render without waiting for auth
   if (currentPage === 'agent-call') {
     return <AgentCallPage />;
+  }
+  if (currentPage === 'accept-invite') {
+    return <AcceptInvitePage onSuccess={() => { window.history.replaceState({}, '', '/'); window.location.reload(); }} />;
   }
 
   if (loading) {

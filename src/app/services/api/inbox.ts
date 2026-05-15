@@ -8,7 +8,12 @@ import type {
     MessageWithSender,
     AIAssistant,
     ApiResponse,
-    PaginatedResponse
+    PaginatedResponse,
+    TeamMember,
+    InternalNote,
+    ActivityLog,
+    AssignmentHistory,
+    RoutingRule,
 } from '../../types/inbox';
 
 export interface MarketplaceTemplate {
@@ -583,11 +588,90 @@ export const conversationTagsApi = {
     }
 };
 
+// ============================================
+// TEAM INBOX API
+// ============================================
+
+export const teamApi = {
+    // ── Members ──────────────────────────────────────────────
+    async getMembers(): Promise<TeamMember[]> {
+        const { data } = await api.get<TeamMember[]>('/team/members');
+        return data;
+    },
+    async addMember(payload: { email: string; name: string; role?: string; team?: string }): Promise<TeamMember> {
+        const { data } = await api.post<TeamMember>('/team/members', payload);
+        return data;
+    },
+    async updateMember(id: string, updates: Partial<TeamMember>): Promise<TeamMember> {
+        const { data } = await api.patch<TeamMember>(`/team/members/${id}`, updates);
+        return data;
+    },
+    async removeMember(id: string): Promise<void> {
+        await api.delete(`/team/members/${id}`);
+    },
+
+    // ── Assignment ────────────────────────────────────────────
+    async assignConversation(conversationId: string, payload: {
+        assignee_id?: string | null;
+        assigned_team?: string | null;
+        note?: string;
+    }): Promise<void> {
+        await api.post(`/team/conversations/${conversationId}/assign`, payload);
+    },
+    async setStatus(conversationId: string, payload: {
+        status?: string;
+        priority?: string;
+    }): Promise<void> {
+        await api.patch(`/team/conversations/${conversationId}/status`, payload);
+    },
+    async getAssignmentHistory(conversationId: string): Promise<AssignmentHistory[]> {
+        const { data } = await api.get<AssignmentHistory[]>(`/team/conversations/${conversationId}/assignments`);
+        return data;
+    },
+
+    // ── Internal Notes ────────────────────────────────────────
+    async getNotes(conversationId: string): Promise<InternalNote[]> {
+        const { data } = await api.get<InternalNote[]>(`/team/conversations/${conversationId}/notes`);
+        return data;
+    },
+    async addNote(conversationId: string, content: string): Promise<InternalNote> {
+        const { data } = await api.post<InternalNote>(`/team/conversations/${conversationId}/notes`, { content });
+        return data;
+    },
+    async deleteNote(conversationId: string, noteId: string): Promise<void> {
+        await api.delete(`/team/conversations/${conversationId}/notes/${noteId}`);
+    },
+
+    // ── Activity Logs ─────────────────────────────────────────
+    async getActivity(conversationId: string): Promise<ActivityLog[]> {
+        const { data } = await api.get<ActivityLog[]>(`/team/conversations/${conversationId}/activity`);
+        return data;
+    },
+
+    // ── Routing Rules ─────────────────────────────────────────
+    async getRules(): Promise<RoutingRule[]> {
+        const { data } = await api.get<RoutingRule[]>('/team/routing-rules');
+        return data;
+    },
+    async createRule(payload: Partial<RoutingRule>): Promise<RoutingRule> {
+        const { data } = await api.post<RoutingRule>('/team/routing-rules', payload);
+        return data;
+    },
+    async updateRule(id: string, updates: Partial<RoutingRule>): Promise<RoutingRule> {
+        const { data } = await api.patch<RoutingRule>(`/team/routing-rules/${id}`, updates);
+        return data;
+    },
+    async deleteRule(id: string): Promise<void> {
+        await api.delete(`/team/routing-rules/${id}`);
+    },
+};
+
 export default {
     channels: channelsApi,
     conversations: conversationsApi,
     aiAssistants: aiAssistantsApi,
     inbox: inboxApi,
     contacts: contactsApi,
-    conversationTags: conversationTagsApi
+    conversationTags: conversationTagsApi,
+    team: teamApi,
 };

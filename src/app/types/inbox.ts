@@ -60,8 +60,13 @@ export interface Conversation {
     lead_id: string | null;
     channel_id: string;
     remote_jid: string;
-    status: 'open' | 'closed' | 'pending' | 'snoozed';
+    status: 'open' | 'closed' | 'pending' | 'resolved' | 'snoozed';
     assigned_to: string | null;
+    assignee_id?: string | null;
+    assignee?: { id: string; name: string; email: string } | null;
+    assigned_team?: string | null;
+    assigned_at?: string | null;
+    priority?: 'low' | 'normal' | 'high' | 'urgent';
     last_message_at: string;
     unread_count: number;
     metadata: {
@@ -72,6 +77,71 @@ export interface Conversation {
         tags?: string[];
         is_group?: boolean;
     };
+    created_at: string;
+    updated_at: string;
+}
+
+// Team management types
+export interface TeamMember {
+    id: string;
+    owner_id: string;
+    user_id: string | null;
+    email: string;
+    name: string;
+    role: 'admin' | 'manager' | 'agent' | 'viewer';
+    team: string | null;
+    is_active: boolean;
+    invited_at: string;
+    accepted_at: string | null;
+    avatar_url: string | null;
+    open_conversations?: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface InternalNote {
+    id: string;
+    conversation_id: string;
+    author_id: string;
+    author_name: string;
+    author_email: string;
+    content: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ActivityLog {
+    id: string;
+    conversation_id: string;
+    actor_id: string | null;
+    actor_name: string | null;
+    action: string;
+    metadata: Record<string, any>;
+    created_at: string;
+}
+
+export interface AssignmentHistory {
+    id: string;
+    conversation_id: string;
+    assignee_id: string | null;
+    assignee_name: string | null;
+    assignee_email: string | null;
+    assigned_team: string | null;
+    assigned_by: string | null;
+    assigned_by_name: string | null;
+    note: string | null;
+    created_at: string;
+}
+
+export interface RoutingRule {
+    id: string;
+    owner_id: string;
+    name: string;
+    is_active: boolean;
+    priority: number;
+    conditions: Array<{ field: string; operator: string; value: string }>;
+    action_type: 'assign_agent' | 'assign_team' | 'round_robin' | 'least_busy';
+    action_data: Record<string, any>;
     created_at: string;
     updated_at: string;
 }
@@ -162,6 +232,7 @@ export interface ConversationWithDetails extends Conversation {
         type: string;
         name: string;
         status: string;
+        provider?: string | null;
     };
     last_message?: {
         id: string;

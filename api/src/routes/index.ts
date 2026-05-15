@@ -34,6 +34,8 @@ import conversationTagsRoutes from './conversation-tags.routes';
 import groupsRoutes from './groups.routes';
 import aiRemarketingRoutes from './ai-remarketing.routes';
 import remarketingRoutes from './remarketing.routes';
+import teamRoutes from './team.routes';
+import smtpRoutes from './smtp.routes';
 // Plan enforcement middleware (blocks writes when plan is expired or lead limit reached)
 import { requireAuth } from '../middleware/auth.middleware';
 import { planEnforcement } from '../middleware/plan-enforcement.middleware';
@@ -73,8 +75,10 @@ router.use('/scheduled-conversations', withPlan, scheduledConversationsRoutes);
 router.use('/groups', withPlan, groupsRoutes);
 router.use('/ai-remarketing', withPlan, aiRemarketingRoutes);
 router.use('/remarketing', withPlan, remarketingRoutes);
+router.use('/team', withPlan, teamRoutes);
 
 // ── Settings / admin (auth required, plan NOT enforced) ──────────────────────
+router.use('/smtp', smtpRoutes);
 router.use('/users', usersRoutes);
 router.use('/user', usersRoutes);         // Alias for compatibility
 router.use('/admin/plans', adminPlansRoutes);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { X, Mail, Phone, Building2, Calendar, FileText, User, Loader2, AlertCircle, Edit2, Save, Camera, Check, Upload, StickyNote, ChevronDown, Clock, MessageSquare, Briefcase, ListTodo, Plus, Trash2, Send, Zap, Target, Copy, Pencil, GripVertical, BrainCircuit } from 'lucide-react';
+import { X, Mail, Phone, Building2, Calendar, FileText, User, Loader2, AlertCircle, Edit2, Save, Camera, Check, Upload, StickyNote, ChevronDown, Clock, MessageSquare, Briefcase, ListTodo, Plus, Trash2, Send, Zap, Target, Copy, Pencil, GripVertical, BrainCircuit, UserCheck, StickyNote as NoteIcon } from 'lucide-react';
 import { leadsApi, scheduledConversationsApi, leadNotesApi } from '../../utils/api';
 import { Lead, LeadNote } from '../../types';
 import { toast } from 'sonner';
@@ -143,6 +143,55 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
   const [generatingSummary, setGeneratingSummary] = useState(false);
   const [aiSentiment, setAiSentiment] = useState<'positivo' | 'neutro' | 'frustrado' | null>(null);
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // ── Team / Assignment state ──
+  const [teamMembers, setTeamMembers] = useState<{ id: string; user_id: string | null; name: string; email: string; user_name?: string; user_email?: string; role?: string }[]>([]);
+  const [assigning, setAssigning] = useState(false);
+  const [assigneeId, setAssigneeId] = useState<string | null>((conversation as any).assignee_id || null);
+  const [internalNotes, setInternalNotes] = useState<{ id: string; content: string; created_at: string; author_name?: string }[]>([]);
+  const [loadingInternalNotes, setLoadingInternalNotes] = useState(false);
+  const [newInternalNote, setNewInternalNote] = useState('');
+  const [savingInternalNote, setSavingInternalNote] = useState(false);
+
+  useEffect(() => {
+    import('../../services/api/inbox').then(({ teamApi }) => {
+      teamApi.getMembers().then(setTeamMembers).catch(() => {});
+      if (conversation.id) {
+        setLoadingInternalNotes(true);
+        teamApi.getNotes(conversation.id).then(setInternalNotes).catch(() => {}).finally(() => setLoadingInternalNotes(false));
+      }
+    });
+  }, [conversation.id]);
+
+  // Sync assignee if conversation prop changes
+  useEffect(() => {
+    setAssigneeId((conversation as any).assignee_id || null);
+  }, [(conversation as any).assignee_id]);
+
+  const handleAssign = async (memberId: string | null) => {
+    setAssigning(true);
+    try {
+      const { teamApi } = await import('../../services/api/inbox');
+      await teamApi.assignConversation(conversation.id, { assignee_id: memberId });
+      setAssigneeId(memberId);
+      toast.success(memberId ? 'Conversa atribuída com sucesso!' : 'Atribuição removida');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.message || 'Erro ao atribuir conversa');
+    }
+    setAssigning(false);
+  };
+
+  const handleAddInternalNote = async () => {
+    if (!newInternalNote.trim()) return;
+    setSavingInternalNote(true);
+    try {
+      const { teamApi } = await import('../../services/api/inbox');
+      const note = await teamApi.addNote(conversation.id, newInternalNote.trim());
+      setInternalNotes(prev => [note, ...prev]);
+      setNewInternalNote('');
+    } catch { /* silently fail */ }
+    setSavingInternalNote(false);
+  };
 
   // Listen for AI sentiment updates
   useEffect(() => {
@@ -1293,6 +1342,76 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 </div>
               </div>
             )}
+
+            {/* Divider before team section */}
+            <div className="border-t border-border/40" />
+
+            {/* Responsável (Assignee) */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                <UserCheck className="w-3 h-3" />
+                Responsável
+              </div>
+              <select
+                value={assigneeId || ''}
+                onChange={(e) => handleAssign(e.target.value || null)}
+                disabled={assigning}
+                className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition-all duration-150"
+              >
+                <option value="">— Não atribuído —</option>
+                {teamMembers.filter(m => m.user_id).map(m => (
+                  <option key={m.id} value={m.user_id!}>{m.user_name || m.name || m.user_email || m.email}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Internal Notes */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                <StickyNote className="w-3 h-3" />
+                Notas Internas
+              </div>
+
+              {/* Add note input */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newInternalNote}
+                  onChange={e => setNewInternalNote(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAddInternalNote()}
+                  placeholder="Adicionar nota interna..."
+                  className="flex-1 px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <button
+                  onClick={handleAddInternalNote}
+                  disabled={savingInternalNote || !newInternalNote.trim()}
+                  className="px-3 py-2 rounded-lg text-sm bg-amber-500 text-white disabled:opacity-50 hover:bg-amber-600 transition-colors"
+                >
+                  {savingInternalNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* Notes list */}
+              {loadingInternalNotes ? (
+                <div className="flex items-center justify-center py-3">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : internalNotes.length > 0 ? (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {internalNotes.map(note => (
+                    <div key={note.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-sm">
+                      <p className="text-foreground/90 leading-relaxed">{note.content}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        {note.author_name && <span className="font-medium">{note.author_name} · </span>}
+                        {new Date(note.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[12px] text-muted-foreground italic text-center py-2">Nenhuma nota interna</p>
+              )}
+            </div>
 
             {/* Divider before actions */}
             <div className="border-t border-border/40" />

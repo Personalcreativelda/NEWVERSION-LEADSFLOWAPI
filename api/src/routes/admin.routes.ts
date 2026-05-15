@@ -555,7 +555,7 @@ router.get('/users/:userId/details', requireAuth, requireAdmin, async (req: Auth
     // Build user query only with columns guaranteed to exist
     const userResult = await query(
       `SELECT u.id, u.email, u.name, u.avatar_url, u.role, u.is_active, u.plan,
-              u.created_at,
+              u.plan_limits, u.created_at,
               (SELECT COUNT(*) FROM leads WHERE user_id = u.id) as leads_count,
               (SELECT COUNT(*) FROM campaigns WHERE user_id = u.id) as campaigns_count
        FROM users u WHERE u.id = $1`,
@@ -839,13 +839,13 @@ router.post('/create-user', requireAuth, requireAdmin, async (req: Authenticated
       `INSERT INTO users (email, password_hash, name, email_verified, is_active, plan, plan_expires_at, plan_limits)
        VALUES ($1, $2, $3, true, true, $4, $5,
          COALESCE(
-           (SELECT limits FROM plans WHERE id = $4 AND is_active = true LIMIT 1),
+           (SELECT limits FROM plans WHERE id = $6 AND is_active = true LIMIT 1),
            (SELECT limits FROM plans WHERE id = 'free' AND is_active = true LIMIT 1),
            '{"leads": 100, "messages": 100, "massMessages": 200}'::jsonb
          )
        )
        RETURNING id, email, name, plan, plan_expires_at, created_at`,
-      [email.toLowerCase().trim(), passwordHash, name?.trim() || null, plan, planExpiresAt]
+      [email.toLowerCase().trim(), passwordHash, name?.trim() || null, plan, planExpiresAt, plan]
     );
 
     const newUser = result.rows[0];

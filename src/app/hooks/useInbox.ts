@@ -181,6 +181,11 @@ export function useInbox(options: UseInboxOptions = {}) {
                 [selectedConversation?.id, updateConversation],
             ),
 
+            onNewConversation: useCallback(() => {
+                // Nova conversa chegou — força refresh imediato da lista
+                refreshConversationsRef.current();
+            }, []),
+
             onReconnect: useCallback(() => {
                 refreshConversationsRef.current();
                 refreshMessagesRef.current();

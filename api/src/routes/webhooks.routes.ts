@@ -1453,12 +1453,13 @@ router.post('/evolution/messages', async (req, res) => {
       conversationMetadata.last_sender_jid = groupSenderJid;
     }
 
-    const conversation = await conversationsService.findOrCreate(
+    const { conversation, isNew: isNewConversation } = await conversationsService.findOrCreate(
       channel.user_id,
       channel.id,
       conversationRemoteJid,
       isGroup ? undefined : leadId,
-      conversationMetadata
+      conversationMetadata,
+      true
     );
 
     // Se é grupo, garantir que o flag is_group está nos metadados
@@ -1472,7 +1473,7 @@ router.post('/evolution/messages', async (req, res) => {
     console.log('[Evolution Webhook] 💬 Conversa processada:');
     console.log('[Evolution Webhook]   - ID:', conversation.id);
     console.log('[Evolution Webhook]   - Lead:', leadId);
-    console.log('[Evolution Webhook]   - Nova:', isNewLead);
+    console.log('[Evolution Webhook]   - Nova:', isNewLead, '| NovaConversa:', isNewConversation);
 
     // Determinar direção da mensagem: fromMe = 'out' (resposta pelo celular), caso contrário = 'in'
     const messageDirection = isFromMe ? 'out' : 'in';
@@ -1595,7 +1596,7 @@ router.post('/evolution/messages', async (req, res) => {
     await query(
       `UPDATE conversations
        SET last_message_at = NOW(),
-           status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+           status = CASE WHEN status IN ('closed', 'resolved') THEN 'open' ELSE status END,
            updated_at = NOW()
        WHERE id = $1`,
       [conversation.id]
@@ -1620,6 +1621,14 @@ router.post('/evolution/messages', async (req, res) => {
     const wsService = getWebSocketService();
     if (wsService) {
       console.log('[Evolution Webhook] 📡 Emitindo WebSocket para usuário:', channel.user_id);
+
+      // Emitir nova conversa (só quando é o primeiro contato — força refresh imediato na dashboard)
+      if (isNewConversation) {
+        wsService.emitNewConversation(channel.user_id, {
+          conversationId: conversation.id,
+          conversation: updatedConversation.rows[0] || conversation
+        });
+      }
 
       // Emitir nova mensagem
       wsService.emitNewMessage(channel.user_id, {
@@ -2034,7 +2043,7 @@ router.post('/telegram/:botToken?', async (req, res) => {
     await query(
       `UPDATE conversations
        SET last_message_at = NOW(),
-           status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+           status = CASE WHEN status IN ('closed', 'resolved') THEN 'open' ELSE status END,
            updated_at = NOW()
        WHERE id = $1`,
       [conversation.id]
@@ -2306,7 +2315,7 @@ router.post('/facebook/test', async (req, res) => {
     await query(
       `UPDATE conversations
        SET last_message_at = NOW(),
-           status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+           status = CASE WHEN status IN ('closed', 'resolved') THEN 'open' ELSE status END,
            updated_at = NOW()
        WHERE id = $1`,
       [conversation.id]
@@ -2599,7 +2608,7 @@ router.post('/facebook', async (req, res) => {
         await query(
           `UPDATE conversations
            SET last_message_at = NOW(),
-               status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+               status = CASE WHEN status IN ('closed', 'resolved') THEN 'open' ELSE status END,
                updated_at = NOW()
            WHERE id = $1`,
           [conversation.id]
@@ -2833,7 +2842,7 @@ router.post('/instagram/test', async (req, res) => {
 
     await conversationsService.updateUnreadCount(conversation.id, 1);
     await query(
-      `UPDATE conversations SET last_message_at = NOW(), status = CASE WHEN status = 'closed' THEN 'open' ELSE status END, updated_at = NOW() WHERE id = $1`,
+      `UPDATE conversations SET last_message_at = NOW(), status = CASE WHEN status IN ('closed', 'resolved') THEN 'open' ELSE status END, updated_at = NOW() WHERE id = $1`,
       [conversation.id]
     );
 
@@ -3147,7 +3156,7 @@ router.post('/instagram', async (req, res) => {
         await query(
           `UPDATE conversations
            SET last_message_at = NOW(),
-               status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+               status = CASE WHEN status IN ('closed', 'resolved') THEN 'open' ELSE status END,
                updated_at = NOW()
            WHERE id = $1`,
           [conversation.id]
@@ -3650,7 +3659,7 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
           await query(
             `UPDATE conversations
              SET last_message_at = NOW(),
-                 status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+                 status = CASE WHEN status IN ('closed', 'resolved') THEN 'open' ELSE status END,
                  updated_at = NOW()
              WHERE id = $1`,
             [conversation.id]
@@ -3859,7 +3868,7 @@ router.post('/website/:channelId', async (req, res) => {
     await query(
       `UPDATE conversations
        SET last_message_at = NOW(),
-           status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+           status = CASE WHEN status IN ('closed', 'resolved') THEN 'open' ELSE status END,
            updated_at = NOW()
        WHERE id = $1`,
       [conversation.id]
@@ -4058,7 +4067,7 @@ router.post('/email/:channelId', async (req, res) => {
     await query(
       `UPDATE conversations
        SET last_message_at = NOW(),
-           status = CASE WHEN status = 'closed' THEN 'open' ELSE status END,
+           status = CASE WHEN status IN ('closed', 'resolved') THEN 'open' ELSE status END,
            updated_at = NOW()
        WHERE id = $1`,
       [conversation.id]

@@ -339,8 +339,102 @@ router.get('/conversations', async (req, res, next) => {
     const search = req.query.search as string | undefined;
     const limit = req.query.limit ? Number(req.query.limit) : 50;
     const offset = req.query.offset ? Number(req.query.offset) : 0;
+    // Team inbox filters
+    const assigneeFilter = req.query.assignee as string | undefined; // 'mine' | 'unassigned' | uuid
+    const statusFilter   = req.query.status   as string | undefined; // 'open' | 'pending' | 'resolved' | 'closed'
+    const priorityFilter = req.query.priority as string | undefined;
 
-    console.log('[Inbox] Fetching conversations for user:', user.id);
+    // Dual-context inbox resolution:
+    // 1. Always resolve the user's OWN workspace (owner context) — their own conversations are always visible.
+    // 2. Also check if they're a member of ANOTHER workspace — conversations assigned to them there are merged in.
+    // Pure agents (no own workspace) only see their assigned conversations from the team workspace.
+
+    let ownWorkspaceId: string | null = null;       // user's own workspace id
+    let ownWorkspaceOwnerId: string   = user.id;    // = user.id when owner
+    let teamWorkspaceId: string | null = null;      // external workspace they were invited to
+    let teamWorkspaceOwnerId: string | null = null; // owner of that external workspace
+    let teamRole: string | null = null;
+    let externalTeamRole: string | null = null;
+
+    // Workspace resolution — wrapped in try/catch so any DB error falls back to user_id filter
+    try {
+      // Own workspace
+      const ownerWs = await dbQuery(
+        'SELECT id, owner_id FROM workspaces WHERE owner_id = $1 LIMIT 1',
+        [user.id]
+      );
+      if (ownerWs.rows[0]) {
+        ownWorkspaceId      = ownerWs.rows[0].id;
+        ownWorkspaceOwnerId = ownerWs.rows[0].owner_id;
+        teamRole            = 'owner';
+      }
+
+      // External team membership (different owner)
+      const memberRow = await dbQuery(
+        `SELECT tm.workspace_id, tm.role, w.owner_id
+         FROM team_members tm
+         JOIN workspaces w ON w.id = tm.workspace_id
+         WHERE tm.user_id = $1
+           AND tm.status = 'active'
+           AND tm.is_active = true
+           AND w.owner_id != $1
+         LIMIT 1`,
+        [user.id]
+      );
+      if (memberRow.rows[0]) {
+        teamWorkspaceId      = memberRow.rows[0].workspace_id;
+        teamWorkspaceOwnerId = memberRow.rows[0].owner_id;
+        externalTeamRole     = memberRow.rows[0].role;
+        if (!teamRole) teamRole = memberRow.rows[0].role;
+      }
+    } catch (wsErr: any) {
+      // Workspace tables may not exist yet — fall back to simple user_id filter
+      console.warn('[Inbox] Workspace resolution error (falling back to user_id filter):', wsErr?.message);
+    }
+
+    console.log('[Inbox] user:', user.id,
+      '| ownWs:', ownWorkspaceId ?? 'none',
+      '| teamWs:', teamWorkspaceId ?? 'none',
+      '| role:', teamRole ?? 'none',
+      '| externalRole:', externalTeamRole ?? 'none');
+
+    // Build WHERE clause and params together — no gaps, no unreferenced $N params.
+    // PostgreSQL errors if a $N param value is present but not referenced in the SQL.
+    const isExternalAgent = externalTeamRole === 'agent';
+    const params: any[] = [];
+    let paramIndex = 1;
+    let workspaceWhere: string;
+
+    if (ownWorkspaceId && teamWorkspaceId) {
+      // Owner of own workspace + member of another workspace
+      const pOwnUser  = paramIndex++; params.push(user.id);
+      const pTeamWs   = paramIndex++; params.push(teamWorkspaceId);
+      const pTeamOwner = paramIndex++; params.push(teamWorkspaceOwnerId);
+      const pAssignee = paramIndex++; params.push(user.id);
+      const teamBranch = isExternalAgent
+        ? `(c.assignee_id = $${pAssignee} AND (c.workspace_id = $${pTeamWs} OR (c.workspace_id IS NULL AND c.user_id = $${pTeamOwner})))`
+        : `(c.workspace_id = $${pTeamWs} OR (c.workspace_id IS NULL AND c.user_id = $${pTeamOwner}))`;
+      workspaceWhere = `(c.user_id = $${pOwnUser} OR ${teamBranch})`;
+
+    } else if (ownWorkspaceId) {
+      // Own workspace only — simple user_id match
+      const p = paramIndex++; params.push(user.id);
+      workspaceWhere = `c.user_id = $${p}`;
+
+    } else if (teamWorkspaceId) {
+      // Pure team member — no own workspace
+      const pTeamWs    = paramIndex++; params.push(teamWorkspaceId);
+      const pTeamOwner = paramIndex++; params.push(teamWorkspaceOwnerId);
+      const pAssignee  = paramIndex++; params.push(user.id);
+      workspaceWhere = isExternalAgent
+        ? `(c.assignee_id = $${pAssignee} AND (c.workspace_id = $${pTeamWs} OR (c.workspace_id IS NULL AND c.user_id = $${pTeamOwner})))`
+        : `(c.workspace_id = $${pTeamWs} OR (c.workspace_id IS NULL AND c.user_id = $${pTeamOwner}))`;
+
+    } else {
+      // Fallback: no workspace — match by user_id
+      const p = paramIndex++; params.push(user.id);
+      workspaceWhere = `c.user_id = $${p}`;
+    }
 
     // STEP 1: Get conversations from database that have messages
     // This is the correct approach - like Chatwoot, only show conversations with actual history
@@ -359,6 +453,7 @@ router.get('/conversations', async (req, res, next) => {
         ch.type as channel_type,
         ch.name as channel_name,
         ch.status as channel_status,
+        ch.credentials->>'provider' as channel_provider,
         (
           SELECT json_build_object(
             'id', m.id,
@@ -391,15 +486,21 @@ router.get('/conversations', async (req, res, next) => {
           FROM conversation_tag_assignments cta
           JOIN conversation_tags ct ON cta.tag_id = ct.id
           WHERE cta.conversation_id = c.id
-        ) as conversation_tags
+        ) as conversation_tags,
+        ua.id       as assignee_id_val,
+        ua.name     as assignee_name,
+        ua.email    as assignee_email,
+        c.assigned_team,
+        c.assigned_at,
+        c.priority
       FROM conversations c
       LEFT JOIN leads l ON c.lead_id = l.id
       LEFT JOIN channels ch ON c.channel_id = ch.id
-      WHERE c.user_id = $1
+      LEFT JOIN users ua ON ua.id = c.assignee_id
+      WHERE ${workspaceWhere}
     `;
 
-    const params: any[] = [user.id];
-    let paramIndex = 2;
+    // params and paramIndex are already built in the workspace WHERE block above
 
     // Add search filter
     if (search) {
@@ -411,6 +512,34 @@ router.get('/conversations', async (req, res, next) => {
         c.remote_jid ILIKE $${paramIndex}
       )`;
       params.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    // Assignee filter
+    if (assigneeFilter === 'mine') {
+      sql += ` AND c.assignee_id = $${paramIndex}`;
+      params.push(user.id);
+      paramIndex++;
+    } else if (assigneeFilter === 'unassigned') {
+      sql += ` AND c.assignee_id IS NULL`;
+    } else if (assigneeFilter && assigneeFilter !== 'all') {
+      // UUID of a specific team member
+      sql += ` AND c.assignee_id = $${paramIndex}`;
+      params.push(assigneeFilter);
+      paramIndex++;
+    }
+
+    // Status filter
+    if (statusFilter && statusFilter !== 'all') {
+      sql += ` AND c.status = $${paramIndex}`;
+      params.push(statusFilter);
+      paramIndex++;
+    }
+
+    // Priority filter
+    if (priorityFilter && priorityFilter !== 'all') {
+      sql += ` AND c.priority = $${paramIndex}`;
+      params.push(priorityFilter);
       paramIndex++;
     }
 
@@ -426,6 +555,7 @@ router.get('/conversations', async (req, res, next) => {
 
     let dbConversations: any[] = [];
     try {
+      console.log('[Inbox] WHERE:', workspaceWhere, '| params[0..4]:', params.slice(0, 5));
       const result = await dbQuery(sql, params);
       dbConversations = result.rows;
       console.log('[Inbox] Found', dbConversations.length, 'conversations in database');
@@ -483,6 +613,15 @@ router.get('/conversations', async (req, res, next) => {
         remote_jid: conv.remote_jid,
         status: conv.status || 'open',
         assigned_to: conv.assigned_to,
+        assignee_id: conv.assignee_id || null,
+        assignee: conv.assignee_id ? {
+          id: conv.assignee_id,
+          name: conv.assignee_name || '',
+          email: conv.assignee_email || '',
+        } : null,
+        assigned_team: conv.assigned_team || null,
+        assigned_at: conv.assigned_at || null,
+        priority: conv.priority || 'normal',
         last_message_at: conv.last_message_at || conv.updated_at,
         unread_count: conv.unread_count || 0,
         is_group: conv.is_group || false,
@@ -519,6 +658,7 @@ router.get('/conversations', async (req, res, next) => {
           type: conv.channel_type || 'whatsapp',
           name: conv.channel_name || 'WhatsApp',
           status: conv.channel_status || 'active',
+          provider: conv.channel_provider || null,
         },
         last_message: conv.last_message || {
           id: 'empty',
@@ -822,16 +962,29 @@ router.get('/conversations/:conversationIdOrJid/messages', async (req, res, next
 
     const { conversationIdOrJid } = req.params;
     const { query: dbQuery } = require('../database/connection');
-    
+
+    // Resolve effective owner: team members access conversations via workspace membership.
+    // effectiveUserId is the workspace owner's ID — used for channel/instance lookups.
+    let effectiveUserId = user.id;
+    const teamWsRow = await dbQuery(
+      `SELECT w.owner_id FROM team_members tm
+       JOIN workspaces w ON w.id = tm.workspace_id
+       WHERE tm.user_id = $1 AND tm.status = 'active' AND tm.is_active = true
+         AND w.owner_id != $1
+       LIMIT 1`,
+      [user.id]
+    );
+    if (teamWsRow.rows[0]) effectiveUserId = teamWsRow.rows[0].owner_id;
+
     // First try to get instance from saved channels, fallback to legacy
-    const savedInstance = await getActiveWhatsAppInstance(user.id);
-    const instanceId = savedInstance || getUserInstanceName(user.id);
+    const savedInstance = await getActiveWhatsAppInstance(effectiveUserId);
+    const instanceId = savedInstance || getUserInstanceName(effectiveUserId);
 
     // Determine the type of ID we received
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationIdOrJid);
     const isJid = conversationIdOrJid.includes('@');
     const isPhone = /^\d+$/.test(conversationIdOrJid);
-    
+
     let remoteJid: string | null = null;
     let conversationId: string | null = null;
     
@@ -844,7 +997,7 @@ router.get('/conversations/:conversationIdOrJid/messages', async (req, res, next
       try {
         const convResult = await dbQuery(
           'SELECT id FROM conversations WHERE remote_jid = $1 AND user_id = $2 LIMIT 1',
-          [remoteJid, user.id]
+          [remoteJid, effectiveUserId]
         );
         if (convResult.rows.length > 0) {
           conversationId = convResult.rows[0].id;
@@ -860,7 +1013,7 @@ router.get('/conversations/:conversationIdOrJid/messages', async (req, res, next
       try {
         const convResult = await dbQuery(
           'SELECT remote_jid FROM conversations WHERE id = $1 AND user_id = $2 LIMIT 1',
-          [conversationId, user.id]
+          [conversationId, effectiveUserId]
         );
         if (convResult.rows.length > 0) {
           remoteJid = convResult.rows[0].remote_jid;
@@ -874,30 +1027,38 @@ router.get('/conversations/:conversationIdOrJid/messages', async (req, res, next
     let localMessages: any[] = [];
     if (conversationId || remoteJid) {
       try {
-        let msgSql = `
-          SELECT 
-            m.*,
-            l.name as sender_name,
-            l.avatar_url as sender_avatar
-          FROM messages m
-          LEFT JOIN leads l ON m.lead_id = l.id
-          WHERE m.user_id = $1
-        `;
-        const msgParams: any[] = [user.id];
-        let paramIdx = 2;
-        
+        let msgSql: string;
+        const msgParams: any[] = [];
+        let paramIdx: number;
+
         if (conversationId) {
-          msgSql += ` AND m.conversation_id = $${paramIdx}`;
+          // Access already verified — filter by conversation_id only (covers all senders)
+          msgSql = `
+            SELECT m.*, l.name as sender_name, l.avatar_url as sender_avatar
+            FROM messages m
+            LEFT JOIN leads l ON m.lead_id = l.id
+            WHERE m.conversation_id = $1
+          `;
           msgParams.push(conversationId);
-          paramIdx++;
-        } else if (remoteJid) {
-          // Try to match by remote_jid in metadata
-          msgSql += ` AND (m.metadata->>'remote_jid' = $${paramIdx} OR m.metadata->>'remote_jid' LIKE $${paramIdx + 1})`;
-          msgParams.push(remoteJid);
-          msgParams.push(`%${extractPhoneFromJid(remoteJid)}%`);
-          paramIdx += 2;
+          paramIdx = 2;
+        } else {
+          // No conversation_id: fall back to user_id + remote_jid metadata match
+          msgSql = `
+            SELECT m.*, l.name as sender_name, l.avatar_url as sender_avatar
+            FROM messages m
+            LEFT JOIN leads l ON m.lead_id = l.id
+            WHERE m.user_id = $1
+          `;
+          msgParams.push(effectiveUserId);
+          paramIdx = 2;
+          if (remoteJid) {
+            msgSql += ` AND (m.metadata->>'remote_jid' = $${paramIdx} OR m.metadata->>'remote_jid' LIKE $${paramIdx + 1})`;
+            msgParams.push(remoteJid);
+            msgParams.push(`%${extractPhoneFromJid(remoteJid)}%`);
+            paramIdx += 2;
+          }
         }
-        
+
         msgSql += ` ORDER BY m.created_at ASC LIMIT $${paramIdx}`;
         msgParams.push(req.query.limit ? Number(req.query.limit) : 100);
         
@@ -1045,7 +1206,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
 
     const { content, channel, media_url, media_type } = req.body;
     const messageContent = content?.trim() || '';
-    
+
     // Content is required only if no media is attached
     if (!messageContent && !media_url) {
       return res.status(400).json({ error: 'Content or media is required' });
@@ -1053,11 +1214,32 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
 
     const { conversationIdOrJid } = req.params;
     let messageChannel = channel || 'whatsapp';
-    // First try to get instance from saved channels, fallback to legacy
-    const savedInstance = await getActiveWhatsAppInstance(user.id);
-    const instanceId = savedInstance || getUserInstanceName(user.id);
 
     const { query: dbQuery } = require('../database/connection');
+
+    // Resolve the team owner (for conversations belonging to the team workspace).
+    // teamOwnerId is only used when the conversation is found under the owner's user_id.
+    // For the member's OWN conversations, we always use user.id as the channel.
+    let teamOwnerId: string | null = null;
+    try {
+      const sendTeamWs = await dbQuery(
+        `SELECT w.owner_id FROM team_members tm
+         JOIN workspaces w ON w.id = tm.workspace_id
+         WHERE tm.user_id = $1 AND tm.status = 'active' AND tm.is_active = true
+           AND w.owner_id != $1
+         LIMIT 1`,
+        [user.id]
+      );
+      if (sendTeamWs.rows[0]) teamOwnerId = sendTeamWs.rows[0].owner_id;
+    } catch { /* workspace tables may not exist yet */ }
+
+    // channelOwnerId is resolved per-conversation after the lookup below.
+    // Default to own user until we know which workspace the conversation belongs to.
+    let channelOwnerId = user.id;
+
+    // Start with own instance; updated below once channelOwnerId is confirmed.
+    let savedInstance = await getActiveWhatsAppInstance(user.id);
+    let instanceId = savedInstance || getUserInstanceName(user.id);
 
     // Determine the type of ID we received
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationIdOrJid);
@@ -1071,20 +1253,26 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
     let channelId: string | null = null;
     let channelCredentials: any = null;
 
-    console.log('[Inbox Send] Processing:', conversationIdOrJid, { isUUID, isJid, isPhone });
+    console.log('[Inbox Send] Processing:', conversationIdOrJid, { isUUID, isJid, isPhone, teamOwner: teamOwnerId });
 
     // If it's a JID, extract phone and use it directly
     if (isJid) {
       remoteJid = conversationIdOrJid;
       phone = extractPhoneFromJid(conversationIdOrJid);
-      // Try to find associated conversation with channel info
+      // Try to find associated conversation — own context first, then team context
       try {
-        const convResult = await dbQuery(
-          `SELECT c.id, c.lead_id, c.channel_id, ch.type as channel_type, ch.credentials as channel_credentials
-           FROM conversations c LEFT JOIN channels ch ON c.channel_id = ch.id
-           WHERE c.remote_jid = $1 AND c.user_id = $2 LIMIT 1`,
-          [remoteJid, user.id]
-        );
+        const ownersToCheck = [user.id, ...(teamOwnerId && teamOwnerId !== user.id ? [teamOwnerId] : [])];
+        let convResult: any = { rows: [] };
+        for (const ownerId of ownersToCheck) {
+          convResult = await dbQuery(
+            `SELECT c.id, c.lead_id, c.channel_id, c.user_id as conv_owner,
+                    ch.type as channel_type, ch.credentials as channel_credentials
+             FROM conversations c LEFT JOIN channels ch ON c.channel_id = ch.id
+             WHERE c.remote_jid = $1 AND c.user_id = $2 LIMIT 1`,
+            [remoteJid, ownerId]
+          );
+          if (convResult.rows.length > 0) { channelOwnerId = ownerId; break; }
+        }
         if (convResult.rows.length > 0) {
           conversationId = convResult.rows[0].id;
           leadId = convResult.rows[0].lead_id;
@@ -1106,17 +1294,22 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       remoteJid = normalizePhoneToJid(phone);
     } else if (isUUID) {
       // Could be a conversation ID or a lead ID
-      // Try conversation first - include channel type detection
+      // Try conversation — own context first, then team context
       try {
-        const convResult = await dbQuery(
-          `SELECT c.*, l.phone as lead_phone, l.whatsapp as lead_whatsapp,
-                  ch.type as channel_type, ch.credentials as channel_credentials
-           FROM conversations c
-           LEFT JOIN leads l ON c.lead_id = l.id
-           LEFT JOIN channels ch ON c.channel_id = ch.id
-           WHERE c.id = $1 AND c.user_id = $2 LIMIT 1`,
-          [conversationIdOrJid, user.id]
-        );
+        const ownersToCheck = [user.id, ...(teamOwnerId && teamOwnerId !== user.id ? [teamOwnerId] : [])];
+        let convResult: any = { rows: [] };
+        for (const ownerId of ownersToCheck) {
+          convResult = await dbQuery(
+            `SELECT c.*, l.phone as lead_phone, l.whatsapp as lead_whatsapp,
+                    ch.type as channel_type, ch.credentials as channel_credentials
+             FROM conversations c
+             LEFT JOIN leads l ON c.lead_id = l.id
+             LEFT JOIN channels ch ON c.channel_id = ch.id
+             WHERE c.id = $1 AND c.user_id = $2 LIMIT 1`,
+            [conversationIdOrJid, ownerId]
+          );
+          if (convResult.rows.length > 0) { channelOwnerId = ownerId; break; }
+        }
         if (convResult.rows.length > 0) {
           conversationId = convResult.rows[0].id;
           leadId = convResult.rows[0].lead_id;
@@ -1132,7 +1325,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
           if (channelCredentials && typeof channelCredentials === 'string') {
             try { channelCredentials = JSON.parse(channelCredentials); } catch (e) { /* ignore */ }
           }
-          console.log('[Inbox Send] Found conversation:', conversationId, 'channel_type:', messageChannel, 'lead:', leadId, 'phone:', phone, 'hasCredentials:', !!channelCredentials);
+          console.log('[Inbox Send] Found conversation:', conversationId, 'channel_type:', messageChannel, 'lead:', leadId, 'phone:', phone, 'hasCredentials:', !!channelCredentials, 'channelOwner:', channelOwnerId, 'convInstance:', channelCredentials?.instance_id || channelCredentials?.instance_name || null);
         }
       } catch (e) {
         console.warn('[Inbox] Error finding conversation by ID:', e);
@@ -1141,7 +1334,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       // If not a conversation, try as lead ID
       if (!conversationId) {
         try {
-          const leadResult = await dbQuery('SELECT * FROM leads WHERE id = $1 AND user_id = $2', [conversationIdOrJid, user.id]);
+          const leadResult = await dbQuery('SELECT * FROM leads WHERE id = $1 AND user_id = $2', [conversationIdOrJid, channelOwnerId]);
           const lead = leadResult.rows[0];
           if (lead) {
             phone = lead.whatsapp || lead.phone;
@@ -1153,6 +1346,30 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
           console.warn('[Inbox] Error finding lead by ID:', e);
         }
       }
+    }
+
+    // Re-resolve WhatsApp instance now that we know which workspace the conversation belongs to
+    if (channelOwnerId !== user.id) {
+      const ownerInstance = await getActiveWhatsAppInstance(channelOwnerId);
+      if (ownerInstance) {
+        savedInstance = ownerInstance;
+        instanceId = ownerInstance;
+      } else {
+        instanceId = getUserInstanceName(channelOwnerId);
+      }
+    }
+
+    // Always prefer the instance_id from the conversation's linked channel credentials.
+    // getActiveWhatsAppInstance searches ALL channels and may pick a different (wrong) one.
+    // The AI assistant reads credentials directly from the conversation's channel — match that.
+    if (messageChannel === 'whatsapp' && channelCredentials?.instance_id) {
+      savedInstance = channelCredentials.instance_id;
+      instanceId = channelCredentials.instance_id;
+      console.log('[Inbox Send] instanceId from conversation channel credentials:', instanceId);
+    } else if (messageChannel === 'whatsapp' && channelCredentials?.instance_name) {
+      savedInstance = channelCredentials.instance_name;
+      instanceId = channelCredentials.instance_name;
+      console.log('[Inbox Send] instanceId from conversation channel credentials (name):', instanceId);
     }
 
     // Try to find associated lead if we have a phone
@@ -1187,6 +1404,35 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         }
       } catch (e) {
         console.warn('[Inbox] Error fetching channel credentials:', e);
+      }
+    }
+
+    // Fallback: auto-detect the owner's best active channel when:
+    //   a) conversation has no linked channel_id, OR
+    //   b) messageChannel is 'whatsapp' but there is no active Evolution API instance
+    //      (e.g. the owner only has a whatsapp_cloud channel — getActiveWhatsAppInstance
+    //      returns null so instanceId is just a bogus fallback name → connect timeout).
+    // getActiveWhatsAppChannel checks both 'whatsapp' and 'whatsapp_cloud'.
+    const needsChannelFallback = !channelId || (messageChannel === 'whatsapp' && !savedInstance);
+    if (needsChannelFallback) {
+      try {
+        const fallbackChannel = await getActiveWhatsAppChannel(channelOwnerId);
+        if (fallbackChannel) {
+          channelId = fallbackChannel.id;
+          messageChannel = fallbackChannel.type;
+          channelCredentials = fallbackChannel.credentials;
+          // For Evolution API channels, also update instanceId from credentials
+          if (fallbackChannel.type === 'whatsapp') {
+            const creds = fallbackChannel.credentials;
+            const fbInstanceId = creds?.instance_id || creds?.instance_name;
+            if (fbInstanceId) { savedInstance = fbInstanceId; instanceId = fbInstanceId; }
+          }
+          console.log('[Inbox Send] Fallback channel resolved:', fallbackChannel.type, fallbackChannel.id, 'for owner:', channelOwnerId);
+        } else {
+          console.warn('[Inbox Send] No active channel found for owner:', channelOwnerId);
+        }
+      } catch (e) {
+        console.warn('[Inbox] Error resolving fallback channel:', e);
       }
     }
 
@@ -1659,12 +1905,12 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
     const finalRemoteJid = remoteJid || normalizePhoneToJid(phone || '');
 
     try {
-      // If we don't have a conversation yet, find or create one
+      // If we don't have a conversation yet, find or create one (using resolved channel owner)
       if (!conversationId) {
-        const activeChannel = await getActiveWhatsAppChannel(user.id);
+        const activeChannel = await getActiveWhatsAppChannel(channelOwnerId);
         if (activeChannel) {
           const conversation = await conversationsService.findOrCreate(
-            user.id,
+            channelOwnerId,
             activeChannel.id,
             finalRemoteJid,
             leadId || undefined,
@@ -1678,6 +1924,9 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         }
       }
 
+      // Store message under channelOwnerId so it appears in the correct workspace feed.
+      // If the member is responding to a team conversation, channelOwnerId = teamOwner.
+      // If sending to their own contacts, channelOwnerId = user.id (member's own workspace).
       message = await messagesService.create({
         conversation_id: conversationId,
         lead_id: leadId,
@@ -1694,8 +1943,9 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
           remote_jid: finalRemoteJid,
           phone: phone,
           channel_type: messageChannel,
+          sent_by: user.id !== channelOwnerId ? user.id : undefined,
         },
-      }, user.id);
+      }, channelOwnerId);
       console.log('[Inbox] Message saved to database:', message.id, 'conversation:', conversationId);
 
       // Update lead's last_contact_at if we have a lead
@@ -1707,10 +1957,12 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       try {
         const wsService = getWebSocketService();
         if (wsService && conversationId) {
-          wsService.emitNewMessage(user.id, {
-            conversationId,
-            message,
-          });
+          // Emit to the conversation's owner so their feed updates
+          wsService.emitNewMessage(channelOwnerId, { conversationId, message });
+          // Also emit to the member who sent (if different)
+          if (user.id !== channelOwnerId) {
+            wsService.emitNewMessage(user.id, { conversationId, message });
+          }
           console.log('[Inbox] WebSocket emitted for outgoing message:', message.id);
         }
       } catch (wsErr) {

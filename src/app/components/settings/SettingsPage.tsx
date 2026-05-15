@@ -4,12 +4,13 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
-import { ArrowLeft, User, CreditCard, Webhook, Shield, Save, CheckCircle, Zap, Lock } from 'lucide-react';
+import { ArrowLeft, User, CreditCard, Webhook, Shield, Save, CheckCircle, Zap, Lock, Users } from 'lucide-react';
 import { userApi, authApi } from '../../utils/api';
 import { AvatarUpload } from './AvatarUpload';
 import IntegrationSettings from './IntegrationSettings';
 import SMTPSettings from './SMTPSettings';
 import { WhatsAppConnection } from '../WhatsAppConnection';
+import { TeamSettingsPage } from './TeamSettingsPage';
 import { toast } from "sonner";
 
 interface SettingsPageProps {
@@ -30,7 +31,7 @@ export default function SettingsPage({
   // Read initial tab from ?tab= query param (e.g. returned from Stripe portal with ?tab=plan)
   const initialTab = (() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
-    const valid = ['profile', 'plan', 'webhooks', 'security'];
+    const valid = ['profile', 'plan', 'webhooks', 'security', 'team'];
     if (tab && valid.includes(tab)) {
       // Clean the query param from the URL without triggering a reload
       window.history.replaceState({}, '', window.location.pathname);
@@ -182,7 +183,7 @@ export default function SettingsPage({
         </div>
 
         <Tabs defaultValue={initialTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="profile">
               <User className="w-4 h-4 mr-2" />
               Perfil
@@ -190,6 +191,10 @@ export default function SettingsPage({
             <TabsTrigger value="plan">
               <CreditCard className="w-4 h-4 mr-2" />
               Plano
+            </TabsTrigger>
+            <TabsTrigger value="team">
+              <Users className="w-4 h-4 mr-2" />
+              Equipa
             </TabsTrigger>
             <TabsTrigger value="webhooks">
               <Webhook className="w-4 h-4 mr-2" />
@@ -263,6 +268,17 @@ export default function SettingsPage({
                 </div>
               </div>
             </div>
+          </TabsContent>
+
+          {/* Team Tab */}
+          <TabsContent value="team" className="space-y-6">
+            <div className="mb-2">
+              <h3 className="font-semibold text-foreground">Equipa</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Convida membros, define papéis e gere o acesso ao teu workspace.
+              </p>
+            </div>
+            <TeamSettingsPage currentUser={user} />
           </TabsContent>
 
           {/* Plan Tab */}

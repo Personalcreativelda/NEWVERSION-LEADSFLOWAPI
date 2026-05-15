@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { toast } from "sonner";
 import { trackLeadStatusChange } from '../utils/tracking';
 
@@ -129,6 +129,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
       '/dashboard/inbox/settings': 'inbox-settings',
       '/dashboard/inbox/ai-assistants': 'ai-assistants',
       '/dashboard/inbox/automations': 'automations',
+      '/dashboard/inbox/team': 'inbox-team',
       '/dashboard/funnel': 'funnel',
       '/dashboard/analytics': 'analytics',
       '/dashboard/tasks': 'tasks',
@@ -150,6 +151,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     'inbox-settings': '/dashboard/inbox/settings',
     'ai-assistants': '/dashboard/inbox/ai-assistants',
     'automations': '/dashboard/inbox/automations',
+    'inbox-team': '/dashboard/inbox/team',
     'funnel': '/dashboard/funnel',
     'analytics': '/dashboard/analytics',
     'tasks': '/dashboard/tasks',
@@ -181,6 +183,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   const [filtrosAplicados, setFiltrosAplicados] = useState({ origem: '', status: '', busca: '' });
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const initialLoadDoneRef = useRef(false); // silent background refresh after first load
   const [isDeletingLeads, setIsDeletingLeads] = useState(false); // ✅ Bloquear auto-refresh durante deleção
   const [isBackendOffline, setIsBackendOffline] = useState(false); // ✅ Detectar backend offline
 
@@ -421,9 +424,13 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
       console.log('[Dashboard] 🚫 Auto-refresh BLOQUEADO - Deleção em andamento');
       return;
     }
-    
+
+    // Only show the full loading skeleton on the very first load.
+    // Subsequent (background) refreshes update data silently so the UI never flickers.
+    const isFirstLoad = !initialLoadDoneRef.current;
+
     try {
-      setLoading(true);
+      if (isFirstLoad) setLoading(true);
       console.log('[Dashboard] 🔄 Starting to load leads from backend...');
       
       // ✅ VERIFICAR se há webhook N8N que pode estar re-importando leads
@@ -479,12 +486,13 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         }
         
         setLeads(response.leads);
+        initialLoadDoneRef.current = true;
       } else {
         console.error('[Dashboard] ❌ Response not successful:', response);
       }
     } catch (error) {
       console.error('[Dashboard] ❌ Error loading leads:', error);
-      
+
       // ✅ Detectar se é erro de backend offline
       const errorMsg = error instanceof Error ? error.message : String(error);
       if (errorMsg.includes('Failed to fetch') || errorMsg.includes('Backend indisponível')) {
@@ -492,7 +500,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         console.error('[Dashboard] 🚨 Backend OFFLINE detectado!');
       }
     } finally {
-      setLoading(false);
+      if (isFirstLoad) setLoading(false);
     }
   };
 
@@ -2484,7 +2492,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
           </div>
 
           {/* Footer - hidden on inbox/full-height pages */}
-          {currentPage !== 'inbox' && currentPage !== 'inbox-settings' && currentPage !== 'ai-assistants' && currentPage !== 'automations' && currentPage !== 'voice-agents' && (
+          {currentPage !== 'inbox' && currentPage !== 'inbox-settings' && currentPage !== 'ai-assistants' && currentPage !== 'automations' && currentPage !== 'voice-agents' && currentPage !== 'inbox-team' && (
             <footer className="border-t border-border mt-12 py-6">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-sm text-muted-foreground">

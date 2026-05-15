@@ -128,11 +128,11 @@ router.post('/', requireAuth, async (req, res) => {
             metadata
         } = req.body;
 
-        // Validate required fields
-        if (!campaign_name || !subject || !from_email || !recipient_mode) {
+        // Validate required fields (from_email can be empty if a channel will be used at send time)
+        if (!campaign_name || !subject || !recipient_mode) {
             return res.status(400).json({
                 success: false,
-                error: 'Missing required fields: campaign_name, subject, from_email, recipient_mode'
+                error: 'Missing required fields: campaign_name, subject, recipient_mode'
             });
         }
 
@@ -332,10 +332,15 @@ router.patch('/:id/stats', requireAuth, async (req, res) => {
 // Test email send with dynamic settings
 router.post('/test', requireAuth, async (req, res) => {
     try {
-        const { smtp_settings, subject, message, is_html, recipient_email, attachments } = req.body;
+        const { smtp_settings: smtpFromBody, subject, message, is_html, recipient_email, attachments } = req.body;
 
-        if (!smtp_settings || !recipient_email || !subject) {
+        if (!recipient_email || !subject) {
             return res.status(400).json({ success: false, error: 'Missing required test fields' });
+        }
+
+        const smtp_settings = await resolveSmtpForUser(req.user!.id, smtpFromBody);
+        if (!smtp_settings) {
+            return res.status(400).json({ success: false, error: 'Nenhuma configuração SMTP encontrada. Configure o SMTP nas Integrações ou conecte um canal de email.' });
         }
 
         await emailService.sendCampaignEmail(
@@ -354,15 +359,74 @@ router.post('/test', requireAuth, async (req, res) => {
     }
 });
 
+// Helper: resolve SMTP config from active email channel or settings table
+async function resolveSmtpForUser(userId: string, smtpFromBody?: any): Promise<any | null> {
+    if (smtpFromBody?.host && smtpFromBody?.user && smtpFromBody?.pass) {
+        return smtpFromBody;
+    }
+    // 1. Try active email channel credentials (smtp sub-object)
+    const channelResult = await query(
+        `SELECT credentials, name FROM channels WHERE user_id = $1 AND type = 'email' AND status = 'active' LIMIT 1`,
+        [userId]
+    );
+    if (channelResult.rows.length > 0) {
+        const creds = channelResult.rows[0].credentials || {};
+        if (creds.smtp?.host && creds.email) {
+            return {
+                host: creds.smtp.host,
+                port: creds.smtp.port || 587,
+                secure: creds.smtp.secure || false,
+                user: creds.smtp.auth?.user || creds.email,
+                pass: creds.smtp.auth?.pass || creds.password,
+                fromEmail: creds.email,
+                fromName: creds.from_name || channelResult.rows[0].name,
+            };
+        }
+    }
+    // 2. Try smtp_config from settings table
+    const settingsResult = await query(
+        `SELECT value FROM settings WHERE user_id = $1 AND key = 'smtp_config' LIMIT 1`,
+        [userId]
+    );
+    if (settingsResult.rows.length > 0) {
+        const cfg = JSON.parse(settingsResult.rows[0].value);
+        if (cfg.host && (cfg.user || cfg.username)) {
+            return {
+                host: cfg.host,
+                port: cfg.port || 587,
+                secure: cfg.secure || false,
+                user: cfg.user || cfg.username,
+                pass: cfg.pass || cfg.password,
+                fromEmail: cfg.fromEmail || cfg.from_email || cfg.user || cfg.username,
+                fromName: cfg.fromName || cfg.from_name || '',
+            };
+        }
+    }
+    // 3. System SMTP env vars
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+        return {
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT || '587'),
+            secure: process.env.SMTP_PORT === '465',
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+            fromEmail: process.env.SMTP_USER,
+            fromName: process.env.SMTP_FROM_NAME || '',
+        };
+    }
+    return null;
+}
+
 // Trigger direct send for a campaign
 router.post('/:id/send', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user?.id;
-        const { smtp_settings } = req.body;
+        const { smtp_settings: smtpFromBody } = req.body;
 
+        const smtp_settings = await resolveSmtpForUser(userId!, smtpFromBody);
         if (!smtp_settings) {
-            return res.status(400).json({ success: false, error: 'SMTP settings are required for direct sending' });
+            return res.status(400).json({ success: false, error: 'Nenhuma configuração SMTP encontrada. Configure o SMTP nas Integrações ou conecte um canal de email.' });
         }
 
         // 1. Get campaign
@@ -412,6 +476,7 @@ router.post('/:id/send', requireAuth, async (req, res) => {
         );
 
         // 4. Send emails asynchronously (don't block the response)
+        console.log(`[Campaign ${id}] SMTP resolved: host=${smtp_settings.host} port=${smtp_settings.port} user=${smtp_settings.user} fromEmail=${smtp_settings.fromEmail}`);
         (async () => {
             try {
                 console.log(`[Campaign ${id}] Starting background send loop for ${recipients.length} recipients`);
@@ -437,7 +502,7 @@ router.post('/:id/send', requireAuth, async (req, res) => {
                         );
                         sent++;
                     } catch (err: any) {
-                        console.error(`[Campaign Send] Failed to send to ${recipient.email}:`, err);
+                        console.error(`[Campaign Send] Failed to send to ${recipient.email}: ${err.message}`, err.code || '', err.responseCode || '');
                         failed++;
                         failureLogs.push({
                             email: recipient.email,
@@ -449,7 +514,8 @@ router.post('/:id/send', requireAuth, async (req, res) => {
 
                     // Update database frequently to show progress on dashboard
                     await query(
-                        'UPDATE email_campaigns SET sent_count = $1, failed_count = $2, delivered_count = $1, metadata = metadata || $3, updated_at = NOW() WHERE id = $4',
+                        `UPDATE email_campaigns SET sent_count = $1, failed_count = $2, delivered_count = $1,
+                         metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb, updated_at = NOW() WHERE id = $4`,
                         [sent, failed, JSON.stringify({ failures: failureLogs }), id]
                     );
 
@@ -473,7 +539,8 @@ router.post('/:id/send', requireAuth, async (req, res) => {
             } catch (fatalError: any) {
                 console.error(`[Campaign ${id}] ❌ FATAL ERROR IN SEND LOOP:`, fatalError);
                 await query(
-                    'UPDATE email_campaigns SET status = $1, metadata = metadata || $2 WHERE id = $3',
+                    `UPDATE email_campaigns SET status = $1,
+                     metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb WHERE id = $3`,
                     ['failed', JSON.stringify({ last_error: fatalError.message }), id]
                 );
             }
@@ -502,12 +569,12 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
         let statsQuery = '';
 
         if (stats) {
-            statsQuery = `, 
-                sent_count = $4, 
-                delivered_count = $5, 
-                opened_count = $6, 
+            statsQuery = `,
+                sent_count = $4,
+                delivered_count = $5,
+                opened_count = $6,
                 failed_count = $7,
-                sent_at = CASE WHEN $1 = 'completed' THEN NOW() ELSE sent_at END`;
+                sent_at = CASE WHEN $1::text = 'completed' THEN NOW() ELSE sent_at END`;
             updateData.push(stats.sent || 0, stats.delivered || 0, stats.read || 0, stats.failed || 0);
         }
 

@@ -244,6 +244,70 @@ Equipe LeadsFlow API
       attachments: mappedAttachments
     }, smtpSettings);
   }
+
+  async sendTeamInvite(
+    email: string,
+    recipientName: string,
+    inviterName: string,
+    workspaceId: string,
+    inviteUrl: string,
+    smtpSettings?: any
+  ): Promise<void> {
+    const subject = `${inviterName} convidou-te para o LeadsFlow`;
+    const text = `
+Olá ${recipientName}!
+
+${inviterName} convidou-te para fazer parte da equipa no LeadsFlow.
+
+Para aceitar o convite, clica no link abaixo:
+${inviteUrl}
+
+Este convite expira em 7 dias.
+
+Se não esperavas este convite, podes ignorar este email.
+
+Equipa LeadsFlow
+    `.trim();
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:0;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table width="520" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+        <tr><td style="background:#0066FF;padding:32px 40px;text-align:center;">
+          <h1 style="color:#fff;margin:0;font-size:24px;">LeadsFlow</h1>
+        </td></tr>
+        <tr><td style="padding:40px;">
+          <h2 style="margin:0 0 16px;color:#111;font-size:20px;">Convite para a equipa</h2>
+          <p style="color:#444;line-height:1.6;margin:0 0 24px;">
+            <strong>${inviterName}</strong> convidou-te para fazer parte da equipa no LeadsFlow.
+          </p>
+          <div style="text-align:center;margin:32px 0;">
+            <a href="${inviteUrl}"
+               style="display:inline-block;background:#0066FF;color:#fff;text-decoration:none;
+                      padding:14px 32px;border-radius:8px;font-weight:bold;font-size:15px;">
+              Aceitar Convite
+            </a>
+          </div>
+          <p style="color:#888;font-size:13px;margin:0;">
+            O convite expira em 7 dias.<br>
+            Se não esperavas este convite, podes ignorar este email.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+    if (smtpSettings) {
+      await this.sendEmailWithSettings({ to: email, subject, text, html }, smtpSettings);
+    } else {
+      await this.sendEmail({ to: email, subject, text, html });
+    }
+  }
 }
 
 export const emailService = new EmailService();

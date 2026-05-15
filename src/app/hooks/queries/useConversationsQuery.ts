@@ -52,8 +52,9 @@ export function useConversationsQuery(
             }) as Promise<ConversationWithDetails[]>,
         staleTime:    STALE.conversations,
         gcTime:       GC.conversations,
-        // Poll only when not searching — search results are ephemeral
-        refetchInterval: enablePolling && !searchQuery ? 30_000 : false,
+        // Poll only when not searching — search results are ephemeral.
+        // 8s fallback ensures new conversations appear even if WebSocket misses an event.
+        refetchInterval: enablePolling && !searchQuery ? 8_000 : false,
         refetchOnMount:        false,
         refetchOnWindowFocus:  false,
         // Keep the previous list visible while loading a new search query
@@ -115,11 +116,11 @@ export function useConversationsQuery(
 
     const addNewMessage = useCallback(
         (conversationId: string, message: any) => {
+            let needsRefresh = false;
             mutateAll((prev) => {
                 const exists = prev.some((c) => c.id === conversationId);
                 if (!exists) {
-                    // New contact — refresh the full list in the background
-                    setTimeout(() => refreshConversations(), 500);
+                    needsRefresh = true;
                     return prev;
                 }
                 const updated = prev.map((c) => {
@@ -148,6 +149,9 @@ export function useConversationsQuery(
                         new Date(a.last_message_at).getTime(),
                 );
             });
+            // Conversation didn't exist in cache — refresh immediately.
+            // This is the fallback for when new_conversation WS event doesn't arrive.
+            if (needsRefresh) refreshConversations();
         },
         [mutateAll, refreshConversations],
     );

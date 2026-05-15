@@ -38,6 +38,7 @@ interface UserDetails {
   leads_count: number;
   messages_count: number;
   campaigns_count: number;
+  plan_limits?: { leads?: number; messages?: number; massMessages?: number } | null;
 }
 
 interface UserDetailsModalProps {
@@ -235,15 +236,21 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
               {/* Stats */}
               <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 {[
-                  { label: 'Leads', value: userDetails.leads_count },
-                  { label: 'Mensagens', value: userDetails.messages_count },
-                  { label: 'Campanhas', value: userDetails.campaigns_count },
-                ].map(stat => (
-                  <div key={stat.label} className="p-3 rounded-xl bg-muted/30 border border-border/50 text-center">
-                    <p className="text-xl sm:text-2xl font-bold text-foreground">{stat.value}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
-                  </div>
-                ))}
+                  { label: 'Leads', value: userDetails.leads_count, limit: userDetails.plan_limits?.leads },
+                  { label: 'Mensagens', value: userDetails.messages_count, limit: userDetails.plan_limits?.messages },
+                  { label: 'Campanhas', value: userDetails.campaigns_count, limit: userDetails.plan_limits?.massMessages },
+                ].map(stat => {
+                  const atLimit = stat.limit != null && stat.value >= stat.limit;
+                  return (
+                    <div key={stat.label} className={`p-3 rounded-xl border text-center ${atLimit ? 'bg-red-500/10 border-red-500/40' : 'bg-muted/30 border-border/50'}`}>
+                      <p className={`text-xl sm:text-2xl font-bold ${atLimit ? 'text-red-500' : 'text-foreground'}`}>{stat.value}</p>
+                      {stat.limit != null && (
+                        <p className="text-xs text-muted-foreground">de {stat.limit}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Channels */}

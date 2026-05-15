@@ -309,19 +309,27 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                         className="w-full p-4 flex items-center gap-3 hover:bg-muted/50/50 transition-colors border-b"
                                         style={{ borderColor: 'hsl(var(--border))' }}
                                     >
-                                        {lead.avatar_url ? (
+                                        {(lead.avatarUrl || lead.avatar_url) ? (
                                             <img
-                                                src={lead.avatar_url}
+                                                src={lead.avatarUrl || lead.avatar_url}
                                                 alt={lead.name || lead.nome}
                                                 className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                                                onError={(e) => {
+                                                    const el = e.currentTarget;
+                                                    el.style.display = 'none';
+                                                    const fallback = el.nextElementSibling as HTMLElement | null;
+                                                    if (fallback) fallback.style.display = 'flex';
+                                                }}
                                             />
-                                        ) : (
-                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
-                                                <span className="text-white font-semibold text-sm">
-                                                    {(lead.name || lead.nome || '?').charAt(0).toUpperCase()}
-                                                </span>
-                                            </div>
-                                        )}
+                                        ) : null}
+                                        <div
+                                            className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 items-center justify-center flex-shrink-0"
+                                            style={{ display: (lead.avatarUrl || lead.avatar_url) ? 'none' : 'flex' }}
+                                        >
+                                            <span className="text-white font-semibold text-sm">
+                                                {(lead.name || lead.nome || '?').charAt(0).toUpperCase()}
+                                            </span>
+                                        </div>
                                         <div className="flex-1 text-left min-w-0">
                                             <p className="font-medium truncate text-sm" style={{ color: 'hsl(var(--foreground))' }}>
                                                 {lead.name || lead.nome || 'Sem nome'}

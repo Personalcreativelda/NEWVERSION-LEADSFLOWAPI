@@ -167,19 +167,29 @@ const PRIORITY_CONFIG = {
 };
 
 // Common origins for display with Lucide icons
-const ORIGIN_CONFIG: Record<string, { icon: LucideIcon; color: string; label: string }> = {
-  whatsapp: { icon: MessageCircle, color: 'text-green-500', label: 'WhatsApp' },
-  instagram: { icon: Instagram, color: 'text-pink-500', label: 'Instagram' },
-  facebook: { icon: Users2, color: 'text-blue-500', label: 'Facebook' },
-  website: { icon: Globe, color: 'text-cyan-500', label: 'Website' },
-  email: { icon: Mail, color: 'text-orange-500', label: 'Email' },
-  telefone: { icon: Phone, color: 'text-blue-400', label: 'Telefone' },
-  indicacao: { icon: Users2, color: 'text-purple-500', label: 'Indicação' },
-  evento: { icon: Calendar, color: 'text-yellow-500', label: 'Evento' },
-  anuncio: { icon: Megaphone, color: 'text-red-500', label: 'Anúncio' },
-  organico: { icon: TrendingUp, color: 'text-green-400', label: 'Orgânico' },
-  telegram: { icon: Send, color: 'text-blue-400', label: 'Telegram' },
+const ORIGIN_CONFIG: Record<string, { icon: LucideIcon; color: string; bgColor: string; hexColor: string; label: string }> = {
+  whatsapp:      { icon: MessageCircle, color: 'text-white', bgColor: 'bg-[#25D366]', hexColor: '#25D366', label: 'WhatsApp' },
+  whatsapp_cloud:{ icon: MessageCircle, color: 'text-white', bgColor: 'bg-[#25D366]', hexColor: '#25D366', label: 'WhatsApp' },
+  instagram:     { icon: Instagram,     color: 'text-white', bgColor: 'bg-[#E4405F]', hexColor: '#E4405F', label: 'Instagram' },
+  facebook:      { icon: Users2,        color: 'text-white', bgColor: 'bg-[#1877F2]', hexColor: '#1877F2', label: 'Facebook' },
+  website:       { icon: Globe,         color: 'text-white', bgColor: 'bg-[#7c3aed]', hexColor: '#7c3aed', label: 'Website' },
+  email:         { icon: Mail,          color: 'text-white', bgColor: 'bg-[#0891b2]', hexColor: '#0891b2', label: 'Email' },
+  telefone:      { icon: Phone,         color: 'text-white', bgColor: 'bg-[#3b82f6]', hexColor: '#3b82f6', label: 'Telefone' },
+  indicacao:     { icon: Users2,        color: 'text-white', bgColor: 'bg-[#8b5cf6]', hexColor: '#8b5cf6', label: 'Indicação' },
+  evento:        { icon: Calendar,      color: 'text-white', bgColor: 'bg-[#eab308]', hexColor: '#eab308', label: 'Evento' },
+  anuncio:       { icon: Megaphone,     color: 'text-white', bgColor: 'bg-[#ef4444]', hexColor: '#ef4444', label: 'Anúncio' },
+  organico:      { icon: TrendingUp,    color: 'text-white', bgColor: 'bg-[#22c55e]', hexColor: '#22c55e', label: 'Orgânico' },
+  telegram:      { icon: Send,          color: 'text-white', bgColor: 'bg-[#0088cc]', hexColor: '#0088cc', label: 'Telegram' },
+  sms:           { icon: MessageCircle, color: 'text-white', bgColor: 'bg-[#0d9488]', hexColor: '#0d9488', label: 'SMS' },
 };
+
+// WhatsApp SVG (not in lucide-react)
+const WhatsAppSVG = ({ size = 10 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="white">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.533 5.859L.057 23.428a.75.75 0 0 0 .921.921l5.569-1.476A11.942 11.942 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75c-1.9 0-3.685-.513-5.218-1.408l-.374-.22-3.878 1.027 1.027-3.878-.22-.374A9.716 9.716 0 0 1 2.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z"/>
+  </svg>
+);
 
 // Format currency with proper NaN handling
 const formatCurrency = (value: number | undefined | null, currency: CurrencyCode = 'USD') => {
@@ -260,14 +270,33 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
       {/* Header: Avatar + Nome + Menu */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-3 flex-1 min-w-0">
-          <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-white/10">
-            {lead.avatarUrl ? (
-              <AvatarImage src={lead.avatarUrl} alt={lead.nome} />
-            ) : null}
-            <AvatarFallback className={`${avatarColor} text-white text-xs font-bold`}>
-              {lead.nome.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          {/* Avatar with channel badge */}
+          <div className="relative flex-shrink-0">
+            <Avatar className="h-9 w-9 ring-2 ring-white/10">
+              {lead.avatarUrl ? (
+                <AvatarImage src={lead.avatarUrl} alt={lead.nome} />
+              ) : null}
+              <AvatarFallback className={`${avatarColor} text-white text-xs font-bold`}>
+                {lead.nome.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            {lead.origem && (() => {
+              const key = lead.origem.toLowerCase();
+              const cfg = ORIGIN_CONFIG[key];
+              if (!cfg) return null;
+              const isWhatsApp = key === 'whatsapp' || key === 'whatsapp_cloud';
+              const Icon = cfg.icon;
+              return (
+                <div
+                  className="absolute -bottom-0.5 -right-0.5 w-[16px] h-[16px] rounded-full border-2 border-card flex items-center justify-center"
+                  style={{ backgroundColor: cfg.hexColor }}
+                  title={cfg.label}
+                >
+                  {isWhatsApp ? <WhatsAppSVG size={8} /> : <Icon size={8} className="text-white" />}
+                </div>
+              );
+            })()}
+          </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-sm truncate text-foreground">
               {lead.nome}
@@ -323,16 +352,21 @@ const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial
         <div className="flex items-center gap-1.5 mb-2 px-1 flex-wrap">
           {lead.origem && (() => {
             const originKey = lead.origem.toLowerCase();
-            const originConfig = ORIGIN_CONFIG[originKey];
-            const OriginIcon = originConfig?.icon || Globe;
-            const iconColor = originConfig?.color || 'text-gray-400';
-            const originLabel = originConfig?.label || lead.origem;
+            const cfg = ORIGIN_CONFIG[originKey];
+            const isWhatsApp = originKey === 'whatsapp' || originKey === 'whatsapp_cloud';
+            const OriginIcon = cfg?.icon || Globe;
+            const originLabel = cfg?.label || lead.origem;
+            const hexColor = cfg?.hexColor || '#6b7280';
             return (
               <span
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground`}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-white"
+                style={{ backgroundColor: hexColor }}
                 title={`Origem: ${originLabel}`}
               >
-                <OriginIcon className={`h-3 w-3 ${iconColor}`} />
+                {isWhatsApp
+                  ? <WhatsAppSVG size={9} />
+                  : <OriginIcon className="h-2.5 w-2.5 text-white" />
+                }
                 <span className="truncate max-w-[60px]">{originLabel}</span>
               </span>
             );

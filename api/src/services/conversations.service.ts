@@ -27,7 +27,23 @@ export class ConversationsService {
         remoteJid: string,
         leadId?: string,
         metadata?: any
-    ): Promise<Conversation> {
+    ): Promise<Conversation>;
+    async findOrCreate(
+        userId: string,
+        channelId: string,
+        remoteJid: string,
+        leadId: string | undefined,
+        metadata: any,
+        returnFlag: true
+    ): Promise<{ conversation: Conversation; isNew: boolean }>;
+    async findOrCreate(
+        userId: string,
+        channelId: string,
+        remoteJid: string,
+        leadId?: string,
+        metadata?: any,
+        returnFlag?: true
+    ): Promise<Conversation | { conversation: Conversation; isNew: boolean }> {
         // Validação: remoteJid deve ser válido
         // - WhatsApp: formato xxx@s.whatsapp.net ou xxx@g.us
         // - Telegram: ID numérico (ex: 123456789)
@@ -78,19 +94,23 @@ export class ConversationsService {
                     existing.metadata = merged;
                 }
             }
-            return result.rows[0];
+            const existing = result.rows[0];
+            return returnFlag ? { conversation: existing, isNew: false } : existing;
         }
 
-        // Criar nova conversa
+        // Criar nova conversa — join workspace_id from workspaces table
         const isGroup = remoteJid.includes('@g.us');
         result = await query(
-            `INSERT INTO conversations (user_id, lead_id, channel_id, remote_jid, is_group, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6)
+            `INSERT INTO conversations (user_id, lead_id, channel_id, remote_jid, is_group, metadata, workspace_id)
+       VALUES ($1, $2, $3, $4, $5, $6,
+         (SELECT id FROM workspaces WHERE owner_id = $1 LIMIT 1)
+       )
        RETURNING *`,
             [userId, leadId || null, channelId, remoteJid, isGroup, JSON.stringify(metadata || {})]
         );
 
-        return result.rows[0];
+        const created = result.rows[0];
+        return returnFlag ? { conversation: created, isNew: true } : created;
     }
 
     /**

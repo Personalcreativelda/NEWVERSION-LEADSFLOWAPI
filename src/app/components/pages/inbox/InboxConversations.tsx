@@ -3,18 +3,20 @@ import { ConversationList } from '../../inbox/ConversationList';
 import { useInbox } from '../../../hooks/useInbox';
 import { useInboxFilters } from '../../../hooks/useInboxFilters';
 import { useInboxLayout } from '../../../hooks/useInboxLayout';
-import { conversationsApi, contactsApi, groupsApi } from '../../../services/api/inbox';
+import { conversationsApi, contactsApi, groupsApi, teamApi } from '../../../services/api/inbox';
 import {
     Search, Filter, Plus, X, Wifi, WifiOff, RefreshCw,
     PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
     Maximize2, Minimize2, ChevronLeft, ChevronRight,
-    Tag, Users, Settings2, Trash2, CheckSquare, Square
+    Tag, Users, Settings2, Trash2, CheckSquare, Square,
+    UserCheck, UserX, CheckCircle2, Clock
 } from 'lucide-react';
 import { ChatPanel } from '../../inbox/ChatPanel';
 import { EmptyState } from '../../inbox/EmptyState';
 import { ContactDetailsPanel } from '../../inbox/ContactDetailsPanel';
 import { NewConversationModal } from '../../inbox/NewConversationModal';
 import { ResizeHandle } from '../../inbox/ResizeHandle';
+import type { TeamMember } from '../../../types/inbox';
 
 interface InboxConversationsProps {
     onNavigate?: (page: string) => void;
@@ -70,12 +72,28 @@ export default function InboxConversations({
     const [selectedConvIds, setSelectedConvIds] = useState<Set<string>>(new Set());
 
     // ── WhatsApp-style quick filter tabs ──────────────────────
-    type QuickFilter = 'all' | 'unread' | 'tags' | 'groups';
+    type QuickFilter = 'all' | 'unread' | 'tags' | 'groups' | 'mine' | 'unassigned' | 'pending' | 'resolved';
+
+    // Team members for assignee dropdown/filters
+    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+    useEffect(() => {
+        teamApi.getMembers().then(setTeamMembers).catch(() => {});
+    }, []);
+
+    // Current user id (for 'mine' filter)
+    const currentUserId = useMemo(() => {
+        try { return JSON.parse(atob((localStorage.getItem('leadflow_access_token') || '').split('.')[1] || 'e30=')).sub || ''; }
+        catch { return ''; }
+    }, []);
 
     // All available filter options
     const ALL_FILTER_OPTIONS: { id: QuickFilter; label: string; icon?: React.ReactNode }[] = [
         { id: 'all', label: 'Tudo' },
         { id: 'unread', label: 'Não lidas' },
+        { id: 'mine', label: 'Minhas', icon: <UserCheck size={11} /> },
+        { id: 'unassigned', label: 'Não atribuídas', icon: <UserX size={11} /> },
+        { id: 'pending', label: 'Pendentes', icon: <Clock size={11} /> },
+        { id: 'resolved', label: 'Resolvidas', icon: <CheckCircle2 size={11} /> },
         { id: 'tags', label: 'Etiquetas', icon: <Tag size={11} /> },
         { id: 'groups', label: 'Grupos', icon: <Users size={11} /> },
     ];
@@ -87,7 +105,7 @@ export default function InboxConversations({
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) return JSON.parse(saved);
         } catch {}
-        return ['all', 'unread', 'tags', 'groups']; // default: show all
+        return ['all', 'unread', 'mine', 'unassigned', 'tags', 'groups']; // default
     });
     const [showFilterConfig, setShowFilterConfig] = useState(false);
     const [isSyncingGroups, setIsSyncingGroups] = useState(false);
@@ -201,6 +219,20 @@ export default function InboxConversations({
         }
     };
 
+    const handleResolveConversation = async () => {
+        if (!selectedConversation) return;
+        const isResolved = selectedConversation.status === 'resolved';
+        const newStatus = isResolved ? 'open' : 'resolved';
+        try {
+            await teamApi.setStatus(selectedConversation.id, { status: newStatus });
+            // Update local state immediately so the button toggles without a full reload
+            selectConversation({ ...selectedConversation, status: newStatus as any });
+            await refreshConversations();
+        } catch (error) {
+            console.error('Erro ao alterar status da conversa:', error);
+        }
+    };
+
     const toggleSelectMode = () => {
         setIsSelectMode(prev => !prev);
         setSelectedConvIds(new Set());
@@ -311,6 +343,22 @@ export default function InboxConversations({
                 const convTags = (conv as any).conversation_tags || [];
                 const hasTags = (leadStatus && leadStatus !== 'novo' && leadStatus !== 'new') || leadTags.length > 0 || convTags.length > 0;
                 if (!hasTags) return false;
+            } else if (quickFilter === 'mine') {
+                if (isGroup) return false;
+                if ((conv as any).assignee_id !== currentUserId) return false;
+            } else if (quickFilter === 'unassigned') {
+                if (isGroup) return false;
+                const hasAssignee = !!(conv as any).assignee_id;
+                if (hasAssignee) return false;
+                // Only show open/pending (not resolved/closed)
+                const s = conv.status;
+                if (s === 'resolved' || s === 'closed') return false;
+            } else if (quickFilter === 'pending') {
+                if (isGroup) return false;
+                if (conv.status !== 'pending') return false;
+            } else if (quickFilter === 'resolved') {
+                if (isGroup) return false;
+                if (conv.status !== 'resolved') return false;
             } else {
                 // 'all' — exclude groups (keep original behavior)
                 if (isGroup) return false;
@@ -554,40 +602,42 @@ export default function InboxConversations({
                                     </div>
 
                                     {/* WhatsApp-style quick filter pill tabs */}
-                                    <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto scrollbar-none relative">
-                                        {visibleFilters.map(f => {
-                                            const isActive = quickFilter === f.id;
-                                            const badge = f.id === 'unread' && totalUnread > 0
-                                                ? totalUnread > 99 ? '99+' : String(totalUnread)
-                                                : f.id === 'groups' && groupCount > 0
-                                                    ? String(groupCount)
-                                                    : null;
-                                            return (
-                                                <button
-                                                    key={f.id}
-                                                    onClick={() => setQuickFilter(f.id)}
-                                                    className={`flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors ${
-                                                        isActive
-                                                            ? 'bg-primary/15 text-primary dark:bg-primary/25 dark:text-primary'
-                                                            : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
-                                                    }`}
-                                                >
-                                                    {f.icon}
-                                                    {f.label}
-                                                    {badge && (
-                                                        <span className={`ml-0.5 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
-                                                            isActive ? 'bg-primary text-white' : 'bg-muted-foreground/20 text-muted-foreground'
-                                                        }`}>
-                                                            {badge}
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
-                                        {/* + button to customize filters */}
+                                    <div className="flex items-center gap-1.5 mt-2.5">
+                                        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 min-w-0">
+                                            {visibleFilters.map(f => {
+                                                const isActive = quickFilter === f.id;
+                                                const badge = f.id === 'unread' && totalUnread > 0
+                                                    ? totalUnread > 99 ? '99+' : String(totalUnread)
+                                                    : f.id === 'groups' && groupCount > 0
+                                                        ? String(groupCount)
+                                                        : null;
+                                                return (
+                                                    <button
+                                                        key={f.id}
+                                                        onClick={() => setQuickFilter(f.id)}
+                                                        className={`flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors ${
+                                                            isActive
+                                                                ? 'bg-primary/15 text-primary dark:bg-primary/25 dark:text-primary'
+                                                                : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                                                        }`}
+                                                    >
+                                                        {f.icon}
+                                                        {f.label}
+                                                        {badge && (
+                                                            <span className={`ml-0.5 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                                                                isActive ? 'bg-primary text-white' : 'bg-muted-foreground/20 text-muted-foreground'
+                                                            }`}>
+                                                                {badge}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        {/* + button always visible outside the scroll area */}
                                         <button
                                             onClick={() => setShowFilterConfig(!showFilterConfig)}
-                                            className="flex items-center justify-center w-6 h-6 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex-shrink-0"
+                                            className="flex items-center justify-center w-6 h-6 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex-shrink-0 ml-0.5"
                                             title="Personalizar filtros"
                                         >
                                             <Plus size={13} />
@@ -758,36 +808,39 @@ export default function InboxConversations({
                         </div>
 
                         {/* Mobile: WhatsApp-style quick filter tabs */}
-                        <div className="flex items-center gap-2 mt-3 overflow-x-auto scrollbar-none">
-                            {visibleFilters.map(f => {
-                                const isActive = quickFilter === f.id;
-                                const badge = f.id === 'unread' && totalUnread > 0
-                                    ? totalUnread > 99 ? '99+' : String(totalUnread)
-                                    : f.id === 'groups' && groupCount > 0
-                                        ? String(groupCount)
-                                        : null;
-                                return (
-                                    <button
-                                        key={f.id}
-                                        onClick={() => setQuickFilter(f.id)}
-                                        className={`flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                                            isActive
-                                                ? 'bg-primary/15 text-primary dark:bg-primary/25 dark:text-primary'
-                                                : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
-                                        }`}
-                                    >
-                                        {f.icon}
-                                        {f.label}
-                                        {badge && (
-                                            <span className={`ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
-                                                isActive ? 'bg-primary text-white' : 'bg-muted-foreground/20 text-muted-foreground'
-                                            }`}>
-                                                {badge}
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
+                        <div className="flex items-center gap-2 mt-3">
+                            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0">
+                                {visibleFilters.map(f => {
+                                    const isActive = quickFilter === f.id;
+                                    const badge = f.id === 'unread' && totalUnread > 0
+                                        ? totalUnread > 99 ? '99+' : String(totalUnread)
+                                        : f.id === 'groups' && groupCount > 0
+                                            ? String(groupCount)
+                                            : null;
+                                    return (
+                                        <button
+                                            key={f.id}
+                                            onClick={() => setQuickFilter(f.id)}
+                                            className={`flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                                                isActive
+                                                    ? 'bg-primary/15 text-primary dark:bg-primary/25 dark:text-primary'
+                                                    : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                                            }`}
+                                        >
+                                            {f.icon}
+                                            {f.label}
+                                            {badge && (
+                                                <span className={`ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                                                    isActive ? 'bg-primary text-white' : 'bg-muted-foreground/20 text-muted-foreground'
+                                                }`}>
+                                                    {badge}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {/* + button always visible outside the scroll area */}
                             <button
                                 onClick={() => setShowFilterConfig(!showFilterConfig)}
                                 className="flex items-center justify-center w-7 h-7 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex-shrink-0"
@@ -871,6 +924,7 @@ export default function InboxConversations({
                         onBack={isMobile ? handleBack : undefined}
                         onEditLead={handleEditLead}
                         onDeleteConversation={handleDeleteConversation}
+                        onResolve={handleResolveConversation}
                         messages={messages}
                         messagesLoading={messagesLoading}
                         messagesError={messagesError}

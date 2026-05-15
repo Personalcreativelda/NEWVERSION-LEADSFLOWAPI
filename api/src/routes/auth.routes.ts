@@ -20,6 +20,7 @@ import { notificationsService } from '../services/notifications.service';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
 import { AIAssistantsService } from '../services/ai-assistants.service';
 import { DEFAULT_ONBOARDING_TEMPLATE } from './ai-assistants.routes';
+import { query as dbQuery } from '../database/connection';
 
 const router = Router();
 
@@ -422,6 +423,144 @@ router.post('/resend-confirmation', async (req, res, next) => {
 
     await resendSignupConfirmation(email);
     return res.status(204).send();
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ─── WORKSPACE INVITE ACCEPTANCE ──────────────────────────────────────────────
+
+// GET /auth/invite/:token  — public: returns invite details so frontend can show context
+router.get('/invite/:token', async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const result = await dbQuery(
+      `SELECT wi.email, wi.role, wi.status, wi.expires_at,
+              w.name AS workspace_name,
+              u.name AS invited_by_name
+       FROM workspace_invites wi
+       JOIN workspaces w  ON w.id  = wi.workspace_id
+       LEFT JOIN users u ON u.id  = wi.invited_by
+       WHERE wi.token = $1`,
+      [token]
+    );
+    const invite = result.rows[0];
+    if (!invite) return res.status(404).json({ error: 'Convite não encontrado' });
+    if (invite.status !== 'pending') {
+      return res.status(410).json({ error: `Convite ${invite.status}` });
+    }
+    if (new Date(invite.expires_at) < new Date()) {
+      await dbQuery(`UPDATE workspace_invites SET status = 'expired' WHERE token = $1`, [token]);
+      return res.status(410).json({ error: 'Convite expirado' });
+    }
+    res.json({
+      email:            invite.email,
+      role:             invite.role,
+      workspace_name:   invite.workspace_name,
+      invited_by_name:  invite.invited_by_name,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// POST /auth/accept-invite  — accepts invite and returns session
+// Body: { token, password?, name? }
+// - If a user account already exists for that email → just log them in + link membership
+// - If no account → create account then link membership
+router.post('/accept-invite', async (req, res, next) => {
+  try {
+    const { token, password, name } = req.body || {};
+    if (!token) return res.status(400).json({ error: 'token é obrigatório' });
+
+    // Load invite
+    const invResult = await dbQuery(
+      `SELECT wi.*, w.id AS workspace_id, w.name AS workspace_name, w.owner_id
+       FROM workspace_invites wi
+       JOIN workspaces w ON w.id = wi.workspace_id
+       WHERE wi.token = $1`,
+      [token]
+    );
+    const invite = invResult.rows[0];
+    if (!invite) return res.status(404).json({ error: 'Convite não encontrado' });
+    if (invite.status !== 'pending') {
+      return res.status(410).json({ error: `Convite ${invite.status}` });
+    }
+    if (new Date(invite.expires_at) < new Date()) {
+      await dbQuery(`UPDATE workspace_invites SET status = 'expired' WHERE token = $1`, [token]);
+      return res.status(410).json({ error: 'Convite expirado' });
+    }
+
+    // Check if user exists
+    const existingUser = await dbQuery('SELECT id FROM users WHERE email = $1', [invite.email]);
+    let userId: string;
+    let session: any;
+
+    if (existingUser.rows[0]) {
+      // User already has an account — log them in if password provided, else just use their id
+      userId = existingUser.rows[0].id;
+      if (password) {
+        try {
+          const loginData = await loginWithEmail(invite.email, password) as any;
+          session = loginData.session;
+        } catch {
+          return res.status(401).json({ error: 'Senha incorreta para a conta existente' });
+        }
+      } else {
+        // No password — must already be authenticated or we issue a token-only response
+        // For simplicity: require password when accepting via link
+        return res.status(400).json({
+          error: 'Conta existente. Forneça a senha para aceitar o convite.',
+          email: invite.email,
+          has_account: true,
+        });
+      }
+    } else {
+      // Create new account
+      if (!password) return res.status(400).json({ error: 'password é obrigatório para criar conta' });
+      const regData = await registerWithEmail(invite.email, password, { name: name || invite.email }) as any;
+      userId = regData.user.id;
+      session = regData.session;
+    }
+
+    // Link team_members row (upsert)
+    // team_members has UNIQUE(owner_id, email) — use that constraint for ON CONFLICT
+    await dbQuery(
+      `INSERT INTO team_members
+         (workspace_id, owner_id, user_id, email, name, role, status, is_active, invited_by, accepted_at, joined_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', true, $7, NOW(), NOW())
+       ON CONFLICT (owner_id, email) DO UPDATE
+         SET user_id     = EXCLUDED.user_id,
+             workspace_id = EXCLUDED.workspace_id,
+             status      = 'active',
+             is_active   = true,
+             joined_at   = COALESCE(team_members.joined_at, NOW()),
+             accepted_at = COALESCE(team_members.accepted_at, NOW())`,
+      [
+        invite.workspace_id,
+        invite.owner_id,
+        userId,
+        invite.email,
+        name || invite.email,
+        invite.role,
+        invite.invited_by ?? null,
+      ]
+    );
+
+    // Mark invite as accepted
+    await dbQuery(
+      `UPDATE workspace_invites
+       SET status = 'accepted', accepted_at = NOW(), accepted_by = $1
+       WHERE token = $2`,
+      [userId, token]
+    );
+
+    res.json({
+      success: true,
+      session,
+      workspace_name: invite.workspace_name,
+      role: invite.role,
+    });
   } catch (error) {
     return next(error);
   }

@@ -3,6 +3,7 @@ import { Rocket, Crown, Bell, Check, X, UserPlus, TrendingUp, CreditCard, AlertT
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Switch } from '../../ui/switch';
+import { apiRequest } from '../../../utils/api';
 
 interface User {
   id: string;
@@ -328,20 +329,13 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      const res = await fetch('/api/admin/create-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          password: form.password,
-          plan: form.plan,
-          expirationDays: form.plan !== 'free' ? form.expirationDays : undefined,
-        }),
+      await apiRequest('/admin/create-user', 'POST', {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        plan: form.plan,
+        expirationDays: form.plan !== 'free' ? form.expirationDays : undefined,
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Erro ao criar usuário'); return; }
       onCreated();
       onClose();
     } catch (e: any) {

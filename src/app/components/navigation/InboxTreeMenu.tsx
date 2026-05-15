@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     ChevronRight, Inbox, Hash, Tag, AtSign, Bell, Settings, Bot, PhoneCall, Zap,
     MessageCircle, Instagram, Facebook, Send, Mail, Cloud, Globe, Plus,
-    Edit2, Trash2, UserPlus, ArrowRightLeft, Smartphone
+    Edit2, Trash2, UserPlus, ArrowRightLeft, Smartphone, Users
 } from 'lucide-react';
 import { channelsApi, conversationTagsApi } from '../../services/api/inbox';
 import { useInboxFilters, type InboxFilterType } from '../../hooks/useInboxFilters';
@@ -399,6 +399,15 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
             >
                 <Hash className="w-4 h-4 flex-shrink-0" />
                 <span className="flex-1 text-left">{t.canais || 'Canais'}</span>
+            </button>
+
+            {/* Equipa */}
+            <button
+                onClick={() => onNavigate('inbox-team')}
+                className={`sidebar-nav-subitem w-full flex items-center gap-2.5 px-3 py-[6px] rounded-md text-[14px] transition-all duration-150 ${currentPage === 'inbox-team' ? 'active' : ''}`}
+            >
+                <Users className="w-4 h-4 flex-shrink-0" />
+                <span className="flex-1 text-left">Equipa</span>
             </button>
 
             {/* ====== RIGHT-CLICK CONTEXT MENU ====== */}
