@@ -192,26 +192,40 @@ export class AssistantProcessorService {
                 ctx.mediaType.includes('spreadsheet')
             )) {
                 const documentEnabled = config.document_enabled !== false; // padrão: ativo
+                // Preservar legenda/pergunta original do usuário para usar nos fallbacks
+                const docUserCaption = (ctx.messageContent && !ctx.messageContent.startsWith('[')) ? ctx.messageContent.trim() : '';
                 if (documentEnabled && ctx.mediaUrl) {
                     try {
+                        // Tentar Gemini primeiro (melhor suporte a PDF), depois OpenAI se disponível
                         const geminiProvider = availableProviders.find(p => p.provider === 'gemini');
                         const extractedText = await aiService.extractDocumentText(ctx.mediaUrl, ctx.mediaType, geminiProvider?.apiKey);
                         if (extractedText && extractedText.length > 50) {
-                            const userQuestion = (ctx.messageContent && !ctx.messageContent.startsWith('[')) ? ctx.messageContent : '';
-                            ctx.messageContent = `[Conteúdo do documento]\n${extractedText}\n\n${userQuestion || 'Responda com base no documento acima.'}`;
+                            ctx.messageContent = `[Conteúdo do documento]\n${extractedText}\n\n${docUserCaption || 'Responda com base no documento acima.'}`;
                             console.log(`[AssistantProcessor] 📄 Documento extraído: ${extractedText.length} chars`);
                         } else {
-                            // Não conseguiu extrair — fallback
-                            const userQuestion = (ctx.messageContent && !ctx.messageContent.startsWith('[')) ? ctx.messageContent : '';
-                            ctx.messageContent = userQuestion || 'O usuário enviou um documento. Informe que recebeu mas não conseguiu ler o conteúdo e peça que cole o texto diretamente.';
+                            // Gemini falhou — ainda passar pergunta do usuário ao assistente com contexto
                             console.warn('[AssistantProcessor] ⚠️ Extração do documento retornou texto insuficiente.');
+                            if (docUserCaption) {
+                                ctx.messageContent = `${docUserCaption}\n\n[O usuário também enviou um documento mas não foi possível extrair o conteúdo para análise.]`;
+                            } else {
+                                ctx.messageContent = '[O usuário enviou um documento mas não foi possível extrair o texto. Informe que recebeu o arquivo, mas peça que cole o conteúdo como texto ou descreva o que precisa.]';
+                            }
                         }
                     } catch (err: any) {
                         console.warn('[AssistantProcessor] ⚠️ Extração de documento falhou:', err.message);
-                        ctx.messageContent = 'O usuário enviou um documento mas não consegui ler o conteúdo. Informe ao usuário e peça que cole o texto diretamente na conversa.';
+                        if (docUserCaption) {
+                            ctx.messageContent = `${docUserCaption}\n\n[O usuário também enviou um documento mas houve um erro ao tentar ler o arquivo.]`;
+                        } else {
+                            ctx.messageContent = '[O usuário enviou um documento mas houve um erro ao ler o arquivo. Informe que recebeu e peça que cole o conteúdo como texto.]';
+                        }
                     }
                 } else if (!ctx.mediaUrl) {
-                    ctx.messageContent = 'O usuário enviou um documento mas não consegui acessar o arquivo. Peça que envie novamente ou cole o conteúdo em texto.';
+                    // Sem URL — provavelmente falha no download via Evolution
+                    if (docUserCaption) {
+                        ctx.messageContent = `${docUserCaption}\n\n[O usuário também enviou um documento mas não foi possível acessar o arquivo.]`;
+                    } else {
+                        ctx.messageContent = '[O usuário enviou um documento mas não foi possível acessar o arquivo. Peça que envie novamente ou cole o conteúdo como texto.]';
+                    }
                 }
             }
 
@@ -232,10 +246,13 @@ export class AssistantProcessorService {
             console.log(`[AssistantProcessor] Resposta gerada em ${responseTime}ms (${aiResponse.tokensUsed} tokens)`);
 
             // 5.5. Verificar se deve responder com áudio (ElevenLabs)
-            // Regra: "eleve deve responder em audio quando o cliente manda audio"
+            // Regra: responder em áudio quando o cliente manda áudio e audio_enabled está ativo
             let audioBase64: string | undefined = undefined;
-            const audioEnabled = config.audio_enabled === true;
-            
+            // Aceitar boolean true OU string "true" (valores vindos de JSON/form podem ser string)
+            const audioEnabled = config.audio_enabled === true || config.audio_enabled === 'true';
+
+            console.log(`[AssistantProcessor] 🔊 audioEnabled=${audioEnabled} mediaType=${ctx.mediaType} hasElevenLabsKey=${!!process.env.ELEVENLABS_API_KEY}`);
+
             if (audioEnabled && ctx.mediaType === 'audio') {
                 const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
                 if (!elevenLabsApiKey) {
@@ -243,17 +260,20 @@ export class AssistantProcessorService {
                 } else {
                     try {
                         console.log(`[AssistantProcessor] 🎙️ Gerando Áudio Mágico (ElevenLabs) para a resposta...`);
-                        // Per-assistant config → SAAS-wide env default → hardcoded fallback
+                        // Per-assistant config → SAAS-wide env default → fallback padrão
                         const voiceId = config.audio_voice_id || process.env.ELEVENLABS_DEFAULT_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
+                        console.log(`[AssistantProcessor] 🎤 VoiceId: ${voiceId}`);
                         const audioBuffer = await aiService.generateElevenLabsAudio(
                             aiResponse.content,
                             voiceId,
                             elevenLabsApiKey
                         );
+                        // Armazenar como data URI para envio via WhatsApp/Telegram
                         audioBase64 = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
-                        console.log(`[AssistantProcessor] ✅ Áudio Mágico gerado com sucesso!`);
+                        console.log(`[AssistantProcessor] ✅ Áudio Mágico gerado: ${audioBuffer.length} bytes`);
                     } catch (audioErr: any) {
                         console.error(`[AssistantProcessor] ❌ Erro ao gerar áudio ElevenLabs (Fallback para texto):`, audioErr.message);
+                        // audioBase64 permanece undefined → fallback para texto
                     }
                 }
             }

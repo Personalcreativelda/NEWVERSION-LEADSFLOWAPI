@@ -817,10 +817,12 @@ export class WhatsAppService {
         encoding: true, // Evolution converte MP3 → OGG Opus automaticamente (necessário para nota de voz PTT)
       };
       if (audioBase64) {
-        pttBody.audio = audioBase64;
+        // Evolution API sendWhatsAppAudio espera base64 puro (sem prefixo data URI)
+        pttBody.audio = audioBase64.startsWith('data:') ? audioBase64.split(',')[1] : audioBase64;
       } else if (audioUrl) {
         pttBody.audio = audioUrl;
       }
+      console.log('[WhatsAppService] Sending PTT audio — encoding=true, base64Len=', pttBody.audio?.length || 0);
 
       return await this.request(`/message/sendWhatsAppAudio/${instanceId}`, {
         method: 'POST',

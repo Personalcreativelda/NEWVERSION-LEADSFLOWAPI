@@ -317,7 +317,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     context_window_messages: cfg.context_window_messages ?? 10,
     memory_enabled: cfg.memory_enabled !== false,
     funnel_tracking_enabled: cfg.funnel_tracking_enabled !== false,
-    audio_enabled: cfg.audio_enabled === true,
+    audio_enabled: cfg.audio_enabled === true || cfg.audio_enabled === 'true',
     vision_enabled: cfg.vision_enabled !== false,
     document_enabled: cfg.document_enabled !== false,
   });
