@@ -14,6 +14,7 @@ import { getWebSocketService } from '../services/websocket.service';
 import { webhookDispatcher } from '../services/webhook-dispatcher.service';
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 import { AIService, getAvailableProviders } from '../services/ai.service';
+import { emailService } from '../services/email.service';
 
 const router = Router();
 
@@ -1359,19 +1360,6 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       }
     }
 
-    // Always prefer the instance_id from the conversation's linked channel credentials.
-    // getActiveWhatsAppInstance searches ALL channels and may pick a different (wrong) one.
-    // The AI assistant reads credentials directly from the conversation's channel — match that.
-    if (messageChannel === 'whatsapp' && channelCredentials?.instance_id) {
-      savedInstance = channelCredentials.instance_id;
-      instanceId = channelCredentials.instance_id;
-      console.log('[Inbox Send] instanceId from conversation channel credentials:', instanceId);
-    } else if (messageChannel === 'whatsapp' && channelCredentials?.instance_name) {
-      savedInstance = channelCredentials.instance_name;
-      instanceId = channelCredentials.instance_name;
-      console.log('[Inbox Send] instanceId from conversation channel credentials (name):', instanceId);
-    }
-
     // Try to find associated lead if we have a phone
     if (!leadId && phone) {
       const normalizedPhone = normalizePhoneForMatch(phone);
@@ -1442,6 +1430,19 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         channelCredentials = JSON.parse(channelCredentials);
       } catch (e) {
         console.warn('[Inbox] Failed to parse channel credentials string:', e);
+      }
+    }
+
+    // Always prefer the instance_id baked into the conversation's linked channel credentials.
+    // getActiveWhatsAppInstance may pick a DIFFERENT channel if the user has multiple WhatsApp
+    // channels. The AI assistant reads credentials directly from the channel record — match that.
+    // Run AFTER all credential resolution (JOIN → DB fetch → fallback → safe-parse).
+    if (messageChannel === 'whatsapp') {
+      const convInstance = channelCredentials?.instance_id || channelCredentials?.instance_name;
+      if (convInstance) {
+        savedInstance = convInstance;
+        instanceId = convInstance;
+        console.log('[Inbox Send] instanceId pinned from channel credentials:', instanceId);
       }
     }
 
@@ -1893,6 +1894,85 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
           details: twilioError.message || 'Unknown error'
         });
       }
+    } else if (messageChannel === 'email') {
+      // Send email reply via SMTP
+      const recipientEmail = remoteJid;
+      if (!recipientEmail || !recipientEmail.includes('@')) {
+        return res.status(400).json({ error: 'Endereço de email do destinatário não encontrado para esta conversa' });
+      }
+
+      // Resolve SMTP from channel credentials → system env vars
+      let smtpSettings: any = null;
+      if (channelCredentials?.smtp?.host) {
+        smtpSettings = {
+          host: channelCredentials.smtp.host,
+          port: channelCredentials.smtp.port || 587,
+          secure: channelCredentials.smtp.secure || false,
+          user: channelCredentials.smtp.auth?.user || channelCredentials.email,
+          pass: channelCredentials.smtp.auth?.pass || channelCredentials.password,
+          fromEmail: channelCredentials.email,
+          fromName: channelCredentials.from_name || '',
+        };
+      } else if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+        smtpSettings = {
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: process.env.SMTP_PORT === '465',
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+          fromEmail: process.env.SMTP_USER,
+          fromName: '',
+        };
+      }
+
+      if (!smtpSettings) {
+        return res.status(400).json({ error: 'SMTP não configurado para este canal de email. Verifique as configurações do canal.' });
+      }
+
+      // Use original email subject for reply threading (Re: Subject)
+      let emailSubject = 'Re: LeadsFlow';
+      try {
+        const subjectQuery = await dbQuery(
+          `SELECT metadata->>'subject' as subject FROM messages
+           WHERE conversation_id = $1 AND direction = 'in' AND channel = 'email'
+           AND metadata->>'subject' IS NOT NULL
+           ORDER BY created_at ASC LIMIT 1`,
+          [conversationId]
+        );
+        if (subjectQuery.rows[0]?.subject) {
+          const orig = subjectQuery.rows[0].subject;
+          emailSubject = orig.startsWith('Re:') ? orig : `Re: ${orig}`;
+        }
+      } catch { /* use default subject */ }
+
+      try {
+        const safeText = messageContent || '';
+        let htmlBody = safeText
+          ? `<div style="font-family:sans-serif;white-space:pre-wrap;">${safeText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`
+          : '';
+
+        // Include attachment if one was uploaded to storage
+        const emailAttachments: any[] = [];
+        if (media_url) {
+          const attachName = media_url.split('/').pop() || 'attachment';
+          emailAttachments.push({ filename: attachName, path: media_url, contentType: media_type || undefined });
+          if (!safeText) htmlBody = `<p><em>Arquivo: ${attachName}</em></p>`;
+        }
+
+        await emailService.sendEmailWithSettings({
+          to: recipientEmail,
+          subject: emailSubject,
+          text: safeText,
+          html: htmlBody,
+          attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
+        }, smtpSettings);
+        externalResult = { email_sent: true, to: recipientEmail, subject: emailSubject };
+        console.log('[Inbox] Email sent to:', recipientEmail, 'subject:', emailSubject);
+      } catch (emailErr: any) {
+        console.error('[Inbox] Email send error:', emailErr.message);
+        return res.status(500).json({ error: 'Falha ao enviar email', details: emailErr.message });
+      }
+
     } else if (!messageChannel || messageChannel === 'whatsapp') {
       // Fallback: WhatsApp without phone/remoteJid
       if (!phone && !remoteJid) {

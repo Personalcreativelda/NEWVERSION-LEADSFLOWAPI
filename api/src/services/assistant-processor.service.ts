@@ -140,6 +140,54 @@ export class AssistantProcessorService {
                 }
             }
 
+            // 4b. Se for imagem, analisar com Vision
+            if (ctx.mediaUrl && ctx.mediaType && (ctx.mediaType === 'image' || ctx.mediaType.startsWith('image/'))) {
+                const visionEnabled = config.vision_enabled === true;
+                if (visionEnabled) {
+                    const hasVisionProvider = availableProviders.some(p => p.provider === 'openai' || p.provider === 'gemini');
+                    if (hasVisionProvider) {
+                        try {
+                            const originalText = ctx.messageContent || '';
+                            const description = await aiService.analyzeImageWithVision(ctx.mediaUrl, originalText, availableProviders);
+                            ctx.messageContent = description;
+                            console.log(`[AssistantProcessor] 🖼️ Imagem analisada: "${description.substring(0, 100)}..."`);
+                        } catch (err: any) {
+                            console.warn('[AssistantProcessor] ⚠️ Análise de imagem falhou, usando texto original:', err.message);
+                        }
+                    } else {
+                        console.warn('[AssistantProcessor] ⚠️ vision_enabled=true mas nenhum provider com suporte a visão (OpenAI/Gemini) disponível.');
+                    }
+                }
+            }
+
+            // 4c. Se for documento/PDF, extrair texto
+            if (ctx.mediaUrl && ctx.mediaType && (
+                ctx.mediaType === 'document' ||
+                ctx.mediaType.includes('pdf') ||
+                ctx.mediaType.includes('word') ||
+                ctx.mediaType.includes('text') ||
+                ctx.mediaType.includes('csv') ||
+                ctx.mediaType.includes('json') ||
+                ctx.mediaType.includes('spreadsheet')
+            )) {
+                const documentEnabled = config.document_enabled === true;
+                if (documentEnabled) {
+                    try {
+                        const geminiProvider = availableProviders.find(p => p.provider === 'gemini');
+                        const extractedText = await aiService.extractDocumentText(ctx.mediaUrl, ctx.mediaType, geminiProvider?.apiKey);
+                        if (extractedText && extractedText.length > 50) {
+                            const userQuestion = ctx.messageContent && !ctx.messageContent.startsWith('[') ? ctx.messageContent : '';
+                            ctx.messageContent = `[Conteúdo do documento]\n${extractedText}\n\n${userQuestion || 'Responda com base no documento acima.'}`;
+                            console.log(`[AssistantProcessor] 📄 Documento extraído: ${extractedText.length} chars`);
+                        } else {
+                            console.warn('[AssistantProcessor] ⚠️ Extração do documento retornou texto insuficiente.');
+                        }
+                    } catch (err: any) {
+                        console.warn('[AssistantProcessor] ⚠️ Extração de documento falhou:', err.message);
+                    }
+                }
+            }
+
             // 4. Construir mensagens para IA
             const messages = await this.buildAIMessages(ctx, activeAssistant);
 

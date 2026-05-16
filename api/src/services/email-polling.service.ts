@@ -123,16 +123,23 @@ class EmailPollingService {
 
         // If first time, check what we already have in DB (e.g. after server restart)
         if (lastUid === 0) {
-          const lastMsg = await query(
-            `SELECT metadata->>'imap_uid' as uid FROM messages
-             WHERE conversation_id IN (SELECT id FROM conversations WHERE channel_id = $1)
-             AND direction = 'in' AND metadata->>'imap_uid' IS NOT NULL
-             ORDER BY created_at DESC LIMIT 1`,
-            [channel.id]
-          );
-          if (lastMsg.rows.length > 0 && lastMsg.rows[0].uid) {
-            lastUid = parseInt(lastMsg.rows[0].uid) || 0;
-          }
+          const [lastMsg, channelSettings] = await Promise.all([
+            query(
+              `SELECT metadata->>'imap_uid' as uid FROM messages
+               WHERE conversation_id IN (SELECT id FROM conversations WHERE channel_id = $1)
+               AND direction = 'in' AND metadata->>'imap_uid' IS NOT NULL
+               ORDER BY created_at DESC LIMIT 1`,
+              [channel.id]
+            ),
+            // Persisted baseline UID (survives server restarts before any message arrives)
+            query(
+              `SELECT settings->>'imap_last_uid' as uid FROM channels WHERE id = $1`,
+              [channel.id]
+            ),
+          ]);
+          const msgUid = parseInt(lastMsg.rows[0]?.uid || '0') || 0;
+          const settingsUid = parseInt(channelSettings.rows[0]?.uid || '0') || 0;
+          lastUid = Math.max(msgUid, settingsUid);
         }
 
         let newCount = 0;
@@ -146,18 +153,24 @@ class EmailPollingService {
           const uidNext = (client.mailbox as any)?.uidNext || 1;
           lastUid = Math.max(0, uidNext - 1);
           this.lastUids.set(channel.id, lastUid);
+          // Persist baseline to DB so it survives server restarts
+          await query(
+            `UPDATE channels SET settings = COALESCE(settings, '{}'::jsonb) || $2::jsonb, last_sync_at = NOW() WHERE id = $1`,
+            [channel.id, JSON.stringify({ imap_last_uid: lastUid })]
+          ).catch((e: any) => console.warn('[Email Polling] Could not persist baseline UID:', e.message));
           console.log(`[Email Polling] Channel ${channel.name}: first sync baseline at UID ${lastUid} — watching for new emails`);
           return; // Nothing to import right now; next poll will see new emails
         }
 
         // Incremental sync: fetch only messages after the last known UID
+        // Use { uid: true } so the range is treated as IMAP UIDs, not sequence numbers
         const searchCriteria = `${lastUid + 1}:*`;
 
         for await (const msg of client.fetch(searchCriteria, {
           envelope: true,
           source: true,
           uid: true
-        })) {
+        }, { uid: true })) {
           if (processed >= maxMessages) break;
 
           // Skip if we already have this UID
@@ -303,8 +316,14 @@ class EmailPollingService {
           processed++;
         }
 
-        // Save last UID
+        // Save last UID in memory and persist to DB (survives server restarts)
         this.lastUids.set(channel.id, lastUid);
+        if (lastUid > 0) {
+          await query(
+            `UPDATE channels SET settings = COALESCE(settings, '{}'::jsonb) || $2::jsonb, last_sync_at = NOW() WHERE id = $1`,
+            [channel.id, JSON.stringify({ imap_last_uid: lastUid })]
+          ).catch((e: any) => console.warn('[Email Polling] Could not persist last UID:', e.message));
+        }
 
         if (newCount > 0) {
           console.log(`[Email Polling] Channel ${channel.name}: ${newCount} new email(s)`);

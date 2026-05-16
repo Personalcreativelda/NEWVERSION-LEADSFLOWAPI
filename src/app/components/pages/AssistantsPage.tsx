@@ -5,7 +5,8 @@ import {
   Zap, X, Check, Loader2,
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash,
-  Brain, Smartphone, Cloud, History, Lock, AlertTriangle, Mic, Volume2
+  Brain, Smartphone, Cloud, History, Lock, AlertTriangle, Mic, Volume2,
+  Image, FileText
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -357,6 +358,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     funnel_tracking_enabled: cfg.funnel_tracking_enabled !== false,
     audio_enabled: cfg.audio_enabled === true,
     audio_voice_id: cfg.audio_voice_id || 'EXAVITQu4vr4xnSDxMaL',
+    vision_enabled: cfg.vision_enabled === true,
+    document_enabled: cfg.document_enabled === true,
   });
 
   // Open config modal — fetch fresh data to avoid stale cached config
@@ -1381,6 +1384,71 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       </p>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* 🖼️ Multimodalidade — Imagens e Documentos */}
+              <div className="p-4 rounded-lg border bg-muted/30 border-border">
+                <div className="flex items-center gap-2 mb-4">
+                  <Image className="w-4 h-4 text-blue-500" />
+                  <h4 className="text-sm font-semibold text-foreground">Multimodalidade</h4>
+                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-medium border border-blue-500/20">
+                    OpenAI / Gemini
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Vision toggle */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                        <Image className="w-3.5 h-3.5 text-blue-400" />
+                        Entender imagens
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Analisa imagens enviadas pelo cliente com OpenAI Vision ou Gemini e responde com base no conteúdo
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!configValues.vision_enabled}
+                      onClick={() => setConfigValues({ ...configValues, vision_enabled: !configValues.vision_enabled })}
+                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                      style={{ width: 44, height: 24, background: configValues.vision_enabled ? '#3b82f6' : '#6b7280' }}
+                    >
+                      <span
+                        className="inline-block rounded-full bg-white shadow transition-transform"
+                        style={{ width: 18, height: 18, transform: configValues.vision_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Document toggle */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-blue-400" />
+                        Ler PDFs e documentos
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Extrai texto de PDFs, Word e arquivos de texto para responder perguntas sobre o conteúdo
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!configValues.document_enabled}
+                      onClick={() => setConfigValues({ ...configValues, document_enabled: !configValues.document_enabled })}
+                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                      style={{ width: 44, height: 24, background: configValues.document_enabled ? '#3b82f6' : '#6b7280' }}
+                    >
+                      <span
+                        className="inline-block rounded-full bg-white shadow transition-transform"
+                        style={{ width: 18, height: 18, transform: configValues.document_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                      />
+                    </button>
+                  </div>
                 </div>
               </div>
 

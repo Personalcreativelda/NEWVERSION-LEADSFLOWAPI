@@ -534,7 +534,7 @@ export class AIService {
     async generateElevenLabsAudio(text: string, voiceId: string, apiKey: string): Promise<Buffer> {
         try {
             console.log(`[AIService] Gerando áudio via ElevenLabs (Voice: ${voiceId})...`);
-            
+
             const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
                 method: 'POST',
                 headers: {
@@ -563,5 +563,227 @@ export class AIService {
             console.error('[AIService] Erro na geração de áudio ElevenLabs:', error.message);
             throw new Error(`Falha na geração de áudio: ${error.message}`);
         }
+    }
+
+    // ==========================================
+    // IMAGE ANALYSIS (OpenAI Vision / Gemini Vision)
+    // ==========================================
+
+    /**
+     * Analyzes an image and returns a textual description.
+     * Tries OpenAI Vision (gpt-4o) first, then Gemini multimodal as fallback.
+     * Always downloads the image so it works with authenticated MinIO URLs.
+     */
+    async analyzeImageWithVision(
+        imageUrl: string,
+        userText: string,
+        providers: ProviderConfig[]
+    ): Promise<string> {
+        const prompt = userText
+            ? `O usuário enviou uma imagem com o seguinte texto: "${userText}". Descreva a imagem em detalhes e responda ao usuário considerando o contexto da imagem e o que ele escreveu.`
+            : 'Descreva esta imagem em detalhes. Inclua qualquer texto visível, objetos, pessoas, marcas, cores, contexto ou informação relevante que um assistente precisaria saber para responder ao cliente.';
+
+        // Download once — used as base64 for Gemini; URL sent directly for OpenAI
+        let imageBase64: string | null = null;
+        let imageMimeType = 'image/jpeg';
+
+        try {
+            const imgRes = await fetch(imageUrl);
+            if (imgRes.ok) {
+                imageMimeType = imgRes.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
+                imageBase64 = Buffer.from(await imgRes.arrayBuffer()).toString('base64');
+            }
+        } catch (e) {
+            console.warn('[AIService] Could not download image for Vision:', e);
+        }
+
+        // ── Try OpenAI gpt-4o ──────────────────────────────────────────────────
+        const openAI = providers.find(p => p.provider === 'openai');
+        if (openAI) {
+            try {
+                const imageContent = imageBase64
+                    ? { type: 'image_url', image_url: { url: `data:${imageMimeType};base64,${imageBase64}`, detail: 'auto' } }
+                    : { type: 'image_url', image_url: { url: imageUrl, detail: 'auto' } };
+
+                const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${openAI.apiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'gpt-4o',
+                        messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, imageContent] }],
+                        max_tokens: 800
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const text = data.choices?.[0]?.message?.content || '';
+                    if (text.length > 10) {
+                        console.log('[AIService] ✅ Image analyzed via OpenAI Vision');
+                        return text;
+                    }
+                } else {
+                    console.warn('[AIService] OpenAI Vision error:', await res.text());
+                }
+            } catch (e: any) {
+                console.warn('[AIService] OpenAI Vision failed:', e.message);
+            }
+        }
+
+        // ── Try Gemini multimodal ──────────────────────────────────────────────
+        const gemini = providers.find(p => p.provider === 'gemini');
+        if (gemini && imageBase64) {
+            try {
+                const res = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gemini.apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [
+                                { text: prompt },
+                                { inline_data: { mime_type: imageMimeType, data: imageBase64 } }
+                            ]}]
+                        })
+                    }
+                );
+                if (res.ok) {
+                    const data = await res.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    if (text.length > 10) {
+                        console.log('[AIService] ✅ Image analyzed via Gemini Vision');
+                        return text;
+                    }
+                } else {
+                    console.warn('[AIService] Gemini Vision error:', await res.text());
+                }
+            } catch (e: any) {
+                console.warn('[AIService] Gemini Vision failed:', e.message);
+            }
+        }
+
+        throw new Error('No vision-capable AI provider available or analysis failed');
+    }
+
+    // ==========================================
+    // DOCUMENT TEXT EXTRACTION
+    // ==========================================
+
+    /**
+     * Downloads a file and extracts readable text content.
+     * - Text/CSV/JSON/Markdown: decoded as UTF-8
+     * - PDF: tries Gemini inline_data (native PDF support), then binary text scan fallback
+     * Returns empty string on failure so callers can degrade gracefully.
+     */
+    async extractDocumentText(
+        fileUrl: string,
+        mimeType?: string,
+        geminiApiKey?: string,
+        maxChars = 4000
+    ): Promise<string> {
+        let buffer: Buffer;
+        let contentType: string;
+
+        try {
+            const res = await fetch(fileUrl);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            contentType = mimeType || res.headers.get('content-type') || 'application/octet-stream';
+            buffer = Buffer.from(await res.arrayBuffer());
+        } catch (e: any) {
+            console.warn('[AIService] Failed to download document:', e.message);
+            return '';
+        }
+
+        const urlLower = fileUrl.toLowerCase();
+
+        // ── Plain text variants ────────────────────────────────────────────────
+        const isText =
+            contentType.includes('text/') ||
+            contentType.includes('application/json') ||
+            urlLower.endsWith('.txt') || urlLower.endsWith('.csv') ||
+            urlLower.endsWith('.md')  || urlLower.endsWith('.json');
+
+        if (isText) {
+            return buffer.toString('utf-8').substring(0, maxChars);
+        }
+
+        // ── PDF ────────────────────────────────────────────────────────────────
+        const isPdf = contentType.includes('pdf') || urlLower.endsWith('.pdf');
+        if (isPdf) {
+            // Prefer Gemini's native PDF understanding
+            if (geminiApiKey) {
+                try {
+                    const b64 = buffer.toString('base64');
+                    const res = await fetch(
+                        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [
+                                    { text: 'Extraia e retorne TODO o texto deste documento PDF, preservando a estrutura e parágrafos. Retorne apenas o texto extraído, sem comentários.' },
+                                    { inline_data: { mime_type: 'application/pdf', data: b64 } }
+                                ]}]
+                            })
+                        }
+                    );
+                    if (res.ok) {
+                        const data = await res.json();
+                        const extracted = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                        if (extracted.length > 50) {
+                            console.log('[AIService] ✅ PDF extracted via Gemini');
+                            return extracted.substring(0, maxChars);
+                        }
+                    }
+                } catch (e: any) {
+                    console.warn('[AIService] Gemini PDF extraction failed:', e.message);
+                }
+            }
+
+            // Fallback: scan PDF binary for printable text sequences
+            const raw = buffer.toString('latin1');
+            const words: string[] = [];
+            let current = '';
+            for (let i = 0; i < raw.length; i++) {
+                const c = raw.charCodeAt(i);
+                // Printable ASCII + common Latin-1 range
+                if ((c >= 32 && c <= 126) || (c >= 160 && c <= 255)) {
+                    current += raw[i];
+                } else {
+                    if (current.length >= 4) words.push(current.trim());
+                    current = '';
+                }
+            }
+            if (current.length >= 4) words.push(current.trim());
+
+            const joined = words.filter(w => /[a-zA-ZÀ-ÿ]{2,}/.test(w)).join(' ');
+            if (joined.length > 100) {
+                console.log('[AIService] ✅ PDF text extracted via binary scan');
+                return joined.substring(0, maxChars);
+            }
+
+            console.warn('[AIService] Could not extract meaningful text from PDF');
+            return '';
+        }
+
+        // ── Other binary formats (DOCX, XLSX, etc.) ───────────────────────────
+        // DOCX is ZIP+XML — try to pull text from word/document.xml
+        const isDocx =
+            contentType.includes('officedocument.wordprocessingml') ||
+            urlLower.endsWith('.docx');
+        if (isDocx) {
+            // Simple regex scan for <w:t> text nodes inside the ZIP (works without unzipping)
+            const raw = buffer.toString('binary');
+            const matches = raw.match(/<w:t[^>]*>([^<]+)<\/w:t>/g) || [];
+            const text = matches
+                .map(m => m.replace(/<[^>]+>/g, '').trim())
+                .filter(Boolean)
+                .join(' ');
+            if (text.length > 50) {
+                console.log('[AIService] ✅ DOCX text extracted');
+                return text.substring(0, maxChars);
+            }
+        }
+
+        return '';
     }
 }
