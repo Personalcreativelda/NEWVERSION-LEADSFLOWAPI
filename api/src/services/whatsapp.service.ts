@@ -111,7 +111,7 @@ export class WhatsAppService {
     }
   }
 
-  async sendMessage(data: { instanceId: string; number: string; text: string }) {
+  async sendMessage(data: { instanceId: string; number: string; text: string; delay?: number }) {
     // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
     const cleanNumber = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
 
@@ -122,9 +122,12 @@ export class WhatsAppService {
       throw new Error('sendMessage: texto da mensagem não pode ser vazio');
     }
 
-    // Evolution API expects { number, text } at root level
-    const body = JSON.stringify({ number: cleanNumber, text: data.text });
-    console.log(`[WhatsAppService] sendMessage → instance=${data.instanceId} number=${cleanNumber} textLen=${data.text.length}`);
+    // delay > 0: Evolution API shows "typing..." indicator for that many ms before sending
+    const payload: Record<string, any> = { number: cleanNumber, text: data.text };
+    if (data.delay && data.delay > 0) payload.delay = data.delay;
+
+    const body = JSON.stringify(payload);
+    console.log(`[WhatsAppService] sendMessage → instance=${data.instanceId} number=${cleanNumber} textLen=${data.text.length}${data.delay ? ` delay=${data.delay}ms` : ''}`);
 
     return this.request(`/message/sendText/${data.instanceId}`, {
       method: 'POST',

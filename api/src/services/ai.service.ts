@@ -293,7 +293,12 @@ export class AIService {
     async getConversationHistory(conversationId: string, limit: number = 20): Promise<AIMessage[]> {
         const result = await query(
             `SELECT direction, content, metadata FROM messages
-             WHERE conversation_id = $1 AND content IS NOT NULL AND content != ''
+             WHERE conversation_id = $1
+               AND content IS NOT NULL
+               AND content != ''
+               AND TRIM(content) NOT IN ('[Mídia]', '[image]', '[audio]', '[video]', '[document]', '[sticker]')
+               AND content NOT LIKE '[O usuário enviou%'
+               AND content NOT LIKE '[The user sent%'
              ORDER BY created_at DESC LIMIT $2`,
             [conversationId, limit]
         );
@@ -462,12 +467,12 @@ export class AIService {
             await query(
                 `INSERT INTO assistant_contact_memory
                     (user_assistant_id, contact_phone, contact_name, summary, last_topics, total_conversations, last_contact_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                 VALUES ($1, $2, $3, $4, $5::jsonb, $6, NOW())
                  ON CONFLICT (user_assistant_id, contact_phone)
                  DO UPDATE SET
                     contact_name = COALESCE($3, assistant_contact_memory.contact_name),
                     summary = $4,
-                    last_topics = $5,
+                    last_topics = $5::jsonb,
                     total_conversations = $6,
                     last_contact_at = NOW()`,
                 [
@@ -475,7 +480,7 @@ export class AIService {
                     data.contactPhone,
                     data.contactName || null,
                     newSummary,
-                    updatedTopics,
+                    JSON.stringify(updatedTopics),
                     totalConversations
                 ]
             );
@@ -579,6 +584,7 @@ export class AIService {
         userText: string,
         providers: ProviderConfig[]
     ): Promise<string> {
+        console.log(`[AIService] 🖼️ analyzeImageWithVision — url=${imageUrl.substring(0, 80)} userText="${userText.substring(0, 60)}"`);
         const prompt = userText
             ? `O usuário enviou uma imagem com o seguinte texto: "${userText}". Descreva a imagem em detalhes e responda ao usuário considerando o contexto da imagem e o que ele escreveu.`
             : 'Descreva esta imagem em detalhes. Inclua qualquer texto visível, objetos, pessoas, marcas, cores, contexto ou informação relevante que um assistente precisaria saber para responder ao cliente.';
@@ -587,14 +593,23 @@ export class AIService {
         let imageBase64: string | null = null;
         let imageMimeType = 'image/jpeg';
 
-        try {
-            const imgRes = await fetch(imageUrl);
-            if (imgRes.ok) {
-                imageMimeType = imgRes.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
-                imageBase64 = Buffer.from(await imgRes.arrayBuffer()).toString('base64');
+        if (imageUrl.startsWith('data:')) {
+            // data URI — extract base64 and mime type directly (no HTTP fetch needed)
+            const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
+                imageMimeType = match[1] || 'image/jpeg';
+                imageBase64 = match[2];
             }
-        } catch (e) {
-            console.warn('[AIService] Could not download image for Vision:', e);
+        } else {
+            try {
+                const imgRes = await fetch(imageUrl);
+                if (imgRes.ok) {
+                    imageMimeType = imgRes.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
+                    imageBase64 = Buffer.from(await imgRes.arrayBuffer()).toString('base64');
+                }
+            } catch (e) {
+                console.warn('[AIService] Could not download image for Vision:', e);
+            }
         }
 
         // ── Try OpenAI gpt-4o ──────────────────────────────────────────────────

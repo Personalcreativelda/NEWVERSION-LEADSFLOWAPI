@@ -26,6 +26,7 @@ export interface IncomingMessageContext {
     remoteJid?: string;       // JID completo do contato (ex: 5511999@s.whatsapp.net)
     mediaType?: string;       // Tipo de mídia recebida (ex: 'audio', 'image')
     mediaUrl?: string;        // URL da mídia (se armazenada no MinIO)
+    incomingMessageId?: string; // ID da mensagem recebida (para marcar como lida)
 }
 
 export class AssistantProcessorService {
@@ -110,6 +111,9 @@ export class AssistantProcessorService {
                     return false;
                 }
             }
+
+            // 4. Processar mídia recebida
+            console.log(`[AssistantProcessor] 📨 Mensagem recebida — mediaType=${ctx.mediaType || 'none'} hasUrl=${!!ctx.mediaUrl} content="${(ctx.messageContent || '').substring(0, 60)}"`);
 
             // 4. Se for áudio, transcrever primeiro
             if (ctx.mediaType === 'audio' && ctx.mediaUrl) {
@@ -254,8 +258,8 @@ export class AssistantProcessorService {
                 }
             }
 
-            // 6. Enviar resposta pelo canal (capturar externalId para dedup no webhook)
-            const externalMsgId = await this.sendReply(ctx, aiResponse.content, audioBase64);
+            // 6. Enviar resposta com comportamento humano (lido + digitando + chunks)
+            const externalMsgId = await this.humanizedSend(ctx, aiResponse.content, audioBase64);
 
             // 7. Salvar mensagem de resposta no banco (com external_id para evitar duplicata via webhook)
             await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId, audioBase64 ? 'audio' : 'text');
@@ -504,6 +508,211 @@ export class AssistantProcessorService {
 
         return messages;
     }
+
+    // ─── Utilitários de humanização ───────────────────────────────────────────
+
+    private sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    /** Delay realista de digitação: ~45 chars/s, min 900ms, max 4000ms */
+    private typingDelayMs(textLength: number): number {
+        const base = Math.round((textLength / 45) * 1000);
+        return Math.min(Math.max(base, 900), 4000);
+    }
+
+    /** Quebra o texto em chunks naturais (máx 4 partes, máx 280 chars cada) */
+    private splitIntoSentences(text: string, maxLen: number): string[] {
+        const parts = text.split(/(?<=[.!?])\s+/);
+        const chunks: string[] = [];
+        let current = '';
+        for (const part of parts) {
+            if (current.length + part.length + 1 > maxLen && current.length > 0) {
+                chunks.push(current.trim());
+                current = part;
+            } else {
+                current += (current ? ' ' : '') + part;
+            }
+        }
+        if (current.trim()) chunks.push(current.trim());
+        return chunks.length > 0 ? chunks : [text];
+    }
+
+    private splitResponse(text: string): string[] {
+        const MAX_LEN = 280;
+        const MAX_CHUNKS = 4;
+
+        let parts = text.split(/\n{2,}/).map(p => p.trim()).filter(p => p.length > 0);
+        if (parts.length === 1 && text.length > MAX_LEN) {
+            parts = this.splitIntoSentences(text, MAX_LEN);
+        }
+
+        const result: string[] = [];
+        for (const part of parts) {
+            if (part.length > MAX_LEN) {
+                result.push(...this.splitIntoSentences(part, MAX_LEN));
+            } else {
+                result.push(part);
+            }
+        }
+
+        // Merge tiny trailing fragments into previous
+        while (result.length > 1 && result[result.length - 1].length < 40) {
+            const tail = result.pop()!;
+            result[result.length - 1] += '\n' + tail;
+        }
+
+        // Cap at MAX_CHUNKS
+        if (result.length > MAX_CHUNKS) {
+            const excess = result.splice(MAX_CHUNKS - 1);
+            result.push(excess.join('\n\n'));
+        }
+
+        return result.length > 0 ? result : [text];
+    }
+
+    /** Marca mensagem como lida no WhatsApp (Evolution API) */
+    private async markEvolutionRead(ctx: IncomingMessageContext): Promise<void> {
+        if (!ctx.incomingMessageId) return;
+        const evolutionUrl = process.env.EVOLUTION_API_URL;
+        const apiKey = process.env.EVOLUTION_API_KEY;
+        let creds = ctx.credentials || {};
+        if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch { creds = {}; } }
+        const instanceId = creds.instance_id || creds.instance_name;
+        if (!evolutionUrl || !apiKey || !instanceId) return;
+        const remoteJid = ctx.remoteJid || `${ctx.contactPhone}@s.whatsapp.net`;
+        try {
+            await fetch(`${evolutionUrl}/chat/markMessageAsRead/${instanceId}`, {
+                method: 'POST',
+                headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ readMessages: [{ id: ctx.incomingMessageId, fromMe: false, remote: remoteJid }] })
+            });
+            console.log(`[AssistantProcessor] 👁️ Mensagem marcada como lida`);
+        } catch { /* não crítico */ }
+    }
+
+    /** Envia ação "typing" no Telegram */
+    private async sendTelegramTypingAction(botToken: string, chatId: string): Promise<void> {
+        await fetch(`https://api.telegram.org/bot${botToken}/sendChatAction`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, action: 'typing' })
+        });
+    }
+
+    /**
+     * Envia a resposta simulando comportamento humano:
+     * marca como lido → delay de leitura → digita → envia em partes
+     */
+    private async humanizedSend(ctx: IncomingMessageContext, text: string, audioBase64?: string): Promise<string | null> {
+        const isEvolutionWA = ctx.channelType === 'whatsapp';
+        const isTelegram    = ctx.channelType === 'telegram';
+        const isWACloud     = ctx.channelType === 'whatsapp_cloud';
+        const isFacebook    = ctx.channelType === 'facebook';
+        const isInstagram   = ctx.channelType === 'instagram';
+
+        // Email e canais sem real-time: enviar direto sem simulação
+        if (!isEvolutionWA && !isTelegram && !isWACloud && !isFacebook && !isInstagram) {
+            return this.sendReply(ctx, text, audioBase64);
+        }
+
+        let creds = ctx.credentials || {};
+        if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch { creds = {}; } }
+
+        // 1. Marcar como lido (Evolution WhatsApp)
+        if (isEvolutionWA) {
+            await this.markEvolutionRead(ctx);
+        }
+
+        // 2. Delay de "leitura" antes de começar a digitar (600–1500ms)
+        await this.sleep(600 + Math.floor(Math.random() * 900));
+
+        // 3. Dividir em partes naturais apenas se texto longo ou tem parágrafos
+        const chunks = (text.includes('\n\n') || text.length > 280)
+            ? this.splitResponse(text)
+            : [text];
+
+        let lastExternalId: string | null = null;
+
+        if (isEvolutionWA) {
+            const instanceId = creds.instance_id || creds.instance_name;
+            const isLidJid   = ctx.remoteJid?.endsWith('@lid');
+            const isGroupJid = ctx.remoteJid?.endsWith('@g.us');
+            const target = (isLidJid || isGroupJid) && ctx.remoteJid ? ctx.remoteJid : ctx.contactPhone!;
+
+            for (const chunk of chunks) {
+                if (!chunk.trim()) continue;
+                const delay = this.typingDelayMs(chunk.length);
+                try {
+                    const res = await whatsappService.sendMessage({ instanceId, number: target, text: chunk, delay }) as any;
+                    lastExternalId = res?.key?.id || res?.id || lastExternalId;
+                } catch (e: any) {
+                    console.warn(`[AssistantProcessor] humanizedSend chunk failed:`, e.message);
+                }
+            }
+            if (audioBase64) {
+                await this.sleep(800);
+                try {
+                    const ar = await whatsappService.sendAudio({ instanceId, number: target, audioBase64 }) as any;
+                    lastExternalId = ar?.key?.id || ar?.id || lastExternalId;
+                } catch (e: any) { console.warn('[AssistantProcessor] audio send failed:', e.message); }
+            }
+
+        } else if (isTelegram) {
+            const botToken = creds.bot_token;
+            const chatId = ctx.contactPhone!;
+            for (const chunk of chunks) {
+                if (!chunk.trim()) continue;
+                const delay = this.typingDelayMs(chunk.length);
+                await this.sendTelegramTypingAction(botToken, chatId).catch(() => {});
+                await this.sleep(delay);
+                await this.sendTelegramMessage(botToken, chatId, chunk).catch(() => {});
+            }
+            if (audioBase64) {
+                await this.sleep(800);
+                await this.sendTelegramAudio(botToken, chatId, audioBase64, ctx.userId).catch(() => {});
+            }
+
+        } else if (isWACloud) {
+            const pid = creds.phone_number_id;
+            const tok = creds.access_token;
+            for (let i = 0; i < chunks.length; i++) {
+                if (!chunks[i].trim()) continue;
+                if (i > 0) await this.sleep(this.typingDelayMs(chunks[i].length));
+                await this.sendWhatsAppCloudMessage(pid, tok, ctx.contactPhone!, chunks[i]).catch(() => {});
+            }
+            if (audioBase64) {
+                await this.sleep(800);
+                await this.sendWhatsAppCloudAudio(pid, tok, ctx.contactPhone!, audioBase64).catch(() => {});
+            }
+
+        } else if (isFacebook) {
+            const tok = creds.page_access_token || creds.access_token;
+            const rid = ctx.contactPhone!;
+            for (let i = 0; i < chunks.length; i++) {
+                if (!chunks[i].trim()) continue;
+                if (i > 0) await this.sleep(this.typingDelayMs(chunks[i].length));
+                await this.sendFacebookMessage(tok, rid, chunks[i]).catch(() => {});
+            }
+            if (audioBase64) {
+                await this.sleep(800);
+                await this.sendFacebookAudio(tok, rid, audioBase64, ctx.userId).catch(() => {});
+            }
+
+        } else if (isInstagram) {
+            const tok = creds.access_token;
+            const rid = ctx.contactPhone!;
+            for (let i = 0; i < chunks.length; i++) {
+                if (!chunks[i].trim()) continue;
+                if (i > 0) await this.sleep(this.typingDelayMs(chunks[i].length));
+                await this.sendInstagramMessage(tok, rid, chunks[i]).catch(() => {});
+            }
+        }
+
+        return lastExternalId;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Envia resposta pelo canal correto

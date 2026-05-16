@@ -1707,6 +1707,8 @@ router.post('/evolution/messages', async (req, res) => {
           // Passar tipo de mídia e URL para transcrição de áudio
           mediaType: mediaType || undefined,
           mediaUrl: mediaUrl || undefined,
+          // ID da mensagem recebida — usado para marcar como lida antes de responder
+          incomingMessageId: messageData.key?.id || undefined,
         },
         (ctx) => assistantProcessor.processIncomingMessage(ctx)
       ).catch(err => {
