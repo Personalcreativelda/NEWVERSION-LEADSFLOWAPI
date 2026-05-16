@@ -5,6 +5,8 @@ import { AIService, getAvailableProviders, type AIMessage, type AIProvider, type
 import { AssistantsService } from './assistants.service';
 import { WhatsAppService } from './whatsapp.service';
 import { getWebSocketService } from './websocket.service';
+import { getStorageService } from './storage.service';
+import { emailService } from './email.service';
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 import { isValidPhoneNumber, isSamePhoneNumber, normalizePhoneNumber } from '../utils/phone.utils';
 
@@ -216,7 +218,8 @@ export class AssistantProcessorService {
                 } else {
                     try {
                         console.log(`[AssistantProcessor] 🎙️ Gerando Áudio Mágico (ElevenLabs) para a resposta...`);
-                        const voiceId = config.audio_voice_id || 'EXAVITQu4vr4xnSDxMaL'; // Default: Sarah
+                        // Per-assistant config → SAAS-wide env default → hardcoded fallback
+                        const voiceId = config.audio_voice_id || process.env.ELEVENLABS_DEFAULT_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
                         const audioBuffer = await aiService.generateElevenLabsAudio(
                             aiResponse.content,
                             voiceId,
@@ -575,37 +578,102 @@ export class AssistantProcessorService {
                 if (!phoneNumberId || !accessToken || !ctx.contactPhone) {
                     throw new Error('Sem credenciais para WhatsApp Cloud API');
                 }
-                await this.sendWhatsAppCloudMessage(phoneNumberId, accessToken, ctx.contactPhone, text);
+                if (audioBase64) {
+                    try {
+                        await this.sendWhatsAppCloudAudio(phoneNumberId, accessToken, ctx.contactPhone, audioBase64);
+                        console.log(`[AssistantProcessor] ✅ Áudio enviado via WhatsApp Cloud para: ${ctx.contactPhone}`);
+                    } catch (audioErr: any) {
+                        console.warn(`[AssistantProcessor] ⚠️ Falha ao enviar áudio WhatsApp Cloud, fallback para texto: ${audioErr.message}`);
+                        await this.sendWhatsAppCloudMessage(phoneNumberId, accessToken, ctx.contactPhone, text);
+                    }
+                } else {
+                    await this.sendWhatsAppCloudMessage(phoneNumberId, accessToken, ctx.contactPhone, text);
+                }
                 return null;
             }
 
             case 'telegram': {
                 const botToken = credentials.bot_token;
-                const chatId = ctx.contactPhone; // Telegram usa chat_id
+                const chatId = ctx.contactPhone;
                 if (!botToken || !chatId) {
                     throw new Error('Sem credenciais para Telegram');
                 }
-                await this.sendTelegramMessage(botToken, chatId, text);
+                if (audioBase64) {
+                    try {
+                        await this.sendTelegramAudio(botToken, chatId, audioBase64, ctx.userId);
+                        console.log(`[AssistantProcessor] ✅ Áudio enviado via Telegram para: ${chatId}`);
+                    } catch (audioErr: any) {
+                        console.warn(`[AssistantProcessor] ⚠️ Falha ao enviar áudio Telegram, fallback para texto: ${audioErr.message}`);
+                        await this.sendTelegramMessage(botToken, chatId, text);
+                    }
+                } else {
+                    await this.sendTelegramMessage(botToken, chatId, text);
+                }
                 return null;
             }
 
             case 'instagram': {
                 const accessToken = credentials.access_token;
-                const recipientId = ctx.contactPhone; // Instagram sender_id
+                const recipientId = ctx.contactPhone;
                 if (!accessToken || !recipientId) {
                     throw new Error('Sem credenciais para Instagram');
                 }
+                // Instagram API não suporta envio de áudio via DM — sempre envia texto
                 await this.sendInstagramMessage(accessToken, recipientId, text);
                 return null;
             }
 
             case 'facebook': {
                 const accessToken = credentials.page_access_token || credentials.access_token;
-                const recipientId = ctx.contactPhone; // Facebook PSID
+                const recipientId = ctx.contactPhone;
                 if (!accessToken || !recipientId) {
                     throw new Error('Sem credenciais para Facebook Messenger');
                 }
-                await this.sendFacebookMessage(accessToken, recipientId, text);
+                if (audioBase64) {
+                    try {
+                        await this.sendFacebookAudio(accessToken, recipientId, audioBase64, ctx.userId);
+                        console.log(`[AssistantProcessor] ✅ Áudio enviado via Facebook para: ${recipientId}`);
+                    } catch (audioErr: any) {
+                        console.warn(`[AssistantProcessor] ⚠️ Falha ao enviar áudio Facebook, fallback para texto: ${audioErr.message}`);
+                        await this.sendFacebookMessage(accessToken, recipientId, text);
+                    }
+                } else {
+                    await this.sendFacebookMessage(accessToken, recipientId, text);
+                }
+                return null;
+            }
+
+            case 'email': {
+                const recipientEmail = ctx.remoteJid;
+                if (!recipientEmail?.includes('@')) {
+                    throw new Error('Endereço de email inválido para resposta do assistente');
+                }
+                if (!credentials.smtp?.host) {
+                    throw new Error('Configuração SMTP não encontrada para canal de email');
+                }
+                const smtpSettings = {
+                    host: credentials.smtp.host,
+                    port: credentials.smtp.port || 587,
+                    secure: credentials.smtp.secure || false,
+                    user: credentials.smtp.auth?.user || credentials.email,
+                    pass: credentials.smtp.auth?.pass || credentials.password,
+                    fromEmail: credentials.email,
+                    fromName: credentials.from_name || '',
+                };
+                const emailAttachments: any[] = [];
+                if (audioBase64) {
+                    const b64 = audioBase64.replace(/^data:audio\/[^;]+;base64,/, '');
+                    emailAttachments.push({ filename: 'resposta_assistente.mp3', content: Buffer.from(b64, 'base64'), contentType: 'audio/mpeg' });
+                }
+                const htmlBody = `<div style="font-family:sans-serif;white-space:pre-wrap;">${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`;
+                await emailService.sendEmailWithSettings({
+                    to: recipientEmail,
+                    subject: 'Re: LeadsFlow',
+                    text,
+                    html: htmlBody,
+                    attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
+                }, smtpSettings);
+                console.log(`[AssistantProcessor] ✅ Email enviado para: ${recipientEmail}`);
                 return null;
             }
 
@@ -743,6 +811,82 @@ export class AssistantProcessorService {
             throw new Error(`Facebook Messenger API error: ${err}`);
         }
         console.log(`[AssistantProcessor] Resposta enviada via Facebook Messenger para ${recipientId}`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // HELPERS DE ÁUDIO — upload + envio por canal
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Upload audio base64 to MinIO and return public URL, or null on failure */
+    private async uploadAudioBuffer(audioBase64: string, userId: string): Promise<string | null> {
+        try {
+            const b64 = audioBase64.replace(/^data:audio\/[^;]+;base64,/, '');
+            const buffer = Buffer.from(b64, 'base64');
+            const storageService = getStorageService();
+            const url = await storageService.uploadBuffer(buffer, `ai_voice_${Date.now()}.mp3`, 'audio/mpeg', 'ai-voices', userId);
+            return url || null;
+        } catch (err: any) {
+            console.warn('[AssistantProcessor] Falha ao fazer upload do áudio para storage:', err.message);
+            return null;
+        }
+    }
+
+    /** Envia áudio via WhatsApp Cloud API (upload para Meta Media API + send) */
+    private async sendWhatsAppCloudAudio(phoneNumberId: string, accessToken: string, to: string, audioBase64: string): Promise<void> {
+        const b64 = audioBase64.replace(/^data:audio\/[^;]+;base64,/, '');
+        const buffer = Buffer.from(b64, 'base64');
+
+        // 1. Upload to Meta Media API
+        const formData = new FormData();
+        const blob = new Blob([buffer], { type: 'audio/mpeg' });
+        formData.append('file', blob, 'voice.mp3');
+        formData.append('type', 'audio/mpeg');
+        formData.append('messaging_product', 'whatsapp');
+
+        const uploadRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/media`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}` },
+            body: formData,
+        });
+        if (!uploadRes.ok) throw new Error(`WhatsApp Cloud media upload error: ${await uploadRes.text()}`);
+        const { id: mediaId } = await uploadRes.json() as any;
+
+        // 2. Send audio message
+        const sendRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'audio', audio: { id: mediaId } }),
+        });
+        if (!sendRes.ok) throw new Error(`WhatsApp Cloud API error: ${await sendRes.text()}`);
+    }
+
+    /** Envia áudio via Telegram sendVoice (via URL do MinIO) */
+    private async sendTelegramAudio(botToken: string, chatId: string, audioBase64: string, userId: string): Promise<void> {
+        const audioUrl = await this.uploadAudioBuffer(audioBase64, userId);
+        if (!audioUrl) throw new Error('Não foi possível fazer upload do áudio para Telegram');
+
+        const response = await fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, voice: audioUrl }),
+        });
+        if (!response.ok) throw new Error(`Telegram sendVoice error: ${await response.text()}`);
+    }
+
+    /** Envia áudio via Facebook Messenger como anexo de áudio */
+    private async sendFacebookAudio(accessToken: string, recipientId: string, audioBase64: string, userId: string): Promise<void> {
+        const audioUrl = await this.uploadAudioBuffer(audioBase64, userId);
+        if (!audioUrl) throw new Error('Não foi possível fazer upload do áudio para Facebook');
+
+        const response = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(accessToken)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                recipient: { id: recipientId },
+                message: { attachment: { type: 'audio', payload: { url: audioUrl, is_reusable: false } } },
+            }),
+        });
+        if (!response.ok) throw new Error(`Facebook Messenger audio error: ${await response.text()}`);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

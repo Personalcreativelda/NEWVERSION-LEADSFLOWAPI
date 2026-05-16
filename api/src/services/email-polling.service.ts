@@ -5,6 +5,7 @@ import { query } from '../database/connection';
 import { ConversationsService } from './conversations.service';
 import { getWebSocketService } from './websocket.service';
 import { getStorageService } from './storage.service';
+import { assistantProcessor } from './assistant-processor.service';
 
 const conversationsService = new ConversationsService();
 
@@ -305,6 +306,21 @@ class EmailPollingService {
                 conversation: conversation,
               });
             }
+
+            // Processar assistente de IA para emails recebidos (assíncrono — não bloqueia o polling)
+            assistantProcessor.processIncomingMessage({
+              channelId: channel.id,
+              channelType: 'email',
+              conversationId: conversation.id,
+              userId: channel.user_id,
+              contactPhone: fromAddress,  // email como identificador do contato
+              contactName: fromName,
+              messageContent: content,
+              credentials: channel.credentials,
+              remoteJid: fromAddress,     // email como remoteJid para reply
+              mediaType: mediaUrl && mediaType ? mediaType : undefined,
+              mediaUrl: mediaUrl || undefined,
+            }).catch((err: any) => console.warn('[Email Polling] Erro no assistente IA:', err.message));
 
             newCount++;
             if (msg.uid > lastUid) lastUid = msg.uid;

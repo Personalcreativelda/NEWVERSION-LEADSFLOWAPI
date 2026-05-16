@@ -1676,10 +1676,12 @@ router.post('/evolution/messages', async (req, res) => {
 
     // Processar assistente de IA via fila (debounce + lock — evita greeting repetido e respostas duplicadas)
     // Só processar mensagens RECEBIDAS (isFromMe=false): evita loop infinito quando a própria IA envia
-    // Processar também áudios: a transcrição será feita dentro do assistantProcessor
     const shouldProcessWithAI = !isFromMe && (
       (messageContent && messageContent.trim() && !messageContent.startsWith('[')) ||
-      mediaType === 'audio'
+      mediaType === 'audio' ||
+      mediaType === 'image' ||
+      mediaType === 'document' ||
+      mediaType === 'video'
     );
     if (shouldProcessWithAI) {
       console.log('[Evolution Webhook] 🤖 Enfileirando mensagem para assistente IA...', mediaType === 'audio' ? '(ÁUDIO)' : '(TEXTO)');
@@ -2100,17 +2102,21 @@ router.post('/telegram/:botToken?', async (req, res) => {
       rawPayload: req.body,
     }).catch(err => console.error('[Telegram Webhook] Erro ao disparar webhook:', err.message));
 
-    // Processar assistente de IA (assíncrono)
-    if (text && text.trim()) {
+    // Processar assistente de IA — texto e mídia (áudio, imagem, documento)
+    const telegramShouldProcess = !!(text && text.trim()) || !!(mediaType && mediaType !== 'sticker');
+    if (telegramShouldProcess) {
       assistantProcessor.processIncomingMessage({
         channelId: channel.id,
         channelType: 'telegram',
         conversationId: conversation.id,
         userId: channel.user_id,
-        contactPhone: chatId,
+        contactPhone: chatId.toString(),
         contactName: contactName,
-        messageContent: text,
-        credentials: channel.credentials
+        messageContent: text || (mediaType ? `[${mediaType}]` : ''),
+        credentials: channel.credentials,
+        remoteJid: chatId.toString(),
+        mediaType: mediaType || undefined,
+        mediaUrl: mediaUrl || undefined,
       }).then(replied => {
         if (replied) console.log('[Telegram Webhook] Assistente IA respondeu');
       }).catch(err => {
@@ -2665,8 +2671,9 @@ router.post('/facebook', async (req, res) => {
           rawPayload: entry,
         }).catch(err => console.error('[Facebook Webhook] Erro ao disparar webhook:', err.message));
 
-        // Processar assistente de IA (assíncrono)
-        if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+        // Processar assistente de IA — texto e mídia
+        const fbShouldProcess = !!(messageContent && messageContent.trim() && !messageContent.startsWith('[')) || !!(mediaType && mediaType !== 'sticker');
+        if (fbShouldProcess) {
           assistantProcessor.processIncomingMessage({
             channelId: channel.id,
             channelType: 'facebook',
@@ -2674,8 +2681,10 @@ router.post('/facebook', async (req, res) => {
             userId: channel.user_id,
             contactPhone: senderId,
             contactName: contactName,
-            messageContent: messageContent,
-            credentials: channel.credentials
+            messageContent: messageContent || (mediaType ? `[${mediaType}]` : ''),
+            credentials: channel.credentials,
+            mediaType: mediaType || undefined,
+            mediaUrl: mediaUrl || undefined,
           }).then(replied => {
             if (replied) console.log('[Facebook Webhook] Assistente IA respondeu automaticamente');
           }).catch(err => {
@@ -3213,8 +3222,9 @@ router.post('/instagram', async (req, res) => {
           rawPayload: entry,
         }).catch(err => console.error('[Instagram Webhook] Erro ao disparar webhook:', err.message));
 
-        // Processar assistente de IA (assíncrono - não bloqueia a resposta)
-        if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+        // Processar assistente de IA — texto e mídia
+        const igShouldProcess = !!(messageContent && messageContent.trim() && !messageContent.startsWith('[')) || !!(mediaType && mediaType !== 'sticker');
+        if (igShouldProcess) {
           assistantProcessor.processIncomingMessage({
             channelId: channel.id,
             channelType: 'instagram',
@@ -3222,8 +3232,10 @@ router.post('/instagram', async (req, res) => {
             userId: channel.user_id,
             contactPhone: senderId,
             contactName: contactName,
-            messageContent: messageContent,
-            credentials: channel.credentials
+            messageContent: messageContent || (mediaType ? `[${mediaType}]` : ''),
+            credentials: channel.credentials,
+            mediaType: mediaType || undefined,
+            mediaUrl: mediaUrl || undefined,
           }).then(replied => {
             if (replied) console.log('[Instagram Webhook] Assistente IA respondeu automaticamente');
           }).catch(err => {
@@ -3712,8 +3724,10 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
             rawPayload: message,
           }).catch(err => console.error('[WhatsApp Cloud Webhook] Erro ao disparar webhook:', err.message));
 
-          // Processar assistente de IA (assíncrono - não bloqueia a resposta)
-          if (messageContent && messageContent.trim() && !messageContent.startsWith('[')) {
+          // Processar assistente de IA — texto e mídia (áudio, imagem, documento)
+          const cloudShouldProcess = !!(messageContent && messageContent.trim() && !messageContent.startsWith('[')) ||
+            mediaType === 'audio' || mediaType === 'image' || mediaType === 'document';
+          if (cloudShouldProcess) {
             assistantProcessor.processIncomingMessage({
               channelId: channel.id,
               channelType: 'whatsapp_cloud',
@@ -3721,8 +3735,11 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
               userId: channel.user_id,
               contactPhone: finalPhone,
               contactName: contactName,
-              messageContent: messageContent,
-              credentials: channel.credentials
+              messageContent: messageContent || (mediaType ? `[${mediaType}]` : ''),
+              credentials: channel.credentials,
+              remoteJid: remoteJid,
+              mediaType: mediaType || undefined,
+              mediaUrl: mediaUrl || undefined,
             }).then(replied => {
               if (replied) console.log('[WhatsApp Cloud Webhook] Assistente IA respondeu automaticamente');
             }).catch(err => {
