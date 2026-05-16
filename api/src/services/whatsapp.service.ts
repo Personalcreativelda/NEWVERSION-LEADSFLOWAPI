@@ -812,13 +812,16 @@ export class WhatsAppService {
     
     // Tenta primeiro o endpoint de PTT audio
     try {
-      const pttBody: any = { number };
+      const pttBody: any = {
+        number,
+        encoding: true, // Evolution converte MP3 → OGG Opus automaticamente (necessário para nota de voz PTT)
+      };
       if (audioBase64) {
         pttBody.audio = audioBase64;
       } else if (audioUrl) {
         pttBody.audio = audioUrl;
       }
-      
+
       return await this.request(`/message/sendWhatsAppAudio/${instanceId}`, {
         method: 'POST',
         body: JSON.stringify(pttBody),

@@ -964,11 +964,19 @@ router.post('/evolution/messages', async (req, res) => {
       const msgKey = messageData.key;
       if (evolutionUrl && apiKey && instance && msgKey) {
         try {
-          console.log(`[Evolution Webhook] 📥 Baixando ${mediaType} via Evolution API — msgKey=${JSON.stringify(msgKey)}`);
+          // Enviar o objeto de mensagem COMPLETO (key + inner message com mediaKey de encriptação)
+          // Sem o mediaKey (dentro de imageMessage/audioMessage/documentMessage) a Evolution
+          // não consegue desencriptar a mídia do CDN do WhatsApp
+          const fullMsgPayload = {
+            key: msgKey,
+            message: msg,                              // contém imageMessage.mediaKey, audioMessage.mediaKey, etc.
+            messageTimestamp: messageData.messageTimestamp,
+          };
+          console.log(`[Evolution Webhook] 📥 Baixando ${mediaType} via Evolution API — key.id=${msgKey?.id}`);
           const mediaResponse = await fetch(`${evolutionUrl}/chat/getBase64FromMediaMessage/${instance}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
-            body: JSON.stringify({ message: { key: msgKey } })
+            body: JSON.stringify({ message: fullMsgPayload })
           });
           if (mediaResponse.ok) {
             const mediaData = await mediaResponse.json();

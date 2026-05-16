@@ -216,20 +216,27 @@ const runPendingMigrations = async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS assistant_message_queue (
-          id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-          conversation_id UUID    NOT NULL,
-          user_id         UUID    NOT NULL,
-          channel_id      UUID    NOT NULL,
-          channel_type    VARCHAR(50) NOT NULL DEFAULT 'whatsapp',
-          message_content TEXT    NOT NULL,
-          remote_jid      VARCHAR(255),
-          contact_phone   VARCHAR(255),
-          contact_name    VARCHAR(255),
-          credentials     JSONB,
-          created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          conversation_id      UUID    NOT NULL,
+          user_id              UUID    NOT NULL,
+          channel_id           UUID    NOT NULL,
+          channel_type         VARCHAR(50) NOT NULL DEFAULT 'whatsapp',
+          message_content      TEXT    NOT NULL,
+          remote_jid           VARCHAR(255),
+          contact_phone        VARCHAR(255),
+          contact_name         VARCHAR(255),
+          credentials          JSONB,
+          media_type           VARCHAR(50),
+          media_url            TEXT,
+          incoming_message_id  VARCHAR(255),
+          created_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_amq_conversation_id ON assistant_message_queue(conversation_id);
       CREATE INDEX IF NOT EXISTS idx_amq_created_at      ON assistant_message_queue(created_at);
+      -- Add missing columns to existing deployments
+      ALTER TABLE assistant_message_queue ADD COLUMN IF NOT EXISTS media_type          VARCHAR(50);
+      ALTER TABLE assistant_message_queue ADD COLUMN IF NOT EXISTS media_url           TEXT;
+      ALTER TABLE assistant_message_queue ADD COLUMN IF NOT EXISTS incoming_message_id VARCHAR(255);
 
       CREATE TABLE IF NOT EXISTS assistant_processing_lock (
           conversation_id UUID PRIMARY KEY,

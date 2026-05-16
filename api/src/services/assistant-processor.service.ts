@@ -612,7 +612,7 @@ export class AssistantProcessorService {
             const readRes = await fetch(`${evolutionUrl}/chat/markMessageAsRead/${instanceId}`, {
                 method: 'POST',
                 headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ readMessages: [{ id: ctx.incomingMessageId, fromMe: false, remote: number }] })
+                body: JSON.stringify({ readMessages: [{ id: ctx.incomingMessageId, fromMe: false, remoteJid: number }] })
             });
             if (readRes.ok) {
                 console.log(`[AssistantProcessor] 👁️ Mensagem marcada como lida (ticks azuis)`);
@@ -632,6 +632,65 @@ export class AssistantProcessorService {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: chatId, action: 'typing' })
         });
+    }
+
+    /** Envia ação "record_voice" no Telegram (antes de enviar áudio) */
+    private async sendTelegramRecordVoiceAction(botToken: string, chatId: string): Promise<void> {
+        await fetch(`https://api.telegram.org/bot${botToken}/sendChatAction`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, action: 'record_voice' })
+        }).catch(() => {});
+    }
+
+    /**
+     * Estima a duração em ms de uma nota de voz com base no texto gerado.
+     * ~130 palavras/min de fala natural.
+     */
+    private recordingDurationMs(text: string): number {
+        const words = text.trim().split(/\s+/).length;
+        const ms = Math.round((words / 130) * 60 * 1000);
+        return Math.min(Math.max(ms, 2000), 10000);
+    }
+
+    /**
+     * Envia presença "recording" (gravando áudio) via Evolution API.
+     * Igual ao nó "Gravando async" do n8n — mostra o indicador de gravação
+     * no WhatsApp do contato antes de enviar a nota de voz.
+     */
+    private async sendEvolutionRecordingPresence(instanceId: string, number: string, durationMs: number): Promise<void> {
+        const evolutionUrl = process.env.EVOLUTION_API_URL;
+        const apiKey = process.env.EVOLUTION_API_KEY;
+        if (!evolutionUrl || !apiKey) return;
+        try {
+            const res = await fetch(`${evolutionUrl}/chat/sendPresence/${instanceId}`, {
+                method: 'POST',
+                headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ number, options: { presence: 'recording', delay: durationMs } })
+            });
+            if (res.ok) {
+                console.log(`[AssistantProcessor] 🎙️ Presença "gravando" enviada (${durationMs}ms)`);
+            } else {
+                const txt = await res.text().catch(() => '');
+                console.warn(`[AssistantProcessor] ⚠️ sendPresence recording falhou (${res.status}): ${txt.substring(0, 150)}`);
+            }
+        } catch (e: any) {
+            console.warn(`[AssistantProcessor] ⚠️ sendPresence recording erro:`, e.message);
+        }
+    }
+
+    /**
+     * Reseta a presença para "paused" após envio de áudio (para o indicador de gravação)
+     */
+    private async resetEvolutionPresence(instanceId: string, number: string): Promise<void> {
+        const evolutionUrl = process.env.EVOLUTION_API_URL;
+        const apiKey = process.env.EVOLUTION_API_KEY;
+        if (!evolutionUrl || !apiKey) return;
+        fetch(`${evolutionUrl}/chat/sendPresence/${instanceId}`, {
+            method: 'POST',
+            headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ number, options: { presence: 'paused', delay: 0 } })
+        }).catch(() => {});
     }
 
     /**
@@ -689,11 +748,18 @@ export class AssistantProcessorService {
                 }
             }
             if (audioBase64) {
-                await this.sleep(800);
+                // Igual ao n8n: 1) presença "recording" → 2) aguarda → 3) envia PTT → 4) reseta presença
+                const recDuration = this.recordingDurationMs(text);
+                await this.sendEvolutionRecordingPresence(instanceId, target, recDuration);
+                await this.sleep(recDuration);
                 try {
                     const ar = await whatsappService.sendAudio({ instanceId, number: target, audioBase64 }) as any;
                     lastExternalId = ar?.key?.id || ar?.id || lastExternalId;
-                } catch (e: any) { console.warn('[AssistantProcessor] audio send failed:', e.message); }
+                    console.log(`[AssistantProcessor] ✅ Áudio PTT enviado para ${target}`);
+                } catch (e: any) {
+                    console.warn('[AssistantProcessor] ⚠️ Áudio PTT falhou:', e.message);
+                }
+                await this.resetEvolutionPresence(instanceId, target);
             }
 
         } else if (isTelegram) {
@@ -707,7 +773,9 @@ export class AssistantProcessorService {
                 await this.sendTelegramMessage(botToken, chatId, chunk).catch(() => {});
             }
             if (audioBase64) {
-                await this.sleep(800);
+                // Telegram: mostra "gravando voz" antes de enviar o áudio
+                await this.sendTelegramRecordVoiceAction(botToken, chatId);
+                await this.sleep(2000);
                 await this.sendTelegramAudio(botToken, chatId, audioBase64, ctx.userId).catch(() => {});
             }
 

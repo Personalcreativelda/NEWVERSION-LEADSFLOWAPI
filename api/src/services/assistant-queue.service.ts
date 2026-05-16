@@ -50,18 +50,22 @@ export class AssistantQueueService {
             await query(
                 `INSERT INTO assistant_message_queue
                     (conversation_id, user_id, channel_id, channel_type,
-                     message_content, remote_jid, contact_phone, contact_name, credentials)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                     message_content, remote_jid, contact_phone, contact_name, credentials,
+                     media_type, media_url, incoming_message_id)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
                 [
                     ctx.conversationId,
                     ctx.userId,
                     ctx.channelId,
                     ctx.channelType,
                     ctx.messageContent,
-                    ctx.remoteJid   || null,
-                    ctx.contactPhone || null,
-                    ctx.contactName  || null,
+                    ctx.remoteJid            || null,
+                    ctx.contactPhone         || null,
+                    ctx.contactName          || null,
                     ctx.credentials ? JSON.stringify(ctx.credentials) : null,
+                    ctx.mediaType            || null,
+                    ctx.mediaUrl             || null,
+                    ctx.incomingMessageId    || null,
                 ]
             );
             return true;
@@ -125,16 +129,19 @@ export class AssistantQueueService {
                 const latest = rows[rows.length - 1];
 
                 const mergedCtx: IncomingMessageContext = {
-                    conversationId:  latest.conversation_id,
-                    userId:          latest.user_id,
-                    channelId:       latest.channel_id,
-                    channelType:     latest.channel_type,
-                    messageContent:  latest.message_content,
-                    remoteJid:       latest.remote_jid   || undefined,
-                    contactPhone:    latest.contact_phone || undefined,
-                    contactName:     latest.contact_name  || undefined,
+                    conversationId:     latest.conversation_id,
+                    userId:             latest.user_id,
+                    channelId:          latest.channel_id,
+                    channelType:        latest.channel_type,
+                    messageContent:     latest.message_content,
+                    remoteJid:          latest.remote_jid          || undefined,
+                    contactPhone:       latest.contact_phone        || undefined,
+                    contactName:        latest.contact_name         || undefined,
+                    mediaType:          latest.media_type           || undefined,
+                    mediaUrl:           latest.media_url            || undefined,
+                    incomingMessageId:  latest.incoming_message_id  || undefined,
                     // credentials pode vir como string (JSONB) — safe-parse
-                    credentials:     latest.credentials
+                    credentials:        latest.credentials
                         ? (typeof latest.credentials === 'string'
                             ? JSON.parse(latest.credentials)
                             : latest.credentials)
