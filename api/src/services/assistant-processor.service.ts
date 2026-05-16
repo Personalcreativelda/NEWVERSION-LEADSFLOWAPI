@@ -143,27 +143,42 @@ export class AssistantProcessorService {
             }
 
             // 4b. Se for imagem, analisar com Vision
-            if (ctx.mediaUrl && ctx.mediaType && (ctx.mediaType === 'image' || ctx.mediaType.startsWith('image/'))) {
-                const visionEnabled = config.vision_enabled === true;
+            // vision_enabled: undefined/null = ativo por padrão, só desativa se explicitamente false
+            if (ctx.mediaType && (ctx.mediaType === 'image' || ctx.mediaType.startsWith('image/'))) {
+                const visionEnabled = config.vision_enabled !== false; // padrão: ativo
                 if (visionEnabled) {
                     const hasVisionProvider = availableProviders.some(p => p.provider === 'openai' || p.provider === 'gemini');
-                    if (hasVisionProvider) {
+                    if (hasVisionProvider && ctx.mediaUrl) {
                         try {
-                            const originalText = ctx.messageContent || '';
+                            const originalText = (ctx.messageContent && !ctx.messageContent.startsWith('[')) ? ctx.messageContent : '';
                             const description = await aiService.analyzeImageWithVision(ctx.mediaUrl, originalText, availableProviders);
                             ctx.messageContent = description;
                             console.log(`[AssistantProcessor] 🖼️ Imagem analisada: "${description.substring(0, 100)}..."`);
                         } catch (err: any) {
-                            console.warn('[AssistantProcessor] ⚠️ Análise de imagem falhou, usando texto original:', err.message);
+                            console.warn('[AssistantProcessor] ⚠️ Análise de imagem falhou:', err.message);
+                            // Fallback: diz ao assistente que recebeu imagem mas não conseguiu analisar
+                            const caption = (ctx.messageContent && !ctx.messageContent.startsWith('[')) ? ` Legenda: "${ctx.messageContent}"` : '';
+                            ctx.messageContent = `[O usuário enviou uma imagem mas não consegui acessar o arquivo para análise.${caption} Informe ao usuário que recebeu a imagem e peça que descreva o que precisa ou envie novamente.]`;
                         }
+                    } else if (!ctx.mediaUrl) {
+                        // Sem URL de mídia — informa ao assistente
+                        const caption = (ctx.messageContent && !ctx.messageContent.startsWith('[')) ? ` Legenda: "${ctx.messageContent}"` : '';
+                        ctx.messageContent = `[O usuário enviou uma imagem mas não consegui acessar o arquivo.${caption} Responda dizendo que recebeu a imagem mas peça que descreva o que precisa.]`;
                     } else {
-                        console.warn('[AssistantProcessor] ⚠️ vision_enabled=true mas nenhum provider com suporte a visão (OpenAI/Gemini) disponível.');
+                        // Sem provider de visão — fallback gracioso
+                        const caption = (ctx.messageContent && !ctx.messageContent.startsWith('[')) ? ` Legenda: "${ctx.messageContent}"` : '';
+                        ctx.messageContent = `[O usuário enviou uma imagem.${caption} Informe que recebeu e peça que descreva o que precisa em texto.]`;
                     }
+                } else {
+                    // Vision desativado — mensagem de fallback
+                    const caption = (ctx.messageContent && !ctx.messageContent.startsWith('[')) ? ctx.messageContent : '';
+                    ctx.messageContent = caption || 'O usuário enviou uma imagem. Peça que descreva o que precisa.';
                 }
             }
 
             // 4c. Se for documento/PDF, extrair texto
-            if (ctx.mediaUrl && ctx.mediaType && (
+            // document_enabled: undefined/null = ativo por padrão, só desativa se explicitamente false
+            if (ctx.mediaType && (
                 ctx.mediaType === 'document' ||
                 ctx.mediaType.includes('pdf') ||
                 ctx.mediaType.includes('word') ||
@@ -172,21 +187,27 @@ export class AssistantProcessorService {
                 ctx.mediaType.includes('json') ||
                 ctx.mediaType.includes('spreadsheet')
             )) {
-                const documentEnabled = config.document_enabled === true;
-                if (documentEnabled) {
+                const documentEnabled = config.document_enabled !== false; // padrão: ativo
+                if (documentEnabled && ctx.mediaUrl) {
                     try {
                         const geminiProvider = availableProviders.find(p => p.provider === 'gemini');
                         const extractedText = await aiService.extractDocumentText(ctx.mediaUrl, ctx.mediaType, geminiProvider?.apiKey);
                         if (extractedText && extractedText.length > 50) {
-                            const userQuestion = ctx.messageContent && !ctx.messageContent.startsWith('[') ? ctx.messageContent : '';
+                            const userQuestion = (ctx.messageContent && !ctx.messageContent.startsWith('[')) ? ctx.messageContent : '';
                             ctx.messageContent = `[Conteúdo do documento]\n${extractedText}\n\n${userQuestion || 'Responda com base no documento acima.'}`;
                             console.log(`[AssistantProcessor] 📄 Documento extraído: ${extractedText.length} chars`);
                         } else {
+                            // Não conseguiu extrair — fallback
+                            const userQuestion = (ctx.messageContent && !ctx.messageContent.startsWith('[')) ? ctx.messageContent : '';
+                            ctx.messageContent = userQuestion || 'O usuário enviou um documento. Informe que recebeu mas não conseguiu ler o conteúdo e peça que cole o texto diretamente.';
                             console.warn('[AssistantProcessor] ⚠️ Extração do documento retornou texto insuficiente.');
                         }
                     } catch (err: any) {
                         console.warn('[AssistantProcessor] ⚠️ Extração de documento falhou:', err.message);
+                        ctx.messageContent = 'O usuário enviou um documento mas não consegui ler o conteúdo. Informe ao usuário e peça que cole o texto diretamente na conversa.';
                     }
+                } else if (!ctx.mediaUrl) {
+                    ctx.messageContent = 'O usuário enviou um documento mas não consegui acessar o arquivo. Peça que envie novamente ou cole o conteúdo em texto.';
                 }
             }
 
