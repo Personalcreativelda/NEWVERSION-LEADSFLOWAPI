@@ -549,10 +549,14 @@ export class AIService {
                 },
                 body: JSON.stringify({
                     text: text,
-                    model_id: "eleven_multilingual_v2",
+                    model_id: 'eleven_multilingual_v2',
+                    // Human-like voice settings — optimised for natural conversational speech in Portuguese
                     voice_settings: {
-                        stability: 0.5,
-                        similarity_boost: 0.75
+                        stability: 0.40,          // lower = more expressive/varied tone (robotic at 1.0)
+                        similarity_boost: 0.80,   // stay close to original voice character
+                        style: 0.20,              // slight emotion/expressiveness
+                        use_speaker_boost: true,  // improved clarity
+                        speed: 0.93               // slightly slower than default — more natural cadence
                     }
                 })
             });
@@ -722,9 +726,13 @@ export class AIService {
         }
 
         // ── PDF ────────────────────────────────────────────────────────────────
-        const isPdf = contentType.includes('pdf') || urlLower.endsWith('.pdf');
+        // 'document' is the generic type from Evolution API WhatsApp webhook — treat as PDF
+        const isPdf = contentType.includes('pdf') || urlLower.endsWith('.pdf')
+            || contentType === 'document' || mimeType === 'document';
         if (isPdf) {
-            // Prefer Gemini's native PDF understanding
+            console.log(`[AIService] 📄 Processing PDF — size=${buffer.length} bytes, hasGeminiKey=${!!geminiApiKey}`);
+
+            // ── Gemini native PDF understanding (best quality, supports scanned PDFs) ──
             if (geminiApiKey) {
                 try {
                     const b64 = buffer.toString('base64');
@@ -735,7 +743,8 @@ export class AIService {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 contents: [{ parts: [
-                                    { text: 'Extraia e retorne TODO o texto deste documento PDF, preservando a estrutura e parágrafos. Retorne apenas o texto extraído, sem comentários.' },
+                                    { text: 'Extraia e retorne TODO o texto deste documento, preservando a estrutura e parágrafos. Retorne apenas o texto extraído, sem comentários adicionais.' },
+                                    // Always use application/pdf as mime_type — 'document' is not a valid Gemini MIME
                                     { inline_data: { mime_type: 'application/pdf', data: b64 } }
                                 ]}]
                             })
@@ -745,34 +754,70 @@ export class AIService {
                         const data = await res.json();
                         const extracted = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
                         if (extracted.length > 50) {
-                            console.log('[AIService] ✅ PDF extracted via Gemini');
+                            console.log('[AIService] ✅ PDF extracted via Gemini:', extracted.length, 'chars');
                             return extracted.substring(0, maxChars);
                         }
+                        console.warn('[AIService] Gemini returned short text for PDF:', extracted.length, 'chars');
+                    } else {
+                        const errText = await res.text().catch(() => '');
+                        console.warn(`[AIService] Gemini PDF error (${res.status}):`, errText.substring(0, 200));
                     }
                 } catch (e: any) {
                     console.warn('[AIService] Gemini PDF extraction failed:', e.message);
                 }
             }
 
-            // Fallback: scan PDF binary for printable text sequences
-            const raw = buffer.toString('latin1');
+            // ── Regex-based PDF stream parser (text-based PDFs without OCR) ──────────
+            // Targets BT...ET operator blocks and extracts parenthesized text strings
+            const pdfStr = buffer.toString('latin1');
+            const streamTexts: string[] = [];
+
+            // Method 1: BT...ET text blocks (most reliable for text-based PDFs)
+            const btEtRegex = /BT\s+([\s\S]*?)\s+ET/g;
+            let blockMatch;
+            while ((blockMatch = btEtRegex.exec(pdfStr)) !== null) {
+                const block = blockMatch[1];
+                const parenRegex = /\(([^()\\\n]|\\[\s\S])*\)/g;
+                let textMatch;
+                while ((textMatch = parenRegex.exec(block)) !== null) {
+                    const raw = textMatch[0].slice(1, -1)
+                        .replace(/\\n/g, ' ')
+                        .replace(/\\r/g, ' ')
+                        .replace(/\\t/g, ' ')
+                        .replace(/\\\(/g, '(')
+                        .replace(/\\\)/g, ')')
+                        .replace(/\\\\/g, '\\')
+                        .trim();
+                    if (raw.length > 0 && /[a-zA-ZÀ-ÿ0-9]/.test(raw)) {
+                        streamTexts.push(raw);
+                    }
+                }
+            }
+
+            if (streamTexts.length > 0) {
+                const result = streamTexts.join(' ').replace(/\s{2,}/g, ' ').trim();
+                if (result.length > 100) {
+                    console.log('[AIService] ✅ PDF extracted via stream regex:', result.length, 'chars');
+                    return result.substring(0, maxChars);
+                }
+            }
+
+            // Method 2: Generic printable char scan (last resort)
             const words: string[] = [];
             let current = '';
-            for (let i = 0; i < raw.length; i++) {
-                const c = raw.charCodeAt(i);
-                // Printable ASCII + common Latin-1 range
+            for (let i = 0; i < pdfStr.length; i++) {
+                const c = pdfStr.charCodeAt(i);
                 if ((c >= 32 && c <= 126) || (c >= 160 && c <= 255)) {
-                    current += raw[i];
+                    current += pdfStr[i];
                 } else {
                     if (current.length >= 4) words.push(current.trim());
                     current = '';
                 }
             }
             if (current.length >= 4) words.push(current.trim());
-
             const joined = words.filter(w => /[a-zA-ZÀ-ÿ]{2,}/.test(w)).join(' ');
             if (joined.length > 100) {
-                console.log('[AIService] ✅ PDF text extracted via binary scan');
+                console.log('[AIService] ✅ PDF text extracted via char scan');
                 return joined.substring(0, maxChars);
             }
 

@@ -260,9 +260,9 @@ export class AssistantProcessorService {
                 } else {
                     try {
                         console.log(`[AssistantProcessor] 🎙️ Gerando Áudio Mágico (ElevenLabs) para a resposta...`);
-                        // Per-assistant config → SAAS-wide env default → fallback padrão
-                        const voiceId = config.audio_voice_id || process.env.ELEVENLABS_DEFAULT_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
-                        console.log(`[AssistantProcessor] 🎤 VoiceId: ${voiceId}`);
+                        // Voz sempre vinda das variáveis de ambiente (UI não expõe mais esse campo)
+                        const voiceId = process.env.ELEVENLABS_DEFAULT_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
+                        console.log(`[AssistantProcessor] 🎤 VoiceId: ${voiceId} (env: ${!!process.env.ELEVENLABS_DEFAULT_VOICE_ID})`);
                         const audioBuffer = await aiService.generateElevenLabsAudio(
                             aiResponse.content,
                             voiceId,
@@ -716,6 +716,11 @@ export class AssistantProcessorService {
     /**
      * Envia a resposta simulando comportamento humano:
      * marca como lido → delay de leitura → digita → envia em partes
+     *
+     * Quando audioBase64 está presente E ctx.mediaType === 'audio':
+     *   - Modo áudio exclusivo: envia APENAS a nota de voz PTT (sem texto)
+     *   - Simula presença "recording" antes de enviar
+     * Quando audioBase64 está ausente ou falhou: envia texto em chunks
      */
     private async humanizedSend(ctx: IncomingMessageContext, text: string, audioBase64?: string): Promise<string | null> {
         const isEvolutionWA = ctx.channelType === 'whatsapp';
@@ -732,21 +737,30 @@ export class AssistantProcessorService {
         let creds = ctx.credentials || {};
         if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch { creds = {}; } }
 
-        // 1. Dividir em partes naturais
-        const chunks = (text.includes('\n\n') || text.length > 280)
+        // Modo áudio exclusivo: cliente mandou áudio E temos áudio gerado → só envia PTT, sem texto
+        const audioOnlyMode = !!audioBase64 && ctx.mediaType === 'audio';
+
+        // 1. Dividir em partes naturais (usado só se não for modo áudio exclusivo)
+        const chunks = (!audioOnlyMode && (text.includes('\n\n') || text.length > 280))
             ? this.splitResponse(text)
-            : [text];
+            : (!audioOnlyMode ? [text] : []);
 
         // Calcular tempo total de digitação estimado (para sendPresence)
-        const totalTypingMs = chunks.reduce((acc, c) => acc + this.typingDelayMs(c.length), 0);
+        const totalTypingMs = audioOnlyMode
+            ? this.recordingDurationMs(text)
+            : chunks.reduce((acc, c) => acc + this.typingDelayMs(c.length), 0);
 
-        // 2. Marcar como lido + enviar presença "digitando" (Evolution WhatsApp)
+        // 2. Marcar como lido + enviar presença correta (digitando OU gravando)
         if (isEvolutionWA) {
-            await this.markEvolutionRead(ctx, totalTypingMs);
+            if (audioOnlyMode) {
+                // Para modo áudio: marcar lido com delay de gravação
+                await this.markEvolutionRead(ctx, totalTypingMs);
+            } else {
+                await this.markEvolutionRead(ctx, totalTypingMs);
+            }
         }
 
-        // 3. Breve delay de "leitura" antes do primeiro chunk (200–600ms)
-        //    sendPresence já mostra "digitando", então delay curto basta
+        // 3. Breve delay de "leitura" antes de responder (200–600ms)
         await this.sleep(200 + Math.floor(Math.random() * 400));
 
         let lastExternalId: string | null = null;
@@ -757,72 +771,85 @@ export class AssistantProcessorService {
             const isGroupJid = ctx.remoteJid?.endsWith('@g.us');
             const target = (isLidJid || isGroupJid) && ctx.remoteJid ? ctx.remoteJid : ctx.contactPhone!;
 
-            for (const chunk of chunks) {
-                if (!chunk.trim()) continue;
-                const delay = this.typingDelayMs(chunk.length);
-                try {
-                    const res = await whatsappService.sendMessage({ instanceId, number: target, text: chunk, delay }) as any;
-                    lastExternalId = res?.key?.id || res?.id || lastExternalId;
-                } catch (e: any) {
-                    console.warn(`[AssistantProcessor] humanizedSend chunk failed:`, e.message);
-                }
-            }
-            if (audioBase64) {
-                // Igual ao n8n: 1) presença "recording" → 2) aguarda → 3) envia PTT → 4) reseta presença
+            if (audioOnlyMode) {
+                // Modo áudio exclusivo — mostrar "gravando" e enviar só o PTT
                 const recDuration = this.recordingDurationMs(text);
                 await this.sendEvolutionRecordingPresence(instanceId, target, recDuration);
                 await this.sleep(recDuration);
                 try {
                     const ar = await whatsappService.sendAudio({ instanceId, number: target, audioBase64 }) as any;
                     lastExternalId = ar?.key?.id || ar?.id || lastExternalId;
-                    console.log(`[AssistantProcessor] ✅ Áudio PTT enviado para ${target}`);
+                    console.log(`[AssistantProcessor] ✅ Áudio PTT enviado para ${target} (modo áudio exclusivo)`);
                 } catch (e: any) {
-                    console.warn('[AssistantProcessor] ⚠️ Áudio PTT falhou:', e.message);
+                    console.warn('[AssistantProcessor] ⚠️ Áudio PTT falhou, enviando texto como fallback:', e.message);
+                    // Fallback: enviar texto se o PTT falhar
+                    for (const chunk of this.splitResponse(text)) {
+                        if (!chunk.trim()) continue;
+                        const delay = this.typingDelayMs(chunk.length);
+                        try {
+                            const res = await whatsappService.sendMessage({ instanceId, number: target, text: chunk, delay }) as any;
+                            lastExternalId = res?.key?.id || res?.id || lastExternalId;
+                        } catch { /* ignore */ }
+                    }
                 }
                 await this.resetEvolutionPresence(instanceId, target);
+            } else {
+                // Modo texto normal — enviar chunks com delay de digitação
+                for (const chunk of chunks) {
+                    if (!chunk.trim()) continue;
+                    const delay = this.typingDelayMs(chunk.length);
+                    try {
+                        const res = await whatsappService.sendMessage({ instanceId, number: target, text: chunk, delay }) as any;
+                        lastExternalId = res?.key?.id || res?.id || lastExternalId;
+                    } catch (e: any) {
+                        console.warn(`[AssistantProcessor] humanizedSend chunk failed:`, e.message);
+                    }
+                }
             }
 
         } else if (isTelegram) {
             const botToken = creds.bot_token;
             const chatId = ctx.contactPhone!;
-            for (const chunk of chunks) {
-                if (!chunk.trim()) continue;
-                const delay = this.typingDelayMs(chunk.length);
-                await this.sendTelegramTypingAction(botToken, chatId).catch(() => {});
-                await this.sleep(delay);
-                await this.sendTelegramMessage(botToken, chatId, chunk).catch(() => {});
-            }
-            if (audioBase64) {
-                // Telegram: mostra "gravando voz" antes de enviar o áudio
+            if (audioOnlyMode && audioBase64) {
                 await this.sendTelegramRecordVoiceAction(botToken, chatId);
                 await this.sleep(2000);
                 await this.sendTelegramAudio(botToken, chatId, audioBase64, ctx.userId).catch(() => {});
+            } else {
+                for (const chunk of chunks) {
+                    if (!chunk.trim()) continue;
+                    const delay = this.typingDelayMs(chunk.length);
+                    await this.sendTelegramTypingAction(botToken, chatId).catch(() => {});
+                    await this.sleep(delay);
+                    await this.sendTelegramMessage(botToken, chatId, chunk).catch(() => {});
+                }
             }
 
         } else if (isWACloud) {
             const pid = creds.phone_number_id;
             const tok = creds.access_token;
-            for (let i = 0; i < chunks.length; i++) {
-                if (!chunks[i].trim()) continue;
-                if (i > 0) await this.sleep(this.typingDelayMs(chunks[i].length));
-                await this.sendWhatsAppCloudMessage(pid, tok, ctx.contactPhone!, chunks[i]).catch(() => {});
-            }
-            if (audioBase64) {
+            if (audioOnlyMode && audioBase64) {
                 await this.sleep(800);
                 await this.sendWhatsAppCloudAudio(pid, tok, ctx.contactPhone!, audioBase64).catch(() => {});
+            } else {
+                for (let i = 0; i < chunks.length; i++) {
+                    if (!chunks[i].trim()) continue;
+                    if (i > 0) await this.sleep(this.typingDelayMs(chunks[i].length));
+                    await this.sendWhatsAppCloudMessage(pid, tok, ctx.contactPhone!, chunks[i]).catch(() => {});
+                }
             }
 
         } else if (isFacebook) {
             const tok = creds.page_access_token || creds.access_token;
             const rid = ctx.contactPhone!;
-            for (let i = 0; i < chunks.length; i++) {
-                if (!chunks[i].trim()) continue;
-                if (i > 0) await this.sleep(this.typingDelayMs(chunks[i].length));
-                await this.sendFacebookMessage(tok, rid, chunks[i]).catch(() => {});
-            }
-            if (audioBase64) {
+            if (audioOnlyMode && audioBase64) {
                 await this.sleep(800);
                 await this.sendFacebookAudio(tok, rid, audioBase64, ctx.userId).catch(() => {});
+            } else {
+                for (let i = 0; i < chunks.length; i++) {
+                    if (!chunks[i].trim()) continue;
+                    if (i > 0) await this.sleep(this.typingDelayMs(chunks[i].length));
+                    await this.sendFacebookMessage(tok, rid, chunks[i]).catch(() => {});
+                }
             }
 
         } else if (isInstagram) {
