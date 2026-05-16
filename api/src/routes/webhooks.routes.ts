@@ -964,7 +964,7 @@ router.post('/evolution/messages', async (req, res) => {
       const msgKey = messageData.key;
       if (evolutionUrl && apiKey && instance && msgKey) {
         try {
-          console.log('[Evolution Webhook] Tentando baixar mídia via Evolution API...');
+          console.log(`[Evolution Webhook] 📥 Baixando ${mediaType} via Evolution API — msgKey=${JSON.stringify(msgKey)}`);
           const mediaResponse = await fetch(`${evolutionUrl}/chat/getBase64FromMediaMessage/${instance}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
@@ -974,7 +974,7 @@ router.post('/evolution/messages', async (req, res) => {
             const mediaData = await mediaResponse.json();
             const fetchedBase64 = mediaData.base64 || mediaData.data?.base64;
             if (fetchedBase64) {
-              console.log('[Evolution Webhook] Mídia baixada via API, tamanho:', fetchedBase64.length);
+              console.log(`[Evolution Webhook] ✅ Base64 obtido (${fetchedBase64.length} chars), fazendo upload para MinIO...`);
               const storageService = getStorageService();
               const cleanB64 = fetchedBase64.replace(/^data:[^;]+;base64,/, '');
               const buffer = Buffer.from(cleanB64, 'base64');
@@ -987,11 +987,17 @@ router.post('/evolution/messages', async (req, res) => {
               const ext = extMap2[mediaMimetype || ''] || (mediaType === 'image' ? 'jpg' : mediaType === 'audio' ? 'ogg' : mediaType === 'video' ? 'mp4' : 'bin');
               const filename = `whatsapp_${mediaType}_${Date.now()}.${ext}`;
               mediaUrl = await storageService.uploadBuffer(buffer, filename, mediaMimetype || 'application/octet-stream', 'inbox-attachments', channel.user_id);
-              console.log('[Evolution Webhook] Mídia (via API) uploaded:', mediaUrl?.substring(0, 100));
+              console.log(`[Evolution Webhook] ✅ ${mediaType} uploaded para MinIO: ${mediaUrl?.substring(0, 100)}`);
+            } else {
+              const rawKeys = Object.keys(mediaData).join(', ');
+              console.warn(`[Evolution Webhook] ⚠️ getBase64FromMediaMessage retornou OK mas sem base64 — campos: ${rawKeys}`);
             }
+          } else {
+            const errText = await mediaResponse.text().catch(() => '');
+            console.warn(`[Evolution Webhook] ⚠️ getBase64FromMediaMessage falhou (${mediaResponse.status}): ${errText.substring(0, 300)}`);
           }
         } catch (dlErr: any) {
-          console.warn('[Evolution Webhook] Falha ao baixar mídia via Evolution API:', dlErr.message);
+          console.warn(`[Evolution Webhook] ⚠️ Erro ao baixar ${mediaType}:`, dlErr.message);
         }
       }
 
@@ -1684,7 +1690,7 @@ router.post('/evolution/messages', async (req, res) => {
       mediaType === 'video'
     );
     if (shouldProcessWithAI) {
-      console.log('[Evolution Webhook] 🤖 Enfileirando mensagem para assistente IA...', mediaType === 'audio' ? '(ÁUDIO)' : '(TEXTO)');
+      console.log(`[Evolution Webhook] 🤖 Enfileirando para assistente IA — tipo=${mediaType || 'text'} hasUrl=${!!mediaUrl} content="${messageContent.substring(0, 60)}"`);
       console.log('[Evolution Webhook]   - channelId:', channel.id);
       console.log('[Evolution Webhook]   - userId:', channel.user_id);
       console.log('[Evolution Webhook]   - conversationId:', conversation.id);

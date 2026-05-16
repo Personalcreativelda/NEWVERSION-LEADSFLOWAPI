@@ -515,10 +515,13 @@ export class AssistantProcessorService {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    /** Delay realista de digitação: ~45 chars/s, min 900ms, max 4000ms */
+    /** Delay realista de digitação: ~30 chars/s, min 1500ms, max 6000ms, com variação aleatória */
     private typingDelayMs(textLength: number): number {
-        const base = Math.round((textLength / 45) * 1000);
-        return Math.min(Math.max(base, 900), 4000);
+        const base = Math.round((textLength / 30) * 1000);
+        const clamped = Math.min(Math.max(base, 1500), 6000);
+        // ±15% variação para parecer mais humano
+        const variation = clamped * 0.15;
+        return Math.round(clamped + (Math.random() * variation * 2 - variation));
     }
 
     /** Quebra o texto em chunks naturais (máx 4 partes, máx 280 chars cada) */
@@ -571,24 +574,55 @@ export class AssistantProcessorService {
         return result.length > 0 ? result : [text];
     }
 
-    /** Marca mensagem como lida no WhatsApp (Evolution API) */
-    private async markEvolutionRead(ctx: IncomingMessageContext): Promise<void> {
-        if (!ctx.incomingMessageId) return;
+    /** Marca mensagem como lida e envia presença "digitando" no WhatsApp (Evolution API) */
+    private async markEvolutionRead(ctx: IncomingMessageContext, totalTypingMs: number): Promise<void> {
         const evolutionUrl = process.env.EVOLUTION_API_URL;
         const apiKey = process.env.EVOLUTION_API_KEY;
         let creds = ctx.credentials || {};
         if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch { creds = {}; } }
         const instanceId = creds.instance_id || creds.instance_name;
         if (!evolutionUrl || !apiKey || !instanceId) return;
+
         const remoteJid = ctx.remoteJid || `${ctx.contactPhone}@s.whatsapp.net`;
+        const number = remoteJid.endsWith('@g.us') || remoteJid.endsWith('@lid') || remoteJid.endsWith('@s.whatsapp.net')
+            ? remoteJid
+            : `${ctx.contactPhone}@s.whatsapp.net`;
+
+        // 1. sendPresence "composing" — faz o WhatsApp mostrar "digitando..." E marca a mensagem como lida
+        //    Isso é mais confiável do que markMessageAsRead em muitas versões da Evolution
         try {
-            await fetch(`${evolutionUrl}/chat/markMessageAsRead/${instanceId}`, {
+            const presRes = await fetch(`${evolutionUrl}/chat/sendPresence/${instanceId}`, {
                 method: 'POST',
                 headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ readMessages: [{ id: ctx.incomingMessageId, fromMe: false, remote: remoteJid }] })
+                body: JSON.stringify({ number, options: { presence: 'composing', delay: totalTypingMs } })
             });
-            console.log(`[AssistantProcessor] 👁️ Mensagem marcada como lida`);
-        } catch { /* não crítico */ }
+            if (presRes.ok) {
+                console.log(`[AssistantProcessor] ✍️ Presença "digitando" enviada (${totalTypingMs}ms)`);
+            } else {
+                const txt = await presRes.text().catch(() => '');
+                console.warn(`[AssistantProcessor] ⚠️ sendPresence falhou (${presRes.status}): ${txt.substring(0, 200)}`);
+            }
+        } catch (e: any) {
+            console.warn(`[AssistantProcessor] ⚠️ sendPresence erro:`, e.message);
+        }
+
+        // 2. markMessageAsRead — ticks azuis explícitos (funciona na maioria das versões)
+        if (!ctx.incomingMessageId) return;
+        try {
+            const readRes = await fetch(`${evolutionUrl}/chat/markMessageAsRead/${instanceId}`, {
+                method: 'POST',
+                headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ readMessages: [{ id: ctx.incomingMessageId, fromMe: false, remote: number }] })
+            });
+            if (readRes.ok) {
+                console.log(`[AssistantProcessor] 👁️ Mensagem marcada como lida (ticks azuis)`);
+            } else {
+                const txt = await readRes.text().catch(() => '');
+                console.warn(`[AssistantProcessor] ⚠️ markMessageAsRead falhou (${readRes.status}): ${txt.substring(0, 200)}`);
+            }
+        } catch (e: any) {
+            console.warn(`[AssistantProcessor] ⚠️ markMessageAsRead erro:`, e.message);
+        }
     }
 
     /** Envia ação "typing" no Telegram */
@@ -619,18 +653,22 @@ export class AssistantProcessorService {
         let creds = ctx.credentials || {};
         if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch { creds = {}; } }
 
-        // 1. Marcar como lido (Evolution WhatsApp)
-        if (isEvolutionWA) {
-            await this.markEvolutionRead(ctx);
-        }
-
-        // 2. Delay de "leitura" antes de começar a digitar (600–1500ms)
-        await this.sleep(600 + Math.floor(Math.random() * 900));
-
-        // 3. Dividir em partes naturais apenas se texto longo ou tem parágrafos
+        // 1. Dividir em partes naturais
         const chunks = (text.includes('\n\n') || text.length > 280)
             ? this.splitResponse(text)
             : [text];
+
+        // Calcular tempo total de digitação estimado (para sendPresence)
+        const totalTypingMs = chunks.reduce((acc, c) => acc + this.typingDelayMs(c.length), 0);
+
+        // 2. Marcar como lido + enviar presença "digitando" (Evolution WhatsApp)
+        if (isEvolutionWA) {
+            await this.markEvolutionRead(ctx, totalTypingMs);
+        }
+
+        // 3. Breve delay de "leitura" antes do primeiro chunk (200–600ms)
+        //    sendPresence já mostra "digitando", então delay curto basta
+        await this.sleep(200 + Math.floor(Math.random() * 400));
 
         let lastExternalId: string | null = null;
 
