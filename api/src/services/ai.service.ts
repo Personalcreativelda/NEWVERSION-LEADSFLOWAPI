@@ -879,7 +879,7 @@ export class AIService {
         return streamTexts.join(' ').replace(/\s{2,}/g, ' ').trim();
     }
 
-    private _decodeAsciiHex(data: string): Buffer {
+    private _decodeAsciiHex(data: string): Buffer<ArrayBuffer> {
         const cleaned = data.replace(/[\s\r\n\t]/g, '');
         const endIdx = cleaned.indexOf('>');
         const hex = endIdx >= 0 ? cleaned.slice(0, endIdx) : cleaned;
@@ -890,10 +890,12 @@ export class AIService {
             if (!/[0-9A-Fa-f]/.test(a) || !/[0-9A-Fa-f]/.test(b)) break;
             bytes.push(parseInt(a + b, 16));
         }
-        return Buffer.from(bytes);
+        const result = Buffer.alloc(bytes.length);
+        bytes.forEach((b, i) => { result[i] = b; });
+        return result;
     }
 
-    private _decodeAscii85(data: string): Buffer {
+    private _decodeAscii85(data: string): Buffer<ArrayBuffer> {
         const cleaned = data.replace(/[\s\r\n\t]/g, '');
         const bytes: number[] = [];
         let tuple: number[] = [];
@@ -930,7 +932,9 @@ export class AIService {
             bytes.push(...decoded.slice(0, outCount));
         }
 
-        return Buffer.from(bytes);
+        const result = Buffer.alloc(bytes.length);
+        bytes.forEach((b, i) => { result[i] = b; });
+        return result;
     }
 
     /** Decompresses FlateDecode PDF streams and extracts text from them */
