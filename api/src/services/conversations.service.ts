@@ -53,10 +53,15 @@ export class ConversationsService {
         }
 
         // Tentar encontrar conversa existente
+        // For group JIDs (@g.us), match by user_id + remote_jid only — a group belongs to one
+        // conversation per user regardless of which channel received the webhook.
+        // This prevents duplicate conversations when the channel_id differs between sync and webhook.
+        const isGroupRemote = remoteJid.includes('@g.us');
         let result = await query(
-            `SELECT * FROM conversations 
-       WHERE user_id = $1 AND channel_id = $2 AND remote_jid = $3`,
-            [userId, channelId, remoteJid]
+            isGroupRemote
+                ? `SELECT * FROM conversations WHERE user_id = $1 AND remote_jid = $2 LIMIT 1`
+                : `SELECT * FROM conversations WHERE user_id = $1 AND channel_id = $2 AND remote_jid = $3`,
+            isGroupRemote ? [userId, remoteJid] : [userId, channelId, remoteJid]
         );
 
         if (result.rows.length > 0) {

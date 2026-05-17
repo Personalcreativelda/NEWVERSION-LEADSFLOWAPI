@@ -320,6 +320,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     audio_enabled: cfg.audio_enabled === true || cfg.audio_enabled === 'true',
     vision_enabled: cfg.vision_enabled !== false,
     document_enabled: cfg.document_enabled !== false,
+    reactions_enabled: cfg.reactions_enabled === true || cfg.reactions_enabled === 'true',
   });
 
   // Open config modal — fetch fresh data to avoid stale cached config
@@ -1358,6 +1359,32 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       <span
                         className="inline-block rounded-full bg-white shadow transition-transform"
                         style={{ width: 18, height: 18, transform: configValues.document_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Reactions toggle */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                        <span className="text-base leading-none">❤️</span>
+                        Reagir às mensagens
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Envia reações (❤️ 👍 😊) às mensagens recebidas no WhatsApp. Desativado por padrão.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!configValues.reactions_enabled}
+                      onClick={() => setConfigValues({ ...configValues, reactions_enabled: !configValues.reactions_enabled })}
+                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                      style={{ width: 44, height: 24, background: configValues.reactions_enabled ? '#f59e0b' : '#6b7280' }}
+                    >
+                      <span
+                        className="inline-block rounded-full bg-white shadow transition-transform"
+                        style={{ width: 18, height: 18, transform: configValues.reactions_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
                       />
                     </button>
                   </div>

@@ -240,31 +240,31 @@ export class AssistantProcessorService {
                         const geminiProvider = availableProviders.find(p => p.provider === 'gemini');
                         const extractedText = await aiService.extractDocumentText(ctx.mediaUrl, ctx.mediaType, geminiProvider?.apiKey);
                         if (extractedText && extractedText.length > 50) {
-                            ctx.messageContent = `[Conteúdo do documento]\n${extractedText}\n\n${docUserCaption || 'Responda com base no documento acima.'}`;
+                            ctx.messageContent = `[Conteúdo do documento enviado pelo usuário]\n${extractedText}\n\n${docUserCaption || 'Responda com base no documento acima.'}`;
                             console.log(`[AssistantProcessor] 📄 Documento extraído: ${extractedText.length} chars`);
                         } else {
-                            // Gemini falhou — ainda passar pergunta do usuário ao assistente com contexto
+                            // Gemini falhou — passar pergunta do usuário com contexto neutro
                             console.warn('[AssistantProcessor] ⚠️ Extração do documento retornou texto insuficiente.');
                             if (docUserCaption) {
-                                ctx.messageContent = `${docUserCaption}\n\n[O usuário também enviou um documento mas não foi possível extrair o conteúdo para análise.]`;
+                                ctx.messageContent = `${docUserCaption}\n\n[Nota interna: o usuário também enviou um arquivo anexo, mas o conteúdo não pôde ser lido automaticamente. Ofereça ajuda com base na mensagem acima e, se necessário, peça que o usuário descreva o conteúdo do arquivo.]`;
                             } else {
-                                ctx.messageContent = '[O usuário enviou um documento mas não foi possível extrair o texto. Informe que recebeu o arquivo, mas peça que cole o conteúdo como texto ou descreva o que precisa.]';
+                                ctx.messageContent = '[Nota interna: o usuário enviou um arquivo anexo, mas o conteúdo não pôde ser extraído. Responda com disposição para ajudar e peça que o usuário descreva o que precisa ou compartilhe o conteúdo em texto.]';
                             }
                         }
                     } catch (err: any) {
                         console.warn('[AssistantProcessor] ⚠️ Extração de documento falhou:', err.message);
                         if (docUserCaption) {
-                            ctx.messageContent = `${docUserCaption}\n\n[O usuário também enviou um documento mas houve um erro ao tentar ler o arquivo.]`;
+                            ctx.messageContent = `${docUserCaption}\n\n[Nota interna: o usuário enviou um arquivo mas houve um erro ao tentar lê-lo. Ajude com base na mensagem acima.]`;
                         } else {
-                            ctx.messageContent = '[O usuário enviou um documento mas houve um erro ao ler o arquivo. Informe que recebeu e peça que cole o conteúdo como texto.]';
+                            ctx.messageContent = '[Nota interna: o usuário enviou um arquivo mas houve um erro ao lê-lo. Responda com disposição para ajudar e peça que descreva o que precisa.]';
                         }
                     }
                 } else if (!ctx.mediaUrl) {
                     // Sem URL — provavelmente falha no download via Evolution
                     if (docUserCaption) {
-                        ctx.messageContent = `${docUserCaption}\n\n[O usuário também enviou um documento mas não foi possível acessar o arquivo.]`;
+                        ctx.messageContent = `${docUserCaption}\n\n[Nota interna: o usuário enviou um arquivo mas ele não pôde ser acessado. Ajude com base na mensagem acima.]`;
                     } else {
-                        ctx.messageContent = '[O usuário enviou um documento mas não foi possível acessar o arquivo. Peça que envie novamente ou cole o conteúdo como texto.]';
+                        ctx.messageContent = '[Nota interna: o usuário enviou um arquivo mas ele não pôde ser acessado. Pergunte o que o usuário precisa e ofereça ajuda.]';
                     }
                 }
             }
@@ -862,9 +862,10 @@ export class AssistantProcessorService {
         if (isEvolutionWA) {
             await this.markEvolutionRead(ctx, totalTypingMs, audioOnlyMode ? 'recording' : 'composing');
 
-            // Enviar reação contextual à última mensagem recebida (assíncrono, não bloqueia)
+            // Enviar reação contextual à última mensagem recebida (somente se reactions_enabled no config)
             const reactionTargetId = ctx.incomingMessageId;
-            if (reactionTargetId && !audioOnlyMode) {
+            const reactionsEnabled = config.reactions_enabled === true || config.reactions_enabled === 'true';
+            if (reactionsEnabled && reactionTargetId && !audioOnlyMode) {
                 const emoji = this.selectReaction(ctx.messageContent || '');
                 if (emoji) {
                     void this.sendEvolutionReaction(ctx, reactionTargetId, emoji);

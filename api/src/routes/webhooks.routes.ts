@@ -1151,6 +1151,23 @@ router.post('/evolution/messages', async (req, res) => {
       console.log('[Evolution Webhook]   - Sender:', groupSenderName);
       console.log('[Evolution Webhook]   - Direção:', messageDirection);
 
+      // Update conversation: increment unread_count (only for incoming) and last_message_at
+      if (messageDirection === 'in') {
+        await query(
+          `UPDATE conversations
+           SET unread_count = unread_count + 1,
+               last_message_at = NOW(),
+               updated_at = NOW()
+           WHERE id = $1`,
+          [conversation.id]
+        ).catch((e: any) => console.warn('[Evolution Webhook] Failed to update conversation stats:', e.message));
+      } else {
+        await query(
+          `UPDATE conversations SET last_message_at = NOW(), updated_at = NOW() WHERE id = $1`,
+          [conversation.id]
+        ).catch((e: any) => console.warn('[Evolution Webhook] Failed to update last_message_at:', e.message));
+      }
+
       // 📡 Notificar via WebSocket
       try {
         const wsService = getWebSocketService();
