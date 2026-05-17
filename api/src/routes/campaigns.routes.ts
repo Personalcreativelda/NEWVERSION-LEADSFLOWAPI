@@ -619,10 +619,11 @@ router.post('/:id/execute', async (req, res, next) => {
     // 3. Buscar leads destinatários
     let leads: any[] = [];
 
-    if (settings.customNumbers && typeof settings.customNumbers === 'string') {
+    if (settings.recipientMode === 'custom' ||
+        (settings.recipientMode !== 'groups' && settings.customNumbers && typeof settings.customNumbers === 'string')) {
       // Modo custom: NÃO consultar o DB — criar leads sintéticos direto da lista
       // Isso garante que 6 números = 6 envios (sem deduplicação SQL)
-      const rawPhones = (settings.customNumbers as string)
+      const rawPhones = ((settings.customNumbers || '') as string)
         .split(',')
         .map((p: string) => p.trim())
         .filter(Boolean);
@@ -655,17 +656,24 @@ router.post('/:id/execute', async (req, res, next) => {
             const participants = await whatsappService.getGroupParticipants(whatsappInstanceId, groupJid);
             console.log(`[Campaigns Execute] Grupo ${groupJid}: ${participants.length} participante(s)`);
             for (const p of participants) {
-              // Prefer phoneNumber (e.g. "258857711143@s.whatsapp.net"), fall back to id stripping
-              const rawPhone = (p.phoneNumber || p.phone || '')
-                .replace('@s.whatsapp.net', '')
-                .replace('@lid', '')
-                .replace(/\D/g, '');
-              const fallback = (p.id || p.jid || '')
-                .replace('@lid', '')
-                .replace('@s.whatsapp.net', '')
-                .replace(/\D/g, '');
-              const finalPhone = rawPhone || fallback;
-              if (!finalPhone || seenPhones.has(finalPhone)) continue;
+              const rawId = String(p.id || p.jid || '');
+              const rawPhoneField = String(p.phoneNumber || p.phone || '');
+
+              // Skip group JIDs and @lid device-linked IDs (not real phone numbers)
+              if (rawId.endsWith('@g.us')) continue;
+              const isLid = rawId.endsWith('@lid') || rawPhoneField.endsWith('@lid');
+              if (isLid) continue;
+
+              // Extract phone: prefer explicit phoneNumber field, fall back to @s.whatsapp.net JID
+              const fromPhoneField = rawPhoneField
+                .replace('@s.whatsapp.net', '').replace(/\D/g, '');
+              const fromJid = rawId.includes('@s.whatsapp.net')
+                ? rawId.replace('@s.whatsapp.net', '').replace(/\D/g, '')
+                : '';
+              const finalPhone = fromPhoneField || fromJid;
+
+              // Reject: empty, deduped, or implausibly long (device ID leaked through)
+              if (!finalPhone || finalPhone.length > 15 || seenPhones.has(finalPhone)) continue;
               seenPhones.add(finalPhone);
               leads.push({
                 id: `gm-${finalPhone}`,
@@ -683,6 +691,12 @@ router.post('/:id/execute', async (req, res, next) => {
           }
         }
         console.log(`[Campaigns Execute] 👥 Modo privado de grupos: ${leads.length} membro(s) únicos`);
+
+        if (leads.length === 0) {
+          return res.status(400).json({
+            error: 'Não foi possível extrair participantes dos grupos selecionados. Verifique se a instância WhatsApp está conectada e tente novamente.'
+          });
+        }
       } else {
         // Enviar diretamente nos grupos (group JID como destinatário)
         for (const groupJid of selectedGroupJids) {
@@ -1096,11 +1110,13 @@ async function executeCampaignMessages(
 
       // Criar conversa no inbox
       try {
+        // Synthetic IDs (group-xxx, gm-xxx, custom-xxx) are not real lead UUIDs
+        const isRealLeadId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lead.id || '');
         const conversation = await conversationsService.findOrCreate(
           userId,
           channel.id,
           remoteJid,
-          lead.id,
+          isRealLeadId ? lead.id : undefined,
           {
             contact_name: contactName,
             phone: cleanPhone,

@@ -14,6 +14,7 @@ interface ChatPanelProps {
     onEditLead?: () => void;
     onDeleteConversation?: () => void;
     onResolve?: () => void;
+    onStatusChange?: (status: 'open' | 'pending' | 'resolved') => void;
     // Props de mensagens do parent (useInbox com WebSocket)
     messages?: MessageWithSender[];
     messagesLoading?: boolean;
@@ -41,6 +42,7 @@ export function ChatPanel({
     onEditLead,
     onDeleteConversation,
     onResolve,
+    onStatusChange,
     messages: externalMessages,
     messagesLoading: externalMessagesLoading,
     messagesError: externalMessagesError,
@@ -95,6 +97,7 @@ export function ChatPanel({
                     onDeleteConversation={onDeleteConversation}
                     onSearchInChat={handleSearchInChat}
                     onResolve={onResolve}
+                    onStatusChange={onStatusChange}
                     layoutControls={layoutControls}
                 />
             </div>

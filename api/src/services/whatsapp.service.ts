@@ -613,33 +613,44 @@ export class WhatsAppService {
    */
   async fetchProfilePicture(instanceId: string, remoteJid: string): Promise<string | null> {
     try {
-      // Clean the JID for the API call
       const number = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '');
-      
-      // Try different Evolution API endpoints for profile picture
-      const endpoints = [
-        { url: `/chat/fetchProfilePictureUrl/${instanceId}`, body: { number: remoteJid } },
-        { url: `/chat/fetchProfilePictureUrl/${instanceId}`, body: { number } },
-        { url: `/chat/profilePicture/${instanceId}`, body: { number: remoteJid } },
+
+      const extractUrl = (result: any): string | null => {
+        if (!result) return null;
+        return result.profilePictureUrl || result.profilePicUrl || result.pictureUrl
+          || result.url || result.picture || result.image || result.imgUrl
+          || result.wuid || result.photo || null;
+      };
+
+      const attempts = [
+        // POST with full JID
+        { url: `/chat/fetchProfilePictureUrl/${instanceId}`, method: 'POST', body: { number: remoteJid } },
+        // POST with number only
+        { url: `/chat/fetchProfilePictureUrl/${instanceId}`, method: 'POST', body: { number } },
+        // GET with query param
+        { url: `/chat/fetchProfilePictureUrl/${instanceId}?number=${encodeURIComponent(remoteJid)}`, method: 'GET' },
+        // Alternative endpoint names
+        { url: `/chat/profilePicture/${instanceId}`, method: 'POST', body: { number: remoteJid } },
+        { url: `/contact/getProfilePicture/${instanceId}`, method: 'POST', body: { number: remoteJid } },
       ];
-      
-      for (const endpoint of endpoints) {
+
+      for (const attempt of attempts) {
         try {
-          const result = await this.request(endpoint.url, {
-            method: 'POST',
-            body: JSON.stringify(endpoint.body),
+          const result = await this.request(attempt.url, {
+            method: attempt.method,
+            ...(attempt.body ? { body: JSON.stringify(attempt.body) } : {}),
           }) as any;
-          
-          if (result?.profilePictureUrl || result?.profilePicUrl || result?.url || result?.picture) {
-            const url = result.profilePictureUrl || result.profilePicUrl || result.url || result.picture;
-            console.log('[WhatsAppService] Found profile picture for', remoteJid);
+
+          const url = extractUrl(result);
+          if (url && typeof url === 'string' && url.startsWith('http')) {
+            console.log('[WhatsAppService] Found profile picture for', remoteJid, 'via', attempt.url);
             return url;
           }
-        } catch (e) {
-          // Try next endpoint
+        } catch {
+          // Try next
         }
       }
-      
+
       return null;
     } catch (error) {
       console.warn('[WhatsAppService] Error fetching profile picture:', error);
@@ -991,16 +1002,18 @@ export class WhatsAppService {
 
     const extractParticipants = (result: any): any[] | null => {
       if (!result) return null;
-      // Direct array
-      if (Array.isArray(result)) return result.length > 0 ? result : null;
+      // findGroupInfos returns [{id, subject, participants:[...]}] — must check BEFORE generic array
+      if (Array.isArray(result) && result.length > 0 && Array.isArray(result[0]?.participants)) {
+        return result[0].participants;
+      }
+      // Direct array of participant objects
+      if (Array.isArray(result) && result.length > 0) return result;
       // { participants: [...] }
       if (Array.isArray(result?.participants)) return result.participants;
       // { data: { participants: [...] } }  ← Evolution API v2 envelope
       if (Array.isArray(result?.data?.participants)) return result.data.participants;
       // { data: [...] }
-      if (Array.isArray(result?.data)) return result.data;
-      // Array of group objects, first has participants
-      if (Array.isArray(result) && result[0]?.participants) return result[0].participants;
+      if (Array.isArray(result?.data) && result.data.length > 0) return result.data;
       return null;
     };
 
@@ -1054,12 +1067,34 @@ export class WhatsAppService {
 
   /**
    * Get group profile picture URL
+   * Tries findGroupInfos first (known to include pictureUrl), then falls back to fetchProfilePicture
    */
   async getGroupProfilePicture(instanceId: string, groupJid: string): Promise<string | null> {
-    try {
-      return await this.fetchProfilePicture(instanceId, groupJid);
-    } catch {
-      return null;
+    // Try findGroupInfos first — it returns pictureUrl in the group object
+    const groupInfoAttempts = [
+      { url: `/group/findGroupInfos/${instanceId}?groupJid=${encodeURIComponent(groupJid)}`, method: 'GET' },
+      { url: `/group/findGroupInfos/${instanceId}`, method: 'POST', body: { groupJid } },
+    ];
+
+    for (const attempt of groupInfoAttempts) {
+      try {
+        const result = await this.request(attempt.url, {
+          method: attempt.method,
+          ...(attempt.body ? { body: JSON.stringify(attempt.body) } : {}),
+        }) as any;
+
+        const info = Array.isArray(result) ? result[0] : result;
+        const pic = info?.pictureUrl || info?.profilePictureUrl || info?.picture || info?.imgUrl || info?.image;
+        if (pic && typeof pic === 'string' && pic.startsWith('http')) {
+          console.log('[WhatsAppService] Group picture from findGroupInfos:', groupJid);
+          return pic;
+        }
+      } catch {
+        // Try next
+      }
     }
+
+    // Fallback to generic profile picture fetch
+    return this.fetchProfilePicture(instanceId, groupJid);
   }
 }

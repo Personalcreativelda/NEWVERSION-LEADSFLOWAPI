@@ -220,18 +220,21 @@ export default function InboxConversations({
         }
     };
 
-    const handleResolveConversation = async () => {
+    const handleChangeStatus = async (newStatus: 'open' | 'pending' | 'resolved') => {
         if (!selectedConversation) return;
-        const isResolved = selectedConversation.status === 'resolved';
-        const newStatus = isResolved ? 'open' : 'resolved';
         try {
             await teamApi.setStatus(selectedConversation.id, { status: newStatus });
-            // Update local state immediately so the button toggles without a full reload
             selectConversation({ ...selectedConversation, status: newStatus as any });
             await refreshConversations();
         } catch (error) {
             console.error('Erro ao alterar status da conversa:', error);
         }
+    };
+
+    const handleResolveConversation = async () => {
+        if (!selectedConversation) return;
+        const isResolved = selectedConversation.status === 'resolved';
+        await handleChangeStatus(isResolved ? 'open' : 'resolved');
     };
 
     const toggleSelectMode = () => {
@@ -944,6 +947,7 @@ export default function InboxConversations({
                         onEditLead={handleEditLead}
                         onDeleteConversation={handleDeleteConversation}
                         onResolve={handleResolveConversation}
+                        onStatusChange={handleChangeStatus}
                         messages={messages}
                         messagesLoading={messagesLoading}
                         messagesError={messagesError}

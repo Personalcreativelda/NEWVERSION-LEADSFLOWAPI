@@ -46,6 +46,20 @@ export class AssistantProcessorService {
                 }
             }
 
+            // 0b. Verificar se a conversa está em modo humano (pending = escalada para humano)
+            // Quando pending, a IA para completamente até um humano reabrir ou resolver.
+            if (ctx.conversationId) {
+                const convStatusResult = await query(
+                    'SELECT status FROM conversations WHERE id = $1',
+                    [ctx.conversationId]
+                );
+                const convStatus = convStatusResult.rows[0]?.status;
+                if (convStatus === 'pending') {
+                    console.log(`[AssistantProcessor] 🛑 Conversa ${ctx.conversationId} está em modo humano (pending) — IA pausada.`);
+                    return false;
+                }
+            }
+
             // 1. Verificar se há assistente ativo para este canal
             const activeAssistant = await this.findActiveAssistantForChannel(ctx.channelId, ctx.userId);
             if (!activeAssistant) {
@@ -99,6 +113,31 @@ export class AssistantProcessorService {
             if (usedThisMonth >= monthlyLimit) {
                 console.warn(`[AssistantProcessor] Limite mensal atingido para assistente ${activeAssistant.user_assistant_id}: ${usedThisMonth}/${monthlyLimit}`);
                 return false;
+            }
+
+            // 2d. Detecção de escalação para humano
+            // Se a mensagem contém palavras-chave de escalação, marcar conversa como pending e parar.
+            const escalationKeywords: string[] = Array.isArray(config.escalation_keywords)
+                ? config.escalation_keywords
+                : ['falar com humano', 'atendente humano', 'falar com pessoa', 'quero atendente',
+                   'fala com humano', 'me coloca pra falar com alguem', 'atendimento humano',
+                   'quero falar com atendente', 'preciso de um humano', 'suporte humano'];
+            const msgLower = (ctx.messageContent || '').toLowerCase().trim();
+            const escalationTriggered = escalationKeywords.some(kw =>
+                msgLower.includes(kw.toLowerCase())
+            );
+            if (escalationTriggered && ctx.conversationId) {
+                console.log(`[AssistantProcessor] 🚨 Escalação detectada para conversa ${ctx.conversationId}`);
+                // Marcar conversa como pendente (aguardando humano)
+                await query(
+                    `UPDATE conversations SET status = 'pending', updated_at = NOW() WHERE id = $1`,
+                    [ctx.conversationId]
+                );
+                // Enviar mensagem de escala configurável
+                const escalationMsg = (config.escalation_message as string) ||
+                    'Entendido! Vou te conectar com um de nossos atendentes humanos. Por favor, aguarde um momento. 🙏';
+                await this.sendReply(ctx, escalationMsg);
+                return true;
             }
 
             // 3. Verificar horário de funcionamento (se configurado)

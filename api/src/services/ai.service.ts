@@ -1,5 +1,6 @@
 // Serviço de IA - suporta OpenAI, Gemini e Anthropic
 import { query } from '../database/connection';
+import * as zlib from 'zlib';
 
 export type AIProvider = 'openai' | 'gemini' | 'anthropic';
 
@@ -690,7 +691,8 @@ export class AIService {
     /**
      * Downloads a file and extracts readable text content.
      * - Text/CSV/JSON/Markdown: decoded as UTF-8
-     * - PDF: tries Gemini inline_data (native PDF support), then binary text scan fallback
+     * - PDF: decompresses flate streams + Gemini fallback (supports scanned PDFs)
+     * - Handles both HTTP URLs and data: URIs
      * Returns empty string on failure so callers can degrade gracefully.
      */
     async extractDocumentText(
@@ -703,16 +705,27 @@ export class AIService {
         let contentType: string;
 
         try {
-            const res = await fetch(fileUrl);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            contentType = mimeType || res.headers.get('content-type') || 'application/octet-stream';
-            buffer = Buffer.from(await res.arrayBuffer());
+            // Handle data: URIs directly (no fetch needed — decode base64 inline)
+            if (fileUrl.startsWith('data:')) {
+                const commaIdx = fileUrl.indexOf(',');
+                const meta = fileUrl.substring(5, commaIdx); // e.g. "application/pdf;base64"
+                const raw = fileUrl.substring(commaIdx + 1);
+                contentType = mimeType || meta.split(';')[0] || 'application/octet-stream';
+                buffer = meta.includes('base64')
+                    ? Buffer.from(raw, 'base64')
+                    : Buffer.from(decodeURIComponent(raw));
+            } else {
+                const res = await fetch(fileUrl);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                contentType = mimeType || res.headers.get('content-type') || 'application/octet-stream';
+                buffer = Buffer.from(await res.arrayBuffer());
+            }
         } catch (e: any) {
             console.warn('[AIService] Failed to download document:', e.message);
             return '';
         }
 
-        const urlLower = fileUrl.toLowerCase();
+        const urlLower = fileUrl.startsWith('data:') ? '' : fileUrl.toLowerCase();
 
         // ── Plain text variants ────────────────────────────────────────────────
         const isText =
@@ -732,7 +745,22 @@ export class AIService {
         if (isPdf) {
             console.log(`[AIService] 📄 Processing PDF — size=${buffer.length} bytes, hasGeminiKey=${!!geminiApiKey}`);
 
-            // ── Gemini native PDF understanding (best quality, supports scanned PDFs) ──
+            // ── Method 1: Decompress flate/deflate streams (handles modern PDFs) ──
+            // Most PDFs from Word, LibreOffice, browsers use FlateDecode compression.
+            const inflatedText = await this._extractPdfStreams(buffer);
+            if (inflatedText.length > 100) {
+                console.log(`[AIService] ✅ PDF extracted via zlib decompression: ${inflatedText.length} chars`);
+                return inflatedText.substring(0, maxChars);
+            }
+
+            // ── Method 2: Uncompressed BT...ET text blocks (simple/legacy PDFs) ──
+            const uncompressedText = this._extractPdfTextBlocks(buffer.toString('latin1'));
+            if (uncompressedText.length > 100) {
+                console.log(`[AIService] ✅ PDF extracted via uncompressed stream parser: ${uncompressedText.length} chars`);
+                return uncompressedText.substring(0, maxChars);
+            }
+
+            // ── Method 3: Gemini native PDF understanding (supports scanned/image PDFs) ──
             if (geminiApiKey) {
                 try {
                     const b64 = buffer.toString('base64');
@@ -744,7 +772,6 @@ export class AIService {
                             body: JSON.stringify({
                                 contents: [{ parts: [
                                     { text: 'Extraia e retorne TODO o texto deste documento, preservando a estrutura e parágrafos. Retorne apenas o texto extraído, sem comentários adicionais.' },
-                                    // Always use application/pdf as mime_type — 'document' is not a valid Gemini MIME
                                     { inline_data: { mime_type: 'application/pdf', data: b64 } }
                                 ]}]
                             })
@@ -767,42 +794,8 @@ export class AIService {
                 }
             }
 
-            // ── Regex-based PDF stream parser (text-based PDFs without OCR) ──────────
-            // Targets BT...ET operator blocks and extracts parenthesized text strings
+            // ── Method 4: Generic printable char scan (absolute last resort) ──
             const pdfStr = buffer.toString('latin1');
-            const streamTexts: string[] = [];
-
-            // Method 1: BT...ET text blocks (most reliable for text-based PDFs)
-            const btEtRegex = /BT\s+([\s\S]*?)\s+ET/g;
-            let blockMatch;
-            while ((blockMatch = btEtRegex.exec(pdfStr)) !== null) {
-                const block = blockMatch[1];
-                const parenRegex = /\(([^()\\\n]|\\[\s\S])*\)/g;
-                let textMatch;
-                while ((textMatch = parenRegex.exec(block)) !== null) {
-                    const raw = textMatch[0].slice(1, -1)
-                        .replace(/\\n/g, ' ')
-                        .replace(/\\r/g, ' ')
-                        .replace(/\\t/g, ' ')
-                        .replace(/\\\(/g, '(')
-                        .replace(/\\\)/g, ')')
-                        .replace(/\\\\/g, '\\')
-                        .trim();
-                    if (raw.length > 0 && /[a-zA-ZÀ-ÿ0-9]/.test(raw)) {
-                        streamTexts.push(raw);
-                    }
-                }
-            }
-
-            if (streamTexts.length > 0) {
-                const result = streamTexts.join(' ').replace(/\s{2,}/g, ' ').trim();
-                if (result.length > 100) {
-                    console.log('[AIService] ✅ PDF extracted via stream regex:', result.length, 'chars');
-                    return result.substring(0, maxChars);
-                }
-            }
-
-            // Method 2: Generic printable char scan (last resort)
             const words: string[] = [];
             let current = '';
             for (let i = 0; i < pdfStr.length; i++) {
@@ -826,12 +819,10 @@ export class AIService {
         }
 
         // ── Other binary formats (DOCX, XLSX, etc.) ───────────────────────────
-        // DOCX is ZIP+XML — try to pull text from word/document.xml
         const isDocx =
             contentType.includes('officedocument.wordprocessingml') ||
             urlLower.endsWith('.docx');
         if (isDocx) {
-            // Simple regex scan for <w:t> text nodes inside the ZIP (works without unzipping)
             const raw = buffer.toString('binary');
             const matches = raw.match(/<w:t[^>]*>([^<]+)<\/w:t>/g) || [];
             const text = matches
@@ -845,5 +836,94 @@ export class AIService {
         }
 
         return '';
+    }
+
+    /** Extracts text from BT...ET operator blocks in a PDF text string */
+    private _extractPdfTextBlocks(pdfStr: string): string {
+        const streamTexts: string[] = [];
+        const btEtRegex = /BT\s+([\s\S]*?)\s+ET/g;
+        let blockMatch;
+        while ((blockMatch = btEtRegex.exec(pdfStr)) !== null) {
+            const block = blockMatch[1];
+            // Parenthesized strings: (text here)
+            const parenRegex = /\(([^()\\\n]|\\[\s\S])*\)/g;
+            let textMatch;
+            while ((textMatch = parenRegex.exec(block)) !== null) {
+                const raw = textMatch[0].slice(1, -1)
+                    .replace(/\\n/g, ' ').replace(/\\r/g, ' ').replace(/\\t/g, ' ')
+                    .replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\')
+                    .trim();
+                if (raw.length > 0 && /[a-zA-ZÀ-ÿ0-9]/.test(raw)) {
+                    streamTexts.push(raw);
+                }
+            }
+            // Hex strings: <4865...> (UTF-16BE)
+            const hexRegex = /<([0-9A-Fa-f]{4,})>/g;
+            let hexMatch;
+            while ((hexMatch = hexRegex.exec(block)) !== null) {
+                const hex = hexMatch[1];
+                if (hex.length % 4 === 0) {
+                    try {
+                        let decoded = '';
+                        for (let i = 0; i < hex.length; i += 4) {
+                            const code = parseInt(hex.substring(i, i + 4), 16);
+                            if (code > 31 && code < 0xFFFE) decoded += String.fromCharCode(code);
+                        }
+                        if (decoded.length > 0 && /[a-zA-ZÀ-ÿ0-9]/.test(decoded)) {
+                            streamTexts.push(decoded);
+                        }
+                    } catch { /* ignore */ }
+                }
+            }
+        }
+        return streamTexts.join(' ').replace(/\s{2,}/g, ' ').trim();
+    }
+
+    /** Decompresses FlateDecode PDF streams and extracts text from them */
+    private async _extractPdfStreams(buffer: Buffer): Promise<string> {
+        const raw = buffer.toString('binary');
+        const allTexts: string[] = [];
+        const streamStartRegex = /stream\r?\n/g;
+        const streamEndStr = 'endstream';
+
+        let match;
+        while ((match = streamStartRegex.exec(raw)) !== null) {
+            const dataStart = match.index + match[0].length;
+
+            // Check dict before stream for FlateDecode
+            const dictSnippet = raw.substring(Math.max(0, match.index - 500), match.index);
+            if (!/FlateDecode|\/Fl\b/.test(dictSnippet)) continue;
+
+            const dataEnd = raw.indexOf(streamEndStr, dataStart);
+            if (dataEnd < 0 || dataEnd - dataStart > 5_000_000) continue;
+
+            const compressed = Buffer.from(raw.substring(dataStart, dataEnd), 'binary');
+            if (compressed.length < 10) continue;
+
+            try {
+                const inflated = await new Promise<Buffer>((resolve, reject) => {
+                    zlib.inflate(compressed, (err, result) => {
+                        if (err) {
+                            zlib.inflateRaw(compressed, (err2, result2) => {
+                                if (err2) reject(err2);
+                                else resolve(result2);
+                            });
+                        } else {
+                            resolve(result);
+                        }
+                    });
+                });
+
+                const decompressed = inflated.toString('latin1');
+                if (!decompressed.includes('BT') || !decompressed.includes('ET')) continue;
+
+                const text = this._extractPdfTextBlocks(decompressed);
+                if (text.length > 10) allTexts.push(text);
+            } catch {
+                // Silently skip streams that fail to decompress
+            }
+        }
+
+        return allTexts.join('\n').replace(/\s{2,}/g, ' ').trim();
     }
 }

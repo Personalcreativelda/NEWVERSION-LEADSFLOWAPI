@@ -19,7 +19,11 @@ import {
     Instagram,
     Mail,
     Globe,
-    Smartphone
+    Smartphone,
+    ChevronDown,
+    Clock,
+    RefreshCw,
+    UserCheck
 } from 'lucide-react';
 
 interface ChatHeaderProps {
@@ -29,6 +33,7 @@ interface ChatHeaderProps {
     onDeleteConversation?: () => void;
     onSearchInChat?: (query: string) => void;
     onResolve?: () => void;
+    onStatusChange?: (status: 'open' | 'pending' | 'resolved') => void;
     layoutControls?: React.ReactNode;
 }
 
@@ -46,14 +51,28 @@ const CHANNEL_CONFIG: Record<string, { label: string; color: string; icon: React
     twilio: { label: 'SMS', color: '#0d9488', icon: Smartphone },
 };
 
-export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat, onResolve, layoutControls }: ChatHeaderProps) {
+export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat, onResolve, onStatusChange, layoutControls }: ChatHeaderProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
+    const [showStatusMenu, setShowStatusMenu] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const menuRef = useRef<HTMLDivElement>(null);
+    const statusMenuRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+
+    const handleStatusChange = (status: 'open' | 'pending' | 'resolved') => {
+        setShowStatusMenu(false);
+        if (onStatusChange) onStatusChange(status);
+        else if (status === 'resolved' || status === 'open') onResolve?.();
+    };
     
-    const contactName = conversation.contact?.name || conversation.contact?.phone || 'Contato';
+    const isGroup = (conversation as any).is_group || conversation.metadata?.is_group;
+    const contactName = isGroup
+        ? (conversation.metadata?.group_name || conversation.contact?.name || 'Grupo')
+        : (conversation.contact?.name || conversation.contact?.phone || 'Contato');
+    const avatarUrl = isGroup
+        ? (conversation.metadata?.group_picture || conversation.metadata?.profile_picture || conversation.contact?.avatar_url || null)
+        : (conversation.contact?.avatar_url || null);
     const isOnline = true;
     const channelType = conversation.channel?.type || 'whatsapp';
     const channelInfo = CHANNEL_CONFIG[channelType];
@@ -63,6 +82,9 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
                 setShowMenu(false);
+            }
+            if (statusMenuRef.current && !statusMenuRef.current.contains(event.target as Node)) {
+                setShowStatusMenu(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -107,16 +129,17 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
 
                 {/* Avatar */}
                 <div className="relative flex-shrink-0">
-                    <div 
+                    <div
                         className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden ${
-                            conversation.contact?.avatar_url ? '' : `bg-gradient-to-br ${getAvatarColor(contactName)}`
+                            avatarUrl ? '' : `bg-gradient-to-br ${getAvatarColor(contactName)}`
                         }`}
                     >
-                        {conversation.contact?.avatar_url ? (
-                            <img 
-                                src={conversation.contact.avatar_url} 
-                                alt={contactName} 
-                                className="w-full h-full object-cover" 
+                        {avatarUrl ? (
+                            <img
+                                src={avatarUrl}
+                                alt={contactName}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                             />
                         ) : (
                             <span className="font-semibold text-sm text-white">
@@ -189,26 +212,80 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                     </div>
                 ) : (
                     <>
-                        {/* Resolve / Reopen button (ManyChat-style) */}
-                        {conversation.status === 'resolved' ? (
+                        {/* Status split-button */}
+                        <div className="hidden sm:flex items-center relative" ref={statusMenuRef}>
+                            {/* Main action button */}
+                            {conversation.status === 'resolved' ? (
+                                <button
+                                    onClick={() => handleStatusChange('open')}
+                                    className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-l-lg text-xs font-medium border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all duration-150"
+                                    title="Reabrir conversa"
+                                >
+                                    <RefreshCw size={13} />
+                                    Reabrir
+                                </button>
+                            ) : conversation.status === 'pending' ? (
+                                <button
+                                    onClick={() => handleStatusChange('resolved')}
+                                    className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-l-lg text-xs font-medium border border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-all duration-150"
+                                    title="Resolver conversa"
+                                >
+                                    <Clock size={13} />
+                                    Pendente
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => handleStatusChange('resolved')}
+                                    className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-l-lg text-xs font-medium border border-border text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30 transition-all duration-150"
+                                    title="Resolver conversa"
+                                >
+                                    <CheckCircle2 size={13} />
+                                    Resolver
+                                </button>
+                            )}
+                            {/* Dropdown arrow */}
                             <button
-                                onClick={onResolve}
-                                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 transition-all duration-150 hover:bg-emerald-500/20"
-                                title="Reabrir conversa"
+                                onClick={() => setShowStatusMenu(v => !v)}
+                                className={`inline-flex items-center justify-center px-1.5 py-1.5 rounded-r-lg text-xs font-medium border-y border-r transition-all duration-150 ${
+                                    conversation.status === 'resolved'
+                                        ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
+                                        : conversation.status === 'pending'
+                                        ? 'border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'
+                                        : 'border-border text-muted-foreground hover:bg-muted'
+                                }`}
+                                title="Mais opções de status"
                             >
-                                <CheckCircle2 size={14} />
-                                Reabrir
+                                <ChevronDown size={12} />
                             </button>
-                        ) : (
-                            <button
-                                onClick={onResolve}
-                                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-muted-foreground transition-all duration-150 hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30"
-                                title="Resolver conversa"
-                            >
-                                <CheckCircle2 size={14} />
-                                Resolver
-                            </button>
-                        )}
+
+                            {/* Status dropdown */}
+                            {showStatusMenu && (
+                                <div className="absolute top-full right-0 mt-1 w-44 rounded-lg border border-border shadow-lg bg-card overflow-hidden z-50">
+                                    <button
+                                        onClick={() => handleStatusChange('resolved')}
+                                        className="w-full px-3 py-2.5 flex items-center gap-2.5 text-sm hover:bg-muted/60 transition-colors text-emerald-600 dark:text-emerald-400"
+                                    >
+                                        <CheckCircle2 size={14} />
+                                        Resolvido
+                                    </button>
+                                    <button
+                                        onClick={() => handleStatusChange('pending')}
+                                        className="w-full px-3 py-2.5 flex items-center gap-2.5 text-sm hover:bg-muted/60 transition-colors text-amber-600 dark:text-amber-400"
+                                    >
+                                        <Clock size={14} />
+                                        Pendente
+                                    </button>
+                                    <div className="border-t border-border" />
+                                    <button
+                                        onClick={() => handleStatusChange('open')}
+                                        className="w-full px-3 py-2.5 flex items-center gap-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                                    >
+                                        <RefreshCw size={14} />
+                                        Reabrir
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         <button 
                             onClick={() => setShowSearch(true)}

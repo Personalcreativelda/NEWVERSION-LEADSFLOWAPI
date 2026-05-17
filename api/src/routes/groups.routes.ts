@@ -148,7 +148,8 @@ router.post('/sync', async (req, res) => {
           const groupOwner = group.owner || group.groupOwner || '';
           const participantsCount = group.participants?.length || group.size || group.participantsCount || 0;
           const creation = group.creation || group.createdAt || null;
-          const groupPicture = group.profilePictureUrl || group.picture || group.imgUrl || null;
+          const groupPicture = group.profilePictureUrl || group.pictureUrl || group.picture
+            || group.imgUrl || group.image || group.icon || null;
 
           // Criar/atualizar conversa para este grupo
           const metadata = {
@@ -207,6 +208,39 @@ router.post('/sync', async (req, res) => {
       total_new: totalNew,
       groups: syncedGroups,
     });
+
+    // Fire-and-forget: fetch profile pictures for groups that don't have one yet
+    // Run after response is sent so sync doesn't block on 60+ API calls
+    setImmediate(async () => {
+      for (const channel of activeChannels) {
+        const instanceId = channel.credentials?.instance_name || channel.credentials?.instance_id;
+        if (!instanceId) continue;
+        const channelGroups = syncedGroups.filter(sg => sg.channel_id === channel.id);
+        console.log(`[Groups BgPic] Fetching pictures for ${channelGroups.length} groups on instance ${instanceId}`);
+        for (const g of channelGroups) {
+          try {
+            const existing = await query(
+              `SELECT metadata->>'group_picture' as pic FROM conversations WHERE user_id = $1 AND remote_jid = $2 LIMIT 1`,
+              [userId, g.jid]
+            );
+            if (existing.rows[0]?.pic) continue; // already has picture
+            const pic = await whatsappService.getGroupProfilePicture(instanceId, g.jid);
+            if (pic) {
+              console.log(`[Groups BgPic] Saved picture for ${g.jid}`);
+              await query(
+                `UPDATE conversations SET metadata = metadata || $1::jsonb WHERE user_id = $2 AND remote_jid = $3`,
+                [JSON.stringify({ group_picture: pic, profile_picture: pic }), userId, g.jid]
+              );
+            } else {
+              console.log(`[Groups BgPic] No picture found for ${g.jid}`);
+            }
+          } catch (bgErr: any) {
+            console.warn(`[Groups BgPic] Error for ${g.jid}:`, bgErr.message);
+          }
+        }
+      }
+    });
+
   } catch (error: any) {
     console.error('[Groups] Error syncing groups:', error);
     res.status(500).json({ error: 'Erro ao sincronizar grupos' });

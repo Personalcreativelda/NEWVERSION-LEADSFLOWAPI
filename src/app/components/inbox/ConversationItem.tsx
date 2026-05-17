@@ -16,7 +16,8 @@ import {
     Smartphone,
     Cloud,
     Tag,
-    UserCheck
+    UserCheck,
+    AlertCircle
 } from 'lucide-react';
 
 interface ConversationItemProps {
@@ -241,9 +242,16 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
                     </span>
                 </div>
 
-                {/* Row 2: Message preview + unread badge */}
+                {/* Row 2: Message preview + badges */}
                 <div className="flex items-center gap-2">
-                    <p 
+                    {/* Pending escalation badge */}
+                    {conversation.status === 'pending' && !hasUnread && (
+                        <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                            <AlertCircle size={8} />
+                            Pendente
+                        </span>
+                    )}
+                    <p
                         className={`text-[13px] truncate flex-1 leading-relaxed ${hasUnread ? 'font-medium text-foreground/80' : 'text-muted-foreground'}`}
                     >
                         {lastMessage?.direction === 'out' && (

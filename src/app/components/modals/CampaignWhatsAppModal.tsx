@@ -68,7 +68,14 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
     try {
       await groupsApi.sync(selectedChannel || undefined);
       const groups = await groupsApi.getAll();
-      setAvailableGroups(groups);
+      // Dedup by remote_jid — same group may be stored for multiple channels
+      const seen = new Set<string>();
+      const deduped = groups.filter((g: any) => {
+        if (!g.remote_jid || seen.has(g.remote_jid)) return false;
+        seen.add(g.remote_jid);
+        return true;
+      });
+      setAvailableGroups(deduped);
       toast.success(`${groups.length} grupo(s) sincronizado(s)`);
     } catch (error) {
       console.error('Erro ao sincronizar grupos:', error);
@@ -412,7 +419,14 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       setLoadingGroups(true);
       try {
         const groups = await groupsApi.getAll();
-        setAvailableGroups(groups);
+        // Dedup by remote_jid — same group may exist for multiple channels
+        const seen = new Set<string>();
+        const deduped = groups.filter((g: any) => {
+          if (!g.remote_jid || seen.has(g.remote_jid)) return false;
+          seen.add(g.remote_jid);
+          return true;
+        });
+        setAvailableGroups(deduped);
       } catch (error) {
         console.error('❌ Erro ao buscar grupos:', error);
         toast.error('Erro ao carregar grupos WhatsApp');
@@ -468,10 +482,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
     }
     if (recipientMode === 'groups') {
       if (groupSendMode === 'private') {
-        // Estimate using stored participants_count from each selected group's metadata
-        return availableGroups
+        // Estimate using stored participants_count; if unknown, assume at least 1 per group
+        const estimated = availableGroups
           .filter(g => selectedGroupJids.includes(g.remote_jid))
           .reduce((sum, g) => sum + (g.metadata?.participants_count || 0), 0);
+        return estimated > 0 ? estimated : selectedGroupJids.length;
       }
       return selectedGroupJids.length;
     }
@@ -1297,7 +1312,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             selectedStatuses,
             // Só aplica segmentos quando o modo é efetivamente por segmentos
             segments: recipientMode === 'segments' ? selectedStatuses : [],
-            customNumbers,
+            // Nunca salvar customNumbers em modo grupos — evita que o executor tome o caminho errado
+            customNumbers: recipientMode === 'groups' ? '' : customNumbers,
             selectedGroupJids: recipientMode === 'groups' ? selectedGroupJids : [],
             groupSendMode: recipientMode === 'groups' ? groupSendMode : undefined,
             scheduleMode,
@@ -1412,7 +1428,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             selectedStatuses,
             // Só envia 'segments' quando o modo é efetivamente por segmentos
             segments: recipientMode === 'segments' ? selectedStatuses : [],
-            customNumbers,
+            // Nunca salvar customNumbers em modo grupos — evita que o executor tome o caminho errado
+            customNumbers: recipientMode === 'groups' ? '' : customNumbers,
             selectedGroupJids: recipientMode === 'groups' ? selectedGroupJids : [],
             groupSendMode: recipientMode === 'groups' ? groupSendMode : undefined,
             scheduleMode: 'now',

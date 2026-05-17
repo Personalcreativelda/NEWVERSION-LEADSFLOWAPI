@@ -76,6 +76,13 @@ export interface Conversation {
         profile_picture?: string;
         tags?: string[];
         is_group?: boolean;
+        group_name?: string;
+        group_description?: string;
+        group_owner?: string;
+        group_picture?: string;
+        participants_count?: number;
+        lead_status?: string;
+        [key: string]: any;
     };
     created_at: string;
     updated_at: string;
