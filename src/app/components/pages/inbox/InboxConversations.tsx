@@ -449,7 +449,7 @@ export default function InboxConversations({
     const groupCount = useMemo(() => {
         return conversations.filter(c => {
             const jid = c.metadata?.jid || c.remote_jid || '';
-            return jid.includes('@g.us') || (c as any).is_group || c.metadata?.is_group;
+            return jid.includes('@g.us') || (c as any).is_group || c.metadata?.is_group || c.contact?.is_group;
         }).length;
     }, [conversations]);
 

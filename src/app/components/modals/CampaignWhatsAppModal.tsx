@@ -100,15 +100,19 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         try {
           const result = await groupsApi.getMembers(conv.id);
           for (const member of result.members) {
-            // Prefer actual phone number over @lid JID
             const m = member as any;
-            const contact = m.phoneNumber
-              ? m.phoneNumber.replace('@s.whatsapp.net', '')
-              : (member.phone || member.jid);
-            if (contact && !seen.has(contact)) {
-              seen.add(contact);
-              collected.push(contact);
+            const rawContact = m.phoneNumber || m.phone || m.jid || '';
+            const normalized = String(rawContact)
+              .replace(/@s\.whatsapp\.net$/i, '')
+              .replace(/@lid$/i, '')
+              .replace(/\D/g, '');
+
+            if (!normalized || normalized.length < 5 || normalized.length > 15 || seen.has(normalized)) {
+              continue;
             }
+
+            seen.add(normalized);
+            collected.push(normalized);
           }
         } catch (err) {
           console.warn(`[Extract] Falha no grupo ${jid}:`, err);

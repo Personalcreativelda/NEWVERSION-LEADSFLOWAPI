@@ -879,6 +879,60 @@ export class AIService {
         return streamTexts.join(' ').replace(/\s{2,}/g, ' ').trim();
     }
 
+    private _decodeAsciiHex(data: string): Buffer {
+        const cleaned = data.replace(/[\s\r\n\t]/g, '');
+        const endIdx = cleaned.indexOf('>');
+        const hex = endIdx >= 0 ? cleaned.slice(0, endIdx) : cleaned;
+        const bytes: number[] = [];
+        for (let i = 0; i < hex.length; i += 2) {
+            const a = hex[i];
+            const b = hex[i + 1] || '0';
+            if (!/[0-9A-Fa-f]/.test(a) || !/[0-9A-Fa-f]/.test(b)) break;
+            bytes.push(parseInt(a + b, 16));
+        }
+        return Buffer.from(bytes);
+    }
+
+    private _decodeAscii85(data: string): Buffer {
+        const cleaned = data.replace(/[\s\r\n\t]/g, '');
+        const bytes: number[] = [];
+        let tuple: number[] = [];
+
+        for (let i = 0; i < cleaned.length; i++) {
+            const ch = cleaned[i];
+            if (ch === 'z') {
+                tuple = [];
+                bytes.push(0, 0, 0, 0);
+                continue;
+            }
+            if (ch === '~') break;
+            if (ch === '>') break;
+            const code = ch.charCodeAt(0);
+            if (code < 33 || code > 117) continue;
+            tuple.push(code - 33);
+            if (tuple.length === 5) {
+                const value = tuple.reduce((acc, v) => acc * 85 + v, 0);
+                bytes.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
+                tuple = [];
+            }
+        }
+
+        if (tuple.length > 0) {
+            while (tuple.length < 5) tuple.push(84);
+            const value = tuple.reduce((acc, v) => acc * 85 + v, 0);
+            const outCount = tuple.length - 1;
+            const decoded = [
+                (value >>> 24) & 0xff,
+                (value >>> 16) & 0xff,
+                (value >>> 8) & 0xff,
+                value & 0xff,
+            ];
+            bytes.push(...decoded.slice(0, outCount));
+        }
+
+        return Buffer.from(bytes);
+    }
+
     /** Decompresses FlateDecode PDF streams and extracts text from them */
     private async _extractPdfStreams(buffer: Buffer): Promise<string> {
         const raw = buffer.toString('binary');
@@ -889,38 +943,47 @@ export class AIService {
         let match;
         while ((match = streamStartRegex.exec(raw)) !== null) {
             const dataStart = match.index + match[0].length;
-
-            // Check dict before stream for FlateDecode
             const dictSnippet = raw.substring(Math.max(0, match.index - 500), match.index);
-            if (!/FlateDecode|\/Fl\b/.test(dictSnippet)) continue;
+            const hasFlate = /FlateDecode|\/Fl\b/.test(dictSnippet);
+            const hasAsciiHex = /ASCIIHexDecode|\/AHx\b/.test(dictSnippet);
+            const hasAscii85 = /ASCII85Decode|\/A85\b/.test(dictSnippet);
+            if (!hasFlate && !hasAsciiHex && !hasAscii85) continue;
 
             const dataEnd = raw.indexOf(streamEndStr, dataStart);
             if (dataEnd < 0 || dataEnd - dataStart > 5_000_000) continue;
 
-            const compressed = Buffer.from(raw.substring(dataStart, dataEnd), 'binary');
-            if (compressed.length < 10) continue;
+            let streamData = Buffer.from(raw.substring(dataStart, dataEnd), 'binary');
+            if (hasAsciiHex) {
+                streamData = this._decodeAsciiHex(raw.substring(dataStart, dataEnd));
+            } else if (hasAscii85) {
+                streamData = this._decodeAscii85(raw.substring(dataStart, dataEnd));
+            }
+
+            if (streamData.length < 10) continue;
 
             try {
-                const inflated = await new Promise<Buffer>((resolve, reject) => {
-                    zlib.inflate(compressed, (err, result) => {
-                        if (err) {
-                            zlib.inflateRaw(compressed, (err2, result2) => {
-                                if (err2) reject(err2);
-                                else resolve(result2);
-                            });
-                        } else {
-                            resolve(result);
-                        }
+                let decompressed = streamData.toString('latin1');
+                if (hasFlate) {
+                    const inflated = await new Promise<Buffer>((resolve, reject) => {
+                        zlib.inflate(streamData, (err, result) => {
+                            if (err) {
+                                zlib.inflateRaw(streamData, (err2, result2) => {
+                                    if (err2) reject(err2);
+                                    else resolve(result2);
+                                });
+                            } else {
+                                resolve(result);
+                            }
+                        });
                     });
-                });
+                    decompressed = inflated.toString('latin1');
+                }
 
-                const decompressed = inflated.toString('latin1');
                 if (!decompressed.includes('BT') || !decompressed.includes('ET')) continue;
-
                 const text = this._extractPdfTextBlocks(decompressed);
                 if (text.length > 10) allTexts.push(text);
             } catch {
-                // Silently skip streams that fail to decompress
+                // Silently skip streams that fail to decode or decompress
             }
         }
 

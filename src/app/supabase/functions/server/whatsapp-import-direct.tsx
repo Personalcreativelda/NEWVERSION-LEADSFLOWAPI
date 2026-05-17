@@ -113,10 +113,12 @@ export async function handleWhatsAppImportDirect(c: any, authMiddleware: any, kv
     // Transform contacts to our format
     const contacts = contactsList
       .map((contact: any) => {
-        // Extrair dados do contato em diferentes formatos possíveis
-        const id = contact.id || contact.remoteJid || contact.jid || '';
-        const phoneNumber = id.split('@')[0] || '';
-        
+        const rawId = contact.id || contact.remoteJid || contact.jid || contact.phone || contact.number || '';
+        const phoneNumber = String(rawId)
+          .replace(/@s\.whatsapp\.net$/i, '')
+          .replace(/@lid$/i, '')
+          .replace(/\D/g, '');
+
         return {
           nome: contact.pushName || contact.name || contact.notify || contact.verifiedName || phoneNumber || 'Sem Nome',
           numero: phoneNumber,
@@ -124,24 +126,14 @@ export async function handleWhatsAppImportDirect(c: any, authMiddleware: any, kv
         };
       })
       .filter((c: any) => {
-        // Filtrar apenas contatos válidos:
-        // 1. Não pode ser grupo, broadcast ou status
-        // 2. Deve ter número válido
-        // 3. Deve começar com 258 (código de Moçambique) ou ter código de país válido (+)
-        const isValidNumber = c.numero && 
-               c.numero.length > 0 && 
-               !c.numero.includes('g.us') && 
+        const isValidNumber = c.numero &&
+               c.numero.length >= 5 &&
+               c.numero.length <= 15 &&
+               !c.numero.includes('g.us') &&
                !c.numero.includes('broadcast') &&
                !c.numero.includes('status');
-        
-        if (!isValidNumber) return false;
-        
-        // Verificar se tem código do país (258 ou começa com +)
-        const hasCountryCode = c.numero.startsWith('258') || 
-                              c.numero.startsWith('+258') ||
-                              c.numero.startsWith('+');
-        
-        return hasCountryCode;
+
+        return isValidNumber;
       });
 
     console.log(`[WhatsApp Import Direct] Processed ${contacts.length} valid contacts (filtered out groups and invalid numbers)`);

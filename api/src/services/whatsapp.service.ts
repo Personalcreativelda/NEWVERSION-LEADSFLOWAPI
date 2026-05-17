@@ -998,6 +998,12 @@ export class WhatsAppService {
         url: `/group/participants/${instanceId}?groupJid=${encodeURIComponent(groupJid)}`,
         method: 'GET',
       },
+      // Official Evolution API POST participants endpoint variant
+      {
+        url: `/group/participants/${instanceId}`,
+        method: 'POST',
+        body: { groupJid },
+      },
     ];
 
     const extractParticipants = (result: any): any[] | null => {
@@ -1006,12 +1012,15 @@ export class WhatsAppService {
       if (Array.isArray(result) && result.length > 0 && Array.isArray(result[0]?.participants)) {
         return result[0].participants;
       }
+      // { group: { participants: [...] } }
+      if (Array.isArray(result?.group?.participants)) return result.group.participants;
+      // Evolution API envelope: { data: { participants: [...] } }
+      if (Array.isArray(result?.data?.participants)) return result.data.participants;
+      if (Array.isArray(result?.data?.group?.participants)) return result.data.group.participants;
       // Direct array of participant objects
       if (Array.isArray(result) && result.length > 0) return result;
       // { participants: [...] }
       if (Array.isArray(result?.participants)) return result.participants;
-      // { data: { participants: [...] } }  ← Evolution API v2 envelope
-      if (Array.isArray(result?.data?.participants)) return result.data.participants;
       // { data: [...] }
       if (Array.isArray(result?.data) && result.data.length > 0) return result.data;
       return null;

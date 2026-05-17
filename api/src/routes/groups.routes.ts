@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
        FROM conversations c
        LEFT JOIN channels ch ON c.channel_id = ch.id
        WHERE c.user_id = $1 
-         AND (c.remote_jid LIKE '%@g.us' OR c.metadata->>'is_group' = 'true')
+         AND (c.remote_jid LIKE '%@g.us' OR c.is_group = true OR c.metadata->>'is_group' = 'true')
        ORDER BY c.last_message_at DESC NULLS LAST`,
       [userId]
     );
