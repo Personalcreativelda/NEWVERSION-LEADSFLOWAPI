@@ -343,13 +343,23 @@ router.get('/:id/members', async (req, res) => {
     const participants = await whatsappService.getGroupParticipants(instanceId, groupJid);
 
     // Normalizar formato dos participantes
-    const members = participants.map((p: any) => ({
-      jid: p.id || p.jid || p.participant,
-      phone: (p.id || p.jid || p.participant || '').replace('@s.whatsapp.net', '').replace('@lid', ''),
-      name: p.name || p.pushName || p.notify || null,
-      role: p.admin === 'admin' ? 'admin' : p.admin === 'superadmin' ? 'superadmin' : p.role || 'member',
-      profile_picture: p.profilePictureUrl || p.imgUrl || null,
-    }));
+    const members = participants.map((p: any) => {
+      const jid = p.id || p.jid || p.participant || '';
+      // phoneNumber from Evolution API is the actual number (e.g., "258857711143@s.whatsapp.net")
+      // Fall back to stripping @lid/@s.whatsapp.net from the JID
+      const rawPhoneNumber = p.phoneNumber || '';
+      const phone = rawPhoneNumber
+        ? rawPhoneNumber.replace('@s.whatsapp.net', '').replace('@lid', '')
+        : jid.replace('@s.whatsapp.net', '').replace('@lid', '').replace(/\D/g, '');
+      return {
+        jid,
+        phone,
+        phoneNumber: rawPhoneNumber || null,
+        name: p.name || p.pushName || p.notify || null,
+        role: p.admin === 'admin' ? 'admin' : p.admin === 'superadmin' ? 'superadmin' : p.role || 'member',
+        profile_picture: p.profilePictureUrl || p.imgUrl || null,
+      };
+    });
 
     res.json({
       group_jid: groupJid,

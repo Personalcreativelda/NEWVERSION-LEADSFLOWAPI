@@ -34,6 +34,7 @@ export default function InboxConversations({
         selectedConversation,
         selectConversation,
         conversationsLoading,
+        conversationsRefreshing,
         unreadCount,
         search,
         refreshConversations,
@@ -365,11 +366,13 @@ export default function InboxConversations({
             }
 
             // Verificar se é um contato válido:
-            // - WhatsApp: @lid ou @s.whatsapp.net
+            // - WhatsApp individual: @lid ou @s.whatsapp.net
+            // - WhatsApp grupo: @g.us
             // - Telegram/Instagram/Facebook/Email: sempre válidos (usam IDs numéricos)
             const isWhatsAppContact = jid.includes('@lid') || jid.includes('@s.whatsapp.net');
+            const isGroupJid = jid.includes('@g.us');
             const isNonWhatsAppChannel = ['telegram', 'instagram', 'facebook', 'email', 'whatsapp_cloud', 'website'].includes(channelType);
-            const isValidContact = isWhatsAppContact || isNonWhatsAppChannel || /^\d+$/.test(jid);
+            const isValidContact = isWhatsAppContact || isGroupJid || isNonWhatsAppChannel || /^\d+$/.test(jid);
 
             if (!isValidContact) return false;
             
@@ -510,6 +513,16 @@ export default function InboxConversations({
                                                     {unreadCount}
                                                 </span>
                                             )}
+                                            {/* Live refresh dot — pulses while a background fetch is in flight */}
+                                            {conversationsRefreshing && (
+                                                <span
+                                                    className="relative flex h-2 w-2 flex-shrink-0"
+                                                    title="Atualizando..."
+                                                >
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
+                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                                                </span>
+                                            )}
                                             <div
                                                 className={`hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] cursor-pointer transition-colors ${
                                                     wsConnected
@@ -528,7 +541,7 @@ export default function InboxConversations({
                                                 className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
                                                 title="Atualizar"
                                             >
-                                                <RefreshCw size={14} className={conversationsLoading ? 'animate-spin' : ''} />
+                                                <RefreshCw size={14} className={conversationsLoading || conversationsRefreshing ? 'animate-spin' : ''} />
                                             </button>
                                             <button
                                                 onClick={() => setShowNewConversationModal(true)}
@@ -739,6 +752,12 @@ export default function InboxConversations({
                                         {unreadCount}
                                     </span>
                                 )}
+                                {conversationsRefreshing && (
+                                    <span className="relative flex h-2.5 w-2.5 flex-shrink-0" title="Atualizando...">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
+                                    </span>
+                                )}
                                 <div
                                     className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-pointer ${
                                         wsConnected
@@ -752,7 +771,7 @@ export default function InboxConversations({
                             </div>
                             <div className="flex items-center gap-1">
                                 <button onClick={refreshConversations} className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors">
-                                    <RefreshCw size={18} className={conversationsLoading ? 'animate-spin' : ''} />
+                                    <RefreshCw size={18} className={conversationsLoading || conversationsRefreshing ? 'animate-spin' : ''} />
                                 </button>
                                 <button onClick={() => setShowNewConversationModal(true)} className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors">
                                     <Plus size={18} />

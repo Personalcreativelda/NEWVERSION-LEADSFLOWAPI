@@ -200,7 +200,7 @@ const ACTION_OPTIONS: { value: ActionType; label: string }[] = [
   { value: 'move_stage', label: 'Mover Etapa' },
   { value: 'condition', label: 'Condição (bifurcação)' },
   { value: 'ab_test', label: 'Teste A/B (Mensagens)' },
-  { value: 'dynamic_audio', label: 'Áudio Mágico (IA ElevenLabs)' },
+  { value: 'dynamic_audio', label: 'Áudio Mágico' },
 ];
 
 // ─── Funnel stages fallback (used when API is unavailable) ──────────────────
@@ -562,16 +562,6 @@ function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditM
                             placeholder="Digite o texto que a IA vai falar (use {{nome}} para personalizar)..."
                             className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                           />
-                          <select
-                            value={cfg.voiceId ?? 'EXAVITQu4vr4xnSDxMaL'}
-                            onChange={e => updateStepConfig(step.id, 'voiceId', e.target.value)}
-                            className={`${selectCls} w-full`}
-                          >
-                            <option value="EXAVITQu4vr4xnSDxMaL">Voz Feminina (Sarah)</option>
-                            <option value="pNInz6obpgDQGcFmaJcg">Voz Masculina (Adam)</option>
-                            <option value="MF3mGyEYCl7XYWbV9V6O">Voz Feminina (Elli)</option>
-                            <option value="VR6AewLTigWG4xSOukaG">Voz Masculina (Arnold)</option>
-                          </select>
                         </div>
                       )}
                       {step.type === 'email' && (

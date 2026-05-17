@@ -639,6 +639,72 @@ router.post('/:id/execute', async (req, res, next) => {
       }));
 
       console.log(`[Campaigns Execute] 📲 Modo custom: ${leads.length} número(s) da lista`);
+
+    } else if (settings.recipientMode === 'groups') {
+      // ── Modo grupos: enviar no grupo OU no privado dos membros ─────────────
+      const selectedGroupJids: string[] = settings.selectedGroupJids || [];
+      if (selectedGroupJids.length === 0) {
+        return res.status(400).json({ error: 'Nenhum grupo selecionado na campanha' });
+      }
+
+      if (settings.groupSendMode === 'private') {
+        // Extrai participantes e cria leads sintéticos para envio individual
+        const seenPhones = new Set<string>();
+        for (const groupJid of selectedGroupJids) {
+          try {
+            const participants = await whatsappService.getGroupParticipants(whatsappInstanceId, groupJid);
+            console.log(`[Campaigns Execute] Grupo ${groupJid}: ${participants.length} participante(s)`);
+            for (const p of participants) {
+              // Prefer phoneNumber (e.g. "258857711143@s.whatsapp.net"), fall back to id stripping
+              const rawPhone = (p.phoneNumber || p.phone || '')
+                .replace('@s.whatsapp.net', '')
+                .replace('@lid', '')
+                .replace(/\D/g, '');
+              const fallback = (p.id || p.jid || '')
+                .replace('@lid', '')
+                .replace('@s.whatsapp.net', '')
+                .replace(/\D/g, '');
+              const finalPhone = rawPhone || fallback;
+              if (!finalPhone || seenPhones.has(finalPhone)) continue;
+              seenPhones.add(finalPhone);
+              leads.push({
+                id: `gm-${finalPhone}`,
+                user_id: user.id,
+                name: p.name || p.pushName || p.notify || finalPhone,
+                phone: finalPhone,
+                whatsapp: null,
+                email: null,
+                company: null,
+                status: null,
+              });
+            }
+          } catch (err: any) {
+            console.error(`[Campaigns Execute] Erro ao buscar participantes do grupo ${groupJid}:`, err.message);
+          }
+        }
+        console.log(`[Campaigns Execute] 👥 Modo privado de grupos: ${leads.length} membro(s) únicos`);
+      } else {
+        // Enviar diretamente nos grupos (group JID como destinatário)
+        for (const groupJid of selectedGroupJids) {
+          const groupResult = await query(
+            `SELECT metadata FROM conversations WHERE remote_jid = $1 AND user_id = $2 LIMIT 1`,
+            [groupJid, user.id]
+          );
+          const meta = groupResult.rows[0]?.metadata || {};
+          leads.push({
+            id: `group-${groupJid}`,
+            user_id: user.id,
+            name: meta.group_name || meta.contact_name || groupJid,
+            phone: groupJid,
+            whatsapp: groupJid,
+            email: null,
+            company: null,
+            status: null,
+          });
+        }
+        console.log(`[Campaigns Execute] 💬 Modo grupo direto: ${leads.length} grupo(s)`);
+      }
+
     } else {
       let leadsQuery = 'SELECT * FROM leads WHERE user_id = $1';
       const queryParams: any[] = [user.id];
@@ -845,8 +911,11 @@ async function executeCampaignMessages(
         continue;
       }
 
-      const cleanPhone = phone.replace(/\D/g, '');
-      const remoteJid = `${cleanPhone}@s.whatsapp.net`;
+      // Group JIDs (@g.us) and @lid JIDs must be sent as-is to the Evolution API
+      const isGroupJid = String(phone).endsWith('@g.us');
+      const isLidJid   = String(phone).endsWith('@lid');
+      const cleanPhone = isGroupJid || isLidJid ? String(phone) : String(phone).replace(/\D/g, '');
+      const remoteJid  = isGroupJid ? String(phone) : (isLidJid ? String(phone) : `${cleanPhone}@s.whatsapp.net`);
       const contactName = lead.name || lead.nome || cleanPhone;
 
       // Personalizar mensagem (substituir variáveis)
@@ -982,7 +1051,7 @@ async function executeCampaignMessages(
           if (hasEvoText) {
             sendResult = await whatsappService.sendMessage({
               instanceId: instanceId,
-              number: cleanPhone,
+              number: cleanPhone, // full JID for groups/@lid, plain phone for individuals
               text: messageContent
             });
           }

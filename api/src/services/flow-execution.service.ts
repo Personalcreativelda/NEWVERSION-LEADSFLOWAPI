@@ -4,6 +4,7 @@ import { WhatsAppService } from './whatsapp.service';
 import { ChannelsService } from './channels.service';
 import { getWebSocketService } from './websocket.service';
 import { AIService } from './ai.service';
+import { getStorageService } from './storage.service';
 import pino from 'pino';
 
 const logger = pino().child({ module: 'FlowExecutionService' });
@@ -367,81 +368,208 @@ export class FlowExecutionService {
   }
 
   /**
-   * Generates dynamic audio using ElevenLabs and sends it via WhatsApp
+   * Generates dynamic audio using ElevenLabs and sends via the lead's channel.
+   * Supports: WhatsApp (Evolution PTT), WhatsApp Cloud, Telegram, Facebook, Instagram.
+   * Falls back to text if audio fails or channel doesn't support audio.
    */
   private async stepDynamicAudio(config: any, ctx: ExecutionContext): Promise<void> {
-    const text = config.text || 'Olá, estou testando o áudio dinâmico.';
+    const text = config.text || 'Olá!';
     const resolvedText = this.replaceVariables(text, ctx);
-    const voiceId = config.voiceId || 'EXAVITQu4vr4xnSDxMaL'; // Default voice
+    // Voz sempre vinda das variáveis de ambiente (config.voiceId é ignorado)
+    const voiceId = process.env.ELEVENLABS_DEFAULT_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
     const apiKey = process.env.ELEVENLABS_API_KEY;
 
     if (!apiKey) {
-      logger.error('[FlowExecution] ❌ ELEVENLABS_API_KEY não configurada no .env');
+      logger.error('[FlowExecution] ❌ ELEVENLABS_API_KEY não configurada — fallback para texto');
+      await this.stepWhatsapp({ message: resolvedText }, ctx);
       return;
     }
 
     try {
-      logger.info(`[FlowExecution] 🎙️ Generando áudio IA para lead ${ctx.leadId}...`);
+      logger.info(`[FlowExecution] 🎙️ Gerando Áudio Mágico para lead ${ctx.leadId} (voice: ${voiceId})`);
       const audioBuffer = await this.aiService.generateElevenLabsAudio(resolvedText, voiceId, apiKey);
-      const audioBase64 = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
+      // raw base64 sem prefixo data URI (Evolution API espera assim)
+      const rawBase64 = audioBuffer.toString('base64');
+      const dataUri   = `data:audio/mp3;base64,${rawBase64}`;
 
       const chType = ctx.channelType || 'whatsapp';
-      if (chType === 'whatsapp') {
-        let usedChannelId = ctx.channelId;
-        let credentials = ctx.channelCredentials;
+      let credentials = ctx.channelCredentials;
+      let usedChannelId = ctx.channelId;
 
-        if (!usedChannelId || !credentials) {
-          const allChannels = await this.channelsService.findAll(ctx.userId);
-          const waCh = allChannels.find(
-            (c: any) => (c.type === 'whatsapp' || c.channel_type === 'whatsapp') &&
-              (c.status === 'active' || c.status === 'connected')
-          );
-          if (!waCh) {
-            logger.warn(`[FlowExecution] No connected WhatsApp channel found for user ${ctx.userId}`);
-            return;
-          }
-          usedChannelId = waCh.id;
-          credentials = waCh.credentials;
-          if (credentials && typeof credentials === 'string') {
-            try { credentials = JSON.parse(credentials); } catch (_) { }
-          }
+      // Resolver credenciais se não disponíveis
+      if (!usedChannelId || !credentials) {
+        const allChannels = await this.channelsService.findAll(ctx.userId);
+        const targetCh = allChannels.find((c: any) => {
+          const ct = c.type || c.channel_type || '';
+          return ct === chType && (c.status === 'active' || c.status === 'connected');
+        }) || allChannels.find((c: any) =>
+          (c.type === 'whatsapp' || c.channel_type === 'whatsapp') &&
+          (c.status === 'active' || c.status === 'connected')
+        );
+        if (!targetCh) {
+          logger.warn(`[FlowExecution] Nenhum canal ativo para ${chType}`);
+          return;
         }
-        
+        usedChannelId = targetCh.id;
+        credentials   = targetCh.credentials;
+        if (credentials && typeof credentials === 'string') {
+          try { credentials = JSON.parse(credentials); } catch (_) { /* ignore */ }
+        }
+      }
+
+      let sent = false;
+
+      // ── Dispatch por canal ───────────────────────────────────────────────────
+      if (chType === 'whatsapp') {
         const instanceId: string =
           credentials?.instance_name || credentials?.instanceId || credentials?.instance_id ||
           (await this._getInstanceName(usedChannelId!));
-        
-        const phone = ctx.leadPhone?.replace(/\D/g, '') ?? '';
-        if (!phone) {
-          logger.warn(`[FlowExecution] Cannot send audio: lead has no phone number`);
-          return;
+        const phone = ctx.leadPhone?.replace(/\D/g, '') || ctx.remoteJid?.replace('@s.whatsapp.net', '') || '';
+        if (!phone) { logger.warn('[FlowExecution] Áudio: sem número de telefone'); return; }
+        await this.whatsappService.sendAudio({ instanceId, number: phone, audioBase64: dataUri });
+        logger.info(`[FlowExecution] ✅ Áudio PTT enviado via Evolution (${instanceId})`);
+        sent = true;
+
+      } else if (chType === 'whatsapp_cloud') {
+        const phoneNumberId = credentials?.phone_number_id;
+        const accessToken   = credentials?.access_token;
+        const phone = ctx.leadPhone?.replace(/\D/g, '') || ctx.remoteJid?.replace('@s.whatsapp.net', '') || '';
+        if (!phoneNumberId || !accessToken || !phone) {
+          logger.warn('[FlowExecution] Áudio Cloud: credenciais insuficientes — fallback texto');
+        } else {
+          try {
+            await this._sendAudioWhatsappCloud(rawBase64, phone, phoneNumberId, accessToken);
+            logger.info(`[FlowExecution] ✅ Áudio enviado via WhatsApp Cloud`);
+            sent = true;
+          } catch (e: any) {
+            logger.warn(`[FlowExecution] Áudio Cloud falhou: ${e.message} — fallback texto`);
+          }
         }
 
-        await this.whatsappService.sendAudio({ instanceId, number: phone, audioBase64 });
-        logger.info(`[FlowExecution] ✅ Áudio IA enviado via Evolution API (instance: ${instanceId})`);
-        
-        // Save to inbox (simplified, similar to text)
-        let convId = ctx.conversationId;
-        if (!convId && ctx.remoteJid && usedChannelId) {
-          const look = await dbQuery(
-            `SELECT id FROM conversations WHERE lead_id = $1 AND user_id = $2 AND remote_jid = $3 ORDER BY updated_at DESC LIMIT 1`,
-            [ctx.leadId, ctx.userId, ctx.remoteJid]
-          );
-          if (look.rows?.[0]) convId = look.rows[0].id;
+      } else if (chType === 'telegram') {
+        const botToken = credentials?.bot_token || credentials?.token;
+        const chatId   = ctx.remoteJid || ctx.leadPhone;
+        if (!botToken || !chatId) {
+          logger.warn('[FlowExecution] Áudio Telegram: sem bot_token ou chatId — fallback texto');
+        } else {
+          try {
+            await this._sendAudioTelegram(rawBase64, chatId, botToken, ctx.userId);
+            logger.info(`[FlowExecution] ✅ Áudio enviado via Telegram`);
+            sent = true;
+          } catch (e: any) {
+            logger.warn(`[FlowExecution] Áudio Telegram falhou: ${e.message} — fallback texto`);
+          }
         }
-        if (convId) {
-          await dbQuery(
-            `INSERT INTO messages (conversation_id, user_id, direction, channel, content, status) VALUES ($1, $2, 'out', $3, $4, 'sent')`,
-            [convId, ctx.userId, chType, '[Áudio Gerado por IA] ' + resolvedText]
-          );
+
+      } else if (chType === 'facebook' || chType === 'messenger' || chType === 'instagram') {
+        const accessToken = credentials?.page_access_token || credentials?.access_token;
+        const recipientId = ctx.remoteJid;
+        if (!accessToken || !recipientId) {
+          logger.warn(`[FlowExecution] Áudio ${chType}: sem token/recipientId — fallback texto`);
+        } else {
+          try {
+            await this._sendAudioMeta(rawBase64, recipientId, accessToken, ctx.userId);
+            logger.info(`[FlowExecution] ✅ Áudio enviado via ${chType} (Meta)`);
+            sent = true;
+          } catch (e: any) {
+            logger.warn(`[FlowExecution] Áudio Meta falhou: ${e.message} — fallback texto`);
+          }
         }
-      } else {
-        logger.warn(`[FlowExecution] Canal ${chType} ainda não suporta envio de áudio nativo. Enviando texto como fallback.`);
-        await this.stepWhatsapp({ message: `[Áudio] ${resolvedText}` }, ctx);
+      }
+
+      // Fallback para texto se o canal não suportou áudio
+      if (!sent) {
+        logger.warn(`[FlowExecution] Canal "${chType}" não suportou áudio — enviando texto`);
+        await this.stepWhatsapp({ message: resolvedText }, ctx);
+        return;
+      }
+
+      // ── Salvar no inbox ──────────────────────────────────────────────────────
+      let convId = ctx.conversationId;
+      if (!convId && ctx.remoteJid && usedChannelId) {
+        const look = await dbQuery(
+          `SELECT id FROM conversations WHERE lead_id = $1 AND user_id = $2 AND remote_jid = $3 ORDER BY updated_at DESC LIMIT 1`,
+          [ctx.leadId, ctx.userId, ctx.remoteJid]
+        );
+        convId = look.rows?.[0]?.id;
+      }
+      if (convId) {
+        await dbQuery(
+          `INSERT INTO messages (conversation_id, user_id, direction, channel, content, status) VALUES ($1, $2, 'out', $3, $4, 'sent')`,
+          [convId, ctx.userId, chType, `[Áudio Mágico] ${resolvedText}`]
+        );
       }
     } catch (err: any) {
-      logger.error(`[FlowExecution] Erro no Áudio IA: ${err.message}`);
+      logger.error(`[FlowExecution] Erro no Áudio Mágico: ${err.message}`);
+      // Fallback para texto
+      try { await this.stepWhatsapp({ message: resolvedText }, ctx); } catch (_) { /* ignore */ }
     }
+  }
+
+  // ── Helpers de áudio por canal ─────────────────────────────────────────────
+
+  /** Upload raw base64 audio to MinIO → return public URL */
+  private async _uploadAudioBuffer(rawBase64: string, userId: string): Promise<string | null> {
+    try {
+      const buffer = Buffer.from(rawBase64, 'base64');
+      const storageService = getStorageService();
+      const url = await storageService.uploadBuffer(buffer, `ai_voice_${Date.now()}.mp3`, 'audio/mpeg', 'ai-voices', userId);
+      return url || null;
+    } catch (e: any) {
+      logger.warn(`[FlowExecution] Upload de áudio falhou: ${e.message}`);
+      return null;
+    }
+  }
+
+  /** WhatsApp Cloud: upload para Media API + enviar como audio */
+  private async _sendAudioWhatsappCloud(rawBase64: string, to: string, phoneNumberId: string, accessToken: string): Promise<void> {
+    const buffer = Buffer.from(rawBase64, 'base64');
+    const formData = new FormData();
+    formData.append('file', new Blob([buffer], { type: 'audio/mpeg' }), 'voice.mp3');
+    formData.append('type', 'audio/mpeg');
+    formData.append('messaging_product', 'whatsapp');
+
+    const uploadRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/media`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: formData,
+    });
+    if (!uploadRes.ok) throw new Error(`WA Cloud media upload: ${await uploadRes.text()}`);
+    const { id: mediaId } = await uploadRes.json() as any;
+
+    const sendRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'audio', audio: { id: mediaId } }),
+    });
+    if (!sendRes.ok) throw new Error(`WA Cloud send audio: ${await sendRes.text()}`);
+  }
+
+  /** Telegram: upload para MinIO → sendVoice via URL */
+  private async _sendAudioTelegram(rawBase64: string, chatId: string, botToken: string, userId: string): Promise<void> {
+    const audioUrl = await this._uploadAudioBuffer(rawBase64, userId);
+    if (!audioUrl) throw new Error('Upload de áudio falhou para Telegram');
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, voice: audioUrl }),
+    });
+    if (!res.ok) throw new Error(`Telegram sendVoice: ${await res.text()}`);
+  }
+
+  /** Facebook / Instagram: upload para MinIO → enviar como attachment de áudio */
+  private async _sendAudioMeta(rawBase64: string, recipientId: string, accessToken: string, userId: string): Promise<void> {
+    const audioUrl = await this._uploadAudioBuffer(rawBase64, userId);
+    if (!audioUrl) throw new Error('Upload de áudio falhou para Meta');
+    const res = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(accessToken)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        message: { attachment: { type: 'audio', payload: { url: audioUrl, is_reusable: false } } },
+      }),
+    });
+    if (!res.ok) throw new Error(`Meta audio: ${await res.text()}`);
   }
 
   /**

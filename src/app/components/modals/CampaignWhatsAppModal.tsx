@@ -57,6 +57,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const [customNumbers, setCustomNumbers] = useState('');
   const [availableGroups, setAvailableGroups] = useState<any[]>([]);
   const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
+  const [groupSendMode, setGroupSendMode] = useState<'group' | 'private'>('group');
+  const [isExtractingMembers, setIsExtractingMembers] = useState(false);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [isSyncingGroups, setIsSyncingGroups] = useState(false);
 
@@ -73,6 +75,50 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       toast.error('Erro ao sincronizar grupos');
     } finally {
       setIsSyncingGroups(false);
+    }
+  };
+
+  const extractGroupMembers = async () => {
+    if (selectedGroupJids.length === 0) {
+      toast.error('Selecione ao menos um grupo');
+      return;
+    }
+    setIsExtractingMembers(true);
+    const seen = new Set<string>();
+    const collected: string[] = [];
+    try {
+      for (const jid of selectedGroupJids) {
+        const conv = availableGroups.find(g => g.remote_jid === jid);
+        if (!conv?.id) continue;
+        try {
+          const result = await groupsApi.getMembers(conv.id);
+          for (const member of result.members) {
+            // Prefer actual phone number over @lid JID
+            const m = member as any;
+            const contact = m.phoneNumber
+              ? m.phoneNumber.replace('@s.whatsapp.net', '')
+              : (member.phone || member.jid);
+            if (contact && !seen.has(contact)) {
+              seen.add(contact);
+              collected.push(contact);
+            }
+          }
+        } catch (err) {
+          console.warn(`[Extract] Falha no grupo ${jid}:`, err);
+        }
+      }
+      if (collected.length === 0) {
+        toast.error('Nenhum participante encontrado');
+        return;
+      }
+      setCustomNumbers(collected.join(', '));
+      setRecipientMode('custom');
+      toast.success(`${collected.length} contato(s) extraído(s)`);
+    } catch (error) {
+      console.error('Erro ao extrair membros:', error);
+      toast.error('Erro ao extrair membros');
+    } finally {
+      setIsExtractingMembers(false);
     }
   };
   const [message, setMessage] = useState('');
@@ -141,6 +187,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         setRecipientMode(settings.recipientMode || 'all');
         setSelectedStatuses(settings.selectedStatuses || ['novo']);
         setCustomNumbers(settings.customNumbers || '');
+        if (settings.selectedGroupJids) setSelectedGroupJids(settings.selectedGroupJids);
+        if (settings.groupSendMode) setGroupSendMode(settings.groupSendMode);
         setScheduleMode(settings.scheduleMode || 'now');
         setScheduleDate(settings.scheduleDate || '');
         setScheduleTime(settings.scheduleTime || '');
@@ -198,6 +246,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       setRecipientMode('all');
       setSelectedStatuses(['novo']);
       setCustomNumbers('');
+      setSelectedGroupJids([]);
+      setGroupSendMode('group');
       setScheduleMode('now');
       setScheduleDate('');
       setScheduleTime('');
@@ -416,7 +466,15 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         return selectedStatuses.includes(normalized);
       }).length;
     }
-    if (recipientMode === 'groups') return selectedGroupJids.length;
+    if (recipientMode === 'groups') {
+      if (groupSendMode === 'private') {
+        // Estimate using stored participants_count from each selected group's metadata
+        return availableGroups
+          .filter(g => selectedGroupJids.includes(g.remote_jid))
+          .reduce((sum, g) => sum + (g.metadata?.participants_count || 0), 0);
+      }
+      return selectedGroupJids.length;
+    }
     const numbers = customNumbers.split(',').map(n => n.trim()).filter(n => n.length > 0);
     return numbers.length;
   };
@@ -1240,6 +1298,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             // Só aplica segmentos quando o modo é efetivamente por segmentos
             segments: recipientMode === 'segments' ? selectedStatuses : [],
             customNumbers,
+            selectedGroupJids: recipientMode === 'groups' ? selectedGroupJids : [],
+            groupSendMode: recipientMode === 'groups' ? groupSendMode : undefined,
             scheduleMode,
             scheduleDate,
             scheduleTime,
@@ -1353,6 +1413,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             // Só envia 'segments' quando o modo é efetivamente por segmentos
             segments: recipientMode === 'segments' ? selectedStatuses : [],
             customNumbers,
+            selectedGroupJids: recipientMode === 'groups' ? selectedGroupJids : [],
+            groupSendMode: recipientMode === 'groups' ? groupSendMode : undefined,
             scheduleMode: 'now',
             sendSpeed,
             recipientCount,
@@ -2291,9 +2353,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     </label>
 
                     {recipientMode === 'segments' && (
-                      <div className="px-2 pb-2 space-y-1 bg-muted/50">
+                      <div className="px-2 pb-2 bg-muted/50">
+                        <div className="max-h-[160px] overflow-y-auto space-y-1 pr-0.5">
                         {Object.entries(statusCounts).map(([status, count]) => (
-                          <label key={status} className="flex items-center gap-2 pl-7 py-1">
+                          <label key={status} className="flex items-center gap-2 pl-7 py-1 hover:bg-muted/60 rounded cursor-pointer">
                             <input
                               type="checkbox"
                               checked={selectedStatuses.includes(status)}
@@ -2311,6 +2374,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                             </span>
                           </label>
                         ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2335,8 +2399,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         <Textarea
                           value={customNumbers}
                           onChange={(e) => setCustomNumbers(e.target.value)}
-                          placeholder="+258843210987, +258847654321..."
-                          className="min-h-[60px] text-xs"
+                          placeholder="+258843210987, +258847654321, 258843210987@lid..."
+                          className="min-h-[60px] max-h-[120px] overflow-y-auto text-xs resize-none"
                         />
                       </div>
                     )}
@@ -2358,8 +2422,51 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     </label>
 
                     {recipientMode === 'groups' && (
-                      <div className="px-2 pb-2 space-y-1 bg-muted/50">
-                        <div className="flex items-center justify-between pt-1 pb-0.5">
+                      <div className="px-2 pb-2 space-y-2 bg-muted/50">
+
+                        {/* Send mode sub-toggle */}
+                        <div className="flex gap-1 pt-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setGroupSendMode('group')}
+                            className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors border ${
+                              groupSendMode === 'group'
+                                ? 'bg-[#25D366]/10 border-[#25D366] text-[#25D366]'
+                                : 'border-border text-muted-foreground hover:border-[#25D366]/50'
+                            }`}
+                          >
+                            Enviar no grupo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGroupSendMode('private')}
+                            className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors border ${
+                              groupSendMode === 'private'
+                                ? 'bg-[#25D366]/10 border-[#25D366] text-[#25D366]'
+                                : 'border-border text-muted-foreground hover:border-[#25D366]/50'
+                            }`}
+                          >
+                            Privado dos membros
+                          </button>
+                        </div>
+
+                        {/* Extrair button — only in private mode */}
+                        {groupSendMode === 'private' && (
+                          <button
+                            type="button"
+                            onClick={extractGroupMembers}
+                            disabled={isExtractingMembers || selectedGroupJids.length === 0}
+                            className="w-full py-1 px-2 rounded text-xs font-medium border border-dashed border-[#25D366]/60 text-[#25D366] hover:bg-[#25D366]/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                          >
+                            {isExtractingMembers ? (
+                              <><RefreshCw size={11} className="animate-spin" /> Extraindo...</>
+                            ) : (
+                              <>↗ Extrair para lista personalizada</>
+                            )}
+                          </button>
+                        )}
+
+                        <div className="flex items-center justify-between pb-0.5">
                           <span className="text-xs text-muted-foreground">{availableGroups.length} grupo(s)</span>
                           <button
                             type="button"
@@ -2376,27 +2483,33 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         ) : availableGroups.length === 0 ? (
                           <p className="text-xs text-muted-foreground py-2 pl-2">Nenhum grupo encontrado. Clique em Sincronizar.</p>
                         ) : (
-                          availableGroups.map(group => {
-                            const jid = group.remote_jid;
-                            const name = group.metadata?.group_name || group.display_name || jid;
-                            return (
-                              <label key={jid} className="flex items-center gap-2 pl-7 py-1">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedGroupJids.includes(jid)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedGroupJids([...selectedGroupJids, jid]);
-                                    } else {
-                                      setSelectedGroupJids(selectedGroupJids.filter(j => j !== jid));
-                                    }
-                                  }}
-                                  className="w-3 h-3 text-[#25D366] focus:ring-[#25D366] rounded"
-                                />
-                                <span className="text-xs text-foreground/80">{name}</span>
-                              </label>
-                            );
-                          })
+                          <div className="max-h-[180px] overflow-y-auto space-y-0.5 pr-0.5">
+                            {availableGroups.map(group => {
+                              const jid = group.remote_jid;
+                              const name = group.metadata?.group_name || group.display_name || jid;
+                              const memberCount = group.metadata?.participants_count;
+                              return (
+                                <label key={jid} className="flex items-center gap-2 pl-7 py-1 hover:bg-muted/60 rounded cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedGroupJids.includes(jid)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedGroupJids([...selectedGroupJids, jid]);
+                                      } else {
+                                        setSelectedGroupJids(selectedGroupJids.filter(j => j !== jid));
+                                      }
+                                    }}
+                                    className="w-3 h-3 text-[#25D366] focus:ring-[#25D366] rounded flex-shrink-0"
+                                  />
+                                  <span className="text-xs text-foreground/80 flex-1 truncate">{name}</span>
+                                  {groupSendMode === 'private' && memberCount != null && (
+                                    <span className="text-[10px] text-muted-foreground flex-shrink-0 mr-1">~{memberCount}</span>
+                                  )}
+                                </label>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
                     )}

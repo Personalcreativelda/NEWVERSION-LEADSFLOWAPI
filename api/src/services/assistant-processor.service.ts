@@ -26,7 +26,8 @@ export interface IncomingMessageContext {
     remoteJid?: string;       // JID completo do contato (ex: 5511999@s.whatsapp.net)
     mediaType?: string;       // Tipo de mídia recebida (ex: 'audio', 'image')
     mediaUrl?: string;        // URL da mídia (se armazenada no MinIO)
-    incomingMessageId?: string; // ID da mensagem recebida (para marcar como lida)
+    incomingMessageId?: string;    // ID da última mensagem recebida
+    incomingMessageIds?: string[]; // IDs de TODAS as mensagens enfileiradas (para blue ticks em lote)
 }
 
 export class AssistantProcessorService {
@@ -535,16 +536,21 @@ export class AssistantProcessorService {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    /** Delay realista de digitação: ~30 chars/s, min 1500ms, max 6000ms, com variação aleatória */
+    /** Delay realista de digitação: ~20 chars/s, min 2000ms, max 9000ms, ±20% variação */
     private typingDelayMs(textLength: number): number {
-        const base = Math.round((textLength / 30) * 1000);
-        const clamped = Math.min(Math.max(base, 1500), 6000);
-        // ±15% variação para parecer mais humano
-        const variation = clamped * 0.15;
+        const base = Math.round((textLength / 20) * 1000);
+        const clamped = Math.min(Math.max(base, 2000), 9000);
+        const variation = clamped * 0.20;
         return Math.round(clamped + (Math.random() * variation * 2 - variation));
     }
 
-    /** Quebra o texto em chunks naturais (máx 4 partes, máx 280 chars cada) */
+    /** Pausa entre chunks: simula o humano pensando antes de enviar a próxima mensagem */
+    private interChunkPauseMs(): number {
+        // 1000–2500ms de pausa realista entre mensagens consecutivas
+        return 1000 + Math.floor(Math.random() * 1500);
+    }
+
+    /** Quebra o texto em chunks naturais (máx 6 partes, máx 120 chars cada — curtas como humano) */
     private splitIntoSentences(text: string, maxLen: number): string[] {
         const parts = text.split(/(?<=[.!?])\s+/);
         const chunks: string[] = [];
@@ -562,8 +568,8 @@ export class AssistantProcessorService {
     }
 
     private splitResponse(text: string): string[] {
-        const MAX_LEN = 280;
-        const MAX_CHUNKS = 4;
+        const MAX_LEN = 120;   // curto como humano digitando no celular
+        const MAX_CHUNKS = 6;
 
         let parts = text.split(/\n{2,}/).map(p => p.trim()).filter(p => p.length > 0);
         if (parts.length === 1 && text.length > MAX_LEN) {
@@ -579,10 +585,10 @@ export class AssistantProcessorService {
             }
         }
 
-        // Merge tiny trailing fragments into previous
-        while (result.length > 1 && result[result.length - 1].length < 40) {
+        // Merge very tiny trailing fragments (< 25 chars) into previous
+        while (result.length > 1 && result[result.length - 1].length < 25) {
             const tail = result.pop()!;
-            result[result.length - 1] += '\n' + tail;
+            result[result.length - 1] += ' ' + tail;
         }
 
         // Cap at MAX_CHUNKS
@@ -594,8 +600,28 @@ export class AssistantProcessorService {
         return result.length > 0 ? result : [text];
     }
 
-    /** Marca mensagem como lida e envia presença "digitando" no WhatsApp (Evolution API) */
-    private async markEvolutionRead(ctx: IncomingMessageContext, totalTypingMs: number): Promise<void> {
+    /**
+     * Seleciona um emoji de reação baseado no contexto da mensagem recebida.
+     * Retorna null se não deve reagir (a maioria das mensagens não deve ter reação).
+     */
+    private selectReaction(text: string): string | null {
+        const t = text.toLowerCase().trim();
+
+        // Reações baseadas em contexto
+        if (/\b(obrigad\w*|valeu|muito\s+bom|excelente|perfeito|ótimo|amei)\b/i.test(t)) return '❤️';
+        if (/\b(oi|olá|bom\s+dia|boa\s+tarde|boa\s+noite)\b/i.test(t)) return Math.random() < 0.5 ? '😊' : '❤️';
+        if (/\b(sim|ok|certo|claro|combinado|entendido|pode\s+ser)\b/i.test(t)) return '👍';
+        if (/\b(haha|kkk|rsrs|😂|😆)\b/i.test(t)) return '😂';
+        // Reação aleatória para 20% das mensagens restantes (mantém natural, não exagerado)
+        if (Math.random() < 0.20) {
+            const pool = ['👍', '❤️', '😊', '🙌', '✅'];
+            return pool[Math.floor(Math.random() * pool.length)];
+        }
+        return null;
+    }
+
+    /** Envia reação a uma mensagem via Evolution API */
+    private async sendEvolutionReaction(ctx: IncomingMessageContext, messageId: string, emoji: string): Promise<void> {
         const evolutionUrl = process.env.EVOLUTION_API_URL;
         const apiKey = process.env.EVOLUTION_API_KEY;
         let creds = ctx.credentials || {};
@@ -608,16 +634,50 @@ export class AssistantProcessorService {
             ? remoteJid
             : `${ctx.contactPhone}@s.whatsapp.net`;
 
-        // 1. sendPresence "composing" — faz o WhatsApp mostrar "digitando..." E marca a mensagem como lida
-        //    Isso é mais confiável do que markMessageAsRead em muitas versões da Evolution
+        try {
+            await fetch(`${evolutionUrl}/message/sendReaction/${instanceId}`, {
+                method: 'POST',
+                headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: { id: messageId, fromMe: false, remoteJid: number }, reaction: emoji })
+            });
+            console.log(`[AssistantProcessor] 🎭 Reação "${emoji}" enviada à msg ${messageId}`);
+        } catch (e: any) {
+            console.warn(`[AssistantProcessor] ⚠️ sendReaction erro:`, e.message);
+        }
+    }
+
+    /**
+     * Marca mensagens como lidas (ticks azuis) e envia presença no WhatsApp (Evolution API).
+     * presenceType 'composing' → digitando | 'recording' → gravando áudio
+     * Marca TODOS os IDs de ctx.incomingMessageIds (mensagens agrupadas pelo debounce).
+     */
+    private async markEvolutionRead(
+        ctx: IncomingMessageContext,
+        totalTypingMs: number,
+        presenceType: 'composing' | 'recording' = 'composing'
+    ): Promise<void> {
+        const evolutionUrl = process.env.EVOLUTION_API_URL;
+        const apiKey = process.env.EVOLUTION_API_KEY;
+        let creds = ctx.credentials || {};
+        if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch { creds = {}; } }
+        const instanceId = creds.instance_id || creds.instance_name;
+        if (!evolutionUrl || !apiKey || !instanceId) return;
+
+        const remoteJid = ctx.remoteJid || `${ctx.contactPhone}@s.whatsapp.net`;
+        const number = remoteJid.endsWith('@g.us') || remoteJid.endsWith('@lid') || remoteJid.endsWith('@s.whatsapp.net')
+            ? remoteJid
+            : `${ctx.contactPhone}@s.whatsapp.net`;
+
+        // 1. sendPresence — "digitando" ou "gravando" dependendo do tipo de resposta
         try {
             const presRes = await fetch(`${evolutionUrl}/chat/sendPresence/${instanceId}`, {
                 method: 'POST',
                 headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ number, options: { presence: 'composing', delay: totalTypingMs } })
+                body: JSON.stringify({ number, options: { presence: presenceType, delay: totalTypingMs } })
             });
             if (presRes.ok) {
-                console.log(`[AssistantProcessor] ✍️ Presença "digitando" enviada (${totalTypingMs}ms)`);
+                const label = presenceType === 'recording' ? '🎙️ Presença "gravando"' : '✍️ Presença "digitando"';
+                console.log(`[AssistantProcessor] ${label} enviada (${totalTypingMs}ms)`);
             } else {
                 const txt = await presRes.text().catch(() => '');
                 console.warn(`[AssistantProcessor] ⚠️ sendPresence falhou (${presRes.status}): ${txt.substring(0, 200)}`);
@@ -626,16 +686,23 @@ export class AssistantProcessorService {
             console.warn(`[AssistantProcessor] ⚠️ sendPresence erro:`, e.message);
         }
 
-        // 2. markMessageAsRead — ticks azuis explícitos (funciona na maioria das versões)
-        if (!ctx.incomingMessageId) return;
+        // 2. markMessageAsRead — marcar TODAS as mensagens agrupadas como lidas (ticks azuis)
+        const idsToMark = [
+            ...(ctx.incomingMessageIds || []),
+            ...(ctx.incomingMessageId ? [ctx.incomingMessageId] : [])
+        ].filter((id, i, arr) => arr.indexOf(id) === i); // deduplicar
+
+        if (idsToMark.length === 0) return;
+
         try {
+            const readMessages = idsToMark.map(id => ({ id, fromMe: false, remoteJid: number }));
             const readRes = await fetch(`${evolutionUrl}/chat/markMessageAsRead/${instanceId}`, {
                 method: 'POST',
                 headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ readMessages: [{ id: ctx.incomingMessageId, fromMe: false, remoteJid: number }] })
+                body: JSON.stringify({ readMessages })
             });
             if (readRes.ok) {
-                console.log(`[AssistantProcessor] 👁️ Mensagem marcada como lida (ticks azuis)`);
+                console.log(`[AssistantProcessor] 👁️ ${idsToMark.length} mensagem(ns) marcada(s) como lida(s)`);
             } else {
                 const txt = await readRes.text().catch(() => '');
                 console.warn(`[AssistantProcessor] ⚠️ markMessageAsRead falhou (${readRes.status}): ${txt.substring(0, 200)}`);
@@ -745,23 +812,29 @@ export class AssistantProcessorService {
             ? this.splitResponse(text)
             : (!audioOnlyMode ? [text] : []);
 
-        // Calcular tempo total de digitação estimado (para sendPresence)
+        // Calcular tempo total estimado (para sendPresence)
         const totalTypingMs = audioOnlyMode
             ? this.recordingDurationMs(text)
             : chunks.reduce((acc, c) => acc + this.typingDelayMs(c.length), 0);
 
-        // 2. Marcar como lido + enviar presença correta (digitando OU gravando)
+        // 2. Marcar como lido + enviar presença correta:
+        //    - Modo áudio → "recording" (ícone de microfone)
+        //    - Modo texto → "composing" (digitando...)
         if (isEvolutionWA) {
-            if (audioOnlyMode) {
-                // Para modo áudio: marcar lido com delay de gravação
-                await this.markEvolutionRead(ctx, totalTypingMs);
-            } else {
-                await this.markEvolutionRead(ctx, totalTypingMs);
+            await this.markEvolutionRead(ctx, totalTypingMs, audioOnlyMode ? 'recording' : 'composing');
+
+            // Enviar reação contextual à última mensagem recebida (assíncrono, não bloqueia)
+            const reactionTargetId = ctx.incomingMessageId;
+            if (reactionTargetId && !audioOnlyMode) {
+                const emoji = this.selectReaction(ctx.messageContent || '');
+                if (emoji) {
+                    void this.sendEvolutionReaction(ctx, reactionTargetId, emoji);
+                }
             }
         }
 
-        // 3. Breve delay de "leitura" antes de responder (200–600ms)
-        await this.sleep(200 + Math.floor(Math.random() * 400));
+        // 3. Breve pausa de "leitura" antes de começar a responder (400–900ms)
+        await this.sleep(400 + Math.floor(Math.random() * 500));
 
         let lastExternalId: string | null = null;
 
@@ -794,8 +867,9 @@ export class AssistantProcessorService {
                 }
                 await this.resetEvolutionPresence(instanceId, target);
             } else {
-                // Modo texto normal — enviar chunks com delay de digitação
-                for (const chunk of chunks) {
+                // Modo texto — enviar chunks com delay de digitação + pausa entre mensagens
+                for (let i = 0; i < chunks.length; i++) {
+                    const chunk = chunks[i];
                     if (!chunk.trim()) continue;
                     const delay = this.typingDelayMs(chunk.length);
                     try {
@@ -803,6 +877,10 @@ export class AssistantProcessorService {
                         lastExternalId = res?.key?.id || res?.id || lastExternalId;
                     } catch (e: any) {
                         console.warn(`[AssistantProcessor] humanizedSend chunk failed:`, e.message);
+                    }
+                    // Aguardar o indicador de digitação + pausa humana antes do próximo chunk
+                    if (i < chunks.length - 1) {
+                        await this.sleep(delay + this.interChunkPauseMs());
                     }
                 }
             }

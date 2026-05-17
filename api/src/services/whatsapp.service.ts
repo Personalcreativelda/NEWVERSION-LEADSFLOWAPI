@@ -971,21 +971,38 @@ export class WhatsAppService {
     console.log('[WhatsAppService] Getting group participants:', groupJid);
 
     const endpointsToTry = [
+      // Primary: findGroupInfos GET with query string — proven to work on this server
       {
-        url: `/group/participants/${instanceId}`,
-        method: 'POST',
-        body: { groupJid },
-      },
-      {
-        url: `/group/participants/${instanceId}?groupJid=${encodeURIComponent(groupJid)}`,
+        url: `/group/findGroupInfos/${instanceId}?groupJid=${encodeURIComponent(groupJid)}`,
         method: 'GET',
       },
+      // Secondary: findGroupInfos POST with body
       {
         url: `/group/findGroupInfos/${instanceId}`,
         method: 'POST',
         body: { groupJid },
       },
+      // Official Evolution API v2 participants endpoint
+      {
+        url: `/group/participants/${instanceId}?groupJid=${encodeURIComponent(groupJid)}`,
+        method: 'GET',
+      },
     ];
+
+    const extractParticipants = (result: any): any[] | null => {
+      if (!result) return null;
+      // Direct array
+      if (Array.isArray(result)) return result.length > 0 ? result : null;
+      // { participants: [...] }
+      if (Array.isArray(result?.participants)) return result.participants;
+      // { data: { participants: [...] } }  ← Evolution API v2 envelope
+      if (Array.isArray(result?.data?.participants)) return result.data.participants;
+      // { data: [...] }
+      if (Array.isArray(result?.data)) return result.data;
+      // Array of group objects, first has participants
+      if (Array.isArray(result) && result[0]?.participants) return result[0].participants;
+      return null;
+    };
 
     for (const endpoint of endpointsToTry) {
       try {
@@ -994,23 +1011,13 @@ export class WhatsAppService {
           ...(endpoint.body ? { body: JSON.stringify(endpoint.body) } : {}),
         }) as any;
 
-        // Direct array of participants
-        if (Array.isArray(result)) {
-          console.log('[WhatsAppService] Found', result.length, 'participants');
-          return result;
+        console.log(`[WhatsAppService] getGroupParticipants raw response (${endpoint.url}):`, JSON.stringify(result).substring(0, 600));
+        const participants = extractParticipants(result);
+        if (participants) {
+          console.log(`[WhatsAppService] Found ${participants.length} participants via ${endpoint.url}`);
+          return participants;
         }
-        // Nested in participants key
-        if (result?.participants && Array.isArray(result.participants)) {
-          console.log('[WhatsAppService] Found', result.participants.length, 'participants');
-          return result.participants;
-        }
-        // findGroupInfos returns full group info with participants inside
-        if (Array.isArray(result) && result[0]?.participants) {
-          return result[0].participants;
-        }
-        if (result?.data && Array.isArray(result.data)) {
-          return result.data;
-        }
+        console.log(`[WhatsAppService] extractParticipants returned null for shape:`, Object.keys(result || {}));
       } catch (error: any) {
         console.log(`[WhatsAppService] getGroupParticipants ${endpoint.url} failed:`, error.message);
       }

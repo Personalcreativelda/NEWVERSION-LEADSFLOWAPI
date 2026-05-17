@@ -128,20 +128,27 @@ export class AssistantQueueService {
                 //    As anteriores já estão na tabela messages e aparecerão no rawHistory.
                 const latest = rows[rows.length - 1];
 
+                // Coletar TODOS os IDs das mensagens enfileiradas (para marcar todas como lidas)
+                const allIncomingIds = rows
+                    .map(r => r.incoming_message_id as string | null)
+                    .filter((id): id is string => !!id);
+
                 const mergedCtx: IncomingMessageContext = {
-                    conversationId:     latest.conversation_id,
-                    userId:             latest.user_id,
-                    channelId:          latest.channel_id,
-                    channelType:        latest.channel_type,
-                    messageContent:     latest.message_content,
-                    remoteJid:          latest.remote_jid          || undefined,
-                    contactPhone:       latest.contact_phone        || undefined,
-                    contactName:        latest.contact_name         || undefined,
-                    mediaType:          latest.media_type           || undefined,
-                    mediaUrl:           latest.media_url            || undefined,
-                    incomingMessageId:  latest.incoming_message_id  || undefined,
+                    conversationId:      latest.conversation_id,
+                    userId:              latest.user_id,
+                    channelId:           latest.channel_id,
+                    channelType:         latest.channel_type,
+                    messageContent:      latest.message_content,
+                    remoteJid:           latest.remote_jid          || undefined,
+                    contactPhone:        latest.contact_phone        || undefined,
+                    contactName:         latest.contact_name         || undefined,
+                    mediaType:           latest.media_type           || undefined,
+                    mediaUrl:            latest.media_url            || undefined,
+                    incomingMessageId:   latest.incoming_message_id  || undefined,
+                    // Todos os IDs da fila — usados para marcar todas as mensagens como lidas
+                    incomingMessageIds:  allIncomingIds.length > 0 ? allIncomingIds : undefined,
                     // credentials pode vir como string (JSONB) — safe-parse
-                    credentials:        latest.credentials
+                    credentials:         latest.credentials
                         ? (typeof latest.credentials === 'string'
                             ? JSON.parse(latest.credentials)
                             : latest.credentials)

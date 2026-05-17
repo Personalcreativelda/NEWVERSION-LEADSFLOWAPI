@@ -3,7 +3,7 @@ import { QueryClient } from '@tanstack/react-query';
 // staleTime: how long data is considered fresh (no background refetch)
 // gcTime: how long unused cache entries are kept in memory (and IndexedDB)
 export const STALE = {
-    conversations:  60_000,          // 1 min — updates via WebSocket anyway
+    conversations:  0,               // always stale → refetchOnMount/Focus always fires
     messages:       30_000,          // 30 s  — updated via WebSocket in real-time
     campaigns:      5  * 60_000,     // 5 min — less dynamic
     stats:          5  * 60_000,     // 5 min

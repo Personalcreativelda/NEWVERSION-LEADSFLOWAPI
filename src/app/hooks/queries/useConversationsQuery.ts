@@ -42,7 +42,7 @@ export function useConversationsQuery(
 
     // ── Data fetch ───────────────────────────────────────────────────────────
 
-    const { data: conversations = [], isLoading: loading, error: queryError, dataUpdatedAt } = useQuery({
+    const { data: conversations = [], isLoading: loading, error: queryError, dataUpdatedAt, isFetching } = useQuery({
         queryKey:     convQueryKey(onlyWithHistory, searchQuery),
         queryFn:      () =>
             conversationsApi.getAll({
@@ -50,19 +50,25 @@ export function useConversationsQuery(
                 limit:            100,
                 only_with_history: onlyWithHistory,
             }) as Promise<ConversationWithDetails[]>,
-        staleTime:    STALE.conversations,
-        gcTime:       GC.conversations,
-        // Poll only when not searching — search results are ephemeral.
-        // 8s fallback ensures new conversations appear even if WebSocket misses an event.
-        refetchInterval: enablePolling && !searchQuery ? 8_000 : false,
-        refetchOnMount:        false,
-        refetchOnWindowFocus:  false,
+        // staleTime 0: data is always stale → window focus and mount always trigger a background refetch.
+        // This is the key fix: without this, the 60s staleTime was blocking refetchOnMount/Focus.
+        staleTime:   0,
+        gcTime:      GC.conversations,
+        // Poll every 5 s when not searching (WebSocket keeps it instant; this is the safety net).
+        refetchInterval:           enablePolling && !searchQuery ? 5_000 : false,
+        // Refetch in background even when tab is hidden (so list is fresh when user switches back)
+        refetchIntervalInBackground: true,
+        // Always fetch fresh data when the component mounts (first open of inbox)
+        refetchOnMount:           true,
+        // Refetch immediately when the user comes back to the tab
+        refetchOnWindowFocus:     true,
         // Keep the previous list visible while loading a new search query
-        placeholderData:       (prev) => prev,
+        placeholderData:          (prev) => prev,
     });
 
-    const error     = queryError ? (queryError as Error).message : null;
+    const error      = queryError ? (queryError as Error).message : null;
     const lastUpdate = useMemo(() => new Date(dataUpdatedAt), [dataUpdatedAt]);
+    const isRefreshing = isFetching && !loading; // background refresh (not first load)
     const unreadCount = useMemo(
         () => conversations.reduce((n, c) => n + c.unread_count, 0),
         [conversations],
@@ -163,6 +169,7 @@ export function useConversationsQuery(
     return {
         conversations,
         loading,
+        isRefreshing,
         error,
         unreadCount,
         searchQuery,

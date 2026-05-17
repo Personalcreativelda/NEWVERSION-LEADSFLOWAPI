@@ -49,6 +49,7 @@ export function useInbox(options: UseInboxOptions = {}) {
     const {
         conversations,
         loading:              conversationsLoading,
+        isRefreshing:         conversationsRefreshing,
         error:                conversationsError,
         unreadCount,
         searchQuery,
@@ -261,6 +262,7 @@ export function useInbox(options: UseInboxOptions = {}) {
         selectedConversation,
         selectConversation,
         conversationsLoading,
+        conversationsRefreshing,
         conversationsError,
         unreadCount,
         searchQuery,
