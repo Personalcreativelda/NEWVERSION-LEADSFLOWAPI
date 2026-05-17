@@ -319,7 +319,8 @@ export class AssistantProcessorService {
             }
 
             // 6. Enviar resposta com comportamento humano (lido + digitando + chunks)
-            const externalMsgId = await this.humanizedSend(ctx, aiResponse.content, audioBase64);
+            const reactionsEnabled = config.reactions_enabled === true || config.reactions_enabled === 'true';
+            const externalMsgId = await this.humanizedSend(ctx, aiResponse.content, audioBase64, reactionsEnabled);
 
             // 7. Salvar mensagem de resposta no banco (com external_id para evitar duplicata via webhook)
             await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId, audioBase64 ? 'audio' : 'text');
@@ -828,7 +829,7 @@ export class AssistantProcessorService {
      *   - Simula presença "recording" antes de enviar
      * Quando audioBase64 está ausente ou falhou: envia texto em chunks
      */
-    private async humanizedSend(ctx: IncomingMessageContext, text: string, audioBase64?: string): Promise<string | null> {
+    private async humanizedSend(ctx: IncomingMessageContext, text: string, audioBase64?: string, reactionsEnabled = false): Promise<string | null> {
         const isEvolutionWA = ctx.channelType === 'whatsapp';
         const isTelegram    = ctx.channelType === 'telegram';
         const isWACloud     = ctx.channelType === 'whatsapp_cloud';
@@ -864,7 +865,6 @@ export class AssistantProcessorService {
 
             // Enviar reação contextual à última mensagem recebida (somente se reactions_enabled no config)
             const reactionTargetId = ctx.incomingMessageId;
-            const reactionsEnabled = config.reactions_enabled === true || config.reactions_enabled === 'true';
             if (reactionsEnabled && reactionTargetId && !audioOnlyMode) {
                 const emoji = this.selectReaction(ctx.messageContent || '');
                 if (emoji) {
