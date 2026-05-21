@@ -651,36 +651,49 @@ router.post('/:id/execute', async (req, res, next) => {
       if (settings.groupSendMode === 'private') {
         // Extrai participantes e cria leads sintéticos para envio individual
         const seenPhones = new Set<string>();
+        let totalSkippedLid = 0;
+
         for (const groupJid of selectedGroupJids) {
           try {
             const participants = await whatsappService.getGroupParticipants(whatsappInstanceId, groupJid);
-            console.log(`[Campaigns Execute] Grupo ${groupJid}: ${participants.length} participante(s)`);
+            console.log(`[Campaigns Execute] Grupo ${groupJid}: ${participants.length} participante(s) brutos`);
+
             for (const p of participants) {
               const rawId = String(p.id || p.jid || '');
-              const rawPhoneField = String(p.phoneNumber || p.phone || '');
 
-              // Skip group JIDs and @lid device-linked IDs (not real phone numbers)
+              // Ignorar o próprio grupo
               if (rawId.endsWith('@g.us')) continue;
-              const isLid = rawId.endsWith('@lid') || rawPhoneField.endsWith('@lid');
-              if (isLid) continue;
 
-              // Extract phone: prefer explicit phoneNumber field, fall back to @s.whatsapp.net JID
-              const fromPhoneField = rawPhoneField
-                .replace('@s.whatsapp.net', '').replace(/\D/g, '');
-              const fromJid = rawId.includes('@s.whatsapp.net')
-                ? rawId.replace('@s.whatsapp.net', '').replace(/\D/g, '')
-                : '';
-              const finalPhone = fromPhoneField || fromJid;
+              // Tentar extrair telefone de todas as fontes disponíveis
+              const candidates = [
+                p.phoneNumber,
+                p.phone,
+                p.numero,
+                p.number,
+                p.participantAlt,       // campo extra da Evolution API em alguns eventos
+                // Se o JID é @s.whatsapp.net, extrair dígitos do ID
+                rawId.includes('@s.whatsapp.net') ? rawId.replace('@s.whatsapp.net', '') : null,
+              ]
+                .map((v: any) => (v ? String(v).replace('@s.whatsapp.net', '').replace(/\D/g, '') : ''))
+                .filter((v: string) => v.length >= 7 && v.length <= 15);
 
-              // Reject: empty, deduped, or implausibly long (device ID leaked through)
-              if (!finalPhone || finalPhone.length > 15 || seenPhones.has(finalPhone)) continue;
+              if (candidates.length === 0) {
+                // @lid sem número resolvível — não tem como enviar no privado
+                totalSkippedLid++;
+                console.log(`[Campaigns Execute] ⚠️ Participante sem telefone resolvível: ${rawId}`);
+                continue;
+              }
+
+              const finalPhone = candidates[0];
+              if (seenPhones.has(finalPhone)) continue;
               seenPhones.add(finalPhone);
+
               leads.push({
                 id: `gm-${finalPhone}`,
                 user_id: user.id,
                 name: p.name || p.pushName || p.notify || finalPhone,
                 phone: finalPhone,
-                whatsapp: null,
+                whatsapp: finalPhone,
                 email: null,
                 company: null,
                 status: null,
@@ -690,11 +703,14 @@ router.post('/:id/execute', async (req, res, next) => {
             console.error(`[Campaigns Execute] Erro ao buscar participantes do grupo ${groupJid}:`, err.message);
           }
         }
-        console.log(`[Campaigns Execute] 👥 Modo privado de grupos: ${leads.length} membro(s) únicos`);
+        console.log(`[Campaigns Execute] 👥 Modo privado: ${leads.length} membro(s) com telefone | ${totalSkippedLid} @lid sem número`);
 
         if (leads.length === 0) {
+          const lidMsg = totalSkippedLid > 0
+            ? ` ${totalSkippedLid} participante(s) com ID de dispositivo vinculado (@lid) não têm número resolvível para envio privado.`
+            : '';
           return res.status(400).json({
-            error: 'Não foi possível extrair participantes dos grupos selecionados. Verifique se a instância WhatsApp está conectada e tente novamente.'
+            error: `Não foi possível extrair participantes com número de telefone dos grupos selecionados.${lidMsg} Verifique se a instância WhatsApp está conectada e tente novamente.`
           });
         }
       } else {
@@ -799,13 +815,22 @@ router.post('/:id/execute', async (req, res, next) => {
 
     // 6. Processar envios em background (após responder ao cliente)
     setImmediate(async () => {
-      await executeCampaignMessages(
-        campaign,
-        leads,
-        channel,
-        whatsappInstanceId,
-        user.id
-      );
+      try {
+        await executeCampaignMessages(
+          campaign,
+          leads,
+          channel,
+          whatsappInstanceId,
+          user.id
+        );
+      } catch (bgErr: any) {
+        console.error(`[Campaigns Execute] ❌ Erro fatal no background da campanha ${campaign.id}:`, bgErr.message);
+        // Marcar como failed para não ficar preso em 'active'
+        await query(
+          `UPDATE campaigns SET status = 'failed', stats = COALESCE(stats, '{}'::jsonb) || $1::jsonb, updated_at = NOW() WHERE id = $2`,
+          [JSON.stringify({ fatalError: bgErr.message }), campaign.id]
+        ).catch(() => {});
+      }
     });
 
   } catch (error: any) {
@@ -925,11 +950,24 @@ async function executeCampaignMessages(
         continue;
       }
 
-      // Group JIDs (@g.us) and @lid JIDs must be sent as-is to the Evolution API
-      const isGroupJid = String(phone).endsWith('@g.us');
-      const isLidJid   = String(phone).endsWith('@lid');
-      const cleanPhone = isGroupJid || isLidJid ? String(phone) : String(phone).replace(/\D/g, '');
-      const remoteJid  = isGroupJid ? String(phone) : (isLidJid ? String(phone) : `${cleanPhone}@s.whatsapp.net`);
+      // Group JIDs (@g.us) são enviados como estão; números normais viram @s.whatsapp.net
+      const phoneStr = String(phone);
+      const isGroupJid = phoneStr.endsWith('@g.us');
+      // @lid nunca deve chegar aqui (filtrados na extração), mas por segurança:
+      const isLidJid   = phoneStr.endsWith('@lid');
+      if (isLidJid) {
+        stats.failed++;
+        stats.errors.push(`Lead ${lead.id}: número @lid não resolvível, ignorado`);
+        continue;
+      }
+      // Manter JID do grupo intacto; para números: remover não-dígitos
+      const cleanPhone = isGroupJid ? phoneStr : phoneStr.replace(/[^0-9]/g, '');
+      if (!isGroupJid && (cleanPhone.length < 7 || cleanPhone.length > 15)) {
+        stats.failed++;
+        stats.errors.push(`Lead ${lead.id}: número inválido (${cleanPhone})`);
+        continue;
+      }
+      const remoteJid = isGroupJid ? phoneStr : `${cleanPhone}@s.whatsapp.net`;
       const contactName = lead.name || lead.nome || cleanPhone;
 
       // Personalizar mensagem (substituir variáveis)

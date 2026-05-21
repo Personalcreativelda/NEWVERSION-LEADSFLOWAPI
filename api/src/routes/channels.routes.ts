@@ -492,35 +492,30 @@ router.delete('/:id', async (req, res, next) => {
         }
 
         const channelId = req.params.id;
-        console.log(`[Channels] Deleting channel: ${channelId} for user: ${user.id}`);
+        console.log(`[Channels] Soft-deleting channel: ${channelId} for user: ${user.id}`);
 
-        // Primeiro, buscar o canal para obter informações
-        const channel = await channelsService.findById(channelId, user.id);
+        // Buscar o canal para obter credenciais (incluindo já marcados como deleted)
+        const channel = await channelsService.findByIdAny(channelId, user.id);
 
-        // Se for WhatsApp, também deletar a instância na Evolution API
+        // Se for WhatsApp, deletar a instância na Evolution API (sem preservar — instância não precisa de histórico)
         if (channel && channel.type === 'whatsapp') {
             const instanceId = channel.credentials?.instance_id || channel.credentials?.instance_name;
             if (instanceId && whatsappService.isReady()) {
                 try {
-                    console.log(`[Channels] Also deleting Evolution API instance: ${instanceId}`);
+                    console.log(`[Channels] Deleting Evolution API instance: ${instanceId}`);
                     await whatsappService.deleteInstance(instanceId);
                     console.log(`[Channels] Evolution API instance deleted: ${instanceId}`);
                 } catch (e: any) {
                     console.warn(`[Channels] Could not delete Evolution API instance: ${e.message}`);
-                    // Continua mesmo se falhar (instância pode já ter sido deletada)
                 }
             }
         }
 
-        // Deletar do banco de dados
+        // Soft delete no banco (status = 'deleted') — conversas e mensagens preservadas
         const deleted = await channelsService.delete(channelId, user.id);
 
-        // Se não encontrou no banco mas temos instanceId na URL, tentar deletar da Evolution
         if (!deleted && !channel) {
-            // Tentar extrair instanceId do ID (pode ser que o frontend esteja enviando instanceId ao invés de channelId)
-            console.log(`[Channels] Channel not found in DB, checking if ${channelId} is an instance name...`);
-
-            // Verificar se é um nome de instância
+            // Fallback: pode ser um instanceId direto passado pelo frontend
             if (channelId.startsWith('leadflow_') && whatsappService.isReady()) {
                 try {
                     await whatsappService.deleteInstance(channelId);
@@ -530,11 +525,10 @@ router.delete('/:id', async (req, res, next) => {
                     console.warn(`[Channels] Could not delete instance: ${e.message}`);
                 }
             }
-
             return res.status(404).json({ error: 'Channel not found' });
         }
 
-        console.log(`[Channels] Channel deleted successfully: ${channelId}`);
+        console.log(`[Channels] Channel soft-deleted (history preserved): ${channelId}`);
         res.json({ success: true });
     } catch (error) {
         console.error('[Channels] Error deleting channel:', error);

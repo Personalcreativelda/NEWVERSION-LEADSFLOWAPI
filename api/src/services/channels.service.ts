@@ -6,7 +6,7 @@ export interface Channel {
     user_id: string;
     type: 'whatsapp' | 'whatsapp_cloud' | 'facebook' | 'instagram' | 'telegram' | 'email' | 'website' | 'twilio_sms';
     name: string;
-    status: 'active' | 'inactive' | 'error' | 'connecting';
+    status: 'active' | 'inactive' | 'error' | 'connecting' | 'deleted';
     credentials: any;
     settings: any;
     last_sync_at?: string;
@@ -58,18 +58,29 @@ export class ChannelsService {
             }
         }
 
-        // 2. Retornar lista atualizada
+        // 2. Retornar lista atualizada (excluir soft-deleted)
         const result = await query(
-            'SELECT * FROM channels WHERE user_id = $1 ORDER BY created_at DESC',
+            `SELECT * FROM channels WHERE user_id = $1 AND status != 'deleted' ORDER BY created_at DESC`,
             [userId]
         );
         return result.rows;
     }
 
     /**
-     * Busca canal por ID
+     * Busca canal por ID (exclui soft-deleted)
      */
     async findById(id: string, userId: string): Promise<Channel | null> {
+        const result = await query(
+            `SELECT * FROM channels WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+            [id, userId]
+        );
+        return result.rows[0] || null;
+    }
+
+    /**
+     * Busca canal por ID incluindo soft-deleted (uso interno para deleção)
+     */
+    async findByIdAny(id: string, userId: string): Promise<Channel | null> {
         const result = await query(
             'SELECT * FROM channels WHERE id = $1 AND user_id = $2',
             [id, userId]
@@ -197,29 +208,13 @@ export class ChannelsService {
     }
 
     /**
-     * Remove canal (preservando histórico de conversas)
+     * Remove canal — soft delete: marca como 'deleted' preservando FK nas conversas.
+     * O histórico de mensagens fica intacto; o canal não aparece mais na lista.
      */
     async delete(id: string, userId: string): Promise<boolean> {
-        // Buscar info do canal antes de deletar (para guardar referência no histórico)
-        const channelResult = await query(
-            'SELECT id, type, name, status FROM channels WHERE id = $1 AND user_id = $2',
-            [id, userId]
-        );
-        const channelInfo = channelResult.rows[0];
-
-        if (channelInfo) {
-            // Salvar info do canal nas conversas antes de deletar
-            // (o FK ON DELETE SET NULL vai setar channel_id = null)
-            await query(
-                `UPDATE conversations 
-                 SET deleted_channel_info = $1, updated_at = NOW() 
-                 WHERE channel_id = $2 AND user_id = $3`,
-                [JSON.stringify({ id: channelInfo.id, type: channelInfo.type, name: channelInfo.name, deleted_at: new Date().toISOString() }), id, userId]
-            );
-        }
-
         const result = await query(
-            'DELETE FROM channels WHERE id = $1 AND user_id = $2 RETURNING id',
+            `UPDATE channels SET status = 'deleted', updated_at = NOW()
+             WHERE id = $1 AND user_id = $2 RETURNING id`,
             [id, userId]
         );
         return (result.rowCount ?? 0) > 0;
