@@ -26,6 +26,7 @@ interface UseWebSocketOptions {
     onAiTaskCreated?: (data: { task: any; timestamp: string }) => void;
     onNewConversation?: (data: { conversationId: string; conversation?: any; timestamp: string }) => void;
     onReconnect?: () => void; // Callback when reconnected
+    onCampaignStats?: (data: { campaignId: string; stats: any; progress: { sent: number; failed: number; total: number } }) => void;
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
@@ -133,6 +134,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             socket.on('user_typing', (data) => callbacksRef.current.onUserTyping?.(data));
             socket.on('lead_funnel_update', (data) => callbacksRef.current.onLeadFunnelUpdate?.(data));
             socket.on('ai_task_created', (data) => callbacksRef.current.onAiTaskCreated?.(data));
+            socket.on('campaign:stats', (data) => callbacksRef.current.onCampaignStats?.(data));
 
             socketRef.current = socket;
         } catch (err) {

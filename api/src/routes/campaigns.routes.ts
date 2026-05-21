@@ -912,6 +912,19 @@ async function executeCampaignMessages(
   console.log(`[Campaigns Execute] ⏱ Anti-ban config: delay ${minDelay/1000}–${maxDelay/1000}s | batch ${batchSize} msgs | batch pause ${batchPauseMin/1000}–${batchPauseMax/1000}s | daily limit ${dailyLimit === -1 ? '∞' : dailyLimit}`);
 
   for (let i = 0; i < leads.length; i++) {
+    // ── Verificar se campanha foi pausada/cancelada externamente ──────────
+    const statusCheck = await query('SELECT status FROM campaigns WHERE id = $1', [campaign.id]);
+    const currentStatus = statusCheck.rows[0]?.status;
+    if (currentStatus === 'paused' || currentStatus === 'cancelled') {
+      console.log(`[Campaigns Execute] Campanha ${campaign.id} foi ${currentStatus} externamente — parando loop.`);
+      // Salvar stats parciais antes de sair
+      await query(
+        `UPDATE campaigns SET stats = COALESCE(stats, '{}'::jsonb) || $1::jsonb, updated_at = NOW() WHERE id = $2`,
+        [JSON.stringify(stats), campaign.id]
+      ).catch(() => {});
+      return;
+    }
+
     // ── Parar se atingiu o limite diário ───────────────────────────────────
     if (dailyLimit !== -1 && sessionSent >= dailyLimit) {
       console.warn(`[Campaigns Execute] Limite diário de ${dailyLimit} mensagens atingido. Pausando campanha.`);
@@ -1238,15 +1251,19 @@ async function executeCampaignMessages(
         console.error(`[Campaigns Execute] Erro ao salvar no inbox:`, inboxError.message);
       }
 
-      // Atualizar estatísticas da campanha periodicamente
-      if (i % 5 === 0 || i === leads.length - 1) {
-        await query(
-          `UPDATE campaigns
-           SET stats = $1,
-               updated_at = NOW()
-           WHERE id = $2`,
-          [JSON.stringify(stats), campaign.id]
-        );
+      // Atualizar estatísticas a cada mensagem para sincronização em tempo real
+      await query(
+        `UPDATE campaigns SET stats = $1, updated_at = NOW() WHERE id = $2`,
+        [JSON.stringify(stats), campaign.id]
+      );
+      // Emitir WebSocket para o frontend atualizar o progresso imediatamente
+      const wsServiceStats = getWebSocketService();
+      if (wsServiceStats) {
+        wsServiceStats.emitToUser(userId, 'campaign:stats', {
+          campaignId: campaign.id,
+          stats,
+          progress: { sent: stats.sent, failed: stats.failed, total: leads.length }
+        });
       }
 
       // ─── ANTI-BAN: delays e pausas entre lotes ──────────────────────────

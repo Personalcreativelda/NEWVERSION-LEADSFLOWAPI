@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import {
   Search, Plus, Filter, X,
   Pause, BarChart3, FileText, Edit2,
@@ -85,6 +86,23 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   const [alertsModalOpen, setAlertsModalOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+
+  // Listener WebSocket para stats em tempo real (sem polling extra)
+  const handleCampaignStats = useCallback((data: { campaignId: string; stats: any; progress: { sent: number; failed: number; total: number } }) => {
+    setCampaigns(prev => prev.map(c => {
+      if (c.id !== data.campaignId) return c;
+      const { sent, failed, total } = data.progress;
+      const totalRecipients = total || c.totalRecipients || 1;
+      return {
+        ...c,
+        sent,
+        totalRecipients,
+        progress: Math.min(100, Math.round(((sent + failed) / totalRecipients) * 100)),
+      };
+    }));
+  }, []);
+
+  useWebSocket({ onCampaignStats: handleCampaignStats });
 
   const isDebugMode = (import.meta as any).env.DEV;
   const debugLog = (...args: any[]) => {
