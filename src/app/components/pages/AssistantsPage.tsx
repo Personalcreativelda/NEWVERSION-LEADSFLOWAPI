@@ -4,7 +4,7 @@ import {
   Briefcase, Headphones, Calendar, Users, ShoppingCart,
   Zap, X, Check, Loader2,
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
-  Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash,
+  Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash, Globe,
   Brain, Smartphone, Cloud, History, Lock, AlertTriangle, Mic,
   Image, FileText
 } from 'lucide-react';
@@ -86,6 +86,7 @@ const CHANNEL_ICONS: Record<string, React.ComponentType<any>> = {
   'twilio_sms': Smartphone,
   'sms': Smartphone,
   'twilio': Smartphone,
+  'website': Globe,
 };
 
 const CHANNEL_COLORS: Record<string, string> = {
@@ -99,6 +100,7 @@ const CHANNEL_COLORS: Record<string, string> = {
   'twilio_sms': 'text-teal-500',
   'sms': 'text-teal-500',
   'twilio': 'text-teal-500',
+  'website': 'text-violet-500',
 };
 
 // Assistants available for free-plan users to try (by name, case-insensitive)

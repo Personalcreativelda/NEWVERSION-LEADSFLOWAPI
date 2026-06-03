@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   X, Zap, UserCog, LogOut, ChevronRight, Search, PanelLeft, HelpCircle, Crown
 } from 'lucide-react';
-import { LayoutDashboard, Users, BarChart3, Megaphone, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, Megaphone, Settings, MessageSquare, Star } from 'lucide-react';
 import { Language, translations, Translations } from '../../utils/i18n';
 import { sidebarConfig, SidebarItemConfig } from '../../config/sidebarConfig';
 import SidebarGroup from './SidebarGroup';
@@ -48,6 +48,7 @@ interface NavigationSidebarProps {
   language: Language;
   onLogout?: () => void;
   onHelp?: () => void;
+  onFeedback?: () => void;
   currentPage?: string;
   onNavigate?: (page: string) => void;
   sidebarWidth?: number;
@@ -66,6 +67,7 @@ export default function NavigationSidebar({
   language,
   onLogout,
   onHelp,
+  onFeedback,
   currentPage = 'dashboard',
   onNavigate,
   sidebarWidth = SIDEBAR_DEFAULT_WIDTH,
@@ -88,6 +90,7 @@ export default function NavigationSidebar({
     { id: 'users', label: 'Usu\u00e1rios', icon: Users },
     { id: 'activity', label: 'Atividade', icon: BarChart3 },
     { id: 'marketing', label: 'Marketing', icon: Megaphone },
+    { id: 'feedback', label: 'Feedbacks', icon: MessageSquare },
     { id: 'settings', label: 'Configura\u00e7\u00f5es', icon: Settings },
   ];
 
@@ -513,6 +516,29 @@ export default function NavigationSidebar({
                 >
                   <HelpCircle className="w-[17px] h-[17px] flex-shrink-0 text-[hsl(var(--sidebar-muted))]" />
                   <span>Ajuda</span>
+                </button>
+              )}
+
+              {/* Feedback */}
+              {isCollapsed ? (
+                <div className="group relative flex justify-center py-0.5 px-2">
+                  <button
+                    onClick={onFeedback}
+                    className="sidebar-icon-btn sidebar-icon-btn-inactive"
+                  >
+                    <Star className="w-5 h-5" />
+                  </button>
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2.5 z-[500] pointer-events-none opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0 transition-all duration-150">
+                    <div className="sidebar-tooltip px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap">Feedback</div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={onFeedback}
+                  className="sidebar-nav-item sidebar-item-inactive w-full flex items-center gap-2.5 px-3 py-[7px] rounded-lg transition-all duration-150 text-[14px] font-medium"
+                >
+                  <Star className="w-[17px] h-[17px] flex-shrink-0 text-[hsl(var(--sidebar-muted))]" />
+                  <span>Feedback</span>
                 </button>
               )}
 

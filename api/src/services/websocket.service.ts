@@ -110,12 +110,28 @@ export class WebSocketService {
             });
 
             // Handler para typing indicator
-            socket.on('typing', (data: { conversationId: string; isTyping: boolean }) => {
+            socket.on('typing', async (data: { conversationId: string; isTyping: boolean }) => {
                 socket.to(`user:${userId}`).emit('user_typing', {
                     conversationId: data.conversationId,
                     isTyping: data.isTyping,
                     timestamp: new Date().toISOString()
                 });
+                // Also update widget typing state for website channels
+                try {
+                    const { query } = await import('../database/connection');
+                    const { widgetTyping } = await import('./widget-typing.service');
+                    const result = await query(
+                        `SELECT ch.type, u.name FROM conversations c
+                         JOIN channels ch ON c.channel_id = ch.id
+                         JOIN users u ON c.user_id = u.id
+                         WHERE c.id = $1 AND ch.type = 'website'`,
+                        [data.conversationId]
+                    );
+                    if (result.rows.length > 0) {
+                        if (data.isTyping) widgetTyping.set(data.conversationId, result.rows[0].name || 'Atendente');
+                        else widgetTyping.clear(data.conversationId);
+                    }
+                } catch { /* non-critical */ }
             });
         });
     }

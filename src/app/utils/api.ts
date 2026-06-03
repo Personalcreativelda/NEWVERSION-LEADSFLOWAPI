@@ -586,10 +586,10 @@ export const authApi = {
       if (
         errorMessage.includes('Backend indisponível') ||
         errorMessage.includes('Failed to fetch') ||
-        errorMessage.includes('ECONNREFUSED')
+        errorMessage.includes('ECONNREFUSED') ||
+        errorMessage.includes('ERR_SSL_PROTOCOL_ERROR')
       ) {
-        logger.warn('[Auth] Backend offline - using Mock Auth');
-        return handleMockSignin(email, password);
+        throw new Error('Não foi possível ligar ao servidor. Verifica se a API está a correr em http://localhost:4000');
       }
 
       if (errorMessage.toLowerCase().includes('invalid login credentials')) {

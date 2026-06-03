@@ -60,7 +60,6 @@ export function ChatPanel({
     conversations = [],
 }: ChatPanelProps) {
     const [isTyping, setIsTyping] = useState(false);
-    const [searchHighlight, setSearchHighlight] = useState<string>('');
     const [forwardTarget, setForwardTarget] = useState<MessageWithSender | null>(null);
     const internalEndRef = useRef<HTMLDivElement>(null);
 
@@ -72,8 +71,8 @@ export function ChatPanel({
 
     const handleTyping = (typing: boolean) => { setIsTyping(typing); };
 
-    const handleSearchInChat = useCallback((query: string) => {
-        setSearchHighlight(query);
+    const handleSearchInChat = useCallback((_query: string) => {
+        // TODO: implement in-chat message search highlight
     }, []);
 
     const handleForwardDone = useCallback(

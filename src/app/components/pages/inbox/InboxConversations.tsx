@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useConfirm } from '../../ui/ConfirmDialog';
 import { ConversationList } from '../../inbox/ConversationList';
 import { useInbox } from '../../../hooks/useInbox';
 import { useInboxFilters } from '../../../hooks/useInboxFilters';
@@ -18,17 +19,17 @@ import { NewConversationModal } from '../../inbox/NewConversationModal';
 import { ResizeHandle } from '../../inbox/ResizeHandle';
 import type { TeamMember } from '../../../types/inbox';
 
-interface InboxConversationsProps {
+interface ConversasConversationsProps {
     onNavigate?: (page: string) => void;
     conversationIdToOpen?: string | null;
     onConversationOpened?: () => void;
 }
 
-export default function InboxConversations({ 
+export default function ConversasConversations({ 
     onNavigate,
     conversationIdToOpen,
     onConversationOpened
-}: InboxConversationsProps) {
+}: ConversasConversationsProps) {
     const {
         conversations,
         selectedConversation,
@@ -55,6 +56,7 @@ export default function InboxConversations({
         lastUpdate
     } = useInbox();
 
+    const confirm = useConfirm();
     const { filters, clearFilters, hasActiveFilters, getActiveFiltersDescription, setChannelFilter } = useInboxFilters();
     const {
         layout,
@@ -164,14 +166,14 @@ export default function InboxConversations({
     // Auto-select conversation when conversationIdToOpen is provided
     useEffect(() => {
         if (conversationIdToOpen && conversations.length > 0) {
-            console.log('[InboxConversations] Auto-selecting conversation:', conversationIdToOpen);
+            console.log('[ConversasConversations] Auto-selecting conversation:', conversationIdToOpen);
             const convToOpen = conversations.find((c: any) => c.id === conversationIdToOpen);
             if (convToOpen) {
                 selectConversation(convToOpen);
                 onConversationOpened?.(); // Notify parent that conversation was opened
-                console.log('[InboxConversations] Conversation auto-selected:', convToOpen.id);
+                console.log('[ConversasConversations] Conversation auto-selected:', convToOpen.id);
             } else {
-                console.warn('[InboxConversations] Conversation not found:', conversationIdToOpen);
+                console.warn('[ConversasConversations] Conversation not found:', conversationIdToOpen);
             }
         }
     }, [conversationIdToOpen, conversations, selectConversation, onConversationOpened]);
@@ -215,9 +217,10 @@ export default function InboxConversations({
 
     const handleDeleteConversation = async () => {
         if (!selectedConversation) return;
+        const ok = await confirm('Tem certeza que deseja apagar esta conversa? Todas as mensagens serão removidas.');
+        if (!ok) return;
         try {
             await conversationsApi.delete(selectedConversation.id);
-            // Limpar conversa selecionada primeiro para fechar o painel de chat
             selectConversation(null);
             await refreshConversations();
         } catch (error) {
@@ -283,7 +286,7 @@ export default function InboxConversations({
     const handleSelectLead = async (lead: any) => {
         // Find existing conversation or create a real one
         const existingConv = conversations.find(conv => {
-            const convLeadId = conv.lead_id || conv.metadata?.leadId || conv.contact?.leadId;
+            const convLeadId = conv.lead_id || conv.metadata?.leadId || (conv.contact as any)?.leadId;
             return convLeadId === lead.id;
         });
 
@@ -300,11 +303,11 @@ export default function InboxConversations({
                     return;
                 }
 
-                console.log('[InboxConversations] Creating conversation for lead:', lead.id, 'with phone:', phone);
+                console.log('[ConversasConversations] Creating conversation for lead:', lead.id, 'with phone:', phone);
 
                 // 1. Create or find contact with this lead's phone
                 const contact = await contactsApi.createOrFind(phone, lead.name || lead.nome || 'Sem nome');
-                console.log('[InboxConversations] Contact created/found:', contact);
+                console.log('[ConversasConversations] Contact created/found:', contact);
                 
                 // Garantir que tem um ID (pode ser 'id' ou 'fid')
                 const contactId = contact?.id || contact?.fid;
@@ -388,7 +391,7 @@ export default function InboxConversations({
             // Filtrar por tipo (mentions, unattended)
             if (filters.type === 'mentions') {
                 // Mostrar apenas conversas onde o usuário foi mencionado
-                const hasMention = conv.metadata?.hasMention || conv.has_mention || false;
+                const hasMention = conv.metadata?.hasMention || (conv as any).has_mention || false;
                 if (!hasMention) return false;
             } else if (filters.type === 'unattended') {
                 // Mostrar apenas conversas não atendidas (sem responsável ou sem resposta)
@@ -460,7 +463,7 @@ export default function InboxConversations({
     };
 
     const handleBack = () => {
-        selectConversation(null as any);
+        selectConversation(null);
     };
 
     const handleSearch = (value: string) => {
@@ -516,7 +519,7 @@ export default function InboxConversations({
                                 <div className="p-3 border-b border-border bg-card/95 backdrop-blur-sm flex-shrink-0">
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <h1 className="text-sm font-semibold text-foreground truncate">Inbox</h1>
+                                            <h1 className="text-sm font-semibold text-foreground truncate">Conversas</h1>
                                             {unreadCount > 0 && (
                                                 <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-primary text-white">
                                                     {unreadCount}
@@ -826,7 +829,7 @@ export default function InboxConversations({
                     <div className="p-4 border-b border-border bg-card/95 backdrop-blur-sm flex-shrink-0">
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                                <h1 className="text-lg font-semibold text-foreground">Inbox</h1>
+                                <h1 className="text-lg font-semibold text-foreground">Conversas</h1>
                                 {unreadCount > 0 && (
                                     <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold bg-primary text-white">
                                         {unreadCount}
@@ -1091,7 +1094,7 @@ export default function InboxConversations({
                         style={{ width: detailsWidth }}
                     >
                         <ContactDetailsPanel
-                            conversation={selectedConversation!}
+                            conversation={selectedConversation! as any}
                             onClose={toggleDetailsPanel}
                             isEditingExternal={isEditingLead}
                             onEditingChange={setIsEditingLead}
@@ -1114,7 +1117,7 @@ export default function InboxConversations({
                         style={{ width: Math.min(detailsWidth, 340) }}
                     >
                         <ContactDetailsPanel
-                            conversation={selectedConversation}
+                            conversation={selectedConversation as any}
                             onClose={toggleDetailsPanel}
                             isEditingExternal={isEditingLead}
                             onEditingChange={setIsEditingLead}

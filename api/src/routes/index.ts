@@ -35,6 +35,7 @@ import groupsRoutes from './groups.routes';
 import aiRemarketingRoutes from './ai-remarketing.routes';
 import remarketingRoutes from './remarketing.routes';
 import teamRoutes from './team.routes';
+import feedbackRoutes from './feedback.routes';
 import smtpRoutes from './smtp.routes';
 // Plan enforcement middleware (blocks writes when plan is expired or lead limit reached)
 import { requireAuth } from '../middleware/auth.middleware';
@@ -76,6 +77,7 @@ router.use('/groups', withPlan, groupsRoutes);
 router.use('/ai-remarketing', withPlan, aiRemarketingRoutes);
 router.use('/remarketing', withPlan, remarketingRoutes);
 router.use('/team', withPlan, teamRoutes);
+router.use('/feedback', feedbackRoutes);
 
 // ── Settings / admin (auth required, plan NOT enforced) ──────────────────────
 router.use('/smtp', smtpRoutes);

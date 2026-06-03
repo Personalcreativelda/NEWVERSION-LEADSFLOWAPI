@@ -858,4 +858,22 @@ router.post('/create-user', requireAuth, requireAdmin, async (req: Authenticated
   }
 });
 
+// GET /admin/feedback — list all user feedback (admin only)
+router.get('/feedback', requireAuth, requireAdmin, async (_req, res, next) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        f.id, f.type, f.stars, f.message,
+        f.user_email, f.user_name, f.user_id, f.created_at
+      FROM user_feedback f
+      ORDER BY f.created_at DESC
+      LIMIT 500
+    `);
+    res.json({ success: true, feedback: result.rows });
+  } catch (err: any) {
+    console.error('[Admin] GET /feedback error:', err.message);
+    next(err);
+  }
+});
+
 export default router;

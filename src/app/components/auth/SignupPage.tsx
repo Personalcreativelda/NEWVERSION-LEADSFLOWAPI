@@ -2,9 +2,17 @@ import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { AlertCircle, CheckCircle, Eye, EyeOff, Lock, Mail, Building2, MailCheck, Zap, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, EyeOff, Lock, Mail, MailCheck, Zap, Loader2, Star } from 'lucide-react';
 import { authApi } from '../../utils/api';
 import { metaEvents } from '../MetaPixel';
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
+
+interface RatingSummary {
+  average: number;
+  total: number;
+  reviews: { stars: number; message: string; user_name: string; created_at: string }[];
+}
 
 // Google icon SVG
 const GoogleIcon = () => (
@@ -16,23 +24,7 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const SLIDES = [
-  {
-    image: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&q=80',
-    title: 'Comece a Crescer Hoje,\nTransforme seu Negócio',
-    subtitle: 'Junte-se a milhares de empresas gerenciando seus leads de forma eficiente',
-  },
-  {
-    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&q=80',
-    title: 'Automatize suas\nComunicações',
-    subtitle: 'WhatsApp, e-mail e muito mais em um só lugar',
-  },
-  {
-    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80',
-    title: 'Acompanhe Resultados\nem Tempo Real',
-    subtitle: 'Métricas e relatórios que impulsionam decisões',
-  },
-];
+const FONT = 'sohne-var, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
 
 interface SignupPageProps {
   onSuccess: () => void;
@@ -41,7 +33,7 @@ interface SignupPageProps {
 }
 
 export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPageProps) {
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [ratings, setRatings] = useState<RatingSummary | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,13 +46,14 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
 
-  // Slideshow auto-advance
+  // Fetch real ratings summary
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % SLIDES.length);
-    }, 5000);
-    return () => clearInterval(timer);
+    fetch(`${API_URL}/api/feedback/summary`)
+      .then(r => r.json())
+      .then(data => { if (data.success) setRatings(data); })
+      .catch(() => {});
   }, []);
+
 
   const isValidEmail = (value: string) => {
     const normalized = value.trim();
@@ -137,95 +130,85 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
     }
   };
 
+
   if (status !== 'idle') {
     const isConfirmation = status === 'confirmation';
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] px-4">
-        <div className="w-full max-w-md">
-          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl shadow-lg p-10 space-y-6 text-center">
+      <div className="min-h-screen relative flex items-center justify-center px-4 overflow-hidden"
+        style={{ background: 'transparent', fontFamily: FONT }}>
+        {/* Logo */}
+        <div className="relative z-10 w-full max-w-[520px] flex flex-col">
+          <div className="flex items-center gap-2.5 mb-8">
+            <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
+              style={{ background: '#675DFF', boxShadow: '0 2px 12px rgba(103,93,255,0.45)' }}>
+              <Zap className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-[19px] font-semibold text-white tracking-tight">LeadsFlow</span>
+          </div>
+          <div className="rounded-[12px] p-10 space-y-6 text-center" style={{ background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 4px 16px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.06)', backdropFilter: 'blur(20px)' }}>
             <div className="flex justify-center">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${isConfirmation ? 'bg-[#00C48C]/15' : 'bg-[#00C48C]/20'}`}>
-                {isConfirmation ? (
-                  <MailCheck className="w-8 h-8 text-[#00C48C]" />
-                ) : (
-                  <CheckCircle className="w-8 h-8 text-[#00C48C]" />
-                )}
+              <div className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(103,93,255,0.08)', border: '1px solid rgba(103,93,255,0.15)' }}>
+                {isConfirmation
+                  ? <MailCheck className="w-8 h-8" style={{ color: '#675DFF' }} />
+                  : <CheckCircle className="w-8 h-8" style={{ color: '#675DFF' }} />
+                }
               </div>
             </div>
             <div className="space-y-3">
-              <h2 className="text-2xl font-semibold text-white">
-                {isConfirmation ? 'Confirme seu email' : 'Conta Criada!'}
+              <h2 style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>
+                {isConfirmation ? 'Confirme seu email' : 'Conta criada!'}
               </h2>
               {isConfirmation ? (
-                <div className="space-y-3 text-sm text-muted-foreground/70">
+                <div className="space-y-2" style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
                   <p>Verifique seu email para confirmar a conta antes de acessar o painel.</p>
-                  {pendingEmail && (
-                    <p className="text-foreground/80">
-                      Enviamos o link para <span className="text-white font-medium">{pendingEmail}</span>.
-                    </p>
-                  )}
-                  <p>Se não encontrar o email, verifique a pasta de spam ou promoções.</p>
+                  {pendingEmail && <p>Enviamos o link para <span style={{ fontWeight: 500, color: '#1A2C44' }}>{pendingEmail}</span>.</p>}
+                  <p>Verifique também a pasta de spam ou promoções.</p>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground/70">
-                  Bem-vindo ao LeadFlow CRM. Redirecionando para o painel...
+                <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
+                  Bem-vindo ao LeadsFlow CRM. Redirecionando para o painel...
                 </p>
               )}
             </div>
-
             {isConfirmation ? (
               <div className="flex flex-col gap-3">
                 <Button
                   onClick={async () => {
                     if (!pendingEmail || resendState === 'loading') return;
                     try {
-                      setResendState('loading');
-                      setResendMessage('');
+                      setResendState('loading'); setResendMessage('');
                       await authApi.resendConfirmation(pendingEmail);
-                      setResendState('sent');
-                      setResendMessage('Email reenviado! Verifique sua caixa de entrada ou spam.');
+                      setResendState('sent'); setResendMessage('Email reenviado! Verifique sua caixa de entrada ou spam.');
                     } catch (resendErr: any) {
-                      console.error('[Signup] Resend confirmation error:', resendErr);
                       setResendState('error');
-                      setResendMessage(resendErr?.message || 'Não foi possível reenviar o email. Tente novamente em instantes.');
+                      setResendMessage(resendErr?.message || 'Não foi possível reenviar o email.');
                     }
                   }}
                   disabled={!pendingEmail || resendState === 'loading'}
-                  variant="outline"
-                  className="w-full py-3 bg-transparent border border-[#2a2a2a] text-foreground/80 hover:bg-[#1a1a1a] rounded-xl"
-                >
+                  style={{ width: '100%', background: 'rgba(239,239,239,0.3)', border: '1px solid #D4DEE9', borderRadius: '6px', height: '44px', fontSize: '14px', color: '#414552', fontWeight: 300 }}
+                  className="transition-all hover:border-[#A497FC] disabled:opacity-60">
                   {resendState === 'loading' ? 'Reenviando...' : 'Reenviar email de confirmação'}
                 </Button>
                 {resendMessage && (
-                  <p className={`text-xs ${resendState === 'error' ? 'text-red-300' : 'text-[#00C48C]'}`}>
-                    {resendMessage}
-                  </p>
+                  <p style={{ fontSize: '13px', color: resendState === 'error' ? '#E61947' : '#059669' }}>{resendMessage}</p>
                 )}
-                <Button
-                  onClick={onSwitchToLogin}
-                  className="w-full py-3 bg-[#00C48C] hover:bg-[#00a576] text-white rounded-xl"
-                >
+                <Button onClick={onSwitchToLogin}
+                  style={{ width: '100%', background: '#675DFF', borderRadius: '6px', height: '44px', fontSize: '14px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
+                  className="transition-all hover:brightness-110">
                   Ir para o login
                 </Button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStatus('idle');
-                    setPendingEmail('');
-                    setError('');
-                    setResendState('idle');
-                    setResendMessage('');
-                  }}
-                  className="text-sm text-zinc-500 hover:text-white"
-                >
+                <button type="button" style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}
+                  className="transition-colors hover:text-[#533AFD]"
+                  onClick={() => { setStatus('idle'); setPendingEmail(''); setError(''); setResendState('idle'); setResendMessage(''); }}>
                   Voltar e tentar outro email
                 </button>
               </div>
             ) : (
               <div className="flex items-center justify-center gap-2">
-                <div className="w-2 h-2 bg-[#00C48C] rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-[#00C48C] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-[#00C48C] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                {[0, 0.1, 0.2].map((delay, i) => (
+                  <div key={i} className="w-2 h-2 rounded-full animate-bounce" style={{ background: '#675DFF', animationDelay: `${delay}s` }} />
+                ))}
               </div>
             )}
           </div>
@@ -235,264 +218,136 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
   }
 
   return (
-    <div className="min-h-screen flex bg-[#0a0a0a] relative">
-      {/* Left Column - Premium Visual */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden" style={{ background: '#07100d' }}>
-        {/* Dot grid pattern */}
-        <div className="absolute inset-0" style={{
-          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px)',
-          backgroundSize: '28px 28px',
-        }} />
+    <div className="min-h-screen relative flex items-center justify-center py-16 px-4 overflow-hidden"
+      style={{ background: 'transparent', fontFamily: FONT }}>
 
-        {/* Brand glow orbs */}
-        <div className="absolute" style={{
-          top: '10%', left: '-5%',
-          width: '560px', height: '560px',
-          background: 'radial-gradient(circle, rgba(0,196,140,0.13) 0%, transparent 65%)',
-        }} />
-        <div className="absolute" style={{
-          bottom: '5%', right: '-10%',
-          width: '380px', height: '380px',
-          background: 'radial-gradient(circle, rgba(0,196,140,0.07) 0%, transparent 65%)',
-        }} />
+      {/* Column: Logo + Card */}
+      <div className="relative z-10 w-full max-w-[520px] flex flex-col">
 
-        {/* Right edge separator */}
-        <div className="absolute inset-y-0 right-0 w-px bg-white/5" />
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between w-full p-14 h-full">
-
-          {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-[#00C48C] rounded-lg flex items-center justify-center shadow-lg shadow-[#00C48C]/40">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-white text-xl font-semibold tracking-tight">LeadsFlow</span>
+        {/* Logo acima do card */}
+        <div className="flex items-center gap-2.5 mb-8">
+          <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
+            style={{ background: '#675DFF', boxShadow: '0 2px 12px rgba(103,93,255,0.45)' }}>
+            <Zap className="w-5 h-5 text-white" />
           </div>
-
-          {/* Slide content */}
-          <div className="relative min-h-[280px] flex items-center">
-            {SLIDES.map((slide, i) => (
-              <div
-                key={i}
-                className="absolute inset-0 flex flex-col justify-center transition-all duration-700"
-                style={{
-                  opacity: i === currentSlide ? 1 : 0,
-                  transform: i === currentSlide ? 'translateY(0)' : 'translateY(18px)',
-                  pointerEvents: i === currentSlide ? 'auto' : 'none',
-                }}
-              >
-                <h2 className="text-white text-[2.6rem] font-semibold leading-snug mb-4 whitespace-pre-line tracking-tight">
-                  {slide.title}
-                </h2>
-                <p className="text-zinc-400 text-base leading-relaxed max-w-[300px]">
-                  {slide.subtitle}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Bottom: stats + indicators */}
-          <div className="space-y-7">
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { value: '10k+', label: 'Leads gerenciados' },
-                { value: '98%', label: 'Taxa de entrega' },
-                { value: '5★', label: 'Avaliação média' },
-              ].map((stat) => (
-                <div key={stat.label} className="px-4 py-3.5 rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div className="text-white text-xl font-bold mb-0.5">{stat.value}</div>
-                  <div className="text-zinc-500 text-xs">{stat.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Slide indicators */}
-            <div className="flex gap-2">
-              {SLIDES.map((_, j) => (
-                <button
-                  key={j}
-                  onClick={() => setCurrentSlide(j)}
-                  className={`h-[2px] rounded-full transition-all duration-500 ${
-                    j === currentSlide ? 'w-10 bg-[#00C48C]' : 'w-4 bg-white/15 hover:bg-white/30'
-                  }`}
-                  aria-label={`Slide ${j + 1}`}
-                />
-              ))}
-            </div>
-          </div>
+          <span className="text-[19px] font-semibold text-white tracking-tight">LeadsFlow</span>
         </div>
-      </div>
 
-      {/* Right Column - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-10 sm:px-6 sm:py-12 lg:px-16 bg-[#0a0a0a] overflow-y-auto">
-        <div className="w-full max-w-md">
+        <div className="rounded-[12px] p-10"
+          style={{ background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 4px 16px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.06)', backdropFilter: 'blur(20px)' }}>
 
-          {/* Mobile Logo */}
-          <div className="lg:hidden flex justify-center mb-6">
-            <div className="w-16 h-16 bg-[#00C48C] rounded-2xl flex items-center justify-center shadow-lg shadow-[#00C48C]/30">
-              <Zap className="w-9 h-9 text-white" />
+          {/* Title */}
+          <h1 style={{ fontSize: '28px', fontWeight: 600, color: '#1A2C44', marginBottom: '4px' }}>Criar uma conta</h1>
+          <p style={{ fontSize: '15px', color: '#6B7280', fontWeight: 300, marginBottom: '28px' }}>
+            Já tem uma conta?{' '}
+            <button onClick={onSwitchToLogin} style={{ color: '#533AFD', fontWeight: 400 }} className="transition-colors hover:text-[#635BFF]">Entrar</button>
+          </p>
+
+          {/* Error */}
+          {error && (
+            <div className="mb-5 p-4 rounded-[8px] flex items-start gap-3 animate-in fade-in duration-200"
+              style={{ background: '#FFF0F3', border: '1px solid rgba(230,25,71,0.3)' }}>
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#E61947' }} />
+              <p style={{ fontSize: '13px', color: '#C0123C', fontWeight: 300 }}>{error}</p>
             </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleEmailSignup} className="space-y-5 mb-6">
+            {/* Email */}
+            <div>
+              <label htmlFor="email" style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: '#414552', marginBottom: '8px' }}>Email</label>
+              <Input id="email" type="email" placeholder="seu@email.com" value={email}
+                onChange={(e) => { setEmail(e.target.value); if (error) setError(''); }}
+                style={{ width: '100%', height: '48px', paddingLeft: '14px', background: '#FFFFFF', border: '1px solid #D4DEE9', borderRadius: '6px', fontSize: '16px', color: '#273951', caretColor: '#675DFF' }}
+                className="placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]" required />
+            </div>
+
+            {/* Company name */}
+            <div>
+              <label htmlFor="name" style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: '#414552', marginBottom: '8px' }}>Nome da Empresa</label>
+              <Input id="name" type="text" placeholder="Nome da sua empresa" value={name} onChange={(e) => setName(e.target.value)}
+                style={{ width: '100%', height: '48px', paddingLeft: '14px', background: '#FFFFFF', border: '1px solid #D4DEE9', borderRadius: '6px', fontSize: '16px', color: '#273951', caretColor: '#675DFF' }}
+                className="placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]" required />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label htmlFor="password" style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: '#414552', marginBottom: '8px' }}>Senha</label>
+              <div className="relative">
+                <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="Mínimo 6 caracteres" value={password}
+                  onChange={(e) => { setPassword(e.target.value); if (error) setError(''); }}
+                  style={{ width: '100%', height: '48px', paddingLeft: '14px', paddingRight: '48px', background: '#FFFFFF', border: '1px solid #D4DEE9', borderRadius: '6px', fontSize: '16px', color: '#273951', caretColor: '#675DFF' }}
+                  className="placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]" required />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: '#8A9BB0' }}>
+                  {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Terms */}
+            <div className="flex items-start gap-3">
+              <input type="checkbox" id="terms" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded cursor-pointer accent-[#675DFF]" />
+              <label htmlFor="terms" className="cursor-pointer" style={{ fontSize: '13px', color: '#3C4257', fontWeight: 300 }}>
+                Concordo com os{' '}
+                <a href="#terms" style={{ color: '#533AFD' }} className="underline transition-colors hover:text-[#635BFF]">Termos e Condições</a>
+              </label>
+            </div>
+
+            {/* Submit */}
+            <Button type="submit" disabled={loading || !agreeTerms}
+              style={{
+                width: '100%', height: '50px', fontSize: '16px', fontWeight: 500,
+                borderRadius: '6px', border: 'none', marginTop: '8px',
+                background: loading || !agreeTerms ? '#D4DEE9' : '#675DFF',
+                color: loading || !agreeTerms ? '#3C4257' : '#FFFFFF',
+                boxShadow: loading || !agreeTerms ? 'none' : '0 0 0 1px #675DFF',
+                transition: 'background-color 200ms ease',
+              }}
+              className="transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60">
+              {loading
+                ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Criando conta...</span>
+                : 'Criar conta'
+              }
+            </Button>
+          </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 border-t" style={{ borderColor: '#D4DEE9' }} />
+            <span style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}>ou registre-se com</span>
+            <div className="flex-1 border-t" style={{ borderColor: '#D4DEE9' }} />
           </div>
 
-          {/* Card wrapper */}
-          <div className="bg-[#0d0d0d] border border-zinc-800 rounded-3xl p-6 sm:p-8 lg:p-0 lg:bg-transparent lg:border-0 lg:rounded-none">
+          {/* Google */}
+          <Button type="button" onClick={handleGoogleSignup} disabled={loading}
+            style={{ width: '100%', height: '48px', fontSize: '15px', fontWeight: 400, borderRadius: '6px', background: '#FFFFFF', border: '1px solid #D4DEE9', color: '#414552', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+            className="flex items-center justify-center gap-3 transition-all hover:border-[#A497FC] hover:shadow-sm disabled:opacity-50">
+            <GoogleIcon /><span>Registrar com Google</span>
+          </Button>
 
-            {/* Title */}
-            <div className="mb-8">
-              <h1 className="text-white text-3xl sm:text-4xl font-semibold mb-2 tracking-tight">Criar uma conta</h1>
-              <p className="text-zinc-500 text-sm">
-                Já tem uma conta?{' '}
-                <button
-                  onClick={onSwitchToLogin}
-                  className="text-[#00C48C] hover:text-[#00a576] font-medium"
-                >
-                  Entrar
-                </button>
-              </p>
+          {/* Rating — dentro do card */}
+          {ratings && ratings.total > 0 && (
+            <div className="flex items-center justify-center gap-2 mt-5 pt-4 border-t" style={{ borderColor: '#EEF0F3' }}>
+              <div className="flex gap-0.5">
+                {[1,2,3,4,5].map(n => (
+                  <Star key={n} className="w-3.5 h-3.5"
+                    fill={n <= Math.round(ratings.average) ? '#FBBF24' : 'none'}
+                    stroke={n <= Math.round(ratings.average) ? '#FBBF24' : '#D4DEE9'} strokeWidth={1.5} />
+                ))}
+              </div>
+              <span style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}>
+                {ratings.average.toFixed(1)} de 5 · <span style={{ color: '#B0B8C4' }}>{ratings.total} avaliações</span>
+              </span>
             </div>
-
-            {/* Error */}
-            {error && (
-              <div className="mb-6 p-4 rounded-xl border bg-red-500/10 border-red-500/30 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-300">{error}</p>
-              </div>
-            )}
-
-            {/* Form */}
-            <form onSubmit={handleEmailSignup} className="space-y-5 mb-6">
-
-              {/* Email */}
-              <div>
-                <Label htmlFor="email" className="text-sm font-medium text-zinc-200 mb-2 block">
-                  Email
-                </Label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-zinc-500 pointer-events-none" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={email}
-                    onChange={(e) => { setEmail(e.target.value); if (error) setError(''); }}
-                    style={{ color: '#fff', caretColor: '#00C48C' }}
-                    className="w-full pl-12 pr-4 h-14 text-base bg-zinc-900 border border-zinc-700 placeholder:text-zinc-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00C48C]/20 focus:border-[#00C48C] transition-all"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Company Name */}
-              <div>
-                <Label htmlFor="name" className="text-sm font-medium text-zinc-200 mb-2 block">
-                  Nome da Empresa
-                </Label>
-                <div className="relative">
-                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-zinc-500 pointer-events-none" />
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="Nome da sua empresa"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    style={{ color: '#fff', caretColor: '#00C48C' }}
-                    className="w-full pl-12 pr-4 h-14 text-base bg-zinc-900 border border-zinc-700 placeholder:text-zinc-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00C48C]/20 focus:border-[#00C48C] transition-all"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div>
-                <Label htmlFor="password" className="text-sm font-medium text-zinc-200 mb-2 block">
-                  Senha
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-zinc-500 pointer-events-none" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Mínimo 6 caracteres"
-                    value={password}
-                    onChange={(e) => { setPassword(e.target.value); if (error) setError(''); }}
-                    style={{ color: '#fff', caretColor: '#00C48C' }}
-                    className="w-full pl-12 pr-14 h-14 text-base bg-zinc-900 border border-zinc-700 placeholder:text-zinc-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00C48C]/20 focus:border-[#00C48C] transition-all"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Terms */}
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  id="terms"
-                  checked={agreeTerms}
-                  onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="mt-1 w-4 h-4 border border-zinc-700 rounded bg-zinc-900 text-[#00C48C] focus:ring-[#00C48C] accent-[#00C48C]"
-                />
-            <label htmlFor="terms" className="text-sm text-zinc-500">
-                  Eu concordo com os{' '}
-                  <a href="#terms" className="text-[#00C48C] hover:text-[#00a576] underline">
-                    Termos e Condições
-                  </a>
-                </label>
-              </div>
-
-              {/* Submit */}
-              <Button
-                type="submit"
-                disabled={loading || !agreeTerms}
-                style={{
-                  background: (loading || !agreeTerms) ? '' : 'linear-gradient(135deg, #00C48C 0%, #00a576 100%)',
-                  boxShadow: (loading || !agreeTerms) ? 'none' : '0 4px 24px rgba(0,196,140,0.28)',
-                }}
-                className="w-full h-14 text-base bg-[#00C48C] text-white font-semibold rounded-xl transition-all hover:brightness-110 hover:shadow-[0_6px_28px_rgba(0,196,140,0.38)] active:scale-[0.985] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" /> Criando conta...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">Criar conta <span className="opacity-70 text-lg leading-none">→</span></span>
-                )}
-              </Button>
-            </form>
-
-            {/* Divider */}
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-zinc-800"></div>
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="px-3 bg-[#0a0a0a] text-zinc-600 uppercase tracking-wider font-medium">ou registre-se com</span>
-              </div>
-            </div>
-
-            {/* Google */}
-            <Button
-              type="button"
-              onClick={handleGoogleSignup}
-              disabled={loading}
-              className="w-full h-14 text-base bg-white hover:bg-zinc-100 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-3 transition-all hover:shadow-lg active:scale-[0.985] shadow-sm disabled:opacity-50"
-            >
-              <GoogleIcon />
-              <span>Registrar com Google</span>
-            </Button>
-
-          </div>{/* end card */}
+          )}
         </div>
       </div>
     </div>
   );
 }
+
 

@@ -46,8 +46,14 @@ export interface Channel {
         business_hours?: {
             enabled: boolean;
             timezone: string;
-            schedule: Record<string, { start: string; end: string }>;
+            offlineMessage?: string;
+            schedule: Record<string, { open: string; close: string } | null>;
         };
+        // Website widget specific
+        primary_color?: string;
+        welcome_message?: string;
+        position?: 'bottom-right' | 'bottom-left';
+        [key: string]: any;
     };
     last_sync_at?: string;
     created_at: string;

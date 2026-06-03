@@ -9,23 +9,27 @@ import {
   ChevronRight,
   ShieldCheck,
   DoorOpen,
+  MessageSquare,
 } from 'lucide-react';
 
+export type AdminTab = 'dashboard' | 'users' | 'activity' | 'marketing' | 'settings' | 'feedback';
+
 interface AdminLayoutProps {
-  activeTab: 'dashboard' | 'users' | 'activity' | 'marketing' | 'settings';
-  onTabChange: (tab: 'dashboard' | 'users' | 'activity' | 'marketing' | 'settings') => void;
+  activeTab: AdminTab;
+  onTabChange: (tab: AdminTab) => void;
   onBack: () => void;
   adminEmail?: string;
   children: React.ReactNode;
 }
 
-const navItems = [
+const navItems: { id: AdminTab; label: string; icon: React.ComponentType<any> }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'users', label: 'Usuários', icon: Users },
   { id: 'activity', label: 'Atividade', icon: BarChart3 },
   { id: 'marketing', label: 'Marketing', icon: Megaphone },
+  { id: 'feedback', label: 'Feedbacks', icon: MessageSquare },
   { id: 'settings', label: 'Configurações', icon: Settings },
-] as const;
+];
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   activeTab,

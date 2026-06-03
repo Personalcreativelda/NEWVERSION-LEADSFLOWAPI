@@ -2,8 +2,16 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Mail, Lock, AlertCircle, LogIn, Eye, EyeOff, Zap, X, Loader2 } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Eye, EyeOff, Zap, Loader2, Star } from 'lucide-react';
 import { authApi } from '../../utils/api';
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
+
+interface RatingSummary {
+  average: number;
+  total: number;
+  reviews: { stars: number; message: string; user_name: string; created_at: string }[];
+}
 
 // Google icon SVG
 const GoogleIcon = () => (
@@ -31,26 +39,10 @@ interface ErrorState {
   type: ErrorType;
 }
 
-const SLIDES = [
-  {
-    image: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&q=80',
-    title: 'Gerencie seus Leads,\nCresça seu Negócio',
-    subtitle: 'A solução CRM completa para empresas modernas',
-  },
-  {
-    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&q=80',
-    title: 'Automatize suas\nComunicações',
-    subtitle: 'WhatsApp, e-mail e muito mais em um só lugar',
-  },
-  {
-    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80',
-    title: 'Acompanhe Resultados\nem Tempo Real',
-    subtitle: 'Métricas e relatórios que impulsionam decisões',
-  },
-];
 
 export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForgotPassword, onBackToHome }: LoginPageProps) {
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [ratings, setRatings] = useState<RatingSummary | null>(null);
+  const [currentReview, setCurrentReview] = useState(0);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<ErrorState | null>(null);
@@ -115,13 +107,22 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Slideshow auto-advance
+  // Fetch real ratings summary
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % SLIDES.length);
-    }, 5000);
-    return () => clearInterval(timer);
+    fetch(`${API_URL}/api/feedback/summary`)
+      .then(r => r.json())
+      .then(data => { if (data.success) setRatings(data); })
+      .catch(() => {});
   }, []);
+
+  // Auto-rotate reviews
+  useEffect(() => {
+    if (!ratings?.reviews?.length) return;
+    const t = setInterval(() => {
+      setCurrentReview(prev => (prev + 1) % ratings.reviews.length);
+    }, 4000);
+    return () => clearInterval(t);
+  }, [ratings?.reviews?.length]);
 
   // ✅ Focar no erro quando aparecer (acessibilidade)
   useEffect(() => {
@@ -550,491 +551,318 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
     }
   };
 
+  const FONT = 'sohne-var, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+
   return (
-    <div className="min-h-screen flex bg-[#0a0a0a] relative">
-      {/* Left Column - Premium Visual */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden" style={{ background: '#07100d' }}>
-        {/* Dot grid pattern */}
-        <div className="absolute inset-0" style={{
-          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px)',
-          backgroundSize: '28px 28px',
-        }} />
+    <div className="min-h-screen relative flex items-center justify-center py-16 px-4 overflow-hidden"
+      style={{ background: 'transparent', fontFamily: FONT }}>
 
-        {/* Brand glow orbs */}
-        <div className="absolute" style={{
-          top: '10%', left: '-5%',
-          width: '560px', height: '560px',
-          background: 'radial-gradient(circle, rgba(0,196,140,0.13) 0%, transparent 65%)',
-        }} />
-        <div className="absolute" style={{
-          bottom: '5%', right: '-10%',
-          width: '380px', height: '380px',
-          background: 'radial-gradient(circle, rgba(0,196,140,0.07) 0%, transparent 65%)',
-        }} />
+      {/* ── CARD + LOGO (coluna centrada) ─────────────────────────── */}
+      <div className="relative z-10 w-full max-w-[520px] flex flex-col">
 
-        {/* Right edge separator */}
-        <div className="absolute inset-y-0 right-0 w-px bg-white/5" />
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between w-full p-14 h-full">
-
-          {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-[#00C48C] rounded-lg flex items-center justify-center shadow-lg shadow-[#00C48C]/40">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-white text-xl font-semibold tracking-tight">LeadsFlow</span>
+        {/* Logo — acima do card, alinhado à esquerda */}
+        <div className="flex items-center gap-2.5 mb-8">
+          <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
+            style={{ background: '#675DFF', boxShadow: '0 2px 12px rgba(103,93,255,0.45)' }}>
+            <Zap className="w-5 h-5 text-white" />
           </div>
-
-          {/* Slide content */}
-          <div className="relative min-h-[280px] flex items-center">
-            {SLIDES.map((slide, i) => (
-              <div
-                key={i}
-                className="absolute inset-0 flex flex-col justify-center transition-all duration-700"
-                style={{
-                  opacity: i === currentSlide ? 1 : 0,
-                  transform: i === currentSlide ? 'translateY(0)' : 'translateY(18px)',
-                  pointerEvents: i === currentSlide ? 'auto' : 'none',
-                }}
-              >
-                <h2 className="text-white text-[2.6rem] font-semibold leading-snug mb-4 whitespace-pre-line tracking-tight">
-                  {slide.title}
-                </h2>
-                <p className="text-zinc-400 text-base leading-relaxed max-w-[300px]">
-                  {slide.subtitle}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Bottom: stats + indicators */}
-          <div className="space-y-7">
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { value: '10k+', label: 'Leads gerenciados' },
-                { value: '98%', label: 'Taxa de entrega' },
-                { value: '5★', label: 'Avaliação média' },
-              ].map((stat) => (
-                <div key={stat.label} className="px-4 py-3.5 rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div className="text-white text-xl font-bold mb-0.5">{stat.value}</div>
-                  <div className="text-zinc-500 text-xs">{stat.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Slide indicators */}
-            <div className="flex gap-2">
-              {SLIDES.map((_, j) => (
-                <button
-                  key={j}
-                  onClick={() => setCurrentSlide(j)}
-                  className={`h-[2px] rounded-full transition-all duration-500 ${
-                    j === currentSlide ? 'w-10 bg-[#00C48C]' : 'w-4 bg-white/15 hover:bg-white/30'
-                  }`}
-                  aria-label={`Slide ${j + 1}`}
-                />
-              ))}
-            </div>
-          </div>
+          <span className="text-[19px] font-semibold text-white tracking-tight">LeadsFlow</span>
         </div>
-      </div>
 
-      {/* Right Column - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-10 sm:px-6 sm:py-12 lg:px-16 bg-[#0a0a0a] overflow-y-auto">
-        <div className="w-full max-w-md">
+        <div className="rounded-[12px] p-10"
+          style={{
+            background: 'rgba(255,255,255,0.97)',
+            border: '1px solid rgba(255,255,255,0.3)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.06)',
+            backdropFilter: 'blur(20px)',
+          }}>
 
-          {/* Mobile Logo — outside the card, centered above it */}
-          <div className="lg:hidden flex justify-center mb-6">
-            <div className="w-16 h-16 bg-[#00C48C] rounded-2xl flex items-center justify-center shadow-lg shadow-[#00C48C]/30">
-              <Zap className="w-9 h-9 text-white" />
-            </div>
-          </div>
-
-          {/* Mobile card wrapper */}
-          <div className="bg-[#0d0d0d] border border-zinc-800 rounded-3xl p-6 sm:p-8 lg:p-0 lg:bg-transparent lg:border-0 lg:rounded-none">
           {/* Title */}
-          <div className="mb-8">
-            <h1 className="text-white text-3xl sm:text-4xl font-semibold mb-2 tracking-tight">Entrar na conta</h1>
-            <p className="text-zinc-500 text-sm">Bem-vindo de volta</p>
-          </div>
+          <h1 className="text-[28px] font-semibold leading-[36px] mb-2" style={{ color: '#1A2C44' }}>
+            Entrar na conta
+          </h1>
+          <p className="text-[15px] mb-7" style={{ color: '#6B7280', fontWeight: 300 }}>
+            Bem-vindo de volta
+          </p>
 
-          {/* ✅ ALERTA DE ERRO MELHORADO */}
+          {/* Error */}
           {error && (
-            <div 
-              ref={errorRef}
-              role="alert"
-              aria-live="assertive"
-              tabIndex={-1}
-              className={`mb-6 p-4 rounded-xl border flex items-start gap-3 transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${
-                error.type === 'invalid_credentials' || error.type === 'not_found' || error.type === 'network'
-                  ? 'bg-red-500/10 border-red-500/30'
-                  : error.type === 'rate_limit'
-                  ? 'bg-yellow-500/10 border-yellow-500/30'
-                  : 'bg-red-500/10 border-red-500/30'
-              }`}
-            >
-              <AlertCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
-                error.type === 'rate_limit' ? 'text-yellow-400' : 'text-red-400'
-              }`} />
-              <div className="flex-1">
-                <p className={`text-sm whitespace-pre-line ${
-                  error.type === 'rate_limit' ? 'text-yellow-300' : 'text-red-300'
-                }`}>
-                  {error.message}
-                </p>
-              </div>
+            <div ref={errorRef} role="alert" aria-live="assertive" tabIndex={-1}
+              className="mb-5 p-4 rounded-[8px] flex items-start gap-3 animate-in fade-in duration-200"
+              style={{
+                background: error.type === 'rate_limit' ? '#FFF8E6' : '#FFF0F3',
+                border: `1px solid ${error.type === 'rate_limit' ? 'rgba(204,75,0,0.3)' : 'rgba(230,25,71,0.3)'}`,
+              }}>
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: error.type === 'rate_limit' ? '#CC4B00' : '#E61947' }} />
+              <p className="text-[13px] leading-[18px] whitespace-pre-line" style={{ color: error.type === 'rate_limit' ? '#CC4B00' : '#C0123C', fontWeight: 300 }}>
+                {error.message}
+              </p>
             </div>
           )}
 
-          {/* Email Login Form */}
+          {/* Form */}
           <form onSubmit={handleEmailLogin} className="space-y-5 mb-6">
+            {/* Email */}
             <div>
-              <Label htmlFor="email" className="text-sm font-medium text-zinc-200 mb-2 block">
-                Email
-              </Label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-zinc-500 pointer-events-none" />
-                <Input
-                  ref={emailRef}
-                  id="email"
-                  type="email"
-                  placeholder="Digite seu email"
-                  value={email}
-                  onChange={(e) => handleEmailChange(e.target.value)}
-                  style={{ color: '#fff', caretColor: '#00C48C' }}
-                  className={`w-full pl-12 pr-4 h-14 text-base bg-zinc-900 placeholder:text-zinc-600 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-[#00C48C]/20 ${
-                    fieldErrors.email
-                      ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20'
-                      : 'border-zinc-700 focus:border-[#00C48C]'
-                  }`}
-                  required
-                  aria-invalid={!!fieldErrors.email}
-                  aria-describedby={fieldErrors.email ? 'email-error' : undefined}
-                />
-                {fieldErrors.email && (
-                  <p id="email-error" className="text-sm text-red-400 mt-1.5 flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    {fieldErrors.email}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label htmlFor="password" className="text-sm font-medium text-zinc-200">
-                  Senha
-                </Label>
-                <button
-                  type="button"
-                  onClick={() => onForgotPassword ? onForgotPassword() : setShowForgotPassword(true)}
-                  className="text-sm text-[#00C48C] hover:text-[#00a576] transition-colors"
-                >
-                  Esqueceu a senha?
-                </button>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-zinc-500 pointer-events-none" />
-                <Input
-                  ref={passwordRef}
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Digite sua senha"
-                  value={password}
-                  onChange={(e) => handlePasswordChange(e.target.value)}
-                  style={{ color: '#fff', caretColor: '#00C48C' }}
-                  className={`w-full pl-12 pr-14 h-14 text-base bg-zinc-900 placeholder:text-zinc-600 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-[#00C48C]/20 ${
-                    fieldErrors.password
-                      ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20'
-                      : 'border-zinc-700 focus:border-[#00C48C]'
-                  }`}
-                  required
-                  aria-invalid={!!fieldErrors.password}
-                  aria-describedby={fieldErrors.password ? 'password-error' : undefined}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {fieldErrors.password && (
-                <p id="password-error" className="text-sm text-red-400 mt-1.5 flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  {fieldErrors.password}
+              <label htmlFor="email" style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px', fontWeight: 500 }}>Email</label>
+              <Input ref={emailRef} id="email" type="email" placeholder="seu@email.com" value={email}
+                onChange={(e) => handleEmailChange(e.target.value)} required
+                aria-invalid={!!fieldErrors.email} aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+                style={{
+                  width: '100%', height: '48px', paddingLeft: '14px', paddingRight: '14px',
+                  background: '#FFFFFF', border: `1px solid ${fieldErrors.email ? '#E61947' : '#D4DEE9'}`,
+                  borderRadius: '6px', fontSize: '16px', color: '#273951', caretColor: '#675DFF',
+                  boxShadow: fieldErrors.email ? '0 0 0 4px rgba(230,25,71,0.1)' : 'none',
+                }}
+                className="placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]"
+              />
+              {fieldErrors.email && (
+                <p id="email-error" className="mt-1.5 flex items-center gap-1" style={{ fontSize: '13px', color: '#E61947', fontWeight: 300 }}>
+                  <AlertCircle className="w-3.5 h-3.5" />{fieldErrors.email}
                 </p>
               )}
             </div>
 
-            <Button
-              type="submit"
+            {/* Password */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="password" style={{ fontSize: '14px', color: '#414552', fontWeight: 500 }}>Senha</label>
+                <button type="button"
+                  onClick={() => onForgotPassword ? onForgotPassword() : setShowForgotPassword(true)}
+                  style={{ fontSize: '14px', color: '#533AFD', fontWeight: 300 }}
+                  className="transition-colors hover:text-[#635BFF]">
+                  Esqueceu a senha?
+                </button>
+              </div>
+              <div className="relative">
+                <Input ref={passwordRef} id="password" type={showPassword ? 'text' : 'password'}
+                  placeholder="Sua senha" value={password}
+                  onChange={(e) => handlePasswordChange(e.target.value)} required
+                  aria-invalid={!!fieldErrors.password} aria-describedby={fieldErrors.password ? 'password-error' : undefined}
+                  style={{
+                    width: '100%', height: '48px', paddingLeft: '14px', paddingRight: '48px',
+                    background: '#FFFFFF', border: `1px solid ${fieldErrors.password ? '#E61947' : '#D4DEE9'}`,
+                    borderRadius: '6px', fontSize: '16px', color: '#273951', caretColor: '#675DFF',
+                    boxShadow: fieldErrors.password ? '0 0 0 4px rgba(230,25,71,0.1)' : 'none',
+                  }}
+                  className="placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]"
+                />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: '#8A9BB0' }}>
+                  {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
+                </button>
+              </div>
+              {fieldErrors.password && (
+                <p id="password-error" className="mt-1.5 flex items-center gap-1" style={{ fontSize: '13px', color: '#E61947', fontWeight: 300 }}>
+                  <AlertCircle className="w-3.5 h-3.5" />{fieldErrors.password}
+                </p>
+              )}
+            </div>
+
+            {/* Primary button */}
+            <Button type="submit"
               disabled={loading || (lockUntil !== null && Date.now() < lockUntil)}
               style={{
-                background: loading ? '#00a576' : 'linear-gradient(135deg, #00C48C 0%, #00a576 100%)',
-                boxShadow: loading ? 'none' : '0 4px 24px rgba(0,196,140,0.28)',
+                width: '100%', height: '50px', fontSize: '16px', fontWeight: 500,
+                borderRadius: '6px', border: 'none', marginTop: '8px',
+                background: loading || (lockUntil !== null && Date.now() < lockUntil) ? '#D4DEE9' : '#675DFF',
+                color: loading || (lockUntil !== null && Date.now() < lockUntil) ? '#3C4257' : '#FFFFFF',
+                boxShadow: loading || (lockUntil !== null && Date.now() < lockUntil) ? 'none' : '0 0 0 1px #675DFF',
+                transition: 'background-color 200ms ease',
               }}
-              className="w-full h-14 text-base text-white font-semibold rounded-xl transition-all hover:brightness-110 hover:shadow-[0_6px_28px_rgba(0,196,140,0.38)] active:scale-[0.985] disabled:opacity-60 disabled:cursor-not-allowed"
-            >
+              className="transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60">
               {loading
-                ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Entrando...</span>
+                ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Entrando...</span>
                 : lockUntil && Date.now() < lockUntil
                   ? `Aguarde ${lockCountdown}s`
-                  : <span className="flex items-center gap-2">Entrar <span className="opacity-70 text-lg leading-none">→</span></span>
+                  : 'Entrar'
               }
             </Button>
           </form>
 
-          {/* Link criar conta */}
-          <p className="text-center text-zinc-500 text-sm mt-4 mb-2">
+          {/* Create account */}
+          <p className="text-center mb-6" style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
             Não tem uma conta?{' '}
-            <button
-              onClick={onSwitchToSignup}
-              className="text-[#00C48C] hover:text-[#00a576] font-medium"
-            >
+            <button onClick={onSwitchToSignup} style={{ color: '#533AFD', fontWeight: 400 }} className="transition-colors hover:text-[#635BFF]">
               Criar conta
             </button>
           </p>
 
           {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-zinc-800"></div>
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-3 bg-[#0a0a0a] text-zinc-600 uppercase tracking-wider font-medium">ou continue com</span>
-            </div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 border-t" style={{ borderColor: '#D4DEE9' }} />
+            <span style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}>ou continue com</span>
+            <div className="flex-1 border-t" style={{ borderColor: '#D4DEE9' }} />
           </div>
 
-          {/* Google Sign In Button */}
-          <Button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-            className="w-full h-14 mb-6 text-base bg-white hover:bg-zinc-100 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-3 transition-all hover:shadow-lg active:scale-[0.985] shadow-sm disabled:opacity-50"
-          >
-            <GoogleIcon />
-            <span>Entrar com Google</span>
+          {/* Google button */}
+          <Button type="button" onClick={handleGoogleSignIn} disabled={loading}
+            style={{
+              width: '100%', height: '48px', fontSize: '15px', fontWeight: 400,
+              borderRadius: '6px', background: '#FFFFFF', border: '1px solid #D4DEE9',
+              color: '#414552', boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}
+            className="flex items-center justify-center gap-3 transition-all hover:border-[#A497FC] hover:shadow-sm disabled:opacity-50">
+            <GoogleIcon /><span>Entrar com Google</span>
           </Button>
 
-          {/* Footer Debug Buttons */}
-          {debugMode && (
-            <div className="mt-8 flex flex-col gap-2">
-              <button
-                onClick={handleDebugSetup}
-                className="text-xs text-foreground/80 hover:text-muted-foreground transition-colors"
-              >
-                Debug Setup
-              </button>
-              <button
-                onClick={handleAdminSetup}
-                className="text-xs text-foreground/80 hover:text-muted-foreground transition-colors"
-              >
-                Admin Setup
-              </button>
+          {/* Rating — dentro do card */}
+          {ratings && ratings.total > 0 && (
+            <div className="flex items-center justify-center gap-2 mt-5 pt-4 border-t" style={{ borderColor: '#EEF0F3' }}>
+              <div className="flex gap-0.5">
+                {[1,2,3,4,5].map(n => (
+                  <Star key={n} className="w-3.5 h-3.5"
+                    fill={n <= Math.round(ratings.average) ? '#FBBF24' : 'none'}
+                    stroke={n <= Math.round(ratings.average) ? '#FBBF24' : '#D4DEE9'} strokeWidth={1.5} />
+                ))}
+              </div>
+              <span style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}>
+                {ratings.average.toFixed(1)} de 5 · <span style={{ color: '#B0B8C4' }}>{ratings.total} avaliações</span>
+              </span>
             </div>
           )}
-          </div>{/* end mobile card */}
+
+          {debugMode && (
+            <div className="flex flex-col gap-2 mt-4">
+              <button onClick={handleDebugSetup} style={{ fontSize: '12px', color: '#8A9BB0' }}>Debug Setup</button>
+              <button onClick={handleAdminSetup} style={{ fontSize: '12px', color: '#8A9BB0' }}>Admin Setup</button>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* ── VERIFICATION MODAL ─────────────────────────────────────── */}
       {verificationModalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
-          <div className="w-full max-w-md bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl shadow-2xl p-8 space-y-6">
+        <div className="fixed inset-0 flex items-center justify-center z-50 px-4"
+          style={{ background: 'rgba(26,44,68,0.55)', backdropFilter: 'blur(6px)' }}>
+          <div className="w-full max-w-md rounded-[12px] p-8 space-y-6"
+            style={{ background: '#FFFFFF', border: '1px solid #D4DEE9', boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 30px 80px rgba(48,49,61,0.1)', fontFamily: FONT }}>
             <div className="text-center space-y-2">
-              <div className="w-12 h-12 mx-auto rounded-full bg-[#00C48C]/10 flex items-center justify-center">
-                <Mail className="w-6 h-6 text-[#00C48C]" />
+              <div className="w-12 h-12 mx-auto rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(103,93,255,0.08)', border: '1px solid rgba(103,93,255,0.15)' }}>
+                <Mail className="w-6 h-6" style={{ color: '#675DFF' }} />
               </div>
-              <h3 className="text-white text-2xl font-semibold">Confirmar email</h3>
-              <p className="text-sm text-zinc-400">
-                Digite o código enviado para <span className="text-white font-medium">{verificationEmail}</span> para concluir o acesso.
+              <h3 style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Confirmar email</h3>
+              <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
+                Código enviado para <span style={{ fontWeight: 500, color: '#1A2C44' }}>{verificationEmail}</span>
               </p>
             </div>
-
             <form onSubmit={handleVerificationSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="verification-code" className="text-sm text-zinc-400 mb-2 block">
-                  Código de verificação
-                </Label>
-                <Input
-                  ref={verificationInputRef}
-                  id="verification-code"
-                  inputMode="numeric"
-                  placeholder="000000"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
-                  maxLength={6}
-                  style={{ color: '#fff', caretColor: '#00C48C' }}
-                  className="w-full px-4 py-3 bg-[#0a0a0a] border-[#2a2a2a] placeholder:text-zinc-600 rounded-xl focus:ring-2 focus:ring-[#00C48C] focus:border-[#00C48C] tracking-widest text-center"
+                <label style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px' }}>Código de verificação</label>
+                <Input ref={verificationInputRef} id="verification-code" inputMode="numeric" placeholder="000000"
+                  value={verificationCode} onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))} maxLength={6}
+                  style={{ width: '100%', height: '48px', background: '#FFFFFF', border: '1px solid #D4DEE9', borderRadius: '6px', fontSize: '22px', letterSpacing: '0.4em', textAlign: 'center', color: '#273951', caretColor: '#675DFF' }}
+                  className="placeholder:text-[#BFC8D6] focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)] transition-all"
                 />
               </div>
-
               {verificationFeedback && (
-                <p className={`text-sm ${verificationFeedback.type === 'error' ? 'text-red-300' : 'text-green-300'}`}>
-                  {verificationFeedback.text}
-                </p>
+                <p style={{ fontSize: '13px', color: verificationFeedback.type === 'error' ? '#E61947' : '#059669' }}>{verificationFeedback.text}</p>
               )}
-
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button
-                  type="submit"
-                  disabled={verificationStatus === 'loading'}
-                  className="flex-1 py-3 bg-[#00C48C] hover:bg-[#00a576] text-white rounded-xl"
-                >
+                <Button type="submit" disabled={verificationStatus === 'loading'}
+                  style={{ flex: 1, background: '#675DFF', borderRadius: '6px', height: '44px', fontSize: '14px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
+                  className="transition-all hover:brightness-110 disabled:opacity-60">
                   {verificationStatus === 'loading' ? 'Confirmando...' : 'Confirmar código'}
                 </Button>
-                <Button
-                  type="button"
-                  onClick={handleVerificationResend}
-                  disabled={resendStatus === 'loading'}
-                  variant="outline"
-                  className="flex-1 py-3 bg-transparent border-[#2a2a2a] text-foreground/80 hover:bg-[#1a1a1a] rounded-xl"
-                >
+                <Button type="button" onClick={handleVerificationResend} disabled={resendStatus === 'loading'}
+                  style={{ flex: 1, background: 'rgba(239,239,239,0.3)', border: '1px solid #D4DEE9', borderRadius: '6px', height: '44px', fontSize: '14px', color: '#414552', fontWeight: 300 }}
+                  className="transition-all hover:border-[#A497FC] disabled:opacity-60">
                   {resendStatus === 'loading' ? 'Reenviando...' : 'Reenviar email'}
                 </Button>
               </div>
-
               {resendFeedback && (
-                <p className={`text-xs ${resendFeedback.type === 'error' ? 'text-red-300' : 'text-green-300'}`}>
-                  {resendFeedback.text}
-                </p>
+                <p style={{ fontSize: '13px', color: resendFeedback.type === 'error' ? '#E61947' : '#059669' }}>{resendFeedback.text}</p>
               )}
             </form>
-
-            <button
-              type="button"
-              onClick={() => {
-                setVerificationModalOpen(false);
-                setVerificationCode('');
-                setVerificationFeedback(null);
-                setResendFeedback(null);
-                setResendStatus('idle');
-                setVerificationStatus('idle');
-              }}
-              className="text-sm text-zinc-500 hover:text-white"
-            >
+            <button type="button" style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}
+              className="transition-colors hover:text-[#533AFD]"
+              onClick={() => { setVerificationModalOpen(false); setVerificationCode(''); setVerificationFeedback(null); setResendFeedback(null); setResendStatus('idle'); setVerificationStatus('idle'); }}>
               Cancelar e voltar
             </button>
           </div>
         </div>
       )}
 
-      {/* 2FA Modal */}
+      {/* ── 2FA MODAL ──────────────────────────────────────────────── */}
       {show2FAModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="w-full max-w-sm bg-[#0d0d0d] border border-zinc-800 rounded-2xl shadow-2xl p-8 space-y-6">
+        <div className="fixed inset-0 flex items-center justify-center z-50 px-4"
+          style={{ background: 'rgba(26,44,68,0.55)', backdropFilter: 'blur(6px)' }}>
+          <div className="w-full max-w-sm rounded-[12px] p-8 space-y-6"
+            style={{ background: '#FFFFFF', border: '1px solid #D4DEE9', boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 30px 80px rgba(48,49,61,0.1)', fontFamily: FONT }}>
             <div className="text-center space-y-2">
-              <div className="w-12 h-12 mx-auto rounded-full bg-[#00C48C]/10 border border-[#00C48C]/20 flex items-center justify-center">
-                <Lock className="w-5 h-5 text-[#00C48C]" />
+              <div className="w-12 h-12 mx-auto rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(103,93,255,0.08)', border: '1px solid rgba(103,93,255,0.15)' }}>
+                <Lock className="w-5 h-5" style={{ color: '#675DFF' }} />
               </div>
-              <h3 className="text-white text-xl font-semibold">Verificação em dois fatores</h3>
-              <p className="text-zinc-400 text-sm">Abra o seu app autenticador e insira o código de 6 dígitos.</p>
+              <h3 style={{ fontSize: '20px', fontWeight: 600, color: '#1A2C44' }}>Verificação em dois fatores</h3>
+              <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>Insira o código de 6 dígitos do seu app autenticador.</p>
             </div>
             <form onSubmit={handle2FASubmit} className="space-y-4">
-              <Input
-                ref={twoFAInputRef}
-                inputMode="numeric"
-                placeholder="000000"
-                value={twoFACode}
-                onChange={(e) => { setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6)); setTwoFAError(null); }}
-                maxLength={6}
-                style={{ color: '#fff', caretColor: '#00C48C' }}
-                className="w-full px-4 h-14 text-center text-2xl tracking-[0.5em] bg-zinc-900 border border-zinc-700 placeholder:text-zinc-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00C48C]/20 focus:border-[#00C48C] transition-all"
+              <Input ref={twoFAInputRef} inputMode="numeric" placeholder="000000"
+                value={twoFACode} onChange={(e) => { setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6)); setTwoFAError(null); }} maxLength={6}
+                style={{ width: '100%', height: '56px', background: '#FFFFFF', border: '1px solid #D4DEE9', borderRadius: '6px', fontSize: '24px', letterSpacing: '0.5em', textAlign: 'center', color: '#273951', caretColor: '#675DFF' }}
+                className="placeholder:text-[#BFC8D6] focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)] transition-all"
               />
               {twoFAError && (
-                <p className="text-sm text-red-400 flex items-center gap-1">
+                <p className="flex items-center gap-1" style={{ fontSize: '13px', color: '#E61947' }}>
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />{twoFAError}
                 </p>
               )}
-              <Button
-                type="submit"
-                disabled={twoFAStatus === 'loading' || twoFACode.length < 6}
-                style={{ background: 'linear-gradient(135deg, #00C48C 0%, #00a576 100%)', boxShadow: '0 4px 24px rgba(0,196,140,0.25)' }}
-                className="w-full h-12 text-white font-semibold rounded-xl transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {twoFAStatus === 'loading'
-                  ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Verificando...</span>
-                  : 'Verificar'
-                }
+              <Button type="submit" disabled={twoFAStatus === 'loading' || twoFACode.length < 6}
+                style={{ width: '100%', background: '#675DFF', borderRadius: '6px', height: '44px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
+                className="transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed">
+                {twoFAStatus === 'loading' ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Verificando...</span> : 'Verificar'}
               </Button>
             </form>
-            <button
-              type="button"
-              onClick={() => { setShow2FAModal(false); setTwoFACode(''); setTwoFAError(null); }}
-              className="w-full text-sm text-zinc-500 hover:text-white transition-colors"
-            >
+            <button type="button" style={{ width: '100%', textAlign: 'center', fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}
+              className="transition-colors hover:text-[#533AFD]"
+              onClick={() => { setShow2FAModal(false); setTwoFACode(''); setTwoFAError(null); }}>
               Cancelar e voltar
             </button>
           </div>
         </div>
       )}
 
-      {/* Forgot Password Modal */}
+      {/* ── FORGOT PASSWORD MODAL ──────────────────────────────────── */}
       {showForgotPassword && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a1a] rounded-2xl shadow-lg p-10 max-w-md w-full space-y-6 border border-[#2a2a2a]">
-            <div className="text-center space-y-2">
-              <h3 className="text-white text-2xl font-semibold">Recuperar Senha</h3>
-              <p className="text-zinc-400 text-sm">
-                Digite seu email para receber o código de recuperação
-              </p>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          style={{ background: 'rgba(26,44,68,0.55)', backdropFilter: 'blur(6px)' }}>
+          <div className="rounded-[12px] p-8 max-w-md w-full space-y-6"
+            style={{ background: '#FFFFFF', border: '1px solid #D4DEE9', boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 30px 80px rgba(48,49,61,0.1)', fontFamily: FONT }}>
+            <div className="text-center space-y-1.5">
+              <h3 style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Recuperar senha</h3>
+              <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>Digite seu email para receber o link de recuperação</p>
             </div>
-
             {resetSuccess && (
-              <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
-                <p className="text-sm text-green-400">
-                  ✅ Email enviado com sucesso! Verifique sua caixa de entrada.
-                </p>
+              <div className="p-4 rounded-[8px]" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                <p style={{ fontSize: '14px', color: '#15803D' }}>✅ Email enviado! Verifique sua caixa de entrada.</p>
               </div>
             )}
-
             {error && (
-              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-300">{error.message}</p>
+              <div className="p-4 rounded-[8px] flex items-start gap-3" style={{ background: '#FFF0F3', border: '1px solid rgba(230,25,71,0.25)' }}>
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#E61947' }} />
+                <p style={{ fontSize: '13px', color: '#C0123C' }}>{error.message}</p>
               </div>
             )}
-
             <form onSubmit={(e) => { e.preventDefault(); handleForgotPassword(); }} className="space-y-4">
               <div>
-                <Label htmlFor="reset-email" className="text-sm text-zinc-400 mb-2 block">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="reset-email"
-                    type="email"
-                    placeholder="Digite seu email"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    style={{ color: '#fff', caretColor: '#00C48C' }}
-                    className="w-full pl-12 pr-4 py-3 bg-[#0a0a0a] border-[#2a2a2a] placeholder:text-zinc-600 rounded-xl focus:ring-2 focus:ring-[#00C48C]"
-                    required
-                  />
-                </div>
+                <label style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px' }}>Email</label>
+                <Input id="reset-email" type="email" placeholder="seu@email.com" value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  style={{ width: '100%', height: '44px', paddingLeft: '12px', background: '#FFFFFF', border: '1px solid #D4DEE9', borderRadius: '6px', fontSize: '16px', color: '#273951', caretColor: '#675DFF' }}
+                  className="placeholder:text-[#BFC8D6] focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)] transition-all" required />
               </div>
-
               <div className="flex gap-3">
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setShowForgotPassword(false);
-                    setResetEmail('');
-                    setError(null);
-                  }}
-                  variant="outline"
-                  className="flex-1 py-3 bg-transparent border-[#2a2a2a] text-foreground/80 hover:bg-[#0a0a0a] rounded-xl"
-                >
-                  Cancelar
+                <Button type="button" onClick={() => { setShowForgotPassword(false); setResetEmail(''); setError(null); }}
+                  style={{ flex: 1, background: 'rgba(239,239,239,0.3)', border: '1px solid #D4DEE9', borderRadius: '6px', height: '44px', fontSize: '14px', color: '#414552', fontWeight: 300 }}
+                  className="transition-all hover:border-[#A497FC]">Cancelar
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 py-3 bg-[#00C48C] hover:bg-[#00a576] text-white font-medium rounded-xl"
-                >
-                  {loading ? 'Enviando...' : 'Enviar Código'}
+                <Button type="submit" disabled={loading}
+                  style={{ flex: 1, background: '#675DFF', borderRadius: '6px', height: '44px', fontSize: '14px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
+                  className="transition-all hover:brightness-110 disabled:opacity-60">
+                  {loading ? 'Enviando...' : 'Enviar link'}
                 </Button>
               </div>
             </form>
@@ -1044,4 +872,3 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
     </div>
   );
 }
-

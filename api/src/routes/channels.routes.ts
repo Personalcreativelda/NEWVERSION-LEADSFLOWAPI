@@ -536,6 +536,32 @@ router.delete('/:id', async (req, res, next) => {
     }
 });
 
+// POST /api/channels/:id/widget-status — altera status manual do widget (online/offline/busy/auto)
+router.post('/:id/widget-status', async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+        const { status } = req.body; // 'online' | 'offline' | 'busy' | 'auto'
+        if (!['online', 'offline', 'busy', 'auto'].includes(status)) {
+            return res.status(400).json({ error: 'Invalid status. Use: online, offline, busy, auto' });
+        }
+
+        const channel = await channelsService.findById(req.params.id, user.id);
+        if (!channel) return res.status(404).json({ error: 'Channel not found' });
+        if (channel.type !== 'website') return res.status(400).json({ error: 'Only website channels support widget status' });
+
+        const settings = typeof channel.settings === 'string' ? JSON.parse(channel.settings) : channel.settings || {};
+        settings.manual_status = status;
+
+        await channelsService.update(req.params.id, { settings }, user.id);
+        console.log(`[Channels] Widget status updated: ${req.params.id} → ${status}`);
+        res.json({ success: true, status });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // POST /api/channels/:id/sync - Sincroniza status do canal
 router.post('/:id/sync', async (req, res, next) => {
     try {

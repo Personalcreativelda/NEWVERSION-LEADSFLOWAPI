@@ -183,7 +183,10 @@ class EmailPollingService {
             const fromAddress = parsed.from?.value?.[0]?.address || '';
             const fromName = parsed.from?.value?.[0]?.name || fromAddress;
             const subject = parsed.subject || '(Sem assunto)';
+            // Prefer plain text for the main content field; fall back to stripped HTML
             const textContent = parsed.text || (typeof parsed.html === 'string' ? parsed.html.replace(/<[^>]*>/g, '') : '') || '';
+            // Preserve original HTML for rich rendering in the frontend (max 100 KB)
+            const htmlBody = typeof parsed.html === 'string' ? parsed.html.substring(0, 100_000) : null;
             const emailMessageId = parsed.messageId || `imap_${msg.uid}_${Date.now()}`;
 
             // Check if we already have this message
@@ -203,7 +206,6 @@ class EmailPollingService {
             }
 
             // Find or create lead from email
-            const phone = ''; // Emails don't have phone
             let leadResult = await query(
               `SELECT * FROM leads WHERE user_id = $1 AND email = $2`,
               [channel.user_id, fromAddress]
@@ -228,32 +230,40 @@ class EmailPollingService {
               channel.id,
               remoteJid,
               leadId,
-              { contact_name: fromName, phone: '' }
+              { contact_name: fromName, phone: fromAddress }
             );
 
-            // Handle attachments
+            // Upload all attachments (skip inline CID images — they're embedded in HTML)
             let mediaUrl: string | null = null;
             let mediaType: string | null = null;
+            const attachmentUrls: { url: string; name: string; contentType: string; mediaType: string }[] = [];
 
-            if (parsed.attachments && parsed.attachments.length > 0) {
-              const firstAttachment = parsed.attachments[0];
-              try {
-                const storageService = getStorageService();
-                const filename = firstAttachment.filename || `email_attachment_${Date.now()}`;
-                mediaUrl = await storageService.uploadBuffer(
-                  firstAttachment.content,
-                  filename,
-                  firstAttachment.contentType || 'application/octet-stream',
-                  'inbox-media',
-                  channel.user_id
-                );
+            const realAttachments = (parsed.attachments || []).filter(
+              (a) => a.contentDisposition !== 'inline' && !a.cid
+            );
 
-                if (firstAttachment.contentType?.startsWith('image')) mediaType = 'image';
-                else if (firstAttachment.contentType?.startsWith('audio')) mediaType = 'audio';
-                else if (firstAttachment.contentType?.startsWith('video')) mediaType = 'video';
-                else mediaType = 'document';
-              } catch (attachErr: any) {
-                console.warn('[Email Polling] Failed to upload attachment:', attachErr.message);
+            if (realAttachments.length > 0) {
+              const storageService = getStorageService();
+              for (const att of realAttachments) {
+                try {
+                  const filename = att.filename || `email_attachment_${Date.now()}`;
+                  const url = await storageService.uploadBuffer(
+                    att.content,
+                    filename,
+                    att.contentType || 'application/octet-stream',
+                    'inbox-media',
+                    channel.user_id
+                  );
+                  const mt = att.contentType?.startsWith('image') ? 'image'
+                    : att.contentType?.startsWith('audio') ? 'audio'
+                    : att.contentType?.startsWith('video') ? 'video'
+                    : 'document';
+                  attachmentUrls.push({ url, name: filename, contentType: att.contentType || '', mediaType: mt });
+                  // Keep first as the legacy media_url / media_type fields
+                  if (!mediaUrl) { mediaUrl = url; mediaType = mt; }
+                } catch (attachErr: any) {
+                  console.warn('[Email Polling] Failed to upload attachment:', attachErr.message);
+                }
               }
             }
 
@@ -282,8 +292,10 @@ class EmailPollingService {
                   from_name: fromName,
                   subject: subject,
                   imap_uid: msg.uid,
-                  has_attachments: (parsed.attachments?.length || 0) > 0,
-                  attachment_count: parsed.attachments?.length || 0,
+                  has_attachments: attachmentUrls.length > 0,
+                  attachment_count: attachmentUrls.length,
+                  attachment_urls: attachmentUrls,
+                  html_body: htmlBody,
                 })
               ]
             );

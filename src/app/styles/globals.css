@@ -1164,3 +1164,46 @@ main > div {
   background-size: 800px 100%;
   animation: shimmer 1.5s linear infinite;
 }
+
+/* ─── Email HTML body (inbox email render) ───────────────────────────────── */
+
+.email-html-body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: inherit;
+}
+
+.email-html-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.email-html-body a {
+  color: #0891b2;
+  word-break: break-all;
+  text-decoration: underline;
+}
+
+.email-html-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.email-html-body td,
+.email-html-body th {
+  padding: 4px 6px;
+  vertical-align: top;
+}
+
+/* Strip excessive spacing injected by email templates */
+.email-html-body p:empty,
+.email-html-body br + br {
+  display: none;
+}
+
+.email-html-body p {
+  margin: 0 0 0.5em;
+}

@@ -58,6 +58,8 @@ import MessageCenterModal, { type MessageCenterMessage, type MessageCenterSectio
 // Onboarding
 import ProductTour from './onboarding/ProductTour';
 import { notifyTourAvailable } from '../utils/notificationHelpers';
+import WelcomeVideoModal from './modals/WelcomeVideoModal';
+import FeedbackModal from './modals/FeedbackModal';
 
 // Chat Flutuante
 
@@ -239,6 +241,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
   // Onboarding state
   const [showTour, setShowTour] = useState(false);
+  const [showWelcomeVideo, setShowWelcomeVideo] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   // Auto-refresh live usage counts (leads / messages / campaigns) on mount
   useEffect(() => {
@@ -300,11 +304,19 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         notifyTourAvailable().catch(console.error);
         localStorage.setItem('leadsflow_tour_notification_sent', 'true');
       }
-      
+
       // Show tour after 2 seconds
       setTimeout(() => {
         setShowTour(true);
       }, 2000);
+    }
+
+    // Show welcome video for brand new users (before tour)
+    const welcomeVideoSeen = localStorage.getItem('leadsflow_welcome_video_seen');
+    if (!welcomeVideoSeen && user) {
+      setTimeout(() => {
+        setShowWelcomeVideo(true);
+      }, 800);
     }
 
     // Detect mobile/desktop
@@ -2056,6 +2068,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         language={language}
         onLogout={onLogout}
         onHelp={handleStartTour}
+        onFeedback={() => setShowFeedback(true)}
         sidebarWidth={sidebarWidth}
         onSidebarWidthChange={setSidebarWidth}
       />
@@ -2692,6 +2705,26 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
         leadNome={leadSelecionado?.nome || ''}
         leadEmail={leadSelecionado?.email || ''}
         onSend={handleSendEmailSubmit}
+      />
+
+      {/* Welcome Video - shown once to new users */}
+      <WelcomeVideoModal
+        isOpen={showWelcomeVideo}
+        onClose={() => {
+          localStorage.setItem('leadsflow_welcome_video_seen', 'true');
+          setShowWelcomeVideo(false);
+        }}
+        onOpenFeedback={() => {
+          localStorage.setItem('leadsflow_welcome_video_seen', 'true');
+          setShowWelcomeVideo(false);
+          setShowFeedback(true);
+        }}
+      />
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        isOpen={showFeedback}
+        onClose={() => setShowFeedback(false)}
       />
 
       {/* Product Tour - Onboarding com suporte a tema */}

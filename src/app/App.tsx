@@ -7,6 +7,7 @@ import Pricing from './components/Pricing';
 import CTASection from './components/CTASection';
 import Footer from './components/Footer';
 import Dashboard from './components/Dashboard';
+import HlsVideoBackground from './components/auth/HlsVideoBackground';
 import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 import ResetPasswordPage from './components/auth/ResetPasswordPage';
@@ -718,7 +719,8 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
       // Standalone public pages — never redirect away, just stop loading
       const pageAtStart = getPageFromPath();
-      if (pageAtStart === 'accept-invite' || pageAtStart === 'agent-call') {
+      const publicPages: (Page | null)[] = ['accept-invite', 'agent-call', 'login', 'signup', 'forgot-password', 'reset-password'];
+      if (publicPages.includes(pageAtStart)) {
         setLoading(false);
         return;
       }
@@ -803,9 +805,10 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
         return;
       }
 
-      // Don't redirect if already on a standalone public page
+      // Don't redirect if already on a public page
       const currentPageFromUrl = getPageFromPath();
-      if (currentPageFromUrl === 'accept-invite' || currentPageFromUrl === 'agent-call') return;
+      const noRedirectPages: (Page | null)[] = ['accept-invite', 'agent-call', 'login', 'signup', 'forgot-password', 'reset-password'];
+      if (noRedirectPages.includes(currentPageFromUrl)) return;
 
       console.log('[checkAuth] No authentication found, redirecting to home');
       setCurrentPage(homePage);
@@ -849,7 +852,8 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
       // Never interfere with standalone public pages
       const initPageFromUrl = getPageFromPath();
-      if (initPageFromUrl === 'accept-invite' || initPageFromUrl === 'agent-call') {
+      const initPublicPages: (Page | null)[] = ['accept-invite', 'agent-call', 'login', 'signup', 'forgot-password', 'reset-password'];
+      if (initPublicPages.includes(initPageFromUrl)) {
         setLoading(false);
         return;
       }
@@ -1016,6 +1020,11 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
           </main>
           <Footer />
         </div>
+      )}
+
+      {/* Shared auth video background — rendered once, persists across login/signup/forgot-password */}
+      {(['login', 'signup', 'forgot-password'] as Page[]).includes(currentPage) && (
+        <HlsVideoBackground overlay="rgba(0,0,0,0.12)" />
       )}
 
       {/* Login Page */}

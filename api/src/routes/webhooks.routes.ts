@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { query } from '../database/connection';
 // INBOX: Importar services para webhook do Evolution
 import { ChannelsService } from '../services/channels.service';
@@ -19,6 +20,7 @@ import { webhookDispatcher } from '../services/webhook-dispatcher.service';
 // Storage: Importar para upload de mídia recebida
 import { getStorageService } from '../services/storage.service';
 import { requireAuth } from '../middleware/auth.middleware';
+import { widgetTyping } from '../services/widget-typing.service';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -3813,10 +3815,10 @@ router.post('/website/:channelId', async (req, res) => {
     console.log('[Website Widget Webhook] Body:', JSON.stringify(req.body).substring(0, 1000));
 
     const { channelId } = req.params;
-    const { visitorId, visitorName, visitorEmail, message, pageUrl, userAgent } = req.body;
+    const { visitorId, visitorName, visitorEmail, message, pageUrl, userAgent, mediaUrl, mediaType } = req.body;
 
-    if (!channelId || !message) {
-      return res.status(400).json({ error: 'channelId and message are required' });
+    if (!channelId || (!message && !mediaUrl)) {
+      return res.status(400).json({ error: 'channelId and message or mediaUrl are required' });
     }
 
     // Buscar canal
@@ -3831,57 +3833,69 @@ router.post('/website/:channelId', async (req, res) => {
 
     const channel = channelResult.rows[0];
 
-    // Buscar ou criar lead pelo visitorId/email
-    let lead = null;
+    // ── Buscar lead: por email → por visitorId (guardado no campo whatsapp como 'web_xxx') ──
+    let lead: any = null;
+
     if (visitorEmail) {
-      const leadResult = await query(
-        `SELECT * FROM leads WHERE user_id = $1 AND email = $2`,
-        [channel.user_id, visitorEmail]
-      );
-      lead = leadResult.rows[0];
+      const r = await query(`SELECT * FROM leads WHERE user_id = $1 AND email = $2 LIMIT 1`, [channel.user_id, visitorEmail]);
+      lead = r.rows[0];
     }
 
     if (!lead && visitorId) {
-      const leadResult = await query(
-        `SELECT * FROM leads WHERE user_id = $1 AND metadata->>'visitor_id' = $2`,
-        [channel.user_id, visitorId]
-      );
-      lead = leadResult.rows[0];
+      // /identify guarda o visitorId no campo whatsapp como 'web_<visitorId>'
+      const r = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND whatsapp = $2 LIMIT 1`,
+        [channel.user_id, `web_${visitorId}`]
+      ).catch(() => ({ rows: [] as any[] }));
+      lead = r.rows[0];
     }
 
     let leadId: string;
 
     if (!lead) {
-      // Criar novo lead
-      const contactName = visitorName || visitorEmail || `Visitante ${visitorId?.substring(0, 8) || 'Anônimo'}`;
-      const leadResult = await query(
-        `INSERT INTO leads (user_id, name, email, source, status, metadata)
-         VALUES ($1, $2, $3, 'website', 'novo', $4)
+      // Criar novo lead com os dados capturados
+      const contactName = visitorName || visitorEmail || `Visitante ${visitorId?.substring(0, 8) || 'Anónimo'}`;
+      const r = await query(
+        `INSERT INTO leads (user_id, name, email, whatsapp, source, status)
+         VALUES ($1, $2, $3, $4, 'website', 'novo')
          RETURNING *`,
-        [
-          channel.user_id,
-          contactName,
-          visitorEmail || null,
-          JSON.stringify({ visitor_id: visitorId, page_url: pageUrl, user_agent: userAgent })
-        ]
+        [channel.user_id, contactName, visitorEmail || null, `web_${visitorId}`]
       );
-      leadId = leadResult.rows[0].id;
+      lead = r.rows[0];
+      leadId = lead.id;
 
-      // 🎯 Registrar captura de lead via Website
       try {
         await leadTrackingService.recordLeadCapture(
           channel.user_id, leadId, channel.id, 'website',
           { contact_name: contactName, email: visitorEmail, page_url: pageUrl }
         );
-        console.log('[Website Widget Webhook] ✅ Captura de lead registrada');
-      } catch (trackErr) {
-        console.error('[Website Widget Webhook] ⚠️ Erro ao registrar captura:', trackErr);
-      }
+      } catch { /* non-critical */ }
     } else {
       leadId = lead.id;
+
+      // Actualizar nome/email se o lead ainda tem nome genérico
+      const isGeneric = !lead.name || lead.name.startsWith('Visitante ');
+      const updates: string[] = [];
+      const vals: any[] = [];
+      let idx = 1;
+      if (visitorName  && (isGeneric || !lead.name))  { updates.push(`name  = $${idx++}`); vals.push(visitorName); }
+      if (visitorEmail && !lead.email)                 { updates.push(`email = $${idx++}`); vals.push(visitorEmail); }
+      // Store visitorId so future lookups work
+      if (!lead.whatsapp || lead.whatsapp !== `web_${visitorId}`) {
+        updates.push(`whatsapp = $${idx++}`); vals.push(`web_${visitorId}`);
+      }
+      if (updates.length > 0) {
+        vals.push(leadId);
+        await query(`UPDATE leads SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${idx}`, vals).catch(() => {});
+      }
     }
 
-    // Buscar ou criar conversa
+    // Nome de contacto = nome real se disponível, senão email, senão ID genérico
+    const contactDisplayName = visitorName || visitorEmail
+      || (lead?.name && !lead.name.startsWith('Visitante ') ? lead.name : null)
+      || `Visitante ${visitorId?.substring(0, 8)}`;
+
+    // remoteJid estável = visitorId (não muda entre sessões)
     const remoteJid = visitorId || visitorEmail || `web_${Date.now()}`;
     const conversation = await conversationsService.findOrCreate(
       channel.user_id,
@@ -3889,7 +3903,7 @@ router.post('/website/:channelId', async (req, res) => {
       remoteJid,
       leadId,
       {
-        contact_name: visitorName || visitorEmail || 'Visitante',
+        contact_name: contactDisplayName,
         visitor_id: visitorId
       }
     );
@@ -3898,15 +3912,17 @@ router.post('/website/:channelId', async (req, res) => {
     const messageResult = await query(
       `INSERT INTO messages (
         user_id, conversation_id, lead_id, direction, channel,
-        content, status, metadata
+        content, media_url, media_type, status, metadata
       )
-       VALUES ($1, $2, $3, 'in', 'website', $4, 'delivered', $5)
+       VALUES ($1, $2, $3, 'in', 'website', $4, $5, $6, 'delivered', $7)
        RETURNING *`,
       [
         channel.user_id,
         conversation.id,
         leadId,
-        message,
+        message || '',
+        mediaUrl || null,
+        mediaType || null,
         JSON.stringify({ page_url: pageUrl, user_agent: userAgent, visitor_id: visitorId })
       ]
     );
@@ -3943,14 +3959,27 @@ router.post('/website/:channelId', async (req, res) => {
       });
     }
 
+    // ── Processar assistente de IA (assíncrono — não bloqueia a resposta) ────
+    assistantProcessor.processIncomingMessage({
+      channelId: channel.id,
+      channelType: 'website',
+      conversationId: conversation.id,
+      userId: channel.user_id,
+      contactPhone: visitorId || 'website_visitor',
+      contactName: visitorName || visitorEmail || 'Visitante',
+      messageContent: message,
+      credentials: channel.credentials || {},
+      remoteJid: remoteJid,
+    }).catch((err: any) => console.warn('[Website Widget Webhook] Erro no assistente IA:', err.message));
+
     res.json({
       success: true,
       conversationId: conversation.id,
       messageId: savedMessage.id
     });
-  } catch (error) {
-    console.error('[Website Widget Webhook] Erro:', error);
-    res.status(500).json({ error: 'Internal server error' });
+  } catch (error: any) {
+    console.error('[Website Widget Webhook] Erro detalhado:', error?.message, error?.stack);
+    res.status(500).json({ error: 'Internal server error', detail: error?.message });
   }
 });
 
@@ -3988,10 +4017,20 @@ router.get('/website/:channelId/messages', async (req, res) => {
     }
 
     const messagesResult = await query(
-      `SELECT id, content, direction, created_at, media_url, media_type
-       FROM messages
-       WHERE conversation_id = $1
-       ORDER BY created_at ASC
+      `SELECT m.id, m.content, m.direction, m.created_at, m.media_url, m.media_type,
+              CASE WHEN m.direction = 'out' THEN COALESCE(u.name, 'Atendente') ELSE NULL END AS sender_name,
+              CASE WHEN m.direction = 'out' THEN u.avatar_url ELSE NULL END AS sender_avatar,
+              CASE WHEN m.direction = 'out' AND (m.metadata->>'automated' = 'true' OR m.metadata->>'source' = 'ai_assistant')
+                   THEN true ELSE false END AS is_bot
+       FROM messages m
+       LEFT JOIN users u ON m.user_id = u.id
+       WHERE m.conversation_id = $1
+         AND m.direction IN ('in', 'out')
+         AND (m.metadata->>'is_internal' IS NULL OR m.metadata->>'is_internal' != 'true')
+         AND m.content NOT LIKE '🤖%'
+         AND m.content NOT LIKE '[Nota interna:%'
+         AND m.content NOT LIKE '[Internal%'
+       ORDER BY m.created_at ASC
        LIMIT 100`,
       [conversation.id]
     );
@@ -4004,6 +4043,195 @@ router.get('/website/:channelId/messages', async (req, res) => {
     console.error('[Website Widget] Erro ao buscar mensagens:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// ✅ Upload de ficheiros via widget (sem auth — público, vinculado ao canal)
+const widgetUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+router.post('/website/:channelId/upload', widgetUpload.single('file'), async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+
+    const channelResult = await query(
+      `SELECT * FROM channels WHERE id = $1 AND type = 'website' AND status = 'active'`,
+      [channelId]
+    );
+    if (channelResult.rows.length === 0) return res.status(404).json({ error: 'Channel not found' });
+
+    const channel = channelResult.rows[0];
+    const storageService = getStorageService();
+    const ext = req.file.originalname.split('.').pop() || 'bin';
+    const filename = `widget_${Date.now()}.${ext}`;
+    const url = await storageService.uploadBuffer(
+      req.file.buffer,
+      filename,
+      req.file.mimetype,
+      'inbox-media',
+      channel.user_id
+    );
+
+    const mime = req.file.mimetype;
+    const mediaType = mime.startsWith('image') ? 'image'
+      : mime.startsWith('audio') ? 'audio'
+      : mime.startsWith('video') ? 'video'
+      : 'document';
+
+    res.json({ url, mediaType, filename: req.file.originalname });
+  } catch (err: any) {
+    console.error('[Website Widget Upload] Erro:', err.message);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+// ── Business hours helper ─────────────────────────────────────────────────────
+function isWithinBusinessHours(settings: any): { online: boolean; offlineMessage: string } {
+  const bh = settings?.businessHours;
+  const offlineMessage = bh?.offlineMessage || 'Estamos fora do horário de atendimento. Deixe sua mensagem e entraremos em contato em breve.';
+
+  if (!bh?.enabled) return { online: true, offlineMessage };
+
+  const tz = bh.timezone || 'UTC';
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const dayName = days[now.getDay()];
+  const schedule = bh.schedule?.[dayName];
+
+  if (!schedule) return { online: false, offlineMessage };
+
+  const [openH, openM]  = (schedule.open  || '00:00').split(':').map(Number);
+  const [closeH, closeM] = (schedule.close || '23:59').split(':').map(Number);
+  const currentMins = now.getHours() * 60 + now.getMinutes();
+  const openMins    = openH  * 60 + openM;
+  const closeMins   = closeH * 60 + closeM;
+
+  return { online: currentMins >= openMins && currentMins < closeMins, offlineMessage };
+}
+
+// ✅ GET /website/:channelId/config — widget fetches live config on init/open
+router.get('/website/:channelId/config', async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const result = await query(
+      `SELECT name, settings FROM channels WHERE id = $1 AND type = 'website' AND status = 'active'`,
+      [channelId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Channel not found' });
+
+    const ch = result.rows[0];
+    const s  = typeof ch.settings === 'string' ? JSON.parse(ch.settings) : ch.settings || {};
+    const { online: bhOnline, offlineMessage } = isWithinBusinessHours(s);
+
+    // Manual status overrides business hours
+    // manual_status: 'auto' | 'online' | 'offline' | 'busy'
+    const manualStatus = s.manual_status || 'auto';
+    let online: boolean;
+    let statusLabel: string;
+    if (manualStatus === 'online')       { online = true;  statusLabel = 'online'; }
+    else if (manualStatus === 'offline') { online = false; statusLabel = 'offline'; }
+    else if (manualStatus === 'busy')    { online = true;  statusLabel = 'busy'; }
+    else                                 { online = bhOnline; statusLabel = bhOnline ? 'online' : 'offline'; }
+
+    // Lead capture form config
+    const lc = s.leadCapture || {};
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      name:              ch.name,
+      primaryColor:      s.primary_color   || '#6366f1',
+      welcomeMessage:    s.welcome_message || 'Olá! Como posso ajudar?',
+      position:          s.position        || 'bottom-right',
+      online,
+      statusLabel,
+      offlineMessage,
+      manualStatus,
+      leadCapture: {
+        enabled:       lc.enabled !== false,
+        requireName:   lc.requireName  !== false,
+        requireEmail:  lc.requireEmail !== false,
+        requirePhone:  !!lc.requirePhone,
+        title:         lc.title   || 'Bem-vindo! Como posso ajudar?',
+        subtitle:      lc.subtitle || 'Preencha os dados abaixo para iniciar o atendimento.',
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ POST /website/:channelId/identify — visitor submits pre-chat lead capture form
+router.post('/website/:channelId/identify', async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const { visitorId, name, email, phone } = req.body;
+    if (!channelId || !visitorId) return res.status(400).json({ error: 'channelId and visitorId required' });
+
+    const channelResult = await query(
+      `SELECT * FROM channels WHERE id = $1 AND type = 'website' AND status = 'active'`,
+      [channelId]
+    );
+    if (channelResult.rows.length === 0) return res.status(404).json({ error: 'Channel not found' });
+    const channel = channelResult.rows[0];
+
+    // Find existing lead or create
+    let lead = null;
+    if (email) {
+      const r = await query(`SELECT * FROM leads WHERE user_id = $1 AND email = $2`, [channel.user_id, email]);
+      lead = r.rows[0];
+    }
+    if (!lead) {
+      const r = await query(
+        `SELECT * FROM leads WHERE user_id = $1 AND source = 'website' AND name = $2 LIMIT 1`,
+        [channel.user_id, name || 'Visitante']
+      ).catch(() => ({ rows: [] as any[] }));
+      lead = r.rows[0];
+    }
+
+    const webVisitorId = `web_${visitorId}`;
+
+    if (lead) {
+      // Update existing lead with captured data
+      const updates: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (name  && (!lead.name || lead.name.startsWith('Visitante '))) { updates.push(`name = $${i++}`);     vals.push(name); }
+      if (email && !lead.email)                                          { updates.push(`email = $${i++}`);    vals.push(email); }
+      if (phone && !lead.phone)                                          { updates.push(`phone = $${i++}`);    vals.push(phone); }
+      // Always link visitorId
+      if (lead.whatsapp !== webVisitorId) { updates.push(`whatsapp = $${i++}`); vals.push(webVisitorId); }
+      if (updates.length > 0) {
+        vals.push(lead.id);
+        await query(`UPDATE leads SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${i}`, vals).catch(() => {});
+      }
+    } else {
+      const r = await query(
+        `INSERT INTO leads (user_id, name, email, phone, whatsapp, source, status)
+         VALUES ($1, $2, $3, $4, $5, 'website', 'novo') RETURNING *`,
+        [channel.user_id, name || 'Visitante', email || null, phone || null, webVisitorId]
+      );
+      lead = r.rows[0];
+    }
+
+    res.json({ success: true, leadId: lead.id });
+  } catch (err: any) {
+    console.error('[Website Widget Identify] Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ GET /website/:channelId/status — widget polls typing state + agent info
+router.get('/website/:channelId/status', (req, res) => {
+  const { conversationId } = req.query as { conversationId?: string };
+  if (!conversationId) return res.json({ typing: false });
+  return res.json(widgetTyping.get(conversationId));
+});
+
+// ✅ POST /website/:channelId/typing — dashboard signals when agent is typing
+router.post('/website/:channelId/typing', (req, res) => {
+  const { conversationId, agentName, isTyping } = req.body;
+  if (!conversationId) return res.status(400).json({ error: 'conversationId required' });
+  if (isTyping) widgetTyping.set(conversationId, agentName || 'Atendente');
+  else widgetTyping.clear(conversationId);
+  res.json({ ok: true });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

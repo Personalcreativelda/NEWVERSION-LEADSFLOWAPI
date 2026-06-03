@@ -21,24 +21,47 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
     const [error, setError] = useState<string | null>(null);
     const [channelId, setChannelId] = useState('');
 
+    const DAYS = [
+        { key: 'monday', label: 'Seg' }, { key: 'tuesday', label: 'Ter' },
+        { key: 'wednesday', label: 'Qua' }, { key: 'thursday', label: 'Qui' },
+        { key: 'friday', label: 'Sex' }, { key: 'saturday', label: 'Sáb' },
+        { key: 'sunday', label: 'Dom' },
+    ] as const;
+    type DayKey = typeof DAYS[number]['key'];
+
+    const defaultSchedule = (): Record<DayKey, { open: string; close: string } | null> => ({
+        monday: { open: '08:00', close: '18:00' }, tuesday: { open: '08:00', close: '18:00' },
+        wednesday: { open: '08:00', close: '18:00' }, thursday: { open: '08:00', close: '18:00' },
+        friday: { open: '08:00', close: '18:00' }, saturday: null, sunday: null,
+    });
+
     const [formData, setFormData] = useState({
         name: '',
         websiteUrl: '',
         primaryColor: '#8B5CF6',
         welcomeMessage: 'Olá! Como posso ajudar?',
-        position: 'bottom-right' as 'bottom-right' | 'bottom-left'
+        position: 'bottom-right' as 'bottom-right' | 'bottom-left',
+        businessHoursEnabled: false,
+        timezone: 'America/Maputo',
+        offlineMessage: 'Estamos fora do horário de atendimento. Deixe sua mensagem e retornaremos em breve.',
+        schedule: defaultSchedule(),
     });
 
     // Preencher dados quando for edição
     useEffect(() => {
         if (isEditing && editingChannel) {
             setChannelId(editingChannel.id);
+            const bh = editingChannel.settings?.business_hours;
             setFormData({
                 name: editingChannel.name || '',
                 websiteUrl: editingChannel.credentials?.website_url || '',
                 primaryColor: editingChannel.settings?.primary_color || '#8B5CF6',
                 welcomeMessage: editingChannel.settings?.welcome_message || 'Olá! Como posso ajudar?',
-                position: (editingChannel.settings?.position as 'bottom-right' | 'bottom-left') || 'bottom-right'
+                position: (editingChannel.settings?.position as 'bottom-right' | 'bottom-left') || 'bottom-right',
+                businessHoursEnabled: !!bh?.enabled,
+                timezone: bh?.timezone || 'America/Maputo',
+                offlineMessage: bh?.offlineMessage || 'Estamos fora do horário de atendimento. Deixe sua mensagem e retornaremos em breve.',
+                schedule: bh?.schedule || defaultSchedule(),
             });
         }
     }, [isEditing, editingChannel]);
@@ -52,7 +75,11 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                     websiteUrl: '',
                     primaryColor: '#8B5CF6',
                     welcomeMessage: 'Olá! Como posso ajudar?',
-                    position: 'bottom-right'
+                    position: 'bottom-right',
+                    businessHoursEnabled: false,
+                    timezone: 'America/Maputo',
+                    offlineMessage: 'Estamos fora do horário de atendimento. Deixe sua mensagem e retornaremos em breve.',
+                    schedule: defaultSchedule(),
                 });
                 setChannelId('');
             }
@@ -81,7 +108,13 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                 settings: {
                     primary_color: formData.primaryColor,
                     welcome_message: formData.welcomeMessage,
-                    position: formData.position
+                    position: formData.position,
+                    business_hours: {
+                        enabled: formData.businessHoursEnabled,
+                        timezone: formData.timezone,
+                        offlineMessage: formData.offlineMessage,
+                        schedule: formData.schedule,
+                    }
                 }
             };
 
@@ -107,6 +140,9 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
         }
     };
 
+    const WIDGET_URL = `${API_URL}/w`;
+    const WEBHOOK_URL = `${API_URL}/api/webhooks/website/${channelId}`;
+
     const getWidgetCode = () => {
         return `<!-- LeadsFlow Chat Widget -->
 <script>
@@ -114,7 +150,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
     w['LeadsFlowWidget']=o;w[o]=w[o]||function(){(w[o].q=w[o].q||[]).push(arguments)};
     js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];
     js.id=o;js.src=f;js.async=1;fjs.parentNode.insertBefore(js,fjs);
-  }(window,document,'script','lfw','${API_URL}/widget.js'));
+  }(window,document,'script','lfw','${WIDGET_URL}'));
   lfw('init', {
     channelId: '${channelId}',
     primaryColor: '${formData.primaryColor}',
@@ -279,6 +315,93 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                                 </div>
                             </div>
 
+                            {/* Business Hours */}
+                            <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'hsl(var(--border))' }}>
+                                <div
+                                    className="flex items-center justify-between px-4 py-3 cursor-pointer"
+                                    style={{ backgroundColor: 'hsl(var(--muted)/0.4)' }}
+                                    onClick={() => setFormData(prev => ({ ...prev, businessHoursEnabled: !prev.businessHoursEnabled }))}
+                                >
+                                    <div>
+                                        <p className="text-sm font-medium" style={{ color: 'hsl(var(--foreground))' }}>Horário de Funcionamento</p>
+                                        <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>Mostra mensagem de indisponibilidade fora do horário</p>
+                                    </div>
+                                    <div
+                                        className="w-10 h-5 rounded-full transition-colors relative flex-shrink-0"
+                                        style={{ backgroundColor: formData.businessHoursEnabled ? '#8B5CF6' : 'hsl(var(--muted))' }}
+                                    >
+                                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${formData.businessHoursEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                                    </div>
+                                </div>
+
+                                {formData.businessHoursEnabled && (
+                                    <div className="px-4 py-3 space-y-3 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
+                                        {/* Timezone */}
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Fuso horário</label>
+                                            <select
+                                                value={formData.timezone}
+                                                onChange={e => setFormData(prev => ({ ...prev, timezone: e.target.value }))}
+                                                className="w-full px-3 py-2 rounded-lg border text-sm"
+                                                style={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                            >
+                                                {['Africa/Maputo','Africa/Luanda','Africa/Nairobi','Europe/Lisbon','America/Sao_Paulo','America/New_York','Europe/London','Asia/Dubai','UTC'].map(tz => (
+                                                    <option key={tz} value={tz}>{tz}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* Schedule per day */}
+                                        <div className="space-y-1.5">
+                                            {DAYS.map(({ key, label }) => {
+                                                const slot = formData.schedule[key];
+                                                return (
+                                                    <div key={key} className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFormData(prev => ({
+                                                                ...prev,
+                                                                schedule: { ...prev.schedule, [key]: slot ? null : { open: '08:00', close: '18:00' } }
+                                                            }))}
+                                                            className={`w-10 text-xs font-semibold py-1 rounded transition-colors ${slot ? 'bg-violet-500 text-white' : 'bg-muted text-muted-foreground'}`}
+                                                        >{label}</button>
+                                                        {slot ? (
+                                                            <>
+                                                                <input type="time" value={slot.open}
+                                                                    onChange={e => setFormData(prev => ({ ...prev, schedule: { ...prev.schedule, [key]: { ...slot, open: e.target.value } } }))}
+                                                                    className="flex-1 px-2 py-1 rounded border text-xs"
+                                                                    style={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                                                />
+                                                                <span className="text-xs text-muted-foreground">–</span>
+                                                                <input type="time" value={slot.close}
+                                                                    onChange={e => setFormData(prev => ({ ...prev, schedule: { ...prev.schedule, [key]: { ...slot, close: e.target.value } } }))}
+                                                                    className="flex-1 px-2 py-1 rounded border text-xs"
+                                                                    style={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                                                />
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground italic">Fechado</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Offline message */}
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1" style={{ color: 'hsl(var(--muted-foreground))' }}>Mensagem fora do horário</label>
+                                            <textarea
+                                                value={formData.offlineMessage}
+                                                onChange={e => setFormData(prev => ({ ...prev, offlineMessage: e.target.value }))}
+                                                rows={2}
+                                                className="w-full px-3 py-2 rounded-lg border text-xs resize-none"
+                                                style={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {error && (
                                 <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-2">
                                     <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -348,13 +471,24 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                                 </button>
                             </div>
 
-                            <div
-                                className="p-4 rounded-lg border border-blue-500/30 bg-blue-500/10"
-                            >
-                                <p className="text-sm text-blue-200">
-                                    <strong>Webhook URL:</strong><br />
-                                    <code className="text-xs">{API_URL}/api/webhooks/website/{channelId}</code>
-                                </p>
+                            <div className="space-y-2">
+                                <div className="p-3 rounded-lg border border-blue-500/30 bg-blue-500/10 flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-blue-300 mb-0.5">Webhook URL</p>
+                                        <code className="text-xs text-blue-200 break-all">{WEBHOOK_URL}</code>
+                                    </div>
+                                    <button
+                                        onClick={() => copyToClipboard(WEBHOOK_URL)}
+                                        className="p-1.5 rounded flex-shrink-0 hover:bg-blue-500/20 transition-colors"
+                                        title="Copiar"
+                                    >
+                                        <Copy className="w-3.5 h-3.5 text-blue-300" />
+                                    </button>
+                                </div>
+                                <div className="p-3 rounded-lg border border-violet-500/20 bg-violet-500/5">
+                                    <p className="text-xs font-semibold text-violet-300 mb-0.5">Widget JS</p>
+                                    <code className="text-xs text-violet-200 break-all">{WIDGET_URL}</code>
+                                </div>
                             </div>
 
                             <button

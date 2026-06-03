@@ -53,6 +53,7 @@
     "date-fns": "*",
     "embla-carousel-react": "*",
     "emoji-picker-react": "*",
+    "hls.js": "^1.6.16",
     "hono": "*",
     "idb-keyval": "^6.2.2",
     "input-otp": "*",

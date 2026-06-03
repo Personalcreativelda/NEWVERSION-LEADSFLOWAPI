@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
-import { 
-  Users, Bell, History, ChevronRight, Megaphone
+import {
+  Users, Bell, History, ChevronRight, Megaphone, Star, AlertTriangle, Loader2, MessageSquare
 } from 'lucide-react';
 
 // New Modular Components
@@ -69,7 +69,9 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [filterPlan, setFilterPlan] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'activity' | 'marketing' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'activity' | 'marketing' | 'settings' | 'feedback'>('dashboard');
+  const [feedbackList, setFeedbackList] = useState<any[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [activities, setActivities] = useState<any[]>([]);
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
@@ -98,6 +100,9 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
     if (activeTab === 'activity') {
       loadActivities();
       loadActiveUsers();
+    }
+    if (activeTab === 'feedback') {
+      loadFeedback();
     }
   }, [activeTab]);
 
@@ -255,6 +260,18 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
   };
 
   const revenue = calculateRevenue();
+
+  const loadFeedback = async () => {
+    setFeedbackLoading(true);
+    try {
+      const response = await apiRequest('/admin/feedback', 'GET');
+      if (response.success) setFeedbackList(response.feedback || []);
+    } catch {
+      toast.error('Erro ao carregar feedbacks');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
 
   const loadNotificationSettings = async () => {
     try {
@@ -426,6 +443,91 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
             enterpriseCount={users.filter(u => u.plan === 'enterprise').length}
             users={users.map(u => ({ id: u.id, name: u.name, email: u.email, plan: u.plan }))}
           />
+        </div>
+      )}
+
+      {/* Feedback tab */}
+      {activeTab === 'feedback' && (
+        <div className="p-6 sm:p-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-foreground mb-1">Feedbacks dos Usuários</h1>
+              <p className="text-sm text-muted-foreground">Avaliações e problemas reportados pelos usuários</p>
+            </div>
+            <button
+              onClick={loadFeedback}
+              className="px-3 py-2 rounded-lg border text-sm font-medium hover:bg-muted/50 transition-colors flex items-center gap-2"
+              style={{ borderColor: 'hsl(var(--border))' }}
+            >
+              {feedbackLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Atualizar
+            </button>
+          </div>
+
+          {feedbackLoading && feedbackList.length === 0 ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : feedbackList.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground">
+              <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>Nenhum feedback recebido ainda.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {feedbackList.map((fb: any) => (
+                <div key={fb.id} className="bg-card border border-border rounded-xl p-4 flex gap-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    fb.type === 'rating' ? 'bg-yellow-500/10' : 'bg-red-500/10'
+                  }`}>
+                    {fb.type === 'rating'
+                      ? <Star className="w-5 h-5 text-yellow-500" />
+                      : <AlertTriangle className="w-5 h-5 text-red-500" />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground">
+                          {fb.user_name || fb.user_email || 'Usuário anônimo'}
+                        </span>
+                        {fb.user_email && fb.user_name && (
+                          <span className="text-xs text-muted-foreground">{fb.user_email}</span>
+                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          fb.type === 'rating' ? 'bg-yellow-500/10 text-yellow-600' : 'bg-red-500/10 text-red-600'
+                        }`}>
+                          {fb.type === 'rating' ? 'Avaliação' : 'Problema'}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(fb.created_at).toLocaleDateString('pt-BR', {
+                          day: '2-digit', month: 'short', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    {fb.type === 'rating' && fb.stars && (
+                      <div className="flex gap-0.5 mt-1">
+                        {[1,2,3,4,5].map(n => (
+                          <Star
+                            key={n}
+                            className="w-4 h-4"
+                            fill={n <= fb.stars ? '#FBBF24' : 'none'}
+                            stroke={n <= fb.stars ? '#FBBF24' : 'hsl(var(--border))'}
+                            strokeWidth={1.5}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {fb.message && (
+                      <p className="text-sm text-muted-foreground mt-1 break-words">{fb.message}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

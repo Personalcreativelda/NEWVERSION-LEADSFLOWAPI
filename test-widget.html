@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teste Widget LeadsFlow</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+      background: #f5f5f5;
+      color: #333;
+    }
+    header {
+      background: #05010e;
+      color: white;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { margin: 0; font-size: 20px; }
+    .hero {
+      max-width: 760px;
+      margin: 60px auto;
+      text-align: center;
+      padding: 0 24px;
+    }
+    .hero h2 { font-size: 36px; margin-bottom: 12px; }
+    .hero p  { font-size: 16px; color: #666; line-height: 1.6; }
+    .btn {
+      display: inline-block;
+      margin-top: 24px;
+      padding: 14px 32px;
+      background: #6366f1;
+      color: white;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      max-width: 760px;
+      margin: 48px auto;
+      padding: 0 24px;
+    }
+    .feature-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .feature-card h3 { margin: 0 0 8px; font-size: 15px; }
+    .feature-card p  { margin: 0; font-size: 13px; color: #666; }
+
+    /* Info bar at top */
+    .info-bar {
+      background: #fef3c7;
+      border-bottom: 1px solid #fde68a;
+      padding: 8px 24px;
+      font-size: 13px;
+      color: #92400e;
+      text-align: center;
+    }
+    .info-bar code {
+      background: rgba(0,0,0,.07);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="info-bar">
+    🧪 Página de teste do widget — o chat deve aparecer no canto <strong>inferior direito</strong>.
+    Envia uma mensagem e vê aparecer no <strong>Inbox → Conversas</strong> do dashboard.
+    <br/>Canal: <code id="channel-id-display"></code>
+  </div>
+
+  <header>
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+    <h1>Minha Empresa</h1>
+  </header>
+
+  <div class="hero">
+    <h2>Bem-vindo ao nosso site</h2>
+    <p>Esta é uma página de demonstração para testar o widget de chat LeadsFlow.<br/>
+       Clica no ícone de chat no canto inferior direito para iniciar uma conversa.</p>
+    <a class="btn" onclick="alert('Botão de demo')">Falar connosco</a>
+  </div>
+
+  <div class="features">
+    <div class="feature-card">
+      <h3>⚡ Rápido</h3>
+      <p>Resposta em tempo real com suporte a IA integrada.</p>
+    </div>
+    <div class="feature-card">
+      <h3>🔒 Seguro</h3>
+      <p>Todas as mensagens são encriptadas de ponta a ponta.</p>
+    </div>
+    <div class="feature-card">
+      <h3>🌍 Global</h3>
+      <p>Suporte multicanal: WhatsApp, Email, Telegram e mais.</p>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('channel-id-display').textContent = '8d6afd8a-d919-4f56-890a-9718e6aa4bf9';
+  </script>
+
+  <!-- LeadsFlow Chat Widget (state machine: loading > capture > chat) -->
+  <script>
+  (function(){
+    var API       = 'http://localhost:4000';
+    var channelId = '8d6afd8a-d919-4f56-890a-9718e6aa4bf9';
+
+    var visitorId    = localStorage.getItem('lfw_vid')   || ('v_'+Math.random().toString(36).slice(2));
+    var visitorName  = localStorage.getItem('lfw_name')  || '';
+    var visitorEmail = localStorage.getItem('lfw_email') || '';
+    var visitorPhone = localStorage.getItem('lfw_phone') || '';
+    localStorage.setItem('lfw_vid', visitorId);
+    var identified = !!(visitorName || visitorEmail);
+
+    var rc = { primaryColor:'#8B5CF6', welcomeMessage:'Olá! Como posso ajudar?', name:'Chat',
+               online:true, statusLabel:'online', offlineMessage:'Fora do horário.',
+               leadCapture:{ enabled:true, requireName:true, requireEmail:true, requirePhone:false,
+                             title:'Bem-vindo!', subtitle:'Preencha os dados para iniciar.' } };
+
+    var conversationId = null, lastMsgCount = 0, isOpen = false;
+    var C = rc.primaryColor; // live color alias
+
+    /* ═══ STYLES ═══ */
+    var st = document.createElement('style');
+    st.id = 'lfw-styles';
+    function buildCSS(c){return [
+      '#lfw-root *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
+      '#lfw-btn{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;background:'+c+';',
+        'border:none;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25);display:flex;align-items:center;',
+        'justify-content:center;z-index:9999;transition:transform .2s,background .3s;}',
+      '#lfw-btn:hover{transform:scale(1.08);}',
+      '#lfw-badge{position:absolute;top:-3px;right:-3px;min-width:20px;height:20px;border-radius:10px;',
+        'background:#ef4444;color:#fff;font-size:11px;font-weight:700;display:none;align-items:center;',
+        'justify-content:center;padding:0 5px;border:2px solid #fff;}',
+      '#lfw-window{position:fixed;right:16px;bottom:88px;width:375px;max-width:calc(100vw - 24px);',
+        'height:540px;max-height:calc(100vh - 110px);background:#fff;border-radius:18px;',
+        'box-shadow:0 12px 48px rgba(0,0,0,.2);display:none;flex-direction:column;overflow:hidden;z-index:9998;',
+        'transition:opacity .2s,transform .2s;}',
+      /* Header */
+      '#lfw-hdr{background:'+c+';padding:14px 16px;color:#fff;display:flex;align-items:center;gap:10px;flex-shrink:0;}',
+      '#lfw-hdr-icon{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.2);',
+        'display:flex;align-items:center;justify-content:center;flex-shrink:0;}',
+      '#lfw-hdr-info{flex:1;min-width:0;}',
+      '#lfw-hdr-name{font-size:15px;font-weight:700;margin:0 0 2px;}',
+      '#lfw-hdr-status{font-size:11px;margin:0;display:flex;align-items:center;gap:4px;opacity:.9;}',
+      '.lfw-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}',
+      '.lfw-dot.online{background:#4ade80;} .lfw-dot.busy{background:#fbbf24;} .lfw-dot.offline{background:#f87171;}',
+      '#lfw-close-btn{background:none;border:none;cursor:pointer;padding:6px;color:rgba(255,255,255,.85);',
+        'border-radius:8px;display:flex;transition:background .15s;}',
+      '#lfw-close-btn:hover{background:rgba(0,0,0,.15);}',
+      /* Offline banner */
+      '#lfw-offline-bar{display:none;padding:10px 16px;background:#fef3c7;border-bottom:1px solid #fde68a;',
+        'font-size:12px;color:#92400e;text-align:center;flex-shrink:0;}',
+      /* Lead capture */
+      '#lfw-capture{flex:1;overflow-y:auto;padding:24px 20px;display:flex;flex-direction:column;background:#f8fafc;}',
+      '#lfw-capture h2{margin:0 0 6px;font-size:17px;color:#111;}',
+      '#lfw-capture p{margin:0 0 20px;font-size:13px;color:#6b7280;line-height:1.5;}',
+      '.lfw-field{margin-bottom:14px;}',
+      '.lfw-field label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;}',
+      '.lfw-field input{width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;',
+        'font-size:14px;outline:none;background:#fff;transition:border .15s;color:#111;}',
+      '.lfw-field input:focus{border-color:'+c+';}',
+      '#lfw-start-btn{width:100%;padding:13px;background:'+c+';color:#fff;border:none;border-radius:12px;',
+        'font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s;margin-top:4px;}',
+      '#lfw-start-btn:hover{opacity:.88;}',
+      '#lfw-start-btn:disabled{opacity:.5;cursor:not-allowed;}',
+      /* Chat */
+      '#lfw-msgs{flex:1;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;gap:8px;background:#f7f8fa;}',
+      '.lfw-msg-row{display:flex;align-items:flex-end;gap:6px;}',
+      '.lfw-msg-row.out{flex-direction:row-reverse;}',
+      '.lfw-av{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;',
+        'justify-content:center;font-size:11px;font-weight:700;color:#fff;overflow:hidden;background:#9ca3af;}',
+      '.lfw-av img{width:100%;height:100%;object-fit:cover;}',
+      '.lfw-wrap{display:flex;flex-direction:column;max-width:74%;}',
+      '.lfw-wrap.in{align-items:flex-start;} .lfw-wrap.out{align-items:flex-end;}',
+      '.lfw-sender-lbl{font-size:10px;font-weight:600;color:#6b7280;margin-bottom:2px;padding:0 4px;}',
+      '.lfw-msg{padding:9px 13px;border-radius:16px;font-size:13.5px;line-height:1.45;word-break:break-word;}',
+      '.lfw-msg.in{background:#fff;color:#111;border-bottom-left-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.07);}',
+      '.lfw-msg.out{background:'+c+';color:#fff;border-bottom-right-radius:3px;}',
+      '.lfw-media-img{max-width:100%;max-height:180px;border-radius:10px;cursor:pointer;display:block;}',
+      '.lfw-doc-link{display:flex;align-items:center;gap:6px;padding:7px 11px;background:rgba(0,0,0,.06);',
+        'border-radius:10px;font-size:12px;color:inherit;text-decoration:none;}',
+      /* Typing */
+      '#lfw-typing{display:none;align-self:flex-start;padding:9px 14px;background:#fff;border-radius:16px;',
+        'border-bottom-left-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.07);}',
+      '#lfw-typing span{display:inline-block;width:6px;height:6px;border-radius:50%;background:#9ca3af;margin:0 1px;',
+        'animation:lfw-dot 1.2s infinite;}',
+      '#lfw-typing span:nth-child(2){animation-delay:.2s;}#lfw-typing span:nth-child(3){animation-delay:.4s;}',
+      '@keyframes lfw-dot{0%,80%,100%{transform:scale(.7);opacity:.4}40%{transform:scale(1);opacity:1}}',
+      /* Footer */
+      '#lfw-footer{padding:8px 10px;background:#fff;border-top:1px solid #f0f0f0;display:flex;gap:6px;align-items:flex-end;flex-shrink:0;}',
+      '#lfw-input{flex:1;border:1.5px solid #e5e7eb;border-radius:22px;padding:9px 14px;font-size:13.5px;',
+        'outline:none;resize:none;background:#f9fafb;transition:border .15s;max-height:100px;overflow-y:auto;}',
+      '#lfw-input:focus{border-color:'+c+';background:#fff;}',
+      '#lfw-send-btn{width:38px;height:38px;border-radius:50%;background:'+c+';border:none;cursor:pointer;',
+        'display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .3s;}',
+      '#lfw-send-btn:disabled{opacity:.4;cursor:not-allowed;}',
+      '#lfw-attach-btn{width:34px;height:34px;border-radius:50%;background:transparent;border:1.5px solid #e5e7eb;',
+        'cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#9ca3af;transition:all .15s;}',
+      '#lfw-attach-btn:hover{background:#f3f4f6;color:'+c+';}',
+      /* Powered */
+      '#lfw-powered{text-align:center;padding:7px 0 9px;border-top:1px solid #f3f4f6;background:#fff;flex-shrink:0;}',
+      '#lfw-powered a{display:inline-flex;align-items:center;gap:5px;color:#6b7280;text-decoration:none;font-size:12px;font-weight:500;}',
+      '#lfw-powered a:hover{opacity:.7;}',
+      '#lfw-powered .lfwb{font-weight:700;color:#4f46e5;font-size:13px;}'
+    ].join('');}
+    st.textContent = buildCSS(C);
+    document.head.appendChild(st);
+
+    /* ═══ DOM ═══ */
+    var root = document.createElement('div'); root.id = 'lfw-root';
+
+    // Launcher button — inline style ensures it's always visible even if stylesheet fails
+    var btn = document.createElement('button'); btn.id = 'lfw-btn';
+    btn.setAttribute('style',
+      'position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;' +
+      'background:'+C+';border:none;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25);' +
+      'display:flex;align-items:center;justify-content:center;z-index:9999;transition:transform .2s,background .3s;'
+    );
+    btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2">' +
+      '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+    var badge = document.createElement('span'); badge.id = 'lfw-badge';
+    btn.appendChild(badge);
+
+    // Window
+    var win = document.createElement('div'); win.id = 'lfw-window';
+
+    // Header
+    var hdr = document.createElement('div'); hdr.id = 'lfw-hdr';
+    hdr.innerHTML =
+      '<div id="lfw-hdr-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2">' +
+        '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>' +
+      '<div id="lfw-hdr-info">' +
+        '<p id="lfw-hdr-name">Chat</p>' +
+        '<p id="lfw-hdr-status"><span class="lfw-dot online" id="lfw-dot"></span><span id="lfw-status-txt">Online</span></p>' +
+      '</div>' +
+      '<button id="lfw-close-btn" title="Fechar">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">' +
+          '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+
+    // Offline bar
+    var offlineBar = document.createElement('div'); offlineBar.id = 'lfw-offline-bar';
+
+    // Lead capture panel
+    var capturePanel = document.createElement('div'); capturePanel.id = 'lfw-capture';
+    capturePanel.style.display = 'none';
+
+    // Chat messages
+    var msgs = document.createElement('div'); msgs.id = 'lfw-msgs';
+    msgs.style.display = 'none';
+
+    // Typing indicator
+    var typingEl = document.createElement('div'); typingEl.id = 'lfw-typing';
+    typingEl.innerHTML = '<span></span><span></span><span></span>';
+
+    // Footer (chat input)
+    var footer = document.createElement('div'); footer.id = 'lfw-footer'; footer.style.display = 'none';
+    var fileInp = document.createElement('input'); fileInp.type = 'file'; fileInp.style.display = 'none';
+    fileInp.accept = 'image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt';
+    var attachBtn = document.createElement('button'); attachBtn.id = 'lfw-attach-btn'; attachBtn.title = 'Anexar';
+    attachBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+      '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+    var input = document.createElement('textarea'); input.id = 'lfw-input'; input.rows = 1;
+    input.placeholder = 'Escreva uma mensagem...';
+    var sendBtn = document.createElement('button'); sendBtn.id = 'lfw-send-btn';
+    sendBtn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.3">' +
+      '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+    footer.appendChild(fileInp); footer.appendChild(attachBtn); footer.appendChild(input); footer.appendChild(sendBtn);
+
+    // Powered by
+    var powered = document.createElement('div'); powered.id = 'lfw-powered';
+    powered.innerHTML = '<a href="https://leadsflowapi.com" target="_blank" rel="noopener">' +
+      '<span>Powered by</span>&nbsp;' +
+      '<span class="lfwb">⚡ LeadsFlow</span></a>';
+
+    win.appendChild(hdr); win.appendChild(offlineBar);
+    win.appendChild(capturePanel); win.appendChild(msgs); msgs.appendChild(typingEl);
+    win.appendChild(footer); win.appendChild(powered);
+    root.appendChild(btn); root.appendChild(win);
+    document.body.appendChild(root);
+
+    /* ═══ HELPERS ═══ */
+    function setColor(c){
+      C = c;
+      st.textContent = buildCSS(c);
+      btn.style.background = c; // update inline style too
+    }
+
+    function setStatus(label){
+      var dot = document.getElementById('lfw-dot');
+      var txt = document.getElementById('lfw-status-txt');
+      var map = { online:'Online', busy:'Ocupado', offline:'Offline' };
+      dot.className = 'lfw-dot ' + label;
+      txt.textContent = map[label] || label;
+    }
+
+    function applyConfig(cfg){
+      if (!cfg || cfg.error) return;
+      Object.assign(rc, cfg);
+      if (cfg.primaryColor && cfg.primaryColor !== C) setColor(cfg.primaryColor);
+      document.getElementById('lfw-hdr-name').textContent = cfg.name || 'Chat';
+      setStatus(cfg.statusLabel || (cfg.online ? 'online' : 'offline'));
+      offlineBar.style.display = cfg.online ? 'none' : 'block';
+      offlineBar.textContent   = cfg.offlineMessage || '';
+      var chatDisabled = !cfg.online;
+      input.disabled    = chatDisabled;
+      sendBtn.disabled  = chatDisabled;
+      attachBtn.disabled= chatDisabled;
+      input.placeholder = chatDisabled ? 'Fora do horário de atendimento' : 'Escreva uma mensagem...';
+    }
+
+    function fetchConfig(){ return fetch(API+'/api/webhooks/website/'+channelId+'/config').then(function(r){return r.json();}); }
+
+    /* ═══ STATE MACHINE ═══ */
+    // state: 'loading' | 'capture' | 'chat'
+    function showState(state){
+      capturePanel.style.display = state==='capture' ? 'flex' : 'none';
+      msgs.style.display         = state==='chat'    ? 'flex' : 'none';
+      footer.style.display       = state==='chat'    ? 'flex' : 'none';
+    }
+
+    /* ═══ LEAD CAPTURE FORM ═══ */
+    function buildCaptureForm(lc){
+      capturePanel.innerHTML = '';
+      var h = document.createElement('h2'); h.textContent = lc.title || 'Bem-vindo!';
+      var p = document.createElement('p');  p.textContent = lc.subtitle || 'Preencha os dados para iniciar.';
+      capturePanel.appendChild(h); capturePanel.appendChild(p);
+
+      function field(id, label, type, placeholder, required){
+        var w = document.createElement('div'); w.className = 'lfw-field';
+        var lbl = document.createElement('label'); lbl.textContent = label + (required ? ' *' : '');
+        var inp = document.createElement('input'); inp.type = type; inp.id = id;
+        inp.placeholder = placeholder; inp.required = required;
+        w.appendChild(lbl); w.appendChild(inp);
+        capturePanel.appendChild(w);
+      }
+      if (lc.requireName  !== false) field('lfw-f-name',  'Nome',     'text',  'Seu nome',     true);
+      if (lc.requireEmail !== false) field('lfw-f-email', 'E-mail',   'email', 'seu@email.com', true);
+      if (lc.requirePhone)           field('lfw-f-phone', 'Telefone', 'tel',   '+258 ...',      false);
+
+      var startBtn = document.createElement('button'); startBtn.id = 'lfw-start-btn';
+      startBtn.textContent = 'Iniciar conversa →';
+      capturePanel.appendChild(startBtn);
+
+      startBtn.addEventListener('click', function(){
+        var nameEl  = document.getElementById('lfw-f-name');
+        var emailEl = document.getElementById('lfw-f-email');
+        var phoneEl = document.getElementById('lfw-f-phone');
+        var n = nameEl  ? nameEl.value.trim()  : '';
+        var e = emailEl ? emailEl.value.trim() : '';
+        var ph= phoneEl ? phoneEl.value.trim() : '';
+        if ((lc.requireName !== false) && !n) { nameEl.focus(); return; }
+        if ((lc.requireEmail !== false) && !e) { emailEl.focus(); return; }
+        startBtn.disabled = true; startBtn.textContent = 'A processar...';
+        // Save to localStorage
+        if (n)  { localStorage.setItem('lfw_name',  n);  visitorName  = n; }
+        if (e)  { localStorage.setItem('lfw_email', e);  visitorEmail = e; }
+        if (ph) { localStorage.setItem('lfw_phone', ph); visitorPhone = ph; }
+        // Call identify endpoint
+        fetch(API+'/api/webhooks/website/'+channelId+'/identify', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ visitorId:visitorId, name:n, email:e, phone:ph })
+        }).then(function(r){ return r.json(); })
+          .then(function(){
+            identified = true;
+            enterChat();
+          })
+          .catch(function(){
+            // Even on error, let them chat
+            identified = true;
+            enterChat();
+          });
+      });
+    }
+
+    /* ═══ CHAT ═══ */
+    function makeAvatar(name, avatarUrl, isBot){
+      var av = document.createElement('div'); av.className = 'lfw-av';
+      if (isBot){
+        av.style.background = '#7c3aed';
+        av.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">' +
+          '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3l-4 4-4-4"/>' +
+          '<circle cx="8.5" cy="14" r="1.5" fill="#fff"/><circle cx="15.5" cy="14" r="1.5" fill="#fff"/></svg>';
+      } else if (avatarUrl){
+        var img = document.createElement('img'); img.src = avatarUrl;
+        img.onerror = function(){ av.textContent = (name||'A')[0].toUpperCase(); };
+        av.appendChild(img);
+      } else {
+        var initials = (name||'A').split(' ').map(function(w){return w[0];}).slice(0,2).join('').toUpperCase();
+        av.textContent = initials;
+        var hue = (name||'A').split('').reduce(function(a,c){return a+c.charCodeAt(0);},0)%360;
+        av.style.background = 'hsl('+hue+',50%,42%)';
+      }
+      return av;
+    }
+
+    function appendMsg(text, dir, mUrl, mType, sName, isBot, sAvatar){
+      var row  = document.createElement('div'); row.className = 'lfw-msg-row ' + dir;
+      var wrap = document.createElement('div'); wrap.className = 'lfw-wrap ' + dir;
+      if (dir==='in' && sName){
+        var lbl = document.createElement('div'); lbl.className = 'lfw-sender-lbl';
+        lbl.textContent = sName; wrap.appendChild(lbl);
+      }
+      var m = document.createElement('div'); m.className = 'lfw-msg ' + dir;
+      if (mUrl){
+        if (mType==='image'){ var el=document.createElement('img'); el.src=mUrl; el.className='lfw-media-img'; el.onclick=function(){window.open(mUrl,'_blank');}; m.appendChild(el); }
+        else if(mType==='audio'){ var el=document.createElement('audio'); el.src=mUrl; el.controls=true; el.style.width='100%'; m.appendChild(el); }
+        else if(mType==='video'){ var el=document.createElement('video'); el.src=mUrl; el.controls=true; el.className='lfw-media-img'; m.appendChild(el); }
+        else { var el=document.createElement('a'); el.href=mUrl; el.target='_blank'; el.className='lfw-doc-link'; el.innerHTML='📎 '+(mUrl.split('/').pop()||'Ficheiro'); m.appendChild(el); }
+        if (text){ var t=document.createElement('div'); t.textContent=text; t.style.marginTop='4px'; m.appendChild(t); }
+      } else { m.textContent = text||''; }
+      wrap.appendChild(m);
+      if (dir==='in' && sName) row.appendChild(makeAvatar(sName, sAvatar, isBot));
+      row.appendChild(wrap);
+      msgs.insertBefore(row, typingEl);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    function dbDir(d){ return d==='out'?'in':'out'; }
+
+    function loadHistory(all){
+      var url = API+'/api/webhooks/website/'+channelId+'/messages?visitorId='+visitorId;
+      if (conversationId) url += '&conversationId='+conversationId;
+      fetch(url).then(function(r){return r.json();}).then(function(d){
+        var ms = d.messages||[];
+        if (d.conversationId && !conversationId) conversationId = d.conversationId;
+        if (ms.length !== lastMsgCount){
+          if (all || ms.length < lastMsgCount){
+            Array.from(msgs.children).forEach(function(c){ if(c!==typingEl) msgs.removeChild(c); });
+            ms.forEach(function(m){ appendMsg(m.content,dbDir(m.direction),m.media_url,m.media_type,m.sender_name,m.is_bot,m.sender_avatar); });
+          } else {
+            ms.slice(lastMsgCount).forEach(function(m){ appendMsg(m.content,dbDir(m.direction),m.media_url,m.media_type,m.sender_name,m.is_bot,m.sender_avatar); });
+          }
+          lastMsgCount = ms.length;
+          // Hide unread badge when chat is open
+          if (isOpen){ badge.style.display='none'; }
+        }
+      }).catch(function(){});
+    }
+
+    function sendMessage(){
+      var text = input.value.trim(); if(!text||sendBtn.disabled) return;
+      input.value = ''; input.style.height = 'auto';
+      appendMsg(text,'out'); lastMsgCount++;
+      sendBtn.disabled = true;
+      fetch(API+'/api/webhooks/website/'+channelId,{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ message:text, visitorId:visitorId, channelId:channelId,
+                               visitorName:visitorName, visitorEmail:visitorEmail })
+      }).then(function(r){return r.json();})
+        .then(function(d){ if(d.conversationId) conversationId=d.conversationId; })
+        .catch(function(){ appendMsg('Erro ao enviar. Tente novamente.','in'); })
+        .finally(function(){ sendBtn.disabled = !rc.online || false; });
+    }
+
+    function enterChat(){
+      showState('chat');
+      // Add welcome message if no history yet
+      if (lastMsgCount === 0) appendMsg(rc.welcomeMessage,'in',null,null,null,false,null);
+      loadHistory(true);
+      input.focus();
+    }
+
+    /* ═══ FILE UPLOAD ═══ */
+    attachBtn.addEventListener('click', function(){ fileInp.click(); });
+    fileInp.addEventListener('change', function(){
+      var file = fileInp.files[0]; if(!file) return; fileInp.value='';
+      var fd = new FormData(); fd.append('file',file);
+      var ind = document.createElement('div'); ind.className='lfw-msg out'; ind.textContent='⏳ '+file.name;
+      msgs.insertBefore(ind,typingEl); msgs.scrollTop=msgs.scrollHeight;
+      sendBtn.disabled=true; attachBtn.disabled=true;
+      fetch(API+'/api/webhooks/website/'+channelId+'/upload',{method:'POST',body:fd})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(!d.url) throw new Error('fail');
+          if(ind.parentNode) msgs.removeChild(ind);
+          return fetch(API+'/api/webhooks/website/'+channelId,{
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({visitorId:visitorId,channelId:channelId,message:'',mediaUrl:d.url,mediaType:d.mediaType})
+          });
+        })
+        .then(function(r){return r.json();})
+        .then(function(d){ if(d.conversationId) conversationId=d.conversationId; setTimeout(function(){loadHistory(false);},600); })
+        .catch(function(){ if(ind.parentNode) msgs.removeChild(ind); appendMsg('Erro ao enviar ficheiro.','out'); })
+        .finally(function(){ sendBtn.disabled=!rc.online; attachBtn.disabled=false; });
+    });
+
+    /* ═══ INPUT EVENTS ═══ */
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', function(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
+    input.addEventListener('input', function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,100)+'px'; });
+
+    /* ═══ TYPING POLL (2s) ═══ */
+    setInterval(function(){
+      if(!conversationId||!isOpen) return;
+      fetch(API+'/api/webhooks/website/'+channelId+'/status?conversationId='+conversationId)
+        .then(function(r){return r.json();})
+        .then(function(d){ typingEl.style.display=d.typing?'flex':'none'; if(d.typing){msgs.scrollTop=msgs.scrollHeight;} })
+        .catch(function(){});
+    }, 2000);
+
+    /* ═══ MESSAGE POLL (3s) ═══ */
+    setInterval(function(){
+      if (msgs.style.display!=='none') loadHistory(false);
+    }, 3000);
+
+    /* ═══ CONFIG POLL (60s) ═══ */
+    setInterval(function(){ fetchConfig().then(applyConfig).catch(function(){}); }, 60000);
+
+    /* ═══ CLOSE BUTTON ═══ */
+    hdr.querySelector('#lfw-close-btn').addEventListener('click', function(e){
+      e.stopPropagation(); win.style.display='none'; isOpen=false;
+    });
+
+    /* ═══ LAUNCHER TOGGLE ═══ */
+    btn.addEventListener('click', function(){
+      isOpen = !isOpen;
+      if (isOpen){
+        win.style.display='flex';
+        badge.style.display='none';
+        // Determine which state to show
+        var needCapture = rc.leadCapture.enabled && !identified;
+        showState(needCapture ? 'capture' : 'chat');
+        if (needCapture) buildCaptureForm(rc.leadCapture);
+        else enterChat();
+      } else {
+        win.style.display='none';
+      }
+    });
+
+    /* ═══ INIT: button always visible, config updates async ═══ */
+    fetchConfig().then(applyConfig).catch(function(){
+      // API not reachable — use defaults, still show widget
+      console.warn('[LeadsFlow] Could not reach config endpoint, using defaults.');
+    });
+    // Button is always visible via CSS — no need to wait for config
+
+  })();
+  </script>
+
+</body>
+</html>

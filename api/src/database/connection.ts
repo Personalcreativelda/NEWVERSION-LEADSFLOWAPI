@@ -45,8 +45,33 @@ async function startProxyBridge(
   targetHost: string,
   targetPort: number,
 ): Promise<number> {
+  // Test the proxy CONNECT before committing to the bridge so we fail-fast
+  // rather than letting every pg connection attempt discover the failure.
+  try {
+    const testSocket = await createConnectTunnel(
+      proxyUrl.hostname,
+      parseInt(proxyUrl.port || '8080', 10),
+      targetHost,
+      targetPort,
+    );
+    testSocket.destroy();
+    console.log('[DB Bridge] Proxy CONNECT test passed — bridge will be used.');
+  } catch (testErr) {
+    throw new Error(`Proxy CONNECT pre-check failed: ${(testErr as Error).message}`);
+  }
+
   return new Promise((resolve, reject) => {
     const server = net.createServer(async (clientSocket) => {
+      const pipeThrough = (upstream: net.Socket) => {
+        clientSocket.pipe(upstream);
+        upstream.pipe(clientSocket);
+        const destroy = () => { clientSocket.destroy(); upstream.destroy(); };
+        clientSocket.on('error', destroy);
+        upstream.on('error', destroy);
+        clientSocket.on('close', () => upstream.destroy());
+        upstream.on('close', () => clientSocket.destroy());
+      };
+
       try {
         const tunnelSocket = await createConnectTunnel(
           proxyUrl.hostname,
@@ -54,18 +79,17 @@ async function startProxyBridge(
           targetHost,
           targetPort,
         );
-
-        clientSocket.pipe(tunnelSocket);
-        tunnelSocket.pipe(clientSocket);
-
-        const destroy = () => { clientSocket.destroy(); tunnelSocket.destroy(); };
-        clientSocket.on('error', destroy);
-        tunnelSocket.on('error', destroy);
-        clientSocket.on('close', () => tunnelSocket.destroy());
-        tunnelSocket.on('close', () => clientSocket.destroy());
-      } catch (err) {
-        console.error('[DB Bridge] Tunnel failed:', (err as Error).message);
-        clientSocket.destroy();
+        pipeThrough(tunnelSocket);
+      } catch (tunnelErr) {
+        // Proxy refused CONNECT — fall back to a direct TCP connection so
+        // pg is not left hanging with a destroyed socket.
+        console.warn('[DB Bridge] Tunnel failed, falling back to direct TCP:', (tunnelErr as Error).message);
+        const directSocket = net.createConnection({ host: targetHost, port: targetPort });
+        directSocket.once('error', (err) => {
+          console.error('[DB Bridge] Direct fallback also failed:', err.message);
+          clientSocket.destroy();
+        });
+        directSocket.once('connect', () => pipeThrough(directSocket));
       }
     });
 

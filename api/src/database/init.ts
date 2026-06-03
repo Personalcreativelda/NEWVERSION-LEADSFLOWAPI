@@ -118,6 +118,24 @@ const runPendingMigrations = async () => {
     console.warn('[DB] Migration warning:', error.message);
   }
 
+  // Migração: Adicionar 'deleted' ao status check da tabela channels (soft-delete)
+  try {
+    await pool.query(`
+      DO $$
+      BEGIN
+        ALTER TABLE channels DROP CONSTRAINT IF EXISTS channels_status_check;
+        ALTER TABLE channels ADD CONSTRAINT channels_status_check
+          CHECK (status IN ('active', 'inactive', 'error', 'connecting', 'deleted'));
+      EXCEPTION
+        WHEN others THEN
+          RAISE NOTICE 'Channels status constraint migration: %', SQLERRM;
+      END $$;
+    `);
+    console.log('[DB] Channel status constraint updated (deleted added for soft-delete)');
+  } catch (error: any) {
+    console.warn('[DB] Channel status migration warning:', error.message);
+  }
+
   // Migração: Adicionar colunas de IDs sociais à tabela leads
   try {
     await pool.query(`
@@ -733,6 +751,28 @@ const runPendingMigrations = async () => {
     console.log('[DB] ✅ pending team member link trigger installed');
   } catch (error: any) {
     console.warn('[DB] Migration 022 (link pending member trigger) warning:', error.message);
+  }
+
+  // ── Migration 023: User Feedback ─────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_feedback (
+        id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id    UUID        REFERENCES users(id) ON DELETE SET NULL,
+        type       VARCHAR(20) NOT NULL CHECK (type IN ('rating', 'problem')),
+        stars      SMALLINT    CHECK (stars BETWEEN 1 AND 5),
+        message    TEXT,
+        user_email VARCHAR(255),
+        user_name  VARCHAR(255),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_feedback_user_id    ON user_feedback(user_id);
+      CREATE INDEX IF NOT EXISTS idx_user_feedback_created_at ON user_feedback(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_user_feedback_type       ON user_feedback(type);
+    `);
+    console.log('[DB] ✅ user_feedback table created/verified');
+  } catch (error: any) {
+    console.warn('[DB] Migration 023 (user_feedback) warning:', error.message);
   }
 };
 

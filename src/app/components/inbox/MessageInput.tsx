@@ -63,6 +63,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
     const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const recordingCancelledRef = useRef(false);
     const emojiPickerRef = useRef<HTMLDivElement>(null);
 
     // ── Watch attachment progress → update in-chat bubbles (WhatsApp style) ──
@@ -159,12 +160,14 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
             };
 
             mediaRecorder.onstop = () => {
+                stream.getTracks().forEach(track => track.stop());
+                if (recordingCancelledRef.current) return;
                 const actualMime = mediaRecorder.mimeType || mimeType;
                 const blob = new Blob(audioChunksRef.current, { type: actualMime });
                 setAudioBlob(blob);
-                stream.getTracks().forEach(track => track.stop());
             };
 
+            recordingCancelledRef.current = false;
             mediaRecorder.start(100);
             setIsRecording(true);
             setRecordingTime(0);
@@ -191,19 +194,17 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     };
 
     const cancelRecording = () => {
-        if (mediaRecorderRef.current && isRecording) {
+        recordingCancelledRef.current = true;
+        if (mediaRecorderRef.current && (isRecording || mediaRecorderRef.current.state !== 'inactive')) {
             mediaRecorderRef.current.stop();
         }
         setIsRecording(false);
         setAudioBlob(null);
         setRecordingTime(0);
+        audioChunksRef.current = [];
         if (recordingIntervalRef.current) {
             clearInterval(recordingIntervalRef.current);
             recordingIntervalRef.current = null;
-        }
-        // Stop tracks
-        if (mediaRecorderRef.current?.stream) {
-            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
         }
     };
 
@@ -246,30 +247,6 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         setContent(prev => prev + emoji);
         setShowEmojiPicker(false);
         textareaRef.current?.focus();
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
-        }
-    };
-
-    const handleSend = async () => {
-        if (!content.trim() || disabled || isSending) return;
-
-        const messageToSend = content;
-        setContent('');
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
-
-        try {
-            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-            onTyping(false);
-            await onSendMessage(messageToSend);
-        } catch (error) {
-            setContent(messageToSend); // Restore if failed
-            console.error('Failed to send', error);
-        }
     };
 
     const handleDraftReply = async () => {
@@ -411,7 +388,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     const canSend = content.trim() || attachments.some(a => !detachedIdsRef.current.has(a.id));
     const composerAttachments = attachments.filter(a => !detachedIdsRef.current.has(a.id));
     const isBusy = isSending || isSendingAudio;
-    const showRecordingMode = isRecording || audioBlob;
+    const showRecordingMode = isRecording || !!audioBlob;
 
     return (
         <div className="transition-colors bg-card">
