@@ -19,7 +19,12 @@ import { storageCleanupService } from './services/storage-cleanup.service';
 const app = express();
 const port = Number(process.env.PORT || 4000);
 
-app.use(helmet());
+// Helmet with CORP set to cross-origin so the /w widget script can be loaded
+// by any external website. Without this, helmet's default same-origin policy
+// blocks the <script src="https://api.leadsflowapi.com/w"> tag.
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(corsMiddleware);
 app.use(express.json({
   limit: '50mb',

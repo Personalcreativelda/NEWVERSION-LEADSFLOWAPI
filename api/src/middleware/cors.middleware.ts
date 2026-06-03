@@ -54,6 +54,7 @@ const noOriginRequiredPaths = [
   '/api/auth/google/callback',
   '/api/inbox/media-proxy',
   '/health',
+  '/w',  // widget script — loaded via <script> tag, never sends Origin
 ];
 
 // ── Public widget API paths — allow ANY origin (embedded on external sites) ───
