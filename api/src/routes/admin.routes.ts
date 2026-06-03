@@ -861,7 +861,7 @@ router.post('/create-user', requireAuth, requireAdmin, async (req: Authenticated
 // GET /admin/feedback — list all user feedback (admin only)
 router.get('/feedback', requireAuth, requireAdmin, async (_req, res, next) => {
   try {
-    const result = await pool.query(`
+    const result = await query(`
       SELECT
         f.id, f.type, f.stars, f.message,
         f.user_email, f.user_name, f.user_id, f.created_at
