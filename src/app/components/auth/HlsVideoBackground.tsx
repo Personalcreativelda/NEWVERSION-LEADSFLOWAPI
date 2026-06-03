@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface HlsVideoBackgroundProps {
   overlay?: string;
 }
 
-// CSS keyframes injected once for the animated gradient shown while video loads
 const STYLE_ID = 'hls-bg-keyframes';
 function injectKeyframes() {
   if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return;
@@ -26,11 +25,54 @@ injectKeyframes();
 export default function HlsVideoBackground({
   overlay = 'rgba(6,10,24,0.52)',
 }: HlsVideoBackgroundProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [videoReady, setVideoReady] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    let done = false;
+    const markReady = () => {
+      if (done) return;
+      done = true;
+      setVideoReady(true);
+    };
+
+    video.addEventListener('playing', markReady);
+
+    // Attempt to play — mobile browsers may block autoplay even with muted+playsInline,
+    // so we call .play() explicitly and catch the rejection.
+    const attemptPlay = () => {
+      video.play().catch(() => {
+        // Autoplay blocked (iOS policy). Wait for first user interaction then retry.
+        const onTouch = () => {
+          video.play().catch(() => {});
+          document.removeEventListener('touchstart', onTouch);
+          document.removeEventListener('click', onTouch);
+        };
+        document.addEventListener('touchstart', onTouch, { passive: true });
+        document.addEventListener('click', onTouch, { passive: true });
+      });
+    };
+
+    // If enough data is already buffered (e.g. cached), play immediately.
+    // Otherwise wait for canplay.
+    if (video.readyState >= 3) {
+      attemptPlay();
+    } else {
+      video.addEventListener('canplay', attemptPlay, { once: true });
+    }
+
+    return () => {
+      video.removeEventListener('playing', markReady);
+      video.removeEventListener('canplay', attemptPlay);
+    };
+  }, []);
 
   return (
     <>
-      {/* Animated gradient — visible instantly via poster, fades out once video plays */}
+      {/* Animated gradient — instant, fades out once video is playing */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
@@ -43,16 +85,16 @@ export default function HlsVideoBackground({
         }}
       />
 
-      {/* Local video — poster shows first frame instantly (no buffering),
-          then video plays when ready. No HLS, no hls.js, no streaming delay. */}
       <video
+        ref={videoRef}
         className="fixed inset-0 w-full h-full object-cover pointer-events-none"
         style={{ zIndex: 1 }}
-        autoPlay
         muted
         loop
         playsInline
-        onCanPlay={() => setVideoReady(true)}
+        preload="auto"
+        // autoPlay as HTML attr is still useful for desktop; JS .play() handles mobile
+        autoPlay
       >
         <source src="/videos/rendition.mp4" type="video/mp4" />
       </video>

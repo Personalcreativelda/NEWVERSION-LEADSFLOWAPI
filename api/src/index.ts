@@ -46,9 +46,11 @@ app.get('/health', (_req, res) => {
 // Serves the tiny JS snippet that bootstraps the chat bubble on any website.
 // Embed: <script src="https://api.leadsflowapi.com/w"></script>
 app.get('/w', (_req, res) => {
-  const apiBase = process.env.API_URL || `http://localhost:${process.env.PORT || 4000}`;
+  const fallbackApi = process.env.API_URL || `http://localhost:${process.env.PORT || 4000}`;
   const widgetJs = `(function(){
-  var API='${apiBase}';
+  // Auto-detect API origin from the script URL so the widget always calls
+  // the same server it was loaded from — no hardcoded URL needed.
+  var API=(function(){try{var s=document.getElementById('lfw')||document.currentScript;if(s&&s.src)return new URL(s.src).origin;}catch(e){}return '${fallbackApi}';})();
   var cfg={};
 
   // Consume queued calls made before this script loaded (stored in window.lfw.q by the loader)

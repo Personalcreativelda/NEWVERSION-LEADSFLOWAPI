@@ -16,7 +16,8 @@ interface WebsiteWidgetConnectProps {
 
 export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChannel }: WebsiteWidgetConnectProps) {
     const isEditing = !!editingChannel;
-    const [step, setStep] = useState<'form' | 'code' | 'success'>(isEditing ? 'form' : 'form');
+    const [step, setStep] = useState<'form' | 'code' | 'success'>('form');
+    const [showCode, setShowCode] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [channelId, setChannelId] = useState('');
@@ -123,7 +124,8 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                 channel = await channelsApi.update(editingChannel.id, channelData);
                 toast.success('Canal Website atualizado com sucesso!');
                 onSuccess();
-                onClose();
+                // Stay open so user can copy the widget code
+                setStep('code');
             } else {
                 channel = await channelsApi.create(channelData);
                 if (channel) {
@@ -401,6 +403,36 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                                     </div>
                                 )}
                             </div>
+
+                            {/* Widget code — available immediately when editing */}
+                            {isEditing && channelId && (
+                                <div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCode(v => !v)}
+                                        className="w-full flex items-center justify-between px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
+                                        style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                    >
+                                        <span className="flex items-center gap-2"><Code className="w-4 h-4 text-violet-400" />Código de Instalação do Widget</span>
+                                        <span className="text-xs text-muted-foreground">{showCode ? 'Ocultar' : 'Ver'}</span>
+                                    </button>
+                                    {showCode && (
+                                        <div className="mt-2 relative">
+                                            <pre
+                                                className="p-4 rounded-lg border text-xs overflow-x-auto"
+                                                style={{ backgroundColor: 'hsl(var(--muted))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                            >{getWidgetCode()}</pre>
+                                            <button
+                                                onClick={() => copyToClipboard(getWidgetCode())}
+                                                className="absolute top-2 right-2 p-2 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors"
+                                                title="Copiar código"
+                                            >
+                                                <Copy className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {error && (
                                 <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-2">
