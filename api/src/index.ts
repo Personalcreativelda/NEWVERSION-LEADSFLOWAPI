@@ -225,6 +225,8 @@ app.get('/w', (_req, res) => {
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=300');
   res.setHeader('Access-Control-Allow-Origin', '*');
+  // Required so browsers with Cross-Origin-Embedder-Policy don't block this script
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.send(widgetJs);
 });
 

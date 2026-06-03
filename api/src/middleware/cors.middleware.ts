@@ -56,6 +56,13 @@ const noOriginRequiredPaths = [
   '/health',
 ];
 
+// ── Public widget API paths — allow ANY origin (embedded on external sites) ───
+// These endpoints are hit by the /w chat widget which can be on any customer domain.
+const publicWidgetPaths = [
+  '/api/webhooks/website/',
+  '/api/feedback/summary',
+];
+
 const options: CorsOptions = {
   origin: (origin, callback) => {
     // No Origin → server-to-server / curl / same-origin — allow
@@ -92,6 +99,17 @@ export const corsMiddleware: RequestHandler = (req, res, next) => {
   const path = req.path;
 
   const isNoOriginRequired = noOriginRequiredPaths.some(p => path.startsWith(p));
+  const isPublicWidget = publicWidgetPaths.some(p => path.startsWith(p));
+
+  // Widget public endpoints: allow any origin unconditionally
+  if (isPublicWidget) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    return next();
+  }
 
   // Block origin-less requests to protected routes in production
   if (!origin && !isNoOriginRequired && !isDev) {
@@ -101,23 +119,13 @@ export const corsMiddleware: RequestHandler = (req, res, next) => {
   // Respond to OPTIONS preflight immediately — some proxies strip headers
   // unless we return 204 here before the real cors() handler does it.
   if (req.method === 'OPTIONS') {
-    const requestOrigin = origin || '';
     const isAllowed = !origin || allowedOrigins.includes(origin) || isDev;
 
     if (isAllowed) {
-      res.setHeader(
-        'Access-Control-Allow-Origin',
-        origin || '*',
-      );
+      res.setHeader('Access-Control-Allow-Origin', origin || '*');
       res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader(
-        'Access-Control-Allow-Methods',
-        'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-      );
-      res.setHeader(
-        'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, X-Requested-With, Accept, Origin',
-      );
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
       res.setHeader('Access-Control-Max-Age', '86400');
       res.setHeader('Vary', 'Origin');
       return res.status(204).end();
