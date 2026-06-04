@@ -76,6 +76,7 @@ app.get('/w', (_req, res) => {
     // Inject styles
     var style=document.createElement('style');
     style.textContent=[
+      '#lfw-root{color-scheme:light;}',
       '#lfw-root *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
       '#lfw-btn{position:fixed;'+(position.includes('right')?'right:20px;':'left:20px;')+'bottom:20px;',
       'width:56px;height:56px;border-radius:50%;background:'+color+';border:none;cursor:pointer;',
@@ -88,17 +89,28 @@ app.get('/w', (_req, res) => {
       'width:360px;max-width:calc(100vw - 32px);height:520px;max-height:calc(100vh - 120px);',
       'background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.18);',
       'display:none;flex-direction:column;overflow:hidden;z-index:9998;}',
-      '#lfw-header{background:'+color+';padding:16px;color:#fff;display:flex;align-items:center;gap:10px;flex-shrink:0;}',
-      '#lfw-header h3{margin:0;font-size:15px;font-weight:600;}',
-      '#lfw-header p{margin:0;font-size:12px;opacity:.8;}',
-      '#lfw-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#f7f8fa;}',
-      '.lfw-msg{max-width:78%;padding:10px 14px;border-radius:16px;font-size:13.5px;line-height:1.45;word-break:break-word;}',
-      '.lfw-msg.in{background:#fff;color:#111;border-bottom-left-radius:4px;align-self:flex-start;box-shadow:0 1px 3px rgba(0,0,0,.08);}',
-      '.lfw-msg.out{background:'+color+';color:#fff;border-bottom-right-radius:4px;align-self:flex-end;}',
-      '#lfw-footer{padding:10px 12px;background:#fff;border-top:1px solid #f0f0f0;display:flex;gap:8px;flex-shrink:0;}',
+      '#lfw-header{background:'+color+';padding:14px 16px;color:#fff;display:flex;align-items:center;gap:10px;flex-shrink:0;}',
+      '#lfw-header h3{margin:0;font-size:15px;font-weight:600;color:#fff;}',
+      '#lfw-header p{margin:0;font-size:12px;opacity:.8;color:#fff;}',
+      '#lfw-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;background:#f7f8fa;}',
+      /* Row wraps avatar + bubble */
+      '.lfw-row{display:flex;align-items:flex-end;gap:8px;}',
+      '.lfw-row.in{align-self:flex-start;flex-direction:row;}',
+      '.lfw-row.out{align-self:flex-end;flex-direction:row-reverse;}',
+      /* Avatars */
+      '.lfw-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;color:#fff;}',
+      '.lfw-av.in{background:'+color+';}',
+      '.lfw-av.out{background:#6b7280;}',
+      /* Bubbles */
+      '.lfw-msg{max-width:240px;padding:9px 13px;border-radius:16px;font-size:13.5px;line-height:1.5;word-break:break-word;}',
+      '.lfw-msg.in{background:#fff;color:#111 !important;border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.08);}',
+      '.lfw-msg.out{background:'+color+';color:#fff !important;border-bottom-right-radius:4px;}',
+      '#lfw-footer{padding:10px 12px;background:#fff;border-top:1px solid #f0f0f0;display:flex;gap:8px;align-items:center;flex-shrink:0;}',
       '#lfw-input{flex:1;border:1px solid #e5e7eb;border-radius:24px;padding:10px 16px;font-size:13.5px;',
-      'outline:none;resize:none;background:#f9fafb;transition:border .15s;}',
-      '#lfw-input:focus{border-color:'+color+';background:#fff;}',
+      'color:#111 !important;outline:none;resize:none;background:#f9fafb !important;transition:border .15s;',
+      'color-scheme:light;-webkit-text-fill-color:#111;}',
+      '#lfw-input:focus{border-color:'+color+';background:#fff !important;}',
+      '#lfw-input::placeholder{color:#9ca3af;}',
       '#lfw-send{width:38px;height:38px;border-radius:50%;background:'+color+';border:none;cursor:pointer;',
       'display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s;}',
       '#lfw-send:disabled{opacity:.45;cursor:not-allowed;}',
@@ -119,7 +131,10 @@ app.get('/w', (_req, res) => {
 
     var win=document.createElement('div');win.id='lfw-window';
     var hdr=document.createElement('div');hdr.id='lfw-header';
-    hdr.innerHTML='<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div><h3>Chat</h3><p>Online</p></div>';
+    hdr.innerHTML='<div style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>'
+      +'<div style="flex:1;min-width:0;"><h3 style="margin:0;font-size:15px;font-weight:600;color:#fff;">Chat</h3>'
+      +'<p style="margin:0;font-size:12px;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:5px;">'
+      +'<span class="lfw-dot" style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;flex-shrink:0;"></span>Online</p></div>';
     var msgs=document.createElement('div');msgs.id='lfw-msgs';
     var footer=document.createElement('div');footer.id='lfw-footer';
     var input=document.createElement('textarea');input.id='lfw-input';input.placeholder='Escreva uma mensagem...';input.rows=1;
@@ -139,8 +154,50 @@ app.get('/w', (_req, res) => {
 
     var conversationId=null;
     var lastMsgCount=0;
+    var typingEl=null;
 
-    function appendMsg(text,dir,mediaUrl,mediaType){
+    // ── Sound notification ──
+    function playBeep(){
+      try{
+        var ctx=new(window.AudioContext||window.webkitAudioContext)();
+        var osc=ctx.createOscillator();var gain=ctx.createGain();
+        osc.connect(gain);gain.connect(ctx.destination);
+        osc.type='sine';osc.frequency.value=820;
+        gain.gain.setValueAtTime(0.25,ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.35);
+        osc.start(ctx.currentTime);osc.stop(ctx.currentTime+0.35);
+        setTimeout(function(){ctx.close();},500);
+      }catch(e){}
+    }
+
+    // ── Build avatar element (photo or initials fallback) ──
+    function makeAvatar(dir,name,avatarUrl,isBot){
+      var av=document.createElement('div');av.className='lfw-av '+dir;
+      if(isBot){av.innerHTML='🤖';av.style.fontSize='16px';av.title='IA';return av;}
+      if(avatarUrl){
+        var img=document.createElement('img');
+        img.src=avatarUrl;img.style.cssText='width:100%;height:100%;border-radius:50%;object-fit:cover;';
+        img.onerror=function(){av.removeChild(img);av.textContent=(name||'A')[0].toUpperCase();};
+        av.appendChild(img);
+      } else {
+        av.textContent=(name||(dir==='in'?'A':'V'))[0].toUpperCase();
+      }
+      av.title=name||(dir==='in'?'Agente':'Você');
+      return av;
+    }
+
+    // ── Append message row with avatar + sender name ──
+    function appendMsg(text,dir,mediaUrl,mediaType,senderName,senderAvatar,isBot){
+      var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:'+(dir==='in'?'flex-start':'flex-end')+';gap:2px;';
+      // Sender label (only for agent messages)
+      if(dir==='in'&&senderName){
+        var lbl=document.createElement('div');
+        lbl.style.cssText='font-size:11px;color:#6b7280;padding-left:36px;font-weight:500;';
+        lbl.textContent=isBot?'🤖 IA Assistant':senderName;
+        wrap.appendChild(lbl);
+      }
+      var row=document.createElement('div');row.className='lfw-row '+dir;
+      row.appendChild(makeAvatar(dir,senderName,dir==='in'?senderAvatar:null,isBot));
       var m=document.createElement('div');m.className='lfw-msg '+dir;
       if(mediaUrl){
         if(mediaType==='image'){var img=document.createElement('img');img.src=mediaUrl;img.className='lfw-media-preview';img.onclick=function(){window.open(mediaUrl,'_blank');};m.appendChild(img);}
@@ -149,7 +206,58 @@ app.get('/w', (_req, res) => {
         else{var a=document.createElement('a');a.href=mediaUrl;a.target='_blank';a.className='lfw-doc-link';a.innerHTML='📎 '+(mediaUrl.split('/').pop()||'Ficheiro');m.appendChild(a);}
         if(text){var t=document.createElement('div');t.textContent=text;t.style.marginTop='4px';m.appendChild(t);}
       }else{m.textContent=text;}
-      msgs.appendChild(m);msgs.scrollTop=msgs.scrollHeight;
+      row.appendChild(m);wrap.appendChild(row);
+      msgs.appendChild(wrap);msgs.scrollTop=msgs.scrollHeight;
+    }
+
+    // ── Fetch live config (name, status, color) ──
+    function fetchConfig(){
+      fetch(API+'/api/webhooks/website/'+channelId+'/config')
+        .then(function(r){return r.json();})
+        .then(function(d){
+          // Update header name
+          var h3=hdr.querySelector('h3');var hp=hdr.querySelector('p');
+          if(h3)h3.textContent=d.name||'Chat';
+          if(hp){
+            hp.textContent=d.statusLabel==='busy'?'Ocupado':d.online?'Online':'Offline';
+            hp.style.color=d.online?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.5)';
+          }
+          // Update status dot color in header
+          var dot=hdr.querySelector('.lfw-dot');
+          if(dot)dot.style.background=d.online?'#22c55e':'#ef4444';
+        }).catch(function(){});
+    }
+
+    // ── Typing indicator ──
+    function pollTyping(){
+      if(!conversationId)return;
+      fetch(API+'/api/webhooks/website/'+channelId+'/status?conversationId='+conversationId)
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(d.typing&&d.agentName){
+            if(!typingEl){
+              typingEl=document.createElement('div');typingEl.id='lfw-typing';
+              typingEl.style.cssText='display:flex;align-items:center;gap:8px;padding:4px 0;';
+              var tav=document.createElement('div');tav.className='lfw-av in';tav.style.width='24px';tav.style.height='24px';tav.style.fontSize='10px';
+              tav.textContent=(d.agentName||'A')[0].toUpperCase();
+              var tb=document.createElement('div');
+              tb.style.cssText='background:#fff;border-radius:16px;border-bottom-left-radius:4px;padding:10px 14px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;gap:4px;align-items:center;';
+              tb.innerHTML='<span style="width:6px;height:6px;border-radius:50%;background:#9ca3af;animation:lfw-dot 1s infinite 0s"></span>'+
+                '<span style="width:6px;height:6px;border-radius:50%;background:#9ca3af;animation:lfw-dot 1s infinite 0.2s"></span>'+
+                '<span style="width:6px;height:6px;border-radius:50%;background:#9ca3af;animation:lfw-dot 1s infinite 0.4s"></span>';
+              // Inject dot animation if not yet present
+              if(!document.getElementById('lfw-dot-style')){
+                var ds=document.createElement('style');ds.id='lfw-dot-style';
+                ds.textContent='@keyframes lfw-dot{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}';
+                document.head.appendChild(ds);
+              }
+              typingEl.appendChild(tav);typingEl.appendChild(tb);
+              msgs.appendChild(typingEl);msgs.scrollTop=msgs.scrollHeight;
+            }
+          } else {
+            if(typingEl&&typingEl.parentNode){typingEl.parentNode.removeChild(typingEl);typingEl=null;}
+          }
+        }).catch(function(){});
     }
 
     attachBtn.addEventListener('click',function(){fileInput.click();});
@@ -183,18 +291,35 @@ app.get('/w', (_req, res) => {
         var ms=d.messages||[];
         if(d.conversationId&&!conversationId)conversationId=d.conversationId;
         if(ms.length!==lastMsgCount){
-          if(showAll||ms.length<lastMsgCount){msgs.innerHTML='';ms.forEach(function(m){appendMsg(m.content,dbDir(m.direction),m.media_url,m.media_type);});}
-          else{ms.slice(lastMsgCount).forEach(function(m){appendMsg(m.content,dbDir(m.direction),m.media_url,m.media_type);});}
+          var prevCount=lastMsgCount;
+          if(showAll||ms.length<lastMsgCount){
+            msgs.innerHTML='';typingEl=null;
+            ms.forEach(function(m){appendMsg(m.content,dbDir(m.direction),m.media_url,m.media_type,m.sender_name,m.sender_avatar,m.is_bot);});
+          } else {
+            var newMsgs=ms.slice(prevCount);
+            // Remove typing bubble before appending real messages
+            if(typingEl&&typingEl.parentNode){typingEl.parentNode.removeChild(typingEl);typingEl=null;}
+            var hasNewAgent=newMsgs.some(function(m){return m.direction==='out';});
+            newMsgs.forEach(function(m){appendMsg(m.content,dbDir(m.direction),m.media_url,m.media_type,m.sender_name,m.sender_avatar,m.is_bot);});
+            if(hasNewAgent&&win.style.display!=='flex'){
+              playBeep();
+              badge.style.display='flex';
+              badge.textContent=String(parseInt(badge.textContent||'0')+newMsgs.filter(function(m){return m.direction==='out';}).length);
+            } else if(hasNewAgent){playBeep();}
+          }
           lastMsgCount=ms.length;
         }
       }).catch(function(){});
     }
 
-    // Load history on open
+    // Load history & config on open
     loadHistory(true);
+    fetchConfig();
 
-    // Poll every 3s — always, uses visitorId as fallback
+    // Poll messages every 3s, typing every 2s, config every 30s
     setInterval(function(){loadHistory(false);},3000);
+    setInterval(pollTyping,2000);
+    setInterval(fetchConfig,30000);
 
     function sendMessage(){
       var text=input.value.trim();if(!text)return;
