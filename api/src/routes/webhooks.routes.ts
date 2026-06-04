@@ -21,6 +21,7 @@ import { webhookDispatcher } from '../services/webhook-dispatcher.service';
 import { getStorageService } from '../services/storage.service';
 import { requireAuth } from '../middleware/auth.middleware';
 import { widgetTyping } from '../services/widget-typing.service';
+import { findOrCreateLead } from '../services/leads-dedup.service';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -3833,61 +3834,28 @@ router.post('/website/:channelId', async (req, res) => {
 
     const channel = channelResult.rows[0];
 
-    // ── Buscar lead: por email → por visitorId (guardado no campo whatsapp como 'web_xxx') ──
-    let lead: any = null;
+    // ── Buscar ou criar lead com deduplicação cross-canal ──────────────────────
+    // Searches by: email → phone → visitorId → creates new if nothing found.
+    // If found from a DIFFERENT channel (e.g. WhatsApp), links the visitorId to
+    // the existing lead and reuses its full history.
+    const lead = await findOrCreateLead({
+      userId: channel.user_id,
+      email:        visitorEmail || undefined,
+      name:         visitorName  || undefined,
+      webVisitorId: visitorId ? `web_${visitorId}` : undefined,
+      source:       'website',
+    });
 
-    if (visitorEmail) {
-      const r = await query(`SELECT * FROM leads WHERE user_id = $1 AND email = $2 LIMIT 1`, [channel.user_id, visitorEmail]);
-      lead = r.rows[0];
-    }
+    const leadId = lead.id;
 
-    if (!lead && visitorId) {
-      // /identify guarda o visitorId no campo whatsapp como 'web_<visitorId>'
-      const r = await query(
-        `SELECT * FROM leads WHERE user_id = $1 AND whatsapp = $2 LIMIT 1`,
-        [channel.user_id, `web_${visitorId}`]
-      ).catch(() => ({ rows: [] as any[] }));
-      lead = r.rows[0];
-    }
-
-    let leadId: string;
-
-    if (!lead) {
-      // Criar novo lead com os dados capturados
-      const contactName = visitorName || visitorEmail || `Visitante ${visitorId?.substring(0, 8) || 'Anónimo'}`;
-      const r = await query(
-        `INSERT INTO leads (user_id, name, email, whatsapp, source, status)
-         VALUES ($1, $2, $3, $4, 'website', 'novo')
-         RETURNING *`,
-        [channel.user_id, contactName, visitorEmail || null, `web_${visitorId}`]
-      );
-      lead = r.rows[0];
-      leadId = lead.id;
-
+    // Record capture only for brand-new leads (source = 'website' and no prior activity)
+    if (lead.source === 'website' && !lead.phone && !lead.facebook_id) {
       try {
         await leadTrackingService.recordLeadCapture(
           channel.user_id, leadId, channel.id, 'website',
-          { contact_name: contactName, email: visitorEmail, page_url: pageUrl }
+          { contact_name: lead.name, email: visitorEmail, page_url: pageUrl }
         );
       } catch { /* non-critical */ }
-    } else {
-      leadId = lead.id;
-
-      // Actualizar nome/email se o lead ainda tem nome genérico
-      const isGeneric = !lead.name || lead.name.startsWith('Visitante ');
-      const updates: string[] = [];
-      const vals: any[] = [];
-      let idx = 1;
-      if (visitorName  && (isGeneric || !lead.name))  { updates.push(`name  = $${idx++}`); vals.push(visitorName); }
-      if (visitorEmail && !lead.email)                 { updates.push(`email = $${idx++}`); vals.push(visitorEmail); }
-      // Store visitorId so future lookups work
-      if (!lead.whatsapp || lead.whatsapp !== `web_${visitorId}`) {
-        updates.push(`whatsapp = $${idx++}`); vals.push(`web_${visitorId}`);
-      }
-      if (updates.length > 0) {
-        vals.push(leadId);
-        await query(`UPDATE leads SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${idx}`, vals).catch(() => {});
-      }
     }
 
     // Nome de contacto = nome real se disponível, senão email, senão ID genérico
@@ -4177,46 +4145,18 @@ router.post('/website/:channelId/identify', async (req, res) => {
     if (channelResult.rows.length === 0) return res.status(404).json({ error: 'Channel not found' });
     const channel = channelResult.rows[0];
 
-    // Find existing lead: priority = visitorId → email → create new
+    // Find existing lead with cross-channel deduplication
     const webVisitorId2 = `web_${visitorId}`;
-    let lead = null;
+    const lead = await findOrCreateLead({
+      userId:       channel.user_id,
+      email:        email || undefined,
+      phone:        phone || undefined,
+      name:         name  || undefined,
+      webVisitorId: webVisitorId2,
+      source:       'website',
+    });
 
-    // 1. Search by visitorId (most reliable — always linked on first message)
-    const byVisitor = await query(
-      `SELECT * FROM leads WHERE user_id = $1 AND whatsapp = $2 LIMIT 1`,
-      [channel.user_id, webVisitorId2]
-    ).catch(() => ({ rows: [] as any[] }));
-    lead = byVisitor.rows[0];
-
-    // 2. Search by email if provided and not found yet
-    if (!lead && email) {
-      const r = await query(`SELECT * FROM leads WHERE user_id = $1 AND email = $2 LIMIT 1`, [channel.user_id, email]);
-      lead = r.rows[0];
-    }
-
-    if (lead) {
-      // Update existing lead with captured data
-      const updates: string[] = [];
-      const vals: any[] = [];
-      let i = 1;
-      if (name  && (!lead.name || lead.name.startsWith('Visitante '))) { updates.push(`name = $${i++}`);     vals.push(name); }
-      if (email && !lead.email)                                          { updates.push(`email = $${i++}`);    vals.push(email); }
-      if (phone && !lead.phone)                                          { updates.push(`phone = $${i++}`);    vals.push(phone); }
-      // Always link visitorId
-      if (lead.whatsapp !== webVisitorId2) { updates.push(`whatsapp = $${i++}`); vals.push(webVisitorId2); }
-      if (updates.length > 0) {
-        vals.push(lead.id);
-        await query(`UPDATE leads SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${i}`, vals).catch(() => {});
-      }
-    } else {
-      const r = await query(
-        `INSERT INTO leads (user_id, name, email, phone, whatsapp, source, status)
-         VALUES ($1, $2, $3, $4, $5, 'website', 'novo') RETURNING *`,
-        [channel.user_id, name || 'Visitante', email || null, phone || null, webVisitorId2]
-      );
-      lead = r.rows[0];
-    }
-
+    // findOrCreateLead already handles update+link — just return the lead id
     res.json({ success: true, leadId: lead.id });
   } catch (err: any) {
     console.error('[Website Widget Identify] Erro:', err.message);
