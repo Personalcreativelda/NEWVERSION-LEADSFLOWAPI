@@ -262,15 +262,15 @@ app.get('/w', (_req, res) => {
         if(p)localStorage.setItem('lfw_phone',p);
         localStorage.setItem('lfw_identified','1');
         isIdentified=true;
-        // POST identify to API
+        // POST identify to API — send all visitor data so the lead is created/updated in dashboard
         fetch(API+'/api/webhooks/website/'+channelId+'/identify',{
           method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({visitorId:visitorId,name:n,email:e||undefined,phone:p||undefined})
+          body:JSON.stringify({visitorId:visitorId,name:n,email:e||undefined,phone:p||undefined,channelId:channelId})
         }).catch(function(){});
-        // Show chat with personalised welcome
+        // Prepare chat content BEFORE showing to avoid empty flash
         msgs.innerHTML='';lastMsgCount=0;
-        showChat();
-        appendMsg('Olá '+n+'! '+welcome,'in');
+        appendMsg('Olá '+n+'! '+welcome,'in'); // add content while still hidden
+        showChat(); // reveal only after content is ready
         input.focus();
       });
     }
@@ -374,7 +374,7 @@ app.get('/w', (_req, res) => {
           if(!d.url)throw new Error('Upload failed');
           msgs.removeChild(ind);
           return fetch(API+'/api/webhooks/website/'+channelId,{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({visitorId:visitorId,channelId:channelId,message:'',mediaUrl:d.url,mediaType:d.mediaType})});
+            body:JSON.stringify({visitorId:visitorId,channelId:channelId,message:'',mediaUrl:d.url,mediaType:d.mediaType,visitorName:visitorName||undefined,visitorEmail:visitorEmail||undefined})});
         })
         .then(function(r){return r.json();})
         .then(function(d){if(d.conversationId)conversationId=d.conversationId;setTimeout(function(){loadHistory(false);},500);})
@@ -431,7 +431,15 @@ app.get('/w', (_req, res) => {
       fetch(API+'/api/webhooks/website/'+channelId,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({message:text,visitorId:visitorId,channelId:channelId})
+        body:JSON.stringify({
+          message:text,
+          visitorId:visitorId,
+          channelId:channelId,
+          // Always send visitor identity so lead is updated on every message
+          visitorName:visitorName||undefined,
+          visitorEmail:visitorEmail||undefined,
+          visitorPhone:visitorPhone||undefined,
+        })
       }).then(function(r){return r.json();})
         .then(function(d){if(d.conversationId)conversationId=d.conversationId;})
         .catch(function(){appendMsg('Erro ao enviar. Tente novamente.','in');})

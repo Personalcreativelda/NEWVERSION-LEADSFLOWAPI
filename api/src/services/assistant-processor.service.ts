@@ -322,8 +322,10 @@ export class AssistantProcessorService {
             const reactionsEnabled = config.reactions_enabled === true || config.reactions_enabled === 'true';
             const externalMsgId = await this.humanizedSend(ctx, aiResponse.content, audioBase64, reactionsEnabled);
 
-            // 7. Salvar mensagem de resposta no banco (com external_id para evitar duplicata via webhook)
-            await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId, audioBase64 ? 'audio' : 'text');
+            // 7. Salvar mensagem no banco — website já salva por chunk em humanizedSend(); outros canais salvam aqui.
+            if (ctx.channelType !== 'website') {
+                await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId, audioBase64 ? 'audio' : 'text');
+            }
 
             // 8. Registrar log do assistente
             try {

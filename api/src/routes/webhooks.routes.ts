@@ -4177,21 +4177,22 @@ router.post('/website/:channelId/identify', async (req, res) => {
     if (channelResult.rows.length === 0) return res.status(404).json({ error: 'Channel not found' });
     const channel = channelResult.rows[0];
 
-    // Find existing lead or create
+    // Find existing lead: priority = visitorId → email → create new
+    const webVisitorId2 = `web_${visitorId}`;
     let lead = null;
-    if (email) {
-      const r = await query(`SELECT * FROM leads WHERE user_id = $1 AND email = $2`, [channel.user_id, email]);
-      lead = r.rows[0];
-    }
-    if (!lead) {
-      const r = await query(
-        `SELECT * FROM leads WHERE user_id = $1 AND source = 'website' AND name = $2 LIMIT 1`,
-        [channel.user_id, name || 'Visitante']
-      ).catch(() => ({ rows: [] as any[] }));
-      lead = r.rows[0];
-    }
 
-    const webVisitorId = `web_${visitorId}`;
+    // 1. Search by visitorId (most reliable — always linked on first message)
+    const byVisitor = await query(
+      `SELECT * FROM leads WHERE user_id = $1 AND whatsapp = $2 LIMIT 1`,
+      [channel.user_id, webVisitorId2]
+    ).catch(() => ({ rows: [] as any[] }));
+    lead = byVisitor.rows[0];
+
+    // 2. Search by email if provided and not found yet
+    if (!lead && email) {
+      const r = await query(`SELECT * FROM leads WHERE user_id = $1 AND email = $2 LIMIT 1`, [channel.user_id, email]);
+      lead = r.rows[0];
+    }
 
     if (lead) {
       // Update existing lead with captured data
@@ -4202,7 +4203,7 @@ router.post('/website/:channelId/identify', async (req, res) => {
       if (email && !lead.email)                                          { updates.push(`email = $${i++}`);    vals.push(email); }
       if (phone && !lead.phone)                                          { updates.push(`phone = $${i++}`);    vals.push(phone); }
       // Always link visitorId
-      if (lead.whatsapp !== webVisitorId) { updates.push(`whatsapp = $${i++}`); vals.push(webVisitorId); }
+      if (lead.whatsapp !== webVisitorId2) { updates.push(`whatsapp = $${i++}`); vals.push(webVisitorId2); }
       if (updates.length > 0) {
         vals.push(lead.id);
         await query(`UPDATE leads SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${i}`, vals).catch(() => {});
@@ -4211,7 +4212,7 @@ router.post('/website/:channelId/identify', async (req, res) => {
       const r = await query(
         `INSERT INTO leads (user_id, name, email, phone, whatsapp, source, status)
          VALUES ($1, $2, $3, $4, $5, 'website', 'novo') RETURNING *`,
-        [channel.user_id, name || 'Visitante', email || null, phone || null, webVisitorId]
+        [channel.user_id, name || 'Visitante', email || null, phone || null, webVisitorId2]
       );
       lead = r.rows[0];
     }
