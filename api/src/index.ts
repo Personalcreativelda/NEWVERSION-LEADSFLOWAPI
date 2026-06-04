@@ -72,6 +72,10 @@ app.get('/w', (_req, res) => {
     var position=cfg.position||'bottom-right';
     var visitorId=localStorage.getItem('lfw_vid')||'v_'+Math.random().toString(36).slice(2);
     localStorage.setItem('lfw_vid',visitorId);
+    var visitorName=localStorage.getItem('lfw_name')||'';
+    var visitorEmail=localStorage.getItem('lfw_email')||'';
+    var visitorPhone=localStorage.getItem('lfw_phone')||'';
+    var isIdentified=!!localStorage.getItem('lfw_identified');
 
     // Inject styles
     var style=document.createElement('style');
@@ -91,7 +95,18 @@ app.get('/w', (_req, res) => {
       'display:none;flex-direction:column;overflow:hidden;z-index:9998;}',
       '@media(max-width:640px){#lfw-window{inset:0!important;width:100%!important;max-width:100%!important;',
       'height:100%!important;max-height:100%!important;border-radius:0!important;bottom:0!important;right:0!important;left:0!important;top:0!important;}',
-      '#lfw-btn{bottom:16px;}}',
+      '#lfw-btn{bottom:16px;}#lfw-btn.lfw-hidden{display:none!important;}}',
+      /* Lead capture form */
+      '#lfw-lead-form{flex:1;overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:14px;background:#f7f8fa;}',
+      '#lfw-lead-form .lfw-lf-title{font-size:16px;font-weight:700;color:#1a1a1a;margin:0 0 2px;}',
+      '#lfw-lead-form .lfw-lf-sub{font-size:13px;color:#6b7280;margin:0 0 8px;}',
+      '#lfw-lead-form label{font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;}',
+      '#lfw-lead-form input{width:100%;padding:10px 14px;border:1px solid #e5e7eb;border-radius:10px;font-size:14px;color:#111;background:#fff;outline:none;transition:border .15s;color-scheme:light;-webkit-text-fill-color:#111;}',
+      '#lfw-lead-form input:focus{border-color:'+color+';}',
+      '#lfw-lead-form input::placeholder{color:#9ca3af;}',
+      '#lfw-lead-start{width:100%;padding:13px;border:none;border-radius:10px;background:'+color+';color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s;margin-top:4px;}',
+      '#lfw-lead-start:hover{opacity:.9;}',
+      '#lfw-lead-start:disabled{opacity:.6;cursor:not-allowed;}',
       '#lfw-header{background:'+color+';padding:14px 16px;color:#fff;display:flex;align-items:center;gap:10px;flex-shrink:0;}',
       '#lfw-header h3{margin:0;font-size:15px;font-weight:600;color:#fff;}',
       '#lfw-header p{margin:0;font-size:12px;opacity:.8;color:#fff;}',
@@ -139,7 +154,7 @@ app.get('/w', (_req, res) => {
 
     var win=document.createElement('div');win.id='lfw-window';
     var hdr=document.createElement('div');hdr.id='lfw-header';
-    hdr.innerHTML='<div style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>'
+    hdr.innerHTML='<div class="lfw-hdr-icon" style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>'
       +'<div style="flex:1;min-width:0;"><h3 style="margin:0;font-size:15px;font-weight:600;color:#fff;">Chat</h3>'
       +'<p style="margin:0;font-size:12px;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:5px;">'
       +'<span class="lfw-dot" style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;flex-shrink:0;"></span>Online</p></div>'
@@ -153,6 +168,16 @@ app.get('/w', (_req, res) => {
     fileInput.accept='image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt';fileInput.style.display='none';
     var attachBtn=document.createElement('button');attachBtn.id='lfw-attach';attachBtn.title='Anexar ficheiro';
     attachBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+    // ── Lead capture form panel ──
+    var leadForm=document.createElement('div');leadForm.id='lfw-lead-form';
+    leadForm.style.display='none';
+    leadForm.innerHTML='<p class="lfw-lf-title">👋 Olá! Antes de começar...</p>'
+      +'<p class="lfw-lf-sub">Preencha os dados para que possamos ajudá-lo melhor.</p>'
+      +'<div><label>Nome *</label><input id="lfw-lf-name" type="text" placeholder="Seu nome completo" autocomplete="name"/></div>'
+      +'<div><label>Email</label><input id="lfw-lf-email" type="email" placeholder="seu@email.com" autocomplete="email"/></div>'
+      +'<div><label>WhatsApp</label><input id="lfw-lf-phone" type="tel" placeholder="+55 11 9 0000-0000" autocomplete="tel"/></div>'
+      +'<button id="lfw-lead-start">Iniciar conversa →</button>';
+
     // Powered by footer
     var powered=document.createElement('div');powered.id='lfw-powered';
     powered.innerHTML='Powered by <a href="https://leadsflowapi.com" target="_blank" rel="noopener">'
@@ -160,12 +185,27 @@ app.get('/w', (_req, res) => {
       +'LeadsFlow</a>';
 
     footer.appendChild(fileInput);footer.appendChild(attachBtn);footer.appendChild(input);footer.appendChild(sendBtn);
-    win.appendChild(hdr);win.appendChild(msgs);win.appendChild(footer);win.appendChild(powered);
+    win.appendChild(hdr);win.appendChild(leadForm);win.appendChild(msgs);win.appendChild(footer);win.appendChild(powered);
     root.appendChild(btn);root.appendChild(win);
     document.body.appendChild(root);
 
-    // Welcome message
-    appendMsg(welcome,'in');
+    // Show lead form or chat depending on identification state
+    function showChat(){
+      leadForm.style.display='none';
+      msgs.style.display='flex';
+      footer.style.display='flex';
+    }
+    function showLeadForm(){
+      leadForm.style.display='flex';
+      msgs.style.display='none';
+      footer.style.display='none';
+    }
+
+    if(!isIdentified){showLeadForm();}else{msgs.style.display='flex';footer.style.display='flex';}
+
+    // Welcome message (only in chat)
+    var welcomeText=isIdentified&&visitorName?'Olá '+visitorName+'! '+welcome:welcome;
+    appendMsg(welcomeText,'in');
 
     var conversationId=null;
     var lastMsgCount=0;
@@ -195,10 +235,44 @@ app.get('/w', (_req, res) => {
         img.onerror=function(){av.removeChild(img);av.textContent=(name||'A')[0].toUpperCase();};
         av.appendChild(img);
       } else {
-        av.textContent=(name||(dir==='in'?'A':'V'))[0].toUpperCase();
+        // For visitor (out), use their name initial if identified
+        var initials=name?(name[0]||'?').toUpperCase():(dir==='in'?'A':(visitorName?visitorName[0].toUpperCase():'V'));
+        av.textContent=initials;
       }
-      av.title=name||(dir==='in'?'Agente':'Você');
+      av.title=name||(dir==='in'?'Agente':(visitorName||'Você'));
       return av;
+    }
+
+    // ── Lead form submission ──
+    var leadStartBtn=document.getElementById('lfw-lead-start');
+    if(leadStartBtn){
+      leadStartBtn.addEventListener('click',function(){
+        var nameInput=document.getElementById('lfw-lf-name');
+        var emailInput=document.getElementById('lfw-lf-email');
+        var phoneInput=document.getElementById('lfw-lf-phone');
+        var n=(nameInput&&nameInput.value.trim())||'';
+        var e=(emailInput&&emailInput.value.trim())||'';
+        var p=(phoneInput&&phoneInput.value.trim())||'';
+        if(!n){nameInput&&nameInput.focus();return;}
+        leadStartBtn.disabled=true;leadStartBtn.textContent='A iniciar...';
+        // Save locally
+        visitorName=n;visitorEmail=e;visitorPhone=p;
+        localStorage.setItem('lfw_name',n);
+        if(e)localStorage.setItem('lfw_email',e);
+        if(p)localStorage.setItem('lfw_phone',p);
+        localStorage.setItem('lfw_identified','1');
+        isIdentified=true;
+        // POST identify to API
+        fetch(API+'/api/webhooks/website/'+channelId+'/identify',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({visitorId:visitorId,name:n,email:e||undefined,phone:p||undefined})
+        }).catch(function(){});
+        // Show chat with personalised welcome
+        msgs.innerHTML='';lastMsgCount=0;
+        showChat();
+        appendMsg('Olá '+n+'! '+welcome,'in');
+        input.focus();
+      });
     }
 
     // ── Append message row with avatar + sender name ──
@@ -225,21 +299,33 @@ app.get('/w', (_req, res) => {
       msgs.appendChild(wrap);msgs.scrollTop=msgs.scrollHeight;
     }
 
-    // ── Fetch live config (name, status, color) ──
+    // ── Fetch live config (name, status, agent avatar) ──
     function fetchConfig(){
       fetch(API+'/api/webhooks/website/'+channelId+'/config')
         .then(function(r){return r.json();})
         .then(function(d){
-          // Update header name
           var h3=hdr.querySelector('h3');var hp=hdr.querySelector('p');
           if(h3)h3.textContent=d.name||'Chat';
           if(hp){
             hp.textContent=d.statusLabel==='busy'?'Ocupado':d.online?'Online':'Offline';
             hp.style.color=d.online?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.5)';
           }
-          // Update status dot color in header
           var dot=hdr.querySelector('.lfw-dot');
           if(dot)dot.style.background=d.online?'#22c55e':'#ef4444';
+          // Update agent avatar in header if available
+          var hdrIcon=hdr.querySelector('.lfw-hdr-icon');
+          if(hdrIcon&&d.agentAvatar){
+            hdrIcon.innerHTML='';
+            var aImg=document.createElement('img');
+            aImg.src=d.agentAvatar;
+            aImg.style.cssText='width:100%;height:100%;border-radius:50%;object-fit:cover;';
+            aImg.onerror=function(){hdrIcon.textContent=(d.agentName||d.name||'A')[0].toUpperCase();hdrIcon.style.fontSize='15px';hdrIcon.style.fontWeight='700';hdrIcon.style.color='#fff';};
+            hdrIcon.appendChild(aImg);
+          } else if(hdrIcon&&d.agentName){
+            hdrIcon.innerHTML='';
+            hdrIcon.textContent=d.agentName[0].toUpperCase();
+            hdrIcon.style.cssText='width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;';
+          }
         }).catch(function(){});
     }
 
@@ -360,8 +446,23 @@ app.get('/w', (_req, res) => {
       this.style.height='auto';
       this.style.height=Math.min(this.scrollHeight,100)+'px';
     });
-    function closeWidget(){win.style.display='none';}
-    function openWidget(){win.style.display='flex';badge.style.display='none';badge.textContent='0';setTimeout(function(){input.focus();},50);}
+    var isMobileView=function(){return window.innerWidth<=640;};
+
+    function closeWidget(){
+      win.style.display='none';
+      // Restore FAB on mobile
+      if(isMobileView())btn.classList.remove('lfw-hidden');
+    }
+    function openWidget(){
+      win.style.display='flex';
+      badge.style.display='none';badge.textContent='0';
+      // Hide FAB on mobile (it overlaps the send button in fullscreen)
+      if(isMobileView())btn.classList.add('lfw-hidden');
+      setTimeout(function(){
+        if(isIdentified)input.focus();
+        else{var ni=document.getElementById('lfw-lf-name');if(ni)ni.focus();}
+      },80);
+    }
 
     btn.addEventListener('click',function(){
       win.style.display==='flex'?closeWidget():openWidget();

@@ -3959,18 +3959,23 @@ router.post('/website/:channelId', async (req, res) => {
       });
     }
 
-    // ── Processar assistente de IA (assíncrono — não bloqueia a resposta) ────
-    assistantProcessor.processIncomingMessage({
-      channelId: channel.id,
-      channelType: 'website',
-      conversationId: conversation.id,
-      userId: channel.user_id,
-      contactPhone: visitorId || 'website_visitor',
-      contactName: visitorName || visitorEmail || 'Visitante',
-      messageContent: message,
-      credentials: channel.credentials || {},
-      remoteJid: remoteJid,
-    }).catch((err: any) => console.warn('[Website Widget Webhook] Erro no assistente IA:', err.message));
+    // ── Processar assistente de IA via fila (debounce, igual ao WhatsApp) ──────
+    if (message && message.trim()) {
+      assistantQueueService.enqueueAndSchedule(
+        {
+          channelId: channel.id,
+          channelType: 'website',
+          conversationId: conversation.id,
+          userId: channel.user_id,
+          contactPhone: visitorId || 'website_visitor',
+          contactName: visitorName || visitorEmail || 'Visitante',
+          messageContent: message,
+          credentials: channel.credentials || {},
+          remoteJid: remoteJid,
+        },
+        (ctx) => assistantProcessor.processIncomingMessage(ctx)
+      ).catch((err: any) => console.warn('[Website Widget Webhook] Erro ao enfileirar assistente IA:', err.message));
+    }
 
     res.json({
       success: true,

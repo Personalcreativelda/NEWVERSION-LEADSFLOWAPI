@@ -835,9 +835,10 @@ export class AssistantProcessorService {
         const isWACloud     = ctx.channelType === 'whatsapp_cloud';
         const isFacebook    = ctx.channelType === 'facebook';
         const isInstagram   = ctx.channelType === 'instagram';
+        const isWebsite     = ctx.channelType === 'website';
 
         // Email e canais sem real-time: enviar direto sem simulação
-        if (!isEvolutionWA && !isTelegram && !isWACloud && !isFacebook && !isInstagram) {
+        if (!isEvolutionWA && !isTelegram && !isWACloud && !isFacebook && !isInstagram && !isWebsite) {
             return this.sendReply(ctx, text, audioBase64);
         }
 
@@ -978,6 +979,43 @@ export class AssistantProcessorService {
                 if (i > 0) await this.sleep(this.typingDelayMs(chunks[i].length));
                 await this.sendInstagramMessage(tok, rid, chunks[i]).catch(() => {});
             }
+
+        } else if (isWebsite) {
+            // ── Website widget: typing indicator + chunk-by-chunk saving ─────────
+            // The widget polls /messages every 3s, so each saved chunk appears naturally.
+            // widgetTyping drives the animated "..." bubble the visitor sees in real time.
+            const { widgetTyping } = await import('./widget-typing.service');
+            const agentLabel = 'IA Assistant';
+
+            // Brief "reading" pause before starting to reply (human feel)
+            await this.sleep(500 + Math.floor(Math.random() * 400));
+
+            for (let i = 0; i < chunks.length; i++) {
+                const chunk = chunks[i];
+                if (!chunk.trim()) continue;
+
+                const delay = this.typingDelayMs(chunk.length);
+
+                // Show typing bubble with agent name
+                widgetTyping.set(ctx.conversationId, agentLabel);
+
+                // Simulate the time it takes to type this chunk
+                await this.sleep(delay);
+
+                // Persist chunk to DB — widget polling picks it up within 3 s
+                await this.saveOutgoingMessage(ctx, chunk);
+
+                // Clear typing between chunks; brief pause before next one
+                if (i < chunks.length - 1) {
+                    widgetTyping.clear(ctx.conversationId);
+                    await this.sleep(this.interChunkPauseMs());
+                }
+            }
+
+            // Clear typing after last chunk
+            widgetTyping.clear(ctx.conversationId);
+
+            console.log(`[AssistantProcessor] ✅ Website: ${chunks.length} chunk(s) enviados com typing simulado`);
         }
 
         return lastExternalId;
@@ -1175,6 +1213,15 @@ export class AssistantProcessorService {
                     attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
                 }, smtpSettings);
                 console.log(`[AssistantProcessor] ✅ Email enviado para: ${recipientEmail}`);
+                return null;
+            }
+
+            case 'website': {
+                // Website widget: save reply to DB — widget polls /messages every 3s and picks it up.
+                // No external API call needed; saveOutgoingMessage also fires a WebSocket event
+                // so the dashboard inbox updates in real-time as well.
+                await this.saveOutgoingMessage(ctx, text);
+                console.log(`[AssistantProcessor] ✅ Resposta IA enviada para widget website (conversa ${ctx.conversationId})`);
                 return null;
             }
 
