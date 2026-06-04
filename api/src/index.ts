@@ -89,9 +89,17 @@ app.get('/w', (_req, res) => {
       'width:360px;max-width:calc(100vw - 32px);height:520px;max-height:calc(100vh - 120px);',
       'background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.18);',
       'display:none;flex-direction:column;overflow:hidden;z-index:9998;}',
+      '@media(max-width:640px){#lfw-window{inset:0!important;width:100%!important;max-width:100%!important;',
+      'height:100%!important;max-height:100%!important;border-radius:0!important;bottom:0!important;right:0!important;left:0!important;top:0!important;}',
+      '#lfw-btn{bottom:16px;}}',
       '#lfw-header{background:'+color+';padding:14px 16px;color:#fff;display:flex;align-items:center;gap:10px;flex-shrink:0;}',
       '#lfw-header h3{margin:0;font-size:15px;font-weight:600;color:#fff;}',
       '#lfw-header p{margin:0;font-size:12px;opacity:.8;color:#fff;}',
+      '#lfw-close{margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;',
+      'border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;}',
+      '#lfw-close:hover{background:rgba(255,255,255,.35);}',
+      '#lfw-powered{padding:6px 12px;text-align:center;font-size:10px;color:#9ca3af;background:#fff;border-top:1px solid #f3f4f6;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:4px;}',
+      '#lfw-powered a{color:#6366f1;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:3px;}',
       '#lfw-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;background:#f7f8fa;}',
       /* Row wraps avatar + bubble */
       '.lfw-row{display:flex;align-items:flex-end;gap:8px;}',
@@ -134,7 +142,8 @@ app.get('/w', (_req, res) => {
     hdr.innerHTML='<div style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>'
       +'<div style="flex:1;min-width:0;"><h3 style="margin:0;font-size:15px;font-weight:600;color:#fff;">Chat</h3>'
       +'<p style="margin:0;font-size:12px;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:5px;">'
-      +'<span class="lfw-dot" style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;flex-shrink:0;"></span>Online</p></div>';
+      +'<span class="lfw-dot" style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;flex-shrink:0;"></span>Online</p></div>'
+      +'<button id="lfw-close" title="Fechar">✕</button>';
     var msgs=document.createElement('div');msgs.id='lfw-msgs';
     var footer=document.createElement('div');footer.id='lfw-footer';
     var input=document.createElement('textarea');input.id='lfw-input';input.placeholder='Escreva uma mensagem...';input.rows=1;
@@ -144,8 +153,14 @@ app.get('/w', (_req, res) => {
     fileInput.accept='image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt';fileInput.style.display='none';
     var attachBtn=document.createElement('button');attachBtn.id='lfw-attach';attachBtn.title='Anexar ficheiro';
     attachBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+    // Powered by footer
+    var powered=document.createElement('div');powered.id='lfw-powered';
+    powered.innerHTML='Powered by <a href="https://leadsflowapi.com" target="_blank" rel="noopener">'
+      +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>'
+      +'LeadsFlow</a>';
+
     footer.appendChild(fileInput);footer.appendChild(attachBtn);footer.appendChild(input);footer.appendChild(sendBtn);
-    win.appendChild(hdr);win.appendChild(msgs);win.appendChild(footer);
+    win.appendChild(hdr);win.appendChild(msgs);win.appendChild(footer);win.appendChild(powered);
     root.appendChild(btn);root.appendChild(win);
     document.body.appendChild(root);
 
@@ -345,17 +360,19 @@ app.get('/w', (_req, res) => {
       this.style.height='auto';
       this.style.height=Math.min(this.scrollHeight,100)+'px';
     });
+    function closeWidget(){win.style.display='none';}
+    function openWidget(){win.style.display='flex';badge.style.display='none';badge.textContent='0';setTimeout(function(){input.focus();},50);}
+
     btn.addEventListener('click',function(){
-      var open=win.style.display==='flex';
-      win.style.display=open?'none':'flex';
-      badge.style.display='none';badge.textContent='0';
-      if(!open){input.focus();}
+      win.style.display==='flex'?closeWidget():openWidget();
     });
+    var closeBtn=document.getElementById('lfw-close');
+    if(closeBtn)closeBtn.addEventListener('click',closeWidget);
   }
 })();`;
 
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Access-Control-Allow-Origin', '*');
   // Required so browsers with Cross-Origin-Embedder-Policy don't block this script
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');

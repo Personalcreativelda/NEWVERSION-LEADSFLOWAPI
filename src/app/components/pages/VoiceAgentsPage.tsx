@@ -814,80 +814,83 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   return (
     <div className={`w-full h-full flex flex-col bg-muted/50`}>
       {/* Header */}
-      <div className={`flex-shrink-0 border-b p-6 bg-card border-border`}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className={`text-2xl font-bold flex items-center gap-3 text-foreground`}>
-              <PhoneCall className="w-7 h-7 text-purple-500" />
-              Agentes de Voz
+      <div className={`flex-shrink-0 border-b px-4 py-3 sm:px-6 sm:py-4 bg-card border-border`}>
+        {/* Title row */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0">
+            <h1 className={`text-lg sm:text-2xl font-bold flex items-center gap-2 text-foreground`}>
+              <PhoneCall className="w-5 h-5 sm:w-7 sm:h-7 text-purple-500 flex-shrink-0" />
+              <span className="truncate">Agentes de Voz</span>
               {!elevenLabsConfigured && (
-                <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/20 hidden sm:inline-flex">
                   Configure API
                 </Badge>
               )}
             </h1>
-            <p className={`text-sm mt-1 text-muted-foreground`}>
+            <p className={`text-xs sm:text-sm mt-0.5 text-muted-foreground hidden sm:block`}>
               Crie agentes de voz usando ElevenLabs para gerar vozes realistas e Wavoip para efetuar chamadas automáticas
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleOpenSettings} 
+          {/* Actions — icon-only on mobile, full labels on sm+ */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              onClick={handleOpenSettings}
               variant="outline"
-              className="border-border hover:bg-muted"
+              size="sm"
+              className="border-border hover:bg-muted px-2 sm:px-3"
             >
-              <Settings className="w-4 h-4 mr-2" />
-              Configurações
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline ml-2">Configurações</span>
             </Button>
-            <Button onClick={handleCreate}>
-              <Plus className="w-4 h-4 mr-2" />
-              Criar Agente
-              {planLimits.limits.voiceAgents === 0 && <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Pro</span>}
+            <Button onClick={handleCreate} size="sm" className="px-2 sm:px-3">
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline ml-1">Criar</span>
+              {planLimits.limits.voiceAgents === 0 && <span className="ml-1 text-xs bg-white/20 px-1 py-0.5 rounded-full hidden sm:inline">Pro</span>}
             </Button>
           </div>
         </div>
 
         {/* Search */}
         <div className="relative">
-          <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground`} />
+          <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground`} />
           <Input
             type="text"
             placeholder="Buscar agentes de voz..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className={`pl-10 bg-muted border-border text-foreground`}
+            className={`pl-9 text-sm bg-muted border-border text-foreground`}
           />
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-3 sm:p-6 pb-20 sm:pb-6">
         {loading ? (
           <SkeletonVoiceAgentGrid count={6} />
         ) : filteredAgents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <PhoneCall className={`w-16 h-16 mb-4 text-muted-foreground/70`} />
-            <h3 className={`text-lg font-semibold mb-2 text-foreground`}>
+          <div className="flex flex-col items-center justify-center h-64 text-center px-4">
+            <PhoneCall className={`w-12 h-12 sm:w-16 sm:h-16 mb-3 sm:mb-4 text-muted-foreground/70`} />
+            <h3 className={`text-base sm:text-lg font-semibold mb-2 text-foreground`}>
               {searchTerm ? 'Nenhum agente encontrado' : 'Nenhum agente de voz configurado'}
             </h3>
-            <p className={`text-sm mb-4 text-muted-foreground`}>
+            <p className={`text-xs sm:text-sm mb-4 text-muted-foreground max-w-xs`}>
               {searchTerm
                 ? 'Tente buscar com outros termos'
-                : 'Crie agentes de voz usando ElevenLabs para gerar vozes realistas e Wavoip para efetuar chamadas automáticas'}
+                : 'Crie agentes de voz usando ElevenLabs e Wavoip para chamadas automáticas'}
             </p>
             {!searchTerm && (
-              <Button onClick={handleCreate}>
+              <Button onClick={handleCreate} size="sm">
                 <Plus className="w-4 h-4 mr-2" />
                 Criar Primeiro Agente
               </Button>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {filteredAgents.map((agent) => (
               <div
                 key={agent.id}
-                className={`rounded-lg p-5 hover:shadow-lg transition-shadow bg-card border border-border`}
+                className={`rounded-lg p-4 sm:p-5 hover:shadow-lg transition-shadow bg-card border border-border`}
               >
                 {/* Card header */}
                 <div className="flex items-start justify-between mb-3">

@@ -3,7 +3,7 @@ import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import {
-  Users, Bell, History, ChevronRight, Megaphone, Star, AlertTriangle, Loader2, MessageSquare
+  Users, Bell, History, ChevronRight, Megaphone, Star, AlertTriangle, Loader2, MessageSquare, Search
 } from 'lucide-react';
 
 // New Modular Components
@@ -375,21 +375,61 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
 
       {/* Users tab */}
       {activeTab === 'users' && (
-        <div className="p-6 sm:p-8">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-foreground mb-1">
-                Usuários
-              </h1>
-              <p className="text-sm text-muted-foreground">Gerencie todos os usuários da plataforma</p>
+        <div className="p-4 sm:p-6 lg:p-8">
+          {/* Header */}
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-semibold text-foreground mb-0.5">Usuários</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">Gerencie todos os usuários da plataforma</p>
             </div>
             <Button
               onClick={() => setShowAddUserModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm px-3 sm:px-4"
+              size="sm"
             >
-              Adicionar Usuário
+              + Adicionar
             </Button>
           </div>
+
+          {/* Search + filter bar */}
+          <div className="flex flex-col sm:flex-row gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Pesquisar por nome ou email..."
+                className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-border bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-all"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <span className="text-xs">✕</span>
+                </button>
+              )}
+            </div>
+            <select
+              value={filterPlan}
+              onChange={(e) => setFilterPlan(e.target.value)}
+              className="px-3 py-2 text-sm rounded-lg border border-border bg-muted text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+            >
+              <option value="all">Todos os planos</option>
+              <option value="free">Free</option>
+              <option value="business">Business</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </div>
+
+          {/* Count */}
+          {!loading && (
+            <p className="text-xs text-muted-foreground mb-3">
+              {filteredUsers.length} {filteredUsers.length === 1 ? 'usuário encontrado' : 'usuários encontrados'}
+              {searchTerm && ` para "${searchTerm}"`}
+            </p>
+          )}
 
           <AdminUsersTab
             searchTerm={searchTerm}
@@ -448,15 +488,20 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
 
       {/* Feedback tab */}
       {activeTab === 'feedback' && (
-        <div className="p-6 sm:p-8">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-foreground mb-1">Feedbacks dos Usuários</h1>
-              <p className="text-sm text-muted-foreground">Avaliações e problemas reportados pelos usuários</p>
+        <div className="p-4 sm:p-6 lg:p-8">
+          {/* Header */}
+          <div className="mb-5 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-semibold text-foreground mb-0.5 leading-tight">
+                Feedbacks dos Usuários
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Avaliações e problemas reportados pelos usuários
+              </p>
             </div>
             <button
               onClick={loadFeedback}
-              className="px-3 py-2 rounded-lg border text-sm font-medium hover:bg-muted/50 transition-colors flex items-center gap-2"
+              className="flex-shrink-0 px-3 py-2 rounded-lg border text-xs sm:text-sm font-medium hover:bg-muted/50 transition-colors flex items-center gap-2"
               style={{ borderColor: 'hsl(var(--border))' }}
             >
               {feedbackLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
@@ -476,30 +521,36 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
           ) : (
             <div className="space-y-3">
               {feedbackList.map((fb: any) => (
-                <div key={fb.id} className="bg-card border border-border rounded-xl p-4 flex gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                <div key={fb.id} className="bg-card border border-border rounded-xl p-3 sm:p-4 flex gap-3">
+                  {/* Icon */}
+                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                     fb.type === 'rating' ? 'bg-yellow-500/10' : 'bg-red-500/10'
                   }`}>
                     {fb.type === 'rating'
-                      ? <Star className="w-5 h-5 text-yellow-500" />
-                      : <AlertTriangle className="w-5 h-5 text-red-500" />
+                      ? <Star className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
+                      : <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
                     }
                   </div>
+
+                  {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">
-                          {fb.user_name || fb.user_email || 'Usuário anônimo'}
-                        </span>
-                        {fb.user_email && fb.user_name && (
-                          <span className="text-xs text-muted-foreground">{fb.user_email}</span>
-                        )}
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          fb.type === 'rating' ? 'bg-yellow-500/10 text-yellow-600' : 'bg-red-500/10 text-red-600'
-                        }`}>
-                          {fb.type === 'rating' ? 'Avaliação' : 'Problema'}
-                        </span>
-                      </div>
+                    {/* Line 1: name + badge */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-foreground truncate max-w-[160px] sm:max-w-none">
+                        {fb.user_name || fb.user_email || 'Usuário anônimo'}
+                      </span>
+                      <span className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                        fb.type === 'rating' ? 'bg-yellow-500/10 text-yellow-600' : 'bg-red-500/10 text-red-600'
+                      }`}>
+                        {fb.type === 'rating' ? 'Avaliação' : 'Problema'}
+                      </span>
+                    </div>
+
+                    {/* Line 2: email + date */}
+                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                      {fb.user_email && fb.user_name && (
+                        <span className="text-xs text-muted-foreground truncate max-w-[180px]">{fb.user_email}</span>
+                      )}
                       <span className="text-xs text-muted-foreground">
                         {new Date(fb.created_at).toLocaleDateString('pt-BR', {
                           day: '2-digit', month: 'short', year: 'numeric',
@@ -507,12 +558,14 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
                         })}
                       </span>
                     </div>
+
+                    {/* Stars */}
                     {fb.type === 'rating' && fb.stars && (
                       <div className="flex gap-0.5 mt-1">
                         {[1,2,3,4,5].map(n => (
                           <Star
                             key={n}
-                            className="w-4 h-4"
+                            className="w-3.5 h-3.5 sm:w-4 sm:h-4"
                             fill={n <= fb.stars ? '#FBBF24' : 'none'}
                             stroke={n <= fb.stars ? '#FBBF24' : 'hsl(var(--border))'}
                             strokeWidth={1.5}
@@ -521,7 +574,7 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
                       </div>
                     )}
                     {fb.message && (
-                      <p className="text-sm text-muted-foreground mt-1 break-words">{fb.message}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">{fb.message}</p>
                     )}
                   </div>
                 </div>

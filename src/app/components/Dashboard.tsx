@@ -71,7 +71,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { useConfirm } from './ui/ConfirmDialog';
 import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
 
-import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X } from 'lucide-react';
+import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X, LayoutDashboard, Users, MessageSquare, BarChart2, Menu } from 'lucide-react';
 
 // Types
 interface Lead {
@@ -2077,11 +2077,14 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
       <div
         className={`min-w-0 flex flex-col transition-[margin] duration-300 ease-out ${
           currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
-            ? 'h-[100dvh] overflow-hidden'
+            ? 'overflow-hidden'
             : 'min-h-screen'
         }`}
         style={{
           marginLeft: isMobile ? 0 : isSidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth,
+          height: (currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations')
+            ? isMobile ? 'calc(100dvh - 64px)' : '100dvh'
+            : undefined,
         }}
       >
         <div className={`dashboard-container flex flex-col flex-1 min-w-0 min-h-0 bg-background ${
@@ -2141,9 +2144,9 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
           {/* Main Content */}
           <main className={`flex-1 min-w-0 ${
-            currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations' 
-              ? 'overflow-hidden flex flex-col min-h-0' 
-              : ''
+            currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
+              ? 'overflow-hidden flex flex-col min-h-0'
+              : isMobile ? 'pb-16' : ''
           }`}>
             <div className={`w-full min-w-0 ${
               currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
@@ -2521,6 +2524,40 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
           )}
         </main>
       </div>
+
+      {/* ── Mobile bottom navigation bar ─────────────────────────────── */}
+      {isMobile && (
+        <nav className="fixed bottom-0 left-0 right-0 z-[9990] bg-card border-t border-border flex items-stretch h-16 safe-area-pb"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          {[
+            { page: 'dashboard', icon: <LayoutDashboard size={20} />, label: 'Início' },
+            { page: 'leads',     icon: <Users size={20} />,           label: 'Leads' },
+            { page: 'inbox',     icon: <MessageSquare size={20} />,   label: 'Inbox' },
+            { page: 'analytics', icon: <BarChart2 size={20} />,       label: 'Analytics' },
+          ].map(({ page, icon, label }) => {
+            const active = currentPage === page || (page === 'inbox' && ['inbox','inbox-settings','inbox-team','ai-assistants','automations'].includes(currentPage));
+            return (
+              <button
+                key={page}
+                onClick={() => handleNavigate(page as any)}
+                className={`flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors ${
+                  active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <span className={active ? 'text-primary' : ''}>{icon}</span>
+                {label}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Menu size={20} />
+            Menu
+          </button>
+        </nav>
+      )}
 
       {/* Modais */}
       <NovoLeadModal

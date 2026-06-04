@@ -154,8 +154,15 @@ export default function ProductTour({ onComplete, onSkip, onNavigate }: ProductT
   const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   const [isVisible, setIsVisible] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
 
   const currentTourStep = tourSteps[currentStep];
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -178,6 +185,13 @@ export default function ProductTour({ onComplete, onSkip, onNavigate }: ProductT
   }, [currentStep]);
 
   const updateTargetElement = () => {
+    // On mobile use the body as target so the bottom sheet still renders
+    if (window.innerWidth < 640) {
+      setTargetElement(document.body);
+      setTooltipPosition({ top: 0, left: 0 });
+      return;
+    }
+
     const element = document.querySelector(currentTourStep.target) as HTMLElement;
     if (element) {
       setTargetElement(element);
@@ -185,8 +199,8 @@ export default function ProductTour({ onComplete, onSkip, onNavigate }: ProductT
 
       const rect = element.getBoundingClientRect();
       const position = currentTourStep.position || 'bottom';
-      const TW = 440; // tooltip width
-      const TH = 280; // tooltip estimated height
+      const TW = 440;
+      const TH = 280;
 
       let top = 0;
       let left = 0;
@@ -196,22 +210,10 @@ export default function ProductTour({ onComplete, onSkip, onNavigate }: ProductT
         left = window.innerWidth / 2 - TW / 2;
       } else {
         switch (position) {
-          case 'top':
-            top = rect.top - TH - 16;
-            left = rect.left + rect.width / 2 - TW / 2;
-            break;
-          case 'bottom':
-            top = rect.bottom + 16;
-            left = rect.left + rect.width / 2 - TW / 2;
-            break;
-          case 'left':
-            top = rect.top + rect.height / 2 - TH / 2;
-            left = rect.left - TW - 16;
-            break;
-          case 'right':
-            top = rect.top + rect.height / 2 - TH / 2;
-            left = rect.right + 16;
-            break;
+          case 'top':    top = rect.top - TH - 16;             left = rect.left + rect.width / 2 - TW / 2; break;
+          case 'bottom': top = rect.bottom + 16;               left = rect.left + rect.width / 2 - TW / 2; break;
+          case 'left':   top = rect.top + rect.height / 2 - TH / 2; left = rect.left - TW - 16;           break;
+          case 'right':  top = rect.top + rect.height / 2 - TH / 2; left = rect.right + 16;               break;
         }
         if (left < 10) left = 10;
         if (left + TW > window.innerWidth - 10) left = window.innerWidth - TW - 10;
@@ -248,32 +250,9 @@ export default function ProductTour({ onComplete, onSkip, onNavigate }: ProductT
   const progress = ((currentStep + 1) / tourSteps.length) * 100;
   const isLast = currentStep === tourSteps.length - 1;
 
-  return (
-    <>
-      {/* Dark overlay */}
-      <div
-        className={`fixed inset-0 transition-opacity duration-300 z-[9998] pointer-events-none ${isVisible ? 'opacity-100' : 'opacity-0'}`}
-        style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
-      />
-
-      {/* Spotlight ring */}
-      <div
-        className={`fixed z-[9999] pointer-events-none transition-all duration-300 rounded-xl ${isVisible ? 'opacity-100' : 'opacity-0'}`}
-        style={{
-          top: targetRect.top - 6,
-          left: targetRect.left - 6,
-          width: targetRect.width + 12,
-          height: targetRect.height + 12,
-          boxShadow: '0 0 0 9999px rgba(0,0,0,0.55), 0 0 0 2px rgba(59,130,246,0.8), 0 0 24px rgba(59,130,246,0.4)',
-        }}
-      />
-
-      {/* Tooltip card */}
-      <div
-        className={`fixed z-[10000] transition-all duration-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
-        style={{ top: tooltipPosition.top, left: tooltipPosition.left, width: 440 }}
-      >
-        <div className="rounded-2xl overflow-hidden shadow-2xl bg-card border border-border dark:shadow-black/40">
+  // ── Shared card content ──────────────────────────────────────────────────
+  const cardContent = (
+    <div className="rounded-2xl overflow-hidden shadow-2xl bg-card border border-border dark:shadow-black/40">
 
           {/* ── Header gradient ── */}
           <div className="relative px-5 pt-4 pb-5 bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 dark:from-blue-700 dark:via-blue-600 dark:to-indigo-700 overflow-hidden">
@@ -366,7 +345,48 @@ export default function ProductTour({ onComplete, onSkip, onNavigate }: ProductT
             </div>
           </div>
         </div>
-      </div>
+  );
+
+  return (
+    <>
+      {/* Dark overlay */}
+      <div
+        className={`fixed inset-0 transition-opacity duration-300 z-[9998] pointer-events-none ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+        style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+      />
+
+      {/* Spotlight ring — desktop only */}
+      {!isMobile && (
+        <div
+          className={`fixed z-[9999] pointer-events-none transition-all duration-300 rounded-xl ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+          style={{
+            top: targetRect.top - 6,
+            left: targetRect.left - 6,
+            width: targetRect.width + 12,
+            height: targetRect.height + 12,
+            boxShadow: '0 0 0 9999px rgba(0,0,0,0.55), 0 0 0 2px rgba(59,130,246,0.8), 0 0 24px rgba(59,130,246,0.4)',
+          }}
+        />
+      )}
+
+      {isMobile ? (
+        /* ── Mobile: bottom sheet ── */
+        <div
+          className={`fixed bottom-0 left-0 right-0 z-[10000] transition-all duration-300 px-3 pb-4 ${
+            isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+          }`}
+        >
+          {cardContent}
+        </div>
+      ) : (
+        /* ── Desktop: floating tooltip ── */
+        <div
+          className={`fixed z-[10000] transition-all duration-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
+          style={{ top: tooltipPosition.top, left: tooltipPosition.left, width: 440 }}
+        >
+          {cardContent}
+        </div>
+      )}
     </>
   );
 }

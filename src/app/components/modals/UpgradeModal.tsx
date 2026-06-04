@@ -153,7 +153,7 @@ export default function UpgradeModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl max-h-[92vh] flex flex-col bg-card text-card-foreground border border-border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-bottom-8 duration-300 p-0">
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-4xl max-h-[92dvh] flex flex-col bg-card text-card-foreground border border-border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-bottom-8 duration-300 p-0">
 
           {/* Header */}
           <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0">
@@ -192,11 +192,9 @@ export default function UpgradeModal({
             </div>
           </div>
 
-          {/* Scrollable cards area */}
-          <div className="flex-1 overflow-y-auto px-6 pb-6 min-h-0">
-
-            {/* Desktop grid */}
-            <div className="hidden sm:grid sm:grid-cols-3 gap-5 pt-5">
+          {/* Scrollable cards area — vertical on mobile, 3-col grid on desktop */}
+          <div className="flex-1 overflow-y-auto px-3 sm:px-6 pb-4 sm:pb-6 min-h-0">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 pt-4 sm:pt-5">
               {plans.map((plan) => {
                 const isCurrentPlan = plan.id === currentPlan;
                 const isBestValue = plan.id === 'business';
@@ -206,7 +204,7 @@ export default function UpgradeModal({
                 return (
                   <div
                     key={plan.id}
-                    className={`relative rounded-xl p-5 border-2 transition flex flex-col ${
+                    className={`relative rounded-xl p-4 sm:p-5 border-2 transition flex flex-col ${
                       isBestValue
                         ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500/20'
                         : 'bg-muted border-border hover:border-muted-foreground/40'
@@ -225,24 +223,24 @@ export default function UpgradeModal({
                       </div>
                     )}
 
-                    {/* Icon + name */}
-                    <div className="flex items-center gap-2.5 mb-3">
+                    {/* Icon + name + price in one row on mobile */}
+                    <div className="flex items-center gap-3 mb-3">
                       <div className={`${config.bg} p-2 rounded-lg flex-shrink-0`}>
-                        <Icon className={`w-6 h-6 ${config.color}`} />
+                        <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${config.color}`} />
                       </div>
-                      <h3 className="text-base font-bold text-foreground">{plan.name}</h3>
-                    </div>
-
-                    {/* Price */}
-                    <div className="mb-4">
-                      <span className="text-3xl font-bold text-foreground">
-                        {plan.id === 'free' ? 'Grátis' : billingPeriod === 'annual' ? `$${plan.price?.annual || 0}` : `$${plan.price?.monthly || 0}`}
-                      </span>
-                      {plan.id !== 'free' && (
-                        <span className="text-xs text-muted-foreground ml-1">
-                          {billingPeriod === 'annual' ? '/ano' : '/mo'}
-                        </span>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm sm:text-base font-bold text-foreground">{plan.name}</h3>
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                          <span className="text-xl sm:text-3xl font-bold text-foreground">
+                            {plan.id === 'free' ? 'Grátis' : billingPeriod === 'annual' ? `$${plan.price?.annual || 0}` : `$${plan.price?.monthly || 0}`}
+                          </span>
+                          {plan.id !== 'free' && (
+                            <span className="text-xs text-muted-foreground">
+                              {billingPeriod === 'annual' ? '/ano' : '/mês'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Features */}
@@ -256,132 +254,24 @@ export default function UpgradeModal({
                     </div>
 
                     {/* Button */}
-                    {plan.id !== 'free' ? (
-                      <Button
-                        onClick={() => handleSelectPlan(plan.id)}
-                        disabled={isCurrentPlan || loading}
-                        className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition-all ${
-                          isCurrentPlan
-                            ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-60'
-                            : 'bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150'
-                        }`}
-                      >
-                        {loading && selectedPlan === plan.id ? (
-                          <span className="flex items-center justify-center gap-1.5">
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            Carregando...
-                          </span>
-                        ) : isCurrentPlan ? 'Plano Atual' : 'Selecionar Plano'}
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() => handleSelectPlan(plan.id)}
-                        disabled={isCurrentPlan || loading}
-                        className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition ${
-                          isCurrentPlan
-                            ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                    <Button
+                      onClick={() => handleSelectPlan(plan.id)}
+                      disabled={isCurrentPlan || loading}
+                      className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition-all ${
+                        isCurrentPlan
+                          ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-60'
+                          : plan.id !== 'free'
+                            ? 'bg-primary text-primary-foreground hover:opacity-90'
                             : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                        }`}
-                      >
-                        {isCurrentPlan ? 'Plano Atual' : 'Fazer Upgrade'}
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Mobile horizontal scroll */}
-            <div className="sm:hidden flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 pt-5">
-              {plans.map((plan) => {
-                const isCurrentPlan = plan.id === currentPlan;
-                const isBestValue = plan.id === 'business';
-                const config = planConfig[plan.id as keyof typeof planConfig] || planConfig.free;
-                const Icon = config?.icon || Zap;
-
-                return (
-                  <div
-                    key={plan.id}
-                    className={`snap-center min-w-[82vw] max-w-[82vw] relative rounded-xl p-5 border-2 flex-shrink-0 flex flex-col transition ${
-                      isBestValue
-                        ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20'
-                        : 'bg-muted border-border'
-                    }`}
-                  >
-                    {isBestValue && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] px-3 py-0.5 rounded-full font-medium shadow-md whitespace-nowrap">
-                        ⭐ Popular
-                      </div>
-                    )}
-                    {isCurrentPlan && (
-                      <div className="absolute top-3 right-3">
-                        <span className="bg-green-500/10 text-green-600 dark:text-green-300 px-1.5 py-0.5 rounded text-[10px] border border-green-500/20">
-                          Atual
+                      }`}
+                    >
+                      {loading && selectedPlan === plan.id ? (
+                        <span className="flex items-center justify-center gap-1.5">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Carregando...
                         </span>
-                      </div>
-                    )}
-
-                    {/* Icon + name */}
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <div className={`${config.bg} p-2 rounded-lg flex-shrink-0`}>
-                        <Icon className={`w-6 h-6 ${config.color}`} />
-                      </div>
-                      <h3 className="text-base font-bold text-foreground">{plan.name}</h3>
-                    </div>
-
-                    {/* Price */}
-                    <div className="mb-4">
-                      <span className="text-3xl font-bold text-foreground">
-                        {plan.id === 'free' ? 'Grátis' : billingPeriod === 'annual' ? `$${plan.price?.annual || 0}` : `$${plan.price?.monthly || 0}`}
-                      </span>
-                      {plan.id !== 'free' && (
-                        <span className="text-xs text-muted-foreground ml-1">
-                          {billingPeriod === 'annual' ? '/ano' : '/mo'}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Features */}
-                    <div className="space-y-2 border-t border-border pt-3 flex-1">
-                      {plan.features.map((feature: string, index: number) => (
-                        <div key={index} className="flex items-start gap-2">
-                          <Check className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
-                          <span className="text-xs text-muted-foreground leading-snug">{feature}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Button */}
-                    {plan.id !== 'free' ? (
-                      <Button
-                        onClick={() => handleSelectPlan(plan.id)}
-                        disabled={isCurrentPlan || loading}
-                        className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition-all ${
-                          isCurrentPlan
-                            ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
-                            : 'bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150'
-                        }`}
-                      >
-                        {loading && selectedPlan === plan.id ? (
-                          <span className="flex items-center justify-center gap-1.5">
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            Carregando...
-                          </span>
-                        ) : isCurrentPlan ? 'Plano Atual' : 'Selecionar Plano'}
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() => handleSelectPlan(plan.id)}
-                        disabled={isCurrentPlan || loading}
-                        className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition ${
-                          isCurrentPlan
-                            ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                        }`}
-                      >
-                        {isCurrentPlan ? 'Plano Atual' : 'Fazer Upgrade'}
-                      </Button>
-                    )}
+                      ) : isCurrentPlan ? 'Plano Atual' : plan.id === 'free' ? 'Fazer Downgrade' : 'Selecionar Plano'}
+                    </Button>
                   </div>
                 );
               })}
