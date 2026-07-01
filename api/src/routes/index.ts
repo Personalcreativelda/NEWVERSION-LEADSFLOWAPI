@@ -37,6 +37,7 @@ import remarketingRoutes from './remarketing.routes';
 import teamRoutes from './team.routes';
 import feedbackRoutes from './feedback.routes';
 import smtpRoutes from './smtp.routes';
+import diagnosticsRoutes from './diagnostics.routes';
 // Plan enforcement middleware (blocks writes when plan is expired or lead limit reached)
 import { requireAuth } from '../middleware/auth.middleware';
 import { planEnforcement } from '../middleware/plan-enforcement.middleware';
@@ -87,6 +88,9 @@ router.use('/admin/plans', adminPlansRoutes);
 router.use('/admin', adminRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/security', securityRoutes);
+
+// ── Diagnostics (admin Bearer or ?secret=DIAGNOSTIC_SECRET) ─────────────────
+router.use('/diagnostics', diagnosticsRoutes);
 
 router.get('/health', (_req, res) => {
   res.json({ status: 'ok' });

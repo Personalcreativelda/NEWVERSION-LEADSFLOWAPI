@@ -308,6 +308,11 @@ Equipa LeadsFlow
       await this.sendEmail({ to: email, subject, text, html });
     }
   }
+
+  /** Send a raw email — used by the diagnostic alert service. */
+  async sendRaw(options: { to: string; subject: string; html: string; text: string }): Promise<void> {
+    await this.sendEmail(options);
+  }
 }
 
 export const emailService = new EmailService();

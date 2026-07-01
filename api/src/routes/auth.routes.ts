@@ -21,6 +21,7 @@ import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware
 import { AIAssistantsService } from '../services/ai-assistants.service';
 import { DEFAULT_ONBOARDING_TEMPLATE } from './ai-assistants.routes';
 import { query as dbQuery } from '../database/connection';
+import { recordAuthEvent } from '../services/auth-metrics.service';
 
 const router = Router();
 
@@ -60,12 +61,14 @@ router.get('/google/callback', async (req, res, next) => {
     // Handle OAuth errors from Google
     if (oauthError) {
       console.error('[Auth Google] OAuth error from Google:', oauthError);
+      recordAuthEvent({ type: 'oauth_failure', code: 'provider_error', detail: String(oauthError) });
       const appUrl = process.env.APP_URL || 'http://localhost:3000';
       return res.redirect(`${appUrl}/login?error=oauth_error&message=${encodeURIComponent(String(oauthError))}`);
     }
 
     if (!code || typeof code !== 'string') {
       console.error('[Auth Google] No authorization code received');
+      recordAuthEvent({ type: 'oauth_failure', code: 'no_code' });
       const appUrl = process.env.APP_URL || 'http://localhost:3000';
       return res.redirect(`${appUrl}/login?error=no_code`);
     }
@@ -75,6 +78,7 @@ router.get('/google/callback', async (req, res, next) => {
       const stateValidation = googleOAuthService.validateState(state);
       if (!stateValidation.valid) {
         console.error('[Auth Google] Invalid state token');
+        recordAuthEvent({ type: 'oauth_failure', code: 'invalid_state' });
         const appUrl = process.env.APP_URL || 'http://localhost:3000';
         return res.redirect(`${appUrl}/login?error=invalid_state`);
       }
@@ -89,14 +93,15 @@ router.get('/google/callback', async (req, res, next) => {
     const authResult = await loginWithOAuth(userData);
 
     console.log('[Auth Google] User authenticated:', userData.email);
+    recordAuthEvent({ type: 'oauth_success', detail: userData.email });
 
     // Redirect to frontend with tokens in URL fragment (hash)
     // This is secure because URL fragments are not sent to server in HTTP requests
     // FRONTEND_URL is where the dashboard/app is hosted (e.g., app.leadsflowapi.com)
     const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
 
-    // Encode user data as base64 to avoid URL encoding issues with special characters
-    const userBase64 = Buffer.from(JSON.stringify(authResult.user)).toString('base64');
+    // Encode user data as base64url (URL-safe: no +, /, = that corrupt URLSearchParams)
+    const userBase64 = Buffer.from(JSON.stringify(authResult.user)).toString('base64url');
 
     const tokenData = new URLSearchParams({
       access_token: authResult.session.access_token,
@@ -107,7 +112,7 @@ router.get('/google/callback', async (req, res, next) => {
     const redirectUrl = `${frontendUrl}/#oauth_callback&${tokenData.toString()}`;
 
     console.log('[Auth Google] Redirecting to frontend:', frontendUrl);
-    
+
     // 📝 Log activity
     void activityService.logActivity({
       userId: authResult.user.id,
@@ -120,6 +125,7 @@ router.get('/google/callback', async (req, res, next) => {
 
   } catch (error: any) {
     console.error('[Auth Google] OAuth callback error:', error);
+    recordAuthEvent({ type: 'oauth_failure', code: 'callback_exception', detail: error.message });
     const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
     const errorMessage = encodeURIComponent(error.message || 'Erro ao autenticar com Google');
     return res.redirect(`${frontendUrl}/login?error=oauth_failed&message=${errorMessage}`);
@@ -191,7 +197,9 @@ router.post('/login', async (req, res, next) => {
     if ('requires_2fa' in data && data.requires_2fa) {
       return res.json(data);
     }
-    
+
+    recordAuthEvent({ type: 'login_success', detail: email });
+
     // 📝 Log activity
     void activityService.logActivity({
       userId: (data as any).user.id,
@@ -201,8 +209,28 @@ router.post('/login', async (req, res, next) => {
     });
 
     return res.json(data);
-  } catch (error) {
+  } catch (error: any) {
+    recordAuthEvent({ type: 'login_failure', detail: req.body?.email ?? 'unknown', code: error?.message });
     return next(error);
+  }
+});
+
+// POST /auth/error-report — frontend reports auth failures for diagnostic visibility
+router.post('/error-report', async (req, res) => {
+  try {
+    const { code, detail, userAgent } = req.body ?? {};
+    if (code) {
+      recordAuthEvent({
+        type: 'frontend_error',
+        code: String(code).slice(0, 100),
+        detail: detail ? String(detail).slice(0, 500) : undefined,
+        userAgent: userAgent ? String(userAgent).slice(0, 200) : undefined,
+      });
+      console.warn(`[Auth] Frontend error reported: ${code}${detail ? ` — ${detail}` : ''}`);
+    }
+    return res.json({ received: true });
+  } catch {
+    return res.json({ received: true }); // always 200 — never block the auth flow
   }
 });
 

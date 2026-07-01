@@ -13,6 +13,7 @@ import { AdminUsersTab } from './admin/AdminUsersTab';
 import { AdminActivityTab } from './admin/AdminActivityTab';
 import { AdminMarketingTab } from './admin/AdminMarketingTab';
 import { AdminDashboardTab } from './admin/AdminDashboardTab';
+import { AdminDiagnosticsTab } from './admin/AdminDiagnosticsTab';
 
 import { UserDetailsModal } from './admin/UserDetailsModal';
 import { ActivatePlanModal, NotificationSettingsModal, AddUserModal } from './admin/AdminModals';
@@ -69,7 +70,7 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [filterPlan, setFilterPlan] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'activity' | 'marketing' | 'settings' | 'feedback'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'activity' | 'marketing' | 'settings' | 'feedback' | 'diagnostics'>('dashboard');
   const [feedbackList, setFeedbackList] = useState<any[]>([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [activities, setActivities] = useState<any[]>([]);
@@ -611,6 +612,8 @@ export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
           </div>
         </div>
       )}
+
+      {activeTab === 'diagnostics' && <AdminDiagnosticsTab />}
 
       {/* Modals — always rendered regardless of active tab */}
       {showAddUserModal && (

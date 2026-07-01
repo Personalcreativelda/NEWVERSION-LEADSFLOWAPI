@@ -53,6 +53,7 @@ const noOriginRequiredPaths = [
   '/api/auth/google',
   '/api/auth/google/callback',
   '/api/inbox/media-proxy',
+  '/api/diagnostics', // direct browser navigation with ?secret= or Bearer token
   '/health',
   '/w',  // widget script — loaded via <script> tag, never sends Origin
 ];

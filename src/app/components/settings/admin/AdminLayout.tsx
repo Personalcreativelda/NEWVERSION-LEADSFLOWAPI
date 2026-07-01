@@ -10,9 +10,10 @@ import {
   ShieldCheck,
   DoorOpen,
   MessageSquare,
+  Activity,
 } from 'lucide-react';
 
-export type AdminTab = 'dashboard' | 'users' | 'activity' | 'marketing' | 'settings' | 'feedback';
+export type AdminTab = 'dashboard' | 'users' | 'activity' | 'marketing' | 'settings' | 'feedback' | 'diagnostics';
 
 interface AdminLayoutProps {
   activeTab: AdminTab;
@@ -28,6 +29,7 @@ const navItems: { id: AdminTab; label: string; icon: React.ComponentType<any> }[
   { id: 'activity', label: 'Atividade', icon: BarChart3 },
   { id: 'marketing', label: 'Marketing', icon: Megaphone },
   { id: 'feedback', label: 'Feedbacks', icon: MessageSquare },
+  { id: 'diagnostics', label: 'Diagnósticos', icon: Activity },
   { id: 'settings', label: 'Configurações', icon: Settings },
 ];
 

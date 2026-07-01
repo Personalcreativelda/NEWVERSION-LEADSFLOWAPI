@@ -15,6 +15,7 @@ import { initializeWebSocket } from './services/websocket.service';
 import { emailPollingService } from './services/email-polling.service';
 import { planExpirationService } from './services/plan-expiration.service';
 import { storageCleanupService } from './services/storage-cleanup.service';
+import { diagnosticAlertService } from './services/diagnostic-alert.service';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -564,6 +565,10 @@ initDatabase().then(() => {
   // ✅ Iniciar limpeza automática de arquivos expirados do MinIO
   storageCleanupService.start();
   console.log('[Leadflow API] Storage cleanup service iniciado ✅');
+
+  // ✅ Iniciar monitor de diagnóstico (verifica serviços e envia alertas por email)
+  diagnosticAlertService.start();
+  console.log('[Leadflow API] Diagnostic alert service iniciado ✅');
 
   server.listen(port, () => {
     console.log(`[Leadflow API] Listening on port ${port}`);

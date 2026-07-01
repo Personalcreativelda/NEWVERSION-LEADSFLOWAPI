@@ -26,7 +26,6 @@ import { authApi, apiRequest, plansApi, isSessionExpired, startSessionExpiryTime
 import { mockAuth } from './utils/auth-mock';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
-import { getSupabaseClient } from './utils/supabase/client';
 
 // ============================================
 // CAPTURE OAUTH HASH IMMEDIATELY ON SCRIPT LOAD
@@ -36,6 +35,13 @@ const CAPTURED_HASH = window.location.hash;
 const CAPTURED_URL = window.location.href;
 console.log('[OAuth Capture] Hash captured on load:', CAPTURED_HASH);
 console.log('[OAuth Capture] Full URL on load:', CAPTURED_URL);
+
+// Decode base64url (URL-safe variant: - instead of +, _ instead of /, no padding)
+function decodeBase64url(str: string): string {
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64 + '=='.slice((base64.length % 4 + 2) % 4);
+  return atob(padded);
+}
 
 // Process OAuth callback immediately if detected
 let OAUTH_PROCESSED = false;
@@ -57,12 +63,20 @@ if (CAPTURED_HASH.includes('oauth_callback') || CAPTURED_HASH.includes('access_t
       if (refreshToken) {
         localStorage.setItem('leadflow_refresh_token', refreshToken);
       }
+      // Reset session timer IMMEDIATELY so any stale/expired timer from a
+      // previous session doesn't cause ensureValidToken() to clear these fresh tokens.
+      startSessionExpiryTimer();
 
       if (userBase64) {
-        const userJsonDecoded = atob(userBase64);
-        const userData = JSON.parse(userJsonDecoded);
-        localStorage.setItem('leadflow_user', JSON.stringify(userData));
-        console.log('[OAuth Capture] User saved:', userData.email);
+        try {
+          const userJsonDecoded = decodeBase64url(userBase64);
+          const userData = JSON.parse(userJsonDecoded);
+          localStorage.setItem('leadflow_user', JSON.stringify(userData));
+          console.log('[OAuth Capture] User saved:', userData.email);
+        } catch (parseErr) {
+          console.warn('[OAuth Capture] Could not parse user data — will fetch from API:', parseErr);
+          // Don't block OAUTH_PROCESSED — token is valid, user will be fetched via /auth/me
+        }
       }
 
       // Clean up URL immediately
@@ -72,6 +86,25 @@ if (CAPTURED_HASH.includes('oauth_callback') || CAPTURED_HASH.includes('access_t
     }
   } catch (error) {
     console.error('[OAuth Capture] Error processing OAuth hash:', error);
+  }
+}
+
+// Report auth errors to the backend so they appear in the diagnostic endpoint.
+// Fire-and-forget: failures here must never affect the auth flow.
+function reportAuthError(code: string, detail?: string): void {
+  try {
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+    const token = localStorage.getItem('leadflow_access_token') ?? undefined;
+    fetch(`${base}/api/auth/error-report`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ code, detail, userAgent: navigator.userAgent }),
+    }).catch(() => { /* silent */ });
+  } catch {
+    // localStorage might be unavailable in certain browsers — ignore
   }
 }
 
@@ -190,8 +223,14 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
   });
   const isLoggingOutRef = useRef(false);
 
-  // Sync currentPage with URL path
+  // Sync currentPage with URL path.
+  // Guard: if OAuth was just processed, the initial currentPage is still 'login' (from
+  // useState's initial value). Calling setPagePath('login') here would push '/login' to
+  // the URL BEFORE initialize fires, causing initialize's public-page guard to return
+  // early and block OAuth entirely. Skip public-page URL pushes during OAuth.
   useEffect(() => {
+    const publicPages = ['login', 'signup', 'forgot-password', 'reset-password'];
+    if (OAUTH_PROCESSED && publicPages.includes(currentPage)) return;
     setPagePath(currentPage);
   }, [currentPage]);
 
@@ -315,7 +354,12 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       void enforceExpiry();
     }, 60 * 1000);
 
-    void enforceExpiry();
+    // Skip the immediate check right after OAuth. The session was just created and
+    // concurrent in-flight requests (e.g. version check) may not have settled yet.
+    // In StrictMode this effect fires 2–3 times; the interval handles enforcement.
+    if (!OAUTH_PROCESSED) {
+      void enforceExpiry();
+    }
 
     return () => clearInterval(intervalId);
   }, [user, forceLogout]);
@@ -420,25 +464,32 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     fetchVersion();
   }, []);
 
-  // Check for version notification when user logs in
+  // Check for version notification when user logs in.
+  // Uses raw fetch (not apiRequest) so a transient 401 never clears the active tokens.
   useEffect(() => {
     const checkVersionNotification = async () => {
       if (!user) return;
-      
+      const token = localStorage.getItem('leadflow_access_token');
+      if (!token) return;
       try {
-        const response = await apiRequest('/version/check-notification', 'GET');
-        if (response.hasNewVersion && response.version) {
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+        const res = await fetch(`${baseUrl}/api/version/check-notification`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.hasNewVersion && data.version) {
           setVersionNotification({
-            id: response.version.id,
-            version: response.version.version,
-            releaseNotes: response.version.release_notes || ''
+            id: data.version.id,
+            version: data.version.version,
+            releaseNotes: data.version.release_notes || '',
           });
         }
-      } catch (error) {
-        console.error('[App] Error checking version notification:', error);
+      } catch {
+        // Version notifications are non-critical — silently ignore network/parse errors.
       }
     };
-    checkVersionNotification();
+    void checkVersionNotification();
   }, [user]);
 
   const dismissVersionNotification = async () => {
@@ -452,165 +503,18 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     setVersionNotification(null);
   };
 
-  // OAuth Callback Handler (Direct Google OAuth - without Supabase)
+  // OAuth error handler — success path is handled at module level (early capture above).
+  // Only need to surface provider errors returned via ?error=... query params.
   useEffect(() => {
-    const handleOAuthCallback = async () => {
-      try {
-        // Check for new OAuth callback format: #oauth_callback&access_token=...
-        const hash = window.location.hash;
-        const queryParams = new URLSearchParams(window.location.search);
-
-        // Check for error in query params (from failed OAuth)
-        const oauthError = queryParams.get('error');
-        if (oauthError) {
-          const errorMessage = queryParams.get('message') || 'Erro ao autenticar com Google';
-          console.error('[OAuth] OAuth error:', oauthError, errorMessage);
-          alert(decodeURIComponent(errorMessage));
-          window.history.replaceState({}, document.title, window.location.pathname);
-          setLoading(false);
-          return;
-        }
-
-        // Check for new direct Google OAuth callback format
-        // Format: #oauth_callback&access_token=...&refresh_token=...&user=...
-        if (hash.startsWith('#oauth_callback')) {
-          console.log('[OAuth] Detected direct Google OAuth callback...');
-          setLoading(true);
-
-          // Parse the hash parameters (skip the #oauth_callback& prefix)
-          const hashContent = hash.substring('#oauth_callback&'.length);
-          const hashParams = new URLSearchParams(hashContent);
-
-          const accessToken = hashParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token');
-          const userJson = hashParams.get('user');
-
-          if (!accessToken) {
-            console.error('[OAuth] No access token in callback');
-            setLoading(false);
-            return;
-          }
-
-          console.log('[OAuth] Processing tokens from backend...');
-
-          // Store tokens
-          localStorage.setItem('leadflow_access_token', accessToken);
-          if (refreshToken) {
-            localStorage.setItem('leadflow_refresh_token', refreshToken);
-          }
-          startSessionExpiryTimer();
-
-          // Parse and store user (base64 encoded from backend)
-          if (userJson) {
-            try {
-              // Decode base64 to JSON string, then parse
-              const userJsonDecoded = atob(userJson);
-              const user = JSON.parse(userJsonDecoded);
-              if (user.id) {
-                localStorage.setItem('leadflow_user', JSON.stringify(user));
-                setUser(user);
-                console.log('[OAuth] User authenticated:', user.email);
-              } else {
-                throw new Error('User ID missing');
-              }
-            } catch (e) {
-              console.error('[OAuth] Failed to parse user data:', e);
-              localStorage.removeItem('leadflow_user');
-              localStorage.removeItem('leadflow_access_token');
-              localStorage.removeItem('leadflow_refresh_token');
-              setUser(null);
-              setLoading(false);
-              alert('Erro ao processar dados do usuário. Tente novamente.');
-              setCurrentPage('login');
-              return;
-            }
-          }
-
-          // Clean up URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-
-          // Redirect to dashboard
-          setCurrentPage('dashboard');
-          setLoading(false);
-
-          console.log('[OAuth] ✅ Google OAuth login completed successfully!');
-          return;
-        }
-
-        // Legacy: Check for old Supabase OAuth callback format (access_token in hash or code in query)
-        const hashParams = new URLSearchParams(hash.substring(1));
-        const hasLegacyCallback = hashParams.get('access_token') || queryParams.get('code');
-
-        if (hasLegacyCallback) {
-          console.log('[OAuth] Detected legacy OAuth callback, trying Supabase fallback...');
-          setLoading(true);
-
-          try {
-            const supabase = getSupabaseClient();
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-            if (sessionError || !session) {
-              console.error('[OAuth] No Supabase session found:', sessionError);
-              setLoading(false);
-              return;
-            }
-
-            // Extract user info from Supabase session
-            const email = session.user.email;
-            const name = session.user.user_metadata.full_name || session.user.user_metadata.name;
-            const avatar_url = session.user.user_metadata.avatar_url || session.user.user_metadata.picture;
-            const provider = session.user.app_metadata.provider || 'google';
-
-            if (!email) {
-              console.error('[OAuth] No email in OAuth user data');
-              setLoading(false);
-              return;
-            }
-
-            // Send to backend
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/auth/oauth/callback`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, name, avatar_url, provider }),
-            });
-
-            if (!response.ok) {
-              throw new Error('Failed to process OAuth login');
-            }
-
-            const data = await response.json();
-
-            // Store tokens
-            if (data.session?.access_token) {
-              localStorage.setItem('leadflow_access_token', data.session.access_token);
-              if (data.session.refresh_token) {
-                localStorage.setItem('leadflow_refresh_token', data.session.refresh_token);
-              }
-              startSessionExpiryTimer();
-            }
-
-            if (data.user?.id) {
-              localStorage.setItem('leadflow_user', JSON.stringify(data.user));
-              setUser(data.user);
-            }
-
-            window.history.replaceState({}, document.title, window.location.pathname);
-            setCurrentPage('dashboard');
-            setLoading(false);
-
-            console.log('[OAuth] ✅ Legacy OAuth login completed!');
-          } catch (error) {
-            console.error('[OAuth] Legacy OAuth error:', error);
-            setLoading(false);
-          }
-        }
-      } catch (error) {
-        console.error('[OAuth] Error processing OAuth callback:', error);
-        setLoading(false);
-      }
-    };
-
-    handleOAuthCallback();
+    const queryParams = new URLSearchParams(window.location.search);
+    const oauthError = queryParams.get('error');
+    if (oauthError) {
+      const errorMessage = queryParams.get('message') || 'Erro ao autenticar com Google';
+      console.error('[OAuth] Provider returned error:', oauthError, errorMessage);
+      alert(decodeURIComponent(errorMessage));
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setLoading(false);
+    }
   }, []);
 
   const loadWebhookSettings = useCallback(async () => {
@@ -771,7 +675,13 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
           return;
         } catch (backendError) {
           console.error('[Auth] Failed to hydrate user from backend:', backendError);
-          // If backend fails, logout to force re-login
+          if (OAUTH_PROCESSED) {
+            // The token was JUST received via OAuth — a transient backend error should not
+            // destroy the fresh tokens. Keep them and let the user try again from login.
+            console.warn('[Auth] OAUTH_PROCESSED=true — not calling forceLogout on backend error');
+            setCurrentPage('login');
+            return;
+          }
           await forceLogout('Failed to load user data');
           return;
         }
@@ -850,17 +760,17 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     const initialize = async () => {
       console.log('[Initialize] Starting... OAUTH_PROCESSED:', OAUTH_PROCESSED);
 
-      // Never interfere with standalone public pages
-      const initPageFromUrl = getPageFromPath();
-      const initPublicPages: (Page | null)[] = ['accept-invite', 'agent-call', 'login', 'signup', 'forgot-password', 'reset-password'];
-      if (initPublicPages.includes(initPageFromUrl)) {
-        setLoading(false);
-        return;
-      }
-
-      // If OAuth was already processed on script load, load user and go to dashboard
+      // OAuth MUST be checked before the URL-based public page guard below.
+      // Two reasons:
+      //   1. The [currentPage] effect (defined earlier in the component) fires first and
+      //      calls pushState('/login'), so getPageFromPath() returns 'login' by the time
+      //      we reach the public-page check — which would block OAuth entirely.
+      //   2. The [currentPage] effect now has its own guard (OAUTH_PROCESSED + public page
+      //      list), but we keep this check first as the primary defense.
       if (OAUTH_PROCESSED) {
         console.log('[Initialize] OAuth was processed on script load, loading user...');
+
+        // Fast path: user was serialised into localStorage by early capture
         const storedUser = localStorage.getItem('leadflow_user');
         if (storedUser) {
           try {
@@ -872,9 +782,48 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
             console.log('[Initialize] ✅ OAuth user loaded from localStorage:', userData.email);
             return;
           } catch (e) {
-            console.error('[Initialize] Error parsing stored user:', e);
+            console.error('[Initialize] Error parsing stored user — will try API fallback:', e);
           }
         }
+
+        // Fallback: token exists but user JSON was missing or corrupt — hydrate from API.
+        // This path is self-contained so we never fall through to checkAuth(), which also
+        // has a public-page URL guard that would silently bail out when the URL is '/login'.
+        const token = localStorage.getItem('leadflow_access_token');
+        if (token) {
+          try {
+            console.log('[Initialize] OAuth token present, hydrating user from API...');
+            const userData = await fetchUserContext();
+            if (userData?.id) {
+              localStorage.setItem('leadflow_user', JSON.stringify(userData));
+              setUser(userData);
+              startSessionExpiryTimer();
+              setCurrentPage('dashboard');
+              setLoading(false);
+              console.log('[Initialize] ✅ OAuth user hydrated from API:', userData.email);
+              return;
+            }
+          } catch (e) {
+            console.error('[Initialize] OAuth API fallback failed:', e);
+            // Report to backend so ops can see repeated OAuth failures in diagnostics
+            void reportAuthError('oauth_hydration_failed', (e as Error)?.message ?? String(e));
+          }
+        }
+
+        // All OAuth recovery attempts failed — keep tokens intact, redirect to login
+        // so the user can retry. Do NOT call forceLogout (that would clear the tokens).
+        console.error('[Initialize] ❌ OAuth processing failed — redirecting to login for retry');
+        setCurrentPage('login');
+        setLoading(false);
+        return;
+      }
+
+      // Never interfere with standalone public pages
+      const initPageFromUrl = getPageFromPath();
+      const initPublicPages: (Page | null)[] = ['accept-invite', 'agent-call', 'login', 'signup', 'forgot-password', 'reset-password'];
+      if (initPublicPages.includes(initPageFromUrl)) {
+        setLoading(false);
+        return;
       }
 
       const resetHandled = checkPasswordResetCallback();
