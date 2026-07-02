@@ -848,6 +848,13 @@ export const userApi = {
     console.log('[UserSettings API] Setting saved successfully');
     return response;
   },
+
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    return apiCall('/users/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }, true);
+  },
 };
 
 // ============================================

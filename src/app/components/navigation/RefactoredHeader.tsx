@@ -88,11 +88,11 @@ export default function RefactoredHeader({
   }, [languageMenuOpen]);
 
   const handleProfile = () => {
-    navigate('/dashboard/account');
+    onNavigate?.('account');
   };
 
   const handleChangePassword = () => {
-    navigate('/dashboard/account');
+    onNavigate?.('account');
   };
 
   const handleLanguageChange = (lang: Language) => {

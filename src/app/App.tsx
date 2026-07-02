@@ -1053,7 +1053,7 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       )}
 
       {/* Agent Call Popup Page */}
-      {currentPage === 'agent-call' && (
+      {(currentPage as string) === 'agent-call' && (
         <AgentCallPage />
       )}
 

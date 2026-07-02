@@ -11,6 +11,7 @@ interface WhatsAppCloudConnectProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    editingChannel?: any;
 }
 
 export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppCloudConnectProps) {

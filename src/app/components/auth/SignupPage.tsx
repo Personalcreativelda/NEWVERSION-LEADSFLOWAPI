@@ -87,7 +87,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
           status: 'success'
         });
 
-        if (response.requiresEmailConfirmation) {
+        if ((response as any).requiresEmailConfirmation) {
           setPendingEmail(trimmedEmail);
           setResendState('idle');
           setResendMessage('');

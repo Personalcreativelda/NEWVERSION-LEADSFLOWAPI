@@ -156,7 +156,7 @@ export default function AdminActivityFeed({ activities, users = [], loading }: A
               const user = users.find(u => u.id === activity.user_id);
               const userName = user?.name || activity.user_name || user?.email?.split('@')[0] || activity.user_email?.split('@')[0] || 'Usuário';
               const userEmail = user?.email || activity.user_email || '';
-              const avatarUrl = activity.avatar_url || user?.avatar_url;
+              const avatarUrl = user?.avatar_url;
               const initials = userName.split(' ').length >= 2
                 ? (userName.split(' ')[0][0] + userName.split(' ')[1][0]).toUpperCase()
                 : userName.substring(0, 2).toUpperCase();

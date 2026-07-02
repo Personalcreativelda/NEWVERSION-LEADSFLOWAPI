@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Check, Crown, Rocket, Zap, Switch as SwitchIcon, Info } from 'lucide-react';
+import { X, Check, Crown, Rocket, Zap, Info } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
 import { useConfirm } from '../ui/ConfirmDialog';

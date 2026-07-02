@@ -140,8 +140,7 @@ export default function TagEditModal({ tag, onClose, onUpdate }: TagEditModalPro
                                     }`}
                                     style={{
                                         backgroundColor: colorOption,
-                                        ringColor: color === colorOption ? colorOption : undefined,
-                                    }}
+                                    } as React.CSSProperties}
                                     disabled={isSubmitting}
                                 />
                             ))}

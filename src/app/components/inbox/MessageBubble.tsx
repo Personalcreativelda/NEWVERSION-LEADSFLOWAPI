@@ -86,7 +86,7 @@ function EmailHtmlBody({ html }: { html: string }) {
     return (
         <div className="relative">
             <div
-                className={`overflow-hidden transition-all duration-200 ${expanded ? '' : `max-h-[${PREVIEW_HEIGHT}px]`}`}
+                className="overflow-hidden transition-all duration-200"
                 style={expanded ? undefined : { maxHeight: PREVIEW_HEIGHT }}
             >
                 <div

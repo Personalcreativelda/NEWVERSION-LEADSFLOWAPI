@@ -1199,11 +1199,7 @@ export default function SalesFunnel({
                         <button
                           key={key}
                           onClick={async () => {
-                            const confirmed = await confirm(`Aplicar template "${template.name}"? Isso substituirá suas etapas atuais.`, {
-                              title: 'Aplicar template',
-                              confirmLabel: 'Aplicar',
-                              variant: 'warning',
-                            });
+                            const confirmed = confirm(`Aplicar template "${template.name}"? Isso substituirá suas etapas atuais.`);
                             if (confirmed) {
                               setStages(template.stages);
                             }

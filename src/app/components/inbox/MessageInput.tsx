@@ -12,6 +12,7 @@ import {
     Sparkles,
     AlertCircle
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { inboxApi } from '../../services/api/inbox';
 import { useConversationUploadQueue } from '../../context/UploadQueueContext';
 import { AttachmentPreviewCard } from './AttachmentPreviewCard';
@@ -178,7 +179,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
 
         } catch (error) {
             console.error('Failed to start recording:', error);
-            alert('Não foi possível acessar o microfone. Verifique as permissões.');
+            toast.error('Não foi possível acessar o microfone. Verifique as permissões.');
         }
     };
 
@@ -228,7 +229,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
             setRecordingTime(0);
         } catch (error) {
             console.error('Failed to send audio:', error);
-            alert('Erro ao enviar áudio. Tente novamente.');
+            toast.error('Erro ao enviar áudio. Tente novamente.');
         } finally {
             setIsSendingAudio(false);
         }
@@ -266,10 +267,10 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                     window.dispatchEvent(new CustomEvent('ai-sentiment-updated', { detail: { conversationId, sentiment: data.sentiment } }));
                 }
             } else {
-                alert('Erro ao gerar resposta com IA.');
+                toast.error('Erro ao gerar resposta com IA.');
             }
         } catch (err) {
-            alert('Erro ao comunicar com o servidor.');
+            toast.error('Erro ao comunicar com o servidor.');
         } finally {
             setIsGeneratingReply(false);
         }
@@ -512,6 +513,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                 {/* Action Buttons */}
                 <div className="flex items-center gap-1 mb-1">
                     <button
+                        type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={disabled || isSending || showRecordingMode}
                         className="p-2 rounded-lg transition-all duration-150 disabled:opacity-50 hover:bg-muted text-muted-foreground"
@@ -520,6 +522,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                         <Paperclip size={18} />
                     </button>
                     <button
+                        type="button"
                         onClick={() => imageInputRef.current?.click()}
                         disabled={disabled || isSending || showRecordingMode}
                         className="p-2 rounded-lg transition-all duration-150 disabled:opacity-50 hover:bg-muted text-muted-foreground"

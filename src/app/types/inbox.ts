@@ -194,6 +194,7 @@ export interface AIAssistant {
     webhook_headers?: Record<string, string>;
     llm_provider?: 'gemini' | 'openai' | 'anthropic';
     llm_model?: string;
+    llm_api_key?: string;
     llm_system_prompt?: string;
     settings: {
         enabled: boolean;

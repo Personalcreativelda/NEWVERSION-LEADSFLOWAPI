@@ -106,7 +106,6 @@ export const translations: Record<Language, Translations> = {
     marketing: 'Marketing',
     remarketing: 'Remarketing',
     aiInsights: 'Motor de Vendas',
-    assistants: 'Assistentes IA',
     plan: 'Plano',
     integrations: 'Integrações',
     security: 'Segurança',

@@ -43,14 +43,17 @@ interface Campaign {
   id: string;
   name: string;
   type: 'whatsapp' | 'email' | 'sms';
-  status: 'active' | 'scheduled' | 'completed' | 'paused' | 'draft';
+  status: 'active' | 'scheduled' | 'completed' | 'paused' | 'draft' | 'sending' | 'failed';
   totalRecipients: number;
   sent?: number;
   delivered?: number;
   read?: number;
+  failed?: number;
   replies?: number;
   scheduledDate?: string;
   completedDate?: string;
+  updatedDate?: string;
+  createdDate?: string;
   progress?: number;
   estimatedTime?: number;
   deliveryRate?: number;
@@ -451,7 +454,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
             if (progress >= 100 || (sent + failed) >= totalRecipients || realData.status === 'completed' || realData.status === 'failed') {
               debugLog('[CampaignsPage] ✅ Campanha CONCLUÍDA (dados reais):', campaign.name);
               const needsCompletionUpdate =
-                campaign.status !== 'completed' ||
+                (campaign.status as string) !== 'completed' ||
                 campaign.progress !== 100 ||
                 (campaign.sent ?? 0) !== sent ||
                 (campaign.delivered ?? 0) !== delivered ||
@@ -560,7 +563,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
           if (newProgress >= 100 || sent >= campaign.totalRecipients) {
             debugLog('[CampaignsPage] ✅ Campanha CONCLUÍDA (simulação):', campaign.name);
             const completedAlready =
-              campaign.status === 'completed' &&
+              (campaign.status as string) === 'completed' &&
               campaign.progress === 100 &&
               (campaign.sent ?? 0) === campaign.totalRecipients &&
               (campaign.delivered ?? 0) === Math.floor(campaign.totalRecipients * 0.95) &&
@@ -1752,7 +1755,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
         <CampaignDetailsModal
           isOpen={detailsModalOpen}
           onClose={() => setDetailsModalOpen(false)}
-          campaign={selectedCampaign!}
+          campaign={selectedCampaign as any}
         />
       )}
 

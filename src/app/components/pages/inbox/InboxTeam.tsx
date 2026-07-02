@@ -59,7 +59,7 @@ export default function InboxTeam() {
     const handleEdit = async (id: string) => {
         setSaving(true);
         try {
-            const m = await teamApi.updateMember(id, editForm);
+            const m = await teamApi.updateMember(id, editForm as Partial<TeamMember>);
             setMembers(prev => prev.map(x => x.id === id ? { ...x, ...m } : x));
             setEditingId(null);
             toast.success('Membro atualizado');

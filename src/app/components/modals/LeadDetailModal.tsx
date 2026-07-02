@@ -934,7 +934,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  if (!isOpen || !currentLead) return null;
 
  const displayLead = currentLead;
- const statusCfg = getStatusConfig(displayLead.status, isDark);
+ const statusCfg = getStatusConfig(displayLead.status);
  const dealValue = displayLead.deal_value ?? displayLead.valor ?? 0;
 
  return (

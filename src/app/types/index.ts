@@ -4,10 +4,10 @@ export interface Lead {
   id?: string;
   nome: string;
   email?: string;
-  telefone: string;
-  interesse: string;
-  origem: string;
-  status: string;
+  telefone?: string;
+  interesse?: string;
+  origem?: string;
+  status?: string;
   data?: string;
   createdAt?: string;
   capturedAt?: string;
@@ -15,6 +15,9 @@ export interface Lead {
   agente_atual?: string;
   observacao?: string;
   observacoes?: string;
+  // Alias fields (some components use English field names)
+  name?: string;
+  phone?: string;
   marcado_email?: boolean;
   valor?: number;
   deal_value?: number;
@@ -107,6 +110,13 @@ export interface WebhookConfig {
   httpEndpoint?: string; // Endpoint HTTP para receber leads (apenas Professional+)
   metaPixelId?: string; // Meta Pixel ID
   googleAnalyticsId?: string; // Google Analytics ID
+  // N8N webhook endpoints (legacy)
+  cadastrar?: string;
+  editar?: string;
+  deletar?: string;
+  listar?: string;
+  enviarMsg?: string;
+  enviarMassa?: string;
 }
 
 export interface PeriodoTeste {

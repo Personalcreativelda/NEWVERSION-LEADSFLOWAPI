@@ -153,6 +153,7 @@ export default function LeadsTable({
   campaignsLimitReached,
   loading
 }: LeadsTableProps) {
+  const confirm = useConfirm();
   const [busca, setBusca] = useState('');
   const [paginaAtual, setPaginaAtual] = useState(1);
   // const [hoveredRow, setHoveredRow] = useState<number | null>(null); // Removido - causava bugs no hover

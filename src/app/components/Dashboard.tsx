@@ -75,7 +75,7 @@ import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X, La
 
 // Types
 interface Lead {
-  id: string;
+  id?: string;
   nome: string;
   telefone?: string;
   email?: string;
@@ -86,6 +86,19 @@ interface Lead {
   agente_atual?: string;
   observacoes?: string;
   marcado_email?: boolean;
+  // Alias fields used in some places
+  name?: string;
+  phone?: string;
+  whatsapp?: string;
+  source?: string;
+  capturedAt?: string;
+  createdAt?: string;
+  deal_value?: number;
+  valor?: number;
+  avatarUrl?: string | null;
+  updatedAt?: string;
+  lead_score?: number | null;
+  empresa?: string;
 }
 
 interface DashboardProps {
@@ -2193,7 +2206,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                     totalLeads={stats.total}
                     leadsNovosHoje={stats.novosHoje}
                     leadsFechados={stats.convertidos}
-                    leads={leadsFiltradosPorFiltros}
+                    leads={leadsFiltradosPorFiltros as any}
                     limites={limites}
                     isDark={isDark}
                   />
@@ -2296,7 +2309,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                     totalLeads={stats.total}
                     leadsNovosHoje={stats.novosHoje}
                     leadsFechados={stats.convertidos}
-                    leads={leadsFiltradosPorFiltros}
+                    leads={leadsFiltradosPorFiltros as any}
                     limites={limites}
                     isDark={isDark}
                   />
@@ -2349,7 +2362,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
 
             {currentPage === 'campaigns' && (
               <CampaignsPage
-                leads={leads}
+                leads={leads as any}
                 isDark={isDark}
                 userPlan={(user?.plan || user?.subscription_plan || 'free') as 'free' | 'business' | 'enterprise'}
               />
@@ -2380,7 +2393,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   <SkeletonFunnel />
                 ) : (
                 <SalesFunnel
-                  leads={leads}
+                  leads={leads as any}
                   onUpdateLeadStatus={async (leadId, newStatus) => {
                     // Atualização otimista: move o lead no estado local imediatamente
                     const leadIndex = leads.findIndex(l => l.id === leadId);
@@ -2476,7 +2489,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                     Exportar Relatório
                   </button>
                 </div>
-                <AdvancedAnalytics leads={leads} isDark={isDark} />
+                <AdvancedAnalytics leads={leads as any} isDark={isDark} />
               </div>
             )}
 
@@ -2503,7 +2516,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
             )}
 
             {currentPage === 'admin' && (
-              <AdminPage user={user} />
+              <AdminPage />
             )}
           </div>
 
@@ -2718,8 +2731,8 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
       <CampaignEmailModal
         isOpen={modalEmailMarketing}
         onClose={() => setModalEmailMarketing(false)}
-        leads={leads}
-        onSendSuccess={() => {
+        leads={leads as any}
+        onCampaignCreated={() => {
           carregarLeads();
         }}
       />
@@ -2800,7 +2813,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
       <CampaignWhatsAppModal
         isOpen={campaignWhatsAppModalOpen}
         onClose={() => setCampaignWhatsAppModalOpen(false)}
-        leads={leads}
+        leads={leads as any}
         isDark={isDark}
         onCampaignCreated={() => {
           setCampaignWhatsAppModalOpen(false);

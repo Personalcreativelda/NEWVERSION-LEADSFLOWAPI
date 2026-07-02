@@ -12,6 +12,7 @@ interface WhatsAppConnectProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    editingChannel?: any;
 }
 
 type ConnectionStatus = 'idle' | 'creating' | 'waiting_qr' | 'connecting' | 'connected' | 'error';

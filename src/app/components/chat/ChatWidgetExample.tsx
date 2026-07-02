@@ -1,6 +1,6 @@
 // Exemplo de como adicionar o ChatWidget no seu App.tsx
 
-import { ChatWidget } from './components/chat/ChatWidget';
+import { ChatWidget } from './ChatWidget';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 function App() {
@@ -17,7 +17,7 @@ function App() {
   return (
     <div className="app">
       {/* Seu conteúdo principal */}
-      <YourMainContent />
+      {/* <YourMainContent /> */}
       
       {/* Chat Widget - sempre visível */}
       <ChatWidget 

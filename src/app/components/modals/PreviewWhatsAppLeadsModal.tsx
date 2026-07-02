@@ -173,11 +173,7 @@ export default function PreviewWhatsAppLeadsModal({
 
  const handleDelete = async (index: number) => {
  const contact = editedContacts[index];
- const confirmed = await confirm(`Deseja remover"${contact.nome}" da lista de importação?`, {
- title: 'Remover contacto',
- confirmLabel: 'Remover',
- variant: 'danger',
- });
+ const confirmed = confirm(`Deseja remover"${contact.nome}" da lista de importação?`);
  if (confirmed) {
  const newContacts = editedContacts.filter((_, idx) => idx !== index);
  setEditedContacts(newContacts);

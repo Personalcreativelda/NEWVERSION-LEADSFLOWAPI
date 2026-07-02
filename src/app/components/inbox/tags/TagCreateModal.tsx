@@ -123,8 +123,7 @@ export default function TagCreateModal({ onClose, onCreate }: TagCreateModalProp
                                     }`}
                                     style={{
                                         backgroundColor: colorOption,
-                                        ringColor: color === colorOption ? colorOption : undefined,
-                                    }}
+                                    } as React.CSSProperties}
                                     disabled={isSubmitting}
                                 />
                             ))}

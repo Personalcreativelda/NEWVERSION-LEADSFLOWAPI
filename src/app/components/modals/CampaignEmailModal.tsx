@@ -73,11 +73,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
     reader.onload = async (event) => {
       const content = event.target?.result as string;
       if (htmlContent.trim()) {
-        const confirmed = await confirm('Isso irá substituir o conteúdo atual. Continuar?', {
-          title: 'Substituir conteúdo HTML',
-          confirmLabel: 'Substituir',
-          variant: 'warning',
-        });
+        const confirmed = confirm('Isso irá substituir o conteúdo atual. Continuar?');
         if (!confirmed) {
           return;
         }
@@ -91,11 +87,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
 
   const applyTemplate = async (templateHtml: string) => {
     if (htmlContent.trim()) {
-      const confirmed = await confirm('Isso irá substituir o conteúdo HTML atual. Deseja continuar?', {
-        title: 'Aplicar modelo HTML',
-        confirmLabel: 'Aplicar',
-        variant: 'warning',
-      });
+      const confirmed = confirm('Isso irá substituir o conteúdo HTML atual. Deseja continuar?');
       if (!confirmed) {
         return;
       }

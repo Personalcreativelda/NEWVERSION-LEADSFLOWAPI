@@ -13,11 +13,17 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "noEmit": true,
+    "noFallthroughCasesInSwitch": true,
+    "ignoreDeprecations": "5.0",
     "baseUrl": "./src",
     "paths": {
       "@/*": ["./*"]
     }
   },
   "include": ["src"],
+  "exclude": [
+    "src/app/supabase",
+    "src/app/components/Dashboard_import_fix.tsx"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
