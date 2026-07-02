@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../../ui/button';
 import {
-  AlertCircle, CheckCircle2, AlertTriangle, Loader2, RefreshCw, Mail, Activity,
+  AlertCircle, CheckCircle2, AlertTriangle, Loader2, RefreshCw, Mail, Activity, Trash2,
 } from 'lucide-react';
 import { apiRequest } from '../../../utils/api';
+import { getApiBaseUrl } from '../../../utils/api-client';
 import { toast } from 'sonner';
 
 interface CheckResult {
@@ -47,6 +48,7 @@ export const AdminDiagnosticsTab: React.FC = () => {
   const [report, setReport] = useState<DiagnosticReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [testingAlert, setTestingAlert] = useState(false);
+  const [cleaningSessions, setCleaningSessions] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [expandedCheck, setExpandedCheck] = useState<string | null>(null);
 
@@ -54,7 +56,17 @@ export const AdminDiagnosticsTab: React.FC = () => {
     setLoading(true);
     setFetchError(null);
     try {
-      const data = (await apiRequest('/api/diagnostics')) as DiagnosticReport;
+      const base = getApiBaseUrl() || 'http://localhost:4000';
+      const token = localStorage.getItem('leadflow_access_token');
+      const res = await fetch(`${base}/api/diagnostics`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      // 200 = ok, 207 = warn, 503 = error — all return JSON report
+      if (res.status === 401 || res.status === 403) {
+        setFetchError('Acesso negado. Apenas administradores podem ver o diagnóstico.');
+        return;
+      }
+      const data = (await res.json()) as DiagnosticReport;
       setReport(data);
     } catch (e: any) {
       setFetchError(e?.message || 'Falha ao carregar diagnóstico');
@@ -66,6 +78,25 @@ export const AdminDiagnosticsTab: React.FC = () => {
   useEffect(() => {
     void fetchDiagnostics();
   }, [fetchDiagnostics]);
+
+  const cleanSessions = async () => {
+    setCleaningSessions(true);
+    try {
+      const base = getApiBaseUrl() || 'http://localhost:4000';
+      const token = localStorage.getItem('leadflow_access_token');
+      const res = await fetch(`${base}/api/diagnostics/cleanup-sessions`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      toast.success(`✅ ${data.deletedSessions} sessões expiradas removidas`);
+      void fetchDiagnostics();
+    } catch (e: any) {
+      toast.error(e?.message || 'Falha ao limpar sessões');
+    } finally {
+      setCleaningSessions(false);
+    }
+  };
 
   const sendTestAlert = async () => {
     setTestingAlert(true);
@@ -80,6 +111,7 @@ export const AdminDiagnosticsTab: React.FC = () => {
   };
 
   const problems = report?.checks.filter(c => c.status !== 'ok') ?? [];
+  const sessionsProblematic = report?.checks.some(c => c.name === 'sessions' && c.status !== 'ok') ?? false;
   const sorted = report
     ? [...report.checks].sort((a, b) => {
         const order = { error: 0, warn: 1, ok: 2 };
@@ -99,6 +131,18 @@ export const AdminDiagnosticsTab: React.FC = () => {
           <p className="text-muted-foreground">Saúde em tempo real de todos os serviços</p>
         </div>
         <div className="flex gap-2">
+          {sessionsProblematic && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void cleanSessions()}
+              disabled={cleaningSessions || loading}
+              className="flex items-center gap-2 border-yellow-500/50 text-yellow-600 hover:bg-yellow-500/10"
+            >
+              {cleaningSessions ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Limpar sessões expiradas
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

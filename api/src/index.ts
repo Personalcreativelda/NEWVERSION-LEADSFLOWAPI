@@ -15,6 +15,7 @@ import { initializeWebSocket } from './services/websocket.service';
 import { emailPollingService } from './services/email-polling.service';
 import { planExpirationService } from './services/plan-expiration.service';
 import { storageCleanupService } from './services/storage-cleanup.service';
+import { sessionCleanupService } from './services/session-cleanup.service';
 import { diagnosticAlertService } from './services/diagnostic-alert.service';
 
 const app = express();
@@ -565,6 +566,9 @@ initDatabase().then(() => {
   // ✅ Iniciar limpeza automática de arquivos expirados do MinIO
   storageCleanupService.start();
   console.log('[Leadflow API] Storage cleanup service iniciado ✅');
+
+  // ✅ Limpeza de sessões expiradas (a cada hora)
+  sessionCleanupService.start();
 
   // ✅ Iniciar monitor de diagnóstico (verifica serviços e envia alertas por email)
   diagnosticAlertService.start();

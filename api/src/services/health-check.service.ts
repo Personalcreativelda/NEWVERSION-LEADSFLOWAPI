@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import v8 from 'v8';
 import { query } from '../database/connection';
 import { config } from '../config/env';
 import { getAuthMetrics } from './auth-metrics.service';
@@ -323,30 +324,38 @@ function checkAuthMetrics(): CheckResult {
 
 function checkProcessMemory(): CheckResult {
   const mem = process.memoryUsage();
-  const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
-  const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
-  const pct = Math.round((mem.heapUsed / mem.heapTotal) * 100);
-  if (pct > 90) {
+  const v8Stats = v8.getHeapStatistics();
+
+  const heapUsedMB  = Math.round(mem.heapUsed / 1024 / 1024);
+  const heapLimitMB = Math.round(v8Stats.heap_size_limit / 1024 / 1024);
+  const rssMB       = Math.round(mem.rss / 1024 / 1024);
+
+  // Use the real V8 heap limit (not heapTotal which is just currently committed pages)
+  const pct = Math.round((mem.heapUsed / v8Stats.heap_size_limit) * 100);
+
+  const details = { heapUsedMB, heapLimitMB, rssMB, pct };
+
+  if (pct > 85) {
     return {
       name: 'memory',
       status: 'error',
-      message: `Heap at ${pct}% (${heapUsedMB}MB / ${heapTotalMB}MB) — risk of OOM crash`,
-      details: { heapUsedMB, heapTotalMB, pct },
+      message: `Heap at ${pct}% (${heapUsedMB}MB / ${heapLimitMB}MB limit) — risk of OOM crash`,
+      details,
     };
   }
-  if (pct > 75) {
+  if (pct > 70) {
     return {
       name: 'memory',
       status: 'warn',
-      message: `Heap at ${pct}% (${heapUsedMB}MB / ${heapTotalMB}MB) — monitor closely`,
-      details: { heapUsedMB, heapTotalMB, pct },
+      message: `Heap at ${pct}% (${heapUsedMB}MB / ${heapLimitMB}MB limit) — monitor closely`,
+      details,
     };
   }
   return {
     name: 'memory',
     status: 'ok',
-    message: `Heap at ${pct}% (${heapUsedMB}MB / ${heapTotalMB}MB)`,
-    details: { heapUsedMB, heapTotalMB, pct },
+    message: `Heap at ${pct}% (${heapUsedMB}MB used, ${heapLimitMB}MB limit, ${rssMB}MB RSS)`,
+    details,
   };
 }
 

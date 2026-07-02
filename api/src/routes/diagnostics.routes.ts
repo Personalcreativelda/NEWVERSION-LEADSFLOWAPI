@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
 import { diagnosticAlertService } from '../services/diagnostic-alert.service';
+import { sessionCleanupService } from '../services/session-cleanup.service';
 
 const router = Router();
 
@@ -88,6 +89,22 @@ router.post('/test-alert', requireAuth, async (req: AuthenticatedRequest, res: R
 
     await emailService.sendRaw({ to: alertEmail, subject, html: `<pre>${text}</pre>`, text });
     return res.json({ success: true, sentTo: alertEmail, overall: report.overall, checks: report.checks.length });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/diagnostics/cleanup-sessions
+ * Admin-only: immediately delete all expired sessions from the DB.
+ */
+router.post('/cleanup-sessions', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  try {
+    const deleted = await sessionCleanupService.runNow();
+    return res.json({ success: true, deletedSessions: deleted });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
