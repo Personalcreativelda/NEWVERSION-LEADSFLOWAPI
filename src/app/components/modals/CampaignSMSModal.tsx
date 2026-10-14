@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  X, Smartphone, Users, Send, Clock, ChevronDown, ChevronUp,
-  Check, Save, AlertCircle, Loader2
+  Smartphone, Users, Send, Clock, AlertCircle, Loader2
 } from 'lucide-react';
-import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
@@ -11,6 +9,8 @@ import { toast } from 'sonner';
 import { smsCampaignsApi } from '../../utils/api';
 import { channelsApi } from '../../services/api/inbox';
 import type { Channel } from '../../types/inbox';
+import { AppModal } from '../base/AppModal';
+import { AppButton } from '../base/AppButton';
 
 interface Lead {
   id: string;
@@ -104,8 +104,6 @@ export default function CampaignSMSModal({
       setScheduleTime('');
     }
   }, [editingCampaign, isOpen]);
-
-  if (!isOpen) return null;
 
   const getRecipientCount = () => {
     if (recipientMode === 'all') return leads.filter(l => l.telefone).length;
@@ -220,28 +218,50 @@ export default function CampaignSMSModal({
   const selectedChannel = twilioChannels.find(c => c.id === selectedChannelId);
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="campaign-modal relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl border border-border">
-        {/* Header */}
-        <div className="campaign-modal flex items-center justify-between p-6 border-b border-border sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#F22F46' }}>
-              <Smartphone className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-foreground">
-                {editingCampaign ? 'Editar Campanha SMS' : 'Nova Campanha SMS'}
-              </h2>
-              <p className="text-sm text-muted-foreground">Via Twilio — envio em massa de SMS</p>
-            </div>
+    <AppModal
+      open={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      size="lg"
+      className="campaign-modal p-0 gap-0 max-h-[90vh] flex flex-col"
+      title={
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#F22F46' }}>
+            <Smartphone className="w-5 h-5 text-white" />
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          <div>
+            <span>{editingCampaign ? 'Editar Campanha SMS' : 'Nova Campanha SMS'}</span>
+            <p className="text-sm text-muted-foreground font-normal">Via Twilio — envio em massa de SMS</p>
+          </div>
         </div>
-
-        <div className="p-6 space-y-6">
+      }
+      footer={
+        <div className="flex items-center justify-between w-full">
+          <button
+            onClick={onClose}
+            disabled={isSending}
+            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancelar
+          </button>
+          <AppButton
+            onClick={handleSend}
+            disabled={isSending || twilioChannels.length === 0 || !message.trim() || recipientCount === 0}
+            loading={isSending}
+            className="text-white font-medium px-6"
+            style={{ backgroundColor: '#F22F46' }}
+          >
+            {isSending ? (
+              'Enviando...'
+            ) : scheduleMode === 'now' ? (
+              <><Send />Disparar SMS</>
+            ) : (
+              <><Clock />Agendar</>
+            )}
+          </AppButton>
+        </div>
+      }
+    >
+        <div className="px-6 pb-2 space-y-6">
           {/* No Twilio channels warning */}
           {!loadingChannels && twilioChannels.length === 0 && (
             <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
@@ -447,34 +467,6 @@ export default function CampaignSMSModal({
             </p>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="campaign-modal flex items-center justify-between p-6 border-t border-border sticky bottom-0">
-          <button
-            onClick={onClose}
-            disabled={isSending}
-            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Cancelar
-          </button>
-          <div className="flex gap-3">
-            <Button
-              onClick={handleSend}
-              disabled={isSending || twilioChannels.length === 0 || !message.trim() || recipientCount === 0}
-              className="text-white font-medium px-6"
-              style={{ backgroundColor: '#F22F46' }}
-            >
-              {isSending ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>
-              ) : scheduleMode === 'now' ? (
-                <><Send className="w-4 h-4 mr-2" />Disparar SMS</>
-              ) : (
-                <><Clock className="w-4 h-4 mr-2" />Agendar</>
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }

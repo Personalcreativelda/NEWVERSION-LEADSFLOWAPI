@@ -1,5 +1,7 @@
 import { User, Edit, Trash2, MessageCircle, Mail } from 'lucide-react';
 import type { Lead } from '../../types';
+import { DashboardCard } from '../base/DashboardCard';
+import { EmptyState } from '../base/EmptyState';
 
 // Mapeamento de nomes de canal para exibição amigável
 const channelLabels: Record<string, string> = {
@@ -38,7 +40,6 @@ export default function RecentLeadsSection({
   onDelete,
   onChat,
   onSendEmail,
-  isDark = false,
 }: RecentLeadsSectionProps) {
   // Pegar os últimos 5 leads (ordenados por data)
   const recentLeads = [...leads]
@@ -104,27 +105,15 @@ export default function RecentLeadsSection({
 
   if (recentLeads.length === 0) {
     return (
-      <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
-        <h3 className="text-foreground font-semibold text-base mb-6">
-          Leads Recentes
-        </h3>
-
-        <div className="text-center py-8">
-          <p className="text-muted-foreground text-sm">
-            Nenhum lead cadastrado ainda
-          </p>
-        </div>
-      </div>
+      <DashboardCard title="Leads Recentes">
+        <EmptyState title="Nenhum lead cadastrado ainda" imgSrc="/assets/icons/empty/ic_content.svg" />
+      </DashboardCard>
     );
   }
 
   return (
-    <div className="bg-card rounded-xl p-5 border border-border shadow-sm h-full flex flex-col">
-      <h3 className="text-foreground font-semibold text-base mb-4">
-        Leads Recentes
-      </h3>
-
-      <div className="space-y-1">
+    <DashboardCard title="Leads Recentes" className="h-full flex flex-col" disableContentPadding>
+      <div className="space-y-1 p-5">
         {recentLeads.map((lead) => {
           const statusStyle = getStatusStyle(lead.status);
           // Encontrar o índice do lead no array original
@@ -214,7 +203,7 @@ export default function RecentLeadsSection({
           );
         })}
       </div>
-    </div>
+    </DashboardCard>
   );
 }
 

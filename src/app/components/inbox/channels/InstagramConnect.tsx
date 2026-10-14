@@ -1,5 +1,5 @@
 // INBOX: Modal de Conexão Instagram via Instagram Business API
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
@@ -24,7 +24,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
     const [instagramId, setInstagramId] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
+    const [, setConnectionStatus] = useState<ConnectionStatus>('idle');
     const [accountInfo, setAccountInfo] = useState<{ username?: string; name?: string; profile_picture_url?: string } | null>(null);
 
     // Detectar tipo de token em tempo real
@@ -300,9 +300,8 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
             setInstagramId(igAccount.id);
 
             // Criar ou atualizar canal
-            let channel;
             if (isEditing && editingChannel) {
-                channel = await channelsApi.update(editingChannel.id, {
+                await channelsApi.update(editingChannel.id, {
                     type: 'instagram',
                     name: igAccount.username || igAccount.name || 'Instagram',
                     status: 'active',
@@ -320,7 +319,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                 });
                 toast.success('Canal Instagram atualizado com sucesso!');
             } else {
-                channel = await channelsApi.create({
+                await channelsApi.create({
                     type: 'instagram',
                     name: igAccount.username || igAccount.name || 'Instagram',
                     status: 'active',

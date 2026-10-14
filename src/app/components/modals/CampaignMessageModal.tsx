@@ -1,5 +1,5 @@
-import { X } from 'lucide-react';
-import { Button } from '../ui/button';
+import { AppModal } from '../base/AppModal';
+import { AppButton } from '../base/AppButton';
 
 interface Campaign {
   id: string;
@@ -17,7 +17,7 @@ interface CampaignMessageModalProps {
 }
 
 export default function CampaignMessageModal({ isOpen, onClose, campaign }: CampaignMessageModalProps) {
-  if (!isOpen || !campaign) return null;
+  if (!campaign) return null;
 
   // Recuperar mensagem diretamente do campaign.settings
   const getCampaignMessage = (): string => {
@@ -81,24 +81,19 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-card rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-[#10B981] to-green-600 px-6 py-4 flex items-center justify-between text-white">
-          <div>
-            <h2 className="text-xl font-bold">Visualizar Mensagem</h2>
-            <p className="text-sm text-green-100 mt-0.5">{campaign.name}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/20 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+    <AppModal
+      open={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      className="p-0 gap-0"
+      title={
+        <div>
+          <span>Visualizar Mensagem</span>
+          <p className="text-sm text-muted-foreground font-normal mt-0.5">{campaign.name}</p>
         </div>
-
-        {/* Body */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+      }
+      footer={<AppButton onClick={onClose}>Fechar</AppButton>}
+    >
+        <div className="px-6 pb-2">
           {/* Pré-visualização no estilo WhatsApp */}
           {campaign.type === 'whatsapp' && (
             <div className="mb-6">
@@ -259,15 +254,7 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
             </div>
           )}
         </div>
-
-        {/* Footer */}
-        <div className="border-t border-border px-6 py-4 flex items-center justify-end bg-muted/50">
-          <Button onClick={onClose}>
-            Fechar
-          </Button>
-        </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }
 

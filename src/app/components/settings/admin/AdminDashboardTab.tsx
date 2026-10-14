@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { Users, DollarSign, TrendingUp, Activity, Rocket, Crown } from 'lucide-react';

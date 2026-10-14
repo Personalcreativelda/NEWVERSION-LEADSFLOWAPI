@@ -1,9 +1,12 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart } from 'recharts';
 import type { Lead } from '../../types';
-import FilterBar from './FilterBar';
 import { useMemo, useState, useEffect } from 'react';
 import { MessageCircle, Cloud, Mail, Instagram, Facebook, Send, Globe, Megaphone, Webhook, Phone, Search, Link, Hash, Smartphone, Users, RefreshCw } from 'lucide-react';
 import { apiRequest } from '../../utils/api';
+import { DashboardCard } from '../base/DashboardCard';
+import { EmptyState } from '../base/EmptyState';
+import { LoadingState } from '../base/LoadingState';
+import { FilterBar, type FilterBarFilter } from '../base/FilterBar';
 
 interface ChartsSectionProps {
   leads: Lead[];
@@ -13,7 +16,7 @@ interface ChartsSectionProps {
   isDark?: boolean;
 }
 
-export default function ChartsSection({ leads, origens = [], status = [], onFilterChange, isDark = false }: ChartsSectionProps) {
+export default function ChartsSection({ leads, origens = [], status = [], onFilterChange }: ChartsSectionProps) {
   // Extrair origens e status únicos caso não sejam passados
   const origensDisponiveis = useMemo(() => {
     if (origens.length > 0) return origens;
@@ -25,9 +28,54 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     return Array.from(new Set(leads.map((l) => l.status).filter(Boolean)));
   }, [leads, status]);
 
+  // ── Barra de filtros (origem/status/busca) — mesmo contrato que já
+  // existia (onFilterChange recebe {origem, status, busca}), só faltava UI.
+  const [filtroOrigem, setFiltroOrigem] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroBusca, setFiltroBusca] = useState('');
+
+  const emitFilterChange = (next: { origem: string; status: string; busca: string }) => {
+    onFilterChange?.(next);
+  };
+
+  const handleBuscaChange = (value: string) => {
+    setFiltroBusca(value);
+    emitFilterChange({ origem: filtroOrigem, status: filtroStatus, busca: value });
+  };
+  const handleOrigemChange = (value: string) => {
+    setFiltroOrigem(value);
+    emitFilterChange({ origem: value, status: filtroStatus, busca: filtroBusca });
+  };
+  const handleStatusChange = (value: string) => {
+    setFiltroStatus(value);
+    emitFilterChange({ origem: filtroOrigem, status: value, busca: filtroBusca });
+  };
+  const handleClearFilters = () => {
+    setFiltroOrigem('');
+    setFiltroStatus('');
+    setFiltroBusca('');
+    emitFilterChange({ origem: '', status: '', busca: '' });
+  };
+
+  const chartFilters: FilterBarFilter[] = [
+    {
+      key: 'origem',
+      placeholder: 'Origem',
+      value: filtroOrigem,
+      options: origensDisponiveis.map((o) => ({ value: o, label: o })),
+      onChange: handleOrigemChange,
+    },
+    {
+      key: 'status',
+      placeholder: 'Status',
+      value: filtroStatus,
+      options: statusDisponiveis.map((s) => ({ value: s, label: s })),
+      onChange: handleStatusChange,
+    },
+  ];
+
   // Cores EXATAS para os gráficos - Paleta LeadsFlow
   const barColors = ['#B794F6', '#5B9FED', '#00D9A3', '#FFA26B', '#FF6B9D', '#FFD93D', '#B794F6', '#5B9FED', '#00D9A3', '#FFA26B'];
-  const pieColors = ['#B794F6', '#00D9A3', '#FFA26B', '#FF6B9D', '#5B9FED', '#FFD93D'];
 
   // Normalizar origens que não representam canais reais
   // 'inbox' e 'unknown' são genéricos e devem ser mapeados para 'whatsapp' (canal principal)
@@ -242,27 +290,6 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     return data;
   }, [leads, chartDays]);
 
-  // Custom Tooltip
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0];
-      const total = leads.length;
-      const percentage = total > 0 ? ((data.value / total) * 100).toFixed(1) : '0';
-      
-      return (
-        <div className="bg-card dark:bg-card border border-border dark:border-border rounded-xl p-4 shadow-md">
-          <p className="font-semibold text-foreground mb-1">
-            {data.payload.fullName || data.payload.name}
-          </p>
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-            {data.value} lead{data.value !== 1 ? 's' : ''} ({percentage}%)
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   // ✨ CustomLabel para mostrar valores ao lado das barras
   const CustomLabel = (props: any) => {
     const { x, y, width, height, value } = props;
@@ -304,30 +331,30 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
       {/* Barra de Filtros */}
       {onFilterChange && (
         <FilterBar
-          origens={origensDisponiveis}
-          status={statusDisponiveis}
-          onFilterChange={onFilterChange}
+          searchValue={filtroBusca}
+          onSearchChange={handleBuscaChange}
+          searchPlaceholder="Pesquisar leads…"
+          filters={chartFilters}
+          onClearAll={handleClearFilters}
         />
       )}
-      
+
       {/* Primeira linha - 2 gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-        
+
         {/* Gráfico de Origem - HORIZONTAL como Engajamento */}
-        <div className="bg-card dark:bg-card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-border dark:border-border shadow-sm hover:shadow-md transition-all duration-300">
-          <div className="flex items-center justify-between mb-3 sm:mb-4 lg:mb-6">
-            <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground dark:text-foreground">
-              Leads por Origem
-            </h3>
-            
+        <DashboardCard
+          title="Leads por Origem"
+          action={
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-[#B794F6]"></div>
               <span className="text-[10px] sm:text-xs text-muted-foreground dark:text-muted-foreground">
                 Total: {leads.length}
               </span>
             </div>
-          </div>
-          
+          }
+        >
+
           {origemChartData.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={220}>
@@ -407,41 +434,30 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center h-[350px] text-muted-foreground">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <p className="font-medium">Nenhum lead cadastrado</p>
-              </div>
-            </div>
+            <EmptyState title="Nenhum lead cadastrado" imgSrc="/assets/icons/empty/ic_content.svg" />
           )}
-        </div>
+        </DashboardCard>
 
         {/* Evolução de Leads (Linha) */}
-        <div className="bg-card dark:bg-card rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-border dark:border-border shadow-sm hover:shadow-md transition-all duration-300">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-semibold text-foreground dark:text-foreground">
-              Evolução de Leads
-            </h3>
+        <DashboardCard
+          title="Evolução de Leads"
+          action={
             <div className="flex gap-1 sm:gap-2">
-              <button 
+              <button
                 onClick={() => setChartDays(7)}
                 className={`px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium rounded-lg transition-colors ${chartDays === 7 ? 'bg-[#5B9FED]/10 text-[#5B9FED]' : 'text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-muted'}`}
               >
                 7 dias
               </button>
-              <button 
+              <button
                 onClick={() => setChartDays(30)}
                 className={`px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium rounded-lg transition-colors ${chartDays === 30 ? 'bg-[#5B9FED]/10 text-[#5B9FED]' : 'text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-muted'}`}
               >
                 30 dias
               </button>
             </div>
-          </div>
-          
+          }
+        >
           <ResponsiveContainer width="100%" height={250}>
             <AreaChart data={evolutionData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
               <defs>
@@ -450,42 +466,37 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
                   <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <XAxis 
-                dataKey="name" 
+              <XAxis
+                dataKey="name"
                 tick={{ fill: '#9ca3af', fontSize: 12 }}
                 stroke="#e5e7eb"
                 className="dark:stroke-gray-700"
               />
-              <YAxis 
+              <YAxis
                 tick={{ fill: '#9ca3af', fontSize: 12 }}
                 stroke="#e5e7eb"
                 className="dark:stroke-gray-700"
                 allowDecimals={false}
               />
               <Tooltip content={<LineTooltip />} />
-              <Area 
-                type="monotone" 
-                dataKey="leads" 
-                stroke="#6366f1" 
+              <Area
+                type="monotone"
+                dataKey="leads"
+                stroke="#6366f1"
                 strokeWidth={3}
-                fillOpacity={1} 
-                fill="url(#colorLeads)" 
+                fillOpacity={1}
+                fill="url(#colorLeads)"
               />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </DashboardCard>
       </div>
 
       {/* Segunda linha - 2 gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-        
+
         {/* Status dos Leads (Pizza) */}
-        <div className="bg-card dark:bg-card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-border dark:border-border shadow-sm hover:shadow-md transition-all duration-300">
-          <div className="flex items-center justify-between mb-3 sm:mb-4 lg:mb-6">
-            <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground dark:text-foreground">
-              Status dos Leads
-            </h3>
-          </div>
+        <DashboardCard title="Status dos Leads">
           
           {statusChartData.length > 0 ? (
             <>
@@ -539,30 +550,20 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center h-[350px] text-muted-foreground">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-                  </svg>
-                </div>
-                <p className="font-medium">Nenhum status definido</p>
-              </div>
-            </div>
+            <EmptyState title="Nenhum status definido" imgSrc="/assets/icons/empty/ic_content.svg" />
           )}
-        </div>
+        </DashboardCard>
 
         {/* Engajamento em Campanhas (Barras horizontais) */}
-        <div className="bg-card dark:bg-card rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-border dark:border-border shadow-sm hover:shadow-md transition-all duration-300">
-          <div className="flex items-center justify-between mb-4 sm:mb-5">
-            <h3 className="text-base sm:text-lg font-semibold text-foreground dark:text-foreground flex items-center gap-2">
+        <DashboardCard
+          title={
+            <span className="flex items-center gap-2">
               <Megaphone className="w-5 h-5 text-[#5B9FED]" />
               Engajamento em Campanhas
-            </h3>
-            {engagementLoading && <RefreshCw className="w-4 h-4 text-muted-foreground animate-spin" />}
-          </div>
-
+            </span>
+          }
+          action={engagementLoading && <RefreshCw className="w-4 h-4 text-muted-foreground animate-spin" />}
+        >
           {/* KPI rate badges */}
           {engagementData?.totals && (
             <div className="grid grid-cols-3 gap-3 mb-5">
@@ -619,15 +620,13 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
               </BarChart>
             </ResponsiveContainer>
           ) : !engagementLoading ? (
-            <div className="flex flex-col items-center justify-center h-[180px] text-muted-foreground">
-              <Megaphone className="w-10 h-10 opacity-20 mb-3" />
-              <p className="text-sm">Nenhuma campanha concluída ainda</p>
-              <p className="text-xs opacity-60 mt-1">Os dados aparecem após a primeira campanha enviada</p>
-            </div>
+            <EmptyState
+              title="Nenhuma campanha concluída ainda"
+              description="Os dados aparecem após a primeira campanha enviada"
+              imgSrc="/assets/icons/empty/ic_mail.svg"
+            />
           ) : (
-            <div className="flex items-center justify-center h-[180px]">
-              <RefreshCw className="w-8 h-8 text-muted-foreground animate-spin" />
-            </div>
+            <LoadingState minHeight={180} />
           )}
 
           {/* Per-campaign mini table */}
@@ -651,7 +650,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
               </div>
             </div>
           )}
-        </div>
+        </DashboardCard>
       </div>
     </div>
   );

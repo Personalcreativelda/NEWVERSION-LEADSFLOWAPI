@@ -1,5 +1,5 @@
 // INBOX: Modal de Conexão Email com SMTP/IMAP
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
@@ -57,7 +57,6 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
     const [step, setStep] = useState<'provider' | 'config' | 'success'>(isEditing ? 'config' : 'provider');
     const [selectedProvider, setSelectedProvider] = useState<typeof EMAIL_PROVIDERS[0] | null>(null);
     const [loading, setLoading] = useState(false);
-    const [testingConnection, setTestingConnection] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
 

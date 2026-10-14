@@ -10,6 +10,10 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { SkeletonFlowCard, UpdatingBadge } from '../ui/skeletons';
+import { AppModal } from '../base/AppModal';
+import { AppButton } from '../base/AppButton';
+import { DashboardCard } from '../base/DashboardCard';
+import { StatusBadge } from '../base/StatusBadge';
 
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
@@ -334,22 +338,24 @@ function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditM
   const selectCls = 'h-8 px-2 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className="bg-card border border-border rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
-          <div className="flex items-center gap-2">
-            {isNew ? <Plus className="w-4 h-4 text-muted-foreground" /> : <Pencil className="w-4 h-4 text-muted-foreground" />}
-            <h2 className="font-semibold text-foreground text-sm">{isNew ? 'Novo Flow' : 'Editar Flow'}</h2>
-          </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-4 h-4" />
-          </button>
+    <AppModal
+      open
+      onOpenChange={(open) => !open && onClose()}
+      size="lg"
+      className="p-0 gap-0 max-h-[90vh] flex flex-col"
+      title={
+        <div className="flex items-center gap-2">
+          {isNew ? <Plus className="w-4 h-4 text-muted-foreground" /> : <Pencil className="w-4 h-4 text-muted-foreground" />}
+          <span>{isNew ? 'Novo Flow' : 'Editar Flow'}</span>
         </div>
-
+      }
+      footer={
+        <>
+          <AppButton variant="ghost" size="sm" onClick={onClose}>Cancelar</AppButton>
+          <AppButton size="sm" onClick={handleSave} disabled={!name.trim()}>Salvar</AppButton>
+        </>
+      }
+    >
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {/* Name */}
@@ -627,14 +633,7 @@ function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditM
             })}
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border flex-shrink-0">
-          <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
-          <Button size="sm" onClick={handleSave} disabled={!name.trim()}>Salvar</Button>
-        </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }
 
@@ -1010,21 +1009,17 @@ export default function RemarketingPage() {
                       ? Math.round((flow.conversions / flow.enrolledLeads) * 100)
                       : 0;
                     return (
-                      <div key={flow.id} className="bg-card border border-border rounded-xl p-5 hover:border-border/80 transition-all">
+                      <DashboardCard key={flow.id} disableContentPadding className="hover:border-border/80 transition-all">
+                        <div className="p-5">
                         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                           {/* Left */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
                               <span className="font-semibold text-foreground text-sm">{flow.name}</span>
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${flow.status === 'active' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
-                                  flow.status === 'paused' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
-                                    'bg-muted text-muted-foreground'
-                                }`}>
-                                <div className={`w-1.5 h-1.5 rounded-full ${flow.status === 'active' ? 'bg-emerald-500 animate-pulse' :
-                                    flow.status === 'paused' ? 'bg-amber-500' : 'bg-muted-foreground'
-                                  }`} />
-                                {flow.status === 'active' ? 'Ativo' : flow.status === 'paused' ? 'Pausado' : 'Rascunho'}
-                              </span>
+                              <StatusBadge
+                                label={flow.status === 'active' ? 'Ativo' : flow.status === 'paused' ? 'Pausado' : 'Rascunho'}
+                                tone={flow.status === 'active' ? 'success' : flow.status === 'paused' ? 'warning' : 'default'}
+                              />
                             </div>
                             <p className="text-xs text-muted-foreground mb-3">{flow.description}</p>
 
@@ -1070,35 +1065,35 @@ export default function RemarketingPage() {
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border">
-                          <Button
+                          <AppButton
                             size="sm"
                             variant="outline"
-                            className="gap-1.5"
                             onClick={() => handleToggleStatus(flow.id)}
                           >
                             {flow.status === 'active'
                               ? <><Pause className="w-3.5 h-3.5" /> Pausar</>
                               : <><Play className="w-3.5 h-3.5" /> Ativar</>
                             }
-                          </Button>
-                          <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setEditingFlow(flow)}>
+                          </AppButton>
+                          <AppButton size="sm" variant="ghost" onClick={() => setEditingFlow(flow)}>
                             <Pencil className="w-3.5 h-3.5" />
                             <span className="text-xs">Editar</span>
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => handleDuplicate(flow)}>
+                          </AppButton>
+                          <AppButton size="sm" variant="ghost" onClick={() => handleDuplicate(flow)}>
                             <Copy className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => handleDelete(flow.id)}>
+                          </AppButton>
+                          <AppButton size="sm" variant="ghost" onClick={() => handleDelete(flow.id)}>
                             <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                          </Button>
+                          </AppButton>
                           <div className="ml-auto">
-                            <Button size="sm" variant="ghost" className="gap-1.5 text-xs text-muted-foreground">
+                            <AppButton size="sm" variant="ghost" className="text-xs text-muted-foreground">
                               <BarChart3 className="w-3.5 h-3.5" />
                               Análise
-                            </Button>
+                            </AppButton>
                           </div>
                         </div>
-                      </div>
+                        </div>
+                      </DashboardCard>
                     );
                   })}
                 </div>

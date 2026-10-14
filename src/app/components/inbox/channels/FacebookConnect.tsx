@@ -1,7 +1,7 @@
 // INBOX: Modal de Conexão Facebook Messenger - Fluxo step-by-step
 // Passo 1: Mostrar Callback URL + Verify Token para configurar no Meta
 // Passo 2: Colar o Page Access Token gerado após webhook configurado
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
@@ -25,7 +25,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
     const [pageAccessToken, setPageAccessToken] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
+    const [, setConnectionStatus] = useState<ConnectionStatus>('idle');
     const [pageInfo, setPageInfo] = useState<{ name?: string; id?: string; picture?: string } | null>(null);
 
     // URLs para configuração do webhook
@@ -93,9 +93,8 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
             });
 
             // Criar ou atualizar canal no sistema
-            let channel;
             if (isEditing && editingChannel) {
-                channel = await channelsApi.update(editingChannel.id, {
+                await channelsApi.update(editingChannel.id, {
                     type: 'facebook',
                     name: data.name || 'Facebook Messenger',
                     status: 'active',
@@ -108,7 +107,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                 });
                 toast.success('Canal Facebook atualizado com sucesso!');
             } else {
-                channel = await channelsApi.create({
+                await channelsApi.create({
                     type: 'facebook',
                     name: data.name || 'Facebook Messenger',
                     status: 'active',

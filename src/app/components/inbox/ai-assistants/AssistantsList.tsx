@@ -1,5 +1,5 @@
 // INBOX: Lista de assistentes virtuais
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { aiAssistantsApi } from '../../../services/api/inbox';
 import { AssistantForm } from './AssistantForm';
 import type { AIAssistant } from '../../../types/inbox';

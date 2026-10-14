@@ -26,7 +26,6 @@ export default function PaymentMethodModal({
   onClose,
   planId,
   billingPeriod: initialBillingPeriod,
-  onPaymentSuccess,
 }: PaymentMethodModalProps) {
   const [loading, setLoading] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'paypal' | null>(null);

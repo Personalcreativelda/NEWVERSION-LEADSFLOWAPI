@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Webhook, Mail, ChevronDown, ChevronUp, Copy, Check, Sheet, BarChart3, Eye, Crown, Lock, Loader2, CheckCircle2, MessageSquare, Save, Trash2, FlaskConical } from 'lucide-react';
+import { Webhook, Mail, ChevronDown, ChevronUp, Sheet, BarChart3, Eye, Loader2, CheckCircle2, MessageSquare, Save, Trash2, FlaskConical } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';

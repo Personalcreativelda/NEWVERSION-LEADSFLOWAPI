@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import {
-  Search, Plus, Filter, X,
+  Plus, Filter, X,
   Pause, BarChart3, FileText, Edit2,
   Send, Trash2, Copy, MoreVertical,
   FileDown, Bell, Calendar, MessageCircle,
   Mail, MessageSquare, PlayCircle, Clock,
   Timer, Save, Users, CheckCircle, CalendarCheck, XCircle
 } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
+import { AppButton } from '../base/AppButton';
+import { DashboardCard } from '../base/DashboardCard';
+import { StatusBadge } from '../base/StatusBadge';
+import { SearchInput } from '../base/SearchInput';
 import CampaignWhatsAppModal from '../modals/CampaignWhatsAppModal';
 import CampaignEmailModal from '../modals/CampaignEmailModal';
 import CampaignSMSModal from '../modals/CampaignSMSModal';
@@ -19,7 +21,6 @@ import CampaignMessageModal from '../modals/CampaignMessageModal';
 import CampaignAlertsModal from '../modals/CampaignAlertsModal';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { toast } from 'sonner';
-import { saveCampaignToDatabase, loadCampaignsFromDatabase, updateCampaignProgress } from '../../utils/campaignsHelper';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
 import { SkeletonCampaignSection, UpdatingBadge } from '../ui/skeletons';
 
@@ -1227,22 +1228,19 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
         <div className="mb-6 md:mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-              <div className="relative flex-1 sm:flex-none">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/70 w-5 h-5" />
-                <Input
-                  type="text"
-                  placeholder="Buscar campanhas..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full sm:w-80 focus:ring-2 focus:ring-[#10B981] !bg-white dark:!bg-white !text-gray-900 dark:!text-gray-900 !border-gray-200 dark:!border-gray-200"
-                />
-              </div>
-              <Button variant="outline" className="flex items-center justify-center space-x-2 border-border text-muted-foreground hover:bg-muted/50">
+              <SearchInput
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Buscar campanhas..."
+                containerClassName="flex-1 sm:flex-none"
+                className="w-full sm:w-80"
+              />
+              <AppButton variant="outline">
                 <Filter className="w-4 h-4" />
                 <span>Filtros</span>
-              </Button>
+              </AppButton>
             </div>
-            <Button
+            <AppButton
               onClick={() => {
                 // SMS campaigns: open SMS modal directly (Twilio handles sending)
                 if (activeTab === 'sms') {
@@ -1269,11 +1267,11 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 }
                 setChannelSelectorOpen(true);
               }}
-              className="font-medium shadow-sm flex items-center justify-center space-x-2 w-full sm:w-auto"
+              className="font-medium shadow-sm w-full sm:w-auto"
             >
               <Plus className="w-4 h-4" />
               <span>Nova Campanha</span>
-            </Button>
+            </AppButton>
           </div>
         </div>
 
@@ -1355,23 +1353,15 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   {activeCampaigns.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                       {activeCampaigns.map((campaign) => (
-                        <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-6 hover:shadow-md transition-shadow duration-200">
+                        <DashboardCard key={campaign.id} disableContentPadding className="hover:shadow-md transition-shadow duration-200">
+                        <div className="p-6">
                           <div className="flex items-start justify-between mb-4">
                             <div>
                               <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
-                              <div className="flex items-center space-x-2">
-                                {campaign.status === 'paused' ? (
-                                  <>
-                                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                                    <span className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">⏸️ Pausada</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                    <span className="text-sm text-green-600 dark:text-green-400 font-medium">Enviando agora...</span>
-                                  </>
-                                )}
-                              </div>
+                              <StatusBadge
+                                label={campaign.status === 'paused' ? '⏸️ Pausada' : 'Enviando agora...'}
+                                tone={campaign.status === 'paused' ? 'warning' : 'success'}
+                              />
                             </div>
                             <DropdownMenu campaign={campaign} />
                           </div>
@@ -1410,22 +1400,25 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
                           {/* Action Buttons */}
                           <div className="flex gap-2 pt-4 border-t border-border">
-                            <button
+                            <AppButton
+                              variant="outline"
                               onClick={() => handlePauseCampaign(campaign.id)}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-foreground/80 bg-card border border-border rounded-lg hover:bg-muted/50 hover:border-border transition-all duration-200"
+                              className="flex-1"
                             >
                               <Pause className="w-4 h-4" />
                               <span>Pausar</span>
-                            </button>
-                            <button
+                            </AppButton>
+                            <AppButton
+                              variant="outline"
                               onClick={() => handleCancelCampaign(campaign)}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-card border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-800 transition-all duration-200"
+                              className="flex-1 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-800"
                             >
                               <X className="w-4 h-4" />
                               <span>Cancelar</span>
-                            </button>
+                            </AppButton>
                           </div>
                         </div>
+                        </DashboardCard>
                       ))}
                     </div>
                   ) : (
@@ -1451,7 +1444,8 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                         const formattedDate = hasValidDate ? formatDate(campaign.scheduledDate!) : 'Data não definida';
 
                         return (
-                          <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-6 hover:shadow-md transition-shadow duration-200">
+                          <DashboardCard key={campaign.id} disableContentPadding className="hover:shadow-md transition-shadow duration-200">
+                          <div className="p-6">
                             <div className="flex items-start justify-between mb-4">
                               <div>
                                 <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
@@ -1488,22 +1482,24 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
                             {/* Action Buttons - Scheduled */}
                             <div className="flex gap-2 pt-4 border-t border-border">
-                              <button
+                              <AppButton
+                                variant="outline"
                                 onClick={() => handleEditCampaign(campaign)}
-                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-card border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200"
+                                className="flex-1 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800"
                               >
                                 <Edit2 className="w-4 h-4" />
                                 <span>Editar</span>
-                              </button>
-                              <button
+                              </AppButton>
+                              <AppButton
                                 onClick={() => handleSendNow(campaign.id, campaign.name, campaign.type)}
-                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-foreground bg-primary border border-transparent rounded-lg hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow"
+                                className="flex-1"
                               >
                                 <Send className="w-4 h-4" />
                                 <span>Enviar</span>
-                              </button>
+                              </AppButton>
                             </div>
                           </div>
+                          </DashboardCard>
                         );
                       })}
                     </div>
@@ -1524,7 +1520,8 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   {draftCampaigns.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                       {draftCampaigns.map((campaign) => (
-                        <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-6 hover:shadow-md transition-shadow duration-200">
+                        <DashboardCard key={campaign.id} disableContentPadding className="hover:shadow-md transition-shadow duration-200">
+                        <div className="p-6">
                           <div className="flex items-start justify-between mb-4">
                             <div>
                               <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
@@ -1554,22 +1551,24 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
                           {/* Action Buttons - Draft */}
                           <div className="flex gap-2 pt-4 border-t border-border">
-                            <button
+                            <AppButton
+                              variant="outline"
                               onClick={() => handleEditCampaign(campaign)}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-card border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200"
+                              className="flex-1 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-800"
                             >
                               <Edit2 className="w-4 h-4" />
                               <span>Editar</span>
-                            </button>
-                            <button
+                            </AppButton>
+                            <AppButton
                               onClick={() => handleSendNow(campaign.id, campaign.name, campaign.type)}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-primary-foreground bg-primary border border-transparent rounded-lg hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow"
+                              className="flex-1"
                             >
                               <Send className="w-4 h-4" />
                               <span>Enviar</span>
-                            </button>
+                            </AppButton>
                           </div>
                         </div>
+                        </DashboardCard>
                       ))}
                     </div>
                   ) : (
@@ -1589,7 +1588,8 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   {completedCampaigns.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                       {completedCampaigns.map((campaign) => (
-                        <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-border dark:border-border p-6 hover:shadow-md transition-shadow duration-200">
+                        <DashboardCard key={campaign.id} disableContentPadding className="hover:shadow-md transition-shadow duration-200">
+                        <div className="p-6">
                           <div className="flex items-start justify-between mb-4">
                             <div>
                               <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
@@ -1620,16 +1620,17 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             </div>
                           </div>
 
-                          <Button
+                          <AppButton
                             onClick={() => handleViewReport(campaign)}
                             variant="outline"
                             size="sm"
                             className="w-full bg-muted hover:bg-muted text-foreground/80 border-0 font-medium"
                           >
-                            <BarChart3 className="w-4 h-4 mr-2" />
+                            <BarChart3 className="w-4 h-4" />
                             Ver Relatório Completo
-                          </Button>
+                          </AppButton>
                         </div>
+                        </DashboardCard>
                       ))}
                     </div>
                   ) : (
@@ -1649,7 +1650,8 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     </h3>
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                       {failedCampaigns.map((campaign) => (
-                        <div key={campaign.id} className="bg-card dark:bg-card rounded-lg shadow-sm border border-red-200 dark:border-red-900 p-6 hover:shadow-md transition-shadow duration-200">
+                        <DashboardCard key={campaign.id} disableContentPadding className="border-red-200 dark:border-red-900 hover:shadow-md transition-shadow duration-200">
+                        <div className="p-6">
                           <div className="flex items-start justify-between mb-4">
                             <div>
                               <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
@@ -1680,16 +1682,17 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             </div>
                           </div>
 
-                          <Button
+                          <AppButton
                             onClick={() => handleViewReport(campaign)}
                             variant="outline"
                             size="sm"
                             className="w-full bg-red-50 dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800 font-medium"
                           >
-                            <BarChart3 className="w-4 h-4 mr-2" />
+                            <BarChart3 className="w-4 h-4" />
                             Ver Relatório
-                          </Button>
+                          </AppButton>
                         </div>
+                        </DashboardCard>
                       ))}
                     </div>
                   </section>

@@ -1,14 +1,24 @@
 import { useState } from 'react';
-import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Shield, Lock, AlertCircle, CheckCircle, Eye, EyeOff, ArrowLeft, Key } from 'lucide-react';
+import { Shield, Lock, AlertCircle, CheckCircle, Eye, EyeOff, ArrowLeft, Key, Zap } from 'lucide-react';
 import { authApi } from '../../utils/api';
+import { AppButton } from '../base/AppButton';
 
 interface ResetPasswordPageProps {
   onSuccess: () => void;
   onBackToLogin: () => void;
 }
+
+const FONT = '"Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+
+const fieldStyle = {
+  width: '100%', height: '48px', paddingLeft: '44px', paddingRight: '14px',
+  background: '#FFFFFF', border: '1px solid #D4DEE9', borderRadius: '6px',
+  fontSize: '16px', color: '#273951', caretColor: '#675DFF',
+} as const;
+
+const fieldClassName = 'placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]';
 
 export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPasswordPageProps) {
   const [email, setEmail] = useState('');
@@ -46,11 +56,11 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
       await authApi.completePasswordReset(trimmedEmail, trimmedToken, password);
 
       console.log('✅ Password updated successfully via API');
-      
+
       // Clear the password reset mode flag
       sessionStorage.removeItem('password_reset_mode');
       console.log('✅ Cleared password_reset_mode flag');
-      
+
       setSuccess(true);
 
       // Redirect to dashboard after 2 seconds
@@ -67,33 +77,46 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
 
   const getPasswordStrength = (pass: string) => {
     if (pass.length === 0) return { strength: 0, label: '', color: '' };
-    if (pass.length < 6) return { strength: 33, label: 'Fraca', color: 'bg-red-500' };
-    if (pass.length < 10) return { strength: 66, label: 'Média', color: 'bg-yellow-500' };
-    return { strength: 100, label: 'Forte', color: 'bg-green-500' };
+    if (pass.length < 6) return { strength: 33, label: 'Fraca', color: '#E61947' };
+    if (pass.length < 10) return { strength: 66, label: 'Média', color: '#CC4B00' };
+    return { strength: 100, label: 'Forte', color: '#059669' };
   };
 
   const passwordStrength = getPasswordStrength(password);
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#1a1625] px-4">
-        <div className="w-full max-w-md">
-          <div className="bg-[#2a2435] border border-[#3a3445] rounded-2xl shadow-lg p-10 space-y-6 text-center">
+      <div className="min-h-screen relative flex items-center justify-center px-4 overflow-hidden"
+        style={{ background: 'transparent', fontFamily: FONT }}>
+        <div className="relative z-10 w-full max-w-[520px] flex flex-col">
+          <div className="flex items-center gap-2.5 mb-8">
+            <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
+              style={{ background: '#675DFF', boxShadow: '0 2px 12px rgba(103,93,255,0.45)' }}>
+              <Zap className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-[19px] font-semibold text-white tracking-tight">LeadsFlow</span>
+          </div>
+          <div className="rounded-[12px] p-10 space-y-6 text-center"
+            style={{
+              background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(255,255,255,0.3)',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.06)', backdropFilter: 'blur(20px)',
+            }}>
             <div className="flex justify-center">
-              <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-8 h-8 text-green-400" />
+              <div className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(5,150,105,0.08)', border: '1px solid rgba(5,150,105,0.2)' }}>
+                <CheckCircle className="w-8 h-8" style={{ color: '#059669' }} />
               </div>
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-semibold text-white">Senha Redefinida!</h2>
-              <p className="text-sm text-muted-foreground">
+              <h2 style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Senha redefinida!</h2>
+              <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
                 Sua senha foi alterada com sucesso. Redirecionando...
               </p>
             </div>
             <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              {[0, 0.1, 0.2].map((delay, i) => (
+                <div key={i} className="w-2 h-2 rounded-full animate-bounce" style={{ background: '#675DFF', animationDelay: `${delay}s` }} />
+              ))}
             </div>
           </div>
         </div>
@@ -102,142 +125,159 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1a1625] px-4 py-8">
-      <div className="w-full max-w-md">
-        {/* Reset Password Card */}
-        <div className="bg-[#2a2435] border border-[#3a3445] rounded-2xl shadow-lg p-8 sm:p-10 space-y-6">
-          {/* Ícone grande no topo */}
-          <div className="flex justify-center">
-            <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center">
-              <Shield className="w-8 h-8 text-primary" />
+    <div className="min-h-screen relative flex items-center justify-center py-16 px-4 overflow-hidden"
+      style={{ background: 'transparent', fontFamily: FONT }}>
+
+      <div className="relative z-10 w-full max-w-[520px] flex flex-col">
+
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 mb-8">
+          <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
+            style={{ background: '#675DFF', boxShadow: '0 2px 12px rgba(103,93,255,0.45)' }}>
+            <Zap className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-[19px] font-semibold text-white tracking-tight">LeadsFlow</span>
+        </div>
+
+        <div className="rounded-[12px] p-10"
+          style={{
+            background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(255,255,255,0.3)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.06)', backdropFilter: 'blur(20px)',
+          }}>
+
+          {/* Icon */}
+          <div className="flex justify-center mb-5">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(103,93,255,0.08)', border: '1px solid rgba(103,93,255,0.15)' }}>
+              <Shield className="w-7 h-7" style={{ color: '#675DFF' }} />
             </div>
           </div>
 
-          {/* Título e Subtítulo */}
-          <div className="text-center space-y-2">
-            <h2 className="text-white text-2xl sm:text-3xl font-semibold">Reset Password</h2>
-            <p className="text-muted-foreground/70 text-sm">
-              Digite o código recebido por email e sua nova senha para concluir a recuperação.
-            </p>
-          </div>
+          {/* Title */}
+          <h1 className="text-[28px] font-semibold leading-[36px] mb-2 text-center" style={{ color: '#1A2C44' }}>
+            Redefinir senha
+          </h1>
+          <p className="text-[15px] mb-7 text-center" style={{ color: '#6B7280', fontWeight: 300 }}>
+            Digite o código recebido por email e sua nova senha para concluir a recuperação.
+          </p>
 
+          {/* Error */}
           {error && (
-            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-300">{error}</p>
+            <div className="mb-5 p-4 rounded-[8px] flex items-start gap-3 animate-in fade-in duration-200"
+              style={{ background: '#FFF0F3', border: '1px solid rgba(230,25,71,0.3)' }}>
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#E61947' }} />
+              <p className="text-[13px] leading-[18px]" style={{ color: '#C0123C', fontWeight: 300 }}>{error}</p>
             </div>
           )}
 
-          {/* Reset Password Form */}
-          <form onSubmit={handleResetPassword} className="space-y-4">
+          {/* Form */}
+          <form onSubmit={handleResetPassword} className="space-y-5 mb-6">
+            {/* Email */}
             <div>
-              <Label htmlFor="email" className="text-sm text-foreground/80 mb-2 block">Email</Label>
+              <Label htmlFor="email" style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px', fontWeight: 500 }}>
+                Email
+              </Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
+                id="email" type="email" placeholder="seu@email.com" value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-[#1a1625] border-[#3a3445] text-white placeholder:text-muted-foreground rounded-xl focus:ring-2 focus:ring-ring"
+                style={{ ...fieldStyle, paddingLeft: '14px' }}
+                className={fieldClassName}
                 required
               />
             </div>
 
+            {/* Token */}
             <div>
-              <Label htmlFor="token" className="text-sm text-foreground/80 mb-2 block">Código de verificação</Label>
+              <Label htmlFor="token" style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px', fontWeight: 500 }}>
+                Código de verificação
+              </Label>
               <div className="relative">
-                <Key className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px]" style={{ color: '#8A9BB0' }} />
                 <Input
-                  id="token"
-                  type="text"
-                  placeholder="Ex: 76414021"
-                  value={token}
+                  id="token" type="text" placeholder="Ex: 76414021" value={token}
                   onChange={(e) => setToken(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-[#1a1625] border-[#3a3445] text-white placeholder:text-muted-foreground rounded-xl focus:ring-2 focus:ring-ring"
+                  style={fieldStyle}
+                  className={fieldClassName}
                   required
                 />
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="mt-1.5" style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}>
                 Copie o código de 8 dígitos enviado no email de recuperação e informe aqui.
               </p>
             </div>
 
+            {/* Password */}
             <div>
-              <Label htmlFor="password" className="text-sm text-foreground/80 mb-2 block">Nova senha</Label>
+              <Label htmlFor="password" style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px', fontWeight: 500 }}>
+                Nova senha
+              </Label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px]" style={{ color: '#8A9BB0' }} />
                 <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Digite sua nova senha"
-                  value={password}
+                  id="password" type={showPassword ? 'text' : 'password'} placeholder="Digite sua nova senha" value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-12 py-3 bg-[#1a1625] border-[#3a3445] text-white placeholder:text-muted-foreground rounded-xl focus:ring-2 focus:ring-ring"
+                  style={{ ...fieldStyle, paddingRight: '48px' }}
+                  className={fieldClassName}
                   required
                 />
-                <button
-                  type="button"
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors" style={{ color: '#8A9BB0' }}>
+                  {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
                 </button>
               </div>
-              
+
               {/* Password Strength Indicator */}
               {password.length > 0 && (
                 <div className="mt-2 space-y-1">
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full ${passwordStrength.color} transition-all duration-300`}
-                        style={{ width: `${passwordStrength.strength}%` }}
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: '#EEF0F3' }}>
+                      <div
+                        className="h-full transition-all duration-300"
+                        style={{ width: `${passwordStrength.strength}%`, background: passwordStrength.color }}
                       />
                     </div>
-                    <span className="text-xs text-muted-foreground/70 font-medium min-w-[50px]">
+                    <span className="min-w-[50px]" style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}>
                       {passwordStrength.label}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}>
                     Força da senha: Use pelo menos 6 caracteres
                   </p>
                 </div>
               )}
             </div>
 
+            {/* Confirm password */}
             <div>
-              <Label htmlFor="confirmPassword" className="text-sm text-foreground/80 mb-2 block">Confirmar nova senha</Label>
+              <Label htmlFor="confirmPassword" style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px', fontWeight: 500 }}>
+                Confirmar nova senha
+              </Label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px]" style={{ color: '#8A9BB0' }} />
                 <Input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder="Confirme sua nova senha"
-                  value={confirmPassword}
+                  id="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirme sua nova senha" value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-12 pr-12 py-3 bg-[#1a1625] border-[#3a3445] text-white placeholder:text-muted-foreground rounded-xl focus:ring-2 focus:ring-ring"
+                  style={{ ...fieldStyle, paddingRight: '48px' }}
+                  className={fieldClassName}
                   required
                 />
-                <button
-                  type="button"
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors" style={{ color: '#8A9BB0' }}>
+                  {showConfirmPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
                 </button>
               </div>
-              
+
               {/* Password Match Indicator */}
               {confirmPassword.length > 0 && (
-                <div className="mt-2">
+                <div className="mt-1.5">
                   {password === confirmPassword ? (
-                    <p className="text-xs text-green-400 flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" />
+                    <p className="flex items-center gap-1" style={{ fontSize: '13px', color: '#059669' }}>
+                      <CheckCircle className="w-3.5 h-3.5" />
                       As senhas coincidem
                     </p>
                   ) : (
-                    <p className="text-xs text-red-400 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
+                    <p className="flex items-center gap-1" style={{ fontSize: '13px', color: '#E61947' }}>
+                      <AlertCircle className="w-3.5 h-3.5" />
                       As senhas não coincidem
                     </p>
                   )}
@@ -245,35 +285,38 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
               )}
             </div>
 
-            <Button
+            {/* Submit */}
+            <AppButton
               type="submit"
-              disabled={loading || password !== confirmPassword || password.length < 6 || !email || !token}
-              className="w-full py-3 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 font-medium rounded-lg disabled:opacity-50"
+              disabled={password !== confirmPassword || password.length < 6 || !email || !token}
+              loading={loading}
+              style={{
+                width: '100%', height: '50px', fontSize: '16px', fontWeight: 500,
+                borderRadius: '6px', border: 'none', marginTop: '8px',
+                background: loading || password !== confirmPassword || password.length < 6 || !email || !token ? '#D4DEE9' : '#675DFF',
+                color: loading || password !== confirmPassword || password.length < 6 || !email || !token ? '#3C4257' : '#FFFFFF',
+                boxShadow: loading || password !== confirmPassword || password.length < 6 || !email || !token ? 'none' : '0 0 0 1px #675DFF',
+                transition: 'background-color 200ms ease',
+              }}
+              className="transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? 'Salvando...' : 'Salvar nova senha'}
-            </Button>
+            </AppButton>
           </form>
 
           {/* Back to Login */}
-          <div className="text-center pt-2">
+          <div className="text-center">
             <button
               onClick={onBackToLogin}
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground/70 hover:text-foreground"
+              className="inline-flex items-center gap-1.5 transition-colors hover:text-[#533AFD]"
+              style={{ fontSize: '14px', color: '#8A9BB0', fontWeight: 300 }}
             >
               <ArrowLeft className="w-4 h-4" />
               Voltar ao login
             </button>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-foreground/80">
-            © {new Date().getFullYear()} PersonalCreativeLda. Todos os direitos reservados.
-          </p>
-        </div>
       </div>
     </div>
   );
 }
-

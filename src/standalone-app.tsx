@@ -3,6 +3,8 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import App from './app/App';
 import { ErrorBoundary } from './app/components/ErrorBoundary';
 import { UploadQueueProvider } from './app/context/UploadQueueContext';
+import { ThemeModeProvider } from './app/context/ThemeModeContext';
+import { AppMuiThemeProvider } from './app/theme';
 import { queryClient } from './app/lib/queryClient';
 import { idbPersister } from './app/lib/idbPersister';
 import './app/styles/globals.css';
@@ -24,13 +26,17 @@ export default function StandaloneApp() {
         buster:     'v1',
       }}
     >
-      <BrowserRouter>
-        <ErrorBoundary>
-          <UploadQueueProvider>
-            <App landingEnabled={false} initialPage="login" />
-          </UploadQueueProvider>
-        </ErrorBoundary>
-      </BrowserRouter>
+      <ThemeModeProvider>
+        <AppMuiThemeProvider>
+          <BrowserRouter>
+            <ErrorBoundary>
+              <UploadQueueProvider>
+                <App landingEnabled={false} initialPage="login" />
+              </UploadQueueProvider>
+            </ErrorBoundary>
+          </BrowserRouter>
+        </AppMuiThemeProvider>
+      </ThemeModeProvider>
     </PersistQueryClientProvider>
   );
 }

@@ -1,4 +1,3 @@
-import React from 'react';
 import InboxConversations from './inbox/InboxConversations';
 import InboxSettings from './inbox/InboxSettings';
 import InboxTeam from './inbox/InboxTeam';

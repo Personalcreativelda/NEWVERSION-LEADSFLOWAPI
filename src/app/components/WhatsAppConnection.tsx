@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Alert, AlertDescription } from './ui/alert';
@@ -23,7 +23,7 @@ export function WhatsAppConnection() {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [polling, setPolling] = useState(false);
+  const [polling] = useState(false);
 
   useEffect(() => {
     checkStatus();

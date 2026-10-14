@@ -1,5 +1,5 @@
 // INBOX: Card de canal de comunicação
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { Channel } from '../../../types/inbox';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';

@@ -1,5 +1,5 @@
 // INBOX: Lista e gestão de canais com UI Moderna inspirada no Chatwoot
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { ChannelCard } from './ChannelCard';
 import { WhatsAppConnect } from './WhatsAppConnect';
@@ -24,7 +24,6 @@ import {
     Send,
     Instagram,
     MessageSquare,
-    Search,
     Plus,
     Settings,
     ChevronDown,
@@ -131,7 +130,7 @@ export function ChannelsList() {
     const [emailModalOpen, setEmailModalOpen] = useState(false);
     const [smsModalOpen, setSmsModalOpen] = useState(false);
     const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
-    const [activeStep, setActiveStep] = useState(1);
+    const [activeStep] = useState(1);
     const [sidebarExpanded, setSidebarExpanded] = useState(true);
     const [channelsExpanded, setChannelsExpanded] = useState(true);
 

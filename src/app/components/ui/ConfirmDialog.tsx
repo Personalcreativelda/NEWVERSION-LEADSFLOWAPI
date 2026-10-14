@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { AlertTriangle, Info, Trash2, Send, X } from 'lucide-react';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -108,73 +109,75 @@ function ConfirmModal({ message, options, onConfirm, onCancel }: ConfirmModalPro
   const { icon: Icon, iconClass, iconBg, confirmClass } = variantConfig[variant];
 
   return (
-    /* Backdrop */
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
-    >
-      {/* Card */}
-      <div
-        className="relative w-full max-w-sm rounded-2xl shadow-2xl border border-border bg-card text-card-foreground animate-in zoom-in-95 fade-in duration-150"
-        role="alertdialog"
-        aria-modal="true"
-      >
-        {/* Close button */}
-        <button
-          onClick={onCancel}
-          className="absolute top-3 right-3 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        <div className="p-6">
-          {/* Icon */}
-          <div className={`w-12 h-12 rounded-full ${iconBg} flex items-center justify-center mb-4`}>
-            <Icon className={`w-6 h-6 ${iconClass}`} />
-          </div>
-
-          {/* Title */}
-          <h3 className="text-base font-semibold text-foreground mb-1">
-            {options.title || 'Confirmar ação'}
-          </h3>
-
-          {/* Message */}
-          <p className="text-sm text-muted-foreground mb-1 leading-relaxed">
-            {message}
-          </p>
-
-          {/* Extra detail */}
-          {options.detail && (
-            <p className="text-sm font-medium text-foreground mt-2 mb-1">
-              {options.detail}
-            </p>
-          )}
-
-          {/* Description */}
-          {options.description && (
-            <p className="text-xs text-muted-foreground mt-2 border-t border-border pt-2">
-              {options.description}
-            </p>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-2 px-6 pb-6">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border border-border bg-transparent text-foreground hover:bg-muted transition-colors"
+    /* Built on the same Radix Dialog primitives as AppModal (ui/dialog.tsx) —
+       not just a portaled div — so when this opens on top of an already-open
+       AppModal, Radix's own dialog stack manages the layering/body-lock
+       correctly instead of two independent fixed overlays racing on z-index. */
+    <DialogPrimitive.Root open onOpenChange={(open) => !open && onCancel()}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[9998] bg-black/55 backdrop-blur-[2px]" />
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
+          <DialogPrimitive.Content
+            className="pointer-events-auto relative w-full max-w-sm rounded-lg shadow-2xl border border-border bg-card text-card-foreground animate-in zoom-in-95 fade-in duration-150"
           >
-            {options.cancelLabel || 'Cancelar'}
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${confirmClass}`}
-          >
-            {options.confirmLabel || 'Confirmar'}
-          </button>
+            {/* Close button */}
+            <DialogPrimitive.Close className="absolute top-3 right-3 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+              <X className="w-4 h-4" />
+            </DialogPrimitive.Close>
+
+            <div className="p-6">
+              {/* Icon */}
+              <div className={`w-12 h-12 rounded-full ${iconBg} flex items-center justify-center mb-4`}>
+                <Icon className={`w-6 h-6 ${iconClass}`} />
+              </div>
+
+              {/* Title */}
+              <DialogPrimitive.Title asChild>
+                <h3 className="text-base font-semibold text-foreground mb-1">
+                  {options.title || 'Confirmar ação'}
+                </h3>
+              </DialogPrimitive.Title>
+
+              {/* Message */}
+              <DialogPrimitive.Description asChild>
+                <p className="text-sm text-muted-foreground mb-1 leading-relaxed">
+                  {message}
+                </p>
+              </DialogPrimitive.Description>
+
+              {/* Extra detail */}
+              {options.detail && (
+                <p className="text-sm font-medium text-foreground mt-2 mb-1">
+                  {options.detail}
+                </p>
+              )}
+
+              {/* Description */}
+              {options.description && (
+                <p className="text-xs text-muted-foreground mt-2 border-t border-border pt-2">
+                  {options.description}
+                </p>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 px-6 pb-6">
+              <button
+                onClick={onCancel}
+                className="flex-1 px-4 py-2 rounded-lg text-sm font-medium border border-border bg-transparent text-foreground hover:bg-muted transition-colors"
+              >
+                {options.cancelLabel || 'Cancelar'}
+              </button>
+              <button
+                onClick={onConfirm}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${confirmClass}`}
+              >
+                {options.confirmLabel || 'Confirmar'}
+              </button>
+            </div>
+          </DialogPrimitive.Content>
         </div>
-      </div>
-    </div>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

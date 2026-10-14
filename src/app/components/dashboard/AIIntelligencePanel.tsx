@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../../lib/api';
-import { Brain, Flame, TrendingDown, Target, Sparkles, RefreshCw, ChevronRight, MessageSquare, Mail } from 'lucide-react';
+import { Brain, Flame, TrendingDown, Sparkles, RefreshCw, ChevronRight } from 'lucide-react';
+import { DashboardCard } from '../base/DashboardCard';
+import { LoadingState } from '../base/LoadingState';
+import { EmptyState } from '../base/EmptyState';
+import { ErrorState } from '../base/ErrorState';
+import { AppButton } from '../base/AppButton';
 
 interface AILead {
   id: string;
@@ -31,17 +36,19 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
   const [stats, setStats] = useState<AIStats>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
 
   const load = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
     else setLoading(true);
+    setError(false);
     try {
       const data = await api.aiRemarketing.insights();
       setHotLeads((data.hotLeads || []).slice(0, 3));
       setAtRiskLeads((data.atRiskLeads || []).slice(0, 3));
       setStats(data.stats || {});
     } catch {
-      // silently fail — panel just won't show data
+      setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -57,27 +64,27 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-2xl p-5 h-full flex flex-col">
-        <div className="flex items-center gap-2 mb-4">
-          <Brain className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">Motor de Vendas</span>
-        </div>
-        <div className="space-y-2">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-14 rounded-xl bg-muted animate-pulse" />
-          ))}
-        </div>
-      </div>
+      <DashboardCard
+        className="h-full flex flex-col"
+        title={
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <Brain className="w-4 h-4 text-primary" />
+            Motor de Vendas
+          </span>
+        }
+      >
+        <LoadingState minHeight={140} />
+      </DashboardCard>
     );
   }
 
   const hasData = hotLeads.length > 0 || atRiskLeads.length > 0;
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5 h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+    <DashboardCard
+      className="h-full flex flex-col"
+      title={
+        <span className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
             <Brain className="w-3.5 h-3.5 text-primary" />
           </div>
@@ -88,7 +95,9 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
               {stats.hot_count}
             </span>
           )}
-        </div>
+        </span>
+      }
+      action={
         <button
           onClick={() => load(true)}
           disabled={refreshing}
@@ -97,14 +106,19 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
         >
           <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
         </button>
-      </div>
-
-      {!hasData ? (
-        <div className="flex flex-col items-center justify-center flex-1 text-center py-6">
-          <Brain className="w-8 h-8 text-muted-foreground/40 mb-2" />
-          <p className="text-xs text-muted-foreground">Nenhum dado de IA ainda.</p>
-          <p className="text-[11px] text-muted-foreground/70 mt-0.5">Abra Remarketing → Motor de Vendas para analisar.</p>
-        </div>
+      }
+    >
+      {error ? (
+        <ErrorState
+          title="Não foi possível carregar os insights"
+          action={<AppButton size="sm" onClick={() => load(true)}>Tentar novamente</AppButton>}
+        />
+      ) : !hasData ? (
+        <EmptyState
+          title="Nenhum dado de IA ainda."
+          description="Abra Remarketing → Motor de Vendas para analisar."
+          imgSrc="/assets/icons/empty/ic_content.svg"
+        />
       ) : (
         <div className="space-y-4">
           {/* Hot Leads */}
@@ -182,6 +196,6 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
           </button>
         </div>
       )}
-    </div>
+    </DashboardCard>
   );
 }

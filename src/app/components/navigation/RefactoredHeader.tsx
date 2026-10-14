@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Menu, Moon, Sun, Bell, X, Languages, ChevronDown } from 'lucide-react';
+import { Menu, X, Languages } from 'lucide-react';
 import AvatarPopover from './AvatarPopover';
 import ThemeSelector from './ThemeSelector';
+import Breadcrumbs from './Breadcrumbs';
 import { NotificationBell } from '../dashboard/NotificationBell';
-import { Language, loadLanguage, saveLanguage, translations } from '../../utils/i18n';
+import { Language, saveLanguage, translations } from '../../utils/i18n';
 
 interface RefactoredHeaderProps {
   user: any;
@@ -39,9 +40,6 @@ export default function RefactoredHeader({
   onToggleTheme,
   onThemeChange,
   themeMode,
-  onNovoLead,
-  onEmailMarketing,
-  onMassMessage,
   onSettings,
   onLogout,
   isSidebarOpen,
@@ -102,7 +100,7 @@ export default function RefactoredHeader({
   };
 
   return (
-    <header className="flex-shrink-0 sticky top-0 z-[1000] border-b backdrop-blur-xl bg-background/80 border-border dark:border-[rgba(255,255,255,0.06)] dark:bg-[hsl(220,6%,10%)]/90">
+    <header className="flex-shrink-0 sticky top-0 z-[1000] border-b backdrop-blur-xl bg-background/80 border-border dark:border-[rgba(255,255,255,0.06)] dark:bg-background/90">
       <div className="px-4 lg:px-6 h-14 flex items-center justify-between">
         {/* Left Section: Hamburger APENAS NO MOBILE */}
         <div className="flex items-center lg:hidden">
@@ -120,8 +118,8 @@ export default function RefactoredHeader({
           </button>
         </div>
 
-        {/* Desktop: Left section vazia */}
-        <div className="hidden lg:block"></div>
+        {/* Desktop: trilho de navegação (páginas reais do LeadFlow) */}
+        <Breadcrumbs currentPage={currentPage || 'dashboard'} language={language} className="hidden lg:block" />
 
         {/* Right Section: Notificações + Idioma + Theme + Avatar + Logout */}
         <div className="flex items-center gap-0.5 ml-auto">

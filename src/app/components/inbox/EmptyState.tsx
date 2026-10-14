@@ -1,6 +1,5 @@
 // INBOX: Empty state - modern ManyChat-style
-import React from 'react';
-import { MessageSquare, Settings, Zap } from 'lucide-react';
+import { MessageSquare, Settings } from 'lucide-react';
 
 interface EmptyStateProps {
     onOpenSettings?: () => void;

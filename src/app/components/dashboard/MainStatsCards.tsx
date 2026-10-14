@@ -1,4 +1,5 @@
 import { Database, TrendingUp, CheckCircle2, Target } from 'lucide-react';
+import { DashboardCard } from '../base/DashboardCard';
 
 interface MainStatsCardsProps {
   totalLeads: number;
@@ -83,54 +84,54 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
         const Icon = stat.icon;
         const isPrimary = index === 0;
         return (
-          <div
+          <DashboardCard
             key={index}
-            id={stat.id}
-            className={`relative rounded-xl p-3 sm:p-5 transition-all duration-200 group bg-card border border-border enterprise-card ${
-              isPrimary ? 'enterprise-card-primary' : 'enterprise-card-secondary'
-            }`}
+            className="group"
+            disableContentPadding
             style={isPrimary ? { transform: 'scale(1.02)' } : undefined}
           >
-            {/* Header: icon + badge */}
-            <div className="flex items-center justify-between mb-4">
-              <div 
-                className="w-10 h-10 rounded-lg flex items-center justify-center"
-                style={{ backgroundColor: `${stat.iconColor}15` }}
-              >
-                <Icon className="w-5 h-5" style={{ color: stat.iconColor }} />
+            <div id={stat.id} className="p-3 sm:p-5">
+              {/* Header: icon + badge */}
+              <div className="flex items-center justify-between mb-4">
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: `${stat.iconColor}15` }}
+                >
+                  <Icon className="w-5 h-5" style={{ color: stat.iconColor }} />
+                </div>
+
+                <span
+                  className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                  style={{ backgroundColor: `${stat.progressColor}12`, color: stat.progressColor }}
+                >
+                  {stat.badge}
+                </span>
               </div>
-              
-              <span 
-                className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                style={{ backgroundColor: `${stat.progressColor}12`, color: stat.progressColor }}
-              >
-                {stat.badge}
-              </span>
-            </div>
 
-            {/* Value */}
-            <div className="mb-0.5">
-              <span className="text-2xl sm:text-3xl font-semibold leading-tight text-foreground tracking-tight">
-                {stat.value}
-              </span>
-            </div>
+              {/* Value */}
+              <div className="mb-0.5">
+                <span className="text-2xl sm:text-3xl font-semibold leading-tight text-foreground tracking-tight">
+                  {stat.value}
+                </span>
+              </div>
 
-            {/* Label */}
-            <p className="text-xs text-muted-foreground mb-3">
-              {stat.label}
-            </p>
+              {/* Label */}
+              <p className="text-xs text-muted-foreground mb-3">
+                {stat.label}
+              </p>
 
-            {/* Progress bar */}
-            <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-700 ease-out"
-                style={{ 
-                  width: `${Math.min(100, stat.progress)}%`,
-                  backgroundColor: stat.progressColor
-                }}
-              />
+              {/* Progress bar */}
+              <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700 ease-out"
+                  style={{
+                    width: `${Math.min(100, stat.progress)}%`,
+                    backgroundColor: stat.progressColor
+                  }}
+                />
+              </div>
             </div>
-          </div>
+          </DashboardCard>
         );
       })}
     </div>

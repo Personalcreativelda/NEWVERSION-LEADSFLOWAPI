@@ -1,20 +1,16 @@
 // INBOX: Conversation item - ManyChat-style
-import React from 'react';
 import type { ConversationWithDetails, ConversationTagInfo } from '../../types/inbox';
 import {
     MessageCircle,
     Facebook,
     Instagram,
     Send,
-    User,
     Users,
-    Clock,
     Check,
     CheckCheck,
     Mail,
     Globe,
     Smartphone,
-    Cloud,
     Tag,
     UserCheck,
     AlertCircle

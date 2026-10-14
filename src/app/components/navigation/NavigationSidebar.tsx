@@ -9,7 +9,7 @@ import SidebarGroup from './SidebarGroup';
 import InboxTreeMenu from './InboxTreeMenu';
 
 // Mapeamento de path para page id
-const pathToPageId: Record<string, string> = {
+export const pathToPageId: Record<string, string> = {
   '/dashboard': 'dashboard',
   '/dashboard/leads': 'leads',
   '/dashboard/inbox': 'inbox',
@@ -58,8 +58,6 @@ interface NavigationSidebarProps {
 export default function NavigationSidebar({
   isOpen,
   onClose,
-  isDark,
-  onToggleTheme,
   isMobile = false,
   isCollapsed = false,
   onToggleCollapse,

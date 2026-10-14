@@ -1,11 +1,12 @@
 // Campaign WhatsApp Modal - Versão Completa com Drag & Drop e Preview
-import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   X, MessageCircle, Send, Clock, Settings, RefreshCw,
   Paperclip, Image as ImageIcon, ChevronDown, ChevronUp,
   Smile, Bold, Italic, Link2, Check, Eye, Save, Trash2, Video, Smartphone
 } from 'lucide-react';
-import { Button } from '../ui/button';
+import { AppModal } from '../base/AppModal';
+import { AppButton } from '../base/AppButton';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
@@ -1745,28 +1746,51 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const minTime = scheduleDate === minDate ? today.toTimeString().slice(0, 5) : '00:00';
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
-      <div className="campaign-modal rounded-2xl shadow-lg w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-
-        {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-[#25D366] to-[#128C7E] px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <MessageCircle className="w-6 h-6 text-white" />
-            <div>
-              <h2 className="text-xl text-white font-bold">NOVA CAMPANHA (WhatsApp)</h2>
-              {autoSaveIndicator && (
-                <p className="text-xs text-white/80">💾 Auto-salvando...</p>
-              )}
-            </div>
+    <AppModal
+      open={isOpen}
+      onOpenChange={(open) => !open && handleClose()}
+      size="2xl"
+      className="campaign-modal p-0 gap-0 max-h-[90vh] flex flex-col"
+      title={
+        <div className="flex items-center gap-3">
+          <MessageCircle className="w-6 h-6 text-[#25D366]" />
+          <div>
+            <span>NOVA CAMPANHA (WhatsApp)</span>
+            {autoSaveIndicator && (
+              <p className="text-xs text-muted-foreground font-normal">💾 Auto-salvando...</p>
+            )}
           </div>
-          <button
-            onClick={handleClose}
-            className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
+      }
+      footer={
+        <>
+          <AppButton type="button" variant="outline" onClick={handleClose} disabled={isSending}>
+            Cancelar
+          </AppButton>
 
+          <AppButton type="button" variant="outline" onClick={handleSaveDraft} disabled={isSending}>
+            <Save className="w-4 h-4" />
+            Salvar
+          </AppButton>
+
+          <AppButton
+            type="button"
+            onClick={handleSend}
+            disabled={
+              isSending ||
+              !campaignName.trim() ||
+              recipientCount === 0 ||
+              (!message.trim() && attachments.length === 0)
+            }
+            loading={isSending}
+            className="bg-[#10B981] hover:bg-[#059669] text-white"
+          >
+            <Send className="w-4 h-4" />
+            {scheduleMode === 'now' ? 'Enviar Campanha' : 'Agendar Campanha'}
+          </AppButton>
+        </>
+      }
+    >
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2043,36 +2067,33 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                 </Label>
 
                 <div className="flex gap-2">
-                  <Button
+                  <AppButton
                     type="button"
                     variant="outline"
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2"
                     size="sm"
                   >
                     <Paperclip className="w-4 h-4" />
                     Arquivo
-                  </Button>
-                  <Button
+                  </AppButton>
+                  <AppButton
                     type="button"
                     variant="outline"
                     onClick={() => imageInputRef.current?.click()}
-                    className="flex items-center gap-2"
                     size="sm"
                   >
                     <ImageIcon className="w-4 h-4" />
                     Imagem
-                  </Button>
-                  <Button
+                  </AppButton>
+                  <AppButton
                     type="button"
                     variant="outline"
                     onClick={() => videoInputRef.current?.click()}
-                    className="flex items-center gap-2"
                     size="sm"
                   >
                     <Video className="w-4 h-4" />
                     Vídeo
-                  </Button>
+                  </AppButton>
                 </div>
 
                 <input
@@ -2716,44 +2737,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="sticky bottom-0 bg-[var(--bg-modal)] border-t border-[var(--border-input)] px-6 py-4 flex justify-end gap-3">
-          <Button type="button" variant="outline" onClick={handleClose} disabled={isSending}>
-            Cancelar
-          </Button>
-
-          <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={isSending} className="flex items-center gap-2">
-            <Save className="w-4 h-4" />
-            Salvar
-          </Button>
-
-          <Button
-            type="button"
-            onClick={handleSend}
-            disabled={
-              isSending ||
-              !campaignName.trim() ||
-              recipientCount === 0 ||
-              (!message.trim() && attachments.length === 0)
-            }
-            className="flex items-center gap-2 bg-[#10B981] hover:bg-[#059669] text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSending ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                {scheduleMode === 'now' ? 'Enviando...' : 'Agendando...'}
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                {scheduleMode === 'now' ? 'Enviar Campanha' : 'Agendar Campanha'}
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }
 

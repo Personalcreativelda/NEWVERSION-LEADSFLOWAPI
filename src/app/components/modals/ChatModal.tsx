@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Send } from 'lucide-react';
-import { Button } from '../ui/button';
 import type { Lead } from '../../types';
 
 interface ChatModalProps {

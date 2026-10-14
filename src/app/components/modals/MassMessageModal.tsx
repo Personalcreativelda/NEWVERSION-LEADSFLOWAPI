@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { X, Check, Crown, Rocket, Zap, Info } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Switch } from '../ui/switch';
+import { Check, Crown, Rocket, Zap } from 'lucide-react';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { projectId } from '../../utils/supabase/info';
 import type { Lead } from '../../types';
+import { AppModal } from '../base/AppModal';
+import { AppButton } from '../base/AppButton';
 
 interface MassMessageModalProps {
   isOpen: boolean;
@@ -71,8 +71,6 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
       setPreview('Digite uma mensagem para ver o preview...');
     }
   }, [mensagem, selecionados, leads]);
-
-  if (!isOpen) return null;
 
   const handleToggleLead = (index: number) => {
     setSelecionados(prev =>
@@ -192,22 +190,36 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-card rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-lg dark:shadow-purple-500/20 dark:border dark:border-purple-500/30">
-        
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-border dark:border-purple-500/30 flex justify-between items-center sticky top-0 bg-card backdrop-blur-sm z-10">
-          <h2 className="text-xl text-foreground font-semibold">
-            📢 Envio em Massa via WhatsApp
-          </h2>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-lg hover:bg-muted/50 dark:hover:bg-purple-500/20 flex items-center justify-center transition-colors"
+    <AppModal
+      open={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      className="p-0 gap-0"
+      title="📢 Envio em Massa via WhatsApp"
+      footer={
+        <>
+          <AppButton type="button" variant="outline" onClick={onClose} disabled={enviando}>
+            Cancelar
+          </AppButton>
+          <AppButton
+            onClick={isFree ? undefined : handleEnviar}
+            disabled={enviando || isFree}
+            loading={enviando}
+            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
+            {isFree ? (
+              <>
+                <Crown className="w-4 h-4" />
+                Recurso Premium
+              </>
+            ) : enviando ? (
+              'Enviando...'
+            ) : (
+              '📤 Enviar Mensagens'
+            )}
+          </AppButton>
+        </>
+      }
+    >
         {/* Upgrade Banner - Only for Free Plan */}
         {isFree && (
           <div className="mx-6 mt-6 mb-0">
@@ -238,7 +250,7 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
                       </li>
                     </ul>
                   </div>
-                  <Button
+                  <AppButton
                     onClick={() => {
                       if (onUpgrade) {
                         onClose();
@@ -247,9 +259,9 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
                     }}
                     className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-md"
                   >
-                    <Crown className="w-4 h-4 mr-2" />
+                    <Crown className="w-4 h-4" />
                     Fazer Upgrade Agora
-                  </Button>
+                  </AppButton>
                 </div>
               </div>
             </div>
@@ -383,40 +395,7 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
           </div>
 
         </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-border dark:border-border flex gap-3 justify-end sticky bottom-0 bg-card">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={enviando}
-          >
-            Cancelar
-          </Button>
-          <Button
-            onClick={isFree ? undefined : handleEnviar}
-            disabled={enviando || isFree}
-            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isFree ? (
-              <>
-                <Crown className="w-4 h-4 mr-2" />
-                Recurso Premium
-              </>
-            ) : enviando ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                Enviando...
-              </>
-            ) : (
-              <>📤 Enviar Mensagens</>
-            )}
-          </Button>
-        </div>
-
-      </div>
-    </div>
+    </AppModal>
   );
 }
 

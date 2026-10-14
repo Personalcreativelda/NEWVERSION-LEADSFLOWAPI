@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   Circle,
   Trash2,
-  Edit2,
   Bell,
   User,
   Phone,
@@ -24,9 +23,8 @@ import {
   MessageCircle,
   AlertCircle,
   Filter,
-  X
 } from 'lucide-react';
-import { format, isAfter, isBefore, isToday, isPast, addDays } from 'date-fns';
+import { format, isToday, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from "sonner";
 import { useWebSocket } from '../../hooks/useWebSocket';

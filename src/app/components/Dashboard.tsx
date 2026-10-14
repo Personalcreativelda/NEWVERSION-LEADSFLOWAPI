@@ -5,7 +5,6 @@ import { trackLeadStatusChange } from '../utils/tracking';
 // Dashboard components
 import StatsCards from './dashboard/StatsCards';
 import MainStatsCards from './dashboard/MainStatsCards';
-import FilterBar from './dashboard/FilterBar';
 import LeadsTable from './dashboard/LeadsTable';
 import ChartsSection from './dashboard/ChartsSection';
 import PlanoWidget from './dashboard/PlanoWidget';
@@ -17,6 +16,8 @@ import AIIntelligencePanel from './dashboard/AIIntelligencePanel';
 // Navigation components
 import RefactoredHeader from './navigation/RefactoredHeader';
 import NavigationSidebar, { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './navigation/NavigationSidebar';
+import { PageContainer } from './base/PageContainer';
+import { AppButton } from './base/AppButton';
 
 // Tasks
 import TaskManager from './tasks/TaskManager';
@@ -27,7 +28,6 @@ import ReportExporter from './reports/ReportExporter';
 // Settings pages
 import PlanPage from './settings/PlanPage';
 import IntegrationsPage from './settings/IntegrationsPage';
-import SecurityPage from './settings/SecurityPage';
 import AccountSettingsPage from './settings/AccountSettingsPage';
 import AdminPage from './settings/AdminPage';
 import CampaignsPage from './pages/CampaignsPage';
@@ -113,7 +113,7 @@ interface DashboardProps {
   onEnforcementBlockCleared?: () => void;
 }
 
-export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserUpdate, onRefreshUser, enforcementBlock, onEnforcementBlockCleared }: DashboardProps) {
+export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser, enforcementBlock, onEnforcementBlockCleared }: DashboardProps) {
   const confirm = useConfirm();
   // Theme mode: 'light' | 'dark'
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
@@ -194,7 +194,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
     return saved !== null ? Number(JSON.parse(saved)) : SIDEBAR_DEFAULT_WIDTH;
   });
   const [isMobile, setIsMobile] = useState(false);
-  const [filtros, setFiltros] = useState({ origem: '', status: '', busca: '' });
   const [filtrosAplicados, setFiltrosAplicados] = useState({ origem: '', status: '', busca: '' });
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -218,7 +217,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
   const [selectedLeadsForMessage, setSelectedLeadsForMessage] = useState<string[]>([]);
   const [deletionSuccessModal, setDeletionSuccessModal] = useState(false);
   const [deletionStats, setDeletionStats] = useState({ deletedCount: 0, errorCount: 0, totalBefore: 0, totalAfter: 0 });
-  const [zombieLeadsDetected, setZombieLeadsDetected] = useState<string[]>([]);
   const [modalReportExporter, setModalReportExporter] = useState(false);
   const [modalLeadDetail, setModalLeadDetail] = useState(false);
   const [channelSelectorOpen, setChannelSelectorOpen] = useState(false);
@@ -499,7 +497,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
           console.error('');
           
           // ✅ Alertar visualmente
-          setZombieLeadsDetected(zombieLeads);
           toast.error(
             `🧟 ${zombieLeads.length} leads deletados VOLTARAM!\n\n` +
             `Verifique:\n` +
@@ -2161,11 +2158,28 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
               ? 'overflow-hidden flex flex-col min-h-0'
               : isMobile ? 'pb-16' : ''
           }`}>
-            <div className={`w-full min-w-0 ${
-              currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
-                ? 'h-full flex-1 min-h-0 max-w-none px-0 py-0 overflow-hidden'
-                : 'max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-10 py-4 sm:py-6 lg:py-8'
-            }`}>
+            <PageContainer
+              className={`w-full min-w-0 ${
+                currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
+                  ? 'h-full flex-1 min-h-0 overflow-hidden'
+                  : ''
+              }`}
+              maxWidth={
+                currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
+                  ? false
+                  : 1720
+              }
+              px={
+                currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
+                  ? 0
+                  : { xs: 3, sm: 6, lg: 10 }
+              }
+              py={
+                currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
+                  ? 0
+                  : { xs: 4, sm: 6, lg: 8 }
+              }
+            >
             {/* Renderizar conteúdo baseado na página atual */}
             {currentPage === 'dashboard' && (
               <div className="space-y-4 sm:space-y-6 lg:space-y-8">
@@ -2239,14 +2253,13 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                     />
                   </div>
                 </div>
-                
-                {/* Barra de Filtros */}
-                <FilterBar
-                  origens={origens}
-                  status={statusList}
-                  onFilterChange={setFiltros}
-                  onRemoveDuplicates={handleRemoveDuplicates}
-                />
+
+                {/* Ação: remover leads duplicados (única parte funcional do antigo FilterBar aqui) */}
+                <div className="flex justify-end">
+                  <AppButton variant="outline" size="sm" onClick={handleRemoveDuplicates}>
+                    Remover duplicados
+                  </AppButton>
+                </div>
 
                 {/* Tabela de Leads */}
                 <LeadsTable
@@ -2325,14 +2338,6 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                   onSendEmail={handleSendEmail}
                 />
                 
-                {/* Barra de Filtros */}
-                <FilterBar
-                  origens={origens}
-                  status={statusList}
-                  onFilterChange={setFiltros}
-                  onRemoveDuplicates={handleRemoveDuplicates}
-                />
-
                 {/* Tabela de Leads */}
                 <LeadsTable
                   leads={leads}
@@ -2518,12 +2523,12 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
             {currentPage === 'admin' && (
               <AdminPage />
             )}
-          </div>
+          </PageContainer>
 
           {/* Footer - hidden on inbox/full-height pages */}
           {currentPage !== 'inbox' && currentPage !== 'inbox-settings' && currentPage !== 'ai-assistants' && currentPage !== 'automations' && currentPage !== 'voice-agents' && currentPage !== 'inbox-team' && (
             <footer className="border-t border-border mt-12 py-6">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <PageContainer maxWidth={1280} px={{ xs: 4, sm: 6, lg: 8 }}>
                 <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-sm text-muted-foreground">
                   <p className="text-center md:text-left">
                     © {new Date().getFullYear()} <span className="font-bold text-foreground">LeadsFlow</span> <span className="text-foreground/80">SAAS</span>. Todos os direitos reservados.
@@ -2532,7 +2537,7 @@ export default function Dashboard({ user, onLogout, onSettings, onAdmin, onUserU
                     Desenvolvido por <span className="text-blue-600 dark:text-blue-400 font-medium">PersonalCreativeLda</span>
                   </p>
                 </div>
-              </div>
+              </PageContainer>
             </footer>
           )}
         </main>

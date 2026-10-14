@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Webhook, Plus, Settings, Power, PowerOff, Trash2, X, Check, Loader2,
-  Copy, Eye, EyeOff, RefreshCw, Play, Clock, AlertCircle, CheckCircle2,
-  ChevronDown, ChevronRight, Link2, Key, FileJson, History, ExternalLink
+  Copy, Play, Clock, AlertCircle, CheckCircle2,
+  ChevronDown, ChevronRight, Link2, Key, FileJson, History
 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
@@ -99,7 +99,6 @@ export default function InboxAutomations() {
     headers: {},
     channel_ids: [],
   });
-  const [showSecret, setShowSecret] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['messages', 'conversations']);
   const [editingId, setEditingId] = useState<string | null>(null);
 

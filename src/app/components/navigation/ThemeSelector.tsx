@@ -12,7 +12,6 @@ interface ThemeSelectorProps {
 }
 
 export default function ThemeSelector({
-  isDark, 
   onToggleTheme,
   onThemeChange,
   themeMode = 'light',

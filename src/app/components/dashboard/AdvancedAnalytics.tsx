@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { TrendingUp, TrendingDown, Users, Target, DollarSign, Clock, Activity, Zap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, LineChart, Line, Legend, AreaChart, Area } from 'recharts';
+import { TrendingUp, Users, Target, DollarSign, Clock, Zap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 
 interface Lead {
   id: string;
@@ -194,7 +194,6 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
     const statusCounts: Record<string, number> = {};
     leads.forEach(lead => {
       const status = (lead.status || 'Sem status').trim();
-      const normalizedStatus = status.toLowerCase();
       // Usar o status original (com a caixa correta) como chave, mas normalizado para contagem
       const displayStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
       statusCounts[displayStatus] = (statusCounts[displayStatus] || 0) + 1;
@@ -680,7 +679,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
           </div>
           <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2">
             {/* ✅ Renderização dinâmica de TODOS os status */}
-            {metrics.dynamicStatuses.map((statusItem, index) => (
+            {metrics.dynamicStatuses.map((statusItem) => (
               <div key={statusItem.status} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div 

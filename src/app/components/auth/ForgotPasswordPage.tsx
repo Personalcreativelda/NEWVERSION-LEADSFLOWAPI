@@ -1,14 +1,14 @@
 import { useState, type FormEvent } from 'react';
-import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { AlertCircle, CheckCircle, ArrowLeft, Zap, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, ArrowLeft, Zap } from 'lucide-react';
 import { authApi } from '../../utils/api';
+import { AppButton } from '../base/AppButton';
 
 interface ForgotPasswordPageProps {
   onBackToLogin: () => void;
 }
 
-const FONT = 'sohne-var, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+const FONT = '"Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
 
 export default function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPageProps) {
   const [email, setEmail] = useState('');
@@ -88,7 +88,7 @@ export default function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPage
                   Verifique sua caixa de entrada e spam. O link é válido por 1 hora.
                 </p>
               </div>
-              <Button
+              <AppButton
                 onClick={onBackToLogin}
                 style={{
                   width: '100%', height: '50px', fontSize: '16px', fontWeight: 500,
@@ -99,7 +99,7 @@ export default function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPage
                 className="transition-all hover:brightness-110 active:brightness-95"
               >
                 Voltar ao login
-              </Button>
+              </AppButton>
             </div>
           ) : (
             /* ── Form state ── */
@@ -147,9 +147,10 @@ export default function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPage
                   />
                 </div>
 
-                <Button
+                <AppButton
                   type="submit"
-                  disabled={loading || !email.trim()}
+                  disabled={!email.trim()}
+                  loading={loading}
                   style={{
                     width: '100%', height: '50px', fontSize: '16px', fontWeight: 500,
                     borderRadius: '6px', border: 'none', marginTop: '8px',
@@ -160,11 +161,8 @@ export default function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPage
                   }}
                   className="transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading
-                    ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Enviando...</span>
-                    : 'Enviar link de recuperação'
-                  }
-                </Button>
+                  {loading ? 'Enviando...' : 'Enviar link de recuperação'}
+                </AppButton>
               </form>
 
               <div className="text-center">

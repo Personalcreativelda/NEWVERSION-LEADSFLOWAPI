@@ -1,5 +1,5 @@
 // INBOX: Componente de mensagem individual com menu de contexto WhatsApp-style
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { MessageWithSender } from '../../types/inbox';
 import { UploadProgressIndicator } from './UploadProgressIndicator';
 import { ChevronDown, Forward, Trash2, Reply, Paperclip, ChevronDown as CollapseIcon } from 'lucide-react';
@@ -57,7 +57,7 @@ function MessageContextMenu({ isOut, onDelete, onForward, onReply, onClose, anch
     return (
         <div
             ref={menuRef}
-            className={`absolute z-50 top-6 ${isOut ? 'right-0' : 'left-0'} min-w-[180px] bg-white dark:bg-[#233138] rounded-xl shadow-xl border border-black/8 dark:border-white/8 overflow-hidden py-1`}
+            className={`absolute z-50 top-6 ${isOut ? 'right-0' : 'left-0'} min-w-[180px] bg-card rounded-xl shadow-xl border border-border overflow-hidden py-1`}
         >
             {items.map((item) => (
                 <button
@@ -66,7 +66,7 @@ function MessageContextMenu({ isOut, onDelete, onForward, onReply, onClose, anch
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13.5px] font-medium text-left transition-colors
                         ${item.danger
                             ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
-                            : 'text-[#111b21] dark:text-[#e9edef] hover:bg-[#f0f2f5] dark:hover:bg-[#2a3942]'
+                            : 'text-foreground hover:bg-muted'
                         }`}
                 >
                     {item.icon}
@@ -98,7 +98,7 @@ function EmailHtmlBody({ html }: { html: string }) {
             {/* Fade + toggle button */}
             <div className={`flex items-center justify-center mt-1 ${!expanded ? 'relative' : ''}`}>
                 {!expanded && (
-                    <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-[#202c33] to-transparent pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-muted to-transparent pointer-events-none" />
                 )}
                 <button
                     onClick={() => setExpanded(v => !v)}
@@ -164,9 +164,7 @@ function TranscribeButton({ messageId, apiUrl, isOut, onTranscribed }: {
 
 export function MessageBubble({
     message,
-    isFirstInGroup = true,
     isLastInGroup = true,
-    isGrouped = false,
     onDelete,
     onForward,
     onReply,
@@ -205,13 +203,13 @@ export function MessageBubble({
         switch (status) {
             case 'pending':
                 return (
-                    <svg className="w-3 h-3 text-[rgba(17,27,33,0.35)] dark:text-[rgba(233,237,239,0.45)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 );
             case 'sent':
                 return (
-                    <svg className="w-3 h-3 text-[rgba(17,27,33,0.35)] dark:text-[rgba(233,237,239,0.45)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                 );
@@ -219,7 +217,7 @@ export function MessageBubble({
                 return (
                     <div className="flex -space-x-1">
                         {[0, 1].map((i) => (
-                            <svg key={i} className="w-3 h-3 text-[rgba(17,27,33,0.35)] dark:text-[rgba(233,237,239,0.45)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg key={i} className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                         ))}
@@ -303,7 +301,7 @@ export function MessageBubble({
     // For email with HTML: don't show raw text (it would be noise)
     const showTextContent = message.content && (!isMediaPlaceholder || !hasValidMedia) && !(isEmail && emailHtml);
 
-    const bubbleRounding = isOut ? 'rounded-lg rounded-br-[4px]' : 'rounded-lg rounded-bl-[4px]';
+    const bubbleRounding = 'rounded-2xl';
 
     // Don't show menu for temp/uploading messages
     const canShowMenu = !message.id.startsWith('temp_') && !isUploading;
@@ -320,8 +318,8 @@ export function MessageBubble({
                 style={{ maxWidth: isEmail ? '85%' : '65%', minWidth: 80, padding: '6px 10px 8px', fontSize: '14.2px', lineHeight: '1.35' }}
                 className={`relative ${bubbleRounding} shadow-sm ${
                     isOut
-                        ? 'bg-[#d9fdd3] text-[#111b21] dark:bg-[#005c4b] dark:text-[#e9edef]'
-                        : 'bg-white text-[#111b21] dark:bg-[#202c33] dark:text-[#e9edef]'
+                        ? 'bg-primary/10 text-foreground'
+                        : 'bg-muted text-foreground'
                 }`}
             >
                 {/* Hover chevron overlay for outgoing (inside bubble) */}
@@ -331,9 +329,9 @@ export function MessageBubble({
                             <button
                                 ref={chevronRef as any}
                                 onClick={() => setMenuOpen((v) => !v)}
-                                className="w-6 h-6 rounded-full bg-[#d9fdd3] dark:bg-[#005c4b] hover:bg-[#c8f2c2] dark:hover:bg-[#004336] flex items-center justify-center transition-colors"
+                                className="w-6 h-6 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
                             >
-                                <ChevronDown className="w-3.5 h-3.5 text-[#667781]" />
+                                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
                             </button>
                             {menuOpen && isOut && (
                                 <MessageContextMenu
@@ -376,7 +374,7 @@ export function MessageBubble({
                 {/* Expired attachment */}
                 {(message.metadata as any)?.media_expired && !isUploading && (
                     <div className={`mb-2 flex items-center gap-2 p-3 rounded-xl text-sm opacity-60
-                        ${isOut ? 'bg-[#c5f0c0] dark:bg-[#04493e]' : 'bg-gray-100 dark:bg-[#182229]'}`}>
+                        ${isOut ? 'bg-primary/15' : 'bg-muted'}`}>
                         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -398,7 +396,7 @@ export function MessageBubble({
                             />
                         ) : (effectiveMediaType === 'image' || effectiveMediaType === 'sticker') && imageError ? (
                             <a href={message.media_url} target="_blank" rel="noopener noreferrer"
-                                className={`flex items-center gap-2 p-3 rounded-xl cursor-pointer ${isOut ? 'bg-[#c5f0c0] hover:bg-[#b4e4af] dark:bg-[#04493e] dark:hover:bg-[#03392f]' : 'bg-gray-100 hover:bg-gray-200 dark:bg-[#182229] dark:hover:opacity-80'}`}>
+                                className={`flex items-center gap-2 p-3 rounded-xl cursor-pointer ${isOut ? 'bg-primary/15 hover:bg-primary/20' : 'bg-muted hover:bg-muted/70'}`}>
                                 <svg className="w-5 h-5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
@@ -412,7 +410,7 @@ export function MessageBubble({
                             <video controls src={message.media_url} className="rounded-md w-full max-h-64" preload="metadata" />
                         ) : (
                             <a href={message.media_url} target="_blank" rel="noopener noreferrer" download={fileName || undefined}
-                                className={`flex items-center gap-2 p-2.5 rounded-xl ${isOut ? 'bg-[#c5f0c0] text-[#111b21] dark:bg-[#04493e] dark:text-[#e9edef]' : 'bg-gray-100 text-[#111b21] dark:bg-[#182229] dark:text-[#e9edef]'}`}>
+                                className={`flex items-center gap-2 p-2.5 rounded-xl ${isOut ? 'bg-primary/15 text-foreground' : 'bg-muted text-foreground'}`}>
                                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                 </svg>
@@ -426,7 +424,7 @@ export function MessageBubble({
                         {effectiveMediaType === 'audio' && message.id && (
                             <div className="mt-2">
                                 {transcription ? (
-                                    <div className={`text-sm italic p-2 rounded-md ${isOut ? 'bg-[rgba(255,255,255,0.4)] dark:bg-[rgba(0,0,0,0.2)]' : 'bg-gray-50 dark:bg-[#182229]'} border-l-2 ${isOut ? 'border-green-600' : 'border-blue-500'}`}>
+                                    <div className={`text-sm italic p-2 rounded-md ${isOut ? 'bg-background/60' : 'bg-muted/60'} border-l-2 border-primary`}>
                                         <span className="text-xs font-semibold not-italic mb-1 flex items-center gap-1 opacity-70">
                                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
                                             Transcrição IA:
@@ -470,8 +468,8 @@ export function MessageBubble({
                                         download={att.name}
                                         className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors
                                             ${isOut
-                                                ? 'bg-[#c5f0c0] hover:bg-[#b4e4af] dark:bg-[#04493e] dark:hover:bg-[#03392f] text-[#111b21] dark:text-[#e9edef]'
-                                                : 'bg-gray-100 hover:bg-gray-200 dark:bg-[#182229] dark:hover:opacity-80 text-[#111b21] dark:text-[#e9edef]'
+                                                ? 'bg-primary/15 hover:bg-primary/20 text-foreground'
+                                                : 'bg-muted hover:bg-muted/70 text-foreground'
                                             }`}
                                     >
                                         <Paperclip className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
@@ -492,7 +490,7 @@ export function MessageBubble({
                 )}
 
                 {/* Metadata row */}
-                <div className="flex justify-end items-center gap-1 mt-1 text-[11px] text-[rgba(17,27,33,0.45)] dark:text-[rgba(233,237,239,0.55)]">
+                <div className="flex justify-end items-center gap-1 mt-1 text-[11px] text-muted-foreground">
                     {isAutomated && (
                         <span className="flex items-center gap-0.5 opacity-70">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -513,9 +511,9 @@ export function MessageBubble({
                         <button
                             ref={chevronRef as any}
                             onClick={() => setMenuOpen((v) => !v)}
-                            className="w-7 h-7 rounded-full bg-white dark:bg-[#233138] shadow flex items-center justify-center hover:bg-[#f0f2f5] dark:hover:bg-[#2a3942] transition-colors"
+                            className="w-7 h-7 rounded-full bg-card shadow flex items-center justify-center hover:bg-muted transition-colors"
                         >
-                            <ChevronDown className="w-4 h-4 text-[#667781]" />
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
                         </button>
                         {menuOpen && !isOut && (
                             <MessageContextMenu

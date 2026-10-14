@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Search, Check, Loader, UserPlus, Users } from 'lucide-react';
 import { api } from '../../../../lib/api';
 

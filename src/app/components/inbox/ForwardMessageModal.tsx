@@ -2,9 +2,11 @@
  * Modal para Reencaminhar Mensagem (WhatsApp-style)
  * Mostra lista de conversas para selecionar destino.
  */
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { X, Search, Forward, Check } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { Search, Forward, Check } from 'lucide-react';
 import type { ConversationWithDetails, MessageWithSender } from '../../types/inbox';
+import { AppModal } from '../base/AppModal';
+import { AppButton } from '../base/AppButton';
 
 interface ForwardMessageModalProps {
     message: MessageWithSender;
@@ -29,13 +31,6 @@ export function ForwardMessageModal({
     useEffect(() => {
         searchRef.current?.focus();
     }, []);
-
-    // Fechar com Escape
-    useEffect(() => {
-        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [onClose]);
 
     const filtered = useMemo(() => {
         const q = search.toLowerCase().trim();
@@ -87,37 +82,30 @@ export function ForwardMessageModal({
         name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-        >
-            <div className="bg-white dark:bg-[#202c33] rounded-2xl shadow-2xl w-full max-w-sm mx-4 flex flex-col overflow-hidden"
-                style={{ maxHeight: '80vh' }}>
-
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-black/8 dark:border-white/8">
-                    <div className="flex items-center gap-2">
-                        <Forward className="w-5 h-5 text-[#00a884]" />
-                        <h2 className="font-semibold text-[15px]">Reencaminhar mensagem</h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/8 dark:hover:bg-white/8 transition-colors"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
+        <AppModal
+            open
+            onOpenChange={(open) => !open && onClose()}
+            size="sm"
+            className="p-0 gap-0 flex flex-col"
+            title={
+                <div className="flex items-center gap-2">
+                    <Forward className="w-5 h-5 text-primary" />
+                    <span>Reencaminhar mensagem</span>
                 </div>
+            }
+        >
+            <div className="flex flex-col overflow-hidden" style={{ maxHeight: '65vh' }}>
 
                 {/* Message preview */}
-                <div className="px-5 py-3 bg-[#f0f2f5] dark:bg-[#111b21] border-b border-black/5 dark:border-white/5">
-                    <div className="flex items-start gap-2 text-xs text-[rgba(17,27,33,0.55)] dark:text-[rgba(233,237,239,0.55)]">
+                <div className="px-5 py-3 bg-muted border-b border-border">
+                    <div className="flex items-start gap-2 text-xs text-muted-foreground">
                         <Forward className="w-3 h-3 mt-0.5 flex-shrink-0" />
                         <span className="italic truncate">{previewText || '(mensagem sem texto)'}</span>
                     </div>
                 </div>
 
                 {/* Search */}
-                <div className="px-4 py-3 border-b border-black/5 dark:border-white/5">
+                <div className="px-4 py-3 border-b border-border">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <input
@@ -125,7 +113,7 @@ export function ForwardMessageModal({
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Pesquisar conversa..."
-                            className="w-full pl-9 pr-3 py-2 text-sm bg-[#f0f2f5] dark:bg-[#2a3942] rounded-lg border-none outline-none placeholder:text-muted-foreground"
+                            className="w-full pl-9 pr-3 py-2 text-sm bg-muted rounded-lg border-none outline-none placeholder:text-muted-foreground"
                         />
                     </div>
                 </div>
@@ -144,16 +132,16 @@ export function ForwardMessageModal({
                                 <button
                                     key={conv.id}
                                     onClick={() => toggle(conv.id)}
-                                    className={`w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f0f2f5] dark:hover:bg-[#2a3942] transition-colors text-left ${isSelected ? 'bg-[#e9fde4] dark:bg-[#003d33]' : ''}`}
+                                    className={`w-full flex items-center gap-3 px-5 py-3 hover:bg-muted transition-colors text-left ${isSelected ? 'bg-primary/10' : ''}`}
                                 >
                                     {/* Avatar */}
                                     <div className="relative flex-shrink-0">
-                                        <div className="w-10 h-10 rounded-full bg-[#00a884]/20 flex items-center justify-center text-[#00a884] text-sm font-semibold">
+                                        <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary text-sm font-semibold">
                                             {getInitials(name)}
                                         </div>
                                         {isSelected && (
-                                            <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#00a884] flex items-center justify-center">
-                                                <Check className="w-3 h-3 text-white" />
+                                            <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                                                <Check className="w-3 h-3 text-primary-foreground" />
                                             </div>
                                         )}
                                     </div>
@@ -180,28 +168,17 @@ export function ForwardMessageModal({
                             {selected.size} conversa{selected.size > 1 ? 's' : ''} selecionada{selected.size > 1 ? 's' : ''}
                         </p>
                     )}
-                    <button
+                    <AppButton
                         onClick={handleForward}
-                        disabled={selected.size === 0 || forwarding}
-                        className="w-full py-2.5 rounded-xl bg-[#00a884] text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#008f72] transition-colors flex items-center justify-center gap-2"
+                        disabled={selected.size === 0}
+                        loading={forwarding}
+                        className="w-full"
                     >
-                        {forwarding ? (
-                            <>
-                                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                                Enviando...
-                            </>
-                        ) : (
-                            <>
-                                <Forward className="w-4 h-4" />
-                                Reencaminhar
-                            </>
-                        )}
-                    </button>
+                        {!forwarding && <Forward className="w-4 h-4" />}
+                        {forwarding ? 'Enviando...' : 'Reencaminhar'}
+                    </AppButton>
                 </div>
             </div>
-        </div>
+        </AppModal>
     );
 }

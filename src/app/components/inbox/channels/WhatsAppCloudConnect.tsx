@@ -1,8 +1,8 @@
 // INBOX: Modal de Conexão WhatsApp Cloud API (Oficial Meta)
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
-import { ExternalLink, Copy, Check, Shield, Zap, Globe, AlertCircle } from 'lucide-react';
+import { ExternalLink, Copy, Check, Shield, Globe, AlertCircle } from 'lucide-react';
 
 // API URL for webhook generation
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:4000';

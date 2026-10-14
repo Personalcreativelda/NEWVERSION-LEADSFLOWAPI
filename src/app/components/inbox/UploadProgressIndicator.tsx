@@ -1,4 +1,3 @@
-import React from 'react';
 
 interface UploadProgressIndicatorProps {
   /** 0–100 */

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { X, Mail, Phone, Building2, Calendar, FileText, User, Loader2, AlertCircle, Edit2, Save, Camera, Check, Upload, StickyNote, ChevronDown, Clock, MessageSquare, Briefcase, ListTodo, Plus, Trash2, Send, Zap, Target, Copy, Pencil, GripVertical, BrainCircuit, UserCheck, StickyNote as NoteIcon } from 'lucide-react';
+import { X, Mail, Phone, Building2, Calendar, User, Loader2, AlertCircle, Edit2, Save, Camera, Check, StickyNote, ChevronDown, Clock, ListTodo, Plus, Trash2, Send, Zap, Target, Copy, Pencil, BrainCircuit, UserCheck } from 'lucide-react';
 import { leadsApi, scheduledConversationsApi, leadNotesApi } from '../../utils/api';
-import { Lead, LeadNote } from '../../types';
+import { LeadNote } from '../../types';
 import { toast } from 'sonner';
 import api from '../../../lib/api';
 
@@ -132,7 +132,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
   
   // Schedules and tasks list
   const [schedules, setSchedules] = useState<any[]>([]);
-  const [loadingSchedules, setLoadingSchedules] = useState(false);
+  const [, setLoadingSchedules] = useState(false);
 
   // Quick notes
   const [notes, setNotes] = useState<LeadNote[]>([]);
@@ -206,7 +206,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
 
   // Remarketing flows
   const [remarketingFlows, setRemarketingFlows] = useState<any[]>([]);
-  const [loadingFlows, setLoadingFlows] = useState(false);
+  const [, setLoadingFlows] = useState(false);
   const [enrollingFlowId, setEnrollingFlowId] = useState<string | null>(null);
   const [sendingMsgId, setSendingMsgId] = useState<string | null>(null);
 

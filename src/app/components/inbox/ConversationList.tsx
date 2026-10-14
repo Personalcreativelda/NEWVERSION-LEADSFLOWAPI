@@ -1,5 +1,4 @@
 // INBOX: Lista de conversas - ManyChat-style
-import React from 'react';
 import { ConversationItem } from './ConversationItem';
 import type { ConversationWithDetails } from '../../types/inbox';
 import { Inbox, CheckSquare, Square, Loader2 } from 'lucide-react';

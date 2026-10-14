@@ -1,6 +1,8 @@
-import { X, Download } from 'lucide-react';
-import { Button } from '../ui/button';
+import { Download } from 'lucide-react';
 import jsPDF from 'jspdf';
+import { AppModal } from '../base/AppModal';
+import { AppButton } from '../base/AppButton';
+import { StatusBadge, type StatusTone } from '../base/StatusBadge';
 
 interface Campaign {
   id: string;
@@ -35,8 +37,31 @@ interface CampaignDetailsModalProps {
   campaign: Campaign | null;
 }
 
+// Estado real da campanha (campaign.status) → tom do StatusBadge. Quando
+// "completed" com falhas reais (campaign.failed > 0), usa tom de aviso
+// ("parcial") em vez de sucesso — mesma distinção que "envio parcial" pedida,
+// derivada de dados já existentes, sem inventar nenhum estado novo.
+function getCampaignStatusTone(campaign: Campaign): { tone: StatusTone; label: string } {
+  switch (campaign.status) {
+    case 'active':
+      return { tone: 'info', label: 'Ativa' };
+    case 'scheduled':
+      return { tone: 'secondary', label: 'Agendada' };
+    case 'paused':
+      return { tone: 'warning', label: 'Pausada' };
+    case 'failed':
+      return { tone: 'error', label: 'Falhou' };
+    case 'completed': {
+      const hasFailures = (campaign.failed ?? campaign.metadata?.failures?.length ?? 0) > 0;
+      return hasFailures ? { tone: 'warning', label: 'Concluída (parcial)' } : { tone: 'success', label: 'Concluída' };
+    }
+    default:
+      return { tone: 'default', label: campaign.status };
+  }
+}
+
 export default function CampaignDetailsModal({ isOpen, onClose, campaign }: CampaignDetailsModalProps) {
-  if (!isOpen || !campaign) return null;
+  if (!campaign) return null;
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -249,26 +274,38 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
   };
 
   const failures = campaign.metadata?.failures || [];
+  const statusInfo = getCampaignStatusTone(campaign);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-card text-foreground rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-[#10B981] to-green-600 px-6 py-5 flex items-center justify-between text-white shrink-0 shadow-lg">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight">Detalhes da Campanha</h2>
-            <p className="text-green-50/90 text-sm font-medium mt-0.5">{campaign.name}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10"
-          >
-            <X className="w-5 h-5" />
-          </button>
+    <AppModal
+      open={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      size="lg"
+      className="p-0 gap-0 max-h-[90vh] flex flex-col"
+      title={
+        <div>
+          <span>Detalhes da Campanha</span>
+          <p className="text-sm text-muted-foreground font-normal mt-0.5">{campaign.name}</p>
         </div>
-
+      }
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-4 w-full">
+          <div className="flex flex-wrap gap-2.5">
+            <AppButton onClick={exportToPDF} variant="outline">
+              <Download />
+              Baixar PDF
+            </AppButton>
+            <AppButton onClick={exportToCSV} variant="outline">
+              <Download />
+              Exportar CSV
+            </AppButton>
+          </div>
+          <AppButton onClick={onClose}>Fechar</AppButton>
+        </div>
+      }
+    >
         {/* Body */}
-        <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-8">
+        <div className="px-6 pb-2 flex-1 space-y-8">
           {/* Informações Gerais */}
           <section>
             <div className="flex items-center gap-2 mb-4">
@@ -284,13 +321,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
               </div>
               <div className="bg-muted/50 p-4 rounded-xl border border-border dark:border-zinc-800/60">
                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Status</p>
-                <p className="text-base font-bold flex items-center gap-2">
-                  {campaign.status === 'active' && <><span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" /> Ativa</>}
-                  {campaign.status === 'completed' && <><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Concluída</>}
-                  {campaign.status === 'paused' && <><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Pausada</>}
-                  {campaign.status === 'scheduled' && <><span className="w-2.5 h-2.5 rounded-full bg-indigo-500" /> Agendada</>}
-                  {campaign.status === 'failed' && <><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Falhou</>}
-                </p>
+                <StatusBadge label={statusInfo.label} tone={statusInfo.tone} />
               </div>
               {campaign.completedDate && (
                 <div className="bg-muted/50 p-4 rounded-xl border border-border dark:border-zinc-800/60 sm:col-span-2">
@@ -404,36 +435,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
             </section>
           )}
         </div>
-
-        {/* Footer */}
-        <div className="bg-muted/30 border-t border-border px-6 py-5 flex flex-wrap items-center justify-between gap-4 shrink-0">
-          <div className="flex flex-wrap gap-2.5">
-            <Button
-              onClick={exportToPDF}
-              variant="outline"
-              className="h-10 px-5 text-xs font-bold border-primary/30 text-primary hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary transition-all rounded-xl gap-2"
-            >
-              <Download className="w-4 h-4" />
-              BAIXAR PDF
-            </Button>
-            <Button
-              onClick={exportToCSV}
-              variant="outline"
-              className="h-10 px-5 text-xs font-bold hover:bg-muted transition-all rounded-xl gap-2 border-border"
-            >
-              <Download className="w-4 h-4" />
-              EXPORTAR CSV
-            </Button>
-          </div>
-          <Button
-            onClick={onClose}
-            className="sm:min-w-[120px] h-10 px-6 font-bold text-xs uppercase tracking-widest rounded-xl shadow-lg hover:shadow-primary/20 transition-all border-none"
-          >
-            Fechar
-          </Button>
-        </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }
 

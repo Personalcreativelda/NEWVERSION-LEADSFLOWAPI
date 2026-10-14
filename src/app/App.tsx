@@ -971,8 +971,8 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
         </div>
       )}
 
-      {/* Shared auth video background — rendered once, persists across login/signup/forgot-password */}
-      {(['login', 'signup', 'forgot-password'] as Page[]).includes(currentPage) && (
+      {/* Shared auth video background — rendered once, persists across login/signup/forgot-password/reset-password */}
+      {(['login', 'signup', 'forgot-password', 'reset-password'] as Page[]).includes(currentPage) && (
         <HlsVideoBackground overlay="rgba(0,0,0,0.12)" />
       )}
 

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Mail, Lock, AlertCircle, Eye, EyeOff, Zap, Loader2, Star } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Eye, EyeOff, Zap, Star } from 'lucide-react';
 import { authApi } from '../../utils/api';
+import { AppModal } from '../base/AppModal';
+import { AppButton } from '../base/AppButton';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -40,9 +40,9 @@ interface ErrorState {
 }
 
 
-export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForgotPassword, onBackToHome }: LoginPageProps) {
+export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPassword }: LoginPageProps) {
   const [ratings, setRatings] = useState<RatingSummary | null>(null);
-  const [currentReview, setCurrentReview] = useState(0);
+  const [, setCurrentReview] = useState(0);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<ErrorState | null>(null);
@@ -52,7 +52,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
   const [resetEmail, setResetEmail] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
-  const [keyPresses, setKeyPresses] = useState<number[]>([]);
+  const [, setKeyPresses] = useState<number[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [verificationModalOpen, setVerificationModalOpen] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
@@ -551,7 +551,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
     }
   };
 
-  const FONT = 'sohne-var, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+  const FONT = '"Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
 
   return (
     <div className="min-h-screen relative flex items-center justify-center py-16 px-4 overflow-hidden"
@@ -661,8 +661,9 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
             </div>
 
             {/* Primary button */}
-            <Button type="submit"
-              disabled={loading || (lockUntil !== null && Date.now() < lockUntil)}
+            <AppButton type="submit"
+              loading={loading}
+              disabled={lockUntil !== null && Date.now() < lockUntil}
               style={{
                 width: '100%', height: '50px', fontSize: '16px', fontWeight: 500,
                 borderRadius: '6px', border: 'none', marginTop: '8px',
@@ -673,12 +674,12 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
               }}
               className="transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60">
               {loading
-                ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Entrando...</span>
+                ? 'Entrando...'
                 : lockUntil && Date.now() < lockUntil
                   ? `Aguarde ${lockCountdown}s`
                   : 'Entrar'
               }
-            </Button>
+            </AppButton>
           </form>
 
           {/* Create account */}
@@ -697,7 +698,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
           </div>
 
           {/* Google button */}
-          <Button type="button" onClick={handleGoogleSignIn} disabled={loading}
+          <AppButton type="button" onClick={handleGoogleSignIn} disabled={loading}
             style={{
               width: '100%', height: '48px', fontSize: '15px', fontWeight: 400,
               borderRadius: '6px', background: '#FFFFFF', border: '1px solid #D4DEE9',
@@ -705,7 +706,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
             }}
             className="flex items-center justify-center gap-3 transition-all hover:border-[#A497FC] hover:shadow-sm disabled:opacity-50">
             <GoogleIcon /><span>Entrar com Google</span>
-          </Button>
+          </AppButton>
 
           {/* Rating — dentro do card */}
           {ratings && ratings.total > 0 && (
@@ -734,20 +735,25 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
 
       {/* ── VERIFICATION MODAL ─────────────────────────────────────── */}
       {verificationModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 px-4"
-          style={{ background: 'rgba(26,44,68,0.55)', backdropFilter: 'blur(6px)' }}>
-          <div className="w-full max-w-md rounded-[12px] p-8 space-y-6"
-            style={{ background: '#FFFFFF', border: '1px solid #D4DEE9', boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 30px 80px rgba(48,49,61,0.1)', fontFamily: FONT }}>
-            <div className="text-center space-y-2">
+        <AppModal
+          open={verificationModalOpen}
+          onOpenChange={(open) => { if (!open) { setVerificationModalOpen(false); setVerificationCode(''); setVerificationFeedback(null); setResendFeedback(null); setResendStatus('idle'); setVerificationStatus('idle'); } }}
+          size="md"
+          className="p-8 space-y-0"
+          title={
+            <div className="text-center space-y-2 w-full" style={{ fontFamily: FONT }}>
               <div className="w-12 h-12 mx-auto rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(103,93,255,0.08)', border: '1px solid rgba(103,93,255,0.15)' }}>
                 <Mail className="w-6 h-6" style={{ color: '#675DFF' }} />
               </div>
-              <h3 style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Confirmar email</h3>
+              <span className="block" style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Confirmar email</span>
               <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
                 Código enviado para <span style={{ fontWeight: 500, color: '#1A2C44' }}>{verificationEmail}</span>
               </p>
             </div>
+          }
+        >
+          <div className="space-y-6 pt-6" style={{ fontFamily: FONT }}>
             <form onSubmit={handleVerificationSubmit} className="space-y-4">
               <div>
                 <label style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px' }}>Código de verificação</label>
@@ -761,16 +767,16 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                 <p style={{ fontSize: '13px', color: verificationFeedback.type === 'error' ? '#E61947' : '#059669' }}>{verificationFeedback.text}</p>
               )}
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button type="submit" disabled={verificationStatus === 'loading'}
+                <AppButton type="submit" loading={verificationStatus === 'loading'}
                   style={{ flex: 1, background: '#675DFF', borderRadius: '6px', height: '44px', fontSize: '14px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
                   className="transition-all hover:brightness-110 disabled:opacity-60">
                   {verificationStatus === 'loading' ? 'Confirmando...' : 'Confirmar código'}
-                </Button>
-                <Button type="button" onClick={handleVerificationResend} disabled={resendStatus === 'loading'}
+                </AppButton>
+                <AppButton type="button" onClick={handleVerificationResend} loading={resendStatus === 'loading'}
                   style={{ flex: 1, background: 'rgba(239,239,239,0.3)', border: '1px solid #D4DEE9', borderRadius: '6px', height: '44px', fontSize: '14px', color: '#414552', fontWeight: 300 }}
                   className="transition-all hover:border-[#A497FC] disabled:opacity-60">
                   {resendStatus === 'loading' ? 'Reenviando...' : 'Reenviar email'}
-                </Button>
+                </AppButton>
               </div>
               {resendFeedback && (
                 <p style={{ fontSize: '13px', color: resendFeedback.type === 'error' ? '#E61947' : '#059669' }}>{resendFeedback.text}</p>
@@ -782,23 +788,28 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
               Cancelar e voltar
             </button>
           </div>
-        </div>
+        </AppModal>
       )}
 
       {/* ── 2FA MODAL ──────────────────────────────────────────────── */}
       {show2FAModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 px-4"
-          style={{ background: 'rgba(26,44,68,0.55)', backdropFilter: 'blur(6px)' }}>
-          <div className="w-full max-w-sm rounded-[12px] p-8 space-y-6"
-            style={{ background: '#FFFFFF', border: '1px solid #D4DEE9', boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 30px 80px rgba(48,49,61,0.1)', fontFamily: FONT }}>
-            <div className="text-center space-y-2">
+        <AppModal
+          open={show2FAModal}
+          onOpenChange={(open) => { if (!open) { setShow2FAModal(false); setTwoFACode(''); setTwoFAError(null); } }}
+          size="sm"
+          className="p-8 space-y-0"
+          title={
+            <div className="text-center space-y-2 w-full" style={{ fontFamily: FONT }}>
               <div className="w-12 h-12 mx-auto rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(103,93,255,0.08)', border: '1px solid rgba(103,93,255,0.15)' }}>
                 <Lock className="w-5 h-5" style={{ color: '#675DFF' }} />
               </div>
-              <h3 style={{ fontSize: '20px', fontWeight: 600, color: '#1A2C44' }}>Verificação em dois fatores</h3>
+              <span className="block" style={{ fontSize: '20px', fontWeight: 600, color: '#1A2C44' }}>Verificação em dois fatores</span>
               <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>Insira o código de 6 dígitos do seu app autenticador.</p>
             </div>
+          }
+        >
+          <div className="space-y-6 pt-6" style={{ fontFamily: FONT }}>
             <form onSubmit={handle2FASubmit} className="space-y-4">
               <Input ref={twoFAInputRef} inputMode="numeric" placeholder="000000"
                 value={twoFACode} onChange={(e) => { setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6)); setTwoFAError(null); }} maxLength={6}
@@ -810,11 +821,11 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />{twoFAError}
                 </p>
               )}
-              <Button type="submit" disabled={twoFAStatus === 'loading' || twoFACode.length < 6}
+              <AppButton type="submit" loading={twoFAStatus === 'loading'} disabled={twoFACode.length < 6}
                 style={{ width: '100%', background: '#675DFF', borderRadius: '6px', height: '44px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
                 className="transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed">
-                {twoFAStatus === 'loading' ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Verificando...</span> : 'Verificar'}
-              </Button>
+                {twoFAStatus === 'loading' ? 'Verificando...' : 'Verificar'}
+              </AppButton>
             </form>
             <button type="button" style={{ width: '100%', textAlign: 'center', fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}
               className="transition-colors hover:text-[#533AFD]"
@@ -822,19 +833,24 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
               Cancelar e voltar
             </button>
           </div>
-        </div>
+        </AppModal>
       )}
 
       {/* ── FORGOT PASSWORD MODAL ──────────────────────────────────── */}
       {showForgotPassword && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
-          style={{ background: 'rgba(26,44,68,0.55)', backdropFilter: 'blur(6px)' }}>
-          <div className="rounded-[12px] p-8 max-w-md w-full space-y-6"
-            style={{ background: '#FFFFFF', border: '1px solid #D4DEE9', boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 30px 80px rgba(48,49,61,0.1)', fontFamily: FONT }}>
-            <div className="text-center space-y-1.5">
-              <h3 style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Recuperar senha</h3>
+        <AppModal
+          open={showForgotPassword}
+          onOpenChange={(open) => { if (!open) { setShowForgotPassword(false); setResetEmail(''); setError(null); } }}
+          size="md"
+          className="p-8 space-y-0"
+          title={
+            <div className="text-center space-y-1.5 w-full" style={{ fontFamily: FONT }}>
+              <span className="block" style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Recuperar senha</span>
               <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>Digite seu email para receber o link de recuperação</p>
             </div>
+          }
+        >
+          <div className="space-y-6 pt-6" style={{ fontFamily: FONT }}>
             {resetSuccess && (
               <div className="p-4 rounded-[8px]" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
                 <p style={{ fontSize: '14px', color: '#15803D' }}>✅ Email enviado! Verifique sua caixa de entrada.</p>
@@ -855,19 +871,19 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onSetup, onForg
                   className="placeholder:text-[#BFC8D6] focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)] transition-all" required />
               </div>
               <div className="flex gap-3">
-                <Button type="button" onClick={() => { setShowForgotPassword(false); setResetEmail(''); setError(null); }}
+                <AppButton type="button" onClick={() => { setShowForgotPassword(false); setResetEmail(''); setError(null); }}
                   style={{ flex: 1, background: 'rgba(239,239,239,0.3)', border: '1px solid #D4DEE9', borderRadius: '6px', height: '44px', fontSize: '14px', color: '#414552', fontWeight: 300 }}
                   className="transition-all hover:border-[#A497FC]">Cancelar
-                </Button>
-                <Button type="submit" disabled={loading}
+                </AppButton>
+                <AppButton type="submit" loading={loading}
                   style={{ flex: 1, background: '#675DFF', borderRadius: '6px', height: '44px', fontSize: '14px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
                   className="transition-all hover:brightness-110 disabled:opacity-60">
                   {loading ? 'Enviando...' : 'Enviar link'}
-                </Button>
+                </AppButton>
               </div>
             </form>
           </div>
-        </div>
+        </AppModal>
       )}
     </div>
   );

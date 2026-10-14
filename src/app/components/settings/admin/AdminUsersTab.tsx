@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MoreVertical, Crown, UserCheck, UserX, Trash2, Eye } from 'lucide-react';
-import { Input } from '../../ui/input';
-import { Button } from '../../ui/button';
+import { MoreVertical, Crown, UserCheck, UserX, Trash2, Eye } from 'lucide-react';
 
 interface User {
   id: string;
@@ -40,8 +38,6 @@ interface AdminUsersTabProps {
 }
 
 export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
-  searchTerm,
-  setSearchTerm,
   filteredUsers,
   loading,
   onActivatePlan,

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Loader2, Users, CheckCircle, AlertCircle, Eye, EyeOff, Lock, User } from 'lucide-react';
 import { startSessionExpiryTimer } from '../../utils/api';
+import { AppButton } from '../base/AppButton';
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
 
@@ -289,19 +290,13 @@ export default function AcceptInvitePage({ onSuccess }: AcceptInvitePageProps) {
                         )}
 
                         {/* Submit */}
-                        <button
+                        <AppButton
                             type="submit"
-                            disabled={submitting}
-                            className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                            loading={submitting}
+                            className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
                         >
-                            {submitting ? (
-                                <><Loader2 className="w-4 h-4 animate-spin" /> A processar…</>
-                            ) : hasAccount ? (
-                                'Aceitar convite'
-                            ) : (
-                                'Criar conta e aceitar convite'
-                            )}
-                        </button>
+                            {submitting ? 'A processar…' : hasAccount ? 'Aceitar convite' : 'Criar conta e aceitar convite'}
+                        </AppButton>
 
                         {/* Switch between modes */}
                         <p className="text-center text-xs text-muted-foreground">

@@ -1,5 +1,4 @@
-import React from 'react';
-import { Check, ArrowRight, Settings } from 'lucide-react';
+import { Check, Settings } from 'lucide-react';
 
 interface IntegrationCardProps {
     title: string;

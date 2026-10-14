@@ -1,5 +1,5 @@
 // INBOX: Modal de Conexão Telegram via Bot Token
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
@@ -22,7 +22,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
     const [botName, setBotName] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
+    const [, setConnectionStatus] = useState<ConnectionStatus>('idle');
     const [botInfo, setBotInfo] = useState<{ username?: string; first_name?: string } | null>(null);
 
     // Preencher dados quando for edição

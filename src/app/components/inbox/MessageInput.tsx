@@ -33,7 +33,7 @@ interface MessageInputProps {
 export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversationId, disabled, isSending, onAddLocalMessage, onUpdateLocalMessageProgress, onFailLocalMessage }: MessageInputProps) {
     const [content, setContent] = useState('');
     const [isRecording, setIsRecording] = useState(false);
-    const [uploadWarning, setUploadWarning] = useState(false);
+    const [uploadWarning] = useState(false);
     const [isSendingAudio, setIsSendingAudio] = useState(false);
 
     // Tracks attachment IDs that have been "sent" as in-chat bubbles (detached from composer)
@@ -46,9 +46,6 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         addFiles,
         removeAttachment,
         retryUpload,
-        clearAttachments,
-        allUploadsCompleted,
-        isUploading,
     } = useConversationUploadQueue(conversationId);
     const [recordingTime, setRecordingTime] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);

@@ -1,4 +1,4 @@
-import { User, Settings, LogOut, Lock } from 'lucide-react';
+import { Settings, LogOut } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,9 +21,7 @@ interface AvatarPopoverProps {
 
 export default function AvatarPopover({
   user,
-  onProfile,
   onSettings,
-  onChangePassword,
   onLogout,
   language,
   isDark = true,

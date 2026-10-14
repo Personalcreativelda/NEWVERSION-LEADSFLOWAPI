@@ -1,4 +1,5 @@
-import { Users as UsersIcon, Target, CheckCircle2, TrendingUp, XCircle } from 'lucide-react';
+import { Target, CheckCircle2, TrendingUp, XCircle } from 'lucide-react';
+import { DashboardCard } from '../base/DashboardCard';
 
 interface StatsCardsProps {
   totalLeads: number;
@@ -26,7 +27,7 @@ interface StatsCardsProps {
   isDark?: boolean;
 }
 
-export default function StatsCards({ totalLeads, leadsNovosHoje, leadsFechados, leads = [], limites, isDark = false }: StatsCardsProps) {
+export default function StatsCards({ leads = [] }: StatsCardsProps) {
   // Contar leads por status real
   const leadsNovos = leads.filter(lead => {
     const status = lead.status?.toLowerCase().replace(/_/g, ' ');
@@ -94,11 +95,8 @@ export default function StatsCards({ totalLeads, leadsNovosHoje, leadsFechados, 
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (
-          <div
-            key={index}
-            className="rounded-xl p-5 transition-all duration-200 bg-card border border-border enterprise-card enterprise-card-secondary"
-          >
-            <div className="flex items-center gap-3">
+          <DashboardCard key={index} disableContentPadding>
+            <div className="flex items-center gap-3 p-5">
               <div className={`w-10 h-10 rounded-lg ${stat.iconBg} flex items-center justify-center flex-shrink-0`}>
                 <Icon className={`w-5 h-5 ${stat.iconColor}`} />
               </div>
@@ -111,7 +109,7 @@ export default function StatsCards({ totalLeads, leadsNovosHoje, leadsFechados, 
                 </p>
               </div>
             </div>
-          </div>
+          </DashboardCard>
         );
       })}
     </div>

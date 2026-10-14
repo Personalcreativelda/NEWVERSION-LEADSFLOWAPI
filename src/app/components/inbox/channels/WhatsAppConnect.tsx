@@ -1,6 +1,6 @@
 // INBOX: Modal de Conexão WhatsApp via Evolution API (QR Code)
 // Usa a mesma lógica da página de integrações
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
 import { QrCode, Smartphone, Check, AlertCircle, RefreshCw, Loader2, Wifi, XCircle, CheckCircle } from 'lucide-react';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { ChannelsList } from '../../inbox/channels/ChannelsList';
 
 export default function InboxSettings() {

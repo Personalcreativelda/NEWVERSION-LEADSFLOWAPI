@@ -1,7 +1,8 @@
 import { X, User, Phone, CheckCircle, MessageSquare, Edit2, Trash2, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { useConfirm } from '../ui/ConfirmDialog';
 import { toast } from"sonner";
+import { AppModal } from '../base/AppModal';
+import { AppButton } from '../base/AppButton';
 
 interface WhatsAppContact {
  nome: string;
@@ -142,8 +143,6 @@ export default function PreviewWhatsAppLeadsModal({
  }
  }, [contacts, existingLeads, leadsLimit, currentLeadsCount]);
 
- if (!isOpen) return null;
-
  const toggleContact = (index: number) => {
  const newSelected = new Set(selectedContacts);
  if (newSelected.has(index)) {
@@ -220,10 +219,12 @@ export default function PreviewWhatsAppLeadsModal({
  const allSelected = selectedContacts.size === editedContacts.length && editedContacts.length > 0;
 
  return (
- <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
- <div className="bg-card text-foreground rounded-2xl shadow-xl border border-border max-w-4xl w-full max-h-[90vh] flex flex-col">
- {/* Header */}
- <div className="flex items-center justify-between p-6 border-b border-border">
+ <AppModal
+ open={isOpen}
+ onOpenChange={(open) => !open && onClose()}
+ size="xl"
+ className="p-0 gap-0 max-h-[90vh] flex flex-col"
+ title={
  <div className="flex items-center gap-3">
  <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
  <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -232,19 +233,32 @@ export default function PreviewWhatsAppLeadsModal({
  <h2 className="text-xl font-semibold text-foreground">
  Contatos Importados do WhatsApp
  </h2>
- <p className="text-sm text-muted-foreground">
+ <p className="text-sm text-muted-foreground font-normal">
  {editedContacts.length} contato(s) disponível(is) para importação no CRM
  </p>
  </div>
  </div>
- <button
- onClick={onClose}
- className="p-2 hover:bg-muted/50 rounded-lg transition-colors"
+ }
+ footer={
+ <div className="flex items-center justify-between gap-3 w-full">
+ <p className="text-sm text-muted-foreground hidden sm:block">
+ Os contatos selecionados serão importados como leads no CRM
+ </p>
+ <div className="flex gap-3 ml-auto">
+ <AppButton variant="outline" onClick={onClose} disabled={loading}>
+ Cancelar
+ </AppButton>
+ <AppButton
+ onClick={handleImport}
+ disabled={selectedContacts.size === 0 || loading || editedContacts.length === 0}
+ loading={loading}
  >
- <X className="w-5 h-5 text-muted-foreground" />
- </button>
+ {loading ? 'Importando...' : `Importar para CRM (${selectedContacts.size})`}
+ </AppButton>
  </div>
-
+ </div>
+ }
+ >
  {/* Lista de Contatos */}
  <div className="flex-1 overflow-y-auto p-6">
  {/* Alertas informativos */}
@@ -431,41 +445,7 @@ export default function PreviewWhatsAppLeadsModal({
  </div>
  )}
  </div>
-
- {/* Footer */}
- <div className="flex items-center justify-between gap-3 p-6 border-t border-border">
- <p className="text-sm text-muted-foreground">
- Os contatos selecionados serão importados como leads no CRM
- </p>
- <div className="flex gap-3">
- <button
- onClick={onClose}
- disabled={loading}
- className="px-6 py-2.5 text-foreground/80 hover:bg-muted/50 rounded-lg transition-colors disabled:opacity-50"
- >
- Cancelar
- </button>
- <button
- onClick={handleImport}
- disabled={selectedContacts.size === 0 || loading || editedContacts.length === 0}
- className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
- >
- {loading ? (
- <>
- <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
- Importando...
- </>
- ) : (
- <>
- <CheckCircle className="w-4 h-4" />
- Importar para CRM ({selectedContacts.size})
- </>
- )}
- </button>
- </div>
- </div>
- </div>
- </div>
+ </AppModal>
  );
 }
 

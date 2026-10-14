@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { teamApi } from '../../../services/api/inbox';
 import type { TeamMember } from '../../../types/inbox';
-import { UserCheck, UserPlus, Trash2, Pencil, X, Check, Loader2, Users } from 'lucide-react';
+import { UserPlus, Trash2, Pencil, X, Check, Loader2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ROLE_LABELS: Record<string, string> = {

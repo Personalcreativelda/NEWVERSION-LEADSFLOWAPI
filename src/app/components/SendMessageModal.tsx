@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { apiRequest } from '../utils/api';
 import { toast } from 'sonner';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { projectId } from '../utils/supabase/info';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Alert, AlertDescription } from './ui/alert';
 import { Switch } from './ui/switch';
-import { MessageSquare, Send, Loader2, CheckCircle2, XCircle, Wifi, WifiOff, AlertCircle, Rocket, Crown, Info, ChevronDown, Phone } from 'lucide-react';
+import { MessageSquare, Send, Loader2, CheckCircle2, Wifi, WifiOff, AlertCircle, Rocket, Crown, Info, ChevronDown, Phone } from 'lucide-react';
 import { channelsApi } from '../services/api/inbox';
 
 interface WhatsAppChannel {

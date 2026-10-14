@@ -229,7 +229,7 @@ interface SalesFunnelProps {
 }
 
 // Card do Lead - design limpo e moderno
-const LeadCard = memo(({ lead, isDark, stage, onEdit, onDelete, onResetToInitial, onEmail, onWhatsApp, onCall, onViewDetails, currency = 'USD' as CurrencyCode, stages = [], onMoveToStage }: any) => {
+const LeadCard = memo(({ lead, stage, onEdit, onDelete, onResetToInitial, onWhatsApp, onCall, onViewDetails, currency = 'USD' as CurrencyCode, stages = [], onMoveToStage }: any) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: lead.id,
     data: { lead }
@@ -897,11 +897,6 @@ export default function SalesFunnel({
       [stageId]: !(prev[stageId] ?? true)
     }));
   }, []);
-
-  // Calcular quantas colunas estão expandidas
-  const expandedCount = useMemo(() => {
-    return stages.filter(stage => expandedColumns[stage.id] ?? true).length;
-  }, [stages, expandedColumns]);
 
   const handleLoadMore = useCallback((stageId: string, total: number) => {
     setVisibleCounts(prev => {

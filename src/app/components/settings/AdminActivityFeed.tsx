@@ -1,10 +1,10 @@
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  Clock, Activity, MessageSquare, 
+import {
+  Clock, Activity, MessageSquare,
   UserPlus, Settings, Shield, AlertCircle, Info,
-  Monitor, Globe, BarChart2, Users, Bot,
+  BarChart2, Users, Bot,
   CreditCard, Plug, Megaphone, GitBranch
 } from 'lucide-react';
 

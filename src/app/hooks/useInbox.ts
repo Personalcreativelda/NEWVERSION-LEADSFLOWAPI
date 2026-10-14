@@ -16,7 +16,7 @@
  *
  *  3. Draft messages persist across navigations and refreshes via inboxStore.
  */
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useRef, useMemo } from 'react';
 import { useConversationsQuery } from './queries/useConversationsQuery';
 import { useMessages } from './useMessages';
 import { useWebSocket } from './useWebSocket';

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  Brain, RefreshCw, Flame, TrendingDown, TrendingUp, Star,
-  Sparkles, CheckCircle2, Calendar, Target, MessageSquare, Mail,
-  Zap, AlertCircle, ArrowRight, Lightbulb, Activity, Copy, Send,
-  ChevronDown, ChevronUp, Edit3, X, Instagram, Facebook, Phone
+  Brain, RefreshCw, Flame, TrendingUp, Star,
+  Sparkles, CheckCircle2, MessageSquare, Mail,
+  Zap, AlertCircle, ArrowRight, Lightbulb, Copy, Send,
+  ChevronDown, ChevronUp, Edit3, Instagram, Facebook
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
@@ -256,13 +256,6 @@ export default function AIInsightsPage() {
       setEditingMessage(null);
       toast.success('Mensagem atualizada!');
     }
-  };
-
-  const getRiskDescription = (lead: LeadInsight, days?: number) => {
-    if (lead.risk_level === 'high') {
-      return days === 0 ? 'Sem contato hoje' : `Sem resposta há ${days} dia${days !== 1 ? 's' : ''}`;
-    }
-    return `Engajamento: ${lead.engagement_score}%`;
   };
 
   return (

@@ -13,7 +13,6 @@ import {
  Target,
  DollarSign,
  BarChart3,
- X,
  Loader2,
  CheckCircle2
 } from 'lucide-react';

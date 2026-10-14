@@ -1,7 +1,7 @@
 import { Users, MessageSquare, Mail, Crown, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
 import { useState } from 'react';
-import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
+import { DashboardCard } from '../base/DashboardCard';
 
 interface PlanoWidgetProps {
   limites: {
@@ -23,7 +23,7 @@ interface PlanoWidgetProps {
   onRefresh?: () => Promise<void>;
 }
 
-export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, subscriptionStatus, onUpgrade, userPlan = 'free', isTrial = false, onRefresh }: PlanoWidgetProps) {
+export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, subscriptionStatus, onUpgrade, userPlan = 'free', onRefresh }: PlanoWidgetProps) {
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -281,67 +281,66 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
           const Icon = card.icon;
           
           return (
-            <div
+            <DashboardCard
               key={index}
-              className={`bg-card rounded-xl p-4 sm:p-5 border shadow-sm transition-all duration-200 ${
-                card.esgotado 
-                  ? 'border-red-500/40 ring-1 ring-red-500/20' 
-                  : 'border-border hover:shadow-md'
-              }`}
+              disableContentPadding
+              className={card.esgotado ? 'ring-1 ring-red-500/40' : undefined}
             >
-              {/* Header com ícone */}
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${card.esgotado ? 'bg-red-500/10' : 'bg-muted'}`}>
-                  <Icon className={`w-5 h-5 ${card.iconColor}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className={`text-sm font-medium truncate ${card.esgotado ? 'text-red-500 dark:text-red-400' : 'text-foreground'}`}>
-                    {card.title}
-                  </h4>
-                  <p className={`text-xs ${card.esgotado ? 'text-red-400 font-semibold' : 'text-muted-foreground'}`}>
-                    {card.label}
-                  </p>
-                </div>
-              </div>
-
-              {/* Layout Horizontal: Valores + Círculo */}
-              <div className="flex items-center justify-between">
-                {/* Valores */}
-                <div>
-                  <div className="flex items-baseline gap-1 mb-1">
-                    <span className={`text-2xl font-bold ${card.esgotado ? 'text-red-500 dark:text-red-400' : 'text-foreground'}`}>
-                      {card.total === -1 ? '∞' : card.restante.toLocaleString()}
-                    </span>
-                    <span className={`text-xs ${card.esgotado ? 'text-red-400/70' : 'text-muted-foreground'}`}>
-                      / {card.total === -1 ? '∞' : card.total.toLocaleString()}
-                    </span>
+              <div className="p-4 sm:p-5">
+                {/* Header com ícone */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${card.esgotado ? 'bg-red-500/10' : 'bg-muted'}`}>
+                    <Icon className={`w-5 h-5 ${card.iconColor}`} />
                   </div>
-                  {card.esgotado ? (
-                    <button
-                      onClick={onUpgrade}
-                      className="mt-1 px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
-                    >
-                      <Crown className="w-3 h-3" />
-                      Fazer Upgrade
-                    </button>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Restantes
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`text-sm font-medium truncate ${card.esgotado ? 'text-red-500 dark:text-red-400' : 'text-foreground'}`}>
+                      {card.title}
+                    </h4>
+                    <p className={`text-xs ${card.esgotado ? 'text-red-400 font-semibold' : 'text-muted-foreground'}`}>
+                      {card.label}
                     </p>
-                  )}
+                  </div>
                 </div>
 
-                {/* Círculo de Progresso */}
-                <div className="relative flex-shrink-0">
-                  <CircularProgress percentage={card.percentual} colors={card.colors} />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className={`text-sm font-bold ${card.colors.text}`}>
-                      {card.percentual === 0 ? '0' : Math.min(100, Math.ceil(card.percentual))}%
-                    </span>
+                {/* Layout Horizontal: Valores + Círculo */}
+                <div className="flex items-center justify-between">
+                  {/* Valores */}
+                  <div>
+                    <div className="flex items-baseline gap-1 mb-1">
+                      <span className={`text-2xl font-bold ${card.esgotado ? 'text-red-500 dark:text-red-400' : 'text-foreground'}`}>
+                        {card.total === -1 ? '∞' : card.restante.toLocaleString()}
+                      </span>
+                      <span className={`text-xs ${card.esgotado ? 'text-red-400/70' : 'text-muted-foreground'}`}>
+                        / {card.total === -1 ? '∞' : card.total.toLocaleString()}
+                      </span>
+                    </div>
+                    {card.esgotado ? (
+                      <button
+                        onClick={onUpgrade}
+                        className="mt-1 px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        <Crown className="w-3 h-3" />
+                        Fazer Upgrade
+                      </button>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Restantes
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Círculo de Progresso */}
+                  <div className="relative flex-shrink-0">
+                    <CircularProgress percentage={card.percentual} colors={card.colors} />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className={`text-sm font-bold ${card.colors.text}`}>
+                        {card.percentual === 0 ? '0' : Math.min(100, Math.ceil(card.percentual))}%
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </DashboardCard>
           );
         })}
       </div>

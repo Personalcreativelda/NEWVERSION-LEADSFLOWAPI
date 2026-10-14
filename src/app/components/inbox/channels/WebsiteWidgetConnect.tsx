@@ -1,9 +1,9 @@
 // INBOX: Modal de Conexão Website Widget (Chat embed para sites)
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
-import { Globe, Check, AlertCircle, Loader2, Copy, Code, ExternalLink, CheckCircle } from 'lucide-react';
+import { Globe, Check, AlertCircle, Loader2, Copy, Code, CheckCircle } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 

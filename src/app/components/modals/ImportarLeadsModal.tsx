@@ -3,7 +3,6 @@ import { leadsApi } from '../../utils/api';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Button } from '../ui/button';
-import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, Download, X, Star, Zap, Rocket, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -422,7 +421,7 @@ export default function ImportarLeadsModal({
 
  return (
  <Dialog open={isOpen} onOpenChange={handleClose}>
- <DialogContent className="bg-card rounded-2xl max-w-xl w-full max-h-[85vh] flex flex-col shadow-lg animate-in zoom-in-95 duration-200">
+ <DialogContent className="bg-card max-w-xl w-full max-h-[85vh] flex flex-col shadow-lg animate-in zoom-in-95 duration-200">
  
  {/* Header */}
  <DialogHeader className="px-5 py-4 border-b border-border shrink-0 relative">

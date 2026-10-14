@@ -21,9 +21,5 @@
     }
   },
   "include": ["src"],
-  "exclude": [
-    "src/app/supabase",
-    "src/app/components/Dashboard_import_fix.tsx"
-  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

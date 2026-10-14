@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   Bell, X, Check, Trash2, UserPlus, UserMinus, TrendingUp, 
   AlertTriangle, Crown, PartyPopper, Target, Calendar, 
-  Sparkles, Rocket, CheckCircle2, XCircle, Clock, CreditCard, ShieldOff
+  Sparkles, Rocket, CheckCircle2, Clock, CreditCard, ShieldOff
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -12,7 +12,6 @@ import {
 } from '../ui/popover';
 import { Badge } from '../ui/badge';
 import { apiRequest } from '../../utils/api';
-import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '../ui/utils';
 
 // ✅ TIPOS DE NOTIFICAÇÃO RELEVANTES AO CRM
@@ -368,15 +367,6 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
   const handleMarkAsReadOnly = async (e: React.MouseEvent, notificationId: string) => {
     e.stopPropagation();
     await markAsRead(notificationId, false);
-  };
-
-  const createTestNotification = async () => {
-    try {
-      await apiRequest('/notifications/test', 'POST');
-      await loadNotifications();
-    } catch (error) {
-      console.error('Failed to create test notification:', error);
-    }
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;

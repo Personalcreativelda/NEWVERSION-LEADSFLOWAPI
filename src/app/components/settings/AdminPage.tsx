@@ -1,14 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import {
-  Users, Bell, History, ChevronRight, Megaphone, Star, AlertTriangle, Loader2, MessageSquare, Search
+  Bell, Star, AlertTriangle, Loader2, MessageSquare, Search
 } from 'lucide-react';
 
 // New Modular Components
-import { AdminStatsCards } from './admin/AdminStatsCards';
-import { AdminRevenueBreakdown } from './admin/AdminRevenueBreakdown';
 import { AdminUsersTab } from './admin/AdminUsersTab';
 import { AdminActivityTab } from './admin/AdminActivityTab';
 import { AdminMarketingTab } from './admin/AdminMarketingTab';
@@ -48,7 +46,7 @@ interface AdminPageProps {
   adminEmail?: string;
 }
 
-export default function AdminPage({ onBack, adminEmail }: AdminPageProps = {}) {
+export default function AdminPage(_props: AdminPageProps = {}) {
   const confirm = useConfirm();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);

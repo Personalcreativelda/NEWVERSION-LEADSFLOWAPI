@@ -4,7 +4,6 @@ import {
   Paperclip, Image as ImageIcon, ChevronDown, ChevronUp,
   Smile, Bold, Italic, Link2, Check, Eye, Save, Trash2, Type
 } from 'lucide-react';
-import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
@@ -12,6 +11,8 @@ import { toast } from "sonner";
 import { emailsApi } from '../../utils/api';
 import { EMAIL_TEMPLATES } from '../../utils/emailTemplates';
 import { Layout } from 'lucide-react';
+import { AppModal } from '../base/AppModal';
+import { AppButton } from '../base/AppButton';
 
 interface Lead {
   id: string;
@@ -592,36 +593,70 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
-      <div
-        style={{
-          backgroundColor: 'hsl(var(--card))',
-          color: 'hsl(var(--card-foreground))',
-        }}
-        className="bg-card text-card-foreground rounded-2xl shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
-      >
-
-        {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-              <Mail className="w-5 h-5 text-white" />
-            </div>
-            <h2 className="text-xl text-white font-bold">Nova Campanha de Email</h2>
+    <AppModal
+      open={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      size="lg"
+      className="p-0 gap-0 max-h-[90vh] flex flex-col"
+      title={
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+            <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
-          <button
-            onClick={onClose}
-            className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <span>{editingCampaign ? 'Editar Campanha de Email' : 'Nova Campanha de Email'}</span>
         </div>
+      }
+      footer={
+        <div className="flex items-center justify-between gap-3 w-full">
+          <AppButton
+            type="button"
+            variant="outline"
+            onClick={handleSaveDraft}
+          >
+            <Save />
+            Salvar Rascunho
+          </AppButton>
 
+          <div className="flex gap-3">
+            <AppButton
+              type="button"
+              variant="outline"
+              onClick={handleTestEmail}
+              disabled={isSending || !subject.trim() || (!message.trim() && !htmlContent.trim())}
+            >
+              <Eye />
+              Enviar Teste
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSending}
+            >
+              Cancelar
+            </AppButton>
+            <AppButton
+              onClick={handleSend}
+              disabled={isSending || recipientCount === 0}
+              loading={isSending}
+              className="bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white font-semibold px-6 min-w-[140px]"
+            >
+              {isSending ? (
+                'Processando...'
+              ) : (
+                <>
+                  <Send />
+                  {scheduleMode === 'scheduled' ? 'Agendar' : 'Enviar Agora'}
+                </>
+              )}
+            </AppButton>
+          </div>
+        </div>
+      }
+    >
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="px-6 pb-2 space-y-6">
 
           {/* Nome da Campanha */}
           <div>
@@ -925,15 +960,14 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             </Label>
 
             <div className="flex gap-2">
-              <Button
+              <AppButton
                 type="button"
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2"
               >
-                <Paperclip className="w-4 h-4" />
+                <Paperclip />
                 Adicionar anexo
-              </Button>
+              </AppButton>
             </div>
 
             <input
@@ -1086,66 +1120,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            backgroundColor: 'hsl(var(--card))',
-            borderTopColor: 'hsl(var(--border))',
-          }}
-          className="sticky bottom-0 bg-card border-t border-border px-6 py-4 flex items-center justify-between gap-3"
-        >
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleSaveDraft}
-            className="flex items-center gap-2 border-border text-foreground hover:bg-muted/50"
-          >
-            <Save className="w-4 h-4" />
-            Salvar Rascunho
-          </Button>
-
-          <div className="flex gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleTestEmail}
-              disabled={isSending || !subject.trim() || (!message.trim() && !htmlContent.trim())}
-              className="border-border text-foreground hover:bg-muted/50"
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              Enviar Teste
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSending}
-              className="border-border text-foreground hover:bg-muted/50"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSend}
-              disabled={isSending || recipientCount === 0}
-              className="bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white font-semibold px-6 min-w-[140px]"
-            >
-              {isSending ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                  Processando...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4 mr-2" />
-                  {scheduleMode === 'scheduled' ? 'Agendar' : 'Enviar Agora'}
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+    </AppModal>
   );
 }
 

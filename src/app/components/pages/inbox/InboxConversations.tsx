@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { ConversationList } from '../../inbox/ConversationList';
 import { useInbox } from '../../../hooks/useInbox';
@@ -8,7 +8,7 @@ import { conversationsApi, contactsApi, groupsApi, teamApi, channelsApi } from '
 import {
     Search, Filter, Plus, X, Wifi, WifiOff, RefreshCw,
     PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-    Maximize2, Minimize2, ChevronLeft, ChevronRight,
+    Maximize2, Minimize2,
     Tag, Users, Settings2, Trash2, CheckSquare, Square,
     UserCheck, UserX, CheckCircle2, Clock
 } from 'lucide-react';
@@ -53,7 +53,6 @@ export default function ConversasConversations({
         deleteMessage,
         forwardMessage,
         wsConnected,
-        lastUpdate
     } = useInbox();
 
     const confirm = useConfirm();
@@ -69,7 +68,7 @@ export default function ConversasConversations({
 
     const [searchQuery, setSearchQuery] = useState('');
     const [showNewConversationModal, setShowNewConversationModal] = useState(false);
-    const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+    const [, setIsCreatingConversation] = useState(false);
     const [isEditingLead, setIsEditingLead] = useState(false);
     const [isSelectMode, setIsSelectMode] = useState(false);
     const [selectedConvIds, setSelectedConvIds] = useState<Set<string>>(new Set());
@@ -78,7 +77,7 @@ export default function ConversasConversations({
     type QuickFilter = 'all' | 'unread' | 'tags' | 'groups' | 'mine' | 'unassigned' | 'pending' | 'resolved';
 
     // Team members for assignee dropdown/filters
-    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+    const [, setTeamMembers] = useState<TeamMember[]>([]);
     useEffect(() => {
         teamApi.getMembers().then(setTeamMembers).catch(() => {});
     }, []);
@@ -475,7 +474,6 @@ export default function ConversasConversations({
     // On mobile: show list OR chat (not both). Details never shown.
     // On tablet: conversation list + chat. Details hidden unless explicitly opened.
     // On desktop: all three panels, respecting layout state.
-    const showConvList = isMobile ? !selectedConversation : !layout.conversationListCollapsed && !layout.focusMode;
     const showDetailsPanel = !isMobile && !isTablet && !layout.detailsPanelCollapsed && !layout.focusMode && !!selectedConversation;
     const convListWidth = layout.conversationListWidth;
     const detailsWidth = layout.detailsPanelWidth;

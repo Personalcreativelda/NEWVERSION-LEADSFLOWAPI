@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { plansApi } from '../../utils/api';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
-import { Check, Loader2, Zap, Rocket, CreditCard, Crown, X } from 'lucide-react';
+import { Check, Loader2, Zap, Rocket, Crown } from 'lucide-react';
 import PaymentMethodModal from './PaymentMethodModal';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';

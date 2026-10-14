@@ -20,7 +20,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { conversationsApi } from '../../services/api/inbox';
 import type { ConversationWithDetails } from '../../types/inbox';
-import { STALE, GC } from '../../lib/queryClient';
+import { GC } from '../../lib/queryClient';
 
 // ── Query key helpers ─────────────────────────────────────────────────────────
 

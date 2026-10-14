@@ -1,5 +1,5 @@
 // INBOX: Tela de configurações do Inbox
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ChannelsList } from './channels/ChannelsList';
 import { AssistantsList } from './ai-assistants/AssistantsList';
 

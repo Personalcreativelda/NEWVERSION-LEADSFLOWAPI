@@ -3,9 +3,9 @@ import { X, StickyNote, Calendar, MessageSquare, DollarSign, Plus, Edit2, Trash2
 import { leadNotesApi, scheduledConversationsApi, inboxApi, leadsApi } from '../../utils/api';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import AvatarUploadModal from './AvatarUploadModal';
+import { AppModal } from '../base/AppModal';
 import type { Lead, LeadNote, ScheduledConversation, Message } from '../../types';
 
 // ---------------------------------------------------------------------------
@@ -903,27 +903,8 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  }
  }, [isOpen, lead?.id, initialTab]);
 
- // Close on Escape
- useEffect(() => {
- if (!isOpen) return;
- const handleKeyDown = (e: KeyboardEvent) => {
- if (e.key === 'Escape') onClose();
- };
- window.addEventListener('keydown', handleKeyDown);
- return () => window.removeEventListener('keydown', handleKeyDown);
- }, [isOpen, onClose]);
-
- // Prevent body scroll when open
- useEffect(() => {
- if (isOpen) {
- document.body.style.overflow = 'hidden';
- } else {
- document.body.style.overflow = '';
- }
- return () => {
- document.body.style.overflow = '';
- };
- }, [isOpen]);
+ // Nota: fechar com Escape e bloquear o scroll do body já são feitos
+ // nativamente pelo Radix Dialog (AppModal) — não duplicar aqui.
 
  const handleLeadUpdated = useCallback((updated: Lead) => {
  setCurrentLead(updated);
@@ -931,7 +912,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  onLeadUpdated?.(updated);
  }, [onLeadUpdated]);
 
- if (!isOpen || !currentLead) return null;
+ if (!currentLead) return null;
 
  const displayLead = currentLead;
  const statusCfg = getStatusConfig(displayLead.status);
@@ -939,26 +920,13 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
 
  return (
  <>
- {/* Backdrop */}
- <div
- className="fixed inset-0 z-50 bg-black/60 transition-opacity"
- onClick={onClose}
- aria-hidden="true"
- />
-
- {/* Centered compact modal */}
- <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
- <div
- className="w-full max-w-md rounded-2xl shadow-2xl transition-transform duration-300 ease-out flex flex-col max-h-[90vh] bg-card text-foreground"
- role="dialog"
- aria-modal="true"
- aria-label={`Detalhes do lead ${displayLead.nome}`}
- onClick={(e) => e.stopPropagation()}
- >
- {/* ===== Header ===== */}
- <div className={`flex-shrink-0 border-b border-border`}>
- {/* Lead identity card - Compact */}
- <div className="p-4 flex items-center gap-3">
+ <AppModal
+ open={isOpen}
+ onOpenChange={(open) => !open && onClose()}
+ size="md"
+ className="p-0 gap-0 max-h-[90vh] flex flex-col"
+ title={
+ <div className="flex items-center gap-3">
  {/* Avatar clicável com overlay de upload */}
  <div
  className="relative group cursor-pointer"
@@ -979,12 +947,12 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  </div>
  </div>
  <div className="flex-1 min-w-0">
- <h3 className={`text-sm font-semibold truncate text-foreground`}>
+ <h3 className="text-sm font-semibold truncate text-foreground">
  {displayLead.nome}
  </h3>
  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
  {displayLead.empresa && (
- <span className={`text-xs truncate text-muted-foreground`}>
+ <span className="text-xs truncate text-muted-foreground font-normal">
  {displayLead.empresa}
  </span>
  )}
@@ -993,17 +961,11 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  </span>
  </div>
  </div>
- <button
- onClick={onClose}
- className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
- aria-label="Fechar"
- >
- <X className="w-4 h-4" />
- </button>
  </div>
-
+ }
+ >
  {/* Tab bar - Compact */}
- <div className="flex px-4 gap-1 border-border">
+ <div className="flex px-4 gap-1 border-b border-border flex-shrink-0">
  {TABS.map((tab) => {
  const isActive = activeTab === tab.key;
  const Icon = tab.icon;
@@ -1033,12 +995,11 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  )}
 
  {isActive && (
- <span className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-blue-600 dark:bg-blue-400`} />
+ <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-blue-600 dark:bg-blue-400" />
  )}
  </button>
  );
  })}
- </div>
  </div>
 
  {/* ===== Content ===== */}
@@ -1048,8 +1009,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  {activeTab === 'historico' && <HistoricoTab lead={displayLead} isDark={isDark} />}
  {activeTab === 'valor' && <ValorTab lead={displayLead} isDark={isDark} onLeadUpdated={handleLeadUpdated} />}
  </div>
- </div>
- </div>
+ </AppModal>
 
  {/* Modal de upload de avatar */}
  <AvatarUploadModal

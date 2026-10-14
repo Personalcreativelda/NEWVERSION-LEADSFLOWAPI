@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { AlertCircle, CheckCircle, Eye, EyeOff, Lock, Mail, MailCheck, Zap, Loader2, Star } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, EyeOff, MailCheck, Zap, Star } from 'lucide-react';
 import { authApi } from '../../utils/api';
 import { metaEvents } from '../MetaPixel';
+import { AppButton } from '../base/AppButton';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -24,7 +23,7 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const FONT = 'sohne-var, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+const FONT = '"Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
 
 interface SignupPageProps {
   onSuccess: () => void;
@@ -173,7 +172,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
             </div>
             {isConfirmation ? (
               <div className="flex flex-col gap-3">
-                <Button
+                <AppButton
                   onClick={async () => {
                     if (!pendingEmail || resendState === 'loading') return;
                     try {
@@ -185,19 +184,20 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
                       setResendMessage(resendErr?.message || 'Não foi possível reenviar o email.');
                     }
                   }}
-                  disabled={!pendingEmail || resendState === 'loading'}
+                  disabled={!pendingEmail}
+                  loading={resendState === 'loading'}
                   style={{ width: '100%', background: 'rgba(239,239,239,0.3)', border: '1px solid #D4DEE9', borderRadius: '6px', height: '44px', fontSize: '14px', color: '#414552', fontWeight: 300 }}
                   className="transition-all hover:border-[#A497FC] disabled:opacity-60">
                   {resendState === 'loading' ? 'Reenviando...' : 'Reenviar email de confirmação'}
-                </Button>
+                </AppButton>
                 {resendMessage && (
                   <p style={{ fontSize: '13px', color: resendState === 'error' ? '#E61947' : '#059669' }}>{resendMessage}</p>
                 )}
-                <Button onClick={onSwitchToLogin}
+                <AppButton onClick={onSwitchToLogin}
                   style={{ width: '100%', background: '#675DFF', borderRadius: '6px', height: '44px', fontSize: '14px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
                   className="transition-all hover:brightness-110">
                   Ir para o login
-                </Button>
+                </AppButton>
                 <button type="button" style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}
                   className="transition-colors hover:text-[#533AFD]"
                   onClick={() => { setStatus('idle'); setPendingEmail(''); setError(''); setResendState('idle'); setResendMessage(''); }}>
@@ -298,7 +298,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
             </div>
 
             {/* Submit */}
-            <Button type="submit" disabled={loading || !agreeTerms}
+            <AppButton type="submit" disabled={!agreeTerms} loading={loading}
               style={{
                 width: '100%', height: '50px', fontSize: '16px', fontWeight: 500,
                 borderRadius: '6px', border: 'none', marginTop: '8px',
@@ -308,11 +308,8 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
                 transition: 'background-color 200ms ease',
               }}
               className="transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60">
-              {loading
-                ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Criando conta...</span>
-                : 'Criar conta'
-              }
-            </Button>
+              {loading ? 'Criando conta...' : 'Criar conta'}
+            </AppButton>
           </form>
 
           {/* Divider */}
@@ -323,11 +320,11 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
           </div>
 
           {/* Google */}
-          <Button type="button" onClick={handleGoogleSignup} disabled={loading}
+          <AppButton type="button" onClick={handleGoogleSignup} disabled={loading}
             style={{ width: '100%', height: '48px', fontSize: '15px', fontWeight: 400, borderRadius: '6px', background: '#FFFFFF', border: '1px solid #D4DEE9', color: '#414552', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
             className="flex items-center justify-center gap-3 transition-all hover:border-[#A497FC] hover:shadow-sm disabled:opacity-50">
             <GoogleIcon /><span>Registrar com Google</span>
-          </Button>
+          </AppButton>
 
           {/* Rating — dentro do card */}
           {ratings && ratings.total > 0 && (

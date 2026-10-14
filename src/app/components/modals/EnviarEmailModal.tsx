@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
-import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
-import { Mail, X, Loader2, Send } from 'lucide-react';
+import { Mail, X, Send } from 'lucide-react';
+import { AppButton } from '../base/AppButton';
+import { FormField } from '../base/FormField';
 
 interface EnviarEmailModalProps {
   isOpen: boolean;
@@ -68,8 +68,8 @@ export default function EnviarEmailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="bg-card text-foreground rounded-2xl max-w-lg w-full shadow-xl border border-border animate-in zoom-in-95 duration-200">
-        
+      <DialogContent className="bg-card text-foreground max-w-lg w-full shadow-xl border border-border animate-in zoom-in-95 duration-200">
+
         {/* Header */}
         <DialogHeader className="px-5 py-4 border-b border-border flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -108,10 +108,7 @@ export default function EnviarEmailModal({
           </div>
 
           {/* Assunto */}
-          <div className="space-y-2">
-            <Label htmlFor="assunto" className="text-sm font-medium text-foreground">
-              Assunto
-            </Label>
+          <FormField label="Assunto" htmlFor="assunto">
             <Input
               id="assunto"
               type="text"
@@ -121,13 +118,10 @@ export default function EnviarEmailModal({
               disabled={loading}
               className="w-full"
             />
-          </div>
+          </FormField>
 
           {/* Mensagem */}
-          <div className="space-y-2">
-            <Label htmlFor="mensagem" className="text-sm font-medium text-foreground">
-              Mensagem
-            </Label>
+          <FormField label="Mensagem" htmlFor="mensagem" hint={`${mensagem.length} caracteres`}>
             <Textarea
               id="mensagem"
               placeholder={`Olá ${leadNome},\n\nEspero que esteja bem!\n\nGostaria de...`}
@@ -137,40 +131,34 @@ export default function EnviarEmailModal({
               rows={8}
               className="w-full resize-none"
             />
-            <p className="text-xs text-muted-foreground">
-              {mensagem.length} caracteres
-            </p>
-          </div>
+          </FormField>
 
         </div>
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-border flex gap-3 justify-end">
-          <Button
+          <AppButton
             variant="outline"
             onClick={handleClose}
             disabled={loading}
-            className="h-9"
           >
             Cancelar
-          </Button>
-          <Button
+          </AppButton>
+          <AppButton
             onClick={handleSend}
             disabled={loading || !assunto.trim() || !mensagem.trim()}
-            className="bg-purple-600 hover:bg-purple-700 text-white h-9"
+            loading={loading}
+            className="bg-purple-600 hover:bg-purple-700 text-white"
           >
             {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Enviando...
-              </>
+              'Enviando...'
             ) : (
               <>
-                <Send className="w-4 h-4 mr-2" />
+                <Send />
                 Enviar Email
               </>
             )}
-          </Button>
+          </AppButton>
         </div>
 
       </DialogContent>

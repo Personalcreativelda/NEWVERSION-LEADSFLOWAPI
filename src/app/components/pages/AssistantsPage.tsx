@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Bot, Search, Plus, Settings, Power, PowerOff, Trash2,
   Briefcase, Headphones, Calendar, Users, ShoppingCart,
@@ -11,7 +11,6 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { assistantsApi, type Assistant, type UserAssistant, type CreateAssistantInput } from '../../services/api/assistants';
 import { channelsApi } from '../../services/api/inbox';
