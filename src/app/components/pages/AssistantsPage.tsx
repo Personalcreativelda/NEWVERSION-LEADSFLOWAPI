@@ -6,13 +6,13 @@ import {
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash, Globe,
   Brain, Smartphone, Cloud, History, Lock, AlertTriangle, Mic,
-  Image, FileText
+  Image, FileText, Upload, BookOpen, FileSpreadsheet, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
-import { assistantsApi, type Assistant, type UserAssistant, type CreateAssistantInput } from '../../services/api/assistants';
+import { assistantsApi, MAX_KNOWLEDGE_FILES, type Assistant, type UserAssistant, type CreateAssistantInput, type KnowledgeFile } from '../../services/api/assistants';
 import { channelsApi } from '../../services/api/inbox';
 import type { Channel } from '../../types/inbox';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
@@ -132,6 +132,13 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([]);
   const [configValues, setConfigValues] = useState<Record<string, any>>({});
   const [actionLoading, setActionLoading] = useState(false);
+  const [knowledgeFiles, setKnowledgeFiles] = useState<KnowledgeFile[]>([]); // base de conhecimento (RAG)
+  const [clientFiles, setClientFiles] = useState<KnowledgeFile[]>([]); // arquivos para enviar ao cliente
+  const [knowledgeLoading, setKnowledgeLoading] = useState(false);
+  const [uploadingKind, setUploadingKind] = useState<'rag' | 'client' | null>(null);
+  const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
+  const [fullTextCache, setFullTextCache] = useState<Record<string, string>>({});
+  const [loadingFullTextId, setLoadingFullTextId] = useState<string | null>(null);
 
   // Create modal state
 
@@ -322,7 +329,110 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     vision_enabled: cfg.vision_enabled !== false,
     document_enabled: cfg.document_enabled !== false,
     reactions_enabled: cfg.reactions_enabled === true || cfg.reactions_enabled === 'true',
+    knowledge_base_enabled: cfg.knowledge_base_enabled === true,
+    file_sending_enabled: cfg.file_sending_enabled !== false,
   });
+
+  // ========== Base de Conhecimento / Arquivos para clientes ==========
+
+  const loadKnowledgeFiles = async (userAssistantId: string) => {
+    try {
+      setKnowledgeLoading(true);
+      const [rag, client] = await Promise.all([
+        assistantsApi.listKnowledgeFiles(userAssistantId, 'rag'),
+        assistantsApi.listKnowledgeFiles(userAssistantId, 'client'),
+      ]);
+      setKnowledgeFiles(rag);
+      setClientFiles(client);
+    } catch (err) {
+      console.warn('[AssistantsPage] Could not load knowledge files:', err);
+    } finally {
+      setKnowledgeLoading(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const handleUploadKnowledge = async (e: React.ChangeEvent<HTMLInputElement>, kind: 'rag' | 'client') => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !selectedUserAssistant) return;
+
+    const currentList = kind === 'client' ? clientFiles : knowledgeFiles;
+    if (currentList.length >= MAX_KNOWLEDGE_FILES) {
+      toast.error(`Limite de ${MAX_KNOWLEDGE_FILES} documentos atingido.`);
+      return;
+    }
+
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    const allowed = ['pdf', 'xlsx', 'xls', 'csv', 'txt', 'docx', 'doc'];
+    if (!allowed.includes(ext)) {
+      toast.error('Formato não suportado. Envie PDF, Excel (XLSX), CSV, TXT ou DOCX.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('O arquivo excede o limite de 5MB.');
+      return;
+    }
+
+    try {
+      setUploadingKind(kind);
+      const kbFile = await assistantsApi.uploadKnowledgeFile(selectedUserAssistant.id, file, kind);
+      if (kbFile.status === 'failed') {
+        toast.warning('Arquivo enviado, mas não foi possível extrair texto dele (documento sem texto selecionável ou formato não suportado).');
+      } else {
+        toast.success(kind === 'client' ? 'Arquivo adicionado aos arquivos para clientes!' : 'Documento adicionado à base de conhecimento!');
+      }
+      await loadKnowledgeFiles(selectedUserAssistant.id);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Erro ao enviar arquivo';
+      toast.error(msg);
+    } finally {
+      setUploadingKind(null);
+    }
+  };
+
+  const handleDeleteKnowledgeFile = async (fileId: string, kind: 'rag' | 'client') => {
+    if (!selectedUserAssistant) return;
+    try {
+      await assistantsApi.deleteKnowledgeFile(selectedUserAssistant.id, fileId);
+      toast.success('Arquivo removido');
+      const setList = kind === 'client' ? setClientFiles : setKnowledgeFiles;
+      setList(prev => prev.filter(f => f.id !== fileId));
+      if (kind === 'rag') {
+        setExpandedFileId(prev => prev === fileId ? null : prev);
+        setFullTextCache(prev => {
+          const next = { ...prev };
+          delete next[fileId];
+          return next;
+        });
+      }
+    } catch {
+      toast.error('Erro ao remover arquivo');
+    }
+  };
+
+  const handleTogglePreview = (fileId: string) => {
+    setExpandedFileId(prev => prev === fileId ? null : fileId);
+  };
+
+  const handleViewFullText = async (fileId: string) => {
+    if (!selectedUserAssistant) return;
+    if (fullTextCache[fileId] !== undefined) return;
+    try {
+      setLoadingFullTextId(fileId);
+      const text = await assistantsApi.getKnowledgeFileText(selectedUserAssistant.id, fileId);
+      setFullTextCache(prev => ({ ...prev, [fileId]: text }));
+    } catch {
+      toast.error('Erro ao carregar o texto do documento');
+    } finally {
+      setLoadingFullTextId(null);
+    }
+  };
 
   // Open config modal — fetch fresh data to avoid stale cached config
   const openConfigModal = async (userAssistant: UserAssistant) => {
@@ -330,6 +440,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     setConfigValues(normalizeConfig(userAssistant.config || {}));
     setSelectedChannelIds(userAssistant.channel_ids || []);
     setConfigModalOpen(true);
+    void loadKnowledgeFiles(userAssistant.id);
     // Re-fetch fresh config in background (updates modal if data differs)
     setConfigLoadingFresh(true);
     try {
@@ -1389,6 +1500,225 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       />
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* 📚 Base de Conhecimento (o assistente CONSULTA para responder) */}
+              <div className="p-4 rounded-lg border bg-muted/30 border-border">
+                <div className="flex items-center gap-2 mb-2">
+                  <BookOpen className="w-4 h-4 text-emerald-500" />
+                  <h4 className="text-sm font-semibold text-foreground">Base de Conhecimento</h4>
+                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-medium border border-emerald-500/20">
+                    Consulta (RAG)
+                  </span>
+                </div>
+
+                <p className="text-xs text-muted-foreground mb-3">
+                  O assistente <strong>lê</strong> estes documentos para responder dúvidas. O texto é extraído uma única vez e guardado — sem gastar tokens a cada mensagem.
+                </p>
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">Usar base de conhecimento</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        O assistente busca trechos relevantes dos documentos para contextualizar as respostas
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!configValues.knowledge_base_enabled}
+                      onClick={() => setConfigValues({ ...configValues, knowledge_base_enabled: !configValues.knowledge_base_enabled })}
+                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                      style={{ width: 44, height: 24, background: configValues.knowledge_base_enabled ? '#10b981' : '#6b7280' }}
+                    >
+                      <span
+                        className="inline-block rounded-full bg-white shadow transition-transform"
+                        style={{ width: 18, height: 18, transform: configValues.knowledge_base_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                      />
+                    </button>
+                  </div>
+
+                  {knowledgeFiles.length >= MAX_KNOWLEDGE_FILES ? (
+                    <div className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+                      <Lock className="w-4 h-4" />
+                      <span>Limite de {MAX_KNOWLEDGE_FILES} documentos atingido</span>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 hover:border-emerald-500/50 transition-colors">
+                      {uploadingKind === 'rag' ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+                      ) : (
+                        <Upload className="w-4 h-4" />
+                      )}
+                      <span>{uploadingKind === 'rag' ? 'Enviando...' : 'Adicionar documento (PDF, Excel, CSV — máx 5MB)'}</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc"
+                        className="hidden"
+                        onChange={(e) => handleUploadKnowledge(e, 'rag')}
+                        disabled={uploadingKind !== null}
+                      />
+                    </label>
+                  )}
+
+                  {knowledgeLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando documentos...
+                    </div>
+                  ) : knowledgeFiles.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum documento adicionado ainda.</p>
+                  ) : (
+                    <ul className="space-y-1.5 max-h-96 overflow-y-auto">
+                      {knowledgeFiles.map(kf => (
+                        <li key={kf.id} className="rounded-lg border border-border bg-background">
+                          <div className="flex items-center gap-2 px-3 py-2">
+                            <FileSpreadsheet className={`w-4 h-4 flex-shrink-0 ${kf.status === 'failed' ? 'text-red-400' : 'text-emerald-500'}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-foreground truncate">{kf.file_name}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {formatFileSize(kf.size_bytes)} · {kf.char_count > 0 ? `${kf.char_count} caracteres` : kf.status === 'failed' ? 'sem texto extraído' : '—'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePreview(kf.id)}
+                              className="p-1.5 rounded-md text-muted-foreground hover:bg-muted transition-colors"
+                              title="Ver prévia do texto"
+                            >
+                              {expandedFileId === kf.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteKnowledgeFile(kf.id, 'rag')}
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              title="Remover documento"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {expandedFileId === kf.id && (
+                            <div className="px-3 pb-2 pl-4">
+                              {kf.status === 'failed' ? (
+                                <p className="text-xs text-red-400">{kf.preview || kf.error_message || 'Não foi possível extrair texto deste documento.'}</p>
+                              ) : (
+                                <>
+                                  <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words max-h-48 overflow-y-auto bg-muted/40 rounded p-2">
+                                    {fullTextCache[kf.id] ?? kf.preview ?? '—'}
+                                  </pre>
+                                  {fullTextCache[kf.id] === undefined && kf.char_count > 220 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewFullText(kf.id)}
+                                      disabled={loadingFullTextId === kf.id}
+                                      className="mt-1.5 text-[11px] text-blue-500 hover:underline flex items-center gap-1"
+                                    >
+                                      {loadingFullTextId === kf.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                                      Ver texto completo ({kf.char_count} caracteres)
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              {/* 📁 Arquivos para clientes (o assistente ENVIA quando pedido) */}
+              <div className="p-4 rounded-lg border bg-muted/30 border-border">
+                <div className="flex items-center gap-2 mb-2">
+                  <Send className="w-4 h-4 text-blue-500" />
+                  <h4 className="text-sm font-semibold text-foreground">Arquivos para clientes</h4>
+                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-medium border border-blue-500/20">
+                    Envio pelo canal
+                  </span>
+                </div>
+
+                <p className="text-xs text-muted-foreground mb-3">
+                  O assistente <strong>envia</strong> estes arquivos quando o cliente pede pelo <em>nome</em> (ex: "me envia o catálogo"). Cada palavra do nome vira um gatilho de detecção.
+                </p>
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">Enviar arquivos quando pedidos</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Quando o cliente pedir, o assistente envia o arquivo correspondente pelo canal conectado (WhatsApp, Telegram, Facebook, e-mail)
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!configValues.file_sending_enabled}
+                      onClick={() => setConfigValues({ ...configValues, file_sending_enabled: !configValues.file_sending_enabled })}
+                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                      style={{ width: 44, height: 24, background: configValues.file_sending_enabled ? '#10b981' : '#6b7280' }}
+                    >
+                      <span
+                        className="inline-block rounded-full bg-white shadow transition-transform"
+                        style={{ width: 18, height: 18, transform: configValues.file_sending_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                      />
+                    </button>
+                  </div>
+
+                  {clientFiles.length >= MAX_KNOWLEDGE_FILES ? (
+                    <div className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+                      <Lock className="w-4 h-4" />
+                      <span>Limite de {MAX_KNOWLEDGE_FILES} arquivos atingido</span>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 hover:border-blue-500/50 transition-colors">
+                      {uploadingKind === 'client' ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                      ) : (
+                        <Upload className="w-4 h-4" />
+                      )}
+                      <span>{uploadingKind === 'client' ? 'Enviando...' : 'Adicionar arquivo (PDF, Excel, CSV — máx 5MB)'}</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc"
+                        className="hidden"
+                        onChange={(e) => handleUploadKnowledge(e, 'client')}
+                        disabled={uploadingKind !== null}
+                      />
+                    </label>
+                  )}
+
+                  {knowledgeLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando arquivos...
+                    </div>
+                  ) : clientFiles.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum arquivo para clientes adicionado ainda.</p>
+                  ) : (
+                    <ul className="space-y-1.5 max-h-96 overflow-y-auto">
+                      {clientFiles.map(kf => (
+                        <li key={kf.id} className="rounded-lg border border-border bg-background">
+                          <div className="flex items-center gap-2 px-3 py-2">
+                            <FileText className={`w-4 h-4 flex-shrink-0 ${kf.status === 'failed' ? 'text-red-400' : 'text-blue-500'}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-foreground truncate">{kf.file_name}</p>
+                              <p className="text-[10px] text-muted-foreground">{formatFileSize(kf.size_bytes)}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteKnowledgeFile(kf.id, 'client')}
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              title="Remover arquivo"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
 

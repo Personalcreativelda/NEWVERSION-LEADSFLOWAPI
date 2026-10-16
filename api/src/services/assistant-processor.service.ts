@@ -238,7 +238,7 @@ export class AssistantProcessorService {
                     try {
                         // Tentar Gemini primeiro (melhor suporte a PDF), depois OpenAI se disponível
                         const geminiProvider = availableProviders.find(p => p.provider === 'gemini');
-                        const extractedText = await aiService.extractDocumentText(ctx.mediaUrl, ctx.mediaType, geminiProvider?.apiKey);
+                        const extractedText = await aiService.extractDocumentTextCached(ctx.mediaUrl, ctx.mediaType, geminiProvider?.apiKey);
                         if (extractedText && extractedText.length > 50) {
                             ctx.messageContent = `[Conteúdo do documento enviado pelo usuário]\n${extractedText}\n\n${docUserCaption || 'Responda com base no documento acima.'}`;
                             console.log(`[AssistantProcessor] 📄 Documento extraído: ${extractedText.length} chars`);
@@ -266,6 +266,45 @@ export class AssistantProcessorService {
                     } else {
                         ctx.messageContent = '[Nota interna: o usuário enviou um arquivo mas ele não pôde ser acessado. Pergunte o que o usuário precisa e ofereça ajuda.]';
                     }
+                }
+            }
+
+            // 4d. Detecção de pedido de arquivo — o assistente envia documentos da base de conhecimento
+            // (regra leve, sem custo de IA; roda APÓS o processamento de mídia para pegar áudio transcrito/legenda)
+            const fileSendingEnabled = config.file_sending_enabled !== false; // padrão: ativo
+            if (fileSendingEnabled) {
+                try {
+                    const requestedFile = await assistantsService.findRequestedFile(
+                        activeAssistant.user_assistant_id,
+                        ctx.messageContent
+                    );
+                    if (requestedFile) {
+                        console.log(`[AssistantProcessor] 📎 Pedido de arquivo detectado: ${requestedFile.file_name}`);
+                        const sentFile = await this.sendKnowledgeFile(ctx, requestedFile);
+                        if (sentFile) {
+                            // Registrar no log (conta para o limite mensal)
+                            try {
+                                await assistantsService.logConversation({
+                                    user_assistant_id: activeAssistant.user_assistant_id,
+                                    conversation_id: ctx.conversationId,
+                                    contact_phone: ctx.contactPhone || '',
+                                    contact_name: ctx.contactName || '',
+                                    message_in: ctx.messageContent,
+                                    message_out: `📎 ${requestedFile.file_name}`,
+                                    tokens_used: 0,
+                                    response_time_ms: 0,
+                                    status: 'success',
+                                    metadata: { action: 'file_sent', file: requestedFile.file_name }
+                                });
+                            } catch (logErr: any) {
+                                console.error('[AssistantProcessor] Erro ao salvar log do arquivo:', logErr.message);
+                            }
+                            return true;
+                        }
+                        console.warn('[AssistantProcessor] Falha ao enviar arquivo — seguindo fluxo normal de IA');
+                    }
+                } catch (fileErr: any) {
+                    console.warn('[AssistantProcessor] Erro na detecção de pedido de arquivo:', fileErr.message);
                 }
             }
 
@@ -303,8 +342,17 @@ export class AssistantProcessorService {
                         // Voz sempre vinda das variáveis de ambiente (UI não expõe mais esse campo)
                         const voiceId = process.env.ELEVENLABS_DEFAULT_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
                         console.log(`[AssistantProcessor] 🎤 VoiceId: ${voiceId} (env: ${!!process.env.ELEVENLABS_DEFAULT_VOICE_ID})`);
+                        // Corrigir a fala: formatar datas/horas/telefones com SSML antes do TTS
+                        let speechText = aiResponse.content;
+                        try {
+                            speechText = await aiService.formatTextForSpeech(aiResponse.content, availableProviders, model);
+                        } catch (ssmlErr: any) {
+                            console.warn('[AssistantProcessor] Falha SSML (usando texto original):', ssmlErr.message);
+                        }
+                        // Empacotar em <speak> para o ElevenLabs interpretar as tags SSML inline
+                        const ssmlSpeech = speechText.includes('<') ? `<speak>${speechText}</speak>` : speechText;
                         const audioBuffer = await aiService.generateElevenLabsAudio(
-                            aiResponse.content,
+                            ssmlSpeech,
                             voiceId,
                             elevenLabsApiKey
                         );
@@ -522,6 +570,26 @@ export class AssistantProcessorService {
                 systemPrompt += 'Use essas informações para personalizar sua resposta, sem mencioná-las explicitamente a menos que seja relevante.\n---';
 
                 console.log(`[AssistantProcessor] 🧠 Memória carregada para ${ctx.contactPhone} (${memory.total_conversations} conversas)`);
+            }
+        }
+
+        // Injetar base de conhecimento no system prompt (busca por relevância — sem embeddings/tokens extras)
+        const kbEnabled = config.knowledge_base_enabled === true;
+        if (kbEnabled) {
+            try {
+                const kbContext = await assistantsService.getKnowledgeContext(
+                    assistant.user_assistant_id,
+                    ctx.messageContent
+                );
+                if (kbContext) {
+                    systemPrompt += '\n\n---\n[BASE DE CONHECIMENTO]\n' +
+                        'Trechos relevantes de seus documentos (use estas informações quando a pergunta do cliente se relacionar a eles; se não forem relevantes, ignore-as):\n' +
+                        kbContext +
+                        '\n---';
+                    console.log(`[AssistantProcessor] 📚 Base de conhecimento injetada (${kbContext.length} chars)`);
+                }
+            } catch (kbErr: any) {
+                console.warn('[AssistantProcessor] Falha ao carregar base de conhecimento:', kbErr.message);
             }
         }
 
@@ -1237,11 +1305,18 @@ export class AssistantProcessorService {
      * Salva mensagem de saída no banco
      * externalId: ID da mensagem retornado pela Evolution API (para dedup no webhook)
      */
-    private async saveOutgoingMessage(ctx: IncomingMessageContext, content: string, externalId?: string | null, mediaType?: string): Promise<void> {
+    private async saveOutgoingMessage(
+        ctx: IncomingMessageContext,
+        content: string,
+        externalId?: string | null,
+        mediaType?: string,
+        mediaUrl?: string | null,
+        metadataExtra?: Record<string, any>
+    ): Promise<void> {
         try {
             const result = await query(
-                `INSERT INTO messages (user_id, conversation_id, direction, channel, content, status, external_id, metadata, media_type)
-                 VALUES ($1, $2, 'out', $3, $4, 'sent', $5, $6, $7)
+                `INSERT INTO messages (user_id, conversation_id, direction, channel, content, status, external_id, metadata, media_type, media_url)
+                 VALUES ($1, $2, 'out', $3, $4, 'sent', $5, $6, $7, $8)
                  RETURNING *`,
                 [
                     ctx.userId,
@@ -1249,8 +1324,9 @@ export class AssistantProcessorService {
                     ctx.channelType,
                     content,
                     externalId || null,
-                    JSON.stringify({ source: 'ai_assistant', automated: true }),
-                    mediaType || null
+                    JSON.stringify({ source: 'ai_assistant', automated: true, ...(metadataExtra || {}) }),
+                    mediaType || null,
+                    mediaUrl || null
                 ]
             );
 
@@ -1437,6 +1513,276 @@ export class AssistantProcessorService {
             }),
         });
         if (!response.ok) throw new Error(`Facebook Messenger audio error: ${await response.text()}`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ENVIO DE ARQUIVOS DA BASE DE CONHECIMENTO
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Envia um arquivo da base de conhecimento para o contato pelo canal atual.
+     * Fluxo: mensagem de texto introdutória + o documento.
+     * Retorna true se o documento foi entregue (ou o link enviado como fallback).
+     */
+    private async sendKnowledgeFile(ctx: IncomingMessageContext, kbFile: any): Promise<boolean> {
+        const fileName: string = kbFile.file_name || 'documento';
+        const fileUrl: string | null = kbFile.storage_url || null;
+        const isHttp = !!fileUrl && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://'));
+
+        let creds = ctx.credentials || {};
+        if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch { creds = {}; } }
+
+        // Nome legível do arquivo (sem extensão, hífens/underscores viram espaços) para a mensagem ao cliente
+        const displayName = this._displayFileName(fileName);
+        const introText = `📎 Aqui está o que você pediu: ${displayName}`;
+
+        // 1. Texto introdutório (email recebe tudo num único email com anexo)
+        if (ctx.channelType !== 'email') {
+            try {
+                await this.sendReply(ctx, introText);
+            } catch (introErr: any) {
+                console.warn('[AssistantProcessor] Falha ao enviar texto introdutório do arquivo:', introErr.message);
+                return false;
+            }
+        }
+
+        // 2. Enviar o documento por canal
+        let sent = false;
+        let sentExternalId: string | null = null;
+        try {
+            switch (ctx.channelType) {
+                case 'whatsapp': {
+                    const instanceId = creds.instance_id || creds.instance_name;
+                    if (!instanceId || !ctx.contactPhone || !fileUrl) break;
+                    const isLidJid = ctx.remoteJid?.endsWith('@lid');
+                    const isGroupJid = ctx.remoteJid?.endsWith('@g.us');
+                    const target = (isLidJid || isGroupJid) && ctx.remoteJid ? ctx.remoteJid : ctx.contactPhone;
+                    const docRes = await whatsappService.sendDocument({
+                        instanceId,
+                        number: target,
+                        documentUrl: isHttp ? fileUrl : undefined,
+                        documentBase64: !isHttp ? fileUrl : undefined,
+                        fileName,
+                    }) as any;
+                    sentExternalId = docRes?.key?.id || docRes?.id || null;
+                    sent = true;
+                    console.log(`[AssistantProcessor] 📎 Documento "${fileName}" enviado via WhatsApp`);
+                    break;
+                }
+                case 'whatsapp_cloud': {
+                    const pid = creds.phone_number_id;
+                    const tok = creds.access_token;
+                    if (!pid || !tok || !ctx.contactPhone || !fileUrl) break;
+                    sentExternalId = await this.sendWhatsAppCloudDocument(pid, tok, ctx.contactPhone, fileUrl, fileName);
+                    sent = true;
+                    console.log(`[AssistantProcessor] 📎 Documento "${fileName}" enviado via WhatsApp Cloud`);
+                    break;
+                }
+                case 'telegram': {
+                    const botToken = creds.bot_token;
+                    const chatId = ctx.contactPhone;
+                    if (!botToken || !chatId || !fileUrl) break;
+                    await this.sendTelegramDocument(botToken, chatId, fileUrl, fileName);
+                    sent = true;
+                    console.log(`[AssistantProcessor] 📎 Documento "${fileName}" enviado via Telegram`);
+                    break;
+                }
+                case 'facebook': {
+                    const tok = creds.page_access_token || creds.access_token;
+                    const rid = ctx.contactPhone;
+                    if (!tok || !rid || !isHttp || !fileUrl) break;
+                    await this.sendFacebookDocument(tok, rid, fileUrl);
+                    sent = true;
+                    console.log(`[AssistantProcessor] 📎 Documento "${fileName}" enviado via Facebook Messenger`);
+                    break;
+                }
+                case 'email': {
+                    const recipientEmail = ctx.remoteJid;
+                    if (!recipientEmail?.includes('@') || !fileUrl) break;
+                    await this.sendEmailDocument(ctx, creds, recipientEmail, fileUrl, fileName, introText);
+                    sent = true;
+                    console.log(`[AssistantProcessor] 📎 Documento "${fileName}" enviado via Email`);
+                    break;
+                }
+                case 'instagram':
+                case 'website':
+                default: {
+                    // Canais sem suporte a anexo de arquivo: enviar o link como texto
+                    if (isHttp && fileUrl) {
+                        await this.sendReply(ctx, `📎 ${displayName}\n${fileUrl}`);
+                        sent = true;
+                    }
+                    break;
+                }
+            }
+        } catch (sendErr: any) {
+            console.warn(`[AssistantProcessor] Falha ao enviar documento (${ctx.channelType}):`, sendErr.message);
+        }
+
+        // 3. Fallback: se o anexo falhou mas temos URL pública, enviar o link como texto
+        if (!sent && isHttp && fileUrl) {
+            try {
+                await this.sendReply(ctx, `📎 ${displayName}\n${fileUrl}`);
+                sent = true;
+            } catch { /* ignore */ }
+        }
+
+        // 4. Registrar no inbox (para o atendente ver o que foi enviado)
+        if (sent) {
+            await this.saveOutgoingMessage(
+                ctx,
+                `📎 ${displayName}`,
+                sentExternalId,
+                'document',
+                fileUrl,
+                { file_name: fileName, storage_url: fileUrl }
+            );
+        }
+
+        return sent;
+    }
+
+    /** Converte um nome de arquivo em nome legível para mensagens (remove extensão; hífens/underscores viram espaços). */
+    private _displayFileName(fileName: string): string {
+        const name = (fileName || '')
+            .replace(/\.[^.]+$/, '')   // remove extensão (.pdf, .xlsx, ...)
+            .replace(/[-_]+/g, ' ')     // hífens e underscores → espaço
+            .replace(/\s+/g, ' ')
+            .trim();
+        return name || 'arquivo';
+    }
+
+    /** Envia documento via WhatsApp Cloud API (link público ou upload para a Media API). Retorna o id da mensagem. */
+    private async sendWhatsAppCloudDocument(
+        phoneNumberId: string,
+        accessToken: string,
+        to: string,
+        fileUrl: string,
+        fileName: string
+    ): Promise<string | null> {
+        let documentPayload: any;
+
+        if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+            documentPayload = { link: fileUrl, filename: fileName };
+        } else {
+            // data URI → upload para a Media API da Meta
+            const commaIdx = fileUrl.indexOf(',');
+            const meta = fileUrl.substring(5, commaIdx);
+            const mimeType = meta.split(';')[0] || 'application/octet-stream';
+            const buffer = Buffer.from(fileUrl.substring(commaIdx + 1), 'base64');
+
+            const formData = new FormData();
+            formData.append('file', new Blob([buffer], { type: mimeType }), fileName);
+            formData.append('type', mimeType);
+            formData.append('messaging_product', 'whatsapp');
+
+            const uploadRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/media`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${accessToken}` },
+                body: formData,
+            });
+            if (!uploadRes.ok) throw new Error(`WhatsApp Cloud media upload error: ${await uploadRes.text()}`);
+            const { id: mediaId } = await uploadRes.json() as any;
+            documentPayload = { id: mediaId, filename: fileName };
+        }
+
+        const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'document', document: documentPayload }),
+        });
+        if (!response.ok) throw new Error(`WhatsApp Cloud API error: ${await response.text()}`);
+        const data = await response.json() as any;
+        return data?.messages?.[0]?.id || null;
+    }
+
+    /** Envia documento via Telegram (URL pública ou upload multipart) */
+    private async sendTelegramDocument(botToken: string, chatId: string, fileUrl: string, fileName: string): Promise<void> {
+        if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+            const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, document: fileUrl }),
+            });
+            if (!response.ok) throw new Error(`Telegram sendDocument error: ${await response.text()}`);
+            return;
+        }
+
+        // data URI → upload multipart
+        const commaIdx = fileUrl.indexOf(',');
+        const meta = fileUrl.substring(5, commaIdx);
+        const mimeType = meta.split(';')[0] || 'application/octet-stream';
+        const buffer = Buffer.from(fileUrl.substring(commaIdx + 1), 'base64');
+
+        const formData = new FormData();
+        formData.append('chat_id', chatId);
+        formData.append('document', new Blob([buffer], { type: mimeType }), fileName);
+
+        const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+            method: 'POST',
+            body: formData,
+        });
+        if (!response.ok) throw new Error(`Telegram sendDocument error: ${await response.text()}`);
+    }
+
+    /** Envia documento via Facebook Messenger (exige URL pública) */
+    private async sendFacebookDocument(accessToken: string, recipientId: string, fileUrl: string): Promise<void> {
+        const response = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(accessToken)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                recipient: { id: recipientId },
+                message: { attachment: { type: 'file', payload: { url: fileUrl, is_reusable: true } } },
+            }),
+        });
+        if (!response.ok) throw new Error(`Facebook Messenger document error: ${await response.text()}`);
+    }
+
+    /** Envia documento por email (baixa o arquivo e anexa) */
+    private async sendEmailDocument(
+        ctx: IncomingMessageContext,
+        creds: any,
+        recipientEmail: string,
+        fileUrl: string,
+        fileName: string,
+        bodyText: string
+    ): Promise<void> {
+        if (!creds.smtp?.host) {
+            throw new Error('Configuração SMTP não encontrada para canal de email');
+        }
+
+        let buffer: Buffer;
+        let contentType = 'application/octet-stream';
+        if (fileUrl.startsWith('data:')) {
+            const commaIdx = fileUrl.indexOf(',');
+            const meta = fileUrl.substring(5, commaIdx);
+            contentType = meta.split(';')[0] || contentType;
+            buffer = Buffer.from(fileUrl.substring(commaIdx + 1), 'base64');
+        } else {
+            const res = await fetch(fileUrl);
+            if (!res.ok) throw new Error(`Falha ao baixar arquivo: HTTP ${res.status}`);
+            contentType = res.headers.get('content-type')?.split(';')[0] || contentType;
+            buffer = Buffer.from(await res.arrayBuffer());
+        }
+
+        const smtpSettings = {
+            host: creds.smtp.host,
+            port: creds.smtp.port || 587,
+            secure: creds.smtp.secure || false,
+            user: creds.smtp.auth?.user || creds.email,
+            pass: creds.smtp.auth?.pass || creds.password,
+            fromEmail: creds.email,
+            fromName: creds.from_name || '',
+        };
+
+        const htmlBody = `<div style="font-family:sans-serif;white-space:pre-wrap;">${bodyText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`;
+        await emailService.sendEmailWithSettings({
+            to: recipientEmail,
+            subject: fileName,
+            text: bodyText,
+            html: htmlBody,
+            attachments: [{ filename: fileName, content: buffer, contentType }],
+        }, smtpSettings);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

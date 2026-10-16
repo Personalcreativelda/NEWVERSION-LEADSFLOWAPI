@@ -64,7 +64,43 @@ export interface ContactMemory {
     last_contact_at?: string;
 }
 
+/**
+ * Prompt do formatador SSML — corrige a fala de datas, horas e telefones
+ * antes da geração de voz. Aplica tags SSML inline (sem cercas markdown e sem <speak>).
+ */
+export const SSML_FORMATTER_PROMPT = `Você é um assistente especialista em text-to-speech e formatação usando tags SSML.
+
+Você irá receber um texto e a sua tarefa é aplicar tags SSML para deixá-lo mais natural no processo de geração de voz.
+
+### Formatação
+
+#### Datas e horas
+
+No caso de datas e horas, modifique o texto para um formato que seja mais natural quando falado.
+
+Exemplos:
+
+- Entrada: '10:00'
+- Saída: 'dez horas'
+
+- Entrada: '22:00'
+- Saída: 'vinte e duas horas'
+
+- Entrada: '01/01/2025'
+- Saída: 'primeiro de janeiro de 2025'
+
+#### Telefones
+
+Similar ao feito para datas, modifique o texto para um formato que seja mais natural quando falado. Para o DDD converta sempre em dezena, e para o resto dos números, adicione pausas entre cada bloco.
+
+**NUNCA COLOQUE ÂNCORAS COMO \`\`\`ssml AO REDOR DO TEXTO**`;
+
 export class AIService {
+    // Cache em memória para extração de documentos (evita re-baixar/re-extrair o mesmo arquivo a cada mensagem)
+    private _docTextCache = new Map<string, string>();
+    private _docTextCacheOrder: string[] = [];
+    private readonly _DOC_CACHE_MAX = 50;
+
     /**
      * Gera resposta usando o provedor de IA configurado.
      * Para uso simples com um único provedor já conhecido.
@@ -126,6 +162,36 @@ export class AIService {
         }
 
         throw new Error(`Todos os provedores de IA falharam:\n${errors.join('\n')}`);
+    }
+
+    /**
+     * Formata o texto de resposta para fala natural usando SSML (datas, horas, telefones).
+     * Usado antes da geração de áudio (ElevenLabs). Retorna o texto formatado,
+     * sem cercas de markdown e sem wrapper <speak>.
+     * Em caso de erro, retorna o texto original (fallback seguro).
+     */
+    async formatTextForSpeech(
+        text: string,
+        providers: ProviderConfig[],
+        model?: string
+    ): Promise<string> {
+        try {
+            if (providers.length === 0 || !text || !text.trim()) return text;
+            const messages: AIMessage[] = [
+                { role: 'system', content: SSML_FORMATTER_PROMPT },
+                { role: 'user', content: `Formate o seguinte texto para fala, retornando apenas o texto formatado:\n\n${text}` },
+            ];
+            const response = await this.generateResponseWithFallback(messages, providers, model);
+            let formatted = (response.content || '').trim();
+            // Remover cercas de markdown caso a IA as adicione
+            formatted = formatted.replace(/^```[a-zA-Z]*\s*\n?/, '').replace(/\n?```\s*$/, '');
+            // Remover wrapper <speak> caso adicionado por engano
+            formatted = formatted.replace(/^<\s*speak[^>]*>/i, '').replace(/<\s*\/\s*speak\s*>$/i, '');
+            return formatted.trim() || text;
+        } catch (err: any) {
+            console.warn('[AIService] Falha ao formatar SSML (usando texto original):', err.message);
+            return text;
+        }
     }
 
     /**
@@ -818,7 +884,32 @@ export class AIService {
             return '';
         }
 
-        // ── Other binary formats (DOCX, XLSX, etc.) ───────────────────────────
+        // ── Excel (XLSX via ZIP/XML; XLS binário legado degrada graciosamente) ──
+        const isXlsx =
+            contentType.includes('spreadsheetml') ||
+            contentType.includes('ms-excel') ||
+            contentType.includes('excel') ||
+            urlLower.endsWith('.xlsx') || urlLower.endsWith('.xls');
+        if (isXlsx) {
+            const text = this._extractXlsxText(buffer);
+            if (text.length > 20) {
+                console.log(`[AIService] ✅ XLSX text extracted: ${text.length} chars`);
+                return text.substring(0, maxChars);
+            }
+            // Fallback para .xls legado (formato binário BIFF/OLE) — só se não for um ZIP (.xlsx)
+            const isZip = buffer.length > 2 && buffer[0] === 0x50 && buffer[1] === 0x4B; // 'PK'
+            if (!isZip) {
+                const legacy = this._extractXlsLegacyText(buffer);
+                if (legacy.length > 20) {
+                    console.log(`[AIService] ✅ XLS (legado) text extracted: ${legacy.length} chars`);
+                    return legacy.substring(0, maxChars);
+                }
+            }
+            console.warn('[AIService] Could not extract meaningful text from spreadsheet');
+            return '';
+        }
+
+        // ── Other binary formats (DOCX, etc.) ──────────────────────────────────
         const isDocx =
             contentType.includes('officedocument.wordprocessingml') ||
             urlLower.endsWith('.docx');
@@ -992,5 +1083,200 @@ export class AIService {
         }
 
         return allTexts.join('\n').replace(/\s{2,}/g, ' ').trim();
+    }
+
+    /**
+     * Extrai texto de uma planilha .xlsx (ZIP + XML), sem dependências externas.
+     * Lê sharedStrings + worksheets e junta o conteúdo legível.
+     * Retorna string vazia em caso de falha (degradação graciosa).
+     */
+    private _extractXlsxText(buffer: Buffer): string {
+        try {
+            const entries = this._unzipEntries(buffer);
+            const sharedStrings = this._xlsxSharedStrings(entries.get('xl/sharedStrings.xml'));
+
+            const sheetNames = [...entries.keys()].filter(k => /^xl\/worksheets\/sheet\d+\.xml$/.test(k));
+            const parts: string[] = [];
+            for (const name of sheetNames) {
+                const text = this._xlsxSheetText(entries.get(name), sharedStrings);
+                if (text) parts.push(text);
+            }
+            return parts.join('\n').replace(/\s{2,}/g, ' ').trim();
+        } catch (e: any) {
+            console.warn('[AIService] XLSX parse error:', e.message);
+            return '';
+        }
+    }
+
+    /**
+     * Extrai texto legível de um .xls legado (formato binário BIFF), sem dependências.
+     * Varre strings UTF-16LE (comuns no BIFF8 SST) e strings ASCII (BIFF5/byte strings).
+     * É best-effort: captura o grosso do conteúdo textual, degradando graciosamente.
+     */
+    private _extractXlsLegacyText(buffer: Buffer): string {
+        const results = new Set<string>();
+
+        // 1. Strings UTF-16LE (unidades de 2 bytes com byte alto = 0)
+        let i = 0;
+        while (i + 1 < buffer.length) {
+            if (buffer[i + 1] === 0 && this._isPrintableLatin1(buffer[i])) {
+                let s = '';
+                while (i + 1 < buffer.length && buffer[i + 1] === 0 && this._isPrintableLatin1(buffer[i])) {
+                    s += String.fromCharCode(buffer[i]);
+                    i += 2;
+                }
+                if (s.length >= 4) results.add(s);
+            } else {
+                i++;
+            }
+        }
+
+        // 2. Strings ASCII (para BIFF5/byte strings)
+        let k = 0;
+        while (k < buffer.length) {
+            const c = buffer[k];
+            if (c >= 32 && c <= 126) {
+                let s = '';
+                while (k < buffer.length && buffer[k] >= 32 && buffer[k] <= 126) {
+                    s += String.fromCharCode(buffer[k]);
+                    k++;
+                }
+                if (s.length >= 4 && /[a-zA-Z]{2,}/.test(s)) results.add(s);
+            } else {
+                k++;
+            }
+        }
+
+        return [...results]
+            .filter(s => /[a-zA-ZÀ-ÿ]{2,}/.test(s))
+            .join(' ')
+            .trim();
+    }
+
+    private _isPrintableLatin1(c: number): boolean {
+        return (c >= 32 && c <= 126) || (c >= 160 && c <= 255);
+    }
+
+    /** Leitor mínimo de ZIP (local file headers) → Map<nome, Buffer> descomprimido. */
+    private _unzipEntries(buffer: Buffer): Map<string, Buffer> {
+        const map = new Map<string, Buffer>();
+        let pos = 0;
+        while (pos + 30 <= buffer.length) {
+            if (buffer.readUInt32LE(pos) !== 0x04034b50) break; // assinatura local header
+            const compMethod = buffer.readUInt16LE(pos + 8);
+            const compSize   = buffer.readUInt32LE(pos + 18);
+            const nameLen    = buffer.readUInt16LE(pos + 26);
+            const extraLen   = buffer.readUInt16LE(pos + 28);
+            if (compSize === 0) break; // sem tamanho no header local (data descriptor) — não suportado
+            const name = buffer.slice(pos + 30, pos + 30 + nameLen).toString('utf-8');
+            const dataStart = pos + 30 + nameLen + extraLen;
+            const dataEnd = dataStart + compSize;
+            if (dataEnd > buffer.length) break;
+            const compData = buffer.slice(dataStart, dataEnd);
+            try {
+                let content: Buffer;
+                if (compMethod === 0) {
+                    content = compData;
+                } else if (compMethod === 8) {
+                    content = zlib.inflateRawSync(compData);
+                } else {
+                    pos = dataEnd;
+                    continue;
+                }
+                map.set(name, content);
+            } catch {
+                // entrada incorrupta — ignora
+            }
+            pos = dataEnd;
+        }
+        return map;
+    }
+
+    /** Extrai as strings compartilhadas (<si><t>...</t></si>) de sharedStrings.xml. */
+    private _xlsxSharedStrings(xml?: Buffer): string[] {
+        if (!xml) return [];
+        const s = xml.toString('utf-8');
+        const out: string[] = [];
+        const re = /<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g;
+        let m;
+        while ((m = re.exec(s)) !== null) {
+            out.push(this._xmlDecode(m[1]));
+        }
+        return out;
+    }
+
+    /** Extrai o texto legível de uma worksheet (inlineStr, shared strings, números). */
+    private _xlsxSheetText(xml: Buffer | undefined, sharedStrings: string[]): string {
+        if (!xml) return '';
+        const s = xml.toString('utf-8');
+        const out: string[] = [];
+        const cellRe = /<c\b[^>]*>([\s\S]*?)<\/c>/g;
+        let m;
+        while ((m = cellRe.exec(s)) !== null) {
+            const tag = m[0];
+            const body = m[1];
+            const t = tag.match(/\bt="([^"]+)"/);
+            const type = t ? t[1] : null;
+            if (type === 'inlineStr') {
+                const im = body.match(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/);
+                if (im) out.push(this._xmlDecode(im[1]));
+                continue;
+            }
+            const v = body.match(/<v>([\s\S]*?)<\/v>/);
+            if (!v) continue;
+            const raw = this._xmlDecode(v[1]);
+            if (type === 's') {
+                const idx = parseInt(raw, 10);
+                if (!isNaN(idx) && sharedStrings[idx]) out.push(sharedStrings[idx]);
+            } else if (type === 'b') {
+                out.push(raw === '1' ? 'Sim' : 'Não');
+            } else {
+                out.push(raw);
+            }
+        }
+        return out.filter(Boolean).join(' ');
+    }
+
+    /** Decodifica entidades XML comuns. */
+    private _xmlDecode(s: string): string {
+        return s
+            .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+            .replace(/&amp;/g, '&')
+            .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+            .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCharCode(parseInt(n, 16)));
+    }
+
+    /**
+     * Wrapper com cache em memória para extração de documentos recebidos via chat.
+     * Evita re-baixar/re-processar (e re-gastar tokens no fallback Gemini) o mesmo arquivo
+     * quando o cliente reenvia o mesmo anexo na mesma conversa.
+     */
+    async extractDocumentTextCached(
+        fileUrl: string,
+        mimeType?: string,
+        geminiApiKey?: string,
+        maxChars = 4000
+    ): Promise<string> {
+        const cacheable = fileUrl.startsWith('http://') || fileUrl.startsWith('https://');
+        if (cacheable) {
+            const cached = this._docTextCache.get(fileUrl);
+            if (cached !== undefined) {
+                console.log('[AIService] 📄 Cache hit para documento (sem reprocessar)');
+                return cached;
+            }
+        }
+
+        const result = await this.extractDocumentText(fileUrl, mimeType, geminiApiKey, maxChars);
+
+        if (cacheable && result.length > 0) {
+            this._docTextCache.set(fileUrl, result);
+            this._docTextCacheOrder.push(fileUrl);
+            while (this._docTextCacheOrder.length > this._DOC_CACHE_MAX) {
+                const oldest = this._docTextCacheOrder.shift();
+                if (oldest) this._docTextCache.delete(oldest);
+            }
+        }
+        return result;
     }
 }

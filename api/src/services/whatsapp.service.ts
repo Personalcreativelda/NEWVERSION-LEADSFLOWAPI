@@ -173,6 +173,53 @@ export class WhatsAppService {
     });
   }
 
+  /**
+   * Send Document (PDF, planilha, etc.)
+   * Aceita URL pública ou base64 (data URI) — Evolution API sendMedia aceita ambos.
+   * O fileName é definido explicitamente (não deriva da URL, que pode ser base64).
+   */
+  async sendDocument(data: {
+    instanceId: string;
+    number: string;
+    documentUrl?: string;
+    documentBase64?: string;
+    fileName?: string;
+    caption?: string;
+  }) {
+    const { instanceId, documentUrl, documentBase64, fileName, caption } = data;
+    // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
+    const number = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
+
+    if (!documentUrl && !documentBase64) {
+      throw new Error('sendDocument: documentUrl ou documentBase64 é obrigatório');
+    }
+
+    const body: any = {
+      number,
+      mediatype: 'document',
+      fileName: fileName || 'documento',
+    };
+    if (documentBase64) {
+      body.media = documentBase64;
+    } else {
+      body.media = documentUrl;
+    }
+    if (caption) body.caption = caption;
+
+    console.log('[WhatsAppService] Sending document:', {
+      instanceId,
+      number,
+      fileName: fileName || 'documento',
+      hasUrl: !!documentUrl,
+      hasBase64: !!documentBase64,
+    });
+
+    return this.request(`/message/sendMedia/${instanceId}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
   async getStatus(instanceId: string) {
     return this.request(`/instance/connectionState/${instanceId}`);
   }

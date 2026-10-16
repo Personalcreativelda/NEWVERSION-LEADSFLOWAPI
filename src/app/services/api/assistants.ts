@@ -95,6 +95,24 @@ export interface CreateAssistantInput {
     greeting?: string;
 }
 
+export interface KnowledgeFile {
+    id: string;
+    user_assistant_id: string;
+    user_id: string;
+    file_name: string;
+    kind: 'rag' | 'client';
+    mime_type: string | null;
+    size_bytes: number;
+    status: 'processing' | 'ready' | 'failed';
+    char_count: number;
+    error_message: string | null;
+    preview?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export const MAX_KNOWLEDGE_FILES = 20; // limite de documentos por assistente
+
 export const assistantsApi = {
     /**
      * Lista assistentes disponíveis no marketplace
@@ -205,5 +223,56 @@ export const assistantsApi = {
             params: { limit }
         });
         return data;
+    },
+
+    /**
+     * Lista documentos da base de conhecimento
+     */
+    async listKnowledgeFiles(userAssistantId: string, kind?: 'rag' | 'client'): Promise<KnowledgeFile[]> {
+        const params = kind ? { kind } : undefined;
+        const { data } = await api.get<KnowledgeFile[]>(`/assistants/${userAssistantId}/knowledge`, { params });
+        return data;
+    },
+
+    /**
+     * Faz upload de um documento para a base de conhecimento (PDF/Excel/CSV/TXT/DOCX, máx 5MB)
+     */
+    async uploadKnowledgeFile(
+        userAssistantId: string,
+        file: File,
+        kind: 'rag' | 'client' = 'rag',
+        onProgress?: (percent: number) => void
+    ): Promise<KnowledgeFile> {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('kind', kind);
+        const token = localStorage.getItem('leadflow_access_token');
+        // Usa o axios "cru" (sem header Content-Type padrão) para o browser definir o boundary do multipart
+        const { data } = await axios.post<KnowledgeFile>(
+            `${baseURL}/assistants/${userAssistantId}/knowledge`,
+            form,
+            {
+                headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                onUploadProgress: onProgress ? (e) => {
+                    if (e.total) onProgress(Math.round((e.loaded / e.total) * 100));
+                } : undefined,
+            }
+        );
+        return data;
+    },
+
+    /**
+     * Remove um documento da base de conhecimento
+     */
+    async deleteKnowledgeFile(userAssistantId: string, fileId: string): Promise<void> {
+        await api.delete(`/assistants/${userAssistantId}/knowledge/${fileId}`);
+    },
+
+    /**
+     * Busca o texto completo extraído de um documento (para preview no dashboard)
+     */
+    async getKnowledgeFileText(userAssistantId: string, fileId: string): Promise<string> {
+        const { data } = await api.get<{ text: string }>(`/assistants/${userAssistantId}/knowledge/${fileId}/text`);
+        return data.text;
     }
 };

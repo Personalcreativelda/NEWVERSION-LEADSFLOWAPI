@@ -1,6 +1,8 @@
 // Service para gerenciar assistentes do marketplace (produtos de IA)
 import { query } from '../database/connection';
 
+export const MAX_KNOWLEDGE_FILES = 20; // limite de documentos por assistente
+
 export interface Assistant {
     id: string;
     name: string;
@@ -61,6 +63,23 @@ export interface AssistantLog {
     error_message: string | null;
     metadata: any;
     created_at: string;
+}
+
+export interface KnowledgeFile {
+    id: string;
+    user_assistant_id: string;
+    user_id: string;
+    file_name: string;
+    kind: 'rag' | 'client';
+    mime_type: string | null;
+    size_bytes: number;
+    status: 'processing' | 'ready' | 'failed';
+    char_count: number;
+    error_message: string | null;
+    preview?: string;
+    storage_url?: string | null;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface CreateAssistantInput {
@@ -211,6 +230,30 @@ export class AssistantsService {
                     UNIQUE(user_assistant_id, contact_phone)
                 )
             `);
+
+            // Tabela de base de conhecimento (documentos lidos uma única vez)
+            await query(`
+                CREATE TABLE IF NOT EXISTS assistant_knowledge_files (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    user_assistant_id UUID REFERENCES user_assistants(id) ON DELETE CASCADE,
+                    user_id UUID,
+                    file_name TEXT NOT NULL,
+                    kind TEXT NOT NULL DEFAULT 'rag',
+                    mime_type TEXT,
+                    storage_url TEXT,
+                    size_bytes INTEGER DEFAULT 0,
+                    status VARCHAR(20) DEFAULT 'ready',
+                    text_content TEXT,
+                    char_count INTEGER DEFAULT 0,
+                    error_message TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            `);
+            await query(`
+                CREATE INDEX IF NOT EXISTS idx_knowledge_user_assistant
+                ON assistant_knowledge_files (user_assistant_id)
+            `);
         } catch (err: any) {
             console.error('[Assistants] Table creation error:', err.message);
         }
@@ -220,6 +263,8 @@ export class AssistantsService {
             'ALTER TABLE assistants ADD COLUMN IF NOT EXISTS is_custom BOOLEAN DEFAULT false',
             'ALTER TABLE assistants ADD COLUMN IF NOT EXISTS created_by UUID',
             "ALTER TABLE user_assistants ADD COLUMN IF NOT EXISTS channel_ids UUID[] DEFAULT '{}'",
+            'ALTER TABLE assistant_knowledge_files ADD COLUMN IF NOT EXISTS storage_url TEXT',
+            "ALTER TABLE assistant_knowledge_files ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'rag'",
             // Memória: flags de configuração no config do user_assistant
             // (memory_enabled e memory_window ficam no JSONB config, não precisam de coluna nova)
         ];
@@ -862,6 +907,272 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
         );
 
         return result.rows;
+    }
+
+    // ── Base de Conhecimento ───────────────────────────────────────────────────
+
+    /** Adiciona um documento à base de conhecimento (texto já extraído/cacheado). */
+    async addKnowledgeFile(
+        userAssistantId: string,
+        userId: string,
+        input: { fileName: string; mimeType: string; sizeBytes: number; textContent: string; storageUrl?: string | null; kind?: 'rag' | 'client' }
+    ): Promise<KnowledgeFile> {
+        await this.ensureColumns();
+
+        const kind = input.kind === 'client' ? 'client' : 'rag';
+
+        const owner = await query(
+            'SELECT id FROM user_assistants WHERE id = $1 AND user_id = $2',
+            [userAssistantId, userId]
+        );
+        if (owner.rows.length === 0) {
+            throw new Error('Assistente não encontrado');
+        }
+
+        // Limite de documentos por assistente e por categoria (rag ou client)
+        const countResult = await query(
+            'SELECT COUNT(*)::int AS cnt FROM assistant_knowledge_files WHERE user_assistant_id = $1 AND kind = $2',
+            [userAssistantId, kind]
+        );
+        const currentCount = countResult.rows[0]?.cnt || 0;
+        if (currentCount >= MAX_KNOWLEDGE_FILES) {
+            const err: any = new Error(`Limite de ${MAX_KNOWLEDGE_FILES} documentos atingido`);
+            err.code = 'KNOWLEDGE_LIMIT_REACHED';
+            throw err;
+        }
+
+        const textContent = (input.textContent || '').trim();
+        const charCount = textContent.length;
+        // Arquivos "client" são apenas enviados ao cliente — não dependem de texto extraído.
+        const status = (kind === 'client' || charCount > 0) ? 'ready' : 'failed';
+        const errorMessage = (kind === 'client' || charCount > 0)
+            ? null
+            : 'Não foi possível extrair texto deste arquivo (documento sem texto selecionável ou formato não suportado).';
+
+        const result = await query(
+            `INSERT INTO assistant_knowledge_files
+                (user_assistant_id, user_id, file_name, kind, mime_type, storage_url, size_bytes, status, text_content, char_count, error_message)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             RETURNING id, user_assistant_id, user_id, file_name, kind, mime_type, storage_url, size_bytes, status, char_count, error_message, created_at, updated_at`,
+            [userAssistantId, userId, input.fileName, kind, input.mimeType, input.storageUrl || null, input.sizeBytes, status, textContent, charCount, errorMessage]
+        );
+        return result.rows[0];
+    }
+
+    /**
+     * Detecta se a mensagem é um pedido de arquivo e retorna o documento da base
+     * que melhor corresponde (ou null se não for pedido de arquivo).
+     * Regras (leves, sem custo de IA): verbo de envio + (token do nome do arquivo
+     * OU substantivo de arquivo genérico). Só considera arquivos com storage_url.
+     */
+    async findRequestedFile(userAssistantId: string, message: string): Promise<KnowledgeFile | null> {
+        try {
+            const result = await query(
+                `SELECT id, user_assistant_id, user_id, file_name, kind, mime_type, storage_url, size_bytes, status, char_count, text_content, error_message, created_at, updated_at
+                 FROM assistant_knowledge_files
+                 WHERE user_assistant_id = $1 AND status = 'ready' AND storage_url IS NOT NULL AND kind = 'client'
+                 ORDER BY created_at ASC`,
+                [userAssistantId]
+            );
+            const files = result.rows as KnowledgeFile[];
+            if (files.length === 0) return null;
+
+            const msgNorm = this._normalize(message);
+            const msgTokens = new Set(this._tokenize(message));
+
+            // Gatilhos de pedido (amplos) — o usuário pede/quer receber algo
+            const requestMarkers = [
+                'envia', 'envie', 'enviar', 'manda', 'mande', 'mandar',
+                'me envia', 'me envie', 'me manda', 'me mande', 'me passa', 'me passe',
+                'passa', 'passe', 'me manda o', 'me envia o', 'me passa o', 'me passa a',
+                'manda pra', 'manda para', 'envia pra', 'envia para', 'manda ai', 'envia ai',
+                'me manda ai', 'me envia ai', 'pode enviar', 'pode mandar', 'pode me enviar',
+                'pode me mandar', 'quero', 'queria', 'gostaria', 'preciso', 'precisava',
+                'gostaria de receber', 'quero receber', 'queria receber', 'preciso do', 'preciso da',
+                'disponibiliza', 'me disponibiliza', 'tem o', 'tem a', 'voce tem', 'vc tem',
+                'cade', 'onde esta', 'onde ta', 'me mostra', 'mostra', 'quero o', 'quero a',
+                'pega o', 'pega a', 'me manda por', 'me envia por', 'manda no', 'envia no',
+            ];
+            const hasRequest = requestMarkers.some(m => msgNorm.includes(m));
+            if (!hasRequest) return null;
+
+            // Tier 1: algum token do NOME do arquivo aparece na mensagem
+            // Os usuários nomeiam os arquivos; cada palavra do nome vira um gatilho de detecção.
+            for (const f of files) {
+                const nameTokens = this._fileTokens(f.file_name || '');
+                const matched = nameTokens.some(t =>
+                    msgTokens.has(t) || (t.length >= 4 && msgNorm.includes(t))
+                );
+                if (matched) return f;
+            }
+
+            // Tier 2: pedido genérico de arquivo ("me manda o pdf", "envia o documento")
+            const fileNouns = ['pdf', 'arquivo', 'ficheiro', 'documento', 'planilha', 'catalogo',
+                'tabela', 'lista', 'material', 'conteudo', 'menu', 'cardapio', 'manual', 'guia',
+                'doc', 'docx', 'xlsx', 'xls', 'csv'];
+            if (!fileNouns.some(n => msgNorm.includes(n))) return null;
+
+            if (files.length === 1) return files[0];
+
+            // Vários arquivos: escolher o de maior sobreposição com a mensagem
+            let best: KnowledgeFile | null = null;
+            let bestScore = 0;
+            for (const f of files) {
+                const textNorm = this._normalize(((f as any).text_content || '')).substring(0, 2000);
+                let score = 0;
+                for (const tk of msgTokens) {
+                    if (tk.length >= 4 && textNorm.includes(tk)) score += 2;
+                }
+                for (const tk of this._fileTokens(f.file_name || '')) {
+                    if (msgTokens.has(tk) || (tk.length >= 4 && msgNorm.includes(tk))) score += 5;
+                }
+                if (score > bestScore) { bestScore = score; best = f; }
+            }
+            return bestScore > 0 ? best : null;
+        } catch (err: any) {
+            if (err.code === '42P01') return null;
+            console.error('[Assistants] Erro ao detectar pedido de arquivo:', err.message);
+            return null;
+        }
+    }
+
+    /** Lista documentos da base de conhecimento (sem expor o texto completo). */
+    async listKnowledgeFiles(userAssistantId: string, userId: string, kind?: 'rag' | 'client'): Promise<KnowledgeFile[]> {
+        await this.ensureColumns();
+        const safeKind = kind === 'client' ? 'client' : kind === 'rag' ? 'rag' : null;
+        const result = await query(
+            `SELECT id, user_assistant_id, user_id, file_name, kind, mime_type, size_bytes, status, char_count, error_message,
+                    CASE WHEN status = 'ready' THEN LEFT(text_content, 220)
+                         ELSE COALESCE(error_message, '')
+                    END AS preview,
+                    created_at, updated_at
+             FROM assistant_knowledge_files
+             WHERE user_assistant_id = $1 AND user_id = $2
+               ${safeKind ? 'AND kind = $3' : ''}
+             ORDER BY created_at ASC`,
+            safeKind ? [userAssistantId, userId, safeKind] : [userAssistantId, userId]
+        );
+        return result.rows;
+    }
+
+    /** Busca o texto completo extraído de um documento da base (para preview no dashboard). */
+    async getKnowledgeFileText(userAssistantId: string, fileId: string, userId: string): Promise<string | null> {
+        const result = await query(
+            `SELECT text_content FROM assistant_knowledge_files
+             WHERE id = $1 AND user_assistant_id = $2 AND user_id = $3`,
+            [fileId, userAssistantId, userId]
+        );
+        return result.rows[0]?.text_content ?? null;
+    }
+
+    /** Remove um documento da base de conhecimento. */
+    async deleteKnowledgeFile(userAssistantId: string, fileId: string, userId: string): Promise<boolean> {
+        const result = await query(
+            `DELETE FROM assistant_knowledge_files
+             WHERE id = $1 AND user_assistant_id = $2 AND user_id = $3
+             RETURNING id`,
+            [fileId, userAssistantId, userId]
+        );
+        return (result.rowCount ?? 0) > 0;
+    }
+
+    /**
+     * Busca (sem embeddings — zero tokens extras) os trechos mais relevantes da base
+     * para a mensagem do usuário, por sobreposição de palavras-chave normalizadas.
+     * Retorna string vazia se não houver correspondência.
+     */
+    async getKnowledgeContext(
+        userAssistantId: string,
+        message: string,
+        maxChars = 2500
+    ): Promise<string> {
+        try {
+            const result = await query(
+                `SELECT file_name, text_content FROM assistant_knowledge_files
+                 WHERE user_assistant_id = $1 AND status = 'ready' AND char_count > 0 AND kind = 'rag'`,
+                [userAssistantId]
+            );
+            const files = result.rows as { file_name: string; text_content: string }[];
+            if (files.length === 0) return '';
+
+            const tokens = this._tokenize(message);
+            if (tokens.length === 0) return '';
+
+            const CHUNK = 600;
+            const OVERLAP = 100;
+            const scored: { file: string; chunk: string; score: number }[] = [];
+
+            for (const f of files) {
+                const text = (f.text_content || '').replace(/\s+/g, ' ').trim();
+                if (!text) continue;
+                const chunks: string[] = [];
+                for (let i = 0; i < text.length; i += (CHUNK - OVERLAP)) {
+                    chunks.push(text.substring(i, i + CHUNK));
+                }
+                for (const chunk of chunks) {
+                    const cNorm = this._normalize(chunk);
+                    let score = 0;
+                    for (const tk of tokens) {
+                        if (cNorm.includes(tk)) score += tk.length >= 4 ? 2 : 1;
+                    }
+                    if (score > 0) scored.push({ file: f.file_name, chunk, score });
+                }
+            }
+
+            scored.sort((a, b) => b.score - a.score);
+
+            const selected: string[] = [];
+            const pickedFiles = new Set<string>();
+            let used = 0;
+            for (const s of scored) {
+                if (pickedFiles.size >= 2 && !pickedFiles.has(s.file)) continue;
+                pickedFiles.add(s.file);
+                selected.push(`[${s.file}]\n${s.chunk}`);
+                used += s.chunk.length;
+                if (used >= maxChars) break;
+            }
+
+            return selected.join('\n\n');
+        } catch (err: any) {
+            if (err.code === '42P01') return '';
+            console.error('[Assistants] Erro ao buscar base de conhecimento:', err.message);
+            return '';
+        }
+    }
+
+    /** Normaliza texto (minúsculas, sem acentos) para correspondência. */
+    private _normalize(s: string): string {
+        return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    /**
+     * Extrai palavras-chave do nome de um arquivo (remove extensão e separadores).
+     * Ex: "Tabela-de-Precos-2024.pdf" → ['tabela', 'precos', '2024']
+     * Cada palavra vira um gatilho de detecção do pedido do cliente.
+     */
+    private _fileTokens(fileName: string): string[] {
+        const noExt = fileName.replace(/\.[^.]+$/, '');
+        const words = noExt
+            .replace(/([a-z])([A-Z])/g, '$1 $2') // camelCase → espaço
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, ' ')
+            .split(' ')
+            .filter(w => w.length >= 2);
+        const GENERIC = new Set(['pdf', 'doc', 'docx', 'xlsx', 'xls', 'csv', 'txt', 'ppt', 'pptx', 'zip', 'rar', 'png', 'jpg', 'jpeg', 'anexo', 'arquivo']);
+        return [...new Set(words.filter(w => !GENERIC.has(w)))];
+    }
+
+    /** Extrai palavras-chave relevantes de uma mensagem (remove stopwords). */
+    private _tokenize(s: string): string[] {
+        const words = this._normalize(s).match(/[a-z0-9]{3,}/g) || [];
+        const stop = new Set([
+            'para', 'com', 'por', 'que', 'qual', 'como', 'onde', 'quando',
+            'voce', 'voces', 'vc', 'isso', 'aquilo', 'sobre', 'mais', 'muito',
+            'obrigado', 'obrigada', 'ola', 'oi', 'bom', 'boa', 'dia', 'tarde', 'noite',
+            'quero', 'gostaria', 'saber', 'preciso', 'entao', 'mas', 'tambem'
+        ]);
+        return [...new Set(words.filter(w => !stop.has(w)))];
     }
 
     /**

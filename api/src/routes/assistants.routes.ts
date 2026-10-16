@@ -1,10 +1,25 @@
 // Rotas para gerenciar assistentes do marketplace
 import { Router } from 'express';
+import multer from 'multer';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { AssistantsService } from '../services/assistants.service';
+import { AIService } from '../services/ai.service';
+import { getStorageService } from '../services/storage.service';
 
 const router = Router();
 const assistantsService = new AssistantsService();
+
+// Upload de base de conhecimento — limite 5MB
+const KB_MAX_BYTES = 5 * 1024 * 1024; // 5MB
+const kbUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: KB_MAX_BYTES } });
+
+function isKnowledgeFileAllowed(file: Express.Multer.File): boolean {
+    const name = (file.originalname || '').toLowerCase();
+    const allowedExt = /\.(pdf|xlsx|xls|csv|txt|docx|doc)$/.test(name);
+    const mime = (file.mimetype || '').toLowerCase();
+    const allowedMime = /pdf|spreadsheet|excel|csv|text\/|word|document/.test(mime);
+    return allowedExt || allowedMime;
+}
 
 // GET /api/assistants/available - Lista assistentes disponíveis no marketplace
 router.get('/available', async (req, res) => {
@@ -382,6 +397,156 @@ router.post('/:id/log', async (req, res, next) => {
     } catch (error) {
         next(error);
     }
+});
+
+// ── Base de Conhecimento ──────────────────────────────────────────────────────
+
+// POST /api/assistants/:id/knowledge - Faz upload de um documento (PDF/Excel/CSV/TXT/DOCX)
+router.post('/:id/knowledge', kbUpload.single('file'), async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const file = req.file;
+        if (!file) {
+            return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+        }
+        if (file.size > KB_MAX_BYTES) {
+            return res.status(400).json({ error: 'O arquivo excede o limite de 5MB' });
+        }
+        if (!isKnowledgeFileAllowed(file)) {
+            return res.status(400).json({ error: 'Formato não suportado. Envie PDF, Excel (XLSX), CSV, TXT ou DOCX.' });
+        }
+
+        // Categoria do documento: 'rag' (base de conhecimento) ou 'client' (arquivo para enviar ao cliente)
+        const kind = req.body?.kind === 'client' ? 'client' : 'rag';
+
+        // Confirmar que o assistente pertence ao usuário
+        const userAssistant = await assistantsService.findUserAssistantById(req.params.id, user.id);
+        if (!userAssistant) {
+            return res.status(404).json({ error: 'Assistente não encontrado' });
+        }
+
+        // Extrair o texto UMA única vez (fica cacheado no banco — não re-lê o arquivo)
+        // Normalizar o MIME pela extensão: navegadores podem reportar 'application/vnd.ms-excel' para .csv, etc.
+        const ext = (file.originalname.split('.').pop() || '').toLowerCase();
+        const extMime: Record<string, string> = {
+            pdf:  'application/pdf',
+            xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            xls:  'application/vnd.ms-excel',
+            csv:  'text/csv',
+            txt:  'text/plain',
+            docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            doc:  'application/msword',
+        };
+        const mimeForExtraction = extMime[ext] || file.mimetype || 'application/octet-stream';
+
+        const aiService = new AIService();
+        const base64 = file.buffer.toString('base64');
+        const dataUri = `data:${mimeForExtraction};base64,${base64}`;
+        const textContent = await aiService.extractDocumentText(dataUri, mimeForExtraction, process.env.GEMINI_API_KEY, 20000);
+
+        // Guardar o arquivo original (para o assistente poder enviá-lo quando o cliente pedir)
+        let storageUrl: string | null = null;
+        try {
+            const storageService = getStorageService();
+            storageUrl = await storageService.uploadBuffer(
+                file.buffer,
+                file.originalname,
+                file.mimetype || 'application/octet-stream',
+                'knowledge-base',
+                user.id
+            );
+        } catch (storeErr: any) {
+            console.warn('[Assistants] Falha ao armazenar arquivo original (não crítico):', storeErr.message);
+        }
+
+        const kbFile = await assistantsService.addKnowledgeFile(req.params.id, user.id, {
+            fileName: file.originalname,
+            mimeType: file.mimetype,
+            sizeBytes: file.size,
+            textContent,
+            storageUrl,
+            kind,
+        });
+
+        res.status(201).json(kbFile);
+    } catch (error: any) {
+        if (error?.name === 'MulterError') {
+            return res.status(400).json({ error: 'O arquivo excede o limite de 5MB' });
+        }
+        if (error?.code === 'KNOWLEDGE_LIMIT_REACHED') {
+            return res.status(400).json({ error: error.message });
+        }
+        next(error);
+    }
+});
+
+// GET /api/assistants/:id/knowledge - Lista documentos da base de conhecimento
+router.get('/:id/knowledge', async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const kind = (req.query.kind === 'rag' || req.query.kind === 'client') ? req.query.kind as 'rag' | 'client' : undefined;
+        const files = await assistantsService.listKnowledgeFiles(req.params.id, user.id, kind);
+        res.json(files);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// GET /api/assistants/:id/knowledge/:fileId/text - Retorna o texto completo extraído
+router.get('/:id/knowledge/:fileId/text', async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const text = await assistantsService.getKnowledgeFileText(req.params.id, req.params.fileId, user.id);
+        if (text === null) {
+            return res.status(404).json({ error: 'Documento não encontrado' });
+        }
+
+        res.json({ text });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// DELETE /api/assistants/:id/knowledge/:fileId - Remove um documento da base
+router.delete('/:id/knowledge/:fileId', async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const deleted = await assistantsService.deleteKnowledgeFile(req.params.id, req.params.fileId, user.id);
+        if (!deleted) {
+            return res.status(404).json({ error: 'Documento não encontrado' });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Trata erros de upload (ex: arquivo > 5MB) de forma amigável
+router.use((err: any, _req: any, res: any, next: any) => {
+    if (err && err.name === 'MulterError') {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: `O arquivo excede o limite de ${KB_MAX_BYTES / 1024 / 1024}MB` });
+        }
+        return res.status(400).json({ error: 'Erro no upload do arquivo' });
+    }
+    next(err);
 });
 
 export default router;
