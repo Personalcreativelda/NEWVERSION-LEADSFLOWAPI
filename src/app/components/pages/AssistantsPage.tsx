@@ -329,7 +329,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     vision_enabled: cfg.vision_enabled !== false,
     document_enabled: cfg.document_enabled !== false,
     reactions_enabled: cfg.reactions_enabled === true || cfg.reactions_enabled === 'true',
-    knowledge_base_enabled: cfg.knowledge_base_enabled === true,
+    knowledge_base_enabled: cfg.knowledge_base_enabled !== false,
     file_sending_enabled: cfg.file_sending_enabled !== false,
   });
 

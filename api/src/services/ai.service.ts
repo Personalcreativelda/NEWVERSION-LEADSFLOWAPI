@@ -765,7 +765,8 @@ export class AIService {
         fileUrl: string,
         mimeType?: string,
         geminiApiKey?: string,
-        maxChars = 4000
+        maxChars = 4000,
+        openaiApiKey?: string
     ): Promise<string> {
         let buffer: Buffer;
         let contentType: string;
@@ -826,7 +827,16 @@ export class AIService {
                 return uncompressedText.substring(0, maxChars);
             }
 
-            // ── Method 3: Gemini native PDF understanding (supports scanned/image PDFs) ──
+            // ── Method 3: OpenAI document understanding (OCR de PDFs escaneados) ──
+            if (openaiApiKey) {
+                const ocrText = await this._extractPdfWithOpenAI(buffer, openaiApiKey, maxChars);
+                if (ocrText.length > 50) {
+                    console.log(`[AIService] ✅ PDF extraído via OpenAI OCR: ${ocrText.length} chars`);
+                    return ocrText;
+                }
+            }
+
+            // ── Method 4: Gemini native PDF understanding (supports scanned/image PDFs) ──
             if (geminiApiKey) {
                 try {
                     const b64 = buffer.toString('base64');
@@ -860,7 +870,7 @@ export class AIService {
                 }
             }
 
-            // ── Method 4: Generic printable char scan (absolute last resort) ──
+            // ── Method 5: Generic printable char scan (absolute last resort) ──
             const pdfStr = buffer.toString('latin1');
             const words: string[] = [];
             let current = '';
@@ -927,6 +937,76 @@ export class AIService {
         }
 
         return '';
+    }
+
+    /**
+     * Extrai texto de um PDF (incluindo PDFs escaneados/em imagem) usando o OpenAI.
+     * Fluxo: upload do PDF para /v1/files → Responses API (gpt-4o) com input_file.
+     * Retorna string vazia em caso de falha (fallback gracioso).
+     */
+    private async _extractPdfWithOpenAI(buffer: Buffer, apiKey: string, maxChars: number): Promise<string> {
+        try {
+            // 1. Upload do PDF para a API da OpenAI (input_file exige arquivo pré-carregado)
+            const form = new FormData();
+            form.append('purpose', 'user_data');
+            form.append('file', new Blob([new Uint8Array(buffer)], { type: 'application/pdf' }), 'document.pdf');
+
+            const uploadRes = await fetch('https://api.openai.com/v1/files', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${apiKey}` },
+                body: form,
+            });
+            if (!uploadRes.ok) {
+                const errText = await uploadRes.text().catch(() => '');
+                console.warn(`[AIService] OpenAI file upload error (${uploadRes.status}):`, errText.substring(0, 200));
+                return '';
+            }
+            const uploadData = await uploadRes.json() as any;
+            const fileId = uploadData?.id;
+            if (!fileId) return '';
+
+            try {
+                // 2. Responses API para extrair TODO o texto (faz OCR de páginas escaneadas)
+                const res = await fetch('https://api.openai.com/v1/responses', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'gpt-4o',
+                        instructions: 'Extraia e retorne TODO o texto deste documento, preservando a estrutura e os parágrafos. Retorne apenas o texto extraído, sem comentários ou formatação adicional. Se for um documento escaneado, faça OCR das páginas.',
+                        input: [
+                            { role: 'user', content: [{ type: 'input_file', file_id: fileId }] },
+                        ],
+                        max_output_tokens: 8000,
+                    }),
+                });
+                if (res.ok) {
+                    const data = await res.json() as any;
+                    const parts: any[] = Array.isArray(data?.output) ? data.output : [];
+                    const text = (data?.output_text as string) ||
+                        parts.map((o: any) => (o?.content || []).map((c: any) => c?.text || '').join(' ')).join(' ').trim();
+                    if (text && text.length > 50) {
+                        return text.substring(0, maxChars);
+                    }
+                    console.warn('[AIService] OpenAI Responses retornou texto curto para o PDF:', text ? text.length : 0);
+                } else {
+                    const errText = await res.text().catch(() => '');
+                    console.warn(`[AIService] OpenAI Responses error (${res.status}):`, errText.substring(0, 200));
+                }
+            } finally {
+                // Remove o arquivo do lado da OpenAI para não acumular (melhor esforço)
+                try {
+                    await fetch(`https://api.openai.com/v1/files/${fileId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${apiKey}` },
+                    });
+                } catch { /* ignore */ }
+            }
+
+            return '';
+        } catch (e: any) {
+            console.warn('[AIService] OpenAI PDF extraction failed:', e.message);
+            return '';
+        }
     }
 
     /** Extracts text from BT...ET operator blocks in a PDF text string */
@@ -1256,7 +1336,8 @@ export class AIService {
         fileUrl: string,
         mimeType?: string,
         geminiApiKey?: string,
-        maxChars = 4000
+        maxChars = 4000,
+        openaiApiKey?: string
     ): Promise<string> {
         const cacheable = fileUrl.startsWith('http://') || fileUrl.startsWith('https://');
         if (cacheable) {
@@ -1267,7 +1348,7 @@ export class AIService {
             }
         }
 
-        const result = await this.extractDocumentText(fileUrl, mimeType, geminiApiKey, maxChars);
+        const result = await this.extractDocumentText(fileUrl, mimeType, geminiApiKey, maxChars, openaiApiKey);
 
         if (cacheable && result.length > 0) {
             this._docTextCache.set(fileUrl, result);

@@ -236,9 +236,10 @@ export class AssistantProcessorService {
                 const docUserCaption = (ctx.messageContent && !ctx.messageContent.startsWith('[')) ? ctx.messageContent.trim() : '';
                 if (documentEnabled && ctx.mediaUrl) {
                     try {
-                        // Tentar Gemini primeiro (melhor suporte a PDF), depois OpenAI se disponível
+                        // Tentar Gemini (PDF) e OpenAI (OCR de escaneados) — ambas passadas; o serviço decide
                         const geminiProvider = availableProviders.find(p => p.provider === 'gemini');
-                        const extractedText = await aiService.extractDocumentTextCached(ctx.mediaUrl, ctx.mediaType, geminiProvider?.apiKey);
+                        const openaiDocProvider = availableProviders.find(p => p.provider === 'openai');
+                        const extractedText = await aiService.extractDocumentTextCached(ctx.mediaUrl, ctx.mediaType, geminiProvider?.apiKey, 4000, openaiDocProvider?.apiKey);
                         if (extractedText && extractedText.length > 50) {
                             ctx.messageContent = `[Conteúdo do documento enviado pelo usuário]\n${extractedText}\n\n${docUserCaption || 'Responda com base no documento acima.'}`;
                             console.log(`[AssistantProcessor] 📄 Documento extraído: ${extractedText.length} chars`);
@@ -574,7 +575,7 @@ export class AssistantProcessorService {
         }
 
         // Injetar base de conhecimento no system prompt (busca por relevância — sem embeddings/tokens extras)
-        const kbEnabled = config.knowledge_base_enabled === true;
+        const kbEnabled = config.knowledge_base_enabled !== false; // padrão: ativo
         if (kbEnabled) {
             try {
                 const kbContext = await assistantsService.getKnowledgeContext(
@@ -1629,9 +1630,11 @@ export class AssistantProcessorService {
 
         // 4. Registrar no inbox (para o atendente ver o que foi enviado)
         if (sent) {
+            // Gravar a ação de envio de forma explícita para que o assistente, na próxima
+            // mensagem (mesma conversa ou sessão seguinte), saiba que JÁ enviou este arquivo.
             await this.saveOutgoingMessage(
                 ctx,
-                `📎 ${displayName}`,
+                `📎 Enviei o arquivo: ${displayName}`,
                 sentExternalId,
                 'document',
                 fileUrl,

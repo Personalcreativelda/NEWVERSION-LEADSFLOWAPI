@@ -446,7 +446,7 @@ router.post('/:id/knowledge', kbUpload.single('file'), async (req, res, next) =>
         const aiService = new AIService();
         const base64 = file.buffer.toString('base64');
         const dataUri = `data:${mimeForExtraction};base64,${base64}`;
-        const textContent = await aiService.extractDocumentText(dataUri, mimeForExtraction, process.env.GEMINI_API_KEY, 20000);
+        const textContent = await aiService.extractDocumentText(dataUri, mimeForExtraction, process.env.GEMINI_API_KEY, 20000, process.env.OPENAI_API_KEY);
 
         // Guardar o arquivo original (para o assistente poder enviá-lo quando o cliente pedir)
         let storageUrl: string | null = null;

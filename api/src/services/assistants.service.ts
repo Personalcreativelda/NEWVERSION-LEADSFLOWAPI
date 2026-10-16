@@ -966,6 +966,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
      * OU substantivo de arquivo genérico). Só considera arquivos com storage_url.
      */
     async findRequestedFile(userAssistantId: string, message: string): Promise<KnowledgeFile | null> {
+        await this.ensureColumns();
         try {
             const result = await query(
                 `SELECT id, user_assistant_id, user_id, file_name, kind, mime_type, storage_url, size_bytes, status, char_count, text_content, error_message, created_at, updated_at
@@ -1086,6 +1087,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
         message: string,
         maxChars = 2500
     ): Promise<string> {
+        await this.ensureColumns();
         try {
             const result = await query(
                 `SELECT file_name, text_content FROM assistant_knowledge_files
@@ -1130,6 +1132,24 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
                 selected.push(`[${s.file}]\n${s.chunk}`);
                 used += s.chunk.length;
                 if (used >= maxChars) break;
+            }
+
+            // Fallback para perguntas genéricas ("o que tem nesse documento?"): quando nenhum trecho
+            // marcou por palavras-chave, injeta o início de cada documento para o assistente ainda
+            // ter o conteúdo disponível (texto já cacheado — custo zero de token extra).
+            if (selected.length === 0) {
+                const fallback: string[] = [];
+                let used = 0;
+                for (const f of files.slice(0, 3)) {
+                    const text = (f.text_content || '').replace(/\s+/g, ' ').trim();
+                    if (!text) continue;
+                    const per = Math.min(700, maxChars - used);
+                    if (per <= 0) break;
+                    const snippet = text.substring(0, per);
+                    fallback.push(`[${f.file_name}]\n${snippet}${text.length > per ? '…' : ''}`);
+                    used += snippet.length;
+                }
+                return fallback.join('\n\n');
             }
 
             return selected.join('\n\n');
