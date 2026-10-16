@@ -318,8 +318,8 @@ export function MessageBubble({
                 style={{ maxWidth: isEmail ? '85%' : '65%', minWidth: 80, padding: '6px 10px 8px', fontSize: '14.2px', lineHeight: '1.35' }}
                 className={`relative ${bubbleRounding} shadow-sm ${
                     isOut
-                        ? 'bg-primary/10 text-foreground'
-                        : 'bg-muted text-foreground'
+                        ? 'bg-[#D9FDD3] dark:bg-[#005C4B] text-[#111B21] dark:text-[#E9EDEF]'
+                        : 'bg-white dark:bg-[#202C33] text-[#111B21] dark:text-[#E9EDEF] border border-black/[0.05] dark:border-white/[0.06]'
                 }`}
             >
                 {/* Hover chevron overlay for outgoing (inside bubble) */}

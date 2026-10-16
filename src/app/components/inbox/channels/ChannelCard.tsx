@@ -10,15 +10,18 @@ interface ChannelCardProps {
     onEdit: (channel: Channel) => void;
     onDelete: (channel: Channel) => void;
     onSync: (channel: Channel) => void;
+    onLinkInstance?: (channel: Channel, newInstanceId: string) => void;
     onRename?: (channel: Channel, newName: string) => void;
     loading?: boolean;
 }
 
-export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loading }: ChannelCardProps) {
+export function ChannelCard({ channel, onEdit, onDelete, onSync, onLinkInstance, onRename, loading }: ChannelCardProps) {
     const [syncing, setSyncing] = useState(false);
     const [expanded, setExpanded] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [editName, setEditName] = useState(channel.name);
+    const [editInstance, setEditInstance] = useState(channel.credentials?.instance_name || channel.credentials?.instance_id || '');
+    const [isRenaming, setIsRenaming] = useState(false);
+    const [renameValue, setRenameValue] = useState(channel.name);
 
     const getIcon = (type: string) => {
         switch (type) {
@@ -169,12 +172,45 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                         {getIcon(channel.type)}
                     </div>
                     <div className="min-w-0 flex-1">
-                        <h4 className="font-semibold leading-tight flex items-center gap-2 truncate" style={{ color: 'hsl(var(--foreground))' }}>
-                            <span className="truncate">{channel.name}</span>
-                            {channel.status === 'active' && (
-                                <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: activeBorderColor }} />
-                            )}
-                        </h4>
+                        {isRenaming ? (
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="text"
+                                    value={renameValue}
+                                    onChange={(e) => setRenameValue(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="px-1.5 py-0.5 text-sm rounded border w-full min-w-0"
+                                    style={{ borderColor: 'hsl(var(--border))', backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))' }}
+                                    autoFocus
+                                />
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); if (onRename && renameValue.trim()) onRename(channel, renameValue.trim()); setIsRenaming(false); }}
+                                    className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600 flex-shrink-0"
+                                >
+                                    <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setRenameValue(channel.name); setIsRenaming(false); }}
+                                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 flex-shrink-0"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        ) : (
+                            <h4 className="font-semibold leading-tight flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
+                                <span className="truncate">{channel.name}</span>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setRenameValue(channel.name); setIsRenaming(true); }}
+                                    className="p-0.5 hover:bg-muted/50 rounded flex-shrink-0"
+                                    title="Editar nome do canal"
+                                >
+                                    <Pencil className="w-3 h-3" style={{ color: 'hsl(var(--muted-foreground))' }} />
+                                </button>
+                                {channel.status === 'active' && (
+                                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: activeBorderColor }} />
+                                )}
+                            </h4>
+                        )}
                         <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
                             {getProviderLabel() || channel.type}
                         </p>
@@ -240,31 +276,31 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onRename, loadi
                                     <span style={{ color: 'hsl(var(--muted-foreground))' }}>API não oficial</span>
                                 </div>
                                 {channel.credentials.instance_name && (
-                                    <div className="text-xs flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                        <span style={{ color: 'hsl(var(--muted-foreground))' }}>Instância: </span>
+                                    <div className="text-xs flex items-center gap-2 min-w-0" style={{ color: 'hsl(var(--foreground))' }}>
+                                        <span className="flex-shrink-0" style={{ color: 'hsl(var(--muted-foreground))' }}>Instância: </span>
                                         {isEditing ? (
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1 min-w-0 flex-1">
                                                 <input
                                                     type="text"
-                                                    value={editName}
-                                                    onChange={(e) => setEditName(e.target.value)}
-                                                    className="px-2 py-1 text-xs rounded border font-mono"
+                                                    value={editInstance}
+                                                    onChange={(e) => setEditInstance(e.target.value)}
+                                                    className="px-2 py-1 text-xs rounded border font-mono flex-1 min-w-0"
                                                     style={{ borderColor: 'hsl(var(--border))', backgroundColor: 'hsl(var(--background))' }}
                                                     autoFocus
                                                 />
-                                                <button onClick={() => { if (onRename && editName.trim()) onRename(channel, editName.trim()); setIsEditing(false); }}
-                                                    className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600">
+                                                <button onClick={() => { if (onLinkInstance && editInstance.trim()) onLinkInstance(channel, editInstance.trim()); setIsEditing(false); }}
+                                                    className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded text-green-600 flex-shrink-0">
                                                     <Check className="w-3 h-3" />
                                                 </button>
-                                                <button onClick={() => { setEditName(channel.name); setIsEditing(false); }}
-                                                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600">
+                                                <button onClick={() => { setEditInstance(channel.credentials?.instance_name || channel.credentials?.instance_id || ''); setIsEditing(false); }}
+                                                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 flex-shrink-0">
                                                     <X className="w-3 h-3" />
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center gap-1">
-                                                <code className="font-mono">{channel.credentials.instance_name || channel.credentials.instance_id}</code>
-                                                <button onClick={() => setIsEditing(true)} className="p-1 hover:bg-muted/50 rounded" title="Editar nome">
+                                            <div className="flex items-center gap-1 min-w-0 flex-1">
+                                                <code className="font-mono truncate min-w-0 flex-1">{channel.credentials.instance_name || channel.credentials.instance_id}</code>
+                                                <button onClick={() => { setEditInstance(channel.credentials?.instance_name || channel.credentials?.instance_id || ''); setIsEditing(true); }} className="p-1 hover:bg-muted/50 rounded flex-shrink-0" title="Editar instância">
                                                     <Pencil className="w-3 h-3" style={{ color: 'hsl(var(--muted-foreground))' }} />
                                                 </button>
                                             </div>

@@ -296,10 +296,20 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     try {
       setActionLoading(true);
       // Normalize __default__ sentinel back to empty string before saving
-      const valuesToSave = {
+      const valuesToSave: Record<string, any> = {
         ...configValues,
         ai_model: configValues.ai_model === '__default__' ? '' : (configValues.ai_model || ''),
       };
+      // Gatilhos de escalação: se o usuário digitou (string), converte para array;
+      // se ficou vazio, remove a chave para o backend usar os gatilhos padrão.
+      if (typeof configValues.escalation_keywords === 'string') {
+        const parsed = configValues.escalation_keywords.split(',').map((s: string) => s.trim()).filter(Boolean);
+        if (parsed.length > 0) {
+          valuesToSave.escalation_keywords = parsed;
+        } else {
+          delete valuesToSave.escalation_keywords;
+        }
+      }
       await assistantsApi.configure(
         selectedUserAssistant.id,
         valuesToSave,
@@ -331,6 +341,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     reactions_enabled: cfg.reactions_enabled === true || cfg.reactions_enabled === 'true',
     knowledge_base_enabled: cfg.knowledge_base_enabled !== false,
     file_sending_enabled: cfg.file_sending_enabled !== false,
+    escalation_enabled: cfg.escalation_enabled !== false,
   });
 
   // ========== Base de Conhecimento / Arquivos para clientes ==========
@@ -1277,6 +1288,68 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
                       style={{ colorScheme: isDark ? 'dark' : 'light' }}
                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* Escalar para humano */}
+              <div className="p-4 rounded-lg border bg-muted/30 border-border">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="w-4 h-4 text-orange-500" />
+                  <h4 className="text-sm font-semibold text-foreground">Escalar para humano</h4>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!!configValues.escalation_enabled}
+                    onClick={() => setConfigValues({ ...configValues, escalation_enabled: !configValues.escalation_enabled })}
+                    className="ml-auto flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                    style={{ width: 44, height: 24, background: configValues.escalation_enabled ? '#f97316' : '#6b7280' }}
+                  >
+                    <span
+                      className="inline-block rounded-full bg-white shadow transition-transform"
+                      style={{ width: 18, height: 18, transform: configValues.escalation_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                    />
+                  </button>
+                </div>
+
+                <p className="text-xs text-muted-foreground mb-3">
+                  Quando o cliente pedir para falar com um atendente humano (ou demonstrar um assunto sensível), o assistente pausa a IA e avisa um responsável.
+                </p>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground">WhatsApp do responsável (DDI + número)</label>
+                    <input
+                      type="tel"
+                      placeholder="Ex: 5511999999999"
+                      value={configValues.escalation_phone || ''}
+                      onChange={(e) => setConfigValues({ ...configValues, escalation_phone: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">Este número recebe a notificação da conversa escalada.</p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-muted-foreground">Mensagem enviada ao cliente ao escalar</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Entendido! Vou te conectar com um atendente humano..."
+                      value={configValues.escalation_message || ''}
+                      onChange={(e) => setConfigValues({ ...configValues, escalation_message: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-muted-foreground">Gatilhos de escalação (separados por vírgula)</label>
+                    <input
+                      type="text"
+                      placeholder="falar com humano, quero atendente, cancelar assinatura"
+                      value={typeof configValues.escalation_keywords === 'string' ? configValues.escalation_keywords : (Array.isArray(configValues.escalation_keywords) ? configValues.escalation_keywords.join(', ') : '')}
+                      onChange={(e) => setConfigValues({ ...configValues, escalation_keywords: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">Deixe vazio para usar os gatilhos padrão.</p>
                   </div>
                 </div>
               </div>

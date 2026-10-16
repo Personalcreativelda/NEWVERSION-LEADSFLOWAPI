@@ -91,23 +91,23 @@
   /* MODO ESCURO - Enterprise neutral dark (Meta/WhatsApp inspired) */
   --background: 220 6% 10%;
   --foreground: 220 6% 93%;
-  --card: 220 6% 13%;
+  --card: 220 6% 10%;
   --card-foreground: 220 6% 93%;
-  --popover: 220 6% 13%;
+  --popover: 220 6% 10%;
   --popover-foreground: 220 6% 93%;
   --primary: 221 70% 55%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 220 6% 15%;
+  --secondary: 220 6% 11%;
   --secondary-foreground: 220 6% 93%;
-  --muted: 220 6% 16%;
+  --muted: 220 6% 12%;
   --muted-foreground: 220 4% 55%;
   --accent: 221 50% 90%;
   --accent-foreground: 220 6% 93%;
   --destructive: 0 62% 50%;
   --destructive-foreground: 0 0% 100%;
   --border: 220 6% 18%;
-  --input: 220 6% 16%;
-  --input-background: 220 6% 13%;
+  --input: 220 6% 14%;
+  --input-background: 220 6% 10%;
   --ring: 221 70% 55%;
   
   /* Chat area background (dark mode) */

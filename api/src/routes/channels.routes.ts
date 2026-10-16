@@ -483,6 +483,73 @@ router.put('/:id', async (req, res, next) => {
     }
 });
 
+// POST /api/channels/:id/link-instance - Vincula/corrige o instance_id de um canal WhatsApp
+// Usado quando o cliente cria a instância direto na Evolution (fora da LeadFlow) e quer
+// apontar o canal existente para essa instância, sem quebrar o fluxo de criação automática.
+router.post('/:id/link-instance', async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+        const rawInstance = req.body?.instance_id ?? req.body?.instance_name;
+        const instanceId = (typeof rawInstance === 'string' ? rawInstance : '').trim();
+        if (!instanceId) {
+            return res.status(400).json({ error: 'instance_id é obrigatório' });
+        }
+
+        const channel = await channelsService.findById(req.params.id, user.id);
+        if (!channel) return res.status(404).json({ error: 'Channel not found' });
+        if (channel.type !== 'whatsapp') {
+            return res.status(400).json({ error: 'Este recurso só se aplica a canais WhatsApp (Evolution API)' });
+        }
+
+        // Evitar duplicidade: se outro canal já usa essa instância
+        const duplicate = await channelsService.findByInstanceId(instanceId, user.id);
+        if (duplicate && duplicate.id !== channel.id) {
+            return res.status(409).json({ error: 'Esta instância já está vinculada a outro canal.' });
+        }
+
+        // Validar vínculo na Evolution API (se disponível)
+        if (whatsappService.isReady()) {
+            try {
+                const status = await whatsappService.getStatus(instanceId) as any;
+                console.log(`[Channels] link-instance validation for "${instanceId}":`, {
+                    state: status?.state,
+                    connectionStatus: status?.connectionStatus,
+                    connected: status?.connected,
+                });
+            } catch (error: any) {
+                const msg = error?.message || '';
+                // 4xx = instância não existe na Evolution → bloquear com erro claro
+                if (/^4\d\d/.test(msg)) {
+                    return res.status(400).json({
+                        error: `Instância "${instanceId}" não foi encontrada na Evolution API. Confira o nome/ID informado.`,
+                    });
+                }
+                // Falha de rede/outro erro → avisar mas permitir vincular (não bloquear o usuário)
+                console.warn(`[Channels] link-instance: não foi possível validar "${instanceId}" (${msg})`);
+            }
+        }
+
+        // Atualizar credentials preservando demais campos (phone_number, etc.)
+        let currentCreds: any = channel.credentials || {};
+        if (typeof currentCreds === 'string') {
+            try { currentCreds = JSON.parse(currentCreds); } catch (e) { currentCreds = {}; }
+        }
+        const updatedCreds = { ...currentCreds, instance_id: instanceId, instance_name: instanceId };
+
+        const updated = await channelsService.update(channel.id, { credentials: updatedCreds }, user.id);
+
+        // Reconfigurar webhook na nova instância
+        await configureWebhookForInstance(instanceId);
+
+        console.log(`[Channels] Instância vinculada ao canal ${channel.id}: ${instanceId}`);
+        res.json(updated);
+    } catch (error) {
+        next(error);
+    }
+});
+
 // DELETE /api/channels/:id - Remove canal
 router.delete('/:id', async (req, res, next) => {
     try {

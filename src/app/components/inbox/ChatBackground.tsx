@@ -11,7 +11,7 @@ export function ChatBackground({ children, className = '', scrollRef }: ChatBack
     return (
         <div
             ref={scrollRef as React.RefObject<HTMLDivElement>}
-            className={`relative bg-background ${className}`}
+            className={`relative bg-[#ECE5DD] dark:bg-[#0B141A] ${className}`}
         >
             <div className="relative h-full">
                 {children}

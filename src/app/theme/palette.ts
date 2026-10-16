@@ -159,7 +159,7 @@ export function palette(mode: 'light' | 'dark') {
       disabled: GREY[600],
     },
     background: {
-      paper: GREY[800],
+      paper: GREY[900],
       default: GREY[900],
       neutral: alpha(GREY[500], 0.12),
     },

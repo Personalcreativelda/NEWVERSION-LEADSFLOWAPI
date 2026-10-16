@@ -105,6 +105,15 @@ export const channelsApi = {
     async sync(id: string): Promise<{ success: boolean; status: string; synced_at: string }> {
         const { data } = await api.post(`/channels/${id}/sync`);
         return data;
+    },
+
+    /**
+     * Vincula/edita a instância Evolution de um canal WhatsApp
+     * (para casos em que a instância foi criada direto na Evolution)
+     */
+    async linkInstance(id: string, instanceId: string): Promise<Channel> {
+        const { data } = await api.post<Channel>(`/channels/${id}/link-instance`, { instance_id: instanceId });
+        return data;
     }
 };
 

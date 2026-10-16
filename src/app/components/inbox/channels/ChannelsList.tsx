@@ -207,16 +207,29 @@ export function ChannelsList() {
         }
     };
 
+    const handleLinkInstance = async (channel: Channel, newInstanceId: string) => {
+        try {
+            const updated = await channelsApi.linkInstance(channel.id, newInstanceId);
+            setChannels(prev => prev.map(c =>
+                c.id === channel.id ? { ...c, credentials: updated.credentials } : c
+            ));
+            toast.success('Instância vinculada com sucesso');
+        } catch (error: any) {
+            console.error('Erro ao vincular instância:', error);
+            toast.error(error?.response?.data?.error || 'Erro ao vincular instância');
+        }
+    };
+
     const handleRename = async (channel: Channel, newName: string) => {
         try {
             await channelsApi.update(channel.id, { name: newName });
-            setChannels(prev => prev.map(c => 
+            setChannels(prev => prev.map(c =>
                 c.id === channel.id ? { ...c, name: newName } : c
             ));
-            toast.success('Nome atualizado com sucesso');
-        } catch (error) {
+            toast.success('Nome do canal atualizado');
+        } catch (error: any) {
             console.error('Erro ao renomear canal:', error);
-            toast.error('Erro ao renomear canal');
+            toast.error(error?.response?.data?.error || 'Erro ao renomear canal');
         }
     };
 
@@ -340,6 +353,7 @@ export function ChannelsList() {
                                     key={channel.id}
                                     channel={channel}
                                     onDelete={handleDelete}
+                                    onLinkInstance={handleLinkInstance}
                                     onRename={handleRename}
                                     onEdit={openEditModal}
                                     onSync={() => loadChannels()}

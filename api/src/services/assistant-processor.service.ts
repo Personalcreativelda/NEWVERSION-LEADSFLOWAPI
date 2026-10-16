@@ -116,14 +116,16 @@ export class AssistantProcessorService {
             }
 
             // 2d. Detecção de escalação para humano
-            // Se a mensagem contém palavras-chave de escalação, marcar conversa como pending e parar.
+            // Se a mensagem contém palavras-chave de escalação, marcar conversa como pending,
+            // responder ao cliente e notificar o humano responsável pelo número configurado.
+            const escalationEnabled = config.escalation_enabled !== false; // padrão: ativo
             const escalationKeywords: string[] = Array.isArray(config.escalation_keywords)
                 ? config.escalation_keywords
                 : ['falar com humano', 'atendente humano', 'falar com pessoa', 'quero atendente',
                    'fala com humano', 'me coloca pra falar com alguem', 'atendimento humano',
                    'quero falar com atendente', 'preciso de um humano', 'suporte humano'];
             const msgLower = (ctx.messageContent || '').toLowerCase().trim();
-            const escalationTriggered = escalationKeywords.some(kw =>
+            const escalationTriggered = escalationEnabled && escalationKeywords.some(kw =>
                 msgLower.includes(kw.toLowerCase())
             );
             if (escalationTriggered && ctx.conversationId) {
@@ -137,6 +139,10 @@ export class AssistantProcessorService {
                 const escalationMsg = (config.escalation_message as string) ||
                     'Entendido! Vou te conectar com um de nossos atendentes humanos. Por favor, aguarde um momento. 🙏';
                 await this.sendReply(ctx, escalationMsg);
+
+                // Notificar o humano responsável (se houver número configurado)
+                await this.notifyHumanEscalation(ctx, activeAssistant, config);
+
                 return true;
             }
 
@@ -843,38 +849,14 @@ export class AssistantProcessorService {
 
     /**
      * Estima a duração em ms de uma nota de voz com base no texto gerado.
-     * ~130 palavras/min de fala natural.
+     * ~150 palavras/min é a velocidade média de fala natural em pt-BR.
+     * Limites: 1.2s (respostas curtas) a 12s (respostas longas).
      */
     private recordingDurationMs(text: string): number {
-        const words = text.trim().split(/\s+/).length;
-        const ms = Math.round((words / 130) * 60 * 1000);
-        return Math.min(Math.max(ms, 2000), 10000);
-    }
-
-    /**
-     * Envia presença "recording" (gravando áudio) via Evolution API.
-     * Igual ao nó "Gravando async" do n8n — mostra o indicador de gravação
-     * no WhatsApp do contato antes de enviar a nota de voz.
-     */
-    private async sendEvolutionRecordingPresence(instanceId: string, number: string, durationMs: number): Promise<void> {
-        const evolutionUrl = process.env.EVOLUTION_API_URL;
-        const apiKey = process.env.EVOLUTION_API_KEY;
-        if (!evolutionUrl || !apiKey) return;
-        try {
-            const res = await fetch(`${evolutionUrl}/chat/sendPresence/${instanceId}`, {
-                method: 'POST',
-                headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ number, options: { presence: 'recording', delay: durationMs } })
-            });
-            if (res.ok) {
-                console.log(`[AssistantProcessor] 🎙️ Presença "gravando" enviada (${durationMs}ms)`);
-            } else {
-                const txt = await res.text().catch(() => '');
-                console.warn(`[AssistantProcessor] ⚠️ sendPresence recording falhou (${res.status}): ${txt.substring(0, 150)}`);
-            }
-        } catch (e: any) {
-            console.warn(`[AssistantProcessor] ⚠️ sendPresence recording erro:`, e.message);
-        }
+        const words = text.trim().split(/\s+/).filter(Boolean).length;
+        if (words === 0) return 1500;
+        const ms = Math.round((words / 150) * 60 * 1000);
+        return Math.min(Math.max(ms, 1200), 12000);
     }
 
     /**
@@ -957,9 +939,9 @@ export class AssistantProcessorService {
             const target = (isLidJid || isGroupJid) && ctx.remoteJid ? ctx.remoteJid : ctx.contactPhone!;
 
             if (audioOnlyMode) {
-                // Modo áudio exclusivo — mostrar "gravando" e enviar só o PTT
+                // Modo áudio exclusivo — a presença "gravando" já foi enviada em markEvolutionRead
+                // (mesmo formato JID de "escrevendo"); aguarda o tempo de gravação e envia só o PTT.
                 const recDuration = this.recordingDurationMs(text);
-                await this.sendEvolutionRecordingPresence(instanceId, target, recDuration);
                 await this.sleep(recDuration);
                 try {
                     const ar = await whatsappService.sendAudio({ instanceId, number: target, audioBase64 }) as any;
@@ -1516,6 +1498,62 @@ export class AssistantProcessorService {
         if (!response.ok) throw new Error(`Facebook Messenger audio error: ${await response.text()}`);
     }
 
+    /**
+     * Notifica o humano responsável (número configurado em escalation_phone) sobre uma
+     * conversa escalada. Usa o mesmo instanceId do canal (WhatsApp) para enviar a mensagem.
+     * Falha de forma silenciosa (apenas log) para nunca quebrar o fluxo da conversa.
+     */
+    private async notifyHumanEscalation(
+        ctx: IncomingMessageContext,
+        assistant: any,
+        config: Record<string, any>
+    ): Promise<void> {
+        const escalationPhone = String(config.escalation_phone || '').trim();
+        if (!escalationPhone) {
+            console.log('[AssistantProcessor] ℹ️ Escalação sem escalation_phone configurado — nenhuma notificação enviada.');
+            return;
+        }
+
+        let creds = ctx.credentials || {};
+        if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch { creds = {}; } }
+        let instanceId = creds.instance_id || creds.instance_name;
+
+        // Se o canal atual não for WhatsApp (ex: Telegram, Facebook, email, website),
+        // localiza o WhatsApp ativo do usuário para enviar a notificação.
+        if (!instanceId) {
+            try {
+                const chResult = await query(
+                    `SELECT credentials FROM channels
+                     WHERE user_id = $1 AND type = 'whatsapp' AND status = 'active'
+                     ORDER BY created_at DESC LIMIT 1`,
+                    [ctx.userId]
+                );
+                let chCreds = chResult.rows[0]?.credentials || {};
+                if (typeof chCreds === 'string') { try { chCreds = JSON.parse(chCreds); } catch { chCreds = {}; } }
+                instanceId = chCreds.instance_id || chCreds.instance_name;
+            } catch (e: any) {
+                console.warn('[AssistantProcessor] Falha ao buscar canal WhatsApp do usuário:', e.message);
+            }
+        }
+
+        if (!instanceId) {
+            console.warn('[AssistantProcessor] ⚠️ Sem instanceId (WhatsApp) para notificar o humano — envio ignorado.');
+            return;
+        }
+
+        const name = ctx.contactName || 'Cliente';
+        const phone = ctx.contactPhone || 'desconhecido';
+        const preview = (ctx.messageContent || '').substring(0, 300);
+        const text = `🔔 Conversa escalada para humano\n\nContato: ${name} (${phone})\nAssistente: ${assistant.assistant_name || 'Assistente'}\n\nMensagem do cliente: ${preview}`;
+
+        try {
+            await whatsappService.sendMessage({ instanceId, number: escalationPhone, text });
+            console.log(`[AssistantProcessor] 📤 Notificação de escalação enviada para ${escalationPhone}`);
+        } catch (e: any) {
+            console.warn('[AssistantProcessor] Falha ao notificar humano sobre escalação:', e.message);
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // ENVIO DE ARQUIVOS DA BASE DE CONHECIMENTO
     // ─────────────────────────────────────────────────────────────────────────
@@ -1545,6 +1583,10 @@ export class AssistantProcessorService {
                 console.warn('[AssistantProcessor] Falha ao enviar texto introdutório do arquivo:', introErr.message);
                 return false;
             }
+
+            // 1.5. Pausa natural entre a mensagem e o arquivo (fluxo mais profissional/humano).
+            // No email, tudo segue num único e-mail com anexo, então não há pausa.
+            await this.sleep(1800);
         }
 
         // 2. Enviar o documento por canal
