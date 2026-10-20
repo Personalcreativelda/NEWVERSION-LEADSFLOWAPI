@@ -1326,7 +1326,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       onChange={(e) => setConfigValues({ ...configValues, escalation_phone: e.target.value })}
                       className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
                     />
-                    <p className="text-[11px] text-muted-foreground mt-1">Este número recebe a notificação da conversa escalada.</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Este número recebe a notificação da conversa escalada, com um código, e passa a receber as mensagens do cliente. O que ele responder é enviado ao cliente pelo número da empresa (com várias conversas abertas: <strong>#código mensagem</strong>). Para devolver a conversa à IA, basta responder <strong>resolvido &lt;código&gt;</strong> (ou <strong>pendentes</strong> para ver a lista).
+                    </p>
                   </div>
 
                   <div>

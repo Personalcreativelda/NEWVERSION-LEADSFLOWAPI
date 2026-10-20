@@ -4,6 +4,16 @@ import * as zlib from 'zlib';
 
 export type AIProvider = 'openai' | 'gemini' | 'anthropic';
 
+/** Modelo Gemini multimodal para leitura de PDFs/imagens (gemini-1.5-flash foi descontinuado) */
+const GEMINI_DOC_MODEL = 'gemini-2.5-flash';
+
+/**
+ * import() dinâmico preservado na compilação CommonJS (o tsc converteria para require(),
+ * que não carrega pacotes ESM-only como o unpdf).
+ */
+const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<any>;
+let unpdfModule: Promise<any> | null = null;
+
 /** Par provedor → chave de API pronto para uso */
 export interface ProviderConfig {
     provider: AIProvider;
@@ -720,7 +730,7 @@ export class AIService {
         if (gemini && imageBase64) {
             try {
                 const res = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gemini.apiKey}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_DOC_MODEL}:generateContent?key=${gemini.apiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -810,24 +820,34 @@ export class AIService {
         const isPdf = contentType.includes('pdf') || urlLower.endsWith('.pdf')
             || contentType === 'document' || mimeType === 'document';
         if (isPdf) {
-            console.log(`[AIService] 📄 Processing PDF — size=${buffer.length} bytes, hasGeminiKey=${!!geminiApiKey}`);
+            console.log(`[AIService] 📄 Processing PDF — size=${buffer.length} bytes, hasOpenAIKey=${!!openaiApiKey}, hasGeminiKey=${!!geminiApiKey}`);
 
-            // ── Method 1: Decompress flate/deflate streams (handles modern PDFs) ──
-            // Most PDFs from Word, LibreOffice, browsers use FlateDecode compression.
+            // Todo método local passa por _isReadableText: texto partido ("P r es t aç ão"),
+            // cifrado por fonte subset ("&DVDPHQWR…") ou sintaxe do PDF ("/BaseFont…") é rejeitado
+            // para que o OCR seja tentado em vez de gravar lixo como "ready".
+
+            // ── Method 1: pdf.js (unpdf) — lê fontes/ToUnicode e junta fragmentos de texto ──
+            const pdfjsText = await this._extractPdfWithPdfjs(buffer);
+            if (this._isReadableText(pdfjsText)) {
+                console.log(`[AIService] ✅ PDF extracted via pdf.js: ${pdfjsText.length} chars`);
+                return pdfjsText.substring(0, maxChars);
+            }
+
+            // ── Method 2: Decompress flate/deflate streams (parser legado) ──
             const inflatedText = await this._extractPdfStreams(buffer);
-            if (inflatedText.length > 100) {
+            if (inflatedText.length > 100 && this._isReadableText(inflatedText)) {
                 console.log(`[AIService] ✅ PDF extracted via zlib decompression: ${inflatedText.length} chars`);
                 return inflatedText.substring(0, maxChars);
             }
 
-            // ── Method 2: Uncompressed BT...ET text blocks (simple/legacy PDFs) ──
+            // ── Method 3: Uncompressed BT...ET text blocks (simple/legacy PDFs) ──
             const uncompressedText = this._extractPdfTextBlocks(buffer.toString('latin1'));
-            if (uncompressedText.length > 100) {
+            if (uncompressedText.length > 100 && this._isReadableText(uncompressedText)) {
                 console.log(`[AIService] ✅ PDF extracted via uncompressed stream parser: ${uncompressedText.length} chars`);
                 return uncompressedText.substring(0, maxChars);
             }
 
-            // ── Method 3: OpenAI document understanding (OCR de PDFs escaneados) ──
+            // ── Method 4: OpenAI document understanding (OCR de PDFs escaneados/em imagem) ──
             if (openaiApiKey) {
                 const ocrText = await this._extractPdfWithOpenAI(buffer, openaiApiKey, maxChars);
                 if (ocrText.length > 50) {
@@ -836,12 +856,12 @@ export class AIService {
                 }
             }
 
-            // ── Method 4: Gemini native PDF understanding (supports scanned/image PDFs) ──
+            // ── Method 5: Gemini native PDF understanding (opcional — só se houver chave válida) ──
             if (geminiApiKey) {
                 try {
                     const b64 = buffer.toString('base64');
                     const res = await fetch(
-                        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+                        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_DOC_MODEL}:generateContent?key=${geminiApiKey}`,
                         {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -870,26 +890,8 @@ export class AIService {
                 }
             }
 
-            // ── Method 5: Generic printable char scan (absolute last resort) ──
-            const pdfStr = buffer.toString('latin1');
-            const words: string[] = [];
-            let current = '';
-            for (let i = 0; i < pdfStr.length; i++) {
-                const c = pdfStr.charCodeAt(i);
-                if ((c >= 32 && c <= 126) || (c >= 160 && c <= 255)) {
-                    current += pdfStr[i];
-                } else {
-                    if (current.length >= 4) words.push(current.trim());
-                    current = '';
-                }
-            }
-            if (current.length >= 4) words.push(current.trim());
-            const joined = words.filter(w => /[a-zA-ZÀ-ÿ]{2,}/.test(w)).join(' ');
-            if (joined.length > 100) {
-                console.log('[AIService] ✅ PDF text extracted via char scan');
-                return joined.substring(0, maxChars);
-            }
-
+            // Sem varredura de caracteres imprimíveis: ela "funcionava" sempre porque a própria
+            // sintaxe do PDF é ASCII, e gravava lixo como texto válido.
             console.warn('[AIService] Could not extract meaningful text from PDF');
             return '';
         }
@@ -924,12 +926,20 @@ export class AIService {
             contentType.includes('officedocument.wordprocessingml') ||
             urlLower.endsWith('.docx');
         if (isDocx) {
-            const raw = buffer.toString('binary');
-            const matches = raw.match(/<w:t[^>]*>([^<]+)<\/w:t>/g) || [];
+            // DOCX é um ZIP: o texto está em word/document.xml (comprimido) — descomprimir antes de ler
+            let raw = '';
+            try {
+                const docXml = this._unzipEntries(buffer).get('word/document.xml');
+                if (docXml) raw = docXml.toString('utf-8').replace(/<\/w:p>/g, '</w:p>\n');
+            } catch { /* fallback abaixo */ }
+            if (!raw) raw = buffer.toString('binary');
+            const matches = raw.match(/<w:t[^>]*>([^<]*)<\/w:t>|\n/g) || [];
             const text = matches
-                .map(m => m.replace(/<[^>]+>/g, '').trim())
-                .filter(Boolean)
-                .join(' ');
+                .map(m => m === '\n' ? '\n' : this._xmlDecode(m.replace(/<[^>]+>/g, '')))
+                .join('')
+                .replace(/[ \t]+/g, ' ')
+                .replace(/\n{2,}/g, '\n')
+                .trim();
             if (text.length > 50) {
                 console.log('[AIService] ✅ DOCX text extracted');
                 return text.substring(0, maxChars);
@@ -1010,6 +1020,45 @@ export class AIService {
     }
 
     /** Extracts text from BT...ET operator blocks in a PDF text string */
+    /** Extrai o texto de um PDF com pdf.js (via unpdf). Retorna '' em caso de falha. */
+    private async _extractPdfWithPdfjs(buffer: Buffer): Promise<string> {
+        try {
+            unpdfModule ??= dynamicImport('unpdf');
+            const { extractText, getDocumentProxy } = await unpdfModule;
+            const pdf = await getDocumentProxy(new Uint8Array(buffer));
+            const { text } = await extractText(pdf, { mergePages: true });
+            return String(text || '').replace(/[ \t]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim();
+        } catch (e: any) {
+            console.warn('[AIService] pdf.js (unpdf) extraction failed:', e.message);
+            return '';
+        }
+    }
+
+    /**
+     * Heurística de legibilidade: rejeita texto extraído que não serve para a IA.
+     * - sintaxe interna do PDF ("%PDF-", "endobj", "/BaseFont")
+     * - palavras partidas em letras soltas ("T a xa", "P r es t aç ão")
+     * - texto cifrado por fonte subset sem ToUnicode ("&DVDPHQWR6iEDGRGH") — quase sem vogais
+     * Tabelas só com números são aceitas.
+     */
+    private _isReadableText(text: string): boolean {
+        const t = (text || '').trim();
+        if (t.length < 20) return false;
+        if (/%PDF-|\bendobj\b|\/BaseFont|\/FontDescriptor|\/Type\s*\/(Page|Font|Catalog)/.test(t)) return false;
+
+        const words = t.split(/\s+/).filter(w => /\p{L}/u.test(w));
+        if (words.length === 0) return /\d/.test(t);
+
+        const singleLetter = words.filter(w => w.replace(/[^\p{L}]/gu, '').length === 1).length;
+        if (words.length >= 6 && singleLetter / words.length > 0.35) return false;
+
+        const letters = (t.match(/\p{L}/gu) || []).length;
+        const vowels = (t.normalize('NFD').match(/[aeiouyAEIOUY]/g) || []).length;
+        if (letters >= 50 && vowels / letters < 0.25) return false;
+
+        return true;
+    }
+
     private _extractPdfTextBlocks(pdfStr: string): string {
         const streamTexts: string[] = [];
         const btEtRegex = /BT\s+([\s\S]*?)\s+ET/g;

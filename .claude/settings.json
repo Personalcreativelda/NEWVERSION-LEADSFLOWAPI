@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Select-String -Path \"e:\\\\personal new logo\\\\new personal\\\\automacao\\\\CRM leadsflowAPI\\\\LeadflowAPI project\\\\SAAS leadsflowApi\\\\Nova Estrutura\\\\dashboard novas features\\\\LOCALHOST\\\\api\\\\.env\" -Pattern \"ELEVENLABS\")",
+      "Bash(Get-ChildItem -Path \"e:\\\\personal new logo\\\\new personal\\\\automacao\\\\CRM leadsflowAPI\\\\LeadflowAPI project\\\\SAAS leadsflowApi\\\\Nova Estrutura\\\\dashboard novas features\\\\LOCALHOST\\\\src\" -Recurse -Directory)",
+      "PowerShell(cd \"E:\\\\personal new logo\\\\new personal\\\\automacao\\\\CRM leadsflowAPI\\\\LeadflowAPI project\\\\SAAS leadsflowApi\\\\Nova Estrutura\\\\dashboard novas features\\\\LOCALHOST\"; Get-ChildItem -Path \"src/app/services\" -Recurse -File | Where-Object { $_.FullName -notmatch \"node_modules\" })",
+      "WebFetch(domain:n8n.personalcreativelda.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "PowerShell(cd \"e:\\\\personal new logo\\\\new personal\\\\automacao\\\\CRM leadsflowAPI\\\\LeadflowAPI project\\\\SAAS leadsflowApi\\\\Nova Estrutura\\\\dashboard novas features\\\\LOCALHOST\"; Get-ChildItem -Path \".\\\\src\\\\app\\\\components\\\\inbox\" -Recurse | Where-Object { -not $_.PSIsContainer } | Select-Object -ExpandProperty FullName | Sort-Object)",
+      "PowerShell(cd \"e:\\\\personal new logo\\\\new personal\\\\automacao\\\\CRM leadsflowAPI\\\\LeadflowAPI project\\\\SAAS leadsflowApi\\\\Nova Estrutura\\\\dashboard novas features\\\\LOCALHOST\"; Get-ChildItem -Path \".\\\\src\\\\app\\\\components\\\\pages\\\\inbox\" -Recurse | Where-Object { -not $_.PSIsContainer } | Select-Object -ExpandProperty FullName | Sort-Object)",
+      "Bash(npm list *)",
+      "Bash(npx update-browserslist-db@latest --yes)",
+      "Bash(npm config *)",
+      "Bash(npx serve *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8888/test-widget.html)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4000/w)",
+      "Bash(curl -s http://localhost:4000/w)",
+      "Bash(curl -s -X POST http://localhost:4000/api/webhooks/website/8d6afd8a-d919-4f56-890a-9718e6aa4bf9 -H 'Content-Type: application/json' -d '{\"message\":\"teste do curl\",\"visitorId\":\"test_visitor_123\",\"channelId\":\"8d6afd8a-d919-4f56-890a-9718e6aa4bf9\"}')",
+      "Bash(curl -v -X POST http://localhost:4000/api/webhooks/website/8d6afd8a-d919-4f56-890a-9718e6aa4bf9 -H 'Content-Type: application/json' -d '{\"message\":\"teste\",\"visitorId\":\"v_test123\",\"channelId\":\"8d6afd8a-d919-4f56-890a-9718e6aa4bf9\"}')",
+      "Read(//tmp/**)",
+      "Bash(curl -s http://localhost:4000/api/channels -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
+      "Bash(curl -s -X POST http://localhost:4000/api/webhooks/website/8d6afd8a-d919-4f56-890a-9718e6aa4bf9 -H 'Content-Type: application/json' -d '{\"message\":\"teste debug\",\"visitorId\":\"v_debug001\"}')",
+      "Bash(curl -s -X POST http://localhost:4000/api/webhooks/website/8d6afd8a-d919-4f56-890a-9718e6aa4bf9 -H 'Content-Type: application/json' -d '{\"message\":\"teste debug 2\",\"visitorId\":\"v_debug001\"}')",
+      "Read(//c/Users/Personalcreativelda/Documents/GitHub/newFronAnd-Leadflowapi/src/app/components/inbox/channels/**)",
+      "Bash(npm install *)",
+      "Bash(dir \"e:\\\\personal new logo\\\\new personal\\\\automacao\\\\CRM leadsflowAPI\\\\LeadflowAPI project\\\\SAAS leadsflowApi\\\\Nova Estrutura\\\\dashboard novas features\\\\LOCALHOST\\\\public\\\\videos\")",
+      "Bash(Rename-Item \"e:\\\\personal new logo\\\\new personal\\\\automacao\\\\CRM leadsflowAPI\\\\LeadflowAPI project\\\\SAAS leadsflowApi\\\\Nova Estrutura\\\\dashboard novas features\\\\LOCALHOST\\\\public\\\\videos\\\\rendition.m3u8\" \"rendition.mp4\")",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(grep -n \"return\\\\s*\\($\\\\|\\(\\\\s*$\" \"e:/personal new logo/new personal/automacao/CRM leadsflowAPI/LeadflowAPI project/SAAS leadsflowApi/Nova Estrutura/dashboard novas features/LOCALHOST/src/app/components/Dashboard.tsx\")",
+      "Read(//c/Users/Personalcreativelda/Documents/GitHub/newFronAnd-Leadflowapi/**)"
+    ]
+  }
+}

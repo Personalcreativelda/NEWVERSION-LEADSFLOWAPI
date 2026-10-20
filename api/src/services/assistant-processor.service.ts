@@ -14,6 +14,85 @@ const aiService = new AIService();
 const assistantsService = new AssistantsService();
 const whatsappService = new WhatsAppService();
 
+/** Marcador que a IA inclui na resposta para transferir a conversa a um humano */
+const ESCALATION_MARKER = '[[ESCALAR]]';
+const ESCALATION_MARKER_RE = /\[\[\s*ESCALAR\s*\]\]/i;
+const ESCALATION_MARKER_RE_GLOBAL = /\[\[\s*ESCALAR\s*\]\]/gi;
+
+/**
+ * Padrões padrão de pedido de humano (aplicados sobre texto normalizado: minúsculas, sem acentos).
+ * Toleram palavras no meio: "quero falar com UM atendente", "posso falar com ALGUÉM da equipa".
+ */
+const DEFAULT_ESCALATION_PATTERNS: RegExp[] = [
+    /\b(falar|fala|falo|conversar|conversa|falarmos)\s+com\s+(\S+\s+){0,2}(humano|humana|pessoa|atendente|alguem|operador|operadora|gerente|responsavel|consultor|consultora|funcionario|funcionaria)\b/,
+    /\b(atendente|atendimento|suporte|agente)\s+(humano|humana|real)\b/,
+    /\b(quero|queria|preciso|precisava|gostaria|pode|podes|posso)\b.{0,25}\b(atendente|humano|humana|operador|operadora)\b/,
+    /\b(me|nos)\s+(passa|passe|coloca|coloque|transfere|transfira|encaminha|encaminhe)\b.{0,30}\b(humano|humana|pessoa|atendente|alguem|operador|equipa|equipe)\b/,
+    /\b(nao|n)\s+(quero|gosto)\s+(falar\s+com\s+)?(robo|bot|maquina|ia)\b/,
+];
+
+/**
+ * Comandos que o responsável envia por WhatsApp (texto normalizado).
+ * Qualquer outra mensagem dele é reencaminhada ao cliente (modo ponte) — por isso
+ * só palavras inequívocas contam como comando, e resolver exige o código.
+ */
+const RESOLVE_COMMAND_RE = /^(?:#?(\d{4})\s+)?(resolvido|resolvida|resolver|encerrado|encerrar|finalizado|finalizar)\W*#?(\d{4})?\W*$/;
+const LIST_COMMAND_RE = /^(pendentes|escalacoes|escaladas)\W*$/;
+/** Mensagem do responsável dirigida a uma conversa específica: "#4821 texto" */
+const TARGETED_RELAY_RE = /^#(\d{4})\s+([\s\S]+)$/;
+
+/** Última escalação para onde cada responsável escreveu (userId:telefone → escalation id) */
+const lastRelayTarget = new Map<string, string>();
+
+const MEDIA_LABELS: Record<string, string> = {
+    audio: 'um áudio', image: 'uma imagem', video: 'um vídeo', document: 'um documento', sticker: 'uma figurinha',
+};
+
+/** Tabela de escalações (código curto por conversa escalada) — criada sob demanda */
+let escalationsTableReady: Promise<void> | null = null;
+function ensureEscalationsTable(): Promise<void> {
+    escalationsTableReady ??= (async () => {
+        await query(`
+            CREATE TABLE IF NOT EXISTS assistant_escalations (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL,
+                user_assistant_id UUID,
+                conversation_id UUID NOT NULL,
+                code VARCHAR(8) NOT NULL,
+                responsible_phone TEXT,
+                contact_name TEXT,
+                contact_phone TEXT,
+                status VARCHAR(20) NOT NULL DEFAULT 'open',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                resolved_at TIMESTAMP WITH TIME ZONE
+            )
+        `);
+        // Modo ponte: dados do canal do cliente (para responder por ele) e
+        // a conversa "em foco" do responsável (a última que lhe foi reencaminhada)
+        for (const sql of [
+            'ALTER TABLE assistant_escalations ADD COLUMN IF NOT EXISTS channel_id UUID',
+            'ALTER TABLE assistant_escalations ADD COLUMN IF NOT EXISTS channel_type TEXT',
+            'ALTER TABLE assistant_escalations ADD COLUMN IF NOT EXISTS remote_jid TEXT',
+            'ALTER TABLE assistant_escalations ADD COLUMN IF NOT EXISTS last_focus_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()',
+        ]) {
+            await query(sql);
+        }
+        await query(`
+            CREATE INDEX IF NOT EXISTS idx_assistant_escalations_user_open
+            ON assistant_escalations (user_id) WHERE status = 'open'
+        `);
+    })().catch(err => {
+        escalationsTableReady = null; // tentar de novo na próxima chamada
+        throw err;
+    });
+    return escalationsTableReady;
+}
+
+/** Normaliza texto para comparação (minúsculas, sem acentos, espaços simples) */
+function normalizeForMatch(s: string): string {
+    return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+}
+
 export interface IncomingMessageContext {
     channelId: string;
     channelType: string;
@@ -46,6 +125,13 @@ export class AssistantProcessorService {
                 }
             }
 
+            // 0a. Comandos do responsável humano via WhatsApp (ex: "resolvido 4821").
+            // Permite devolver conversas escaladas à IA sem acesso à dashboard, e evita
+            // que a IA trate o responsável como um cliente comum.
+            if (await this.handleResponsibleCommand(ctx)) {
+                return true;
+            }
+
             // 0b. Verificar se a conversa está em modo humano (pending = escalada para humano)
             // Quando pending, a IA para completamente até um humano reabrir ou resolver.
             if (ctx.conversationId) {
@@ -56,6 +142,8 @@ export class AssistantProcessorService {
                 const convStatus = convStatusResult.rows[0]?.status;
                 if (convStatus === 'pending') {
                     console.log(`[AssistantProcessor] 🛑 Conversa ${ctx.conversationId} está em modo humano (pending) — IA pausada.`);
+                    // Modo ponte: o responsável recebe a mensagem no WhatsApp dele
+                    await this.relayCustomerMessageToResponsible(ctx);
                     return false;
                 }
             }
@@ -115,34 +203,20 @@ export class AssistantProcessorService {
                 return false;
             }
 
-            // 2d. Detecção de escalação para humano
-            // Se a mensagem contém palavras-chave de escalação, marcar conversa como pending,
+            // 2d. Detecção de escalação para humano (regra leve, sem custo de IA)
+            // Se a mensagem pede um humano, marcar conversa como pending,
             // responder ao cliente e notificar o humano responsável pelo número configurado.
+            // A IA também pode escalar sozinha via marcador [[ESCALAR]] (ver passo 5b).
             const escalationEnabled = config.escalation_enabled !== false; // padrão: ativo
-            const escalationKeywords: string[] = Array.isArray(config.escalation_keywords)
-                ? config.escalation_keywords
-                : ['falar com humano', 'atendente humano', 'falar com pessoa', 'quero atendente',
-                   'fala com humano', 'me coloca pra falar com alguem', 'atendimento humano',
-                   'quero falar com atendente', 'preciso de um humano', 'suporte humano'];
-            const msgLower = (ctx.messageContent || '').toLowerCase().trim();
-            const escalationTriggered = escalationEnabled && escalationKeywords.some(kw =>
-                msgLower.includes(kw.toLowerCase())
-            );
-            if (escalationTriggered && ctx.conversationId) {
-                console.log(`[AssistantProcessor] 🚨 Escalação detectada para conversa ${ctx.conversationId}`);
-                // Marcar conversa como pendente (aguardando humano)
-                await query(
-                    `UPDATE conversations SET status = 'pending', updated_at = NOW() WHERE id = $1`,
-                    [ctx.conversationId]
-                );
-                // Enviar mensagem de escala configurável
+            if (escalationEnabled && ctx.conversationId && this.isEscalationRequest(ctx.messageContent, config)) {
+                console.log(`[AssistantProcessor] 🚨 Escalação detectada (palavra-chave) para conversa ${ctx.conversationId}`);
                 const escalationMsg = (config.escalation_message as string) ||
                     'Entendido! Vou te conectar com um de nossos atendentes humanos. Por favor, aguarde um momento. 🙏';
-                await this.sendReply(ctx, escalationMsg);
-
-                // Notificar o humano responsável (se houver número configurado)
-                await this.notifyHumanEscalation(ctx, activeAssistant, config);
-
+                const escalationMsgId = await this.sendReply(ctx, escalationMsg);
+                if (ctx.channelType !== 'website') {
+                    await this.saveOutgoingMessage(ctx, escalationMsg, escalationMsgId);
+                }
+                await this.escalateConversation(ctx, activeAssistant, config);
                 return true;
             }
 
@@ -331,6 +405,21 @@ export class AssistantProcessorService {
 
             console.log(`[AssistantProcessor] Resposta gerada em ${responseTime}ms (${aiResponse.tokensUsed} tokens)`);
 
+            // 5b. Escalação decidida pela IA: a resposta traz o marcador [[ESCALAR]].
+            // Remove o marcador antes de qualquer envio/log para nunca chegar ao cliente.
+            let aiRequestedEscalation = false;
+            if (ESCALATION_MARKER_RE.test(aiResponse.content)) {
+                aiResponse.content = aiResponse.content.replace(ESCALATION_MARKER_RE_GLOBAL, '').trim();
+                aiRequestedEscalation = escalationEnabled && !!ctx.conversationId;
+                if (!aiResponse.content) {
+                    aiResponse.content = (config.escalation_message as string) ||
+                        'Entendido! Vou te conectar com um de nossos atendentes humanos. Por favor, aguarde um momento. 🙏';
+                }
+                if (aiRequestedEscalation) {
+                    console.log(`[AssistantProcessor] 🚨 Escalação solicitada pela IA para conversa ${ctx.conversationId}`);
+                }
+            }
+
             // 5.5. Verificar se deve responder com áudio (ElevenLabs)
             // Regra: responder em áudio quando o cliente manda áudio e audio_enabled está ativo
             let audioBase64: string | undefined = undefined;
@@ -380,6 +469,11 @@ export class AssistantProcessorService {
             // 7. Salvar mensagem no banco — website já salva por chunk em humanizedSend(); outros canais salvam aqui.
             if (ctx.channelType !== 'website') {
                 await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId, audioBase64 ? 'audio' : 'text');
+            }
+
+            // 7b. Concluir a escalação pedida pela IA (após a resposta já ter sido entregue)
+            if (aiRequestedEscalation) {
+                await this.escalateConversation(ctx, activeAssistant, config);
             }
 
             // 8. Registrar log do assistente
@@ -548,6 +642,16 @@ export class AssistantProcessorService {
         }
 
         systemPrompt += '\n\nResponda sempre no mesmo idioma do cliente. Mantenha respostas concisas e diretas.';
+
+        // Escalação pela IA: o processador detecta o marcador, remove-o e passa a conversa para um humano
+        if (config.escalation_enabled !== false) {
+            systemPrompt += '\n\n---\n[TRANSFERÊNCIA PARA HUMANO]\n' +
+                'Você consegue transferir a conversa para um atendente humano. Faça isso quando o cliente pedir para falar com uma pessoa/atendente, ' +
+                'quando suas instruções mandarem escalar/encaminhar para a equipe, ou quando você não puder resolver o pedido. ' +
+                `Para transferir, escreva uma breve mensagem avisando o cliente e termine a resposta com o marcador ${ESCALATION_MARKER} ` +
+                '(o marcador é removido automaticamente e o cliente não o vê). ' +
+                `Nunca diga que vai encaminhar ou transferir sem incluir ${ESCALATION_MARKER}.\n---`;
+        }
 
         // Injetar memória de longo prazo no system prompt
         if (memoryEnabled && ctx.contactPhone) {
@@ -1499,27 +1603,314 @@ export class AssistantProcessorService {
     }
 
     /**
-     * Notifica o humano responsável (número configurado em escalation_phone) sobre uma
-     * conversa escalada. Usa o mesmo instanceId do canal (WhatsApp) para enviar a mensagem.
-     * Falha de forma silenciosa (apenas log) para nunca quebrar o fluxo da conversa.
+     * Verifica se a mensagem do cliente pede um atendente humano.
+     * Padrões padrão + palavras-chave personalizadas (somam-se, não substituem), sem acentos.
      */
-    private async notifyHumanEscalation(
+    private isEscalationRequest(message: string, config: Record<string, any>): boolean {
+        const msg = normalizeForMatch(message);
+        if (!msg || msg.startsWith('[')) return false; // notas internas (imagem/documento sem texto)
+
+        if (DEFAULT_ESCALATION_PATTERNS.some(re => re.test(msg))) return true;
+
+        const customKeywords: string[] = Array.isArray(config.escalation_keywords)
+            ? config.escalation_keywords
+            : typeof config.escalation_keywords === 'string'
+                ? config.escalation_keywords.split(',')
+                : [];
+        return customKeywords
+            .map(kw => normalizeForMatch(String(kw)))
+            .filter(Boolean)
+            .some(kw => msg.includes(kw));
+    }
+
+    /** Passa a conversa para modo humano (pending — a IA pausa) e notifica o responsável. */
+    private async escalateConversation(
         ctx: IncomingMessageContext,
         assistant: any,
         config: Record<string, any>
     ): Promise<void> {
-        const escalationPhone = String(config.escalation_phone || '').trim();
-        if (!escalationPhone) {
-            console.log('[AssistantProcessor] ℹ️ Escalação sem escalation_phone configurado — nenhuma notificação enviada.');
-            return;
-        }
+        await query(
+            `UPDATE conversations SET status = 'pending', updated_at = NOW() WHERE id = $1`,
+            [ctx.conversationId]
+        );
+        await this.notifyHumanEscalation(ctx, assistant, config);
+    }
 
+    /**
+     * Gera um código curto (4 dígitos) para a conversa escalada, único entre as escalações
+     * em aberto do usuário. O responsável usa-o para resolver pelo WhatsApp ("resolvido 4821").
+     */
+    private async createEscalationCode(
+        ctx: IncomingMessageContext,
+        assistant: any,
+        responsiblePhone: string
+    ): Promise<string | null> {
+        try {
+            await ensureEscalationsTable();
+            // Uma conversa escalada de novo substitui o código anterior
+            await query(
+                `UPDATE assistant_escalations SET status = 'superseded' WHERE conversation_id = $1 AND status = 'open'`,
+                [ctx.conversationId]
+            );
+            for (let attempt = 0; attempt < 10; attempt++) {
+                const code = String(Math.floor(1000 + Math.random() * 9000));
+                const clash = await query(
+                    `SELECT 1 FROM assistant_escalations WHERE user_id = $1 AND code = $2 AND status = 'open' LIMIT 1`,
+                    [ctx.userId, code]
+                );
+                if (clash.rows.length > 0) continue;
+                await query(
+                    `INSERT INTO assistant_escalations
+                        (user_id, user_assistant_id, conversation_id, code, responsible_phone, contact_name, contact_phone,
+                         channel_id, channel_type, remote_jid, last_focus_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+                    [ctx.userId, assistant.user_assistant_id || null, ctx.conversationId, code,
+                     responsiblePhone, ctx.contactName || null, ctx.contactPhone || null,
+                     ctx.channelId || null, ctx.channelType || null, ctx.remoteJid || null]
+                );
+                return code;
+            }
+        } catch (e: any) {
+            console.warn('[AssistantProcessor] Falha ao gerar código de escalação:', e.message);
+        }
+        return null;
+    }
+
+    /**
+     * Trata mensagens enviadas pelo responsável (escalation_phone de algum assistente do usuário):
+     *   "resolvido 4821" / "4821 resolvido" → marca a conversa como resolvida e devolve à IA
+     *   "pendentes"                          → lista as conversas escaladas em aberto
+     *   "#4821 texto"                        → envia o texto ao cliente dessa conversa
+     *   qualquer outro texto                 → envia ao cliente da conversa em foco (modo ponte)
+     * Sem escalações em aberto, a mensagem segue o fluxo normal da IA.
+     * Retorna true se a mensagem foi consumida (a IA não deve responder).
+     */
+    private async handleResponsibleCommand(ctx: IncomingMessageContext): Promise<boolean> {
+        if (!ctx.contactPhone || !ctx.conversationId) return false;
+        const raw = (ctx.messageContent || '').trim();
+        const msg = normalizeForMatch(raw);
+        // Mídia sem legenda chega como nota entre colchetes (ex: "[Imagem]")
+        const isMediaOnly = !msg || msg.startsWith('[');
+        if (isMediaOnly && !ctx.mediaType) return false;
+
+        try {
+            const phones = await query(
+                `SELECT DISTINCT config->>'escalation_phone' AS phone FROM user_assistants
+                 WHERE user_id = $1 AND COALESCE(config->>'escalation_phone', '') <> ''`,
+                [ctx.userId]
+            );
+            const sender = ctx.contactPhone;
+            if (!phones.rows.some((r: any) => isSamePhoneNumber(r.phone, sender))) return false;
+
+            await ensureEscalationsTable();
+            // Só conta como pendente se a conversa ainda está em modo humano
+            // (se já foi resolvida pela dashboard, o código deixa de valer)
+            const openResult = await query(
+                `SELECT e.id, e.code, e.conversation_id, e.contact_name, e.contact_phone, e.responsible_phone,
+                        e.channel_id, e.channel_type, e.remote_jid, e.last_focus_at
+                 FROM assistant_escalations e
+                 JOIN conversations c ON c.id = e.conversation_id
+                 WHERE e.user_id = $1 AND e.status = 'open' AND c.status = 'pending'
+                 ORDER BY e.created_at ASC`,
+                [ctx.userId]
+            );
+            const open = openResult.rows.filter((r: any) => isSamePhoneNumber(r.responsible_phone, sender));
+            const label = (e: any) => `#${e.code} — ${e.contact_name || 'Cliente'} (${e.contact_phone || 'sem número'})`;
+            const pendingList = (list: any[]) => list.map(label).join('\n');
+
+            const resolveMatch = isMediaOnly ? null : msg.match(RESOLVE_COMMAND_RE);
+            if (resolveMatch) {
+                const code = resolveMatch[1] || resolveMatch[3];
+                const target = code ? open.find((e: any) => e.code === code) : null;
+                if (!target) {
+                    // Sem código não resolve (pode ser uma mensagem para o cliente) e não reencaminha
+                    const reply = open.length === 0
+                        ? 'Não há conversas pendentes. ✅'
+                        : code
+                            ? `Não encontrei conversa pendente com o código ${code}.\n\nPendentes:\n${pendingList(open)}`
+                            : `Para encerrar, responda com o código:\n\n${pendingList(open)}\n\nEx: *resolvido ${open[0].code}*\n` +
+                              `(Se era uma mensagem para o cliente, ela não foi enviada — escreva-a de outra forma.)`;
+                    await this.replyToResponsible(ctx, reply);
+                    return true;
+                }
+
+                await this.resolveEscalation(ctx.userId, target);
+                const remaining = open.filter((e: any) => e.id !== target.id);
+                await this.replyToResponsible(ctx,
+                    `✅ Conversa com ${target.contact_name || target.contact_phone || 'o cliente'} (#${target.code}) marcada como resolvida. A IA voltou a atender este contato.` +
+                    (remaining.length ? `\n\nAinda pendentes:\n${pendingList(remaining)}` : '')
+                );
+                return true;
+            }
+
+            if (!isMediaOnly && LIST_COMMAND_RE.test(msg)) {
+                await this.replyToResponsible(ctx, open.length
+                    ? `Conversas pendentes:\n${pendingList(open)}\n\n` +
+                      `Para falar com um cliente específico: *#código mensagem*\nPara encerrar: *resolvido <código>*`
+                    : 'Não há conversas pendentes. ✅');
+                return true;
+            }
+
+            // Sem escalações em aberto: segue o fluxo normal da IA
+            if (open.length === 0) return false;
+
+            if (isMediaOnly) {
+                await this.replyToResponsible(ctx,
+                    'Por enquanto só consigo reencaminhar *texto* ao cliente. Escreva a mensagem ou responda pela dashboard.');
+                return true;
+            }
+
+            // ── Modo ponte: reencaminhar a mensagem do responsável ao cliente ──
+            let target: any;
+            let text = raw;
+            const targeted = raw.match(TARGETED_RELAY_RE);
+            if (targeted) {
+                target = open.find((e: any) => e.code === targeted[1]);
+                if (!target) {
+                    await this.replyToResponsible(ctx,
+                        `Não encontrei conversa pendente com o código ${targeted[1]}. A mensagem não foi enviada.\n\nPendentes:\n${pendingList(open)}`);
+                    return true;
+                }
+                text = targeted[2].trim();
+            } else {
+                // Conversa em foco: a última reencaminhada ao responsável (ou escalada)
+                target = [...open].sort((a: any, b: any) =>
+                    new Date(b.last_focus_at || 0).getTime() - new Date(a.last_focus_at || 0).getTime())[0];
+            }
+
+            const delivered = await this.relayResponsibleMessageToCustomer(ctx.userId, target, text);
+            if (!delivered) {
+                await this.replyToResponsible(ctx,
+                    `⚠️ Não consegui enviar a mensagem para ${target.contact_name || target.contact_phone || 'o cliente'} (#${target.code}). Tente de novo ou use a dashboard.`);
+            } else {
+                // Com várias conversas abertas, confirmar o destino quando ele muda
+                // evita respostas no cliente errado (sem repetir a cada mensagem)
+                const relayKey = `${ctx.userId}:${sender}`;
+                if (open.length > 1 && lastRelayTarget.get(relayKey) !== target.id) {
+                    await this.replyToResponsible(ctx,
+                        `↪️ Enviado para ${target.contact_name || target.contact_phone || 'o cliente'} (#${target.code}). Para outra conversa: *#código mensagem*`);
+                }
+                lastRelayTarget.set(relayKey, target.id);
+            }
+            return true;
+        } catch (e: any) {
+            console.warn('[AssistantProcessor] Falha ao tratar comando do responsável:', e.message);
+            return false;
+        }
+    }
+
+    /** Marca a conversa escalada como resolvida (a IA volta a responder) e avisa a dashboard. */
+    private async resolveEscalation(userId: string, escalation: any): Promise<void> {
+        await query(
+            `UPDATE conversations SET status = 'resolved', updated_at = NOW() WHERE id = $1`,
+            [escalation.conversation_id]
+        );
+        await query(
+            `UPDATE assistant_escalations SET status = 'resolved', resolved_at = NOW() WHERE id = $1`,
+            [escalation.id]
+        );
+        console.log(`[AssistantProcessor] ✅ Escalação #${escalation.code} resolvida pelo responsável (conversa ${escalation.conversation_id})`);
+        try {
+            getWebSocketService()?.emitConversationUpdate(userId, {
+                conversationId: escalation.conversation_id,
+                updates: { status: 'resolved' },
+            });
+        } catch { /* não crítico */ }
+    }
+
+    /**
+     * Modo ponte (cliente → responsável): enquanto a conversa está escalada, cada mensagem
+     * do cliente é reencaminhada ao WhatsApp do responsável e a conversa passa a ficar em foco
+     * (respostas sem "#código" vão para ela).
+     */
+    private async relayCustomerMessageToResponsible(ctx: IncomingMessageContext): Promise<void> {
+        try {
+            await ensureEscalationsTable();
+            const result = await query(
+                `SELECT id, code, responsible_phone FROM assistant_escalations
+                 WHERE conversation_id = $1 AND status = 'open' AND COALESCE(responsible_phone, '') <> ''
+                 ORDER BY created_at DESC LIMIT 1`,
+                [ctx.conversationId]
+            );
+            const escalation = result.rows[0];
+            if (!escalation) return; // escalada sem responsável (ou antes do modo ponte)
+
+            const instanceId = await this.findNotificationInstanceId(ctx);
+            if (!instanceId) return;
+
+            const content = (ctx.messageContent || '').trim();
+            const caption = content && !content.startsWith('[') ? content : '';
+            let body: string;
+            if (ctx.mediaType) {
+                const kind = MEDIA_LABELS[ctx.mediaType] || MEDIA_LABELS[ctx.mediaType.split('/')[0]] || 'um arquivo';
+                body = `📎 enviou ${kind}${caption ? `: ${caption}` : ''}`;
+                if (ctx.mediaUrl?.startsWith('http')) body += `\n${ctx.mediaUrl}`;
+            } else {
+                if (!caption) return;
+                body = caption;
+            }
+
+            const name = ctx.contactName || ctx.contactPhone || 'Cliente';
+            await whatsappService.sendMessage({
+                instanceId,
+                number: escalation.responsible_phone,
+                text: `💬 ${name} (#${escalation.code}):\n${body}`,
+            });
+            await query(
+                `UPDATE assistant_escalations SET last_focus_at = NOW() WHERE id = $1`,
+                [escalation.id]
+            );
+            console.log(`[AssistantProcessor] 🔁 Mensagem do cliente reencaminhada ao responsável (#${escalation.code})`);
+        } catch (e: any) {
+            console.warn('[AssistantProcessor] Falha ao reencaminhar mensagem ao responsável:', e.message);
+        }
+    }
+
+    /**
+     * Modo ponte (responsável → cliente): envia o texto ao cliente pelo canal da conversa
+     * escalada (número da empresa) e grava na inbox como mensagem humana.
+     */
+    private async relayResponsibleMessageToCustomer(userId: string, escalation: any, text: string): Promise<boolean> {
+        try {
+            let credentials: any = {};
+            if (escalation.channel_id) {
+                const ch = await query('SELECT credentials FROM channels WHERE id = $1', [escalation.channel_id]);
+                credentials = ch.rows[0]?.credentials || {};
+            }
+            const customerCtx: IncomingMessageContext = {
+                channelId: escalation.channel_id,
+                channelType: escalation.channel_type || 'whatsapp',
+                conversationId: escalation.conversation_id,
+                userId,
+                contactPhone: escalation.contact_phone || undefined,
+                contactName: escalation.contact_name || undefined,
+                remoteJid: escalation.remote_jid || undefined,
+                credentials,
+                messageContent: text,
+            };
+            const externalId = await this.sendReply(customerCtx, text);
+            if (customerCtx.channelType !== 'website') {
+                await this.saveOutgoingMessage(customerCtx, text, externalId, 'text', null, {
+                    source: 'escalation_relay', automated: false, escalation_code: escalation.code,
+                });
+            }
+            console.log(`[AssistantProcessor] 🔁 Mensagem do responsável enviada ao cliente (#${escalation.code})`);
+            return true;
+        } catch (e: any) {
+            console.warn(`[AssistantProcessor] Falha ao enviar mensagem do responsável ao cliente (#${escalation.code}):`, e.message);
+            return false;
+        }
+    }
+
+    /**
+     * Instância WhatsApp (Evolution) usada para falar com o responsável: a do canal atual,
+     * ou o WhatsApp ativo do usuário quando o canal é outro (Telegram, Facebook, email, website).
+     */
+    private async findNotificationInstanceId(ctx: IncomingMessageContext): Promise<string | null> {
         let creds = ctx.credentials || {};
         if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch { creds = {}; } }
         let instanceId = creds.instance_id || creds.instance_name;
 
-        // Se o canal atual não for WhatsApp (ex: Telegram, Facebook, email, website),
-        // localiza o WhatsApp ativo do usuário para enviar a notificação.
         if (!instanceId) {
             try {
                 const chResult = await query(
@@ -1535,7 +1926,36 @@ export class AssistantProcessorService {
                 console.warn('[AssistantProcessor] Falha ao buscar canal WhatsApp do usuário:', e.message);
             }
         }
+        return instanceId || null;
+    }
 
+    /** Responde ao responsável na conversa dele e grava a mensagem (aparece na inbox). */
+    private async replyToResponsible(ctx: IncomingMessageContext, text: string): Promise<void> {
+        try {
+            const externalId = await this.sendReply(ctx, text);
+            await this.saveOutgoingMessage(ctx, text, externalId, 'text', null, { action: 'escalation_command' });
+        } catch (e: any) {
+            console.warn('[AssistantProcessor] Falha ao responder ao responsável:', e.message);
+        }
+    }
+
+    /**
+     * Notifica o humano responsável (número configurado em escalation_phone) sobre uma
+     * conversa escalada. Usa o mesmo instanceId do canal (WhatsApp) para enviar a mensagem.
+     * Falha de forma silenciosa (apenas log) para nunca quebrar o fluxo da conversa.
+     */
+    private async notifyHumanEscalation(
+        ctx: IncomingMessageContext,
+        assistant: any,
+        config: Record<string, any>
+    ): Promise<void> {
+        const escalationPhone = String(config.escalation_phone || '').trim();
+        if (!escalationPhone) {
+            console.log('[AssistantProcessor] ℹ️ Escalação sem escalation_phone configurado — nenhuma notificação enviada.');
+            return;
+        }
+
+        const instanceId = await this.findNotificationInstanceId(ctx);
         if (!instanceId) {
             console.warn('[AssistantProcessor] ⚠️ Sem instanceId (WhatsApp) para notificar o humano — envio ignorado.');
             return;
@@ -1544,7 +1964,12 @@ export class AssistantProcessorService {
         const name = ctx.contactName || 'Cliente';
         const phone = ctx.contactPhone || 'desconhecido';
         const preview = (ctx.messageContent || '').substring(0, 300);
-        const text = `🔔 Conversa escalada para humano\n\nContato: ${name} (${phone})\nAssistente: ${assistant.assistant_name || 'Assistente'}\n\nMensagem do cliente: ${preview}`;
+        const code = await this.createEscalationCode(ctx, assistant, escalationPhone);
+        let text = `🔔 Conversa escalada para humano${code ? `  #${code}` : ''}\n\nContato: ${name} (${phone})\nAssistente: ${assistant.assistant_name || 'Assistente'}\n\nMensagem do cliente: ${preview}`;
+        if (code) {
+            text += `\n\n💬 Responda aqui para falar com o cliente — a mensagem sai pelo número da empresa.` +
+                `\n\n✅ Quando terminar o atendimento, responda:\n*resolvido ${code}*\n(a IA volta a atender este contato)`;
+        }
 
         try {
             await whatsappService.sendMessage({ instanceId, number: escalationPhone, text });

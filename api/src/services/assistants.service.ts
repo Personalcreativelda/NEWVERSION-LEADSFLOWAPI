@@ -1091,7 +1091,8 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
         try {
             const result = await query(
                 `SELECT file_name, text_content FROM assistant_knowledge_files
-                 WHERE user_assistant_id = $1 AND status = 'ready' AND char_count > 0 AND kind = 'rag'`,
+                 WHERE user_assistant_id = $1 AND status = 'ready' AND char_count > 0 AND kind = 'rag'
+                 ORDER BY created_at ASC`,
                 [userAssistantId]
             );
             const files = result.rows as { file_name: string; text_content: string }[];
@@ -1138,12 +1139,15 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
             // marcou por palavras-chave, injeta o início de cada documento para o assistente ainda
             // ter o conteúdo disponível (texto já cacheado — custo zero de token extra).
             if (selected.length === 0) {
+                // Divide o orçamento entre até 5 documentos (antes: só os 3 primeiros, sem ordem definida)
                 const fallback: string[] = [];
+                const fallbackFiles = files.slice(0, 5);
+                const perFile = Math.floor(maxChars / fallbackFiles.length);
                 let used = 0;
-                for (const f of files.slice(0, 3)) {
+                for (const f of fallbackFiles) {
                     const text = (f.text_content || '').replace(/\s+/g, ' ').trim();
                     if (!text) continue;
-                    const per = Math.min(700, maxChars - used);
+                    const per = Math.min(perFile, maxChars - used);
                     if (per <= 0) break;
                     const snippet = text.substring(0, per);
                     fallback.push(`[${f.file_name}]\n${snippet}${text.length > per ? '…' : ''}`);

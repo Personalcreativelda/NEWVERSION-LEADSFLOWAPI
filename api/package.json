@@ -29,7 +29,8 @@
     "socket.io": "^4.8.3",
     "speakeasy": "^2.0.0",
     "stripe": "^22.0.1",
-    "twilio": "^5.12.1"
+    "twilio": "^5.12.1",
+    "unpdf": "1.4.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
