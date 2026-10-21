@@ -1196,6 +1196,7 @@ html.native-app,
 html.native-app body {
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation; /* sem atraso de 300ms no toque, mantém o zoom por pinça */
 }
 
 /* Botão flutuante do chat de suporte: no app abre-se pelo Menu → "Chat de suporte". */

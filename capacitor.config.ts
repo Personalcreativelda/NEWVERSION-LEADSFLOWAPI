@@ -9,6 +9,17 @@ const config: CapacitorConfig = {
     // aceita no CORS. Sem isto a origem seria https://localhost e a API bloquearia os pedidos.
     androidScheme: 'https',
     hostname: 'app.leadsflowapi.com',
+    // Páginas de pagamento abertas dentro do próprio app (sem saltar para o Chrome).
+    // No fim o Stripe devolve para https://app.leadsflowapi.com/..., servido localmente.
+    // Manter em sincronia com IN_APP_HOSTS em src/native.ts.
+    allowNavigation: [
+      'checkout.stripe.com',
+      'billing.stripe.com',
+      'stripe.com',
+      '*.stripe.com',
+      'paypal.com',
+      '*.paypal.com',
+    ],
   },
   android: {
     allowMixedContent: false,

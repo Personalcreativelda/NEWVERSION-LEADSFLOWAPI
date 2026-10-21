@@ -2561,20 +2561,29 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
               <button
                 key={page}
                 onClick={() => handleNavigate(page as any)}
-                className={`flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors ${
-                  active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                aria-current={active ? 'page' : undefined}
+                className={`group flex-1 flex flex-col items-center justify-center gap-1 text-[12px] font-medium transition-colors touch-manipulation ${
+                  active ? 'text-primary' : 'text-muted-foreground'
                 }`}
               >
-                <span className={active ? 'text-primary' : ''}>{icon}</span>
+                {/* Indicador "pílula" do item ativo (Material 3) + feedback ao tocar */}
+                <span aria-hidden className={`flex items-center justify-center w-14 h-7 rounded-full transition-colors duration-150 ${
+                  active ? 'bg-primary/15' : 'group-active:bg-muted'
+                }`}>
+                  {icon}
+                </span>
                 {label}
               </button>
             );
           })}
           <button
             onClick={() => setIsSidebarOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+            aria-expanded={isSidebarOpen}
+            className="group flex-1 flex flex-col items-center justify-center gap-1 text-[12px] font-medium text-muted-foreground transition-colors touch-manipulation"
           >
-            <Menu size={20} />
+            <span aria-hidden className="flex items-center justify-center w-14 h-7 rounded-full transition-colors duration-150 group-active:bg-muted">
+              <Menu size={20} />
+            </span>
             Menu
           </button>
         </nav>

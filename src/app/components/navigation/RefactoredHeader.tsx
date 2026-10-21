@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Languages } from 'lucide-react';
+import { Languages } from 'lucide-react';
 import AvatarPopover from './AvatarPopover';
 import ThemeSelector from './ThemeSelector';
-import Breadcrumbs from './Breadcrumbs';
+import Breadcrumbs, { getPageTitle } from './Breadcrumbs';
 import { NotificationBell } from '../dashboard/NotificationBell';
 import { Language, saveLanguage, translations } from '../../utils/i18n';
 
@@ -102,21 +102,11 @@ export default function RefactoredHeader({
   return (
     <header className="flex-shrink-0 sticky top-0 z-[1000] border-b backdrop-blur-xl bg-background/80 border-border dark:border-[rgba(255,255,255,0.06)] dark:bg-background/90">
       <div className="px-4 lg:px-6 h-14 flex items-center justify-between">
-        {/* Left Section: Hamburger APENAS NO MOBILE */}
-        <div className="flex items-center lg:hidden">
-          {/* Hamburger Menu - APENAS MOBILE (<1024px) */}
-          <button
-            onClick={onToggleSidebar}
-            className="p-2 rounded-lg transition-all duration-200 group hover:bg-muted text-muted-foreground hover:text-foreground"
-            aria-label="Toggle menu"
-          >
-            {isSidebarOpen ? (
-              <X className="w-5 h-5 transition-colors" />
-            ) : (
-              <Menu className="w-5 h-5 transition-colors" />
-            )}
-          </button>
-        </div>
+        {/* Mobile (<1024px): título da página. O menu fica só na barra inferior
+            (item "Menu"), para não haver dois botões a abrir a mesma gaveta. */}
+        <h1 className="lg:hidden min-w-0 truncate text-[17px] font-semibold tracking-tight text-foreground">
+          {getPageTitle(currentPage || 'dashboard', language)}
+        </h1>
 
         {/* Desktop: trilho de navegação (páginas reais do LeadFlow) */}
         <Breadcrumbs currentPage={currentPage || 'dashboard'} language={language} className="hidden lg:block" />

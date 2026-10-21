@@ -90,14 +90,55 @@ function syncSystemBars(): () => void {
   };
 }
 
-// Desliga o zoom por pinça/duplo toque — num app as telas têm tamanho fixo.
-function lockViewport() {
-  document
-    .querySelector('meta[name="viewport"]')
-    ?.setAttribute(
-      'content',
-      'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
-    );
+// Domínios que abrem dentro do próprio WebView (pagamentos). Manter em sincronia com
+// server.allowNavigation em capacitor.config.ts.
+const IN_APP_HOSTS = ['stripe.com', 'paypal.com'];
+
+const matchesHost = (host: string, domain: string) => host === domain || host.endsWith('.' + domain);
+
+// Decide onde abre um link: null = comportamento normal (mesmo app, tel:, mailto:, WhatsApp…).
+function routeExternalUrl(rawUrl: string): 'in-app' | 'overlay' | null {
+  let url: URL;
+  try {
+    url = new URL(rawUrl, window.location.href);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (url.host === window.location.host) return null;
+  if (IN_APP_HOSTS.some((d) => matchesHost(url.hostname, d))) return 'in-app';
+  // WhatsApp deve abrir a app do WhatsApp, não uma página.
+  if (['wa.me', 'whatsapp.com'].some((d) => matchesHost(url.hostname, d))) return null;
+  return 'overlay';
+}
+
+function openRouted(rawUrl: string, route: 'in-app' | 'overlay') {
+  const href = new URL(rawUrl, window.location.href).href;
+  if (route === 'in-app') window.location.href = href;
+  else Browser.open({ url: href }).catch(() => {});
+}
+
+// Mantém o utilizador dentro do app: pagamentos abrem no próprio app e restantes links
+// externos numa Custom Tab por cima do app (com ✕ para voltar), em vez de saltar para o Chrome.
+function keepLinksInApp() {
+  const nativeOpen = window.open.bind(window);
+  window.open = ((url?: string | URL, target?: string, features?: string) => {
+    const route = url ? routeExternalUrl(String(url)) : null;
+    if (!route) return nativeOpen(url, target, features);
+    openRouted(String(url), route);
+    return null;
+  }) as typeof window.open;
+
+  // Fase de bubbling: corre depois dos handlers do React, que podem já ter tratado o clique.
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented) return;
+    const anchor = (event.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+    if (!anchor || anchor.hasAttribute('download')) return;
+    const route = routeExternalUrl(anchor.href);
+    if (!route) return;
+    event.preventDefault();
+    openRouted(anchor.href, route);
+  });
 }
 
 // Integração com o Android — no navegador não faz nada.
@@ -105,7 +146,7 @@ export async function initNative() {
   if (!isNativeApp()) return;
 
   document.documentElement.classList.add('native-app');
-  lockViewport();
+  keepLinksInApp();
 
   // Botão "voltar" do Android: fecha o chat de suporte se estiver aberto, senão navega
   // no histórico; na primeira página fecha o app.
