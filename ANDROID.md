@@ -29,6 +29,22 @@ npm run android:open
 No Android Studio: **Build → Build App Bundle(s) / APK(s) → Build APK(s)**.
 O ficheiro fica em `android/app/build/outputs/apk/debug/app-debug.apk`.
 
+### Pela linha de comando (sem abrir o Android Studio)
+
+O projeto usa Gradle 9.1 + Android Gradle Plugin 8.13, compatíveis com o Java 25 que vem com o
+Android Studio. Em Git Bash:
+
+```bash
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+export TEMP='C:\tmp\jtmp' TMP='C:\tmp\jtmp'
+export JAVA_TOOL_OPTIONS='-Djdk.net.unixdomain.tmpdir=C:\tmp\jtmp -Djava.io.tmpdir=C:\tmp\jtmp'
+cd android && ./gradlew assembleDebug
+```
+
+O `TEMP` curto evita o erro `Unable to establish loopback connection` do Java 25 no Windows.
+`android/local.properties` (não versionado) deve conter
+`sdk.dir=C:/Users/<utilizador>/AppData/Local/Android/Sdk`, com barras `/`.
+
 Para a Play Store use **Build → Generate Signed App Bundle** (ficheiro `.aab`).
 Guarde a keystore num lugar seguro — sem ela não é possível publicar atualizações.
 
