@@ -79,7 +79,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+    <div className="stagger grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         const isPrimary = index === 0;

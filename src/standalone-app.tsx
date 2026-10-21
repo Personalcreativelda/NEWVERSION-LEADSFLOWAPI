@@ -1,4 +1,5 @@
 import { BrowserRouter } from 'react-router-dom';
+import { MotionConfig } from 'motion/react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import App from './app/App';
 import { ErrorBoundary } from './app/components/ErrorBoundary';
@@ -28,13 +29,16 @@ export default function StandaloneApp() {
     >
       <ThemeModeProvider>
         <AppMuiThemeProvider>
-          <BrowserRouter>
-            <ErrorBoundary>
-              <UploadQueueProvider>
-                <App landingEnabled={false} initialPage="login" />
-              </UploadQueueProvider>
-            </ErrorBoundary>
-          </BrowserRouter>
+          {/* Animações (motion) respeitam "reduzir movimento" do sistema */}
+          <MotionConfig reducedMotion="user">
+            <BrowserRouter>
+              <ErrorBoundary>
+                <UploadQueueProvider>
+                  <App landingEnabled={false} initialPage="login" />
+                </UploadQueueProvider>
+              </ErrorBoundary>
+            </BrowserRouter>
+          </MotionConfig>
         </AppMuiThemeProvider>
       </ThemeModeProvider>
     </PersistQueryClientProvider>

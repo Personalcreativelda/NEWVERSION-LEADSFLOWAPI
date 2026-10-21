@@ -61,7 +61,7 @@ export function PageAction({ icon: Icon, label, onClick, disabled, variant = 'se
       aria-label={label}
       title={label}
       className={cn(
-        'inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 sm:px-4',
+        'inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 sm:px-4',
         primary
           ? 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80'
           : 'border border-border bg-card text-foreground hover:bg-muted active:bg-muted',

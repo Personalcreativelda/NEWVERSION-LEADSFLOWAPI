@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { SplashScreen } from '@capacitor/splash-screen';
 
 // Plugin nativo do app (android/.../SystemBarsPlugin.java).
@@ -12,6 +13,12 @@ const SystemBars = registerPlugin<{
 export const NATIVE_OAUTH_REDIRECT = 'com.leadsflowapi.app://oauth';
 
 export const isNativeApp = () => Capacitor.isNativePlatform();
+
+/** Vibração curta de confirmação (só no app; no browser não faz nada). */
+export function haptic(strength: 'light' | 'medium' = 'light') {
+  if (!isNativeApp()) return;
+  Haptics.impact({ style: strength === 'medium' ? ImpactStyle.Medium : ImpactStyle.Light }).catch(() => {});
+}
 
 let oauthCompleting = false;
 

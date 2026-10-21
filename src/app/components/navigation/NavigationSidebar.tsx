@@ -304,7 +304,7 @@ export default function NavigationSidebar({
       {/* Overlay - mobile only */}
       {isOpen && isMobile && (
         <div
-          className="fixed inset-0 bg-black/60 z-[900] transition-opacity duration-200"
+          className="fixed inset-0 bg-black/60 z-[900] animate-in fade-in duration-200"
           onClick={onClose}
         />
       )}

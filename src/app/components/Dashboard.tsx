@@ -75,6 +75,7 @@ import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
 
 import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X, LayoutDashboard, Users, MessageSquare, BarChart2, Menu, FileText, Workflow } from 'lucide-react';
 import { PageHeader, PageAction } from './base/PageHeader';
+import { motion } from 'motion/react';
 
 // Types
 interface Lead {
@@ -2170,6 +2171,20 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   : { xs: 4, sm: 6, lg: 8 }
               }
             >
+            {/* Transição entre páginas: entra com fade + 8px (sem esperar pela saída da
+                anterior). Depois da animação o transform fica "none", para não afetar
+                elementos position:fixed (modais) dentro das páginas. */}
+            <motion.div
+              key={currentPage}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
+              className={
+                currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
+                  ? 'h-full flex flex-col min-h-0'
+                  : undefined
+              }
+            >
             {/* Renderizar conteúdo baseado na página atual */}
             {currentPage === 'dashboard' && (
               <div className="space-y-4 sm:space-y-6 lg:space-y-8">
@@ -2497,6 +2512,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             {currentPage === 'admin' && (
               <AdminPage />
             )}
+            </motion.div>
           </PageContainer>
 
           {/* Footer - hidden on inbox/full-height pages and on mobile (bottom nav layout / app) */}
@@ -2538,10 +2554,20 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                 }`}
               >
                 {/* Indicador "pílula" do item ativo (Material 3) + feedback ao tocar */}
-                <span aria-hidden className={`flex items-center justify-center w-14 h-7 rounded-full transition-colors duration-150 ${
-                  active ? 'bg-primary/15' : 'group-active:bg-muted'
+                <span aria-hidden className={`relative flex items-center justify-center w-14 h-7 rounded-full transition-colors duration-150 ${
+                  active ? '' : 'group-active:bg-muted'
                 }`}>
-                  {icon}
+                  {/* Pílula partilhada: desliza com mola até ao separador ativo */}
+                  {active && (
+                    <motion.span
+                      layoutId="bottom-nav-pill"
+                      className="absolute inset-0 rounded-full bg-primary/15"
+                      transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                    />
+                  )}
+                  <motion.span className="relative" whileTap={{ scale: 0.85 }}>
+                    {icon}
+                  </motion.span>
                 </span>
                 {label}
               </button>

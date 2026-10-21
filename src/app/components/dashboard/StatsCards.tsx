@@ -91,7 +91,7 @@ export default function StatsCards({ leads = [] }: StatsCardsProps) {
   ];
 
   return (
-    <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+    <div className="stagger grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (

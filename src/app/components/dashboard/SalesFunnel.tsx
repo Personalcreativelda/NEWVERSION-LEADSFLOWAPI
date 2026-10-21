@@ -1,10 +1,11 @@
 import { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import type { UIEvent } from 'react';
-import { DndContext, DragEndEvent, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragOverlay, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Phone, Mail, MessageCircle, Trash2, Edit2, MoreVertical, ChevronDown, BarChart3, Clock, CheckCircle2, TrendingUp, GripVertical, DollarSign, StickyNote, Calendar, MessageSquare, Settings, Plus, X, RotateCcw, Globe, Flag, AlertTriangle, AlertCircle, Minus, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, Instagram, Send, Megaphone, MoveRight, Workflow, type LucideIcon } from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
+import { haptic } from '../../../native';
 import type { TabKey } from '../modals/LeadDetailModal';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -231,14 +232,12 @@ interface SalesFunnelProps {
 
 // Card do Lead - design limpo e moderno
 const LeadCard = memo(({ lead, stage, onEdit, onDelete, onResetToInitial, onWhatsApp, onCall, onViewDetails, currency = 'USD' as CurrencyCode, stages = [], onMoveToStage }: any) => {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  // O cartão que segue o dedo/rato é o DragOverlay; o original fica no lugar como marcador
+  // (aplicar-lhe também o transform fazia dois cartões mexerem-se ao mesmo tempo).
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: lead.id,
     data: { lead }
   });
-
-  const style = transform ? {
-    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-  } : undefined;
 
   // Cores dos avatares vibrantes
   const avatarColors = [
@@ -258,13 +257,11 @@ const LeadCard = memo(({ lead, stage, onEdit, onDelete, onResetToInitial, onWhat
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={`group relative rounded-2xl p-3 mb-3 cursor-move transition-all duration-200 border ${isDragging ? 'opacity-50 scale-95 shadow-2xl z-50 ring-2 ring-white/10' : 'opacity-100'
-        } ${isDragging
-          ? 'opacity-50 scale-95 shadow-2xl z-50 ring-2 ring-border/30'
+      className={`group relative rounded-2xl p-3 mb-3 cursor-grab active:cursor-grabbing select-none touch-manipulation [-webkit-touch-callout:none] transition-[opacity,box-shadow,background-color,border-color] duration-200 border animate-in fade-in zoom-in-95 ${isDragging
+          ? 'opacity-40 border-dashed border-primary/40 shadow-none'
           : 'opacity-100 hover:bg-muted/30 border-border shadow-sm hover:shadow-md'
         }`}
       style={{
-        ...style,
         backgroundColor: 'hsl(var(--card))'
       }}
     >
@@ -881,10 +878,19 @@ export default function SalesFunnel({
     });
   }, [stages]);
 
+  // Rato: arrasta após 8px. Toque: toque longo (200ms) — com o PointerSensor o browser
+  // tratava o movimento como scroll e cancelava o gesto, e o arrastar nunca começava no
+  // telemóvel. Assim o deslizar normal continua a fazer scroll das colunas.
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -985,6 +991,7 @@ export default function SalesFunnel({
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
     setActiveId(active.id as string);
+    haptic('light');
   }, []);
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
@@ -1026,6 +1033,7 @@ export default function SalesFunnel({
       const normalizedNewStatus = newStatusValue.toLowerCase();
 
       if (normalizedNewStatus !== currentStatus) {
+        haptic('medium');
         // Optimistic update
         setLocalLeads(prev =>
           prev.map(l => l.id === activeId ? { ...l, status: newStatusValue } : l)
@@ -1448,7 +1456,7 @@ export default function SalesFunnel({
 
                 <DragOverlay dropAnimation={null}>
                   {activeLead ? (
-                    <div className="rounded-xl p-4 shadow-lg opacity-95 max-w-[280px] rotate-3 border-2 border-blue-500 backdrop-blur-sm bg-card">
+                    <div className="rounded-xl p-4 shadow-2xl max-w-[280px] rotate-2 scale-105 border-2 border-primary bg-card cursor-grabbing">
                       <p className="text-sm font-semibold text-foreground">
                         {activeLead.nome}
                       </p>

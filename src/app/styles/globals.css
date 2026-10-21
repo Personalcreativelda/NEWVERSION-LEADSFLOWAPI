@@ -1,6 +1,9 @@
 /* Estilos globais do LeadsFlow - Compatible with Tailwind CSS v4 */
 
 @import "tailwindcss";
+/* animate-in/out, fade, zoom, slide… (equivalente Tailwind v4 do tailwindcss-animate,
+   que nunca chegou a ser carregado — modais, menus e folhas abriam sem animação) */
+@import "tw-animate-css";
 @config "../../../tailwind.config.js";
 
 :root {
@@ -1238,3 +1241,35 @@ html.native-app #lfw-close {
     height: 20px;
   }
 }
+
+/* ── Movimento ──────────────────────────────────────────────────────────────
+   Curva e duração padrão do app para transições CSS (estilo Stripe/Notion:
+   rápidas e com "ease-out" suave), e respeito por "reduzir movimento". */
+:root {
+  --ease-app: cubic-bezier(0.2, 0, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Entrada em cascata (cartões de estatísticas): cada filho sobe 6px com fade,
+   40ms depois do anterior. */
+@keyframes app-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.stagger > * {
+  animation: app-rise 320ms var(--ease-app) both;
+}
+.stagger > *:nth-child(2) { animation-delay: 40ms; }
+.stagger > *:nth-child(3) { animation-delay: 80ms; }
+.stagger > *:nth-child(4) { animation-delay: 120ms; }
+.stagger > *:nth-child(5) { animation-delay: 160ms; }
+.stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
