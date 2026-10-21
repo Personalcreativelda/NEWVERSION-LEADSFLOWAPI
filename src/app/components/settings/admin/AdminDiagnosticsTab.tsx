@@ -3,6 +3,7 @@ import { Button } from '../../ui/button';
 import {
   AlertCircle, CheckCircle2, AlertTriangle, Loader2, RefreshCw, Mail, Activity, Trash2,
 } from 'lucide-react';
+import { PageHeader, PageAction } from '../../base/PageHeader';
 import { apiRequest } from '../../../utils/api';
 import { getApiBaseUrl } from '../../../utils/api-client';
 import { toast } from 'sonner';
@@ -120,51 +121,39 @@ export const AdminDiagnosticsTab: React.FC = () => {
     : [];
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-semibold text-foreground mb-1 flex items-center gap-3">
-            <Activity className="w-7 h-7 text-blue-500" />
-            Diagnóstico do Sistema
-          </h1>
-          <p className="text-muted-foreground">Saúde em tempo real de todos os serviços</p>
-        </div>
-        <div className="flex gap-2">
-          {sessionsProblematic && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void cleanSessions()}
-              disabled={cleaningSessions || loading}
-              className="flex items-center gap-2 border-yellow-500/50 text-yellow-600 hover:bg-yellow-500/10"
-            >
-              {cleaningSessions ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-              Limpar sessões expiradas
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void sendTestAlert()}
-            disabled={testingAlert || loading}
-            className="flex items-center gap-2"
-          >
-            {testingAlert ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-            Testar alerta por email
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void fetchDiagnostics()}
-            disabled={loading}
-            className="flex items-center gap-2"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Actualizar
-          </Button>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="Diagnóstico do Sistema"
+        description="Saúde em tempo real de todos os serviços"
+        icon={Activity}
+        actions={
+          <>
+            {sessionsProblematic && (
+              <PageAction
+                icon={cleaningSessions ? Loader2 : Trash2}
+                label="Limpar sessões expiradas"
+                onClick={() => void cleanSessions()}
+                disabled={cleaningSessions || loading}
+                className={`border-yellow-500/50 text-yellow-600 ${cleaningSessions ? '[&>svg]:animate-spin' : ''}`}
+              />
+            )}
+            <PageAction
+              icon={testingAlert ? Loader2 : Mail}
+              label="Testar alerta por email"
+              onClick={() => void sendTestAlert()}
+              disabled={testingAlert || loading}
+              className={testingAlert ? '[&>svg]:animate-spin' : undefined}
+            />
+            <PageAction
+              icon={loading ? Loader2 : RefreshCw}
+              label="Atualizar"
+              onClick={() => void fetchDiagnostics()}
+              disabled={loading}
+              className={loading ? '[&>svg]:animate-spin' : undefined}
+            />
+          </>
+        }
+      />
 
       {/* Loading state */}
       {loading && !report && (

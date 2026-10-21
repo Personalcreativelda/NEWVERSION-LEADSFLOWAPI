@@ -9,6 +9,7 @@ import {
   Instagram, Facebook, Send, Split, Mic, RefreshCw,
 } from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
+import { EmptyState } from '../base/EmptyState';
 import { Button } from '../ui/button';
 import { SkeletonFlowCard, UpdatingBadge } from '../ui/skeletons';
 import { AppModal } from '../base/AppModal';
@@ -970,19 +971,12 @@ export default function RemarketingPage() {
                   {Array.from({ length: 3 }).map((_, i) => <SkeletonFlowCard key={i} />)}
                 </div>
               ) : flows.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-                    <GitBranch className="w-7 h-7 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-base font-semibold text-foreground mb-1">Nenhum flow criado</h3>
-                  <p className="text-sm text-muted-foreground mb-5 max-w-xs">
-                    Crie seu primeiro flow de remarketing a partir de um template ou do zero.
-                  </p>
-                  <Button onClick={() => setActiveTab('templates')} className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Explorar Templates
-                  </Button>
-                </div>
+                <EmptyState
+                  icon={GitBranch}
+                  title="Ainda sem flows"
+                  description="Comece por um template ou crie um flow do zero."
+                  action={<PageAction variant="primary" icon={Layers} label="Ver templates" onClick={() => setActiveTab('templates')} />}
+                />
               ) : (
                 <>
                   {loading && (
@@ -1147,17 +1141,6 @@ export default function RemarketingPage() {
                     </div>
                   );
                 })}
-              </div>
-
-              {/* Coming soon notice */}
-              <div className="rounded-xl border border-border bg-muted/30 p-5 flex items-start gap-3">
-                <AlertCircle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">Editor visual em breve</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Estamos desenvolvendo um construtor visual drag-and-drop ao estilo ManyChat, com condições, delays, A/B testing e integração direta com o funil de vendas.
-                  </p>
-                </div>
               </div>
             </div>
           )}

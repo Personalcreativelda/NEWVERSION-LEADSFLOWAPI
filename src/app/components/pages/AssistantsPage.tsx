@@ -11,6 +11,7 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { PageHeader, PageAction } from '../base/PageHeader';
+import { EmptyState } from '../base/EmptyState';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { assistantsApi, MAX_KNOWLEDGE_FILES, type Assistant, type UserAssistant, type CreateAssistantInput, type KnowledgeFile } from '../../services/api/assistants';
@@ -1003,24 +1004,25 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredAssistants.map(assistant => renderAssistantCard(assistant, true))}
           {filteredAssistants.length === 0 && (
-            <div className="col-span-full text-center py-12 text-muted-foreground">
-              <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Nenhum assistente encontrado</p>
-            </div>
+            <EmptyState
+              className="col-span-full"
+              icon={Bot}
+              title="Nenhum assistente encontrado"
+              description="Tente outro termo de pesquisa."
+            />
           )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {userAssistants.map(ua => ua.assistant && renderAssistantCard(ua.assistant, false))}
           {userAssistants.length === 0 && (
-            <div className="col-span-full text-center py-12 text-muted-foreground">
-              <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p className="mb-4">Você ainda não conectou nenhum assistente</p>
-              <Button onClick={() => setActiveTab('marketplace')}>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Explorar Marketplace
-              </Button>
-            </div>
+            <EmptyState
+              className="col-span-full"
+              icon={Bot}
+              title="Ainda sem assistentes ligados"
+              description="Escolha um assistente pronto no marketplace e ligue-o aos seus canais."
+              action={<PageAction variant="primary" icon={Sparkles} label="Explorar marketplace" onClick={() => setActiveTab('marketplace')} />}
+            />
           )}
         </div>
       )}
@@ -1298,7 +1300,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
 
                 <p className="text-xs text-muted-foreground mb-3">
-                  Quando o cliente pedir para falar com um atendente humano (ou demonstrar um assunto sensível), o assistente pausa a IA e avisa um responsável.
+                  Pausa a IA e avisa a equipa quando o cliente pede um humano.
                 </p>
 
                 <div className="space-y-3">
@@ -1453,7 +1455,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   <div className="flex-1">
                     <p className="text-sm font-medium text-foreground">Responder em áudio quando receber áudio</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Quando o cliente enviar um áudio, o assistente responde com voz gerada por IA em todos os canais suportados
+                      Responde a áudios com voz gerada por IA.
                     </p>
                   </div>
                   <button
@@ -1491,7 +1493,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                         Entender imagens
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Analisa imagens enviadas pelo cliente com OpenAI Vision ou Gemini e responde com base no conteúdo
+                        Entende imagens enviadas pelo cliente (OpenAI Vision ou Gemini).
                       </p>
                     </div>
                     <button
@@ -1543,7 +1545,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                         Reagir às mensagens
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Envia reações (❤️ 👍 😊) às mensagens recebidas no WhatsApp. Desativado por padrão.
+                        Reage às mensagens recebidas no WhatsApp.
                       </p>
                     </div>
                     <button
@@ -1709,7 +1711,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">Enviar arquivos quando pedidos</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Quando o cliente pedir, o assistente envia o arquivo correspondente pelo canal conectado (WhatsApp, Telegram, Facebook, e-mail)
+                        Envia o ficheiro pedido pelo cliente no canal da conversa.
                       </p>
                     </div>
                     <button

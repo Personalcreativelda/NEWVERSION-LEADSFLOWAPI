@@ -115,8 +115,8 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
         />
       ) : !hasData ? (
         <EmptyState
-          title="Nenhum dado de IA ainda."
-          description="Abra Remarketing → Motor de Vendas para analisar."
+          title="Ainda sem análise de IA"
+          description="Abra o Motor de Vendas no menu para analisar os seus leads."
           imgSrc="/assets/icons/empty/ic_content.svg"
         />
       ) : (

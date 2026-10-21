@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { PageHeader, PageAction } from '../base/PageHeader';
+import { EmptyState } from '../base/EmptyState';
 import { toast } from 'sonner';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { voiceAgentsApi } from '../../services/api/voice-agents';
@@ -858,23 +859,12 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         {loading ? (
           <SkeletonVoiceAgentGrid count={6} />
         ) : filteredAgents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center px-4">
-            <PhoneCall className={`w-12 h-12 sm:w-16 sm:h-16 mb-3 sm:mb-4 text-muted-foreground/70`} />
-            <h3 className={`text-base sm:text-lg font-semibold mb-2 text-foreground`}>
-              {searchTerm ? 'Nenhum agente encontrado' : 'Nenhum agente de voz configurado'}
-            </h3>
-            <p className={`text-xs sm:text-sm mb-4 text-muted-foreground max-w-xs`}>
-              {searchTerm
-                ? 'Tente buscar com outros termos'
-                : 'Crie agentes de voz usando ElevenLabs e Wavoip para chamadas automáticas'}
-            </p>
-            {!searchTerm && (
-              <Button onClick={handleCreate} size="sm">
-                <Plus className="w-4 h-4 mr-2" />
-                Criar Primeiro Agente
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            icon={PhoneCall}
+            title={searchTerm ? 'Nenhum agente encontrado' : 'Ainda sem agentes de voz'}
+            description={searchTerm ? 'Tente outro termo de pesquisa.' : 'Crie o primeiro agente para fazer chamadas automáticas.'}
+            action={!searchTerm ? <PageAction variant="primary" icon={Plus} label="Criar agente" onClick={handleCreate} /> : undefined}
+          />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {filteredAgents.map((agent) => (
@@ -1189,7 +1179,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   </select>
                   {!convAILoading && phoneNumbers.length === 0 && (
                     <p className="mt-1 text-[10px] text-yellow-600 dark:text-yellow-400">
-                      Nenhum número SIP encontrado. Registre em Configurações → SIP Wavoip ou clique ↺ para recarregar.
+                      Sem números SIP. Registe-os em Configurações → SIP Wavoip.
                     </p>
                   )}
                 </div>
@@ -1424,7 +1414,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     </h4>
                   </div>
                   <p className={`text-xs mb-3 text-muted-foreground`}>
-                    Registre as credenciais SIP do Wavoip no ElevenLabs para que o agente AI possa fazer chamadas via WhatsApp.
+                    Registe as credenciais SIP do Wavoip no ElevenLabs para o agente ligar via WhatsApp.
                     Encontre as credenciais em: <strong>Wavoip Dashboard → Dispositivos → SIP</strong>
                   </p>
 

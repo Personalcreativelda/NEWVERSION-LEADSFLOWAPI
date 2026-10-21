@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { teamApi } from '../../../services/api/inbox';
 import type { TeamMember } from '../../../types/inbox';
 import { UserPlus, Trash2, Pencil, X, Check, Loader2, Users } from 'lucide-react';
+import { PageHeader, PageAction } from '../../base/PageHeader';
+import { EmptyState } from '../../base/EmptyState';
 import { toast } from 'sonner';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -81,26 +83,15 @@ export default function InboxTeam() {
     const getInitials = (name: string) => name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
 
     return (
-        <div className="p-6 max-w-3xl mx-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
-                        <Users className="w-5 h-5 text-violet-500" />
-                    </div>
-                    <div>
-                        <h1 className="text-lg font-semibold text-foreground">Equipa da Inbox</h1>
-                        <p className="text-sm text-muted-foreground">{members.length} membro{members.length !== 1 ? 's' : ''}</p>
-                    </div>
-                </div>
-                <button
-                    onClick={() => setShowAdd(true)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-                >
-                    <UserPlus className="w-4 h-4" />
-                    Adicionar Membro
-                </button>
-            </div>
+        // Página de ecrã inteiro (dentro do InboxPage): mesmas margens do PageContainer do Dashboard
+        <div className="h-full overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-10 lg:py-8">
+          <div className="max-w-3xl">
+            <PageHeader
+                title="Equipa da Inbox"
+                description={`${members.length} membro${members.length !== 1 ? 's' : ''}`}
+                icon={Users}
+                actions={<PageAction variant="primary" icon={UserPlus} label="Adicionar membro" onClick={() => setShowAdd(true)} />}
+            />
 
             {/* Add member form */}
             {showAdd && (
@@ -111,7 +102,7 @@ export default function InboxTeam() {
                             <X className="w-4 h-4" />
                         </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                             required
                             type="text"
@@ -163,12 +154,12 @@ export default function InboxTeam() {
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
             ) : members.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
-                    <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
-                        <Users className="w-7 h-7 text-muted-foreground" />
-                    </div>
-                    <p className="text-sm text-muted-foreground">Nenhum membro adicionado ainda.</p>
-                </div>
+                <EmptyState
+                    icon={Users}
+                    title="Ainda sem membros"
+                    description="Adicione agentes para distribuir as conversas da Inbox."
+                    action={<PageAction variant="primary" icon={UserPlus} label="Adicionar membro" onClick={() => setShowAdd(true)} />}
+                />
             ) : (
                 <div className="space-y-2">
                     {members.map(m => (
@@ -209,14 +200,17 @@ export default function InboxTeam() {
                                 ) : (
                                     <>
                                         <p className="text-sm font-medium text-foreground truncate">{m.name || '—'}</p>
-                                        <p className="text-[12px] text-muted-foreground truncate">{m.email}</p>
+                                        <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                                        {m.role && (
+                                            <p className="sm:hidden text-xs text-muted-foreground truncate">{ROLE_LABELS[m.role] || m.role}{m.team ? ` · ${m.team}` : ''}</p>
+                                        )}
                                     </>
                                 )}
                             </div>
 
                             {/* Badges */}
                             {editingId !== m.id && (
-                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
                                     {m.role && (
                                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${ROLE_COLORS[m.role] || 'bg-muted text-muted-foreground'}`}>
                                             {ROLE_LABELS[m.role] || m.role}
@@ -242,11 +236,11 @@ export default function InboxTeam() {
                                         <button
                                             onClick={() => handleEdit(m.id)}
                                             disabled={saving}
-                                            className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                            className="p-2.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                         >
                                             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                                         </button>
-                                        <button onClick={() => setEditingId(null)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted">
+                                        <button onClick={() => setEditingId(null)} className="p-2.5 rounded-lg text-muted-foreground hover:bg-muted">
                                             <X className="w-4 h-4" />
                                         </button>
                                     </>
@@ -254,14 +248,14 @@ export default function InboxTeam() {
                                     <>
                                         <button
                                             onClick={() => { setEditingId(m.id); setEditForm({ name: m.name, role: m.role, team: m.team }); }}
-                                            className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                                            className="p-2.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                                         >
                                             <Pencil className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={() => handleDelete(m.id)}
                                             disabled={deletingId === m.id}
-                                            className="p-1.5 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 disabled:opacity-50"
+                                            className="p-2.5 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 disabled:opacity-50"
                                         >
                                             {deletingId === m.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                         </button>
@@ -272,6 +266,7 @@ export default function InboxTeam() {
                     ))}
                 </div>
             )}
+          </div>
         </div>
     );
 }

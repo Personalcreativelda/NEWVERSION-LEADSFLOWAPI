@@ -73,7 +73,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { useConfirm } from './ui/ConfirmDialog';
 import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
 
-import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X, LayoutDashboard, Users, MessageSquare, BarChart2, Menu, FileText } from 'lucide-react';
+import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X, LayoutDashboard, Users, MessageSquare, BarChart2, Menu, FileText, Workflow } from 'lucide-react';
 import { PageHeader, PageAction } from './base/PageHeader';
 
 // Types
@@ -2378,7 +2378,11 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             {currentPage === 'funnel' && (
               <div className="space-y-5 sm:space-y-6 xl:space-y-8">
                 {loading && leads.length === 0 ? (
-                  <SkeletonFunnel />
+                  <>
+                    {/* Mesmo cabeçalho do SalesFunnel, para a página não "saltar" ao carregar */}
+                    <PageHeader title="Funil de Vendas" description="Arraste os leads entre as etapas do funil" icon={Workflow} />
+                    <SkeletonFunnel />
+                  </>
                 ) : (
                 <SalesFunnel
                   leads={leads as any}
@@ -2495,8 +2499,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             )}
           </PageContainer>
 
-          {/* Footer - hidden on inbox/full-height pages */}
-          {currentPage !== 'inbox' && currentPage !== 'inbox-settings' && currentPage !== 'ai-assistants' && currentPage !== 'automations' && currentPage !== 'voice-agents' && currentPage !== 'inbox-team' && (
+          {/* Footer - hidden on inbox/full-height pages and on mobile (bottom nav layout / app) */}
+          {!isMobile && currentPage !== 'inbox' && currentPage !== 'inbox-settings' && currentPage !== 'ai-assistants' && currentPage !== 'automations' && currentPage !== 'voice-agents' && currentPage !== 'inbox-team' && (
             <footer className="border-t border-border mt-12 py-6">
               <PageContainer maxWidth={1280} px={{ xs: 4, sm: 6, lg: 8 }}>
                 <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-sm text-muted-foreground">

@@ -3,8 +3,10 @@ import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import {
-  Bell, Star, AlertTriangle, Loader2, MessageSquare, Search
+  Bell, Star, AlertTriangle, Loader2, MessageSquare, Search,
+  RefreshCw, Activity, Megaphone, Settings, Users, UserPlus,
 } from 'lucide-react';
+import { PageHeader, PageAction } from '../base/PageHeader';
 
 // New Modular Components
 import { AdminUsersTab } from './admin/AdminUsersTab';
@@ -374,21 +376,13 @@ export default function AdminPage(_props: AdminPageProps = {}) {
 
       {/* Users tab */}
       {activeTab === 'users' && (
-        <div className="p-4 sm:p-6 lg:p-8">
-          {/* Header */}
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-lg sm:text-2xl font-semibold text-foreground mb-0.5">Usuários</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Gerencie todos os usuários da plataforma</p>
-            </div>
-            <Button
-              onClick={() => setShowAddUserModal(true)}
-              className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm px-3 sm:px-4"
-              size="sm"
-            >
-              + Adicionar
-            </Button>
-          </div>
+        <div>
+          <PageHeader
+            title="Utilizadores"
+            description="Todas as contas da plataforma"
+            icon={Users}
+            actions={<PageAction variant="primary" icon={UserPlus} label="Adicionar" onClick={() => setShowAddUserModal(true)} />}
+          />
 
           {/* Search + filter bar */}
           <div className="flex flex-col sm:flex-row gap-2 mb-4">
@@ -449,13 +443,8 @@ export default function AdminPage(_props: AdminPageProps = {}) {
 
       {/* Activity tab */}
       {activeTab === 'activity' && (
-        <div className="p-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-semibold text-foreground mb-1">
-              Fluxo de Atividade
-            </h1>
-            <p className="text-muted-foreground">Atividades recentes e usuários online</p>
-          </div>
+        <div>
+          <PageHeader title="Atividade" description="Atividades recentes e utilizadores online" icon={Activity} />
           <AdminActivityTab
             activities={activities}
             activeUsers={activeUsers}
@@ -468,13 +457,8 @@ export default function AdminPage(_props: AdminPageProps = {}) {
 
       {/* Marketing tab */}
       {activeTab === 'marketing' && (
-        <div className="p-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-semibold text-foreground mb-1">
-              Marketing
-            </h1>
-            <p className="text-muted-foreground">Ferramentas de marketing e comunicação</p>
-          </div>
+        <div>
+          <PageHeader title="Marketing" description="Comunicação com os utilizadores da plataforma" icon={Megaphone} />
           <AdminMarketingTab
             totalUsers={users.length}
             freeCount={users.filter(u => u.plan === 'free').length}
@@ -487,26 +471,20 @@ export default function AdminPage(_props: AdminPageProps = {}) {
 
       {/* Feedback tab */}
       {activeTab === 'feedback' && (
-        <div className="p-4 sm:p-6 lg:p-8">
-          {/* Header */}
-          <div className="mb-5 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-lg sm:text-2xl font-semibold text-foreground mb-0.5 leading-tight">
-                Feedbacks dos Usuários
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                Avaliações e problemas reportados pelos usuários
-              </p>
-            </div>
-            <button
-              onClick={loadFeedback}
-              className="flex-shrink-0 px-3 py-2 rounded-lg border text-xs sm:text-sm font-medium hover:bg-muted/50 transition-colors flex items-center gap-2"
-              style={{ borderColor: 'hsl(var(--border))' }}
-            >
-              {feedbackLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Atualizar
-            </button>
-          </div>
+        <div>
+          <PageHeader
+            title="Feedbacks"
+            description="Avaliações e problemas reportados pelos utilizadores"
+            icon={MessageSquare}
+            actions={
+              <PageAction
+                icon={feedbackLoading ? Loader2 : RefreshCw}
+                label="Atualizar"
+                onClick={loadFeedback}
+                className={feedbackLoading ? '[&>svg]:animate-spin' : undefined}
+              />
+            }
+          />
 
           {feedbackLoading && feedbackList.length === 0 ? (
             <div className="flex items-center justify-center py-20">
@@ -585,13 +563,8 @@ export default function AdminPage(_props: AdminPageProps = {}) {
 
       {/* Settings tab */}
       {activeTab === 'settings' && (
-        <div className="p-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-semibold text-foreground mb-1">
-              Configurações Admin
-            </h1>
-            <p className="text-muted-foreground">Configurações de notificações e sistema</p>
-          </div>
+        <div>
+          <PageHeader title="Configurações Admin" description="Notificações e sistema" icon={Settings} />
           <div className="max-w-2xl">
             <div className="bg-card rounded-xl p-6 shadow-sm border border-border mb-4">
               <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">

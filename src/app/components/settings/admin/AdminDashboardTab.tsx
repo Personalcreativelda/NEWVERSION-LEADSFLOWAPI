@@ -4,6 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { Users, DollarSign, TrendingUp, Activity, Rocket, Crown } from 'lucide-react';
+import { PageHeader } from '../../base/PageHeader';
 
 interface User {
   id: string;
@@ -103,27 +104,24 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
   }, [users]);
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h2 className="text-3xl font-semibold text-foreground">Financeiro</h2>
-        <p className="text-muted-foreground mt-1">Visão geral das finanças</p>
-      </div>
+    <div>
+      <PageHeader title="Financeiro" description="Visão geral das finanças" icon={DollarSign} />
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
             <div
               key={stat.label}
-              className="bg-card rounded-xl p-6 shadow-sm border border-border"
+              className="bg-card rounded-xl p-4 sm:p-6 shadow-sm border border-border min-w-0"
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`${stat.color} w-12 h-12 rounded-lg flex items-center justify-center text-white`}>
-                  <Icon size={24} />
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <div className={`${stat.color} w-10 h-10 rounded-lg flex items-center justify-center text-white`}>
+                  <Icon size={20} />
                 </div>
               </div>
-              <h3 className="text-2xl font-semibold text-foreground">{stat.value}</h3>
+              <h3 className="text-xl sm:text-2xl font-semibold text-foreground tabular-nums truncate">{stat.value}</h3>
               <p className="text-muted-foreground text-sm mt-1">{stat.label}</p>
               <p className="text-xs text-muted-foreground/70 mt-0.5">{stat.sub}</p>
             </div>
