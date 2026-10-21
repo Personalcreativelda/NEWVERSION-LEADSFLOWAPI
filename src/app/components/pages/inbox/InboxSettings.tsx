@@ -1,29 +1,14 @@
+import { Radio } from 'lucide-react';
 import { ChannelsList } from '../../inbox/channels/ChannelsList';
+import { PageHeader } from '../../base/PageHeader';
 
 export default function InboxSettings() {
     return (
-        <div className="h-full min-w-0 flex flex-col overflow-hidden" style={{ backgroundColor: 'hsl(var(--card))' }}>
-            {/* Header */}
-            <div
-                className="px-6 py-4 border-b"
-                style={{
-                    backgroundColor: 'hsl(var(--card))',
-                    borderColor: 'hsl(var(--border))'
-                }}
-            >
-                <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                    Configurações do Inbox
-                </h2>
-                <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                    Gerencie seus canais de comunicação
-                </p>
-            </div>
+        // Página de ecrã inteiro (dentro do InboxPage): mesmas margens do PageContainer do Dashboard
+        <div className="h-full min-w-0 flex flex-col overflow-hidden px-3 py-4 sm:px-6 sm:py-6 lg:px-10 lg:py-8" style={{ backgroundColor: 'hsl(var(--background))' }}>
+            <PageHeader title="Canais" description="Os seus canais de comunicação ligados à Inbox" icon={Radio} />
 
-            {/* Content */}
-            <div
-                className="flex-1 overflow-auto"
-                style={{ backgroundColor: 'hsl(var(--background))' }}
-            >
+            <div className="flex-1 min-h-0 overflow-auto">
                 <ChannelsList />
             </div>
         </div>

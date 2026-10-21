@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import {
-  Plus, Filter, X,
+  Plus, X, Megaphone,
   Pause, BarChart3, FileText, Edit2,
   Send, Trash2, Copy, MoreVertical,
   FileDown, Bell, Calendar, MessageCircle,
@@ -9,6 +9,7 @@ import {
   Timer, Save, Users, CheckCircle, CalendarCheck, XCircle
 } from 'lucide-react';
 import { AppButton } from '../base/AppButton';
+import { PageHeader, PageAction } from '../base/PageHeader';
 import { DashboardCard } from '../base/DashboardCard';
 import { StatusBadge } from '../base/StatusBadge';
 import { SearchInput } from '../base/SearchInput';
@@ -1220,60 +1221,50 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
     );
   };
 
+  const handleNewCampaign = () => {
+    // SMS campaigns: open SMS modal directly (Twilio handles sending)
+    if (activeTab === 'sms') {
+      setShowSMSModal(true);
+      return;
+    }
+    // Email campaigns bypass plan limits when SMTP is configured
+    const hasSmtp = !!localStorage.getItem('smtp_host');
+    if (activeTab === 'email' && hasSmtp) {
+      setShowEmailModal(true);
+      return;
+    }
+    // Count all non-completed campaigns across all types as "active"
+    const activeCampaignCount = campaigns.filter(c =>
+      c.status === 'active' || c.status === 'scheduled' || c.status === 'paused'
+    ).length;
+    if (!planLimits.canCreateActiveCampaign(activeCampaignCount)) {
+      planLimits.openUpgradeModal();
+      toast.warning(
+        `Limite de ${planLimits.limitLabel.activeCampaigns} campanha(s) ativa(s) atingido. Faça upgrade para criar mais.`,
+        { duration: 4000 }
+      );
+      return;
+    }
+    setChannelSelectorOpen(true);
+  };
+
   return (
-    <div className="min-h-screen bg-background dark:bg-background">
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
-        {/* Search & Filters */}
-        <div className="mb-6 md:mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-              <SearchInput
-                value={searchTerm}
-                onChange={setSearchTerm}
-                placeholder="Buscar campanhas..."
-                containerClassName="flex-1 sm:flex-none"
-                className="w-full sm:w-80"
-              />
-              <AppButton variant="outline">
-                <Filter className="w-4 h-4" />
-                <span>Filtros</span>
-              </AppButton>
-            </div>
-            <AppButton
-              onClick={() => {
-                // SMS campaigns: open SMS modal directly (Twilio handles sending)
-                if (activeTab === 'sms') {
-                  setShowSMSModal(true);
-                  return;
-                }
-                // Email campaigns bypass plan limits when SMTP is configured
-                const hasSmtp = !!localStorage.getItem('smtp_host');
-                if (activeTab === 'email' && hasSmtp) {
-                  setShowEmailModal(true);
-                  return;
-                }
-                // Count all non-completed campaigns across all types as "active"
-                const activeCampaignCount = campaigns.filter(c =>
-                  c.status === 'active' || c.status === 'scheduled' || c.status === 'paused'
-                ).length;
-                if (!planLimits.canCreateActiveCampaign(activeCampaignCount)) {
-                  planLimits.openUpgradeModal();
-                  toast.warning(
-                    `Limite de ${planLimits.limitLabel.activeCampaigns} campanha(s) ativa(s) atingido. Faça upgrade para criar mais.`,
-                    { duration: 4000 }
-                  );
-                  return;
-                }
-                setChannelSelectorOpen(true);
-              }}
-              className="font-medium shadow-sm w-full sm:w-auto"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Nova Campanha</span>
-            </AppButton>
-          </div>
-        </div>
+    <div className="w-full">
+      <main>
+        <PageHeader
+          title="Campanhas"
+          description="Envios em massa por WhatsApp, email e SMS"
+          icon={Megaphone}
+          actions={<PageAction variant="primary" icon={Plus} label="Nova campanha" onClick={handleNewCampaign} />}
+        />
+
+        <SearchInput
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="Buscar campanhas..."
+          containerClassName="mb-6 w-full sm:w-80"
+          className="w-full"
+        />
 
         {/* Channel Tabs */}
         <div className="mb-6 md:mb-8">

@@ -6,8 +6,9 @@ import {
   ChevronRight, Play, Pause, Copy, Trash2, BarChart3, ArrowRight,
   Tag, ShoppingCart, UserCheck, AlertCircle,
   Layers, Repeat2, Target, Pencil, X, GripVertical, Info,
-  Instagram, Facebook, Send, Split, Mic,
+  Instagram, Facebook, Send, Split, Mic, RefreshCw,
 } from 'lucide-react';
+import { PageHeader, PageAction } from '../base/PageHeader';
 import { Button } from '../ui/button';
 import { SkeletonFlowCard, UpdatingBadge } from '../ui/skeletons';
 import { AppModal } from '../base/AppModal';
@@ -927,35 +928,21 @@ export default function RemarketingPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-background">
-        <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8 space-y-6">
+      <div className="w-full">
+        <main className="space-y-6">
 
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-xl md:text-2xl font-semibold text-foreground tracking-tight flex items-center gap-2.5">
-                <Repeat2 className="w-6 h-6 text-muted-foreground" />
-                Remarketing
-              </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Crie flows automáticos que re-engajam leads com base no comportamento no funil
-              </p>
-            </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <Button variant="outline" onClick={syncToDB} disabled={syncing} className="gap-2" title="Sincronizar flows locais com o banco de dados">
-                <Target className="w-4 h-4" />
-                {syncing ? 'Sincronizando…' : 'Sincronizar'}
-              </Button>
-              <Button variant="outline" onClick={() => setActiveTab('templates')} className="gap-2">
-                <Layers className="w-4 h-4" />
-                Templates
-              </Button>
-              <Button onClick={handleCreateBlank} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Novo Flow
-              </Button>
-            </div>
-          </div>
+          <PageHeader
+            className="mb-0"
+            title="Remarketing"
+            description="Flows automáticos para reativar leads"
+            icon={Repeat2}
+            actions={
+              <>
+                <PageAction icon={RefreshCw} label={syncing ? 'A sincronizar…' : 'Sincronizar'} onClick={syncToDB} disabled={syncing} />
+                <PageAction variant="primary" icon={Plus} label="Novo flow" onClick={handleCreateBlank} />
+              </>
+            }
+          />
 
 
           {/* Tabs */}

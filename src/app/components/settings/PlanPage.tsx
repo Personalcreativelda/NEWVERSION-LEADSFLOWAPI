@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check, Crown, Zap, Rocket, Loader2, Calendar, Clock, History, ShieldCheck, AlertTriangle, XCircle, ExternalLink } from 'lucide-react';
+import { PageHeader } from '../base/PageHeader';
 import { Button } from '../ui/button';
 import { plansApi } from '../../utils/api';
 import { toast } from 'sonner';
@@ -140,13 +141,9 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-0 space-y-8 pb-12">
+    <div className="max-w-6xl space-y-8 pb-12">
 
-      {/* Header */}
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold text-foreground mb-1">Planos e Preços</h1>
-        <p className="text-sm text-muted-foreground">Escolha o plano ideal para o seu negócio</p>
-      </div>
+      <PageHeader className="mb-0" title="Planos e Preços" description="O seu plano atual e opções de upgrade" icon={Crown} />
 
       {/* ── CARD PLANO ATIVO ── */}
       <div className={`rounded-xl border-2 bg-gradient-to-br ${gradientMap[currentPlan] || 'from-gray-500/10 to-gray-600/5'} ${borderColorMap[currentPlan] || 'border-gray-500/40'} p-6`}>

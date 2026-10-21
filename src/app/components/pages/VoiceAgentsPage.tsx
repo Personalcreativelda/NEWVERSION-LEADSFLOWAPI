@@ -7,6 +7,7 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+import { PageHeader, PageAction } from '../base/PageHeader';
 import { toast } from 'sonner';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { voiceAgentsApi } from '../../services/api/voice-agents';
@@ -812,46 +813,35 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
   };
 
   return (
-    <div className={`w-full h-full flex flex-col bg-muted/50`}>
-      {/* Header */}
-      <div className={`flex-shrink-0 border-b px-4 py-3 sm:px-6 sm:py-4 bg-card border-border`}>
-        {/* Title row */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="min-w-0">
-            <h1 className={`text-lg sm:text-2xl font-bold flex items-center gap-2 text-foreground`}>
-              <PhoneCall className="w-5 h-5 sm:w-7 sm:h-7 text-purple-500 flex-shrink-0" />
-              <span className="truncate">Agentes de Voz</span>
-              {!elevenLabsConfigured && (
-                <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/20 hidden sm:inline-flex">
-                  Configure API
-                </Badge>
-              )}
-            </h1>
-            <p className={`text-xs sm:text-sm mt-0.5 text-muted-foreground hidden sm:block`}>
-              Crie agentes de voz usando ElevenLabs para gerar vozes realistas e Wavoip para efetuar chamadas automáticas
-            </p>
-          </div>
-          {/* Actions — icon-only on mobile, full labels on sm+ */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Button
-              onClick={handleOpenSettings}
-              variant="outline"
-              size="sm"
-              className="border-border hover:bg-muted px-2 sm:px-3"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline ml-2">Configurações</span>
-            </Button>
-            <Button onClick={handleCreate} size="sm" className="px-2 sm:px-3">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline ml-1">Criar</span>
-              {planLimits.limits.voiceAgents === 0 && <span className="ml-1 text-xs bg-white/20 px-1 py-0.5 rounded-full hidden sm:inline">Pro</span>}
-            </Button>
-          </div>
-        </div>
+    // Página de ecrã inteiro (dentro do InboxPage): mesmas margens do PageContainer do Dashboard
+    <div className="w-full h-full overflow-y-auto">
+      <div className="px-3 pt-4 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8">
+        <PageHeader
+          title="Agentes de Voz"
+          description="Chamadas automáticas com vozes realistas"
+          icon={PhoneCall}
+          actions={
+            <>
+              <PageAction icon={Settings} label="Configurações" onClick={handleOpenSettings} />
+              <PageAction
+                variant="primary"
+                icon={Plus}
+                label={planLimits.limits.voiceAgents === 0 ? 'Criar agente (Pro)' : 'Criar agente'}
+                onClick={handleCreate}
+              />
+            </>
+          }
+        />
+
+        {!elevenLabsConfigured && (
+          <p className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+            <Settings className="h-4 w-4 flex-shrink-0" aria-hidden />
+            Configure a API ElevenLabs em Configurações para criar agentes.
+          </p>
+        )}
 
         {/* Search */}
-        <div className="relative">
+        <div className="relative w-full sm:w-80">
           <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground`} />
           <Input
             type="text"
@@ -864,7 +854,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-3 sm:p-6 pb-20 sm:pb-6">
+      <div className="px-3 py-6 sm:px-6 lg:px-10">
         {loading ? (
           <SkeletonVoiceAgentGrid count={6} />
         ) : filteredAgents.length === 0 ? (

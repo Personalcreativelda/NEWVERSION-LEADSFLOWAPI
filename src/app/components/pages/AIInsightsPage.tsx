@@ -5,6 +5,7 @@ import {
   Zap, AlertCircle, ArrowRight, Lightbulb, Copy, Send,
   ChevronDown, ChevronUp, Edit3, Instagram, Facebook
 } from 'lucide-react';
+import { PageHeader, PageAction } from '../base/PageHeader';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
 import { api } from '../../../lib/api';
@@ -259,36 +260,23 @@ export default function AIInsightsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-page">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-card/95 backdrop-blur-sm border-b border-border px-6 py-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
-              <Brain className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Motor de Vendas</h1>
-              <p className="text-xs text-muted-foreground">Decisões inteligentes para seus leads</p>
-            </div>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-2"
+    <div className="w-full">
+      <PageHeader
+        title="Motor de Vendas"
+        description="Prioridades e próximas ações para os seus leads"
+        icon={Brain}
+        actions={
+          <PageAction
+            icon={RefreshCw}
+            label={analyzing ? 'A analisar…' : 'Reanalisar'}
             onClick={handleAnalyzeLeads}
             disabled={analyzing}
-          >
-            {analyzing
-              ? <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              : <RefreshCw className="w-3.5 h-3.5" />
-            }
-            {analyzing ? 'Analisando...' : 'Reanalisar'}
-          </Button>
-        </div>
-      </header>
+            className={analyzing ? '[&>svg]:animate-spin' : undefined}
+          />
+        }
+      />
 
-      <main className="p-6 space-y-6 max-w-7xl mx-auto">
+      <main className="space-y-6">
         {loading && !insights ? (
           <div className="space-y-6">
             <SkeletonStatCardsRow count={4} />

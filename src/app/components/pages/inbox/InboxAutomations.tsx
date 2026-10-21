@@ -4,6 +4,7 @@ import {
   Copy, Play, Clock, AlertCircle, CheckCircle2,
   ChevronDown, ChevronRight, Link2, Key, FileJson, History
 } from 'lucide-react';
+import { PageHeader, PageAction } from '../../base/PageHeader';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
@@ -332,37 +333,27 @@ export default function InboxAutomations() {
   };
 
   return (
+    // Página de ecrã inteiro (dentro do InboxPage): mesmas margens do PageContainer do Dashboard
     <div
-      className="h-full p-6 overflow-y-auto"
+      className="h-full overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-10 lg:py-8"
       style={{ backgroundColor: 'hsl(var(--background))' }}
     >
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1
-            className="text-2xl font-bold mb-2 flex items-center gap-2"
-            style={{ color: 'hsl(var(--foreground))' }}
-          >
-            <Webhook className="w-6 h-6 text-purple-500" />
-            Webhooks
-          </h1>
-          <p className="max-w-2xl" style={{ color: 'hsl(var(--muted-foreground))' }}>
-            Configure webhooks para integrar com n8n, Make, Zapier e outras ferramentas de automação.
-            Receba eventos em tempo real dos seus canais conectados.
-          </p>
-        </div>
-
-        <Button
-          onClick={() => {
-            resetForm();
-            setCreateModalOpen(true);
-          }}
-          className="bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Webhook
-        </Button>
-      </div>
+      <PageHeader
+        title="Webhooks"
+        description="Eventos em tempo real para n8n, Make, Zapier e outras ferramentas"
+        icon={Webhook}
+        actions={
+          <PageAction
+            variant="primary"
+            icon={Plus}
+            label="Novo webhook"
+            onClick={() => {
+              resetForm();
+              setCreateModalOpen(true);
+            }}
+          />
+        }
+      />
 
       {/* Webhooks List */}
       {loading ? (

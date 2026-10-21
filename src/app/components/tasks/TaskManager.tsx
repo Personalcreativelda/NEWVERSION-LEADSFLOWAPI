@@ -23,7 +23,9 @@ import {
   MessageCircle,
   AlertCircle,
   Filter,
+  CheckSquare,
 } from 'lucide-react';
+import { PageHeader, PageAction } from '../base/PageHeader';
 import { format, isToday, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from "sonner";
@@ -218,32 +220,17 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   };
 
   return (
-    <div className="space-y-6 px-4 md:px-0">
-      {/* Header com ação destacada */}
-      <div className="pt-6 pb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="space-y-2 min-w-0">
-          <h1
-            className="text-2xl md:text-[32px] font-semibold text-[#1F2937] dark:text-[#F1F5F9] truncate"
-            style={{ letterSpacing: '-0.5px' }}
-          >
-            Tarefas e Follow-ups
-          </h1>
-          <p className="text-sm md:text-[15px] text-[#6B7280] dark:text-[#6B7280]">
-            Gerencie suas atividades e lembretes
-          </p>
-        </div>
-        <Button
-          onClick={() => setShowNewTaskModal(true)}
-          className="gap-2 px-4 md:px-5 flex-shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Nova Tarefa</span>
-          <span className="sm:hidden">Nova</span>
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        className="mb-0"
+        title="Tarefas e Follow-ups"
+        description="Atividades e lembretes da sua equipa"
+        icon={CheckSquare}
+        actions={<PageAction variant="primary" icon={Plus} label="Nova tarefa" onClick={() => setShowNewTaskModal(true)} />}
+      />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="p-4 bg-card dark:bg-card border-border dark:border-border">
           <div className="flex items-center justify-between">
             <div>

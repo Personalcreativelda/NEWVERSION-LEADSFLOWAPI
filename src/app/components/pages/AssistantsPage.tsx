@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { PageHeader, PageAction } from '../base/PageHeader';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { assistantsApi, MAX_KNOWLEDGE_FILES, type Assistant, type UserAssistant, type CreateAssistantInput, type KnowledgeFile } from '../../services/api/assistants';
@@ -868,58 +869,42 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-4 md:p-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Assistentes de IA
-          </h1>
-          <p className="text-sm mt-1 text-muted-foreground">
-            Conecte assistentes inteligentes aos seus canais para automatizar o atendimento
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* Create button */}
-          {(() => {
-            const customCount = availableAssistants.filter(a => a.is_custom).length;
-            const canCreate = planLimits.canCreateCustomAssistant(customCount);
-            return (
-              <Button
+    // Página de ecrã inteiro (dentro do InboxPage): mesmas margens do PageContainer do Dashboard
+    <div className="flex flex-col h-full overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-10 lg:py-8">
+      {(() => {
+        const customCount = availableAssistants.filter(a => a.is_custom).length;
+        const canCreate = planLimits.canCreateCustomAssistant(customCount);
+        const limitTag = planLimits.limits.customAssistants === 0 ? 'Pro' : `${customCount}/${planLimits.limitLabel.customAssistants}`;
+        return (
+          <PageHeader
+            title="Assistentes de IA"
+            description="Atendimento automático nos seus canais"
+            icon={Bot}
+            actions={
+              <PageAction
+                variant="primary"
+                icon={canCreate ? Plus : Lock}
+                label={canCreate ? 'Criar assistente' : `Criar assistente (${limitTag})`}
+                disabled={!canCreate}
                 onClick={() => {
-                  if (!canCreate) return;
                   resetCreateForm();
                   setCreateModalOpen(true);
                 }}
-                disabled={!canCreate}
-                className={canCreate
-                  ? 'bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150'
-                  : 'bg-primary/30 text-primary-foreground/60 cursor-not-allowed'
-                }
-              >
-                {canCreate ? <Plus className="w-4 h-4 mr-2" /> : <Lock className="w-4 h-4 mr-2" />}
-                Criar Assistente
-                {!canCreate && (
-                  <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
-                    {planLimits.limits.customAssistants === 0 ? 'Pro' : `${customCount}/${planLimits.limitLabel.customAssistants}`}
-                  </span>
-                )}
-              </Button>
-            );
-          })()}
+              />
+            }
+          />
+        );
+      })()}
 
-          {/* Search */}
-          <div className="relative flex-1 md:w-72 md:flex-none">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar assistentes..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`pl-9 bg-background border-border`}
-            />
-          </div>
-        </div>
+      {/* Search */}
+      <div className="relative mb-6 w-full sm:w-80">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar assistentes..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className={`pl-9 bg-background border-border`}
+        />
       </div>
 
       {/* Inline custom-assistant limit banner */}

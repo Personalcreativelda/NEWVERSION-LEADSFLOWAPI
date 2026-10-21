@@ -73,7 +73,8 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { useConfirm } from './ui/ConfirmDialog';
 import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
 
-import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X, LayoutDashboard, Users, MessageSquare, BarChart2, Menu } from 'lucide-react';
+import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X, LayoutDashboard, Users, MessageSquare, BarChart2, Menu, FileText } from 'lucide-react';
+import { PageHeader, PageAction } from './base/PageHeader';
 
 // Types
 interface Lead {
@@ -2281,15 +2282,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
             {currentPage === 'leads' && (
               <div className="space-y-5 sm:space-y-6 xl:space-y-8">
-                <div className="mb-6">
-                  <h1 className="text-2xl font-semibold text-foreground mb-2">
-                    Leads
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    Gerencie todos os seus leads
-                  </p>
-                </div>
-                
+                <PageHeader title="Leads" description="Todos os seus contactos e oportunidades" icon={Users} />
+
                 {/* Cards Principais de Estatísticas */}
                 {loading && leads.length === 0 ? (
                   <SkeletonStatCardsRow count={4} />
@@ -2464,26 +2458,12 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
             {currentPage === 'analytics' && (
               <div className="space-y-5 sm:space-y-6 xl:space-y-8">
-                <div className="flex justify-between items-start gap-3 pt-2 pb-4 sm:pt-6 sm:pb-8">
-                  <div className="space-y-2 min-w-0">
-                    <h1 className="text-[32px] font-semibold text-[#1F2937] dark:text-[#F1F5F9]" style={{ letterSpacing: '-0.5px' }}>
-                      Analytics
-                    </h1>
-                    <p className="text-[15px] text-[#6B7280] dark:text-[#6B7280]">
-                      Análises detalhadas e insights sobre seus leads e performance de vendas
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setModalReportExporter(true)}
-                    className="flex-shrink-0 h-10 px-3.5 sm:px-4 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 rounded-lg flex items-center gap-2 text-sm font-medium"
-                  >
-                    <svg aria-hidden className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="sm:hidden">Exportar</span>
-                    <span className="hidden sm:inline">Exportar Relatório</span>
-                  </button>
-                </div>
+                <PageHeader
+                  title="Analytics"
+                  description="Desempenho dos seus leads e vendas"
+                  icon={BarChart2}
+                  actions={<PageAction variant="primary" icon={FileText} label="Exportar relatório" onClick={() => setModalReportExporter(true)} />}
+                />
                 <AdvancedAnalytics leads={leads as any} isDark={isDark} />
               </div>
             )}

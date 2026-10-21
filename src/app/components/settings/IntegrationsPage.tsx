@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Webhook, Mail, ChevronDown, ChevronUp, Sheet, BarChart3, Eye, Loader2, CheckCircle2, MessageSquare, Save, Trash2, FlaskConical } from 'lucide-react';
+import { Webhook, Mail, ChevronDown, ChevronUp, Sheet, BarChart3, Eye, Loader2, CheckCircle2, MessageSquare, Save, Trash2, FlaskConical, Plug } from 'lucide-react';
+import { PageHeader } from '../base/PageHeader';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -752,15 +753,8 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 md:px-0">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground dark:text-foreground mb-2">
-          Integrações
-        </h1>
-        <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-          Configure suas integrações e serviços externos
-        </p>
-      </div>
+    <div className="max-w-4xl">
+      <PageHeader title="Integrações" description="Serviços externos ligados à sua conta" icon={Plug} />
 
       {/* Integration Cards */}
       <div className="space-y-4">

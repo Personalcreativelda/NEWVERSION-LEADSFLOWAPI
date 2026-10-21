@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Upload, User, Loader2, Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users } from 'lucide-react';
+import { Upload, User, Loader2, Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog } from 'lucide-react';
+import { PageHeader } from '../base/PageHeader';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -256,15 +257,8 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
   ];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 md:px-0">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground dark:text-foreground mb-2">
-          Configurações da Conta
-        </h1>
-        <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-          Gerencie suas informações pessoais e segurança
-        </p>
-      </div>
+    <div className="max-w-4xl">
+      <PageHeader title="Configurações da Conta" description="Perfil, segurança e equipa" icon={UserCog} />
 
       {/* Tabs */}
       <div className="border-b border-border dark:border-border mb-6">

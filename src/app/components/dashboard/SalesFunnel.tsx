@@ -3,7 +3,8 @@ import type { UIEvent } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Phone, Mail, MessageCircle, Trash2, Edit2, MoreVertical, ChevronDown, BarChart3, Clock, CheckCircle2, TrendingUp, GripVertical, DollarSign, StickyNote, Calendar, MessageSquare, Settings, Plus, X, RotateCcw, Globe, Flag, AlertTriangle, AlertCircle, Minus, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, Instagram, Send, Megaphone, MoveRight, type LucideIcon } from 'lucide-react';
+import { Phone, Mail, MessageCircle, Trash2, Edit2, MoreVertical, ChevronDown, BarChart3, Clock, CheckCircle2, TrendingUp, GripVertical, DollarSign, StickyNote, Calendar, MessageSquare, Settings, Plus, X, RotateCcw, Globe, Flag, AlertTriangle, AlertCircle, Minus, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, Instagram, Send, Megaphone, MoveRight, Workflow, type LucideIcon } from 'lucide-react';
+import { PageHeader, PageAction } from '../base/PageHeader';
 import type { TabKey } from '../modals/LeadDetailModal';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -1052,113 +1053,96 @@ export default function SalesFunnel({
   return (
     <>
       <div className="flex flex-col h-full">
-        {/* Top Header Section */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'hsl(var(--foreground))' }}>
-              Funil de Vendas
-            </h1>
-            <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-              Gerencie seus leads com drag & drop entre os estágios do funil
-            </p>
-          </div>
-
-          <button
-            onClick={() => setShowStageEditor(true)}
-            className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border"
-            style={{ 
-              borderColor: 'hsl(var(--border))', 
-              color: 'hsl(var(--muted-foreground))'
-            }}
-          >
-            <Settings className="w-4 h-4" />
-            <span>Personalizar</span>
-          </button>
-        </div>
+        <PageHeader
+          title="Funil de Vendas"
+          description="Arraste os leads entre as etapas do funil"
+          icon={Workflow}
+          actions={<PageAction icon={Settings} label="Personalizar etapas" onClick={() => setShowStageEditor(true)} />}
+        />
 
         {/* Cards de Estatísticas */}
-        <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
+        <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
           {/* Total de Leads */}
-          <div className="group rounded-xl p-6 border shadow-lg hover:shadow-md transition-all duration-300 hover:-translate-y-1" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'hsl(var(--muted-foreground))' }}>
+          <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wider font-semibold mb-1 truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   Total de Leads
                 </p>
-                <p className="text-3xl font-bold" style={{ color: 'hsl(var(--foreground))' }}>
+                <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
                   {stats.total.toLocaleString('pt-BR')}
                 </p>
               </div>
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 bg-purple-100 dark:bg-purple-500/10 group-hover:bg-purple-200 dark:group-hover:bg-purple-500/20">
-                <BarChart3 className="w-7 h-7 text-purple-600 dark:text-purple-400" />
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-purple-100 dark:bg-purple-500/10 group-hover:bg-purple-200 dark:group-hover:bg-purple-500/20">
+                <BarChart3 className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
           </div>
 
           {/* Em Progresso */}
-          <div className="group rounded-xl p-6 border shadow-lg hover:shadow-md transition-all duration-300 hover:-translate-y-1" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'hsl(var(--muted-foreground))' }}>
+          <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wider font-semibold mb-1 truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   Em Progresso
                 </p>
-                <p className="text-3xl font-bold" style={{ color: 'hsl(var(--foreground))' }}>
+                <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
                   {stats.inProgress.toLocaleString('pt-BR')}
                 </p>
               </div>
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 bg-yellow-100 dark:bg-yellow-500/10 group-hover:bg-yellow-200 dark:group-hover:bg-yellow-500/20">
-                <Clock className="w-7 h-7 text-yellow-600 dark:text-yellow-400" />
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-yellow-100 dark:bg-yellow-500/10 group-hover:bg-yellow-200 dark:group-hover:bg-yellow-500/20">
+                <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
               </div>
             </div>
           </div>
 
           {/* Convertidos */}
-          <div className="group rounded-xl p-6 border shadow-lg hover:shadow-md transition-all duration-300 hover:-translate-y-1" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'hsl(var(--muted-foreground))' }}>
+          <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wider font-semibold mb-1 truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   Convertidos
                 </p>
-                <p className="text-3xl font-bold" style={{ color: 'hsl(var(--foreground))' }}>
+                <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
                   {stats.converted.toLocaleString('pt-BR')}
                 </p>
               </div>
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 bg-green-100 dark:bg-green-500/10 group-hover:bg-green-200 dark:group-hover:bg-green-500/20">
-                <CheckCircle2 className="w-7 h-7 text-green-600 dark:text-green-400" />
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-100 dark:bg-green-500/10 group-hover:bg-green-200 dark:group-hover:bg-green-500/20">
+                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
               </div>
             </div>
           </div>
 
           {/* Taxa de Conversão */}
-          <div className="group rounded-xl p-6 border shadow-lg hover:shadow-md transition-all duration-300 hover:-translate-y-1" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'hsl(var(--muted-foreground))' }}>
+          <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wider font-semibold mb-1 truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   Taxa de Conversão
                 </p>
-                <p className="text-3xl font-bold" style={{ color: 'hsl(var(--foreground))' }}>
+                <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
                   {stats.conversionRate}%
                 </p>
               </div>
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 bg-orange-100 dark:bg-orange-500/10 group-hover:bg-orange-200 dark:group-hover:bg-orange-500/20">
-                <TrendingUp className="w-7 h-7 text-orange-600 dark:text-orange-400" />
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-orange-100 dark:bg-orange-500/10 group-hover:bg-orange-200 dark:group-hover:bg-orange-500/20">
+                <TrendingUp className="w-5 h-5 text-orange-600 dark:text-orange-400" />
               </div>
             </div>
           </div>
 
           {/* Valor do Pipeline */}
-          <div className="group rounded-xl p-6 border shadow-lg hover:shadow-md transition-all duration-300 hover:-translate-y-1" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'hsl(var(--muted-foreground))' }}>
+          <div className="col-span-2 md:col-span-1 rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wider font-semibold mb-1 truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   Valor Pipeline
                 </p>
-                <p className="text-2xl font-bold" style={{ color: 'hsl(var(--foreground))' }}>
+                <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
                   {formatCurrency(stats.pipelineValue, currency)}
                 </p>
               </div>
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 bg-emerald-100 dark:bg-emerald-500/10 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-500/20">
-                <DollarSign className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-emerald-100 dark:bg-emerald-500/10 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-500/20">
+                <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
           </div>
