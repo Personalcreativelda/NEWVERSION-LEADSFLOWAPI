@@ -190,8 +190,16 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
   // Check URL path for initial page (clean URLs)
   const pageFromUrl = getPageFromPath();
+  // With a stored session, start on the dashboard (checkAuth validates the token while the
+  // loading screen shows). Starting on 'login' made the [currentPage] effect push '/login'
+  // before initialize ran, whose public-page guard then skipped checkAuth — so every reload
+  // at '/' (e.g. coming back from Stripe) dropped a logged-in user on the login screen.
+  const hasStoredSession = (() => {
+    try { return !!localStorage.getItem('leadflow_access_token'); } catch { return false; }
+  })();
   const resolvedInitialPage: Page =
     pageFromUrl ? pageFromUrl :
+    hasStoredSession ? 'dashboard' :
     initialPage && (!landingEnabled ? initialPage !== 'landing' : true)
       ? initialPage
       : homePage;

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Languages } from 'lucide-react';
 import AvatarPopover from './AvatarPopover';
 import ThemeSelector from './ThemeSelector';
-import Breadcrumbs, { getPageTitle } from './Breadcrumbs';
+import Breadcrumbs from './Breadcrumbs';
 import { NotificationBell } from '../dashboard/NotificationBell';
 import { Language, saveLanguage, translations } from '../../utils/i18n';
 
@@ -102,11 +102,20 @@ export default function RefactoredHeader({
   return (
     <header className="flex-shrink-0 sticky top-0 z-[1000] border-b backdrop-blur-xl bg-background/80 border-border dark:border-[rgba(255,255,255,0.06)] dark:bg-background/90">
       <div className="px-4 lg:px-6 h-14 flex items-center justify-between">
-        {/* Mobile (<1024px): título da página. O menu fica só na barra inferior
-            (item "Menu"), para não haver dois botões a abrir a mesma gaveta. */}
-        <h1 className="lg:hidden min-w-0 truncate text-[17px] font-semibold tracking-tight text-foreground">
-          {getPageTitle(currentPage || 'dashboard', language)}
-        </h1>
+        {/* Mobile (<1024px): avatar do perfil à esquerda. Sem título (a barra inferior já
+            indica a página) e sem ☰ (o menu fica só no item "Menu" da barra inferior). */}
+        <div className="lg:hidden -ml-1.5">
+          <AvatarPopover
+            user={user}
+            onProfile={handleProfile}
+            onSettings={onSettings}
+            onChangePassword={handleChangePassword}
+            onLogout={onLogout}
+            language={language}
+            isDark={isDark}
+            align="start"
+          />
+        </div>
 
         {/* Desktop: trilho de navegação (páginas reais do LeadFlow) */}
         <Breadcrumbs currentPage={currentPage || 'dashboard'} language={language} className="hidden lg:block" />
@@ -161,11 +170,10 @@ export default function RefactoredHeader({
             language={language}
           />
 
-          {/* Divider */}
-          <div className="h-6 w-px mx-1 bg-border"></div>
+          {/* Divider + Avatar (desktop; no mobile o avatar está à esquerda) */}
+          <div className="hidden lg:block h-6 w-px mx-1 bg-border"></div>
 
-          {/* Avatar Popover */}
-          <div id="user-avatar">
+          <div id="user-avatar" className="hidden lg:block">
             <AvatarPopover
               user={user}
               onProfile={handleProfile}

@@ -80,10 +80,20 @@ function syncSystemBars(): () => void {
     SystemBars.setColors({ color, dark }).catch(() => {});
   };
   apply();
-  new MutationObserver(apply).observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['class', 'style', 'data-theme'],
-  });
+  // O fundo muda com o tema e também com a página (login claro, painel escuro) e tem
+  // transições de cor: reaplicar depois da transição, e numa verificação leve periódica
+  // (só chama o plugin quando a cor muda).
+  let pending: number | undefined;
+  const scheduleApply = () => {
+    window.clearTimeout(pending);
+    pending = window.setTimeout(apply, 350);
+  };
+  const observer = new MutationObserver(scheduleApply);
+  const attributeFilter = ['class', 'style', 'data-theme'];
+  observer.observe(document.documentElement, { attributes: true, attributeFilter });
+  observer.observe(document.body, { attributes: true, attributeFilter });
+  window.addEventListener('popstate', scheduleApply);
+  window.setInterval(apply, 1500);
   return () => {
     last = '';
     apply();
@@ -148,12 +158,20 @@ export async function initNative() {
   document.documentElement.classList.add('native-app');
   keepLinksInApp();
 
-  // Botão "voltar" do Android: fecha o chat de suporte se estiver aberto, senão navega
-  // no histórico; na primeira página fecha o app.
+  // Botão "voltar" do Android, por ordem: painéis do app (evento 'native-back', que um
+  // componente cancela com preventDefault), chat de suporte, diálogos/modais Radix
+  // (fecham com Escape), histórico; na primeira página fecha o app.
   App.addListener('backButton', ({ canGoBack }) => {
+    if (!window.dispatchEvent(new Event('native-back', { cancelable: true }))) return;
+
     const chat = document.getElementById('lfw-window');
     if (chat && getComputedStyle(chat).display !== 'none') {
       document.getElementById('lfw-close')?.click();
+      return;
+    }
+    if (document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) {
+      const target = document.activeElement ?? document.body;
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
       return;
     }
     if (canGoBack) window.history.back();

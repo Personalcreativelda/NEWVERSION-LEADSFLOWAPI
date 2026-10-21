@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Bell, X, Check, Trash2, UserPlus, UserMinus, TrendingUp, 
   AlertTriangle, Crown, PartyPopper, Target, Calendar, 
@@ -182,6 +183,8 @@ interface NotificationBellProps {
 export function NotificationBell({ onNavigate, onStartTour }: NotificationBellProps = {}) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
+  // Telemóvel: painel em folha inferior (bottom sheet) em vez de popover flutuante
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 639px)').matches);
   const [loading, setLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
@@ -419,37 +422,36 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
 
   const groupedNotifications = groupNotifications();
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="relative p-2 rounded-lg hover:bg-muted dark:hover:bg-muted transition-colors"
-        >
-          <Bell className="h-5 w-5 text-muted-foreground" />
-          {unreadCount > 0 && (
-            <Badge
-              className="absolute -top-0.5 -right-0.5 h-4 w-4 flex items-center justify-center p-0 text-[10px] bg-red-500 border-none hover:bg-red-500"
-            >
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </Badge>
-          )}
-        </Button>
-      </PopoverTrigger>
-      
-      {/* ✅ PAINEL RESPONSIVO - Desktop: 420px | Mobile: otimizado */}
-      <PopoverContent 
-        className={cn(
-          'w-[95vw] sm:w-[420px] p-0 max-h-[calc(100vh-80px)] sm:max-h-[min(600px,calc(100vh-100px))] overflow-hidden flex flex-col modal-panel shadow-2xl border border-border',
-        )}
-        align="end"
-        sideOffset={8}
-      >
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const onChange = () => setIsMobile(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Folha aberta no telemóvel: bloqueia o scroll da página e o "voltar" do Android fecha-a
+  useEffect(() => {
+    if (!open || !isMobile) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onNativeBack = (e: Event) => {
+      e.preventDefault();
+      setOpen(false);
+    };
+    window.addEventListener('native-back', onNativeBack);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('native-back', onNativeBack);
+    };
+  }, [open, isMobile]);
+
+  const panel = (
+      <>
         {/* ✅ HEADER FIXO */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-3 flex-shrink-0 bg-[hsl(var(--card))]">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5 sm:py-3 flex-shrink-0 bg-[hsl(var(--card))]">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-base">🔔 Notificações</h3>
+            <Bell aria-hidden className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-semibold text-base">Notificações</h3>
             {unreadCount > 0 && (
               <Badge variant="secondary" className="h-5 px-2 text-xs">
                 {unreadCount}
@@ -459,32 +461,34 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 -mr-2"
+            className="h-10 w-10 sm:h-8 sm:w-8 -mr-2"
+            aria-label="Fechar notificações"
             onClick={() => setOpen(false)}
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5 sm:h-4 sm:w-4" />
           </Button>
         </div>
 
         {/* ✅ ACTIONS BAR FIXO */}
         {notifications.length > 0 && (
-          <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-[hsl(var(--muted))/0.35] flex-shrink-0">
+          <div className="flex items-center gap-2 px-3 sm:px-4 py-2 border-b border-border bg-[hsl(var(--muted))/0.35] flex-shrink-0">
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs"
+              className="h-9 sm:h-7 text-xs"
               onClick={markAllAsRead}
               disabled={unreadCount === 0}
             >
               <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-              Marcar todas como lidas
+              <span className="sm:hidden">Marcar lidas</span>
+              <span className="hidden sm:inline">Marcar todas como lidas</span>
             </Button>
-            
+
             {!showClearConfirm ? (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                className="h-9 sm:h-7 text-xs text-muted-foreground hover:text-destructive"
                 onClick={() => setShowClearConfirm(true)}
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1.5" />
@@ -495,7 +499,7 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs text-destructive"
+                  className="h-9 sm:h-7 text-xs text-destructive"
                   onClick={clearAll}
                 >
                   Confirmar
@@ -503,7 +507,7 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs"
+                  className="h-9 sm:h-7 text-xs"
                   onClick={() => setShowClearConfirm(false)}
                 >
                   Cancelar
@@ -514,9 +518,9 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
         )}
 
         {/* ✅ LISTA DE NOTIFICAÇÕES - Scroll interno controlado */}
-        <div 
-          className="overflow-y-auto flex-1 notifications-scroll px-1" 
-          style={{ maxHeight: 'calc(100vh - 200px)' }}
+        <div
+          className="overflow-y-auto flex-1 min-h-0 notifications-scroll px-1 overscroll-contain"
+          style={{ maxHeight: isMobile ? undefined : 'calc(100vh - 200px)' }}
         >
           {loading && notifications.length === 0 ? (
             <div className="flex items-center justify-center py-12">
@@ -602,7 +606,7 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
                                 <Button
                                   variant="default"
                                   size="sm"
-                                  className="h-7 text-xs px-3 bg-primary hover:bg-primary/90"
+                                  className="h-9 sm:h-7 text-xs px-3 bg-primary hover:bg-primary/90"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleAction(notification, true);
@@ -617,8 +621,9 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7 hover:bg-muted"
+                                  className="h-9 w-9 sm:h-7 sm:w-7 hover:bg-muted"
                                   title="Marcar como lida"
+                                  aria-label="Marcar como lida"
                                   onClick={(e) => handleMarkAsReadOnly(e, notification.id)}
                                 >
                                   <Check className="h-3.5 w-3.5" />
@@ -629,8 +634,9 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                                className="h-9 w-9 sm:h-7 sm:w-7 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
                                 title="Remover notificação"
+                                aria-label="Remover notificação"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   removeNotification(notification.id, true);
@@ -649,8 +655,56 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
             </div>
           )}
         </div>
-      </PopoverContent>
-    </Popover>
+      </>
+  );
+
+  return (
+    <>
+      <Popover open={open && !isMobile} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Notificações"
+            className="relative p-2 rounded-lg hover:bg-muted dark:hover:bg-muted transition-colors"
+          >
+            <Bell className="h-5 w-5 text-muted-foreground" />
+            {unreadCount > 0 && (
+              <Badge
+                className="absolute -top-0.5 -right-0.5 h-4 w-4 flex items-center justify-center p-0 text-[10px] bg-red-500 border-none hover:bg-red-500"
+              >
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </Badge>
+            )}
+          </Button>
+        </PopoverTrigger>
+
+        {/* Desktop/tablet: popover de 420px */}
+        {!isMobile && (
+          <PopoverContent
+            className="w-[420px] p-0 max-h-[min(600px,calc(100vh-100px))] overflow-hidden flex flex-col modal-panel shadow-2xl border border-border"
+            align="end"
+            sideOffset={8}
+          >
+            {panel}
+          </PopoverContent>
+        )}
+      </Popover>
+
+      {/* Telemóvel: folha inferior acima do cabeçalho e da barra de navegação */}
+      {isMobile && open && createPortal(
+        <div className="fixed inset-0 z-[10002] flex flex-col justify-end" role="dialog" aria-modal="true" aria-label="Notificações">
+          <div className="absolute inset-0 bg-black/50 animate-in fade-in duration-200" onClick={() => setOpen(false)} />
+          <div className="relative flex flex-col max-h-[88dvh] min-h-[45dvh] rounded-t-2xl bg-card border-t border-border shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div className="flex justify-center pt-2 pb-1 flex-shrink-0 bg-[hsl(var(--card))]" aria-hidden>
+              <span className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+            </div>
+            {panel}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 

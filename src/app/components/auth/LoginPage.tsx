@@ -554,14 +554,14 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
   const FONT = '"Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center py-16 px-4 overflow-hidden"
+    <div className="min-h-[100dvh] relative flex items-center justify-center py-6 sm:py-16 px-4 overflow-hidden"
       style={{ background: 'transparent', fontFamily: FONT }}>
 
       {/* ── CARD + LOGO (coluna centrada) ─────────────────────────── */}
       <div className="relative z-10 w-full max-w-[520px] flex flex-col">
 
         {/* Logo — acima do card, alinhado à esquerda */}
-        <div className="flex items-center gap-2.5 mb-8">
+        <div className="flex items-center gap-2.5 mb-5 sm:mb-8">
           <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
             style={{ background: '#675DFF', boxShadow: '0 2px 12px rgba(103,93,255,0.45)' }}>
             <Zap className="w-5 h-5 text-white" />
@@ -569,7 +569,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           <span className="text-[19px] font-semibold text-white tracking-tight">LeadsFlow</span>
         </div>
 
-        <div className="rounded-[12px] p-10"
+        <div className="rounded-[12px] p-6 sm:p-10"
           style={{
             background: 'rgba(255,255,255,0.97)',
             border: '1px solid rgba(255,255,255,0.3)',
@@ -578,10 +578,10 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           }}>
 
           {/* Title */}
-          <h1 className="text-[28px] font-semibold leading-[36px] mb-2" style={{ color: '#1A2C44' }}>
+          <h1 className="text-[24px] leading-[32px] sm:text-[28px] sm:leading-[36px] font-semibold mb-1 sm:mb-2" style={{ color: '#1A2C44' }}>
             Entrar na conta
           </h1>
-          <p className="text-[15px] mb-7" style={{ color: '#6B7280', fontWeight: 300 }}>
+          <p className="text-[15px] mb-5 sm:mb-7" style={{ color: '#6B7280', fontWeight: 300 }}>
             Bem-vindo de volta
           </p>
 
@@ -601,7 +601,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           )}
 
           {/* Form */}
-          <form onSubmit={handleEmailLogin} className="space-y-5 mb-6">
+          <form onSubmit={handleEmailLogin} className="space-y-4 sm:space-y-5 mb-5 sm:mb-6">
             {/* Email */}
             <div>
               <label htmlFor="email" style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px', fontWeight: 500 }}>Email</label>
@@ -683,7 +683,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           </form>
 
           {/* Create account */}
-          <p className="text-center mb-6" style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
+          <p className="text-center mb-4 sm:mb-6" style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
             Não tem uma conta?{' '}
             <button onClick={onSwitchToSignup} style={{ color: '#533AFD', fontWeight: 400 }} className="transition-colors hover:text-[#635BFF]">
               Criar conta
@@ -710,7 +710,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
 
           {/* Rating — dentro do card */}
           {ratings && ratings.total > 0 && (
-            <div className="flex items-center justify-center gap-2 mt-5 pt-4 border-t" style={{ borderColor: '#EEF0F3' }}>
+            <div className="flex items-center justify-center gap-2 mt-4 sm:mt-5 pt-3 sm:pt-4 border-t" style={{ borderColor: '#EEF0F3' }}>
               <div className="flex gap-0.5">
                 {[1,2,3,4,5].map(n => (
                   <Star key={n} className="w-3.5 h-3.5"

@@ -79,10 +79,10 @@ export default function PaymentMethodModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md bg-card text-card-foreground border border-border shadow-xl animate-in fade-in slide-in-from-bottom-10 duration-300">
         <DialogHeader>
-          <DialogTitle className="text-xl text-center text-foreground">
+          <DialogTitle className="text-lg sm:text-xl text-center text-foreground px-8 sm:px-0">
             Escolha o Método de Pagamento
           </DialogTitle>
-          <DialogDescription className="text-center text-muted-foreground py-2">
+          <DialogDescription className="text-center text-muted-foreground py-1 sm:py-2">
             Selecione como deseja pagar seu plano
           </DialogDescription>
         </DialogHeader>
@@ -90,7 +90,7 @@ export default function PaymentMethodModal({
         {/* Período selecionado */}
         <div className="flex justify-center pb-2 px-4">
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-muted border border-border text-foreground text-sm font-medium">
-            {billingPeriod === 'monthly' ? '🗓 Plano Mensal' : '📅 Plano Anual'}
+            {billingPeriod === 'monthly' ? 'Plano Mensal' : 'Plano Anual'}
             {billingPeriod === 'annual' && (
               <span className="bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded-full">-20%</span>
             )}
@@ -98,12 +98,12 @@ export default function PaymentMethodModal({
         </div>
 
         {/* Payment Methods */}
-        <div className="flex flex-col gap-4 py-6 px-4">
+        <div className="flex flex-col gap-3 sm:gap-4 py-3 sm:py-6 px-0 sm:px-4">
           {/* Stripe Option */}
           <button
             onClick={handleStripePayment}
             disabled={loading}
-            className={`relative w-full p-6 rounded-lg border-2 transition-all duration-200 transform hover:scale-105 hover:shadow-lg ${
+            className={`relative w-full p-4 sm:p-6 rounded-lg border-2 transition-colors duration-150 hover:shadow-lg ${
               loading && selectedMethod === 'stripe'
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                 : 'border-blue-500 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-400'
@@ -148,7 +148,7 @@ export default function PaymentMethodModal({
           <button
             onClick={handlePayPalPayment}
             disabled={loading}
-            className={`relative w-full p-6 rounded-lg border-2 transition-all duration-200 transform hover:scale-105 hover:shadow-lg ${
+            className={`relative w-full p-4 sm:p-6 rounded-lg border-2 transition-colors duration-150 hover:shadow-lg ${
               loading && selectedMethod === 'paypal'
                 ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
                 : 'border-blue-500 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-400'
@@ -182,11 +182,11 @@ export default function PaymentMethodModal({
         </div>
 
         {/* Close Button */}
-        <div className="flex justify-center pt-4">
+        <div className="flex justify-center pt-2 sm:pt-4">
           <Button
             onClick={onClose}
             variant="outline"
-            className="w-full"
+            className="w-full h-11 sm:h-9"
             disabled={loading}
           >
             Cancelar

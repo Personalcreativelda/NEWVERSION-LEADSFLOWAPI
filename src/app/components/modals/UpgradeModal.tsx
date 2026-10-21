@@ -153,15 +153,16 @@ export default function UpgradeModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-4xl max-h-[92dvh] flex flex-col bg-card text-card-foreground border border-border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-bottom-8 duration-300 p-0">
+        {/* Telemóvel: ecrã inteiro (max-sm:*); a partir de sm: modal centrado */}
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-4xl max-h-[92dvh] flex flex-col bg-card text-card-foreground border border-border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-bottom-8 duration-300 p-0 max-sm:mx-0 max-sm:w-screen max-sm:max-w-none max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:rounded-none max-sm:border-0">
 
           {/* Header */}
-          <DialogHeader className="px-6 pt-6 pb-3 flex-shrink-0">
+          <DialogHeader className="px-12 sm:px-6 pt-5 sm:pt-6 pb-2 sm:pb-3 flex-shrink-0">
             <DialogTitle className="text-lg sm:text-xl text-center text-foreground font-bold">
-              ✨ Escolha o Plano Ideal para Você
+              Escolha o seu plano
             </DialogTitle>
             <DialogDescription className="text-center text-muted-foreground text-xs sm:text-sm mt-1">
-              Desbloqueie recursos poderosos e leve sua operação para o próximo nível
+              Desbloqueie recursos e leve a sua operação ao próximo nível
             </DialogDescription>
           </DialogHeader>
 
@@ -170,7 +171,7 @@ export default function UpgradeModal({
             <div className="inline-flex items-center bg-muted/30 rounded-lg p-0.5 border border-border">
               <button
                 onClick={() => setBillingPeriod('monthly')}
-                className={`px-5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                className={`px-5 h-10 sm:h-auto sm:py-1.5 rounded-md text-sm font-medium transition-colors ${
                   billingPeriod === 'monthly'
                     ? 'bg-card text-foreground shadow-sm border border-border'
                     : 'text-muted-foreground hover:text-foreground'
@@ -180,7 +181,7 @@ export default function UpgradeModal({
               </button>
               <button
                 onClick={() => setBillingPeriod('annual')}
-                className={`relative px-5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                className={`relative px-5 h-10 sm:h-auto sm:py-1.5 rounded-md text-sm font-medium transition-colors ${
                   billingPeriod === 'annual'
                     ? 'bg-card text-foreground shadow-sm border border-border'
                     : 'text-muted-foreground hover:text-foreground'
@@ -212,7 +213,7 @@ export default function UpgradeModal({
                   >
                     {isBestValue && (
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] px-3 py-0.5 rounded-full font-medium shadow-md whitespace-nowrap">
-                        ⭐ Popular
+                        Popular
                       </div>
                     )}
                     {isCurrentPlan && (
@@ -257,7 +258,7 @@ export default function UpgradeModal({
                     <Button
                       onClick={() => handleSelectPlan(plan.id)}
                       disabled={isCurrentPlan || loading}
-                      className={`w-full text-sm font-medium h-9 rounded-lg mt-4 transition-all ${
+                      className={`w-full text-sm font-medium h-11 sm:h-9 rounded-lg mt-4 transition-all ${
                         isCurrentPlan
                           ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-60'
                           : plan.id !== 'free'
@@ -279,11 +280,11 @@ export default function UpgradeModal({
           </div>
 
           {/* Footer */}
-          <div className="flex-shrink-0 border-t border-border px-6 py-3">
-            <div className="flex flex-wrap items-center justify-center gap-5 text-muted-foreground text-xs">
-              <span>✓ No hidden fees</span>
-              <span>✓ Cancel anytime</span>
-              <span>✓ Secure payments</span>
+          <div className="flex-shrink-0 border-t border-border px-4 sm:px-6 py-3">
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-muted-foreground text-xs">
+              <span>✓ Sem taxas ocultas</span>
+              <span>✓ Cancele quando quiser</span>
+              <span>✓ Pagamento seguro</span>
             </div>
           </div>
 

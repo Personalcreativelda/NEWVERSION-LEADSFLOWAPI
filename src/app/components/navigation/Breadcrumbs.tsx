@@ -41,11 +41,6 @@ export default function Breadcrumbs({ currentPage, language, className }: Breadc
   );
 }
 
-/** Nome da página atual — usado como título do cabeçalho no telemóvel. */
-export function getPageTitle(currentPage: string, language: Language): string {
-  return resolveTrail(currentPage, translations[language])?.page ?? 'LeadsFlow';
-}
-
 // Páginas geridas por Dashboard.tsx que não têm entrada própria na sidebar
 // (aparecem lá dentro de outra secção, ex.: "Segurança" faz parte da
 // Conta). Mantido pequeno de propósito — só os casos que existem hoje.
