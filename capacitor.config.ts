@@ -26,8 +26,11 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 1500,
-      backgroundColor: '#0f0f14',
+      // O app esconde o splash quando o ecrã de abertura em HTML (mesmo azul) já está
+      // pintado; sem fade, a troca é imediata (ver finishBootScreen em src/native.ts).
+      launchAutoHide: false,
+      launchFadeOutDuration: 0,
+      backgroundColor: '#2563EB',
       showSpinner: false,
     },
   },

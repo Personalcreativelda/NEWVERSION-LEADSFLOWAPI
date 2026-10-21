@@ -1,15 +1,57 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Leadsflow API - Dashboard</title>
+    <meta name="color-scheme" content="light dark" />
+    <title>LeadsFlow</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700&family=Barlow:wght@900&display=swap" rel="stylesheet" />
+    <style>
+      /* Ecrã de abertura do app Android (logo + nome sobre azul). Só aparece no app:
+         o script abaixo marca <html> antes do primeiro paint; src/native.ts esconde-o. */
+      #app-boot { display: none; }
+      html.app-booting #app-boot {
+        display: flex; position: fixed; inset: 0; z-index: 2147483000;
+        flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+        background: #2563EB; color: #fff;
+        font-family: "Public Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+        transition: opacity 320ms ease;
+      }
+      @media (prefers-color-scheme: dark) {
+        html.app-booting #app-boot { background: #1E3A8A; }
+      }
+      html.app-booting #app-boot.is-done { opacity: 0; pointer-events: none; }
+      /* Sem animação de entrada: enquanto o JS do app carrega, a thread principal está ocupada
+         e uma animação a partir de opacity 0 deixava o ecrã vazio durante ~2 s. */
+      #app-boot .boot-mark {
+        width: 96px; height: 96px; border-radius: 26px;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(255, 255, 255, 0.14);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+      }
+      #app-boot .boot-name { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+      #app-boot .boot-tagline { font-size: 14px; opacity: .8; margin-top: -10px; }
+    </style>
   </head>
   <body>
+    <script>
+      // Capacitor (Android) expõe androidBridge antes de a página correr
+      if (window.androidBridge || (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) {
+        document.documentElement.classList.add('app-booting');
+      }
+    </script>
+    <div id="app-boot" aria-hidden="true">
+      <div class="boot-mark">
+        <svg width="56" height="56" viewBox="4 3 24 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18.2 4L6.8 18h8.2l-1.2 12 11.4-14h-8.4L18.2 4z" fill="#FFFFFF" />
+        </svg>
+      </div>
+      <div class="boot-name">LeadsFlow</div>
+      <div class="boot-tagline">CRM · IA · Omnichannel</div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

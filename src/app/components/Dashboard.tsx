@@ -60,6 +60,7 @@ import ProductTour from './onboarding/ProductTour';
 import { notifyTourAvailable } from '../utils/notificationHelpers';
 import WelcomeVideoModal from './modals/WelcomeVideoModal';
 import { isNativeApp } from '../../native';
+import { resolveTheme, applyThemeClass, saveThemeChoice, onSystemThemeChange } from '../utils/theme';
 import FeedbackModal from './modals/FeedbackModal';
 
 // Chat Flutuante
@@ -116,25 +117,19 @@ interface DashboardProps {
 
 export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser, enforcementBlock, onEnforcementBlockCleared }: DashboardProps) {
   const confirm = useConfirm();
-  // Theme mode: 'light' | 'dark'
+  // Theme mode: 'light' | 'dark' — segue o tema do telemóvel/sistema até o utilizador
+  // escolher um manualmente (ver utils/theme.ts)
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
-    const savedMode = localStorage.getItem('crm_tema_mode') as 'light' | 'dark' | null;
-    const initialMode = savedMode || 'dark';
-    if (!savedMode) {
-      localStorage.setItem('crm_tema_mode', initialMode);
-    }
-    return initialMode;
+    const mode = resolveTheme();
+    applyThemeClass(mode);
+    return mode;
   });
-  const [isDark, setIsDark] = useState(() => {
-    const savedMode = localStorage.getItem('crm_tema_mode');
-    const mode = savedMode || 'dark';
-    if (mode === 'dark') {
-      document.documentElement.classList.add('dark');
-      return true;
-    }
-    document.documentElement.classList.remove('dark');
-    return false;
-  });
+  const [isDark, setIsDark] = useState(() => themeMode === 'dark');
+
+  useEffect(() => onSystemThemeChange((mode) => {
+    setThemeMode(mode);
+    setIsDark(mode === 'dark');
+  }), []);
   const [language, setLanguage] = useState<Language>(() => loadLanguage());
 
   // Resolve the dashboard sub-page from the URL path on first mount
@@ -1078,14 +1073,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   // Troca de tema instantânea, aproveitando o transition do body
   const handleThemeChange = (mode: 'light' | 'dark') => {
     setThemeMode(mode);
-    localStorage.setItem('crm_tema_mode', mode);
-    if (mode === 'light') {
-      setIsDark(false);
-      document.documentElement.classList.remove('dark');
-    } else if (mode === 'dark') {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
-    }
+    setIsDark(mode === 'dark');
+    saveThemeChoice(mode);
   };
 
   // Legacy support - mantém para compatibilidade
@@ -2128,28 +2117,30 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
           {/* ⚠️ BANNER DE BACKEND OFFLINE */}
           {isBackendOffline && (
-            <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-4 shadow-lg border-b-4 border-red-700">
-              <div className="max-w-[1720px] mx-auto flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <AlertCircle className="w-6 h-6 mt-0.5" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg mb-1">🚨 Backend Offline - App em Modo Simulação</h3>
-                  <p className="text-sm mb-2 opacity-90">
-                    O servidor backend não está respondendo. Suas ações (criar, editar, deletar leads) <strong>NÃO serão salvas</strong>.
+            <div role="alert" className="bg-amber-500/10 border-b border-amber-500/30 px-4 sm:px-6 py-3">
+              <div className="max-w-[1720px] mx-auto flex items-center gap-3">
+                <AlertCircle aria-hidden className="w-5 h-5 flex-shrink-0 text-amber-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Sem ligação ao servidor</p>
+                  <p className="text-xs text-muted-foreground">
+                    Verifique a sua internet. As alterações não serão guardadas até a ligação voltar.
                   </p>
-                  <div className="bg-white/10 rounded-lg p-3 text-xs space-y-1">
-                    <p className="font-semibold">🔧 Como resolver:</p>
-                    <p>1. Abra o terminal na pasta do projeto</p>
-                    <p>2. Execute: <code className="bg-black/20 px-2 py-0.5 rounded">chmod +x deploy-backend.sh && ./deploy-backend.sh</code></p>
-                    <p>3. Aguarde o deploy completar e recarregue a página</p>
-                  </div>
                 </div>
                 <button
-                  onClick={() => setIsBackendOffline(false)}
-                  className="flex-shrink-0 p-2 hover:bg-white/10 rounded-lg transition"
+                  onClick={() => {
+                    setIsBackendOffline(false);
+                    void carregarLeads();
+                  }}
+                  className="flex-shrink-0 h-9 px-3 rounded-lg text-sm font-medium bg-amber-500 text-white active:bg-amber-600 transition-colors"
                 >
-                  <X className="w-5 h-5" />
+                  Tentar de novo
+                </button>
+                <button
+                  onClick={() => setIsBackendOffline(false)}
+                  aria-label="Fechar aviso"
+                  className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>

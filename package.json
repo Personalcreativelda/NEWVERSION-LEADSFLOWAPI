@@ -91,6 +91,7 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^7.6.9",
     "@tailwindcss/postcss": "^4.1.17",
     "@types/node": "^20.10.0",

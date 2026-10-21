@@ -68,7 +68,10 @@ function toHex(cssColor: string): string | null {
 function syncSystemBars(): () => void {
   let last = '';
   const apply = () => {
+    const boot = document.getElementById('app-boot');
+    const bootVisible = boot && document.documentElement.classList.contains('app-booting');
     const color =
+      (bootVisible ? toHex(getComputedStyle(boot).backgroundColor) : null) ??
       toHex(getComputedStyle(document.body).backgroundColor) ??
       toHex(getComputedStyle(document.documentElement).backgroundColor) ??
       (document.documentElement.classList.contains('dark') ? '#0a0a0a' : '#ffffff');
@@ -151,6 +154,34 @@ function keepLinksInApp() {
   });
 }
 
+// O App avisa ('app-ready') quando termina o carregamento inicial — pode acontecer antes
+// de o splash nativo sair, por isso fica registado desde o carregamento deste módulo.
+let appReady = false;
+window.addEventListener('app-ready', () => { appReady = true; }, { once: true });
+
+// Ecrã de abertura (#app-boot em index.html, logo + nome sobre azul). Chamado quando o splash
+// nativo sai: fica visível pelo menos MIN_VISIBLE_MS e até o App estar pronto.
+function finishBootScreen() {
+  const boot = document.getElementById('app-boot');
+  if (!boot) return;
+  const MIN_VISIBLE_MS = 900;
+  const MAX_WAIT_MS = 8000;
+  const shownAt = performance.now();
+  const hide = () => {
+    boot.classList.add('is-done');
+    window.setTimeout(() => {
+      boot.remove();
+      document.documentElement.classList.remove('app-booting');
+    }, 400);
+  };
+  const waitUntilReady = () => {
+    const elapsed = performance.now() - shownAt;
+    if ((appReady && elapsed >= MIN_VISIBLE_MS) || elapsed >= MAX_WAIT_MS) hide();
+    else window.setTimeout(waitUntilReady, 100);
+  };
+  waitUntilReady();
+}
+
 // Integração com o Android — no navegador não faz nada.
 export async function initNative() {
   if (!isNativeApp()) return;
@@ -183,6 +214,8 @@ export async function initNative() {
   });
 
   const reapplySystemBars = syncSystemBars();
+  // O ecrã de abertura em HTML (mesmo azul) já está pintado: o splash nativo sai já
   await SplashScreen.hide();
+  finishBootScreen();
   setTimeout(reapplySystemBars, 400);
 }
