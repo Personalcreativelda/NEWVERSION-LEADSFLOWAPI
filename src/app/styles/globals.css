@@ -1190,3 +1190,25 @@ main > div {
 .email-html-body p {
   margin: 0 0 0.5em;
 }
+
+/* ── App Android (Capacitor) — html.native-app é adicionada em src/native.ts ── */
+html.native-app,
+html.native-app body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Botão flutuante do chat de suporte: no app abre-se pelo Menu → "Chat de suporte". */
+html.native-app #lfw-btn {
+  display: none !important;
+}
+
+/* Janela do chat de suporte acima da barra inferior do app e com o ✕ sempre tocável. */
+html.native-app #lfw-window {
+  z-index: 10000 !important;
+}
+html.native-app #lfw-close {
+  width: 40px !important;
+  height: 40px !important;
+  font-size: 20px !important;
+}

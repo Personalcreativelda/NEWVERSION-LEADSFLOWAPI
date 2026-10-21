@@ -20,7 +20,6 @@
     "@capacitor/browser": "^7.0.5",
     "@capacitor/core": "^7.6.9",
     "@capacitor/splash-screen": "^7.0.5",
-    "@capacitor/status-bar": "^7.0.6",
     "@dnd-kit/core": "*",
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "*",

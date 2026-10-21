@@ -59,6 +59,7 @@ import MessageCenterModal, { type MessageCenterMessage, type MessageCenterSectio
 import ProductTour from './onboarding/ProductTour';
 import { notifyTourAvailable } from '../utils/notificationHelpers';
 import WelcomeVideoModal from './modals/WelcomeVideoModal';
+import { isNativeApp } from '../../native';
 import FeedbackModal from './modals/FeedbackModal';
 
 // Chat Flutuante
@@ -322,9 +323,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       }, 2000);
     }
 
-    // Show welcome video for brand new users (before tour)
+    // Show welcome video for brand new users (before tour) — not in the Android app
     const welcomeVideoSeen = localStorage.getItem('leadsflow_welcome_video_seen');
-    if (!welcomeVideoSeen && user) {
+    if (!welcomeVideoSeen && user && !isNativeApp()) {
       setTimeout(() => {
         setShowWelcomeVideo(true);
       }, 800);
@@ -2057,7 +2058,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
   return (
     <div
-      className="min-h-screen transition-colors duration-200 bg-background overflow-x-hidden"
+      // overflow-x-clip (e não hidden): hidden criaria um contentor de scroll e o
+      // cabeçalho sticky deixaria de ficar fixo ao rolar a página.
+      className="min-h-screen transition-colors duration-200 bg-background overflow-x-clip"
     >
       {/* Background Grid - Dark Mode Only - Removido para ter fundo preto puro */}
       
@@ -2156,7 +2159,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
           <main className={`flex-1 min-w-0 ${
             currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
               ? 'overflow-hidden flex flex-col min-h-0'
-              : isMobile ? 'pb-16' : ''
+              : isMobile ? 'pb-24' : ''
           }`}>
             <PageContainer
               className={`w-full min-w-0 ${
