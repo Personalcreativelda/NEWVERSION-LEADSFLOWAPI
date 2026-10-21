@@ -1,6 +1,7 @@
 import { mockAuth } from './auth-mock';
 import { getApiBaseUrl } from './api-client';
 import { logger } from './logger';
+import { isNativeApp, openNativeOAuth, NATIVE_OAUTH_REDIRECT } from '../../native';
 import type { Lead, LeadNote, ScheduledConversation, InboxConversation, Message } from '../types';
 
 const API_BASE_URL = getApiBaseUrl();
@@ -772,6 +773,13 @@ export const authApi = {
       const googleAuthUrl = `${apiUrl}/api/auth/google`;
 
       console.log('[Auth] Redirecting to Google OAuth via backend:', googleAuthUrl);
+
+      // App Android: login numa Custom Tab, a API devolve-nos por deep link.
+      if (isNativeApp()) {
+        return await openNativeOAuth(
+          `${googleAuthUrl}?redirect=${encodeURIComponent(NATIVE_OAUTH_REDIRECT)}`
+        );
+      }
 
       // Redirect the browser to initiate OAuth flow
       window.location.href = googleAuthUrl;

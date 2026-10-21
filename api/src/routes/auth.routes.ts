@@ -29,6 +29,9 @@ const router = Router();
 // Google OAuth Routes (Direct, without Supabase)
 // ============================================
 
+// Deep links aceites no ?redirect= — o app Android volta por aqui em vez do site.
+const NATIVE_APP_REDIRECTS = ['com.leadsflowapi.app://oauth'];
+
 // GET /auth/google - Initiate Google OAuth flow
 router.get('/google', async (req, res, next) => {
   try {
@@ -55,6 +58,7 @@ router.get('/google', async (req, res, next) => {
 
 // GET /auth/google/callback - Handle Google OAuth callback
 router.get('/google/callback', async (req, res, next) => {
+  let nativeRedirect: string | undefined;
   try {
     const { code, state, error: oauthError } = req.query;
 
@@ -81,6 +85,9 @@ router.get('/google/callback', async (req, res, next) => {
         recordAuthEvent({ type: 'oauth_failure', code: 'invalid_state' });
         const appUrl = process.env.APP_URL || 'http://localhost:3000';
         return res.redirect(`${appUrl}/login?error=invalid_state`);
+      }
+      if (stateValidation.redirectUrl && NATIVE_APP_REDIRECTS.includes(stateValidation.redirectUrl)) {
+        nativeRedirect = stateValidation.redirectUrl;
       }
     }
 
@@ -109,9 +116,11 @@ router.get('/google/callback', async (req, res, next) => {
       user: userBase64,
     });
 
-    const redirectUrl = `${frontendUrl}/#oauth_callback&${tokenData.toString()}`;
+    const redirectUrl = nativeRedirect
+      ? `${nativeRedirect}#oauth_callback&${tokenData.toString()}`
+      : `${frontendUrl}/#oauth_callback&${tokenData.toString()}`;
 
-    console.log('[Auth Google] Redirecting to frontend:', frontendUrl);
+    console.log('[Auth Google] Redirecting to frontend:', nativeRedirect || frontendUrl);
 
     // 📝 Log activity
     void activityService.logActivity({
@@ -128,6 +137,9 @@ router.get('/google/callback', async (req, res, next) => {
     recordAuthEvent({ type: 'oauth_failure', code: 'callback_exception', detail: error.message });
     const frontendUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
     const errorMessage = encodeURIComponent(error.message || 'Erro ao autenticar com Google');
+    if (nativeRedirect) {
+      return res.redirect(`${nativeRedirect}?error=oauth_failed&message=${errorMessage}`);
+    }
     return res.redirect(`${frontendUrl}/login?error=oauth_failed&message=${errorMessage}`);
   }
 });
