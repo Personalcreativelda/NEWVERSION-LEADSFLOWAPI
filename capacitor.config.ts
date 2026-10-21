@@ -4,8 +4,13 @@ const config: CapacitorConfig = {
   appId: 'com.leadsflowapi.app',
   appName: 'LeadsFlow',
   webDir: 'dist',
+  server: {
+    // O app é servido localmente como https://app.leadsflowapi.com, origem que a API já
+    // aceita no CORS. Sem isto a origem seria https://localhost e a API bloquearia os pedidos.
+    androidScheme: 'https',
+    hostname: 'app.leadsflowapi.com',
+  },
   android: {
-    // O app é servido em https://localhost — adicionar esta origem ao CORS_ORIGINS da API.
     allowMixedContent: false,
   },
   plugins: {

@@ -7,8 +7,8 @@ empacotado com [Capacitor](https://capacitorjs.com) e ligado à API de produçã
 
 1. Instalar o **Android Studio** — https://developer.android.com/studio (já inclui o JDK e o Android SDK).
 2. Abrir o Android Studio uma vez e deixar terminar o download do SDK.
-3. No servidor da API, adicionar `https://localhost` à variável `CORS_ORIGINS`
-   (é a origem do app dentro do Android) e reiniciar a API.
+3. (Opcional) O app já usa a origem `https://app.leadsflowapi.com`; só é preciso mexer no `CORS_ORIGINS`
+   se mudar o `hostname` em `capacitor.config.ts`.
 
 ## Comandos
 
@@ -50,7 +50,7 @@ Guarde a keystore num lugar seguro — sem ela não é possível publicar atuali
 
 ## Configuração
 
-- `capacitor.config.ts` — id do app (`com.leadsflowapi.app`), nome, splash screen.
+- `capacitor.config.ts` — id do app (`com.leadsflowapi.app`), nome, splash screen. O app corre como `https://app.leadsflowapi.com` (origem já aceite pelo CORS da API).
 - `.env.android` — `VITE_API_URL` usada no build Android.
 - `src/native.ts` — botão voltar do Android, status bar, splash screen.
 - `android/app/src/main/AndroidManifest.xml` — permissões (internet, microfone, câmara, notificações).
