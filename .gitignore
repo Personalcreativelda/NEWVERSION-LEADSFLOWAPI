@@ -1,18 +1,35 @@
+# Só o código vai para o GitHub: dependências, builds, ambientes e ficheiros
+# locais ficam apenas na máquina.
+
 # Variáveis de ambiente locais (NÃO commitar!)
+# (.env.example e .env.android são modelos/config públicos e continuam versionados)
 .env
+.env.local
+.env.*.local
 
 # Dados do PostgreSQL
 api/postgres-data/
 
-# Node modules
+# Dependências (instalar com npm install / npm ci)
 node_modules/
 api/node_modules/
+.pnpm-store/
+.npm/
 
 # Build outputs
 dist/
 build/
 api/dist/
 api/build/
+*.tsbuildinfo
+coverage/
+
+# Android (Capacitor) — o resto está em android/.gitignore
+*.apk
+*.aab
+android/local.properties
+android/.gradle/
+android/app/build/
 
 # Logs
 *.log
@@ -27,11 +44,17 @@ yarn-error.log*
 *.swo
 *~
 
+# Claude Code — estado local (settings.json do projeto continua versionado)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+
 # OS
 .DS_Store
 Thumbs.db
 
-# Temporary files
+# Temporary files e backups
 tmp/
 temp/
 *.tmp
+*.bak
