@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../utils/search';
 import React, { useState, useEffect } from 'react';
 import { X, Phone, User, Loader2, Search, UserCircle } from 'lucide-react';
 import { leadsApi } from '../../utils/api';
@@ -89,12 +90,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
     };
 
     const filteredLeads = leads.filter(lead => {
-        if (!searchQuery) return true;
-        const query = searchQuery.toLowerCase();
-        const leadName = (lead.name || lead.nome || '').toLowerCase();
-        const leadPhone = (lead.phone || lead.telefone || '').toLowerCase();
-        const leadEmail = (lead.email || '').toLowerCase();
-        return leadName.includes(query) || leadPhone.includes(query) || leadEmail.includes(query);
+        return matchesSearch(searchQuery, lead.name, lead.nome, lead.phone, lead.telefone, lead.email);
     });
 
     return (

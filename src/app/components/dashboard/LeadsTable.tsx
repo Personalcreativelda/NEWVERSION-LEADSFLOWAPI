@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../utils/search';
 import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, Megaphone, Instagram, Facebook, Send, Smartphone, Search, Plus } from 'lucide-react';
 import { useState } from 'react';
 import type { Lead } from '../../types';
@@ -181,16 +182,7 @@ export default function LeadsTable({
 
   // Filtrar leads pela busca
   const leadsFiltrados = leads.filter((lead) => {
-    if (!busca) return true;
-    const buscaLower = busca.toLowerCase();
-    return (
-      lead.nome?.toLowerCase().includes(buscaLower) ||
-      lead.telefone?.includes(busca) ||
-      lead.email?.toLowerCase().includes(buscaLower) ||
-      lead.interesse?.toLowerCase().includes(buscaLower) ||
-      lead.origem?.toLowerCase().includes(buscaLower) ||
-      lead.status?.toLowerCase().includes(buscaLower)
-    );
+    return matchesSearch(busca, lead.nome, lead.telefone, lead.email, lead.interesse, lead.origem, lead.status, (lead as any).empresa);
   });
 
   const handleBuscaChange = (valor: string) => setBusca(valor);

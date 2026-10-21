@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../utils/search';
 /**
  * Modal para Reencaminhar Mensagem (WhatsApp-style)
  * Mostra lista de conversas para selecionar destino.
@@ -33,7 +34,6 @@ export function ForwardMessageModal({
     }, []);
 
     const filtered = useMemo(() => {
-        const q = search.toLowerCase().trim();
         return conversations
             .filter((c) => c.id !== currentConversationId)
             .filter((c) => {
@@ -43,11 +43,7 @@ export function ForwardMessageModal({
                 if ((c as any).is_group || (c.metadata as any)?.is_group || c.contact?.is_group) return false;
                 return true;
             })
-            .filter((c) => {
-                if (!q) return true;
-                const name = (c.contact?.name || (c as any).lead?.name || c.contact?.phone || '').toLowerCase();
-                return name.includes(q);
-            });
+            .filter((c) => matchesSearch(search, c.contact?.name, (c as any).lead?.name, c.contact?.phone));
     }, [conversations, currentConversationId, search]);
 
     const toggle = (id: string) => {

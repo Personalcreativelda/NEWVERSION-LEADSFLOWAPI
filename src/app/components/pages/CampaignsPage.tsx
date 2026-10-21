@@ -13,6 +13,8 @@ import { PageHeader, PageAction } from '../base/PageHeader';
 import { DashboardCard } from '../base/DashboardCard';
 import { StatusBadge } from '../base/StatusBadge';
 import { SearchInput } from '../base/SearchInput';
+import { EmptyState } from '../base/EmptyState';
+import { matchesSearch } from '../../utils/search';
 import CampaignWhatsAppModal from '../modals/CampaignWhatsAppModal';
 import CampaignEmailModal from '../modals/CampaignEmailModal';
 import CampaignSMSModal from '../modals/CampaignSMSModal';
@@ -66,6 +68,17 @@ interface Campaign {
 }
 
 const INITIAL_CAMPAIGNS: Campaign[] = [];
+
+// Rótulos dos estados, também usados na pesquisa ("agendada", "concluída"…)
+const CAMPAIGN_STATUS_LABELS: Record<Campaign['status'], string> = {
+  active: 'ativa',
+  paused: 'pausada',
+  sending: 'em envio',
+  scheduled: 'agendada',
+  draft: 'rascunho salva',
+  completed: 'concluida',
+  failed: 'falhada erro',
+};
 
 // ✅ Restaurando props leads e userPlan que foram removidos acidentalmente
 export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp', isDark = false, userPlan = 'free' }: CampaignsPageProps) {
@@ -929,11 +942,23 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
     })();
   };
 
-  const filteredCampaigns = campaigns.filter(
-    c => c.type === activeTab && c.name.toLowerCase().includes(searchTerm.toLowerCase())
+  // Pesquisa: nome, mensagem, assunto e estado — sem acentos/maiúsculas, em todos os canais
+  const searchMatches = campaigns.filter(c =>
+    matchesSearch(searchTerm, c.name, c.template, c.settings?.subject, CAMPAIGN_STATUS_LABELS[c.status])
   );
+  const filteredCampaigns = searchMatches.filter(c => c.type === activeTab);
+  const countByChannel = (type: Campaign['type']) => searchMatches.filter(c => c.type === type).length;
 
-  const activeCampaigns = filteredCampaigns.filter(c => c.status === 'active' || c.status === 'paused');
+  // Se o canal aberto não tem resultados mas outro tem, mostra esse
+  useEffect(() => {
+    if (!searchTerm.trim() || filteredCampaigns.length > 0) return;
+    const firstWithResults = (['whatsapp', 'email', 'sms'] as const).find(t => searchMatches.some(c => c.type === t));
+    if (firstWithResults && firstWithResults !== activeTab) setActiveTab(firstWithResults);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, campaigns]);
+
+  // 'sending' (em envio) aparece junto das ativas — antes não entrava em nenhuma lista
+  const activeCampaigns = filteredCampaigns.filter(c => c.status === 'active' || c.status === 'paused' || c.status === 'sending');
   const scheduledCampaigns = filteredCampaigns.filter(c => c.status === 'scheduled');
   const draftCampaigns = filteredCampaigns.filter(c => c.status === 'draft');
   const completedCampaigns = filteredCampaigns.filter(c => c.status === 'completed');
@@ -1280,7 +1305,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 <MessageCircle className="w-4 h-4" />
                 <span>WhatsApp</span>
                 <span className={`${activeTab === 'whatsapp' ? 'bg-[#10B981]' : 'bg-muted text-muted-foreground'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
-                  {campaigns.filter(c => c.type === 'whatsapp').length}
+                  {countByChannel('whatsapp')}
                 </span>
               </button>
               <button
@@ -1293,7 +1318,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 <Mail className="w-4 h-4" />
                 <span>Email</span>
                 <span className={`${activeTab === 'email' ? 'bg-[#3B82F6]' : 'bg-muted text-muted-foreground'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
-                  {campaigns.filter(c => c.type === 'email').length}
+                  {countByChannel('email')}
                 </span>
               </button>
               <button
@@ -1308,7 +1333,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
                   activeTab === 'sms' ? 'bg-[#F22F46] text-white' : 'bg-muted text-muted-foreground'
                 }`}>
-                  {campaigns.filter(c => c.type === 'sms').length}
+                  {countByChannel('sms')}
                 </span>
               </button>
             </nav>
@@ -1327,8 +1352,18 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
               </>
             )}
 
+            {/* Pesquisa sem resultados em nenhum canal */}
+            {(!isLoadingCampaigns || campaigns.length > 0) && searchTerm.trim() !== '' && searchMatches.length === 0 && (
+              <EmptyState
+                icon={Megaphone}
+                title="Nenhuma campanha encontrada"
+                description={`Nada corresponde a "${searchTerm.trim()}" no nome, mensagem ou estado.`}
+                action={<AppButton variant="outline" onClick={() => setSearchTerm('')}>Limpar pesquisa</AppButton>}
+              />
+            )}
+
             {/* Content: stale or fresh data */}
-            {(!isLoadingCampaigns || campaigns.length > 0) && (
+            {(!isLoadingCampaigns || campaigns.length > 0) && !(searchTerm.trim() !== '' && searchMatches.length === 0) && (
               <>
                 {isLoadingCampaigns && (
                   <div className="flex items-center justify-end">

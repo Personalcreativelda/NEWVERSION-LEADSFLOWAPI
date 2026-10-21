@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../../utils/search';
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { ConversationList } from '../../inbox/ConversationList';
@@ -428,10 +429,14 @@ export default function ConversasConversations({
             
             // Filtrar por busca
             if (searchQuery) {
-                const query = searchQuery.toLowerCase();
-                const name = conv.contact?.name?.toLowerCase() || '';
-                const phone = conv.contact?.phone?.toLowerCase() || '';
-                return name.includes(query) || phone.includes(query);
+                const lastMessage = (conv as any).last_message;
+                return matchesSearch(
+                    searchQuery,
+                    conv.contact?.name,
+                    conv.contact?.phone,
+                    (conv.contact as any)?.email,
+                    typeof lastMessage === 'string' ? lastMessage : lastMessage?.content
+                );
             }
             
             return true;

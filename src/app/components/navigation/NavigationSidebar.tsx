@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../utils/search';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   X, Zap, UserCog, LogOut, ChevronRight, Search, PanelLeft, HelpCircle, Crown, LifeBuoy
@@ -117,7 +118,7 @@ export default function NavigationSidebar({
 
   const filteredSidebarConfig = sidebarSearch.trim()
     ? sidebarConfig.filter(item =>
-        (t[item.labelKey as keyof Translations] || '').toLowerCase().includes(sidebarSearch.toLowerCase())
+        matchesSearch(sidebarSearch, t[item.labelKey as keyof Translations], item.sectionLabel)
       )
     : sidebarConfig;
 

@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../../utils/search';
 import React, { useState, useMemo } from 'react';
 import { Mail, MessageSquare, Send, Loader2, Users, Rocket, Crown, 
   Info, CheckCircle, Search, X, UserCheck, Code2, Eye, Type } from 'lucide-react';
@@ -56,11 +57,10 @@ export const AdminMarketingTab: React.FC<AdminMarketingTabProps> = ({
 
   const searchResults = useMemo(() => {
     if (!userSearch.trim() || target !== 'specific') return [];
-    const q = userSearch.toLowerCase();
     return users
       .filter(u =>
         !selectedUsers.find(s => s.id === u.id) &&
-        (u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+        matchesSearch(userSearch, u.name, u.email)
       )
       .slice(0, 8);
   }, [userSearch, users, selectedUsers, target]);

@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../utils/search';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Phone, Search, Plus, Power, PowerOff, Trash2, Edit3,
@@ -239,10 +240,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     }
   }, [modalOpen]);
 
-  const filteredAgents = voiceAgents.filter(agent =>
-    agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (agent.description || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredAgents = voiceAgents.filter(agent => matchesSearch(searchTerm, agent.name, agent.description));
 
   // Refresh ConvAI data (agents + phone numbers) — no elevenLabsConfigured guard
   const refreshConvAIData = async () => {

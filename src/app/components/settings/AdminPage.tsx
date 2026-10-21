@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../utils/search';
 import { useState, useEffect } from 'react';
 import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
@@ -113,11 +114,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
       filtered = filtered.filter(u => u.plan === filterPlan);
     }
     if (searchTerm) {
-      filtered = filtered.filter(
-        (user) =>
-          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.name?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      filtered = filtered.filter((user) => matchesSearch(searchTerm, user.email, user.name, user.plan));
     }
     setFilteredUsers(filtered);
   }, [searchTerm, users, filterPlan]);

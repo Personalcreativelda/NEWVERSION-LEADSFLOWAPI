@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../utils/search';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Bot, Search, Plus, Settings, Power, PowerOff, Trash2,
@@ -200,10 +201,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
   // Filter assistants
   const filteredAssistants = availableAssistants.filter(assistant => {
-    const matchesSearch = assistant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (assistant.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesQuery = matchesSearch(searchTerm, assistant.name, assistant.description, assistant.category);
     const matchesCategory = selectedCategory === 'all' || assistant.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    return matchesQuery && matchesCategory;
   });
 
   // Check if assistant is connected
