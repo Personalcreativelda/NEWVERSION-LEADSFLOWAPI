@@ -4,8 +4,27 @@ import { Mail, Lock, AlertCircle, Eye, EyeOff, Zap, Star } from 'lucide-react';
 import { authApi } from '../../utils/api';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
+import { useThemeMode } from '../../context/ThemeModeContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
+
+// Cores do cartão de login por tema (o tema segue o telemóvel — ver utils/theme.ts)
+const LOGIN_COLORS = {
+  light: {
+    card: 'rgba(255,255,255,0.97)', cardBorder: 'rgba(255,255,255,0.3)',
+    title: '#1A2C44', muted: '#6B7280', label: '#414552', body: '#3C4257', link: '#533AFD',
+    inputBg: '#FFFFFF', inputText: '#273951', border: '#D4DEE9',
+    subtle: '#8A9BB0', faint: '#B0B8C4', divider: '#EEF0F3',
+    errorBg: '#FFF0F3', errorIcon: '#E61947', errorText: '#C0123C', warnBg: '#FFF8E6', warnText: '#CC4B00',
+  },
+  dark: {
+    card: 'rgba(22,23,27,0.95)', cardBorder: 'rgba(255,255,255,0.08)',
+    title: '#F1F5F9', muted: '#9CA3AF', label: '#D1D5DB', body: '#C7CBD4', link: '#A5B4FC',
+    inputBg: '#0F1013', inputText: '#F1F5F9', border: '#2E3240',
+    subtle: '#8B93A7', faint: '#6B7280', divider: '#24262B',
+    errorBg: 'rgba(230,25,71,0.12)', errorIcon: '#FB7185', errorText: '#FDA4AF', warnBg: 'rgba(204,75,0,0.14)', warnText: '#FDBA74',
+  },
+} as const;
 
 interface RatingSummary {
   average: number;
@@ -41,6 +60,7 @@ interface ErrorState {
 
 
 export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPassword }: LoginPageProps) {
+  const c = LOGIN_COLORS[useThemeMode()];
   const [ratings, setRatings] = useState<RatingSummary | null>(null);
   const [, setCurrentReview] = useState(0);
   const [email, setEmail] = useState('');
@@ -554,14 +574,14 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
   const FONT = '"Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center py-16 px-4 overflow-hidden"
+    <div className="min-h-[100dvh] relative flex items-center justify-center py-6 sm:py-16 px-4 overflow-hidden"
       style={{ background: 'transparent', fontFamily: FONT }}>
 
       {/* ── CARD + LOGO (coluna centrada) ─────────────────────────── */}
       <div className="relative z-10 w-full max-w-[520px] flex flex-col">
 
         {/* Logo — acima do card, alinhado à esquerda */}
-        <div className="flex items-center gap-2.5 mb-8">
+        <div className="flex items-center gap-2.5 mb-5 sm:mb-8">
           <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
             style={{ background: '#675DFF', boxShadow: '0 2px 12px rgba(103,93,255,0.45)' }}>
             <Zap className="w-5 h-5 text-white" />
@@ -569,19 +589,19 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           <span className="text-[19px] font-semibold text-white tracking-tight">LeadsFlow</span>
         </div>
 
-        <div className="rounded-[12px] p-10"
+        <div className="rounded-[12px] p-6 sm:p-10"
           style={{
-            background: 'rgba(255,255,255,0.97)',
+            background: c.card,
             border: '1px solid rgba(255,255,255,0.3)',
             boxShadow: '0 4px 16px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.06)',
             backdropFilter: 'blur(20px)',
           }}>
 
           {/* Title */}
-          <h1 className="text-[28px] font-semibold leading-[36px] mb-2" style={{ color: '#1A2C44' }}>
+          <h1 className="text-[24px] leading-[32px] sm:text-[28px] sm:leading-[36px] font-semibold mb-1 sm:mb-2" style={{ color: c.title }}>
             Entrar na conta
           </h1>
-          <p className="text-[15px] mb-7" style={{ color: '#6B7280', fontWeight: 300 }}>
+          <p className="text-[15px] mb-5 sm:mb-7" style={{ color: c.muted, fontWeight: 300 }}>
             Bem-vindo de volta
           </p>
 
@@ -590,28 +610,28 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
             <div ref={errorRef} role="alert" aria-live="assertive" tabIndex={-1}
               className="mb-5 p-4 rounded-[8px] flex items-start gap-3 animate-in fade-in duration-200"
               style={{
-                background: error.type === 'rate_limit' ? '#FFF8E6' : '#FFF0F3',
+                background: error.type === 'rate_limit' ? c.warnBg : c.errorBg,
                 border: `1px solid ${error.type === 'rate_limit' ? 'rgba(204,75,0,0.3)' : 'rgba(230,25,71,0.3)'}`,
               }}>
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: error.type === 'rate_limit' ? '#CC4B00' : '#E61947' }} />
-              <p className="text-[13px] leading-[18px] whitespace-pre-line" style={{ color: error.type === 'rate_limit' ? '#CC4B00' : '#C0123C', fontWeight: 300 }}>
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: error.type === 'rate_limit' ? c.warnText : c.errorIcon }} />
+              <p className="text-[13px] leading-[18px] whitespace-pre-line" style={{ color: error.type === 'rate_limit' ? c.warnText : c.errorText, fontWeight: 300 }}>
                 {error.message}
               </p>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleEmailLogin} className="space-y-5 mb-6">
+          <form onSubmit={handleEmailLogin} className="space-y-4 sm:space-y-5 mb-5 sm:mb-6">
             {/* Email */}
             <div>
-              <label htmlFor="email" style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px', fontWeight: 500 }}>Email</label>
+              <label htmlFor="email" style={{ display: 'block', fontSize: '14px', color: c.label, marginBottom: '8px', fontWeight: 500 }}>Email</label>
               <Input ref={emailRef} id="email" type="email" placeholder="seu@email.com" value={email}
                 onChange={(e) => handleEmailChange(e.target.value)} required
                 aria-invalid={!!fieldErrors.email} aria-describedby={fieldErrors.email ? 'email-error' : undefined}
                 style={{
                   width: '100%', height: '48px', paddingLeft: '14px', paddingRight: '14px',
-                  background: '#FFFFFF', border: `1px solid ${fieldErrors.email ? '#E61947' : '#D4DEE9'}`,
-                  borderRadius: '6px', fontSize: '16px', color: '#273951', caretColor: '#675DFF',
+                  background: c.inputBg, border: `1px solid ${fieldErrors.email ? '#E61947' : c.border}`,
+                  borderRadius: '6px', fontSize: '16px', color: c.inputText, caretColor: '#675DFF',
                   boxShadow: fieldErrors.email ? '0 0 0 4px rgba(230,25,71,0.1)' : 'none',
                 }}
                 className="placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]"
@@ -626,10 +646,10 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label htmlFor="password" style={{ fontSize: '14px', color: '#414552', fontWeight: 500 }}>Senha</label>
+                <label htmlFor="password" style={{ fontSize: '14px', color: c.label, fontWeight: 500 }}>Senha</label>
                 <button type="button"
                   onClick={() => onForgotPassword ? onForgotPassword() : setShowForgotPassword(true)}
-                  style={{ fontSize: '14px', color: '#533AFD', fontWeight: 300 }}
+                  style={{ fontSize: '14px', color: c.link, fontWeight: 300 }}
                   className="transition-colors hover:text-[#635BFF]">
                   Esqueceu a senha?
                 </button>
@@ -641,15 +661,15 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
                   aria-invalid={!!fieldErrors.password} aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                   style={{
                     width: '100%', height: '48px', paddingLeft: '14px', paddingRight: '48px',
-                    background: '#FFFFFF', border: `1px solid ${fieldErrors.password ? '#E61947' : '#D4DEE9'}`,
-                    borderRadius: '6px', fontSize: '16px', color: '#273951', caretColor: '#675DFF',
+                    background: c.inputBg, border: `1px solid ${fieldErrors.password ? '#E61947' : c.border}`,
+                    borderRadius: '6px', fontSize: '16px', color: c.inputText, caretColor: '#675DFF',
                     boxShadow: fieldErrors.password ? '0 0 0 4px rgba(230,25,71,0.1)' : 'none',
                   }}
                   className="placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]"
                 />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
-                  style={{ color: '#8A9BB0' }}>
+                  style={{ color: c.subtle }}>
                   {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
                 </button>
               </div>
@@ -667,8 +687,8 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
               style={{
                 width: '100%', height: '50px', fontSize: '16px', fontWeight: 500,
                 borderRadius: '6px', border: 'none', marginTop: '8px',
-                background: loading || (lockUntil !== null && Date.now() < lockUntil) ? '#D4DEE9' : '#675DFF',
-                color: loading || (lockUntil !== null && Date.now() < lockUntil) ? '#3C4257' : '#FFFFFF',
+                background: loading || (lockUntil !== null && Date.now() < lockUntil) ? c.border : '#675DFF',
+                color: loading || (lockUntil !== null && Date.now() < lockUntil) ? c.body : c.inputBg,
                 boxShadow: loading || (lockUntil !== null && Date.now() < lockUntil) ? 'none' : '0 0 0 1px #675DFF',
                 transition: 'background-color 200ms ease',
               }}
@@ -683,26 +703,26 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           </form>
 
           {/* Create account */}
-          <p className="text-center mb-6" style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
+          <p className="text-center mb-4 sm:mb-6" style={{ fontSize: '14px', color: c.body, fontWeight: 300 }}>
             Não tem uma conta?{' '}
-            <button onClick={onSwitchToSignup} style={{ color: '#533AFD', fontWeight: 400 }} className="transition-colors hover:text-[#635BFF]">
+            <button onClick={onSwitchToSignup} style={{ color: c.link, fontWeight: 400 }} className="transition-colors hover:text-[#635BFF]">
               Criar conta
             </button>
           </p>
 
           {/* Divider */}
           <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 border-t" style={{ borderColor: '#D4DEE9' }} />
-            <span style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}>ou continue com</span>
-            <div className="flex-1 border-t" style={{ borderColor: '#D4DEE9' }} />
+            <div className="flex-1 border-t" style={{ borderColor: c.border }} />
+            <span style={{ fontSize: '13px', color: c.subtle, fontWeight: 300 }}>ou continue com</span>
+            <div className="flex-1 border-t" style={{ borderColor: c.border }} />
           </div>
 
           {/* Google button */}
           <AppButton type="button" onClick={handleGoogleSignIn} disabled={loading}
             style={{
               width: '100%', height: '48px', fontSize: '15px', fontWeight: 400,
-              borderRadius: '6px', background: '#FFFFFF', border: '1px solid #D4DEE9',
-              color: '#414552', boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              borderRadius: '6px', background: c.inputBg, border: `1px solid ${c.border}`,
+              color: c.label, boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
             }}
             className="flex items-center justify-center gap-3 transition-all hover:border-[#A497FC] hover:shadow-sm disabled:opacity-50">
             <GoogleIcon /><span>Entrar com Google</span>
@@ -710,24 +730,24 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
 
           {/* Rating — dentro do card */}
           {ratings && ratings.total > 0 && (
-            <div className="flex items-center justify-center gap-2 mt-5 pt-4 border-t" style={{ borderColor: '#EEF0F3' }}>
+            <div className="flex items-center justify-center gap-2 mt-4 sm:mt-5 pt-3 sm:pt-4 border-t" style={{ borderColor: c.divider }}>
               <div className="flex gap-0.5">
                 {[1,2,3,4,5].map(n => (
                   <Star key={n} className="w-3.5 h-3.5"
                     fill={n <= Math.round(ratings.average) ? '#FBBF24' : 'none'}
-                    stroke={n <= Math.round(ratings.average) ? '#FBBF24' : '#D4DEE9'} strokeWidth={1.5} />
+                    stroke={n <= Math.round(ratings.average) ? '#FBBF24' : c.border} strokeWidth={1.5} />
                 ))}
               </div>
-              <span style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}>
-                {ratings.average.toFixed(1)} de 5 · <span style={{ color: '#B0B8C4' }}>{ratings.total} avaliações</span>
+              <span style={{ fontSize: '13px', color: c.subtle, fontWeight: 300 }}>
+                {ratings.average.toFixed(1)} de 5 · <span style={{ color: c.faint }}>{ratings.total} avaliações</span>
               </span>
             </div>
           )}
 
           {debugMode && (
             <div className="flex flex-col gap-2 mt-4">
-              <button onClick={handleDebugSetup} style={{ fontSize: '12px', color: '#8A9BB0' }}>Debug Setup</button>
-              <button onClick={handleAdminSetup} style={{ fontSize: '12px', color: '#8A9BB0' }}>Admin Setup</button>
+              <button onClick={handleDebugSetup} style={{ fontSize: '12px', color: c.subtle }}>Debug Setup</button>
+              <button onClick={handleAdminSetup} style={{ fontSize: '12px', color: c.subtle }}>Admin Setup</button>
             </div>
           )}
         </div>

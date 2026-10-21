@@ -8,6 +8,7 @@ import CTASection from './components/CTASection';
 import Footer from './components/Footer';
 import Dashboard from './components/Dashboard';
 import HlsVideoBackground from './components/auth/HlsVideoBackground';
+import { useThemeMode } from './context/ThemeModeContext';
 import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 import ResetPasswordPage from './components/auth/ResetPasswordPage';
@@ -186,12 +187,21 @@ const setPagePath = (page: Page) => {
 };
 
 export default function App({ initialPage, landingEnabled = true }: AppProps = {}) {
+  const themeMode = useThemeMode();
   const homePage: Page = landingEnabled ? 'landing' : 'login';
 
   // Check URL path for initial page (clean URLs)
   const pageFromUrl = getPageFromPath();
+  // With a stored session, start on the dashboard (checkAuth validates the token while the
+  // loading screen shows). Starting on 'login' made the [currentPage] effect push '/login'
+  // before initialize ran, whose public-page guard then skipped checkAuth — so every reload
+  // at '/' (e.g. coming back from Stripe) dropped a logged-in user on the login screen.
+  const hasStoredSession = (() => {
+    try { return !!localStorage.getItem('leadflow_access_token'); } catch { return false; }
+  })();
   const resolvedInitialPage: Page =
     pageFromUrl ? pageFromUrl :
+    hasStoredSession ? 'dashboard' :
     initialPage && (!landingEnabled ? initialPage !== 'landing' : true)
       ? initialPage
       : homePage;
@@ -401,6 +411,11 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
   }, []);
 
 
+
+  // Avisa o ecrã de abertura do app Android (src/native.ts) que o carregamento inicial terminou
+  useEffect(() => {
+    if (!loading) window.dispatchEvent(new Event('app-ready'));
+  }, [loading]);
 
   // Handle Stripe redirect back with ?checkoutSuccess=true
   // Clean the URL on mount (runs once) — params already captured in state above
@@ -938,11 +953,11 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[#00C48C] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Carregando...</p>
-          <p className="text-xs text-gray-500 mt-2">Versão {appVersion} - LeadFlow CRM</p>
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+          <p className="text-xs text-gray-500 mt-2">Versão {appVersion} · LeadsFlow</p>
         </div>
       </div>
     );
@@ -973,7 +988,7 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
       {/* Shared auth video background — rendered once, persists across login/signup/forgot-password/reset-password */}
       {(['login', 'signup', 'forgot-password', 'reset-password'] as Page[]).includes(currentPage) && (
-        <HlsVideoBackground overlay="rgba(0,0,0,0.12)" />
+        <HlsVideoBackground overlay={themeMode === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.12)'} />
       )}
 
       {/* Login Page */}

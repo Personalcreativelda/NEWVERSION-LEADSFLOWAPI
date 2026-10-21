@@ -14,3 +14,7 @@ pnpm-debug.log*
 
 # Local environment overrides
 .env.local
+
+# Projeto Android (Capacitor) e fontes de ícones — não fazem parte do site
+android/
+assets/

@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  X, Zap, UserCog, LogOut, ChevronRight, Search, PanelLeft, HelpCircle, Crown
+  X, Zap, UserCog, LogOut, ChevronRight, Search, PanelLeft, HelpCircle, Crown, LifeBuoy
 } from 'lucide-react';
 import { LayoutDashboard, Users, BarChart3, Megaphone, Settings, MessageSquare, Star, Activity } from 'lucide-react';
 import { Language, translations, Translations } from '../../utils/i18n';
 import { sidebarConfig, SidebarItemConfig } from '../../config/sidebarConfig';
 import SidebarGroup from './SidebarGroup';
 import InboxTreeMenu from './InboxTreeMenu';
+import { isNativeApp, openSupportChat } from '../../../native';
 
 // Mapeamento de path para page id
 export const pathToPageId: Record<string, string> = {
@@ -538,6 +539,20 @@ export default function NavigationSidebar({
                 >
                   <Star className="w-[17px] h-[17px] flex-shrink-0 text-[hsl(var(--sidebar-muted))]" />
                   <span>Feedback</span>
+                </button>
+              )}
+
+              {/* Chat de suporte — no app Android substitui o botão flutuante */}
+              {isNativeApp() && !isCollapsed && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    openSupportChat();
+                  }}
+                  className="sidebar-nav-item sidebar-item-inactive w-full flex items-center gap-2.5 px-3 py-[7px] rounded-lg transition-all duration-150 text-[14px] font-medium"
+                >
+                  <LifeBuoy className="w-[17px] h-[17px] flex-shrink-0 text-[hsl(var(--sidebar-muted))]" />
+                  <span>Chat de suporte</span>
                 </button>
               )}
 

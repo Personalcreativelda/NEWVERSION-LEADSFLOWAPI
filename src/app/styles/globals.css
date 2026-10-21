@@ -1190,3 +1190,54 @@ main > div {
 .email-html-body p {
   margin: 0 0 0.5em;
 }
+
+/* ── App Android (Capacitor) — html.native-app é adicionada em src/native.ts ── */
+html.native-app,
+html.native-app body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation; /* sem atraso de 300ms no toque, mantém o zoom por pinça */
+}
+
+/* Botão flutuante do chat de suporte: no app abre-se pelo Menu → "Chat de suporte". */
+html.native-app #lfw-btn {
+  display: none !important;
+}
+
+/* Janela do chat de suporte acima da barra inferior do app e com o ✕ sempre tocável. */
+html.native-app #lfw-window {
+  z-index: 10000 !important;
+}
+html.native-app #lfw-close {
+  width: 40px !important;
+  height: 40px !important;
+  font-size: 20px !important;
+}
+
+/* Telemóvel: títulos de página em escala de app e botões numa só linha
+   (texto partido em duas linhas deixava os botões "grossos"). */
+@media (max-width: 639px) {
+  html.native-app main h1 {
+    font-size: 1.5rem !important;
+    line-height: 2rem !important;
+    letter-spacing: -0.01em;
+  }
+  html.native-app main button {
+    white-space: nowrap;
+  }
+  /* ✕ dos diálogos (ui/dialog.tsx) com área de toque de app */
+  html.native-app [data-slot="dialog-content"] > button:last-child {
+    top: 6px;
+    right: 6px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+  }
+  html.native-app [data-slot="dialog-content"] > button:last-child svg {
+    width: 20px;
+    height: 20px;
+  }
+}

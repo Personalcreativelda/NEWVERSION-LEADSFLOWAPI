@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Raio do logotipo LeadsFlow (mesmo traçado de public/favicon.svg), centrado com margem -->
+  <g transform="translate(96 70) scale(26)">
+    <path d="M18.2 4L6.8 18h8.2l-1.2 12 11.4-14h-8.4L18.2 4z" fill="#FFFFFF"/>
+  </g>
+</svg>

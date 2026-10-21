@@ -6,3 +6,5 @@ setup-db.sh
 scripts/
 SVG logos/
 env. backup.com
+android/
+assets/

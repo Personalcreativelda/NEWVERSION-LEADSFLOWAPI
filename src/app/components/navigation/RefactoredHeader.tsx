@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Languages } from 'lucide-react';
+import { Languages } from 'lucide-react';
 import AvatarPopover from './AvatarPopover';
 import ThemeSelector from './ThemeSelector';
 import Breadcrumbs from './Breadcrumbs';
@@ -102,20 +102,19 @@ export default function RefactoredHeader({
   return (
     <header className="flex-shrink-0 sticky top-0 z-[1000] border-b backdrop-blur-xl bg-background/80 border-border dark:border-[rgba(255,255,255,0.06)] dark:bg-background/90">
       <div className="px-4 lg:px-6 h-14 flex items-center justify-between">
-        {/* Left Section: Hamburger APENAS NO MOBILE */}
-        <div className="flex items-center lg:hidden">
-          {/* Hamburger Menu - APENAS MOBILE (<1024px) */}
-          <button
-            onClick={onToggleSidebar}
-            className="p-2 rounded-lg transition-all duration-200 group hover:bg-muted text-muted-foreground hover:text-foreground"
-            aria-label="Toggle menu"
-          >
-            {isSidebarOpen ? (
-              <X className="w-5 h-5 transition-colors" />
-            ) : (
-              <Menu className="w-5 h-5 transition-colors" />
-            )}
-          </button>
+        {/* Mobile (<1024px): avatar do perfil à esquerda. Sem título (a barra inferior já
+            indica a página) e sem ☰ (o menu fica só no item "Menu" da barra inferior). */}
+        <div className="lg:hidden -ml-1.5">
+          <AvatarPopover
+            user={user}
+            onProfile={handleProfile}
+            onSettings={onSettings}
+            onChangePassword={handleChangePassword}
+            onLogout={onLogout}
+            language={language}
+            isDark={isDark}
+            align="start"
+          />
         </div>
 
         {/* Desktop: trilho de navegação (páginas reais do LeadFlow) */}
@@ -171,11 +170,10 @@ export default function RefactoredHeader({
             language={language}
           />
 
-          {/* Divider */}
-          <div className="h-6 w-px mx-1 bg-border"></div>
+          {/* Divider + Avatar (desktop; no mobile o avatar está à esquerda) */}
+          <div className="hidden lg:block h-6 w-px mx-1 bg-border"></div>
 
-          {/* Avatar Popover */}
-          <div id="user-avatar">
+          <div id="user-avatar" className="hidden lg:block">
             <AvatarPopover
               user={user}
               onProfile={handleProfile}

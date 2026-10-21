@@ -59,6 +59,8 @@ import MessageCenterModal, { type MessageCenterMessage, type MessageCenterSectio
 import ProductTour from './onboarding/ProductTour';
 import { notifyTourAvailable } from '../utils/notificationHelpers';
 import WelcomeVideoModal from './modals/WelcomeVideoModal';
+import { isNativeApp } from '../../native';
+import { resolveTheme, applyThemeClass, saveThemeChoice, onSystemThemeChange } from '../utils/theme';
 import FeedbackModal from './modals/FeedbackModal';
 
 // Chat Flutuante
@@ -115,25 +117,19 @@ interface DashboardProps {
 
 export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser, enforcementBlock, onEnforcementBlockCleared }: DashboardProps) {
   const confirm = useConfirm();
-  // Theme mode: 'light' | 'dark'
+  // Theme mode: 'light' | 'dark' — segue o tema do telemóvel/sistema até o utilizador
+  // escolher um manualmente (ver utils/theme.ts)
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
-    const savedMode = localStorage.getItem('crm_tema_mode') as 'light' | 'dark' | null;
-    const initialMode = savedMode || 'dark';
-    if (!savedMode) {
-      localStorage.setItem('crm_tema_mode', initialMode);
-    }
-    return initialMode;
+    const mode = resolveTheme();
+    applyThemeClass(mode);
+    return mode;
   });
-  const [isDark, setIsDark] = useState(() => {
-    const savedMode = localStorage.getItem('crm_tema_mode');
-    const mode = savedMode || 'dark';
-    if (mode === 'dark') {
-      document.documentElement.classList.add('dark');
-      return true;
-    }
-    document.documentElement.classList.remove('dark');
-    return false;
-  });
+  const [isDark, setIsDark] = useState(() => themeMode === 'dark');
+
+  useEffect(() => onSystemThemeChange((mode) => {
+    setThemeMode(mode);
+    setIsDark(mode === 'dark');
+  }), []);
   const [language, setLanguage] = useState<Language>(() => loadLanguage());
 
   // Resolve the dashboard sub-page from the URL path on first mount
@@ -322,9 +318,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       }, 2000);
     }
 
-    // Show welcome video for brand new users (before tour)
+    // Show welcome video for brand new users (before tour) — not in the Android app
     const welcomeVideoSeen = localStorage.getItem('leadsflow_welcome_video_seen');
-    if (!welcomeVideoSeen && user) {
+    if (!welcomeVideoSeen && user && !isNativeApp()) {
       setTimeout(() => {
         setShowWelcomeVideo(true);
       }, 800);
@@ -1077,14 +1073,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   // Troca de tema instantânea, aproveitando o transition do body
   const handleThemeChange = (mode: 'light' | 'dark') => {
     setThemeMode(mode);
-    localStorage.setItem('crm_tema_mode', mode);
-    if (mode === 'light') {
-      setIsDark(false);
-      document.documentElement.classList.remove('dark');
-    } else if (mode === 'dark') {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
-    }
+    setIsDark(mode === 'dark');
+    saveThemeChoice(mode);
   };
 
   // Legacy support - mantém para compatibilidade
@@ -2057,7 +2047,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
   return (
     <div
-      className="min-h-screen transition-colors duration-200 bg-background overflow-x-hidden"
+      // overflow-x-clip (e não hidden): hidden criaria um contentor de scroll e o
+      // cabeçalho sticky deixaria de ficar fixo ao rolar a página.
+      className="min-h-screen transition-colors duration-200 bg-background overflow-x-clip"
     >
       {/* Background Grid - Dark Mode Only - Removido para ter fundo preto puro */}
       
@@ -2125,28 +2117,30 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
           {/* ⚠️ BANNER DE BACKEND OFFLINE */}
           {isBackendOffline && (
-            <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-4 shadow-lg border-b-4 border-red-700">
-              <div className="max-w-[1720px] mx-auto flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <AlertCircle className="w-6 h-6 mt-0.5" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg mb-1">🚨 Backend Offline - App em Modo Simulação</h3>
-                  <p className="text-sm mb-2 opacity-90">
-                    O servidor backend não está respondendo. Suas ações (criar, editar, deletar leads) <strong>NÃO serão salvas</strong>.
+            <div role="alert" className="bg-amber-500/10 border-b border-amber-500/30 px-4 sm:px-6 py-3">
+              <div className="max-w-[1720px] mx-auto flex items-center gap-3">
+                <AlertCircle aria-hidden className="w-5 h-5 flex-shrink-0 text-amber-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Sem ligação ao servidor</p>
+                  <p className="text-xs text-muted-foreground">
+                    Verifique a sua internet. As alterações não serão guardadas até a ligação voltar.
                   </p>
-                  <div className="bg-white/10 rounded-lg p-3 text-xs space-y-1">
-                    <p className="font-semibold">🔧 Como resolver:</p>
-                    <p>1. Abra o terminal na pasta do projeto</p>
-                    <p>2. Execute: <code className="bg-black/20 px-2 py-0.5 rounded">chmod +x deploy-backend.sh && ./deploy-backend.sh</code></p>
-                    <p>3. Aguarde o deploy completar e recarregue a página</p>
-                  </div>
                 </div>
                 <button
-                  onClick={() => setIsBackendOffline(false)}
-                  className="flex-shrink-0 p-2 hover:bg-white/10 rounded-lg transition"
+                  onClick={() => {
+                    setIsBackendOffline(false);
+                    void carregarLeads();
+                  }}
+                  className="flex-shrink-0 h-9 px-3 rounded-lg text-sm font-medium bg-amber-500 text-white active:bg-amber-600 transition-colors"
                 >
-                  <X className="w-5 h-5" />
+                  Tentar de novo
+                </button>
+                <button
+                  onClick={() => setIsBackendOffline(false)}
+                  aria-label="Fechar aviso"
+                  className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -2156,7 +2150,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
           <main className={`flex-1 min-w-0 ${
             currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
               ? 'overflow-hidden flex flex-col min-h-0'
-              : isMobile ? 'pb-16' : ''
+              : isMobile ? 'pb-24' : ''
           }`}>
             <PageContainer
               className={`w-full min-w-0 ${
@@ -2475,8 +2469,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
             {currentPage === 'analytics' && (
               <div className="space-y-5 sm:space-y-6 xl:space-y-8">
-                <div className="flex justify-between items-start pt-6 pb-8">
-                  <div className="space-y-2">
+                <div className="flex justify-between items-start gap-3 pt-2 pb-4 sm:pt-6 sm:pb-8">
+                  <div className="space-y-2 min-w-0">
                     <h1 className="text-[32px] font-semibold text-[#1F2937] dark:text-[#F1F5F9]" style={{ letterSpacing: '-0.5px' }}>
                       Analytics
                     </h1>
@@ -2486,12 +2480,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   </div>
                   <button
                     onClick={() => setModalReportExporter(true)}
-                    className="px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 rounded-lg flex items-center gap-2"
+                    className="flex-shrink-0 h-10 px-3.5 sm:px-4 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 rounded-lg flex items-center gap-2 text-sm font-medium"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg aria-hidden className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Exportar Relatório
+                    <span className="sm:hidden">Exportar</span>
+                    <span className="hidden sm:inline">Exportar Relatório</span>
                   </button>
                 </div>
                 <AdvancedAnalytics leads={leads as any} isDark={isDark} />
@@ -2558,20 +2553,29 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
               <button
                 key={page}
                 onClick={() => handleNavigate(page as any)}
-                className={`flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors ${
-                  active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                aria-current={active ? 'page' : undefined}
+                className={`group flex-1 flex flex-col items-center justify-center gap-1 text-[12px] font-medium transition-colors touch-manipulation ${
+                  active ? 'text-primary' : 'text-muted-foreground'
                 }`}
               >
-                <span className={active ? 'text-primary' : ''}>{icon}</span>
+                {/* Indicador "pílula" do item ativo (Material 3) + feedback ao tocar */}
+                <span aria-hidden className={`flex items-center justify-center w-14 h-7 rounded-full transition-colors duration-150 ${
+                  active ? 'bg-primary/15' : 'group-active:bg-muted'
+                }`}>
+                  {icon}
+                </span>
                 {label}
               </button>
             );
           })}
           <button
             onClick={() => setIsSidebarOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+            aria-expanded={isSidebarOpen}
+            className="group flex-1 flex flex-col items-center justify-center gap-1 text-[12px] font-medium text-muted-foreground transition-colors touch-manipulation"
           >
-            <Menu size={20} />
+            <span aria-hidden className="flex items-center justify-center w-14 h-7 rounded-full transition-colors duration-150 group-active:bg-muted">
+              <Menu size={20} />
+            </span>
             Menu
           </button>
         </nav>

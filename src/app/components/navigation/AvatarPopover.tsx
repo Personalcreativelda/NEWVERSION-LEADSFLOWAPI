@@ -17,6 +17,8 @@ interface AvatarPopoverProps {
   onLogout: () => void;
   language: Language;
   isDark?: boolean;
+  /** Alinhamento do menu: 'end' quando o avatar está à direita (desktop), 'start' à esquerda (mobile). */
+  align?: 'start' | 'end';
 }
 
 export default function AvatarPopover({
@@ -25,6 +27,7 @@ export default function AvatarPopover({
   onLogout,
   language,
   isDark = true,
+  align = 'end',
 }: AvatarPopoverProps) {
   const t = translations[language];
   
@@ -40,7 +43,7 @@ export default function AvatarPopover({
           </Avatar>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64 p-2 bg-card border-border">
+      <DropdownMenuContent align={align} className="w-64 p-2 bg-card border-border">
         {/* User Info Header */}
         <div className="px-3 py-3 mb-1">
           <p className="text-sm font-semibold text-foreground">

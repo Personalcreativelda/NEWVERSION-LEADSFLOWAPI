@@ -151,8 +151,9 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
 
   return (
     <div id="plan-limits-card" className="space-y-4">
-      {/* Header com botão de atualizar limites e botão de abrir modal de upgrade */}
-      <div id="dashboard-welcome" className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+      {/* Header com botão de atualizar limites e botão de abrir modal de upgrade (sm+; no
+          telemóvel estas ações ficam no cabeçalho do cartão compacto abaixo) */}
+      <div id="dashboard-welcome" className="hidden sm:flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2 items-center w-full md:w-auto">
           {onRefresh && (
             <button
@@ -275,8 +276,79 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
         </div>
       )}
 
-      {/* Grid de Cards Horizontais com Círculos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+      {/* Telemóvel: um único cartão compacto com os três limites, em vez de três cartões
+          altos que empurravam o resto do painel para baixo */}
+      <DashboardCard disableContentPadding className="sm:hidden">
+        <div className="p-4">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="text-[15px] font-semibold text-foreground">Uso do plano</h3>
+            <div className="flex items-center gap-1">
+              {onRefresh && (
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  aria-label="Atualizar limites"
+                  className="w-11 h-11 -my-2 flex items-center justify-center rounded-full text-muted-foreground transition-colors active:bg-muted disabled:opacity-50"
+                >
+                  <RefreshCw aria-hidden className={`w-[18px] h-[18px] ${refreshing ? 'animate-spin' : ''}`} />
+                </button>
+              )}
+              {!algumLimiteEsgotado && (
+                <button
+                  onClick={onUpgrade}
+                  className="h-9 px-3.5 rounded-full bg-indigo-600 active:bg-indigo-700 text-white text-[13px] font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <Crown aria-hidden className="w-4 h-4" />
+                  Upgrade
+                </button>
+              )}
+            </div>
+          </div>
+
+          <ul className="space-y-3.5">
+            {limitCards.map((card) => {
+              const Icon = card.icon;
+              const unlimited = card.total === -1;
+              const usedPct = Math.round(card.percentual);
+              return (
+                <li key={card.title} className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${card.esgotado ? 'bg-red-500/10' : 'bg-muted'}`}>
+                    <Icon aria-hidden className={`w-[18px] h-[18px] ${card.iconColor}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-medium text-foreground">{card.title}</span>
+                      <span className={`text-[13px] tabular-nums truncate ${card.esgotado ? 'text-red-500 dark:text-red-400 font-semibold' : 'text-muted-foreground'}`}>
+                        {unlimited
+                          ? 'Ilimitado'
+                          : card.esgotado
+                            ? 'Limite esgotado'
+                            : `${card.restante.toLocaleString()} de ${card.total.toLocaleString()} restantes`}
+                      </span>
+                    </div>
+                    <div
+                      role="progressbar"
+                      aria-label={`${card.title}: ${usedPct}% usado`}
+                      aria-valuenow={usedPct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden"
+                    >
+                      <div
+                        className="h-full rounded-full transition-[width] duration-700"
+                        style={{ width: `${unlimited ? 0 : card.percentual}%`, backgroundColor: card.colors.stroke }}
+                      />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </DashboardCard>
+
+      {/* Grid de Cards Horizontais com Círculos (sm+) */}
+      <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
         {limitCards.map((card, index) => {
           const Icon = card.icon;
           
