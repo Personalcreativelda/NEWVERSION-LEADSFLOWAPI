@@ -69,6 +69,20 @@ interface Campaign {
 
 const INITIAL_CAMPAIGNS: Campaign[] = [];
 
+// Estados vindos da API → as secções da página. Estados fora desta lista (ex.: 'sent'
+// do email, 'pending', 'cancelled') não entravam em nenhuma secção e a campanha
+// ficava invisível — mesmo encontrada pela pesquisa.
+function normalizeCampaignStatus(raw: unknown): Campaign['status'] {
+  const s = String(raw ?? '').toLowerCase();
+  if (s === 'active' || s === 'running' || s === 'open' || s === 'in_progress' || s === 'processing' || s === 'queued') return 'active';
+  if (s === 'sending') return 'sending';
+  if (s === 'paused') return 'paused';
+  if (s === 'scheduled' || s === 'pending') return 'scheduled';
+  if (s === 'completed' || s === 'sent' || s === 'finished' || s === 'done') return 'completed';
+  if (s === 'failed' || s === 'error' || s === 'cancelled' || s === 'canceled' || s === 'stopped') return 'failed';
+  return 'draft';
+}
+
 // Rótulos dos estados, também usados na pesquisa ("agendada", "concluída"…)
 const CAMPAIGN_STATUS_LABELS: Record<Campaign['status'], string> = {
   active: 'ativa',
@@ -178,7 +192,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
             id: campaign.id,
             name: campaign.name,
             type: campaign.type || 'whatsapp',
-            status: campaign.status,
+            status: normalizeCampaignStatus(campaign.status),
             totalRecipients: settings.recipientCount || 0,
             sent: stats.sent || 0,
             delivered: stats.delivered || 0,
@@ -227,7 +241,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
               id: c.id,
               name: c.campaign_name,
               type: 'email' as const,
-              status: c.status,
+              status: normalizeCampaignStatus(c.status),
               totalRecipients: c.recipient_count || 0,
               sent: c.sent_count || 0,
               delivered: c.delivered_count || 0,
@@ -271,7 +285,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
             id: c.id,
             name: c.campaign_name,
             type: 'sms' as const,
-            status: c.status,
+            status: normalizeCampaignStatus(c.status),
             totalRecipients: c.recipient_count || 0,
             sent: c.sent_count || 0,
             delivered: c.delivered_count || 0,
@@ -947,6 +961,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
     matchesSearch(searchTerm, c.name, c.template, c.settings?.subject, CAMPAIGN_STATUS_LABELS[c.status])
   );
   const filteredCampaigns = searchMatches.filter(c => c.type === activeTab);
+  const isSearching = searchTerm.trim() !== '';
   const countByChannel = (type: Campaign['type']) => searchMatches.filter(c => c.type === type).length;
 
   // Se o canal aberto não tem resultados mas outro tem, mostra esse
@@ -1370,7 +1385,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     <UpdatingBadge />
                   </div>
                 )}
-                <section>
+                <section className={isSearching && activeCampaigns.length === 0 ? 'hidden' : undefined}>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <PlayCircle className="w-5 h-5 text-[#10B981]" />
                     <span>Campanhas Ativas</span>
@@ -1455,7 +1470,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 </section>
 
                 {/* Scheduled Campaigns */}
-                <section>
+                <section className={isSearching && scheduledCampaigns.length === 0 ? 'hidden' : undefined}>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <Clock className="w-5 h-5 text-[#F59E0B]" />
                     <span>Campanhas Agendadas</span>
@@ -1537,7 +1552,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 </section>
 
                 {/* Draft/Saved Campaigns */}
-                <section>
+                <section className={isSearching && draftCampaigns.length === 0 ? 'hidden' : undefined}>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <Save className="w-5 h-5 text-blue-500" />
                     <span>Campanhas Salvas (Rascunhos)</span>
@@ -1605,7 +1620,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 </section>
 
                 {/* Completed Campaigns */}
-                <section>
+                <section className={isSearching && completedCampaigns.length === 0 ? 'hidden' : undefined}>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
                     <span>Campanhas Concluídas</span>
@@ -1671,7 +1686,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   <section>
                     <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                       <XCircle className="w-5 h-5 text-red-500" />
-                      <span>Campanhas Falhadas</span>
+                      <span>Canceladas ou com falha</span>
                       <span className="text-sm font-normal text-muted-foreground">({failedCampaigns.length})</span>
                     </h3>
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">

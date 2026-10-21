@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Languages } from 'lucide-react';
 import AvatarPopover from './AvatarPopover';
 import ThemeSelector from './ThemeSelector';
-import Breadcrumbs from './Breadcrumbs';
 import { NotificationBell } from '../dashboard/NotificationBell';
 import { Language, saveLanguage, translations } from '../../utils/i18n';
 
@@ -116,9 +115,6 @@ export default function RefactoredHeader({
             align="start"
           />
         </div>
-
-        {/* Desktop: trilho de navegação (páginas reais do LeadFlow) */}
-        <Breadcrumbs currentPage={currentPage || 'dashboard'} language={language} className="hidden lg:block" />
 
         {/* Right Section: Notificações + Idioma + Theme + Avatar + Logout */}
         <div className="flex items-center gap-0.5 ml-auto">
