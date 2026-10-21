@@ -1,5 +1,6 @@
 // INBOX: Conversation item - ManyChat-style
 import type { ConversationWithDetails, ConversationTagInfo } from '../../types/inbox';
+import { usableImageUrl } from '../../utils/media-url';
 import {
     MessageCircle,
     Facebook,
@@ -112,9 +113,9 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
     const lastMessage = conversation.last_message;
     const channel = conversation.channel;
     const isGroup = (conversation as any).is_group || conversation.metadata?.is_group || contact?.is_group;
-    const avatarUrl = isGroup
+    const avatarUrl = usableImageUrl(isGroup
         ? (conversation.metadata?.group_picture || conversation.metadata?.profile_picture || contact?.avatar_url || null)
-        : (contact?.avatar_url || null);
+        : (contact?.avatar_url || null));
     const displayName = isGroup
         ? (conversation.metadata?.group_name || contact?.name || 'Grupo WhatsApp')
         : (contact?.name || contact?.phone || 'Desconhecido');

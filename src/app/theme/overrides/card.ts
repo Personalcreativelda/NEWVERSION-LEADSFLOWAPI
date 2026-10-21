@@ -6,12 +6,24 @@ import type { Theme } from '@mui/material/styles';
 // são o dobro dos do Minimal Kit (spacing(6,6,0)/spacing(6) em vez de
 // spacing(3,3,0)/spacing(3)) para preservar o mesmo padding em pixels (24px).
 export function cardOverrides(theme: Theme) {
+  const isDark = theme.palette.mode === 'dark';
   return {
+    // Superfícies MUI usam as mesmas variáveis de cor do resto do app (globals.css)
+    // e sem a camada clara de "elevação" que o MUI aplica no modo escuro.
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+        },
+      },
+    },
     MuiCard: {
       styleOverrides: {
         root: {
           position: 'relative' as const,
-          boxShadow: theme.customShadows.card,
+          backgroundColor: 'hsl(var(--card))',
+          boxShadow: isDark ? 'none' : theme.customShadows.card,
+          border: isDark ? '1px solid rgba(255, 255, 255, 0.06)' : undefined,
           borderRadius: Number(theme.shape.borderRadius) * 2,
           zIndex: 0, // Fix Safari overflow:hidden com border-radius
         },

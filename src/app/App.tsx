@@ -109,13 +109,6 @@ function reportAuthError(code: string, detail?: string): void {
   }
 }
 
-declare global {
-  interface Window {
-    chatwootSDK?: {
-      run: (options: { websiteToken: string; baseUrl: string }) => void;
-    };
-  }
-}
 
 // LeadsFlow SAAS - Main App Component
 type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'settings' | 'admin' | 'setup' | 'reset-password' | 'forgot-password' | 'agent-call' | 'accept-invite';
@@ -284,43 +277,6 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       isLoggingOutRef.current = false;
     }
   }, [homePage]);
-
-  useEffect(() => {
-    const BASE_URL = import.meta.env.VITE_CHATWOOT_URL;
-    const WEBSITE_TOKEN = import.meta.env.VITE_CHATWOOT_TOKEN;
-
-    // Skip Chatwoot initialization if not configured
-    if (!BASE_URL || !WEBSITE_TOKEN) {
-      return;
-    }
-
-    const initChatwoot = () => {
-      if (window.chatwootSDK) {
-        window.chatwootSDK.run({
-          websiteToken: WEBSITE_TOKEN,
-          baseUrl: BASE_URL,
-        });
-      }
-    };
-
-    const existingScript = document.getElementById('chatwoot-sdk');
-    if (existingScript) {
-      initChatwoot();
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.id = 'chatwoot-sdk';
-    script.src = `${BASE_URL}/packs/js/sdk.js`;
-    script.async = true;
-    script.dataset.chatwoot = 'true';
-    script.onload = initChatwoot;
-    document.body.appendChild(script);
-
-    return () => {
-      // Keep widget available across navigation; no cleanup required
-    };
-  }, []);
 
   // ✅ AUTO-REFRESH TOKEN - Renova o token a cada 30 minutos para evitar expiração
   useEffect(() => {

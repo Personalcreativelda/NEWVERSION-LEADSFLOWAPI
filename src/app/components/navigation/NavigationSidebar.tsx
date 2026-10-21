@@ -314,7 +314,8 @@ export default function NavigationSidebar({
         ref={sidebarRef}
         className={`sidebar-root flex flex-col flex-shrink-0 ${
           isMobile
-            ? `fixed top-0 left-0 z-[10000] h-screen w-64 transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`
+            // Fechado: sem sombra — fora do ecrã ela aparecia como uma linha na borda esquerda
+            ? `fixed top-0 left-0 z-[10000] h-screen w-64 transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full shadow-none!'}`
             : `fixed top-0 left-0 h-screen z-[10000] ${isResizing ? '' : 'transition-[width] duration-200 ease-out'}`
         }`}
         style={!isMobile ? { width: computedWidth } : undefined}
@@ -542,8 +543,9 @@ export default function NavigationSidebar({
                 </button>
               )}
 
-              {/* Chat de suporte — no app Android substitui o botão flutuante */}
-              {isNativeApp() && !isCollapsed && (
+              {/* Chat de suporte — no app Android e no layout mobile da web substitui o
+                  botão flutuante, que aí fica escondido (ver has-bottom-nav em globals.css) */}
+              {(isNativeApp() || isMobile) && !isCollapsed && (
                 <button
                   onClick={() => {
                     onClose();

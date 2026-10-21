@@ -1199,8 +1199,10 @@ html.native-app body {
   touch-action: manipulation; /* sem atraso de 300ms no toque, mantém o zoom por pinça */
 }
 
-/* Botão flutuante do chat de suporte: no app abre-se pelo Menu → "Chat de suporte". */
-html.native-app #lfw-btn {
+/* Botão flutuante do chat de suporte: no app, e na web quando há barra de navegação
+   inferior (painel em < 1024px), abre-se pelo Menu → "Chat de suporte". */
+html.native-app #lfw-btn,
+html.has-bottom-nav #lfw-btn {
   display: none !important;
 }
 

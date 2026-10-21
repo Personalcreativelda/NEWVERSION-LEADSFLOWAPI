@@ -5,6 +5,7 @@ import { UploadProgressIndicator } from './UploadProgressIndicator';
 import { ChevronDown, Forward, Trash2, Reply, Paperclip, ChevronDown as CollapseIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import DOMPurify from 'dompurify';
+import { isInternalMediaUrl } from '../../utils/media-url';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -171,7 +172,9 @@ export function MessageBubble({
 }: MessageBubbleProps) {
     const isOut = message.direction === 'out';
     const [imageError, setImageError]       = useState(false);
-    const [useProxy, setUseProxy]           = useState(false);
+    // Média num host interno do servidor (ex.: MinIO) só abre pelo proxy da API: ir
+    // direto ao proxy evita o pedido falhado (ERR_NAME_NOT_RESOLVED) na consola
+    const [useProxy, setUseProxy]           = useState(() => isInternalMediaUrl(message.media_url));
     const [menuOpen, setMenuOpen]           = useState(false);
     const [hovered, setHovered]             = useState(false);
     const [transcription, setTranscription] = useState<string | null>(

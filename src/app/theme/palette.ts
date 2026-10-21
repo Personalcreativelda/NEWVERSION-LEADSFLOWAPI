@@ -158,9 +158,11 @@ export function palette(mode: 'light' | 'dark') {
       secondary: GREY[500],
       disabled: GREY[600],
     },
+    // Igual ao --background/--card do modo escuro em globals.css (hsl 220 6% 10%),
+    // para os cartões MUI não ficarem cinzento-azulados ao lado do resto do app.
     background: {
-      paper: GREY[900],
-      default: GREY[900],
+      paper: '#18191B',
+      default: '#18191B',
       neutral: alpha(GREY[500], 0.12),
     },
     action: {

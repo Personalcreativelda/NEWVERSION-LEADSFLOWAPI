@@ -190,6 +190,12 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     return saved !== null ? Number(JSON.parse(saved)) : SIDEBAR_DEFAULT_WIDTH;
   });
   const [isMobile, setIsMobile] = useState(false);
+  // Com a barra inferior visível o botão flutuante do chat de suporte fica escondido
+  // (abre-se pelo Menu) — ver html.has-bottom-nav em globals.css
+  useEffect(() => {
+    document.documentElement.classList.toggle('has-bottom-nav', isMobile);
+    return () => document.documentElement.classList.remove('has-bottom-nav');
+  }, [isMobile]);
   const [filtrosAplicados, setFiltrosAplicados] = useState({ origem: '', status: '', busca: '' });
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -235,17 +241,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   });
   const [whatsappImportKey, setWhatsappImportKey] = useState<number>(Date.now()); // ✅ Key única para forçar remontagem
   
-  // ✅ DEBUG - Rastrear mudanças no estado whatsappContacts
-  useEffect(() => {
-    console.log('[Dashboard] ================================================');
-    console.log('[Dashboard] 📊 ESTADO whatsappContacts MUDOU');
-    console.log('[Dashboard] 📈 Novo tamanho:', whatsappContacts.length);
-    console.log('[Dashboard] 📋 Sample (3 primeiros):', whatsappContacts.slice(0, 3));
-    console.log('[Dashboard] 🔍 Stack trace de onde veio a mudança:');
-    console.trace();
-    console.log('[Dashboard] ================================================');
-  }, [whatsappContacts]);
-
   // Onboarding state
   const [showTour, setShowTour] = useState(false);
   const [showWelcomeVideo, setShowWelcomeVideo] = useState(false);

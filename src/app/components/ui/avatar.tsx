@@ -4,6 +4,7 @@ import * as React from "react";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
 
 import { cn } from "./utils";
+import { usableImageUrl } from "../../utils/media-url";
 
 function Avatar({
   className,
@@ -23,12 +24,15 @@ function Avatar({
 
 function AvatarImage({
   className,
+  src,
   ...props
 }: React.ComponentProps<typeof AvatarPrimitive.Image>) {
+  // Fotos de perfil já expiradas no CDN da Meta → sem pedido, mostra o AvatarFallback
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
       className={cn("aspect-square size-full", className)}
+      src={usableImageUrl(src) ?? undefined}
       {...props}
     />
   );

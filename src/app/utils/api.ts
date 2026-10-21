@@ -2,6 +2,7 @@ import { mockAuth } from './auth-mock';
 import { getApiBaseUrl } from './api-client';
 import { logger } from './logger';
 import { isNativeApp, openNativeOAuth, NATIVE_OAUTH_REDIRECT } from '../../native';
+import { usableImageUrl } from './media-url';
 import type { Lead, LeadNote, ScheduledConversation, InboxConversation, Message } from '../types';
 
 const API_BASE_URL = getApiBaseUrl();
@@ -1018,7 +1019,7 @@ const mapLeadFromApi = (lead: any): Lead => {
     marcado_email: lead.marcado_email ?? false,
     valor: lead.deal_value ?? custom.valor ?? lead.valor ?? 0,
     deal_value: lead.deal_value ?? custom.valor ?? lead.valor ?? 0,
-    avatarUrl: lead.avatar_url ?? null,
+    avatarUrl: usableImageUrl(lead.avatar_url),
     empresa: lead.company || lead.empresa || '',
     createdAt: lead.created_at,
     capturedAt: lead.captured_at || lead.created_at,

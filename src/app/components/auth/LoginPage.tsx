@@ -625,7 +625,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
             {/* Email */}
             <div>
               <label htmlFor="email" style={{ display: 'block', fontSize: '14px', color: c.label, marginBottom: '8px', fontWeight: 500 }}>Email</label>
-              <Input ref={emailRef} id="email" type="email" placeholder="seu@email.com" value={email}
+              <Input ref={emailRef} id="email" type="email" autoComplete="email" placeholder="seu@email.com" value={email}
                 onChange={(e) => handleEmailChange(e.target.value)} required
                 aria-invalid={!!fieldErrors.email} aria-describedby={fieldErrors.email ? 'email-error' : undefined}
                 style={{
@@ -655,7 +655,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
                 </button>
               </div>
               <div className="relative">
-                <Input ref={passwordRef} id="password" type={showPassword ? 'text' : 'password'}
+                <Input ref={passwordRef} id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password"
                   placeholder="Sua senha" value={password}
                   onChange={(e) => handlePasswordChange(e.target.value)} required
                   aria-invalid={!!fieldErrors.password} aria-describedby={fieldErrors.password ? 'password-error' : undefined}

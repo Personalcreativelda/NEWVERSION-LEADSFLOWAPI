@@ -1,6 +1,7 @@
 // INBOX: Chat header - ManyChat-style with channel badge & resolve
 import React, { useState, useRef, useEffect } from 'react';
 import type { ConversationWithDetails } from '../../types/inbox';
+import { usableImageUrl } from '../../utils/media-url';
 import {
     MoreVertical,
     ChevronLeft,
@@ -66,9 +67,9 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
     const contactName = isGroup
         ? (conversation.metadata?.group_name || conversation.contact?.name || 'Grupo')
         : (conversation.contact?.name || conversation.contact?.phone || 'Contato');
-    const avatarUrl = isGroup
+    const avatarUrl = usableImageUrl(isGroup
         ? (conversation.metadata?.group_picture || conversation.metadata?.profile_picture || conversation.contact?.avatar_url || null)
-        : (conversation.contact?.avatar_url || null);
+        : (conversation.contact?.avatar_url || null));
     const channelType = conversation.channel?.type || 'whatsapp';
     const channelInfo = CHANNEL_CONFIG[channelType];
     const ChannelIcon = channelInfo?.icon || MessageCircle;
