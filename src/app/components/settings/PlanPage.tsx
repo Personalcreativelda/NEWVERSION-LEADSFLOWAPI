@@ -141,9 +141,9 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
   };
 
   return (
-    <div className="max-w-6xl space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
 
-      <PageHeader className="mb-0" title="Planos e Preços" description="O seu plano atual e opções de upgrade" icon={Crown} />
+      <PageHeader title="Planos e Preços" description="O seu plano atual e opções de upgrade" icon={Crown} />
 
       {/* ── CARD PLANO ATIVO ── */}
       <div className={`rounded-xl border-2 bg-gradient-to-br ${gradientMap[currentPlan] || 'from-gray-500/10 to-gray-600/5'} ${borderColorMap[currentPlan] || 'border-gray-500/40'} p-6`}>

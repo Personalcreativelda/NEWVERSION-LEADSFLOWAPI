@@ -933,7 +933,6 @@ export default function RemarketingPage() {
         <main className="space-y-6">
 
           <PageHeader
-            className="mb-0"
             title="Remarketing"
             description="Flows automáticos para reativar leads"
             icon={Repeat2}

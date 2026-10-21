@@ -222,7 +222,6 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   return (
     <div className="space-y-6">
       <PageHeader
-        className="mb-0"
         title="Tarefas e Follow-ups"
         description="Atividades e lembretes da sua equipa"
         icon={CheckSquare}

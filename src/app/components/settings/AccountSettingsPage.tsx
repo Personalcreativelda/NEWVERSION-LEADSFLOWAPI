@@ -257,7 +257,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
   ];
 
   return (
-    <div className="max-w-4xl">
+    <div>
       <PageHeader title="Configurações da Conta" description="Perfil, segurança e equipa" icon={UserCog} />
 
       {/* Tabs */}

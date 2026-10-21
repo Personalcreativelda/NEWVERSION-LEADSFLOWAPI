@@ -753,7 +753,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   ];
 
   return (
-    <div className="max-w-4xl">
+    <div>
       <PageHeader title="Integrações" description="Serviços externos ligados à sua conta" icon={Plug} />
 
       {/* Integration Cards */}
