@@ -54,9 +54,23 @@ Guarde a keystore num lugar seguro — sem ela não é possível publicar atuali
 - `.env.android` — `VITE_API_URL` usada no build Android.
 - `src/native.ts` — botão voltar do Android, status bar, splash screen.
 - `android/app/src/main/AndroidManifest.xml` — permissões (internet, microfone, câmara, notificações).
+- `src/app/utils/theme.ts` — tema claro/escuro segue o telemóvel até o utilizador escolher no ☀/🌙.
+- Ecrã de abertura: splash nativo (`res/values*/splash_colors.xml`, `styles.xml`) + ecrã HTML
+  `#app-boot` em `index.html`, escondido por `finishBootScreen` em `src/native.ts`.
+
+## Ícone e splash
+
+Gerados a partir de `assets/logo.svg` (raio do logotipo). Depois de alterar o logo:
+
+```bash
+npx sharp-cli -i assets/logo.svg -o assets/logo.png resize 1024 1024
+npx @capacitor/assets generate --android --iconBackgroundColor '#2563EB' --iconBackgroundColorDark '#1D4ED8' --splashBackgroundColor '#2563EB' --splashBackgroundColorDark '#1E3A8A'
+```
+
+(`@capacitor/assets` não está no `package.json` de propósito: traz o `sharp`, que atrasaria
+o `npm ci` do build do site.)
 
 ## Próximos passos
 
-- Ícone e splash: `npx @capacitor/assets generate` a partir de `assets/icon.png` (1024×1024).
 - Notificações push: integrar Firebase Cloud Messaging com `@capacitor/push-notifications`
   (as notificações do navegador não funcionam dentro do app).
