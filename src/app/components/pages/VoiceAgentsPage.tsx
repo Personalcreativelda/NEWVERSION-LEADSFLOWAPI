@@ -1,4 +1,5 @@
 import { matchesSearch } from '../../utils/search';
+import { OverlayModal } from '../base/OverlayModal';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Phone, Search, Plus, Power, PowerOff, Trash2, Edit3,
@@ -972,8 +973,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
 
       {/* Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-lg shadow-xl w-full max-w-[calc(100%-2rem)] sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col bg-card`}>
+        <OverlayModal onClose={() => setModalOpen(false)} className="overflow-hidden" stickyEdges={false}>
             <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3 border-b bg-card border-border`}>
               <h2 className={`text-base sm:text-lg md:text-xl font-bold flex-1 text-foreground`}>
                 {selectedAgent ? 'Editar Agente de Voz' : 'Criar Agente de Voz'}
@@ -1212,8 +1212,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 )}
               </Button>
             </div>
-          </div>
-        </div>
+        </OverlayModal>
       )}
 
       {/* Settings Modal */}

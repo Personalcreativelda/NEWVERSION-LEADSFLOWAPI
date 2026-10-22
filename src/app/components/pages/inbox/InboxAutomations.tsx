@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { OverlayModal } from '../../base/OverlayModal';
 import {
   Webhook, Plus, Settings, Power, PowerOff, Trash2, X, Check, Loader2,
   Copy, Play, Clock, AlertCircle, CheckCircle2,
@@ -538,14 +539,7 @@ export default function InboxAutomations() {
 
       {/* Create/Edit Modal */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div
-            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl"
-            style={{
-              backgroundColor: 'hsl(var(--card))',
-              borderColor: 'hsl(var(--border))',
-            }}
-          >
+        <OverlayModal onClose={() => { setCreateModalOpen(false); resetForm(); }} className="max-w-2xl">
             {/* Modal Header */}
             <div
               className="sticky top-0 z-10 flex items-center justify-between p-4 border-b"
@@ -835,20 +829,12 @@ export default function InboxAutomations() {
                 {editingId ? 'Salvar' : 'Criar Webhook'}
               </Button>
             </div>
-          </div>
-        </div>
+        </OverlayModal>
       )}
 
       {/* Logs Modal */}
       {logsModalOpen && selectedWebhook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div
-            className="w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col"
-            style={{
-              backgroundColor: 'hsl(var(--card))',
-              borderColor: 'hsl(var(--border))',
-            }}
-          >
+        <OverlayModal onClose={() => { setLogsModalOpen(false); setSelectedWebhook(null); setLogs([]); }} className="max-w-3xl overflow-hidden" stickyEdges={false}>
             {/* Header */}
             <div
               className="flex items-center justify-between p-4 border-b"
@@ -938,8 +924,7 @@ export default function InboxAutomations() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
+        </OverlayModal>
       )}
     </div>
   );

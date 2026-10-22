@@ -116,11 +116,41 @@ export default function NavigationSidebar({
   const isAdmin = user?.isAdmin === true || user?.email === 'admin@leadflow.com';
   const t = translations[language];
 
-  const filteredSidebarConfig = sidebarSearch.trim()
+  // Procura no nome, secção, palavras-chave (sinónimos e sub-páginas, ex.: "leads",
+  // "whatsapp", "senha") e nos sub-itens
+  const isSearching = sidebarSearch.trim().length > 0;
+  const filteredSidebarConfig = isSearching
     ? sidebarConfig.filter(item =>
-        matchesSearch(sidebarSearch, t[item.labelKey as keyof Translations], item.sectionLabel)
+        matchesSearch(
+          sidebarSearch,
+          t[item.labelKey as keyof Translations],
+          item.sectionLabel,
+          item.keywords,
+          item.id,
+          ...(item.children || []).map(child => t[child.labelKey as keyof Translations]),
+        )
       )
     : sidebarConfig;
+  const showAdminInSearch = isAdmin && (!isSearching ||
+    matchesSearch(sidebarSearch, t.admin, 'admin administracao', ...adminSubItems.map(sub => sub.label)));
+
+  // Enter abre o primeiro resultado; Escape limpa
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setSidebarSearch('');
+      return;
+    }
+    if (e.key !== 'Enter') return;
+    const first = filteredSidebarConfig[0];
+    if (first) {
+      handleItemClick(pathToPageId[first.path] || first.id);
+    } else if (showAdminInSearch && isSearching) {
+      handleItemClick('admin');
+    } else {
+      return;
+    }
+    setSidebarSearch('');
+  };
 
   // --- Resize logic ---
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -187,7 +217,7 @@ export default function NavigationSidebar({
       if (item.id === 'inbox') {
         return (
           <React.Fragment key={item.id}>
-            {item.sectionLabel && (
+            {item.sectionLabel && !isSearching && (
               isCollapsed
                 ? <li className="sidebar-collapsed-divider" />
                 : <li className="px-3 pt-6 pb-1.5 sidebar-section-label">
@@ -215,7 +245,7 @@ export default function NavigationSidebar({
 
       return (
         <React.Fragment key={item.id}>
-          {item.sectionLabel && (
+          {item.sectionLabel && !isSearching && (
             isCollapsed
               ? <li className="sidebar-collapsed-divider" />
               : <li className="px-3 pt-6 pb-1.5 sidebar-section-label">
@@ -253,7 +283,7 @@ export default function NavigationSidebar({
     // Leaf item
     return (
       <React.Fragment key={item.id}>
-        {item.sectionLabel && (
+        {item.sectionLabel && !isSearching && (
           isCollapsed
             ? <li className="sidebar-collapsed-divider" />
             : <li className="px-3 pt-6 pb-1.5 sidebar-section-label">
@@ -360,7 +390,7 @@ export default function NavigationSidebar({
           isso tocar em qualquer sítio fora da gaveta fecha-a. */}
       {isMobile && (
         <div
-          className={`fixed inset-0 z-[9995] bg-black/50 transition-opacity duration-300 ${
+          className={`fixed inset-0 z-[46] bg-black/50 transition-opacity duration-300 ${
             isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
           style={dragX ? { opacity: Math.max(0, 1 + dragX / 300), transition: 'none' } : undefined}
@@ -379,8 +409,8 @@ export default function NavigationSidebar({
         className={`sidebar-root flex flex-col flex-shrink-0 ${
           isMobile
             // Fechado: sem sombra — fora do ecrã ela aparecia como uma linha na borda esquerda
-            ? `sidebar-mobile fixed top-0 left-0 z-[10000] h-[100dvh] w-[85vw] max-w-[320px] rounded-r-2xl overflow-hidden ease-[cubic-bezier(0.32,0.72,0,1)] ${dragX ? '' : 'transition-transform duration-300'} ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full shadow-none!'}`
-            : `fixed top-0 left-0 h-screen z-[10000] ${isResizing ? '' : 'transition-[width] duration-200 ease-out'}`
+            ? `sidebar-mobile fixed top-0 left-0 z-[47] h-[100dvh] w-[85vw] max-w-[320px] rounded-r-2xl overflow-hidden ease-[cubic-bezier(0.32,0.72,0,1)] ${dragX ? '' : 'transition-transform duration-300'} ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full shadow-none!'}`
+            : `fixed top-0 left-0 h-screen z-40 ${isResizing ? '' : 'transition-[width] duration-200 ease-out'}`
         }`}
         style={!isMobile ? { width: computedWidth } : dragX ? { transform: `translateX(${dragX}px)` } : undefined}
       >
@@ -443,7 +473,9 @@ export default function NavigationSidebar({
                     type="text"
                     value={sidebarSearch}
                     onChange={e => setSidebarSearch(e.target.value)}
-                    placeholder="Buscar..."
+                    onKeyDown={handleSearchKeyDown}
+                    placeholder="Buscar páginas..."
+                    aria-label="Buscar páginas"
                     className="sidebar-search-input w-full pl-8 pr-3 py-[7px] text-[12px] rounded-md"
                   />
                 </div>
@@ -453,8 +485,16 @@ export default function NavigationSidebar({
             <ul className="space-y-1">
               {filteredSidebarConfig.map(renderItem)}
 
+              {isSearching && filteredSidebarConfig.length === 0 && !showAdminInSearch && !isCollapsed && (
+                <li className="px-3 py-6 text-center">
+                  <Search className="w-5 h-5 mx-auto mb-2 text-[hsl(var(--sidebar-muted))] opacity-60" />
+                  <p className="text-[13px] text-[hsl(var(--sidebar-foreground)/0.7)]">Nada encontrado</p>
+                  <p className="text-[12px] mt-0.5 text-[hsl(var(--sidebar-muted))]">Tente outro termo, ex.: "leads" ou "whatsapp"</p>
+                </li>
+              )}
+
               {/* Admin */}
-              {isAdmin && (
+              {showAdminInSearch && (
                 <li className={`pt-2 mt-2 relative ${isCollapsed ? 'group flex justify-center pb-0.5 px-2' : ''}`}>
                   {!isCollapsed && (
                     <div className="absolute top-0 left-3 right-3 h-px bg-[hsl(var(--sidebar-border))]" />

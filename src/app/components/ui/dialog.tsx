@@ -39,7 +39,7 @@ const DialogOverlay = React.forwardRef<
       ref={ref}
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-[9998] bg-black/50 flex items-center justify-center",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-[9998] bg-black/55 backdrop-blur-[2px]",
         className,
       )}
       {...props}
@@ -56,27 +56,30 @@ function DialogContent({
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
+      {/* Telemóvel: folha que sobe do fundo, largura total (como no Slack/Notion).
+          Desktop: cartão centrado. Fica acima de cabeçalho, sidebar e barra inferior. */}
+      <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center pointer-events-none sm:p-6">
         <DialogPrimitive.Content
           data-slot="dialog-content"
           className={cn(
-            // Base — mobile-first: full width with side margin, capped height, scrollable
-            "modal-panel relative bg-card border-border shadow-2xl",
-            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            "relative flex flex-col gap-5 bg-card text-card-foreground border border-border shadow-2xl",
+            "pointer-events-auto w-full max-w-lg",
+            "rounded-t-2xl rounded-b-none sm:rounded-2xl",
+            "max-h-[92dvh] sm:max-h-[min(88dvh,820px)] overflow-y-auto overscroll-contain",
+            "p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out duration-200",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-            "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-            "pointer-events-auto w-full mx-4 sm:mx-0",
-            "max-w-[calc(100vw-2rem)] sm:max-w-lg",
-            "max-h-[92dvh] overflow-y-auto",
-            "gap-4 rounded-lg border p-4 sm:p-6 duration-200",
+            "data-[state=open]:slide-in-from-bottom-10 data-[state=closed]:slide-out-to-bottom-10",
+            "sm:data-[state=open]:slide-in-from-bottom-2 sm:data-[state=closed]:slide-out-to-bottom-2",
+            "sm:data-[state=open]:zoom-in-[0.97] sm:data-[state=closed]:zoom-out-[0.97]",
             className,
           )}
           {...props}
         >
           {children}
-          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <DialogPrimitive.Close className="absolute right-3 top-3 sm:right-4 sm:top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none">
             <XIcon className="h-4 w-4" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">Fechar</span>
           </DialogPrimitive.Close>
         </DialogPrimitive.Content>
       </div>
@@ -88,7 +91,8 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+      // pr-10: o título nunca passa por baixo do botão fechar
+      className={cn("flex flex-col gap-1.5 pr-10 text-left", className)}
       {...props}
     />
   );
@@ -99,7 +103,9 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        // Telemóvel: botões em largura total, o principal em cima. Desktop: à direita.
+        "flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:items-center sm:justify-end",
+        "[&>button]:w-full sm:[&>button]:w-auto [&>button]:min-h-10",
         className,
       )}
       {...props}
@@ -114,7 +120,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+      className={cn("text-lg leading-snug font-semibold tracking-tight text-foreground", className)}
       {...props}
     />
   );
@@ -127,7 +133,7 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-muted-foreground text-sm leading-relaxed", className)}
       {...props}
     />
   );

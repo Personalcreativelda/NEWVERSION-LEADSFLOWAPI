@@ -676,7 +676,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
           {/* Destinatários */}
           <div>
             <Label className="text-sm font-semibold text-foreground mb-3 block">
-              DESTINATÁRIOS
+              Destinatários
             </Label>
 
             <div className="space-y-3">
@@ -1034,7 +1034,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
           {/* Agendamento */}
           <div>
             <Label className="text-sm font-semibold text-foreground mb-3 block">
-              AGENDAMENTO
+              Agendamento
             </Label>
 
             <div className="space-y-3">

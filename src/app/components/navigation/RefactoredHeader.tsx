@@ -103,7 +103,7 @@ export default function RefactoredHeader({
   };
 
   return (
-    <header className="flex-shrink-0 sticky top-0 z-[1000] border-b backdrop-blur-xl bg-background/80 border-border dark:border-[rgba(255,255,255,0.06)] dark:bg-background/90">
+    <header className="flex-shrink-0 sticky top-0 z-30 border-b backdrop-blur-xl bg-background/80 border-border dark:border-[rgba(255,255,255,0.06)] dark:bg-background/90">
       <div className="px-4 lg:px-6 h-14 flex items-center justify-between">
         {/* Esquerda: no mobile (<1024px) o avatar do perfil seguido da saudação; no desktop
             só a saudação (o avatar fica à direita). Sem título nem ☰ — a barra inferior

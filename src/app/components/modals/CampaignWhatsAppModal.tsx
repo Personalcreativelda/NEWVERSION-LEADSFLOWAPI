@@ -1755,7 +1755,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         <div className="flex items-center gap-3">
           <MessageCircle className="w-6 h-6 text-[#25D366]" />
           <div>
-            <span>NOVA CAMPANHA (WhatsApp)</span>
+            <span>Nova Campanha WhatsApp</span>
             {autoSaveIndicator && (
               <p className="text-xs text-muted-foreground font-normal">💾 Auto-salvando...</p>
             )}
@@ -1792,7 +1792,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       }
     >
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="px-5 py-5 sm:px-6 sm:py-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
             {/* COLUNA ESQUERDA - EDITOR */}
@@ -1928,7 +1928,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
               {/* Mensagem com Preview */}
               <div>
                 <Label className="text-sm font-semibold text-foreground mb-3 block">
-                  MENSAGEM *
+                  Mensagem *
                 </Label>
 
                 {/* Toolbar */}
@@ -2224,7 +2224,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
               <div>
                 <Label className="text-sm font-semibold text-foreground mb-3 block flex items-center gap-2">
                   <Eye className="w-4 h-4" />
-                  PREVIEW EM TEMPO REAL
+                  Pré-visualização
                 </Label>
 
                 <div className="bg-[#ECE5DD] dark:bg-[#0B141A] p-4 rounded-lg border border-[var(--border-input)]">
@@ -2361,7 +2361,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
               {/* Destinatários */}
               <div>
                 <Label className="text-sm font-semibold text-foreground mb-3 block">
-                  DESTINATÁRIOS *
+                  Destinatários *
                 </Label>
 
                 <div className="space-y-2">
@@ -2571,7 +2571,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
               {/* Agendamento */}
               <div>
                 <Label className="text-sm font-semibold text-foreground mb-3 block">
-                  AGENDAMENTO
+                  Agendamento
                 </Label>
 
                 <div className="space-y-2">

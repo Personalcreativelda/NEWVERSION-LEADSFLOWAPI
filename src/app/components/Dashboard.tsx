@@ -2542,7 +2542,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
       {/* ── Mobile bottom navigation bar ─────────────────────────────── */}
       {isMobile && (
-        <nav className="fixed bottom-0 left-0 right-0 z-[9990] bg-card border-t border-border flex items-stretch h-16 safe-area-pb"
+        <nav className="fixed bottom-0 left-0 right-0 z-[45] bg-card border-t border-border flex items-stretch h-16 safe-area-pb"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           {[
             { page: 'dashboard', icon: <LayoutDashboard size={20} />, label: 'Início' },

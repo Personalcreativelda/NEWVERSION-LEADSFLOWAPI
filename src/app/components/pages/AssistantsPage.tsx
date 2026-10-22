@@ -1,4 +1,5 @@
 import { matchesSearch } from '../../utils/search';
+import { OverlayModal } from '../base/OverlayModal';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Bot, Search, Plus, Settings, Power, PowerOff, Trash2,
@@ -1029,8 +1030,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
       {/* Connect Modal - Multi-channel */}
       {connectModalOpen && selectedAssistant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-2xl shadow-2xl bg-card border border-border">
+        <OverlayModal onClose={() => { setConnectModalOpen(false); setSelectedAssistant(null); setSelectedChannelIds([]); }} className="max-w-md">
             <div className="flex items-center justify-between p-4 border-b border-border">
               <h3 className="text-lg font-semibold text-foreground">
                 Conectar Assistente
@@ -1162,14 +1162,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 Conectar {selectedChannelIds.length > 0 ? `(${selectedChannelIds.length} ${selectedChannelIds.length === 1 ? 'canal' : 'canais'})` : '(selecione canais)'}
               </Button>
             </div>
-          </div>
-        </div>
+        </OverlayModal>
       )}
 
       {/* Config Modal */}
       {configModalOpen && selectedUserAssistant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl bg-card border border-border">
+        <OverlayModal onClose={() => { setConfigModalOpen(false); setSelectedUserAssistant(null); }} className="max-w-lg">
             <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-card border-border">
               <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
                 Configurar {selectedUserAssistant.assistant?.name}
@@ -1837,14 +1835,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 Salvar
               </Button>
             </div>
-          </div>
-        </div>
+        </OverlayModal>
       )}
 
       {/* Create/Edit Assistant Modal */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl shadow-2xl bg-card border border-border">
+        <OverlayModal onClose={() => { setCreateModalOpen(false); resetCreateForm(); }} className="max-w-lg">
             <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-card border-border">
               <h3 className="text-lg font-semibold text-foreground">
                 {editingAssistantId ? 'Editar Assistente' : 'Criar Assistente'}
@@ -2024,14 +2020,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 {editingAssistantId ? 'Salvar' : 'Criar Assistente'}
               </Button>
             </div>
-          </div>
-        </div>
+        </OverlayModal>
       )}
 
       {/* Premium Upgrade Modal */}
       {premiumModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-sm rounded-2xl shadow-2xl bg-card border border-border p-6 flex flex-col items-center text-center gap-4">
+        <OverlayModal onClose={() => setPremiumModalOpen(false)} className="max-w-sm p-6 items-center text-center gap-4" stickyEdges={false}>
             <div className="w-16 h-16 rounded-full bg-amber-500/15 flex items-center justify-center">
               <Lock className="w-8 h-8 text-amber-400" />
             </div>
@@ -2060,8 +2054,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 Ver Planos
               </Button>
             </div>
-          </div>
-        </div>
+        </OverlayModal>
       )}
     </div>
   );

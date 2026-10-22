@@ -30,7 +30,7 @@ function useHasBottomNav() {
  * Avisos das ações (toast). As variáveis do tema guardam só os componentes HSL
  * ("220 6% 10%"), por isso as cores têm de ir dentro de hsl(...) — com var(--popover)
  * direto o fundo ficava transparente. No telemóvel/tablet ficam centrados acima da
- * barra de navegação inferior; no desktop no canto inferior direito.
+ * barra de navegação inferior; no desktop em cima ao centro.
  */
 const Toaster = ({ ...props }: ToasterProps) => {
   const theme = useThemeMode();
@@ -40,8 +40,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme}
-      position={hasBottomNav ? "bottom-center" : "bottom-right"}
-      offset={hasBottomNav ? aboveNav : 24}
+      // Desktop em cima ao centro: em baixo à direita tapava os botões dos modais
+      position={hasBottomNav ? "bottom-center" : "top-center"}
+      offset={hasBottomNav ? aboveNav : 16}
       mobileOffset={aboveNav}
       richColors
       closeButton

@@ -13,11 +13,11 @@ import { cn } from '../ui/utils';
 type AppModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
 const SIZE_CLASS: Record<AppModalSize, string> = {
-  sm: 'sm:max-w-sm',
-  md: 'sm:max-w-lg',
-  lg: 'sm:max-w-2xl',
-  xl: 'sm:max-w-4xl',
-  '2xl': 'sm:max-w-5xl',
+  sm: 'max-w-sm',
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+  '2xl': 'max-w-5xl',
 };
 
 interface AppModalProps {
@@ -29,6 +29,8 @@ interface AppModalProps {
   footer?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** Classes extra para a área com scroll (corpo) */
+  bodyClassName?: string;
 }
 
 /**
@@ -36,6 +38,10 @@ interface AppModalProps {
  * Dialog, com portal/focus-trap próprios) em vez de o recriar em MUI:
  * preserva foco/teclado/portal e só acrescenta convenções de
  * header/body/footer/tamanho.
+ *
+ * Layout fixo, igual em todos os modais: cabeçalho e barra de botões ficam
+ * sempre visíveis (com separadores) e só o corpo faz scroll. Modais que passam
+ * `p-0` tratam o espaçamento do corpo eles próprios; os restantes recebem-no aqui.
  */
 export function AppModal({
   open,
@@ -46,20 +52,46 @@ export function AppModal({
   footer,
   children,
   className,
+  bodyClassName,
 }: AppModalProps) {
+  const cls = className || '';
+  // Modal com padding próprio (ex.: p-8) mantém o layout simples de sempre
+  const hasOwnPadding = /(^|\s)p-(?!0(\s|$))\S+/.test(cls);
+  const bodyHandlesPadding = hasOwnPadding || /(^|\s)p-0(\s|$)/.test(cls);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(SIZE_CLASS[size], className)}>
+      <DialogContent
+        className={cn(
+          !hasOwnPadding && 'p-0 sm:p-0 gap-0 overflow-hidden',
+          SIZE_CLASS[size],
+          cls,
+        )}
+      >
         {(title || description) && (
-          <DialogHeader>
+          <DialogHeader className="shrink-0 px-5 pt-5 pb-4 sm:px-6 border-b border-border">
             {title && <DialogTitle>{title}</DialogTitle>}
             {description && <DialogDescription>{description}</DialogDescription>}
           </DialogHeader>
         )}
 
-        {children}
+        <div
+          className={cn(
+            'flex-1 min-h-0 overflow-y-auto overscroll-contain',
+            !bodyHandlesPadding && 'px-5 py-5 sm:px-6',
+            bodyClassName,
+          )}
+        >
+          {children}
+        </div>
 
-        {footer && <DialogFooter>{footer}</DialogFooter>}
+        {footer && (
+          <DialogFooter
+            className="shrink-0 px-5 py-3.5 sm:px-6 border-t border-border bg-muted/30 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-3.5"
+          >
+            {footer}
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
