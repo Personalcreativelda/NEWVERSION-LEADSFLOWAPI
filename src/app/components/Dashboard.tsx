@@ -204,6 +204,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const initialLoadDoneRef = useRef(false); // silent background refresh after first load
+  // Último valor de "é mobile" visto no resize (começa em false, como o estado: ao abrir
+  // no telemóvel o menu começa fechado)
+  const lastIsMobileRef = useRef(false);
   const [isDeletingLeads, setIsDeletingLeads] = useState(false); // ✅ Bloquear auto-refresh durante deleção
   const [isBackendOffline, setIsBackendOffline] = useState(false); // ✅ Detectar backend offline
 
@@ -345,11 +348,15 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     }
 
     // Detect mobile/desktop
+    // O valor anterior vem de uma ref: o `isMobile` desta closure é o do primeiro render,
+    // e abrir o teclado no telemóvel (que dispara "resize") parecia sempre uma mudança
+    // para mobile — fechava o menu ao tocar na pesquisa.
     const checkMobile = () => {
       const mobile = window.innerWidth < 1024;
-      const wasMobile = isMobile;
+      const wasMobile = lastIsMobileRef.current;
+      lastIsMobileRef.current = mobile;
       setIsMobile(mobile);
-      
+
       // Apenas ajustar sidebar se mudou de mobile para desktop ou vice-versa
       if (mobile !== wasMobile) {
         if (mobile) {

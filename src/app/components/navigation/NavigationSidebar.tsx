@@ -579,7 +579,9 @@ export default function NavigationSidebar({
           </nav>
 
           {/* Footer */}
-          <div className="relative sidebar-footer-border flex-shrink-0" ref={profileMenuRef}>
+          {/* No telemóvel, durante a pesquisa (teclado aberto) o rodapé sai para os
+              resultados terem espaço */}
+          <div className={`relative sidebar-footer-border flex-shrink-0 ${isMobile && isSearching ? 'hidden' : ''}`} ref={profileMenuRef}>
             {/* Profile popup (expanded only) */}
             {!isCollapsed && profileMenuOpen && (
               <div className="sidebar-profile-menu absolute bottom-full left-2 right-2 mb-2 rounded-xl shadow-2xl overflow-hidden z-[500]">
