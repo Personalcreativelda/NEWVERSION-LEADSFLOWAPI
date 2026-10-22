@@ -4,6 +4,11 @@ import path from 'node:path';
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  define: {
+    // Hora do build. O script release:mobile passa APP_BUILD_TIME para que o pacote e o
+    // registo na API tenham exatamente o mesmo valor (ver src/live-update.ts).
+    __APP_BUILD_TIME__: JSON.stringify(Number(process.env.APP_BUILD_TIME) || Date.now()),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

@@ -33,6 +33,19 @@ const config: CapacitorConfig = {
       backgroundColor: '#2563EB',
       showSpinner: false,
     },
+    // Atualizações ao vivo auto-hospedadas (src/live-update.ts + /api/version/mobile).
+    // Modo manual: nada é pedido aos servidores da Capgo, e statsUrl vazio desliga o
+    // envio de estatísticas para eles.
+    CapacitorUpdater: {
+      autoUpdate: false,
+      statsUrl: '',
+      appReadyTimeout: 10000,
+      // APK novo instalado → volta ao código que vem dentro dele
+      resetWhenUpdate: true,
+      // Pacotes que falharam ficam na lista para não serem descarregados outra vez
+      autoDeleteFailed: false,
+      autoDeletePrevious: true,
+    },
   },
 };
 

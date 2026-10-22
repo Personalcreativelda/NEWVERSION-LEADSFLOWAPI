@@ -3,6 +3,7 @@ import { App } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { SplashScreen } from '@capacitor/splash-screen';
+import { initLiveUpdates } from './live-update';
 
 // Plugin nativo do app (android/.../SystemBarsPlugin.java).
 const SystemBars = registerPlugin<{
@@ -192,6 +193,9 @@ function finishBootScreen() {
 // Integração com o Android — no navegador não faz nada.
 export async function initNative() {
   if (!isNativeApp()) return;
+
+  // Primeiro de tudo: confirmar que este pacote web arrancou (ver live-update.ts)
+  initLiveUpdates();
 
   document.documentElement.classList.add('native-app');
   keepLinksInApp();

@@ -11,6 +11,7 @@
     "lint": "tsc --noEmit",
     "build:android": "vite build --mode android",
     "android:sync": "npm run build:android && npx cap sync android",
+    "release:mobile": "node scripts/release-mobile.mjs",
     "android:open": "npx cap open android",
     "android:run": "npm run android:sync && npx cap run android"
   },
@@ -21,6 +22,7 @@
     "@capacitor/core": "^7.6.9",
     "@capacitor/haptics": "^7.0.5",
     "@capacitor/splash-screen": "^7.0.5",
+    "@capgo/capacitor-updater": "7.51.23",
     "@dnd-kit/core": "*",
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "*",
@@ -101,6 +103,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react-swc": "^3.10.2",
     "autoprefixer": "^10.4.22",
+    "fflate": "0.8.2",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.17",
     "terser": "^5.44.1",

@@ -15,3 +15,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Hora (ms) do build web — usada pelas atualizações ao vivo do app (src/live-update.ts) */
+declare const __APP_BUILD_TIME__: number;

@@ -17,6 +17,7 @@ export const RETENTION_DAYS: Record<string, number | null> = {
   'profile-images':    null,  // permanent
   'company-logos':     null,  // permanent
   'system-assets':     null,  // permanent
+  'mobile-bundles':    null,  // permanent (atualizações ao vivo do app)
   'avatars':           null,  // permanent (legacy name)
   'campaigns':         parseInt(process.env.CAMPAIGN_RETENTION_DAYS || '90'), // legacy name
 };
@@ -79,6 +80,7 @@ interface StorageService {
   uploadBuffer(buffer: Buffer, filename: string, mimetype: string, folder: string, userId?: string): Promise<string>;
   deleteFile(url: string): Promise<void>;
   getPresignedUploadUrl?(filename: string, contentType: string, folder: string, userId?: string): Promise<PresignedUploadResult>;
+  getFileStream?(url: string): Promise<NodeJS.ReadableStream | null>;
 }
 
 class MinIOStorage implements StorageService {
@@ -237,6 +239,14 @@ class MinIOStorage implements StorageService {
     const publicUrl = `${publicBase}/${this.bucket}/${key}`;
 
     return { presignedUrl, publicUrl, key };
+  }
+
+  // Lê um ficheiro do bucket pelo URL público (para a API servir sem depender de o
+  // bucket ser de leitura pública)
+  async getFileStream(url: string): Promise<NodeJS.ReadableStream | null> {
+    const urlParts = url.split(`/${this.bucket}/`);
+    if (urlParts.length < 2) return null;
+    return this.client.getObject(this.bucket, urlParts[1]);
   }
 
   async deleteFile(url: string): Promise<void> {

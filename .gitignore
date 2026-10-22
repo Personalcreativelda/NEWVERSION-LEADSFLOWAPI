@@ -58,3 +58,7 @@ tmp/
 temp/
 *.tmp
 *.bak
+
+# Atualizações ao vivo do app (npm run release:mobile)
+dist-mobile/
+dist-mobile-*.zip
