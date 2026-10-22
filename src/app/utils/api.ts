@@ -12,7 +12,9 @@ if (!API_BASE_URL) {
 }
 
 const SESSION_EXPIRY_KEY = 'leadflow_session_expires_at';
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+// Janela de inatividade da sessão: igual à validade do refresh token no servidor
+// (7 dias). Com 24h quem não abria o app de um dia para o outro tinha de entrar de novo.
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export const startSessionExpiryTimer = () => {
   try {
@@ -76,62 +78,85 @@ const EMAIL_CONFIRMATION_ENABLED = (import.meta.env.VITE_ENABLE_EMAIL_CONFIRMATI
 
 let networkErrorCount = 0;
 const MAX_NETWORK_ERRORS = 2;
-let isRefreshingToken = false;
 
-// Ensure token is valid before making authenticated requests
-async function ensureValidToken(): Promise<void> {
-  if (!shouldRefreshToken() && !isSessionExpired()) {
-    return;
-  }
-
-  if (isRefreshingToken) {
-    // Wait for current refresh to complete
-    let attempts = 0;
-    while (isRefreshingToken && attempts < 30) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      attempts++;
-    }
-    return;
-  }
-
-  isRefreshingToken = true;
+// Validade (exp) do access token JWT, em ms; null se não der para ler
+const getAccessTokenExpiry = (): number | null => {
   try {
+    const token = localStorage.getItem('leadflow_access_token');
+    const payload = token?.split('.')[1];
+    if (!payload) return null;
+    const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof json.exp === 'number' ? json.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+};
+
+let refreshPromise: Promise<boolean> | null = null;
+
+/**
+ * Troca o refresh token por um access token novo. Pedidos em simultâneo partilham a
+ * mesma troca — o servidor invalida o refresh token usado, por isso duas trocas em
+ * paralelo faziam a segunda falhar e terminavam a sessão. Só apaga as credenciais
+ * quando o servidor recusa o refresh token; sem rede mantém-nas para tentar depois.
+ */
+export function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
     const refreshToken = localStorage.getItem('leadflow_refresh_token');
-    if (!refreshToken) {
-      throw new Error('No refresh token available');
-    }
+    if (!refreshToken || !API_BASE_URL) return false;
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
 
-    if (!response.ok) {
-      throw new Error('Token refresh failed');
-    }
+      if (!response.ok) {
+        if (response.status >= 400 && response.status < 500) {
+          logger.warn('[Auth] Refresh token rejected - clearing credentials');
+          clearSessionExpiry();
+          localStorage.removeItem('leadflow_access_token');
+          localStorage.removeItem('leadflow_refresh_token');
+        }
+        return false;
+      }
 
-    const data = await response.json();
-    if (data?.session?.access_token) {
+      const data = await response.json();
+      if (!data?.session?.access_token) return false;
+
       localStorage.setItem('leadflow_access_token', data.session.access_token);
       if (data.session.refresh_token) {
         localStorage.setItem('leadflow_refresh_token', data.session.refresh_token);
       }
       startSessionExpiryTimer();
+      return true;
+    } catch (error) {
+      logger.warn('[Auth] Token refresh failed (network):', error);
+      return false;
+    } finally {
+      refreshPromise = null;
     }
-  } catch (error) {
-    logger.error('[Auth] Failed to refresh token:', error);
-    clearSessionExpiry();
-    localStorage.removeItem('leadflow_access_token');
-    localStorage.removeItem('leadflow_refresh_token');
-  } finally {
-    isRefreshingToken = false;
-  }
+  })();
+
+  return refreshPromise;
 }
+
+// Renova o access token antes de expirar (faltando menos de 5 minutos)
+async function ensureValidToken(): Promise<void> {
+  if (!localStorage.getItem('leadflow_access_token')) return;
+  const expiry = getAccessTokenExpiry();
+  if (expiry !== null && expiry - Date.now() > REFRESH_THRESHOLD_MS) return;
+  await refreshAccessToken();
+}
+
 async function apiCall(
   endpoint: string,
   options: RequestInit = {},
-  useAuth = false
+  useAuth = false,
+  isRetry = false
 ): Promise<any> {
   if (!API_BASE_URL) {
     throw new Error('Backend indisponível. Configure VITE_API_URL ou deixe o backend acessível no mesmo domínio.');
@@ -234,6 +259,10 @@ async function apiCall(
       }
 
       if (response.status === 401 && useAuth) {
+        // Token expirado: renova com o refresh token e repete o pedido uma vez
+        if (!isRetry && await refreshAccessToken()) {
+          return apiCall(endpoint, options, useAuth, true);
+        }
         logger.warn('[API] 401 Unauthorized - clearing credentials');
         localStorage.removeItem('leadflow_access_token');
         localStorage.removeItem('leadflow_refresh_token');

@@ -118,6 +118,14 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         };
     }, []);
 
+    // Cresce com o texto até 5 linhas, como no WhatsApp (também com emoji ou resposta da IA)
+    useEffect(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    }, [content]);
+
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setContent(e.target.value);
 
@@ -505,32 +513,47 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                 </div>
             )}
 
-            {/* Input row */}
-            <div className="flex items-end gap-2">
-                {/* Action Buttons */}
-                <div className="flex items-center gap-1 mb-1">
-                    <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={disabled || isSending || showRecordingMode}
-                        className="p-2 rounded-lg transition-all duration-150 disabled:opacity-50 hover:bg-muted text-muted-foreground"
-                        title="Anexar arquivo"
-                    >
-                        <Paperclip size={18} />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => imageInputRef.current?.click()}
-                        disabled={disabled || isSending || showRecordingMode}
-                        className="p-2 rounded-lg transition-all duration-150 disabled:opacity-50 hover:bg-muted text-muted-foreground"
-                        title="Enviar imagem"
-                    >
-                        <ImageIcon size={18} />
-                    </button>
-                </div>
+            {/* Linha de escrita ao estilo WhatsApp: uma pílula fina com emoji, texto e
+                anexos lá dentro, e um botão redondo que alterna entre microfone e enviar */}
+            <div className="flex items-end gap-1.5 sm:gap-2">
+                <div className="flex-1 min-w-0 min-h-[44px] rounded-[22px] border border-border bg-muted focus-within:border-primary/40 transition-colors duration-150 flex items-end px-1 relative">
+                    {/* Emoji */}
+                    <div className="relative flex-shrink-0" ref={emojiPickerRef}>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowEmojiPicker(!showEmojiPicker);
+                            }}
+                            disabled={disabled || showRecordingMode}
+                            className="h-[42px] w-9 flex items-center justify-center text-muted-foreground hover:text-yellow-500 rounded-full transition-colors disabled:opacity-50"
+                            title="Emoji"
+                            type="button"
+                        >
+                            <Smile size={21} />
+                        </button>
 
-                {/* Input Container */}
-                <div className="flex-1 min-w-0 rounded-2xl border border-border bg-muted focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/5 transition-all duration-150 flex items-center px-4 py-1.5 relative">
+                        {/* Emoji Picker Dropdown */}
+                        {showEmojiPicker && (
+                            <div
+                                className="absolute bottom-full left-0 mb-2 p-3 rounded-xl border border-border shadow-xl bg-card z-[100] w-[280px] max-w-[calc(100vw-24px)]"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="grid grid-cols-8 gap-1">
+                                    {popularEmojis.map((emoji, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => insertEmoji(emoji)}
+                                            type="button"
+                                            className="p-1.5 hover:bg-muted/50 rounded-lg text-xl transition-colors flex items-center justify-center"
+                                        >
+                                            {emoji}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <textarea
                         ref={textareaRef}
                         value={content}
@@ -542,88 +565,72 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                             }
                         }}
                         disabled={disabled || isSending || showRecordingMode}
-                        placeholder={attachments.length > 0 ? "Adicione uma legenda (opcional)..." : showRecordingMode ? "Gravando áudio..." : "Escreva sua mensagem..."}
+                        placeholder={attachments.length > 0 ? "Legenda (opcional)" : showRecordingMode ? "Gravando áudio..." : "Mensagem"}
                         rows={1}
-                        className="w-full bg-transparent border-none focus:ring-0 text-sm text-foreground resize-none max-h-[120px] py-1.5 scrollbar-none outline-none overflow-y-auto"
+                        className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-[15px] sm:text-sm leading-5 text-foreground placeholder:text-muted-foreground resize-none max-h-[120px] py-[11px] px-1 scrollbar-none outline-none overflow-y-auto"
                     />
-                    
-                    {/* Emoji and AI Buttons */}
-                    <div className="relative flex-shrink-0 flex items-center gap-1" ref={emojiPickerRef}>
+
+                    {/* IA e anexos dentro da pílula */}
+                    <div className="flex-shrink-0 flex items-center">
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleDraftReply();
                             }}
                             disabled={disabled || showRecordingMode || isGeneratingReply}
-                            className={`p-1.5 rounded-full transition-colors disabled:opacity-50 ${isGeneratingReply ? 'text-purple-500 animate-pulse' : 'text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/20'}`}
+                            className={`h-[42px] w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-50 text-purple-500 ${isGeneratingReply ? 'animate-pulse' : 'hover:text-purple-600'}`}
                             title="Gerar resposta com IA"
                             type="button"
                         >
-                            <Sparkles size={20} />
+                            <Sparkles size={19} />
                         </button>
-                        
                         <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setShowEmojiPicker(!showEmojiPicker);
-                            }}
-                            disabled={disabled || showRecordingMode}
-                            className="p-1.5 text-muted-foreground/70 hover:text-yellow-500 rounded-full transition-colors disabled:opacity-50"
                             type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={disabled || isSending || showRecordingMode}
+                            className="h-[42px] w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-50 text-muted-foreground hover:text-foreground"
+                            title="Anexar arquivo"
                         >
-                            <Smile size={20} />
+                            <Paperclip size={19} />
                         </button>
-                        
-                        {/* Emoji Picker Dropdown */}
-                        {showEmojiPicker && (
-                            <div 
-                                className="absolute bottom-full right-0 mb-2 p-3 rounded-xl border border-border shadow-xl bg-card z-[100] w-[280px]"
-                                onClick={(e) => e.stopPropagation()}
+                        {!content.trim() && (
+                            <button
+                                type="button"
+                                onClick={() => imageInputRef.current?.click()}
+                                disabled={disabled || isSending || showRecordingMode}
+                                className="h-[42px] w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-50 text-muted-foreground hover:text-foreground"
+                                title="Enviar imagem"
                             >
-                                <div className="grid grid-cols-8 gap-1">
-                                    {popularEmojis.map((emoji, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={() => insertEmoji(emoji)}
-                                            type="button"
-                                            className="p-2 hover:bg-muted/50 rounded-lg text-xl transition-colors flex items-center justify-center"
-                                        >
-                                            {emoji}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                                <ImageIcon size={19} />
+                            </button>
                         )}
                     </div>
                 </div>
 
-                {/* Send/Voice Button */}
-                <div className="mb-1">
-                    {canSend && !showRecordingMode ? (
-                        <button
-                            onClick={handleSendWithFile}
-                            disabled={disabled || isSending}
-                            className={`p-2.5 rounded-xl text-white transition-all active:scale-95 flex items-center justify-center
-                                ${(disabled || isSending) ? 'opacity-50 cursor-not-allowed bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}
-                            `}
-                        >
-                            {isSending ? (
-                                <Loader2 size={20} className="animate-spin" />
-                            ) : (
-                                <Send size={20} className="ml-0.5" />
-                            )}
-                        </button>
-                    ) : !showRecordingMode && (
-                        <button
-                            onClick={startRecording}
-                            disabled={disabled}
-                            className="p-2.5 rounded-xl transition-all duration-150 active:scale-95 hover:bg-blue-50 dark:hover:bg-blue-900/20 bg-muted text-muted-foreground"
-                            title="Gravar áudio"
-                        >
-                            <Mic size={20} />
-                        </button>
-                    )}
-                </div>
+                {/* Enviar / gravar áudio */}
+                {canSend && !showRecordingMode ? (
+                    <button
+                        onClick={handleSendWithFile}
+                        disabled={disabled || isSending}
+                        className="h-11 w-11 flex-shrink-0 rounded-full bg-primary text-primary-foreground shadow-sm transition-all active:scale-90 hover:brightness-110 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Enviar"
+                    >
+                        {isSending ? (
+                            <Loader2 size={20} className="animate-spin" />
+                        ) : (
+                            <Send size={19} className="ml-0.5" />
+                        )}
+                    </button>
+                ) : !showRecordingMode && (
+                    <button
+                        onClick={startRecording}
+                        disabled={disabled}
+                        className="h-11 w-11 flex-shrink-0 rounded-full bg-primary text-primary-foreground shadow-sm transition-all active:scale-90 hover:brightness-110 flex items-center justify-center disabled:opacity-50"
+                        title="Gravar áudio"
+                    >
+                        <Mic size={20} />
+                    </button>
+                )}
             </div>
         </div>
     );

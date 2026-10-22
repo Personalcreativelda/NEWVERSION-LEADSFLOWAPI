@@ -262,14 +262,14 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
 
       {/* Tabs */}
       <div className="border-b border-border dark:border-border mb-6">
-        <div className="flex gap-6 overflow-x-auto">
+        <div className="flex sm:gap-6">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-1 py-3 border-b-2 transition-colors whitespace-nowrap text-sm ${
+                className={`flex-1 sm:flex-none flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 py-2.5 sm:py-3 border-b-2 transition-colors whitespace-nowrap text-xs sm:text-sm font-medium ${
                   activeTab === tab.id
                     ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                     : 'border-transparent text-muted-foreground hover:text-foreground/80'

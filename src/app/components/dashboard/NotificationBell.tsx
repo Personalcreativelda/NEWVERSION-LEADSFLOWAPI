@@ -191,6 +191,23 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
   const [dismissedReady, setDismissedReady] = useState(false);
 
   const DISMISSED_KEY = 'leadflow_dismissed_notifications';
+  const READ_KEY = 'leadflow_read_notifications';
+
+  const getLocalRead = (): Set<string> => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(READ_KEY) || '[]');
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      return new Set();
+    }
+  };
+
+  const addLocalRead = (ids: string[]) => {
+    const set = getLocalRead();
+    ids.forEach(id => set.add(id));
+    // Guarda só as mais recentes para a lista não crescer sem fim
+    localStorage.setItem(READ_KEY, JSON.stringify(Array.from(set).slice(-500)));
+  };
 
   useEffect(() => {
     try {
@@ -221,6 +238,7 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
 
   const loadNotifications = useCallback(async () => {
     const dismissedSet = new Set(dismissedIds);
+    const localRead = getLocalRead();
     const token = localStorage.getItem('leadflow_access_token');
     if (!token) {
       setNotifications([]);
@@ -237,7 +255,7 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
           timestamp: n.createdAt || n.timestamp,
           type: n.type || 'system_update',
           message: n.description || n.message,
-          read: n.isRead || n.read,
+          read: n.isRead || n.read || localRead.has(n.id),
         }));
         
         // Ordenar por prioridade e timestamp
@@ -278,25 +296,28 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Lidas/apagadas mudam logo no ecrã e ficam gravadas no aparelho; o servidor é
+  // atualizado a seguir — assim nada volta a aparecer ao atualizar a página.
   const markAsRead = async (notificationId: string, closePanel = false) => {
+    addLocalRead([notificationId]);
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+    );
+    if (closePanel) {
+      setOpen(false);
+    }
     try {
       await apiRequest(`/notifications/${notificationId}/read`, 'PUT');
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
-      );
-      
-      if (closePanel) {
-        setOpen(false);
-      }
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
     }
   };
 
   const markAllAsRead = async () => {
+    addLocalRead(notifications.map((n) => n.id));
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     try {
       await apiRequest('/notifications/mark-all-read', 'PUT');
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     } catch (error) {
       console.error('Failed to mark all as read:', error);
     }
@@ -313,21 +334,21 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
         }
       }
       
-      await apiRequest(`/notifications/${notificationId}`, 'DELETE');
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
       addDismissed([notificationId]);
+      await apiRequest(`/notifications/${notificationId}`, 'DELETE');
     } catch (error) {
       console.error('Failed to remove notification:', error);
     }
   };
 
   const clearAll = async () => {
+    const currentIds = notifications.map((n) => n.id);
+    setNotifications([]);
+    addDismissed(currentIds);
+    setShowClearConfirm(false);
     try {
-      const currentIds = notifications.map((n) => n.id);
       await apiRequest('/notifications/clear-all', 'DELETE');
-      setNotifications([]);
-      addDismissed(currentIds);
-      setShowClearConfirm(false);
     } catch (error) {
       console.error('Failed to clear notifications:', error);
     }

@@ -68,13 +68,13 @@ export const notificationsService = {
     };
   },
 
-  async markAsRead(notificationId: string): Promise<boolean> {
+  async markAsRead(notificationId: string, userId: string): Promise<boolean> {
     const result = await query(
       `UPDATE notifications
        SET is_read = true, updated_at = NOW()
-       WHERE id = $1
+       WHERE id = $1 AND user_id = $2
        RETURNING id`,
-      [notificationId]
+      [notificationId, userId]
     );
 
     return result.rows.length > 0;
@@ -92,12 +92,12 @@ export const notificationsService = {
     return result.rows.length;
   },
 
-  async deleteNotification(notificationId: string): Promise<boolean> {
+  async deleteNotification(notificationId: string, userId: string): Promise<boolean> {
     const result = await query(
       `DELETE FROM notifications
-       WHERE id = $1
+       WHERE id = $1 AND user_id = $2
        RETURNING id`,
-      [notificationId]
+      [notificationId, userId]
     );
 
     return result.rows.length > 0;

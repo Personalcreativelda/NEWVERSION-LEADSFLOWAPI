@@ -33,6 +33,8 @@ const LANGUAGES = [
   { code: 'fr' as Language, flag: '🇫🇷', name: 'Français' },
 ];
 
+const GREETINGS: Record<string, string> = { pt: 'Olá', en: 'Hello', es: 'Hola', fr: 'Bonjour' };
+
 export default function RefactoredHeader({
   user,
   isDark,
@@ -54,6 +56,8 @@ export default function RefactoredHeader({
 
   const t = translations[language];
   const currentLanguage = LANGUAGES.find(lang => lang.code === language) || LANGUAGES[0];
+  const firstName = String(user?.name || user?.email?.split('@')[0] || '').trim().split(/\s+/)[0];
+  const greeting = GREETINGS[language] || GREETINGS.pt;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -101,19 +105,28 @@ export default function RefactoredHeader({
   return (
     <header className="flex-shrink-0 sticky top-0 z-[1000] border-b backdrop-blur-xl bg-background/80 border-border dark:border-[rgba(255,255,255,0.06)] dark:bg-background/90">
       <div className="px-4 lg:px-6 h-14 flex items-center justify-between">
-        {/* Mobile (<1024px): avatar do perfil à esquerda. Sem título (a barra inferior já
-            indica a página) e sem ☰ (o menu fica só no item "Menu" da barra inferior). */}
-        <div className="lg:hidden -ml-1.5">
-          <AvatarPopover
-            user={user}
-            onProfile={handleProfile}
-            onSettings={onSettings}
-            onChangePassword={handleChangePassword}
-            onLogout={onLogout}
-            language={language}
-            isDark={isDark}
-            align="start"
-          />
+        {/* Esquerda: no mobile (<1024px) o avatar do perfil seguido da saudação; no desktop
+            só a saudação (o avatar fica à direita). Sem título nem ☰ — a barra inferior
+            já indica a página e abre o menu. */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="lg:hidden -ml-1.5 flex-shrink-0">
+            <AvatarPopover
+              user={user}
+              onProfile={handleProfile}
+              onSettings={onSettings}
+              onChangePassword={handleChangePassword}
+              onLogout={onLogout}
+              language={language}
+              isDark={isDark}
+              align="start"
+            />
+          </div>
+          {firstName && (
+            <div className="min-w-0 leading-tight">
+              <p className="text-[11px] text-muted-foreground">{greeting} 👋</p>
+              <p className="text-[15px] font-semibold text-foreground truncate max-w-[45vw] lg:max-w-xs">{firstName}</p>
+            </div>
+          )}
         </div>
 
         {/* Right Section: Notificações + Idioma + Theme + Avatar + Logout */}

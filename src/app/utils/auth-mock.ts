@@ -31,7 +31,7 @@ interface MockSession {
 const STORAGE_KEY = 'leadflow_mock_users';
 const SESSION_KEY = 'leadflow_mock_session';
 const SESSION_EXPIRY_KEY = 'leadflow_session_expires_at';
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (igual a utils/api.ts)
 
 const VERIFICATION_EXPIRATION_MIN = 15;
 

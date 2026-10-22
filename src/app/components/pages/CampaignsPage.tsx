@@ -1308,11 +1308,11 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
         {/* Channel Tabs */}
         <div className="mb-6 md:mb-8">
-          <div className="border-b border-border overflow-x-auto scrollbar-hide">
-            <nav className="flex space-x-4 md:space-x-8 min-w-max">
+          <div className="border-b border-border">
+            <nav className="grid grid-cols-3 sm:flex sm:space-x-8">
               <button
                 onClick={() => setActiveTab('whatsapp')}
-                className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'whatsapp'
+                className={`py-3 px-1 text-sm sm:text-base font-semibold flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 border-b-2 transition-all ${activeTab === 'whatsapp'
                   ? 'border-[#10B981] text-[#10B981]'
                   : 'border-transparent text-muted-foreground hover:text-[#10B981]'
                   }`}
@@ -1325,7 +1325,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
               </button>
               <button
                 onClick={() => setActiveTab('email')}
-                className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'email'
+                className={`py-3 px-1 text-sm sm:text-base font-semibold flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 border-b-2 transition-all ${activeTab === 'email'
                   ? 'border-[#3B82F6] text-[#3B82F6]'
                   : 'border-transparent text-muted-foreground hover:text-[#3B82F6]'
                   }`}
@@ -1338,7 +1338,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
               </button>
               <button
                 onClick={() => setActiveTab('sms')}
-                className={`py-3 px-1 font-semibold flex items-center space-x-2 border-b-2 transition-all ${activeTab === 'sms'
+                className={`py-3 px-1 text-sm sm:text-base font-semibold flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 border-b-2 transition-all ${activeTab === 'sms'
                   ? 'border-[#F22F46] text-[#F22F46]'
                   : 'border-transparent text-muted-foreground hover:text-[#F22F46]'
                   }`}

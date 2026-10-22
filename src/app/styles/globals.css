@@ -1273,3 +1273,22 @@ html.native-app #lfw-close {
 .stagger > *:nth-child(4) { animation-delay: 120ms; }
 .stagger > *:nth-child(5) { animation-delay: 160ms; }
 .stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
+
+/* Menu lateral no telemóvel (gaveta): alvos de toque de ~44px e texto maior,
+   como nas gavetas do Slack, Notion e ChatGPT */
+.sidebar-mobile .sidebar-nav-item {
+  padding-top: 11px;
+  padding-bottom: 11px;
+  font-size: 15px;
+}
+.sidebar-mobile .sidebar-nav-subitem {
+  padding-top: 9px;
+  padding-bottom: 9px;
+  font-size: 14.5px;
+}
+.sidebar-mobile .sidebar-search-input {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-size: 15px;
+  border-radius: 12px;
+}

@@ -1,8 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Toaster as Sonner, ToasterProps } from "sonner";
+import { Toaster as Sonner, ToasterProps, toast } from "sonner";
 import { useThemeMode } from "../../context/ThemeModeContext";
+
+// Um aviso com o mesmo texto substitui o que já está no ecrã em vez de empilhar
+// outro igual (efeitos repetidos, respostas em duplicado do servidor, etc.).
+for (const kind of ["success", "error", "info", "warning", "message"] as const) {
+  const original = toast[kind];
+  (toast as any)[kind] = (message: any, options?: any) =>
+    original(message, { ...(typeof message === "string" ? { id: message } : {}), ...options });
+}
 
 // Abaixo de 1024px o painel tem a barra de navegação inferior (64px)
 const BOTTOM_NAV_QUERY = "(max-width: 1023px)";

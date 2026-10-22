@@ -170,7 +170,7 @@ export function ChatPanel({
             )}
 
             {/* Input Area */}
-            <div className="flex-shrink-0 p-3 border-t transition-colors bg-card border-border">
+            <div className="flex-shrink-0 px-2 py-2 sm:p-3 border-t transition-colors bg-card border-border">
                 <MessageInput
                     onSendMessage={onSendMessage || (async () => {})}
                     onSendAudio={onSendAudio}

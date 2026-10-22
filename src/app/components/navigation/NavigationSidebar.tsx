@@ -299,27 +299,90 @@ export default function NavigationSidebar({
   };
 
   const computedWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
+  const drawerOpen = isMobile && isOpen;
+
+  // Gaveta no telemóvel: fecha com o botão "voltar" do Android e com Escape
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onNativeBack = (e: Event) => {
+      e.preventDefault();
+      onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('native-back', onNativeBack);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('native-back', onNativeBack);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [drawerOpen, onClose]);
+
+  // Arrastar para a esquerda fecha a gaveta; ela acompanha o dedo enquanto arrasta
+  const [dragX, setDragX] = useState(0);
+  const touchStart = useRef<{ x: number; y: number; t: number; horizontal: boolean | null } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!drawerOpen) return;
+    const touch = e.touches[0];
+    touchStart.current = { x: touch.clientX, y: touch.clientY, t: Date.now(), horizontal: null };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const start = touchStart.current;
+    if (!start) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (start.horizontal === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      start.horizontal = Math.abs(dx) > Math.abs(dy);
+    }
+    if (start.horizontal) setDragX(Math.min(0, dx));
+  };
+
+  const handleTouchEnd = () => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start?.horizontal) return;
+    const width = sidebarRef.current?.offsetWidth || 300;
+    const velocity = Math.abs(dragX) / Math.max(1, Date.now() - start.t);
+    if (dragX < -width * 0.3 || (dragX < -30 && velocity > 0.5)) onClose();
+    setDragX(0);
+  };
+
+  const userInitials = (user?.name || user?.email || 'U')
+    .split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <>
-      {/* Overlay - mobile only */}
-      {isOpen && isMobile && (
+      {/* Overlay - mobile only. Fica por cima do cabeçalho e da barra inferior, por
+          isso tocar em qualquer sítio fora da gaveta fecha-a. */}
+      {isMobile && (
         <div
-          className="fixed inset-0 bg-black/60 z-[900] animate-in fade-in duration-200"
+          className={`fixed inset-0 z-[9995] bg-black/50 transition-opacity duration-300 ${
+            isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+          style={dragX ? { opacity: Math.max(0, 1 + dragX / 300), transition: 'none' } : undefined}
           onClick={onClose}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
       <aside
         ref={sidebarRef}
+        onTouchStart={isMobile ? handleTouchStart : undefined}
+        onTouchMove={isMobile ? handleTouchMove : undefined}
+        onTouchEnd={isMobile ? handleTouchEnd : undefined}
+        aria-hidden={isMobile && !isOpen ? true : undefined}
         className={`sidebar-root flex flex-col flex-shrink-0 ${
           isMobile
             // Fechado: sem sombra — fora do ecrã ela aparecia como uma linha na borda esquerda
-            ? `fixed top-0 left-0 z-[10000] h-screen w-64 transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full shadow-none!'}`
+            ? `sidebar-mobile fixed top-0 left-0 z-[10000] h-[100dvh] w-[85vw] max-w-[320px] rounded-r-2xl overflow-hidden ease-[cubic-bezier(0.32,0.72,0,1)] ${dragX ? '' : 'transition-transform duration-300'} ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full shadow-none!'}`
             : `fixed top-0 left-0 h-screen z-[10000] ${isResizing ? '' : 'transition-[width] duration-200 ease-out'}`
         }`}
-        style={!isMobile ? { width: computedWidth } : undefined}
+        style={!isMobile ? { width: computedWidth } : dragX ? { transform: `translateX(${dragX}px)` } : undefined}
       >
         <div className="flex flex-col h-full">
 
@@ -356,22 +419,19 @@ export default function NavigationSidebar({
                     <PanelLeft className="w-[16px] h-[16px]" />
                   </button>
                 )}
+                {/* Mobile: fechar na mesma linha do logótipo (sem a barra "Menu" à parte) */}
+                {isMobile && (
+                  <button
+                    onClick={onClose}
+                    aria-label="Fechar menu"
+                    className="w-10 h-10 -mr-2 flex items-center justify-center rounded-full flex-shrink-0 transition-colors duration-150 text-[hsl(var(--sidebar-muted))] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-border))]"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
               </>
             )}
           </div>
-
-          {/* Mobile close */}
-          {isMobile && (
-            <div className="sidebar-section-border px-4 py-2.5 flex items-center justify-between lg:hidden">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--sidebar-muted))]">Menu</h2>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg transition-colors duration-150 text-[hsl(var(--sidebar-muted))] hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-border))]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
 
           {/* Navigation */}
           <nav id="sidebar-navigation" className={`sidebar-nav flex-1 flex flex-col min-h-0 ${isCollapsed ? 'sidebar-scroll-fade overflow-y-auto scrollbar-none' : 'overflow-y-auto'}`}>
@@ -497,6 +557,51 @@ export default function NavigationSidebar({
               </div>
             )}
 
+            {/* Mobile: cartão do perfil no fundo, como no ChatGPT e no Claude — abre a conta */}
+            {isMobile && (
+              <button
+                onClick={() => handleItemClick('account')}
+                className="w-[calc(100%-16px)] mx-2 mt-2 flex items-center gap-3 p-2.5 rounded-xl transition-colors duration-150 hover:bg-[hsl(var(--sidebar-border))] active:bg-[hsl(var(--sidebar-border))] text-left"
+              >
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <span className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center bg-[hsl(var(--sidebar-primary)/0.15)] text-[hsl(var(--sidebar-primary))] text-sm font-semibold">
+                    {userInitials}
+                  </span>
+                )}
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[15px] font-semibold truncate text-[hsl(var(--sidebar-foreground))]">{user?.name || 'Usuário'}</span>
+                  <span className="block text-xs truncate text-[hsl(var(--sidebar-muted))]">{user?.email || ''}</span>
+                </span>
+                <ChevronRight className="w-4 h-4 flex-shrink-0 text-[hsl(var(--sidebar-muted))]" />
+              </button>
+            )}
+
+            {/* Mobile: atalhos secundários numa fila compacta em vez de quatro linhas */}
+            {isMobile ? (
+              <div className="grid grid-cols-4 gap-1 px-2 pt-1 pb-2">
+                {[
+                  { label: 'Ajuda', icon: HelpCircle, onClick: () => { onClose(); onHelp?.(); } },
+                  { label: 'Feedback', icon: Star, onClick: () => { onClose(); onFeedback?.(); } },
+                  { label: 'Suporte', icon: LifeBuoy, onClick: () => { onClose(); openSupportChat(); } },
+                  ...(onLogout ? [{ label: 'Sair', icon: LogOut, onClick: onLogout, danger: true }] : []),
+                ].map(({ label, icon: ActionIcon, onClick, danger }: any) => (
+                  <button
+                    key={label}
+                    onClick={onClick}
+                    className={`flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[11.5px] font-medium transition-colors duration-150 ${
+                      danger
+                        ? 'text-red-400 hover:bg-red-500/10 active:bg-red-500/10'
+                        : 'text-[hsl(var(--sidebar-foreground)/0.7)] hover:bg-[hsl(var(--sidebar-border))] active:bg-[hsl(var(--sidebar-border))]'
+                    }`}
+                  >
+                    <ActionIcon className="w-5 h-5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : (
             <div className="px-2 py-2 space-y-0.5">
               {/* Help */}
               {isCollapsed ? (
@@ -555,7 +660,7 @@ export default function NavigationSidebar({
                   className="sidebar-nav-item sidebar-item-inactive w-full flex items-center gap-2.5 px-3 py-[7px] rounded-lg transition-all duration-150 text-[14px] font-medium"
                 >
                   <LifeBuoy className="w-[17px] h-[17px] flex-shrink-0 text-[hsl(var(--sidebar-muted))]" />
-                  <span>Chat de suporte</span>
+                  <span>Suporte</span>
                 </button>
               )}
 
@@ -584,6 +689,7 @@ export default function NavigationSidebar({
                 )
               )}
             </div>
+            )}
           </div>
         </div>
 

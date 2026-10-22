@@ -721,12 +721,14 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     }
   };
 
-  const handleEditarLead = async (leadEditado: Lead) => {
+  // silent: quem chama mostra o seu próprio aviso (ex.: mover no Funil) — evita dois
+  // toasts seguidos. Devolve true se a gravação correu bem.
+  const handleEditarLead = async (leadEditado: Lead, options: { silent?: boolean } = {}): Promise<boolean> => {
     try {
       if (!leadEditado.id) {
         console.error('Lead ID is missing:', leadEditado);
         triggerErrorMessage('Lead sem ID', 'Não foi possível localizar o identificador do lead. Por favor, recarregue a página e tente novamente.');
-        return;
+        return false;
       }
 
       const response = await leadsApi.update(leadEditado.id, leadEditado);
@@ -735,11 +737,15 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         await carregarLeads();
         setModalEditarLead(false);
         setLeadSelecionado(null);
-        toast.success('Lead atualizado com sucesso!');
+        if (!options.silent) toast.success('Lead atualizado com sucesso!');
+        return true;
       }
+      if (!options.silent) toast.error('Erro ao atualizar lead. Por favor, tente novamente.');
+      return false;
     } catch (error) {
       console.error('Error updating lead:', error);
-      toast.error('Erro ao atualizar lead. Por favor, tente novamente.');
+      if (!options.silent) toast.error('Erro ao atualizar lead. Por favor, tente novamente.');
+      return false;
     }
   };
 
@@ -2413,7 +2419,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                     newLeads[leadIndex] = updatedLead;
                     setLeads(newLeads);
                     try {
-                      await handleEditarLead(updatedLead);
+                      const saved = await handleEditarLead(updatedLead, { silent: true });
+                      if (!saved) throw new Error('update failed');
                       // 🔔 Disparar evento de tracking (Meta Pixel + GA4)
                       trackLeadStatusChange(newStatus, {
                         id: leadId,
@@ -2600,7 +2607,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
           setModalEditarLead(false);
           setLeadSelecionado(null);
         }}
-        onSave={handleEditarLead}
+        onSave={async (lead) => { await handleEditarLead(lead); }}
       />
 
       <LeadDetailModal

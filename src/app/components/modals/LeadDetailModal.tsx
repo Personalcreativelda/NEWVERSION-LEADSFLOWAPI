@@ -847,9 +847,9 @@ function ValorTab({ lead, isDark, onLeadUpdated }: { lead: Lead; isDark: boolean
 // Main Modal
 // ---------------------------------------------------------------------------
 
-const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
+const TABS: { key: TabKey; label: string; short?: string; icon: React.ElementType }[] = [
  { key: 'notas', label: 'Notas', icon: StickyNote },
- { key: 'agendamentos', label: 'Agendamentos', icon: Calendar },
+ { key: 'agendamentos', label: 'Agendamentos', short: 'Agenda', icon: Calendar },
  { key: 'historico', label: 'Historico', icon: MessageSquare },
  { key: 'valor', label: 'Valor', icon: DollarSign },
 ];
@@ -965,7 +965,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  }
  >
  {/* Tab bar - Compact */}
- <div className="flex px-4 gap-1 border-b border-border flex-shrink-0">
+ <div className="flex px-2 sm:px-4 gap-1 border-b border-border flex-shrink-0">
  {TABS.map((tab) => {
  const isActive = activeTab === tab.key;
  const Icon = tab.icon;
@@ -975,7 +975,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  <button
  key={tab.key}
  onClick={() => setActiveTab(tab.key)}
- className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t-lg transition-colors relative ${isActive
+ className={`flex-1 sm:flex-none min-w-0 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2.5 sm:py-2 text-xs font-medium rounded-t-lg transition-colors relative ${isActive
  ? isDark
  ? 'text-blue-400'
  : 'text-blue-600'
@@ -985,7 +985,8 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  }`}
  >
  <Icon className="w-3.5 h-3.5" />
- <span>{tab.label}</span>
+ <span className="truncate sm:hidden">{tab.short || tab.label}</span>
+ <span className="hidden sm:inline">{tab.label}</span>
 
  {/* Badge de notificação */}
  {badgeCount > 0 && (

@@ -23,7 +23,7 @@ import PlanUpgradeSuccessModal from './components/modals/PlanUpgradeSuccessModal
 import { MetaPixel } from './components/MetaPixel';
 import { GoogleAnalytics } from './components/GoogleAnalytics';
 import { ConfirmProvider } from './components/ui/ConfirmDialog';
-import { authApi, apiRequest, plansApi, isSessionExpired, startSessionExpiryTimer } from './utils/api';
+import { authApi, apiRequest, plansApi, isSessionExpired, startSessionExpiryTimer, refreshAccessToken } from './utils/api';
 import { mockAuth } from './utils/auth-mock';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
@@ -290,11 +290,11 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
         return;
       }
 
-      try {
-        await authApi.refreshSession();
-      } catch (error) {
-        console.error('[Auth] Error during auto-refresh:', error);
-        await forceLogout('Session refresh failed');
+      // Sem rede a renovação falha mas a sessão continua; só termina se o servidor
+      // recusar o refresh token (aí as credenciais já foram apagadas)
+      await refreshAccessToken();
+      if (!localStorage.getItem('leadflow_access_token')) {
+        await forceLogout('Session refresh rejected');
       }
     };
 
@@ -651,6 +651,18 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
             // destroy the fresh tokens. Keep them and let the user try again from login.
             console.warn('[Auth] OAUTH_PROCESSED=true — not calling forceLogout on backend error');
             setCurrentPage('login');
+            return;
+          }
+          // Rede lenta/sem rede ao abrir o app: as credenciais continuam guardadas (um
+          // token recusado já as teria apagado), por isso entra com o utilizador da
+          // última sessão em vez de pedir login de novo.
+          const cachedUser = (() => {
+            try { return JSON.parse(localStorage.getItem('leadflow_user') || 'null'); } catch { return null; }
+          })();
+          if (localStorage.getItem('leadflow_access_token') && cachedUser?.id) {
+            console.warn('[Auth] Backend unreachable — using cached user');
+            setUser(cachedUser);
+            setCurrentPage('dashboard');
             return;
           }
           await forceLogout('Failed to load user data');

@@ -45,8 +45,8 @@ router.get('/unread/count', requireAuth, async (req: AuthenticatedRequest, res, 
   }
 });
 
-// Mark all notifications as read
-router.post('/mark-all/read', requireAuth, async (req: AuthenticatedRequest, res, next) => {
+// Mark all notifications as read (PUT /mark-all-read é o que o dashboard chama)
+const markAllAsReadHandler = async (req: AuthenticatedRequest, res: any, next: any) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -63,6 +63,27 @@ router.post('/mark-all/read', requireAuth, async (req: AuthenticatedRequest, res
     });
   } catch (error) {
     console.error('[Notifications] Error marking all notifications as read:', error);
+    next(error);
+  }
+};
+router.post('/mark-all/read', requireAuth, markAllAsReadHandler);
+router.put('/mark-all-read', requireAuth, markAllAsReadHandler);
+
+// Mark one notification as read (MUST come BEFORE /:id routes)
+router.put('/:id/read', requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const updated = await notificationsService.markAsRead(req.params.id, req.user.id);
+    if (!updated) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Notifications] Error marking notification as read:', error);
     next(error);
   }
 });
@@ -97,7 +118,7 @@ router.delete('/:id', requireAuth, async (req: AuthenticatedRequest, res, next) 
     }
 
     const { id } = req.params;
-    const deleted = await notificationsService.deleteNotification(id);
+    const deleted = await notificationsService.deleteNotification(id, req.user.id);
 
     if (!deleted) {
       return res.status(404).json({ error: 'Notification not found' });

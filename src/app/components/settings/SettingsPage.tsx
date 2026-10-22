@@ -185,24 +185,24 @@ export default function SettingsPage({
         <Tabs defaultValue={initialTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="profile">
-              <User className="w-4 h-4 mr-2" />
-              Perfil
+              <User className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Perfil</span>
             </TabsTrigger>
             <TabsTrigger value="plan">
-              <CreditCard className="w-4 h-4 mr-2" />
-              Plano
+              <CreditCard className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Plano</span>
             </TabsTrigger>
             <TabsTrigger value="team">
-              <Users className="w-4 h-4 mr-2" />
-              Equipa
+              <Users className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Equipa</span>
             </TabsTrigger>
             <TabsTrigger value="webhooks">
-              <Webhook className="w-4 h-4 mr-2" />
-              Integrações
+              <Webhook className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Integrações</span>
             </TabsTrigger>
             <TabsTrigger value="security">
-              <Shield className="w-4 h-4 mr-2" />
-              Segurança
+              <Shield className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Segurança</span>
             </TabsTrigger>
           </TabsList>
 

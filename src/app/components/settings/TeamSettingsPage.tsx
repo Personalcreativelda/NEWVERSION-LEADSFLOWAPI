@@ -512,7 +512,9 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
                             const isPending     = member.status === 'pending';
 
                             return (
-                                <div key={member.id} className={`flex items-center gap-3 px-5 py-3.5 ${!member.is_active ? 'opacity-50' : ''}`}>
+                                // No telemóvel: nome e email numa linha inteira, conversas/papel/ações
+                                // por baixo — antes tudo na mesma linha cortava o nome
+                                <div key={member.id} className={`flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 px-4 sm:px-5 py-3.5 ${!member.is_active ? 'opacity-50' : ''}`}>
                                     {/* Avatar */}
                                     <div className="w-9 h-9 rounded-full flex-shrink-0 overflow-hidden bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center">
                                         {displayAvatar ? (
@@ -523,8 +525,8 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
                                     </div>
 
                                     {/* Info */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
+                                    <div className="flex-1 min-w-0 basis-[calc(100%-48px)] sm:basis-auto">
+                                        <div className="flex items-center gap-2 min-w-0">
                                             <span className="text-sm font-medium truncate">{displayName}</span>
                                             {isSelf && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">Você</span>}
                                             {isPending && (
@@ -537,6 +539,7 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
                                         <p className="text-xs text-muted-foreground truncate">{displayEmail}</p>
                                     </div>
 
+                                    <div className="flex items-center gap-3 w-full sm:w-auto pl-12 sm:pl-0">
                                     {/* Conversations badge */}
                                     {!isPending && (
                                         <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
@@ -561,7 +564,7 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
 
                                     {/* Actions */}
                                     {isOwnerOrAdmin && !isOwner && !isSelf && (
-                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                        <div className="flex items-center gap-1 flex-shrink-0 ml-auto sm:ml-0">
                                             <button
                                                 onClick={() => handleToggleActive(member)}
                                                 title={member.is_active ? 'Desactivar' : 'Reactivar'}
@@ -578,6 +581,7 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
                                             </button>
                                         </div>
                                     )}
+                                    </div>
                                 </div>
                             );
                         })}
