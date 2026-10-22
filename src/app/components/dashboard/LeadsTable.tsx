@@ -1,5 +1,5 @@
 import { matchesSearch } from '../../utils/search';
-import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, Megaphone, Instagram, Facebook, Send, Smartphone, Search, Plus } from 'lucide-react';
+import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, Megaphone, Instagram, Facebook, Send, Smartphone, Search, Plus, CopyX } from 'lucide-react';
 import { useState } from 'react';
 import type { Lead } from '../../types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -146,6 +146,8 @@ interface LeadsTableProps {
   onExport: () => void;
   onImport: () => void;
   onImportWhatsApp?: () => void;
+  /** Remover leads duplicados (fica na barra da tabela, junto das outras ações) */
+  onRemoveDuplicates?: () => void;
   onToggleEmailMarketing?: (leadId: string) => void;
   onSendEmail?: (leadId: string) => void;
   onNovoLead?: () => void;
@@ -168,6 +170,7 @@ export default function LeadsTable({
   onExport,
   onImport,
   onImportWhatsApp,
+  onRemoveDuplicates,
   onNovoLead,
   onCampaigns,
   onDeleteMultiple,
@@ -383,6 +386,11 @@ export default function LeadsTable({
                 <WhatsAppIcon className="w-4 h-4" />
               </AppButton>
             )}
+            {onRemoveDuplicates && (
+              <AppButton size="icon" variant="outline" onClick={onRemoveDuplicates} title="Remover duplicados" aria-label="Remover duplicados">
+                <CopyX />
+              </AppButton>
+            )}
             {onCampaigns && (
               <AppButton
                 size="icon"
@@ -470,6 +478,13 @@ export default function LeadsTable({
               <AppButton variant="outline" onClick={() => onImportWhatsApp?.()} disabled={isBlocked}>
                 <WhatsAppIcon className="w-4 h-4" />
                 Importar do WhatsApp
+              </AppButton>
+            )}
+
+            {onRemoveDuplicates && (
+              <AppButton variant="outline" onClick={onRemoveDuplicates}>
+                <CopyX />
+                Remover duplicados
               </AppButton>
             )}
 

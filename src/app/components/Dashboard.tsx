@@ -17,7 +17,6 @@ import AIIntelligencePanel from './dashboard/AIIntelligencePanel';
 import RefactoredHeader from './navigation/RefactoredHeader';
 import NavigationSidebar, { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './navigation/NavigationSidebar';
 import { PageContainer } from './base/PageContainer';
-import { AppButton } from './base/AppButton';
 
 // Tasks
 import TaskManager from './tasks/TaskManager';
@@ -2296,13 +2295,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   </div>
                 </div>
 
-                {/* Ação: remover leads duplicados (única parte funcional do antigo FilterBar aqui) */}
-                <div className="flex justify-end">
-                  <AppButton variant="outline" size="sm" onClick={handleRemoveDuplicates}>
-                    Remover duplicados
-                  </AppButton>
-                </div>
-
                 {/* Tabela de Leads */}
                 <LeadsTable
                   leads={leads}
@@ -2313,6 +2305,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   onExport={handleExport}
                   onImport={handleImport}
                   onImportWhatsApp={handleImportWhatsApp}
+                  onRemoveDuplicates={handleRemoveDuplicates}
                   onToggleEmailMarketing={handleToggleEmailMarketing}
                   onSendEmail={handleSendEmail}
                   onNovoLead={handleNovoLead}
@@ -2383,6 +2376,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   onExport={handleExport}
                   onImport={handleImport}
                   onImportWhatsApp={handleImportWhatsApp}
+                  onRemoveDuplicates={handleRemoveDuplicates}
                   onToggleEmailMarketing={handleToggleEmailMarketing}
                   onSendEmail={handleSendEmail}
                   onNovoLead={handleNovoLead}

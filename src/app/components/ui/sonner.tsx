@@ -4,12 +4,18 @@ import { useEffect, useState } from "react";
 import { Toaster as Sonner, ToasterProps, toast } from "sonner";
 import { useThemeMode } from "../../context/ThemeModeContext";
 
+// Símbolos de estado no início das mensagens ("✅ Guardado", "❌ Erro…") repetem o ícone
+// que o aviso já mostra — saem aqui, para todas as mensagens do app de uma vez.
+const LEADING_STATUS_SYMBOL = /^\s*(?:[✅✔✓☑❌✖✗⚠ℹ⛔🚫]️?\s*)+/u;
+
 // Um aviso com o mesmo texto substitui o que já está no ecrã em vez de empilhar
 // outro igual (efeitos repetidos, respostas em duplicado do servidor, etc.).
 for (const kind of ["success", "error", "info", "warning", "message"] as const) {
   const original = toast[kind];
-  (toast as any)[kind] = (message: any, options?: any) =>
-    original(message, { ...(typeof message === "string" ? { id: message } : {}), ...options });
+  (toast as any)[kind] = (message: any, options?: any) => {
+    const text = typeof message === "string" ? message.replace(LEADING_STATUS_SYMBOL, "") : message;
+    return original(text, { ...(typeof text === "string" ? { id: text } : {}), ...options });
+  };
 }
 
 // Abaixo de 1024px o painel tem a barra de navegação inferior (64px)

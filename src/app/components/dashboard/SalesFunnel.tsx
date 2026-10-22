@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import { OverlayModal } from '../base/OverlayModal';
 import type { UIEvent } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
@@ -1158,8 +1159,7 @@ export default function SalesFunnel({
 
         {/* Stage Editor Modal */}
         {showStageEditor && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl m-4 bg-card border border-border">
+          <OverlayModal onClose={() => setShowStageEditor(false)} className="max-w-2xl">
               <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-card border-border">
                 <h3 className="text-lg font-semibold text-foreground">
                   Personalizar Etapas do Funil
@@ -1218,9 +1218,9 @@ export default function SalesFunnel({
                 {stages.map((stage, index) => (
                   <div
                     key={stage.id}
-                    className="flex items-center gap-3 p-3 rounded-xl border bg-muted/50 border-border"
+                    className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl border bg-muted/50 border-border"
                   >
-                    <div className={`w-4 h-4 rounded-full ${stage.color}`} />
+                    <div className={`w-3.5 h-3.5 shrink-0 rounded-full ${stage.color}`} />
                     <input
                       type="text"
                       value={stage.label}
@@ -1229,7 +1229,7 @@ export default function SalesFunnel({
                         newStages[index] = { ...stage, label: e.target.value };
                         setStages(newStages);
                       }}
-                      className="flex-1 px-3 py-2 rounded-lg border text-sm bg-card border-border text-foreground"
+                      className="flex-1 min-w-0 px-3 py-2 rounded-lg border text-sm bg-card border-border text-foreground"
                     />
                     <select
                       value={stage.color}
@@ -1244,7 +1244,8 @@ export default function SalesFunnel({
                           setStages(newStages);
                         }
                       }}
-                      className="px-3 py-2 rounded-lg border text-sm bg-card border-border text-foreground"
+                      className="w-[6.5rem] sm:w-32 shrink-0 px-2 sm:px-3 py-2 rounded-lg border text-sm bg-card border-border text-foreground"
+                      aria-label="Cor da etapa"
                     >
                       {STAGE_COLORS.map(color => (
                         <option key={color.color} value={color.color}>
@@ -1258,7 +1259,8 @@ export default function SalesFunnel({
                           const newStages = stages.filter((_, i) => i !== index);
                           setStages(newStages);
                         }}
-                        className="p-2 rounded-lg transition-colors hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400"
+                        className="p-2 shrink-0 rounded-lg transition-colors hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 dark:text-red-400"
+                        aria-label="Apagar etapa"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -1305,14 +1307,12 @@ export default function SalesFunnel({
                   Fechar
                 </button>
               </div>
-            </div>
-          </div>
+          </OverlayModal>
         )}
 
         {/* Single Stage Edit Modal */}
         {editingStage && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="w-full max-w-md rounded-2xl shadow-2xl m-4 bg-card border border-border">
+          <OverlayModal onClose={() => setEditingStage(null)} className="max-w-md">
               <div className="flex items-center justify-between p-4 border-b bg-card border-border">
                 <h3 className="text-lg font-semibold text-foreground">
                   Editar Etapa
@@ -1376,8 +1376,7 @@ export default function SalesFunnel({
                   Salvar
                 </button>
               </div>
-            </div>
-          </div>
+          </OverlayModal>
         )}
 
         {/* Funil de Vendas - Layout Responsivo */}

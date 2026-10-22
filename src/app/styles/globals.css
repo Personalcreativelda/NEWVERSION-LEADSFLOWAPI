@@ -195,6 +195,16 @@
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
   }
+
+  /* Campos de formulário têm uma largura mínima própria (~20 caracteres) que não
+     encolhe numa linha flex: input + select + botão passavam a largura do ecrã e o
+     modal/página rolava para o lado. Assim encolhem como qualquer outro elemento.
+     (Em layer base: uma classe min-w-* explícita continua a ganhar.) */
+  input,
+  select,
+  textarea {
+    min-width: 0;
+  }
 }
 
 /* ─── Sidebar Styles ─── ALWAYS DARK in both themes ─── */
