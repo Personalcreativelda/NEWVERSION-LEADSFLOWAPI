@@ -76,6 +76,8 @@ import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
 import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X, LayoutDashboard, Users, MessageSquare, BarChart2, Menu, FileText, Workflow } from 'lucide-react';
 import { PageHeader, PageAction } from './base/PageHeader';
 import { motion } from 'motion/react';
+import { OfflineState } from './base/OfflineState';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 // Types
 interface Lead {
@@ -204,6 +206,25 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   const initialLoadDoneRef = useRef(false); // silent background refresh after first load
   const [isDeletingLeads, setIsDeletingLeads] = useState(false); // ✅ Bloquear auto-refresh durante deleção
   const [isBackendOffline, setIsBackendOffline] = useState(false); // ✅ Detectar backend offline
+
+  // Sem internet: o painel mostra o ecrã "Sem ligação" em vez de esqueletos sem fim; quando
+  // a ligação volta, a página atual é montada de novo (pedidos refeitos) e avisa-se.
+  const isOnline = useOnlineStatus();
+  const [reconnectKey, setReconnectKey] = useState(0);
+  const wasOfflineRef = useRef(false);
+  useEffect(() => {
+    if (!isOnline) {
+      wasOfflineRef.current = true;
+      return;
+    }
+    if (wasOfflineRef.current) {
+      wasOfflineRef.current = false;
+      setIsBackendOffline(false);
+      setReconnectKey((k) => k + 1);
+      void carregarLeads();
+      toast.success('Ligação restabelecida');
+    }
+  }, [isOnline]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Estados dos modais
   const [modalNovoLead, setModalNovoLead] = useState(false);
@@ -2119,7 +2140,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
           />
 
           {/* ⚠️ BANNER DE BACKEND OFFLINE */}
-          {isBackendOffline && (
+          {isBackendOffline && isOnline && (
             <div role="alert" className="bg-amber-500/10 border-b border-amber-500/30 px-4 sm:px-6 py-3">
               <div className="max-w-[1720px] mx-auto flex items-center gap-3">
                 <AlertCircle aria-hidden className="w-5 h-5 flex-shrink-0 text-amber-500" />
@@ -2181,7 +2202,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                 anterior). Depois da animação o transform fica "none", para não afetar
                 elementos position:fixed (modais) dentro das páginas. */}
             <motion.div
-              key={currentPage}
+              key={`${currentPage}-${reconnectKey}`}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
@@ -2191,6 +2212,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   : undefined
               }
             >
+            {!isOnline ? (
+              <OfflineState onRetry={() => setReconnectKey((k) => k + 1)} />
+            ) : (<>
             {/* Renderizar conteúdo baseado na página atual */}
             {currentPage === 'dashboard' && (
               <div className="space-y-4 sm:space-y-6 lg:space-y-8">
@@ -2519,6 +2543,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             {currentPage === 'admin' && (
               <AdminPage />
             )}
+            </>)}
             </motion.div>
           </PageContainer>
 

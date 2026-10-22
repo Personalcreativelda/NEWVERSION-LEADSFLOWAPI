@@ -804,15 +804,31 @@ export const authApi = {
 
       console.log('[Auth] Redirecting to Google OAuth via backend:', googleAuthUrl);
 
+      // Pede à API o endereço do Google e abre-o diretamente: a barra do browser mostra
+      // logo accounts.google.com, nunca o endereço da API. Se a API ainda não suportar
+      // (?format=json), usa o redirecionamento antigo.
+      const directGoogleUrl = async (redirect?: string) => {
+        try {
+          const params = new URLSearchParams({ format: 'json' });
+          if (redirect) params.set('redirect', redirect);
+          const res = await fetch(`${googleAuthUrl}?${params}`, { cache: 'no-store' });
+          const data = res.ok ? await res.json() : null;
+          return typeof data?.url === 'string' && data.url.startsWith('https://accounts.google.com/') ? data.url : null;
+        } catch {
+          return null;
+        }
+      };
+
       // App Android: login numa Custom Tab, a API devolve-nos por deep link.
       if (isNativeApp()) {
+        const url = await directGoogleUrl(NATIVE_OAUTH_REDIRECT);
         return await openNativeOAuth(
-          `${googleAuthUrl}?redirect=${encodeURIComponent(NATIVE_OAUTH_REDIRECT)}`
+          url || `${googleAuthUrl}?redirect=${encodeURIComponent(NATIVE_OAUTH_REDIRECT)}`
         );
       }
 
       // Redirect the browser to initiate OAuth flow
-      window.location.href = googleAuthUrl;
+      window.location.href = (await directGoogleUrl()) || googleAuthUrl;
 
       // This function won't return as the page is redirecting
       return { success: true, redirecting: true };

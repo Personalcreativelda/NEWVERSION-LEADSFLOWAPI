@@ -56,6 +56,7 @@ const noOriginRequiredPaths = [
   '/api/diagnostics', // direct browser navigation with ?secret= or Bearer token
   '/api/version/mobile/release', // script release:mobile (protegido por MOBILE_RELEASE_KEY)
   '/api/version/mobile/bundle/', // zip descarregado pelo código nativo do app
+  '/api/files/', // ficheiros em <img>/<audio>, abertos no browser ou buscados pelo WhatsApp
   '/health',
   '/w',  // widget script — loaded via <script> tag, never sends Origin
 ];

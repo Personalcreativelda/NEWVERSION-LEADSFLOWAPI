@@ -26,6 +26,8 @@ import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import { authApi, apiRequest, plansApi, isSessionExpired, startSessionExpiryTimer, refreshAccessToken } from './utils/api';
 import { mockAuth } from './utils/auth-mock';
 import { Toaster } from './components/ui/sonner';
+import { OfflineBanner } from './components/base/OfflineState';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { toast } from 'sonner';
 
 // ============================================
@@ -199,6 +201,7 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       ? initialPage
       : homePage;
   const [currentPage, setCurrentPage] = useState<Page>(resolvedInitialPage);
+  const isOnline = useOnlineStatus();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   // Prevent concurrent checkAuth calls (e.g. React StrictMode double-invocation in dev)
@@ -936,6 +939,7 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       <MetaPixel pixelId={metaPixelId} />
       <GoogleAnalytics gaId={googleAnalyticsId} />
       <Toaster />
+      {!isOnline && currentPage !== 'dashboard' && <OfflineBanner />}
       {/* Landing Page */}
       {landingEnabled && currentPage === 'landing' && (
         <div className="min-h-screen bg-[#0f0a1a]">

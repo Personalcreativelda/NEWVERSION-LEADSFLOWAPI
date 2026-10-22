@@ -9,6 +9,7 @@ import { sidebarConfig, SidebarItemConfig } from '../../config/sidebarConfig';
 import SidebarGroup from './SidebarGroup';
 import InboxTreeMenu from './InboxTreeMenu';
 import { isNativeApp, openSupportChat } from '../../../native';
+import { getInstalledVersion } from '../../../live-update';
 
 // Mapeamento de path para page id
 export const pathToPageId: Record<string, string> = {
@@ -77,6 +78,11 @@ export default function NavigationSidebar({
   const [adminExpanded, setAdminExpanded] = useState(currentPage === 'admin');
   const [adminActiveSubTab, setAdminActiveSubTab] = useState<string>('');
   const [sidebarSearch, setSidebarSearch] = useState('');
+  // Versão em uso no app (pacote ao vivo ou APK), no fundo do menu do telemóvel
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  useEffect(() => {
+    if (isNativeApp()) void getInstalledVersion().then(setAppVersion);
+  }, []);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
 
@@ -640,6 +646,11 @@ export default function NavigationSidebar({
                     {label}
                   </button>
                 ))}
+                {appVersion && (
+                  <p className="col-span-4 pt-1 text-center text-[11px] text-[hsl(var(--sidebar-muted))]">
+                    LeadsFlow · versão {appVersion}
+                  </p>
+                )}
               </div>
             ) : (
             <div className="px-2 py-2 space-y-0.5">

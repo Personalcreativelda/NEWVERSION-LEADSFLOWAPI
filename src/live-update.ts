@@ -75,6 +75,19 @@ export async function checkForLiveUpdate(force = false) {
   }
 }
 
+/**
+ * Versão em uso no app: a do pacote ao vivo (ex.: "1.0.2") ou, sem nenhum, a do APK
+ * (ex.: "1.1"). null fora do app.
+ */
+export async function getInstalledVersion(): Promise<string | null> {
+  try {
+    const { bundle, native } = await CapacitorUpdater.current();
+    return bundle.id === 'builtin' ? native : bundle.version;
+  } catch {
+    return null;
+  }
+}
+
 export function initLiveUpdates() {
   confirmBundleReady();
   // Depois do arranque, para não competir com o carregamento do painel

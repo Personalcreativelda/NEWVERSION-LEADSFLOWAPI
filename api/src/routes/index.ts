@@ -26,6 +26,7 @@ import assistantsRoutes from './assistants.routes';
 import voiceAgentsRoutes from './voice-agents.routes';
 import userWebhooksRoutes from './user-webhooks.routes';
 import versionRoutes from './version.routes';
+import filesRoutes from './files.routes';
 // Lead Tracking: Importar rotas de rastreamento de leads
 import leadsTrackingRoutes from './leads-tracking.routes';
 // Conversation Tags: Importar rotas de etiquetas de conversas
@@ -53,6 +54,7 @@ router.use('/auth', authRoutes);
 router.use('/plans', plansRoutes);        // must stay accessible so users can upgrade
 router.use('/webhooks', webhooksRoutes);  // external Stripe / provider webhooks
 router.use('/version', versionRoutes);
+router.use('/files', filesRoutes);          // ficheiros guardados (sem expor o MinIO)
 
 // ── Routes with plan enforcement ────────────────────────────────────────────
 router.use('/leads', withPlan, leadsRoutes);

@@ -1,5 +1,36 @@
 import { Router } from 'express';
 import multer from 'multer';
+import { isStorageUrl } from '../utils/storage-urls';
+
+/**
+ * Destino aceite pelo /media-proxy além do armazenamento: hosts públicos (CDNs de
+ * redes sociais, etc.) e a Evolution API. Bloqueia a rede interna.
+ */
+function isAllowedProxyTarget(raw: string): boolean {
+  let host: string;
+  try {
+    host = new URL(raw).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  try {
+    const evolutionHost = process.env.EVOLUTION_API_URL ? new URL(process.env.EVOLUTION_API_URL).hostname.toLowerCase() : '';
+    if (evolutionHost && host === evolutionHost) return true;
+  } catch {
+    // EVOLUTION_API_URL inválida — ignorar
+  }
+  const isPrivate =
+    !host.includes('.') ||
+    host === 'localhost' ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    /^(127|10|0)\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^169\.254\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+    host.startsWith('[') || host.includes(':');
+  return !isPrivate;
+}
 import { authMiddleware } from '../middleware/auth.middleware';
 import { InboxService } from '../services/inbox.service';
 import { MessagesService } from '../services/messages.service';
@@ -2616,6 +2647,13 @@ router.get('/media-proxy', async (req, res) => {
     // Validar que é uma URL HTTP válida (não permitir file://, etc.)
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       return res.status(400).json({ error: 'Only HTTP/HTTPS URLs are supported' });
+    }
+
+    // Sem autenticação, este proxy não pode buscar qualquer endereço: endereços da rede
+    // interna (localhost, IPs privados, nomes de serviços Docker, metadados da cloud)
+    // só são aceites se forem o nosso armazenamento ou a Evolution API.
+    if (!isStorageUrl(url) && !isAllowedProxyTarget(url)) {
+      return res.status(403).json({ error: 'URL not allowed' });
     }
 
     console.log('[Media Proxy] Fetching:', url.substring(0, 200));

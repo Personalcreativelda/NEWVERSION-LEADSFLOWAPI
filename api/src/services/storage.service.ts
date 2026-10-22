@@ -1,5 +1,6 @@
 import type { Express } from 'express';
 import type { Pool } from 'pg';
+import { storageKeyFromUrl } from '../utils/storage-urls';
 
 export interface PresignedUploadResult {
   presignedUrl: string;
@@ -244,16 +245,16 @@ class MinIOStorage implements StorageService {
   // Lê um ficheiro do bucket pelo URL público (para a API servir sem depender de o
   // bucket ser de leitura pública)
   async getFileStream(url: string): Promise<NodeJS.ReadableStream | null> {
-    const urlParts = url.split(`/${this.bucket}/`);
-    if (urlParts.length < 2) return null;
-    return this.client.getObject(this.bucket, urlParts[1]);
+    const key = storageKeyFromUrl(url);
+    if (!key) return null;
+    return this.client.getObject(this.bucket, key);
   }
 
   async deleteFile(url: string): Promise<void> {
     try {
-      const urlParts = url.split(`/${this.bucket}/`);
-      if (urlParts.length < 2) return;
-      const fileName = urlParts[1];
+      // Aceita URLs do MinIO e os URLs /api/files/ que a API devolve aos clientes
+      const fileName = storageKeyFromUrl(url);
+      if (!fileName) return;
       await this.client.removeObject(this.bucket, fileName);
     } catch (error) {
       console.error('[MinIO] Error deleting file:', error);

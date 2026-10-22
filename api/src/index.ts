@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import { corsMiddleware } from './middleware/cors.middleware';
 import routes from './routes';
 import { errorMiddleware } from './middleware/error.middleware';
+import { rewriteStorageUrlsInJson } from './utils/storage-urls';
 import { initDatabase } from './database/init';
 import { campaignScheduler } from './services/campaign-scheduler.service';
 import { campaignCleanupService } from './services/campaign-cleanup.service';
@@ -39,6 +40,27 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('tiny'));
+
+// Respostas JSON nunca mostram o endereço do armazenamento: os URLs do MinIO passam a
+// <API>/api/files/... (servidos por routes/files.routes.ts). A base é o próprio
+// endereço com que o cliente chamou a API.
+app.use((req, res, next) => {
+  const sendJson = res.json.bind(res);
+  res.json = (body: any) => {
+    if (body && typeof body === 'object') {
+      const proto = String(req.headers['x-forwarded-proto'] || req.protocol).split(',')[0].trim();
+      const host = req.get('x-forwarded-host') || req.get('host');
+      const json = JSON.stringify(body);
+      const rewritten = rewriteStorageUrlsInJson(json, host ? `${proto}://${host}` : null);
+      if (rewritten !== json) {
+        if (!res.get('Content-Type')) res.type('application/json');
+        return res.send(rewritten);
+      }
+    }
+    return sendJson(body);
+  };
+  next();
+});
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });

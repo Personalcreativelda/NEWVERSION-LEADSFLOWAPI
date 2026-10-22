@@ -46,6 +46,13 @@ router.get('/google', async (req, res, next) => {
 
     const { url, state } = googleOAuthService.getAuthorizationUrl(frontendRedirectUrl);
 
+    // ?format=json: o app abre a página do Google diretamente, sem o endereço da API
+    // aparecer na barra do browser
+    if (req.query.format === 'json') {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ url });
+    }
+
     console.log('[Auth Google] Redirecting to Google OAuth...');
 
     // Redirect to Google OAuth

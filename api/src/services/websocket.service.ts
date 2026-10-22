@@ -2,6 +2,7 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import { rewriteStorageUrls } from '../utils/storage-urls';
 interface AuthenticatedSocket extends Socket {
     userId?: string;
 }
@@ -146,7 +147,8 @@ export class WebSocketService {
     }) {
         console.log(`[WebSocket] Emitindo nova mensagem para usuário ${userId}`);
         this.io.to(`user:${userId}`).emit('new_message', {
-            ...data,
+            // URLs de ficheiros pela API, sem o endereço do armazenamento
+            ...rewriteStorageUrls(data),
             timestamp: new Date().toISOString()
         });
     }
@@ -181,7 +183,8 @@ export class WebSocketService {
     }) {
         console.log(`[WebSocket] Emitindo atualização de conversa para usuário ${userId}`);
         this.io.to(`user:${userId}`).emit('conversation_update', {
-            ...data,
+            // URLs de ficheiros pela API, sem o endereço do armazenamento
+            ...rewriteStorageUrls(data),
             timestamp: new Date().toISOString()
         });
     }
@@ -254,7 +257,8 @@ export class WebSocketService {
     }) {
         console.log(`[WebSocket] Emitindo nova conversa para usuário ${userId}: ${data.conversationId}`);
         this.io.to(`user:${userId}`).emit('new_conversation', {
-            ...data,
+            // URLs de ficheiros pela API, sem o endereço do armazenamento
+            ...rewriteStorageUrls(data),
             timestamp: new Date().toISOString()
         });
     }
@@ -265,7 +269,8 @@ export class WebSocketService {
     emitToUser(userId: string, event: string, data: any) {
         console.log(`[WebSocket] Emitindo evento "${event}" para usuário ${userId}`);
         this.io.to(`user:${userId}`).emit(event, {
-            ...data,
+            // URLs de ficheiros pela API, sem o endereço do armazenamento
+            ...rewriteStorageUrls(data),
             timestamp: new Date().toISOString()
         });
     }
