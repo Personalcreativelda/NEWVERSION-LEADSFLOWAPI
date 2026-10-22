@@ -1220,9 +1220,11 @@ html.native-app #lfw-close {
 }
 
 /* Telemóvel: botões numa só linha (texto partido em duas linhas deixava os botões
-   "grossos"). O tamanho dos títulos vem do PageHeader (components/base). */
+   "grossos"). Só nos botões simples (rótulo + ícone): cartões clicáveis com título e
+   descrição (ex.: Integrações) têm de quebrar linha, senão o texto sai do cartão.
+   O tamanho dos títulos vem do PageHeader (components/base). */
 @media (max-width: 639px) {
-  html.native-app main button {
+  html.native-app main button:not(:has(p, h1, h2, h3, h4, h5, h6, div)) {
     white-space: nowrap;
   }
   /* ✕ dos diálogos (ui/dialog.tsx) com área de toque de app */

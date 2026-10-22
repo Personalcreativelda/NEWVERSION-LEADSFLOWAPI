@@ -698,7 +698,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   const integrationInputClass =
     "mt-1.5 h-11 text-sm rounded-lg border border-border !bg-card !text-foreground dark:shadow-none shadow-sm focus-visible:border-primary focus-visible:ring-primary/15";
   const integrationIconClass =
-    "w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted border border-border";
+    "w-11 h-11 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted border border-border";
   const infoBlockClass =
     "rounded-lg border border-border bg-muted p-4";
   const currentUrlBannerClass =
@@ -770,24 +770,24 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
               {/* Card Header - Clickable */}
               <button
                 onClick={() => handleToggleSection(integration.id)}
-                className="w-full p-6 flex items-center justify-between text-left hover:bg-muted dark:hover:bg-muted/50 transition-colors rounded-t-xl"
+                className={`w-full p-4 sm:p-6 flex items-center justify-between gap-3 text-left hover:bg-muted dark:hover:bg-muted/50 transition-colors ${isExpanded ? 'rounded-t-xl' : 'rounded-xl'}`}
               >
-                <div className="flex items-center gap-4 flex-1">
+                <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                   <div className={integrationIconClass}>
                     <Icon className={`w-6 h-6 ${integration.color}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-foreground dark:text-foreground">
                         {integration.name}
                       </h3>
                       {'badge' in integration && integration.badge && (
-                        <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-foreground">
+                        <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                           {integration.badge}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground leading-snug mt-0.5 line-clamp-2">
                       {integration.description}
                     </p>
                   </div>
@@ -801,7 +801,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
               {/* Expanded Content */}
               {isExpanded && (
-                <div className="px-6 pb-6 border-t border-border pt-6 relative">
+                <div className="px-4 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6 border-t border-border relative">
 
                   {/* Webhook Content */}
                   {integration.id === 'webhook' && (
