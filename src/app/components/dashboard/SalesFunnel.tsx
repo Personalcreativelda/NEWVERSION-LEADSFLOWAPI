@@ -1074,14 +1074,14 @@ export default function SalesFunnel({
           <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wider font-semibold mb-1 truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                <p className="text-[13px] font-medium mb-1 leading-tight truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   Total de Leads
                 </p>
                 <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
                   {stats.total.toLocaleString('pt-BR')}
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-purple-100 dark:bg-purple-500/10 group-hover:bg-purple-200 dark:group-hover:bg-purple-500/20">
+              <div className="w-10 h-10 rounded-lg hidden sm:flex items-center justify-center flex-shrink-0 bg-purple-100 dark:bg-purple-500/10 group-hover:bg-purple-200 dark:group-hover:bg-purple-500/20">
                 <BarChart3 className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
@@ -1091,14 +1091,14 @@ export default function SalesFunnel({
           <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wider font-semibold mb-1 truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                <p className="text-[13px] font-medium mb-1 leading-tight truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   Em Progresso
                 </p>
                 <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
                   {stats.inProgress.toLocaleString('pt-BR')}
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-yellow-100 dark:bg-yellow-500/10 group-hover:bg-yellow-200 dark:group-hover:bg-yellow-500/20">
+              <div className="w-10 h-10 rounded-lg hidden sm:flex items-center justify-center flex-shrink-0 bg-yellow-100 dark:bg-yellow-500/10 group-hover:bg-yellow-200 dark:group-hover:bg-yellow-500/20">
                 <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
               </div>
             </div>
@@ -1108,14 +1108,14 @@ export default function SalesFunnel({
           <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wider font-semibold mb-1 truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                <p className="text-[13px] font-medium mb-1 leading-tight truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   Convertidos
                 </p>
                 <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
                   {stats.converted.toLocaleString('pt-BR')}
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-100 dark:bg-green-500/10 group-hover:bg-green-200 dark:group-hover:bg-green-500/20">
+              <div className="w-10 h-10 rounded-lg hidden sm:flex items-center justify-center flex-shrink-0 bg-green-100 dark:bg-green-500/10 group-hover:bg-green-200 dark:group-hover:bg-green-500/20">
                 <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
               </div>
             </div>
@@ -1125,14 +1125,14 @@ export default function SalesFunnel({
           <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wider font-semibold mb-1 truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                <p className="text-[13px] font-medium mb-1 leading-tight truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   Taxa de Conversão
                 </p>
                 <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
                   {stats.conversionRate}%
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-orange-100 dark:bg-orange-500/10 group-hover:bg-orange-200 dark:group-hover:bg-orange-500/20">
+              <div className="w-10 h-10 rounded-lg hidden sm:flex items-center justify-center flex-shrink-0 bg-orange-100 dark:bg-orange-500/10 group-hover:bg-orange-200 dark:group-hover:bg-orange-500/20">
                 <TrendingUp className="w-5 h-5 text-orange-600 dark:text-orange-400" />
               </div>
             </div>
@@ -1142,14 +1142,14 @@ export default function SalesFunnel({
           <div className="col-span-2 md:col-span-1 rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wider font-semibold mb-1 truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                <p className="text-[13px] font-medium mb-1 leading-tight truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   Valor Pipeline
                 </p>
                 <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
                   {formatCurrency(stats.pipelineValue, currency)}
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-emerald-100 dark:bg-emerald-500/10 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-500/20">
+              <div className="w-10 h-10 rounded-lg hidden sm:flex items-center justify-center flex-shrink-0 bg-emerald-100 dark:bg-emerald-500/10 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-500/20">
                 <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>

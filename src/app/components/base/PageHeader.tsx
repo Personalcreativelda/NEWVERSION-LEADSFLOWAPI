@@ -20,8 +20,10 @@ interface PageHeaderProps {
  */
 export function PageHeader({ title, description, icon: Icon, actions, className }: PageHeaderProps) {
   return (
-    <header className={cn('mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between', className)}>
-      <div className="flex min-w-0 items-center gap-3">
+    // Ações sempre à direita do título, também no telemóvel (numa linha própria por
+    // baixo, um só botão ocupava uma linha inteira de ecrã)
+    <header className={cn('mb-5 flex items-start justify-between gap-3 sm:mb-6 sm:items-center', className)}>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         {Icon && (
           <div className="hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:flex">
             <Icon className="h-5 w-5" aria-hidden />
@@ -30,11 +32,11 @@ export function PageHeader({ title, description, icon: Icon, actions, className 
         <div className="min-w-0">
           <h1 className="truncate text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{title}</h1>
           {description && (
-            <p className="mt-1 line-clamp-1 text-sm text-muted-foreground sm:line-clamp-2">{description}</p>
+            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{description}</p>
           )}
         </div>
       </div>
-      {actions && <div className="flex flex-shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-shrink-0 items-center gap-2">{actions}</div>}
     </header>
   );
 }
@@ -50,7 +52,7 @@ interface PageActionProps {
   className?: string;
 }
 
-/** Botão de ação do PageHeader: 40px de altura; secundárias só com ícone no telemóvel. */
+/** Botão de ação do PageHeader: 40px de altura; no telemóvel só com o ícone (o texto fica no aria-label). */
 export function PageAction({ icon: Icon, label, onClick, disabled, variant = 'secondary', className }: PageActionProps) {
   const primary = variant === 'primary';
   return (
@@ -61,15 +63,16 @@ export function PageAction({ icon: Icon, label, onClick, disabled, variant = 'se
       aria-label={label}
       title={label}
       className={cn(
-        'inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 sm:px-4',
+        // Telemóvel: só o ícone (40×40), para o título ao lado ter espaço; desktop com texto
+        'inline-flex h-10 w-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:px-4',
         primary
-          ? 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80'
+          ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:bg-primary/80'
           : 'border border-border bg-card text-foreground hover:bg-muted active:bg-muted',
         className,
       )}
     >
-      <Icon className="h-4 w-4 flex-shrink-0" aria-hidden />
-      <span className={primary ? undefined : 'hidden sm:inline'}>{label}</span>
+      <Icon className={cn('flex-shrink-0', primary ? 'h-5 w-5 sm:h-4 sm:w-4' : 'h-4 w-4')} aria-hidden />
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }

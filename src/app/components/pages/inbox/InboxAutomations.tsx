@@ -336,7 +336,7 @@ export default function InboxAutomations() {
   return (
     // Página de ecrã inteiro (dentro do InboxPage): mesmas margens do PageContainer do Dashboard
     <div
-      className="h-full overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-10 lg:py-8"
+      className="h-full overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-6 sm:py-6 lg:px-10 lg:py-8"
       style={{ backgroundColor: 'hsl(var(--background))' }}
     >
       <PageHeader
@@ -391,36 +391,37 @@ export default function InboxAutomations() {
           {webhooks.map(webhook => (
             <div
               key={webhook.id}
-              className="rounded-xl border p-5 transition-all hover:shadow-md"
+              className="rounded-xl border p-4 sm:p-5 transition-all hover:shadow-md min-w-0"
               style={{
                 backgroundColor: 'hsl(var(--card))',
                 borderColor: 'hsl(var(--border))',
               }}
             >
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center gap-3 mb-2 min-w-0">
                     <div
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center ${
                         webhook.is_active ? 'bg-purple-500/10' : 'bg-muted-foreground/10'
                       }`}
                     >
                       <Webhook className={`w-5 h-5 ${webhook.is_active ? 'text-purple-500' : 'text-muted-foreground'}`} />
                     </div>
-                    <div>
-                      <h3 className="font-semibold flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
-                        {webhook.name}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold flex items-center gap-2 min-w-0" style={{ color: 'hsl(var(--foreground))' }}>
+                        <span className="truncate">{webhook.name}</span>
                         <Badge variant={webhook.is_active ? 'default' : 'secondary'} className="text-xs">
                           {webhook.is_active ? 'Ativo' : 'Inativo'}
                         </Badge>
                       </h3>
-                      <div className="flex items-center gap-2 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                        <Link2 className="w-3 h-3" />
-                        <span className="truncate max-w-md">{webhook.url}</span>
+                      <div className="flex items-center gap-2 text-xs min-w-0" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                        <Link2 className="w-3 h-3 shrink-0" />
+                        <span className="truncate min-w-0">{webhook.url}</span>
                         <button
                           onClick={() => copyToClipboard(webhook.url, 'URL')}
-                          className="hover:text-foreground"
+                          className="hover:text-foreground shrink-0 p-1 -m-1"
+                          aria-label="Copiar URL"
                         >
                           <Copy className="w-3 h-3" />
                         </button>
@@ -450,7 +451,7 @@ export default function InboxAutomations() {
                   </div>
 
                   {/* Stats */}
-                  <div className="flex items-center gap-4 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
                     <span className="flex items-center gap-1">
                       <Play className="w-3 h-3" />
                       {webhook.trigger_count} disparos
@@ -462,8 +463,8 @@ export default function InboxAutomations() {
                       </span>
                     )}
                     {webhook.last_error ? (
-                      <span className="flex items-center gap-1 text-red-500">
-                        <AlertCircle className="w-3 h-3" />
+                      <span className="flex items-center gap-1 text-red-500 min-w-0 break-all">
+                        <AlertCircle className="w-3 h-3 shrink-0" />
                         Erro: {webhook.last_error}
                       </span>
                     ) : webhook.trigger_count > 0 ? (
@@ -475,8 +476,8 @@ export default function InboxAutomations() {
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2">
+                {/* Actions — no telemóvel numa fila por baixo, separada por uma linha */}
+                <div className="flex items-center justify-between sm:justify-end gap-1 sm:gap-2 border-t sm:border-0 border-border pt-3 sm:pt-0 shrink-0">
                   <Button
                     variant="ghost"
                     size="sm"
