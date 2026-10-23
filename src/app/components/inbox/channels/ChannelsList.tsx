@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { ChannelRow, ChannelDetailSheet, AddChannelSheet } from './ChannelRows';
-import { MetaPagesSheet, readMetaReturn, startMetaConnect, type MetaProduct } from './MetaConnect';
+import { MetaPagesSheet, readMetaReturn, startMetaConnect, startWhatsAppConnect, type MetaProduct } from './MetaConnect';
 import { EmptyState } from '../../base/EmptyState';
 import { WhatsAppConnect } from './WhatsAppConnect';
 import { WhatsAppCloudConnect } from './WhatsAppCloudConnect';
@@ -142,6 +142,19 @@ export function ChannelsList() {
         const handleReturn = () => {
             const ret = readMetaReturn();
             if (ret?.session) setMetaSession(ret.session);
+            else if (ret?.whatsapp) {
+                loadChannels();
+                toast.success(`WhatsApp ${ret.whatsapp} ligado`, {
+                    description: 'As mensagens começam a chegar à caixa de entrada.',
+                    action: {
+                        label: 'Ligar assistente',
+                        onClick: () => {
+                            window.history.pushState({ dashboardPage: true }, '', '/dashboard/inbox/ai-assistants');
+                            window.dispatchEvent(new PopStateEvent('popstate'));
+                        },
+                    },
+                });
+            }
             else if (ret?.error) toast.error(ret.error);
         };
         handleReturn();
@@ -171,7 +184,7 @@ export function ChannelsList() {
         setEditingChannel(channel);
         switch (channel.type) {
             case 'whatsapp': setModalOpen(true); break;
-            case 'whatsapp_cloud': setCloudModalOpen(true); break;
+            case 'whatsapp_cloud': void startWhatsAppConnect().then((ok) => { if (!ok) setCloudModalOpen(true); }); break;
             case 'telegram': setTelegramModalOpen(true); break;
             case 'facebook': void connectMeta('facebook', () => setFacebookModalOpen(true)); break;
             case 'instagram': void connectMeta('instagram', () => setInstagramModalOpen(true)); break;
@@ -208,7 +221,7 @@ export function ChannelsList() {
         if (channelId === 'whatsapp') {
             setModalOpen(true);
         } else if (channelId === 'whatsapp_cloud') {
-            setCloudModalOpen(true);
+            void startWhatsAppConnect().then((ok) => { if (!ok) setCloudModalOpen(true); });
         } else if (channelId === 'telegram') {
             setTelegramModalOpen(true);
         } else if (channelId === 'facebook') {

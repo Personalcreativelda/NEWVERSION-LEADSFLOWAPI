@@ -12,10 +12,14 @@ function buildAllowedOrigins(): string[] {
   // Automatically trust the configured front-end URL (APP_URL) so the app
   // works even when CORS_ORIGINS is not explicitly set in production.
   const appUrl = (process.env.APP_URL || '').trim().replace(/\/$/, '');
+  // A própria API (páginas servidas por ela, ex.: ligar o WhatsApp oficial em /api/oauth/whatsapp/connect)
+  let apiOrigin = '';
+  try { apiOrigin = new URL(process.env.API_PUBLIC_URL || process.env.API_URL || '').origin; } catch { /* não definido */ }
 
   const origins: string[] = [
     ...fromEnv,
     ...(appUrl && appUrl.startsWith('http') ? [appUrl] : []),
+    ...(apiOrigin.startsWith('http') ? [apiOrigin] : []),
     // Always allow standard localhost dev ports in non-production
     ...(isDev
       ? [
@@ -53,6 +57,7 @@ const noOriginRequiredPaths = [
   '/api/auth/google',
   '/api/auth/google/callback',
   '/api/oauth/meta/callback', // o Facebook redireciona o browser para aqui (sem Origin)
+  '/api/oauth/whatsapp/connect', // página do Embedded Signup aberta no browser (sem Origin)
   '/api/inbox/media-proxy',
   '/api/diagnostics', // direct browser navigation with ?secret= or Bearer token
   '/api/version/mobile/release', // script release:mobile (protegido por MOBILE_RELEASE_KEY)

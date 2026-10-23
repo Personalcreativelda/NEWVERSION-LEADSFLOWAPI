@@ -29,7 +29,7 @@ export function isMetaOAuthConfigured(): boolean {
   return !!(process.env.META_APP_ID && process.env.META_APP_SECRET);
 }
 
-function apiBaseUrl(): string {
+export function apiBaseUrl(): string {
   const base = process.env.API_PUBLIC_URL || process.env.API_URL || process.env.SERVICE_URL_API || process.env.WEBHOOK_URL || 'http://localhost:4000';
   return base.replace(/\/$/, '').replace(/\/api$/, '');
 }

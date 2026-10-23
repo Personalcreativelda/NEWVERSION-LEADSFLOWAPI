@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { AppModal } from '../../base/AppModal';
 import { BrandIcon } from '../../base/BrandIcon';
 import { isNativeApp } from '../../../../native';
-import { metaOAuthApi, type MetaConnectResult, type MetaOAuthPage } from '../../../services/api/inbox';
+import { metaOAuthApi, whatsappSignupApi, type MetaConnectResult, type MetaOAuthPage } from '../../../services/api/inbox';
 
 export type MetaProduct = 'facebook' | 'instagram';
 const PRODUCT_KEY = 'leadsflow_meta_oauth_product';
@@ -31,6 +31,24 @@ export async function startMetaConnect(product: MetaProduct): Promise<boolean> {
   }
 }
 
+/**
+ * WhatsApp Business oficial (Embedded Signup): abre a página da LeadsFlow com o login da Meta.
+ * Devolve false quando ainda não está configurado no servidor (o app usa o formulário manual).
+ */
+export async function startWhatsAppConnect(): Promise<boolean> {
+  try {
+    const native = isNativeApp();
+    const url = await whatsappSignupApi.start(native ? 'app' : 'web');
+    if (native) await Browser.open({ url, presentationStyle: 'popover' });
+    else window.location.assign(url);
+    return true;
+  } catch (err: any) {
+    if (err?.response?.data?.code === 'wa_not_configured') return false;
+    toast.error(err?.message || 'Não foi possível abrir a ligação do WhatsApp');
+    return true;
+  }
+}
+
 const ERRORS: Record<string, string> = {
   cancelled: 'A ligação foi cancelada no Facebook.',
   no_pages: 'Esta conta do Facebook não gere nenhuma página. Crie ou peça acesso a uma página e tente de novo.',
@@ -38,17 +56,20 @@ const ERRORS: Record<string, string> = {
   exchange_failed: 'O Facebook não confirmou a autorização. Tente de novo.',
 };
 
-/** Lê ?meta_session / ?meta_error do URL (regresso do Facebook) e limpa-os */
-export function readMetaReturn(): { session?: string; error?: string } | null {
+/** Lê o regresso do Facebook/WhatsApp do URL (?meta_session, ?meta_error, ?wa_connected) e limpa-o */
+export function readMetaReturn(): { session?: string; error?: string; whatsapp?: string } | null {
   const params = new URLSearchParams(window.location.search);
   const session = params.get('meta_session') || undefined;
   const error = params.get('meta_error') || undefined;
-  if (!session && !error) return null;
+  const whatsapp = params.get('wa_connected') || undefined;
+  if (!session && !error && !whatsapp) return null;
   params.delete('meta_session');
   params.delete('meta_error');
+  params.delete('wa_connected');
   const qs = params.toString();
   window.history.replaceState(window.history.state, '', window.location.pathname + (qs ? `?${qs}` : ''));
   if (error) return { error: ERRORS[error] || 'Não foi possível ligar ao Facebook. Tente de novo.' };
+  if (whatsapp) return { whatsapp };
   return { session };
 }
 

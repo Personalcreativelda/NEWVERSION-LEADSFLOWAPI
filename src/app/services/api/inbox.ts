@@ -168,6 +168,14 @@ export const metaOAuthApi = {
     },
 };
 
+export const whatsappSignupApi = {
+    /** URL da página do Embedded Signup. Erro 'wa_not_configured' (503) quando ainda não está configurado. */
+    async start(platform: 'web' | 'app'): Promise<string> {
+        const { data } = await api.post<{ url: string }>('/oauth/whatsapp/start', { platform });
+        return data.url;
+    },
+};
+
 export const conversationsApi = {
     /**
      * Lista conversas com filtros

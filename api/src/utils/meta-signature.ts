@@ -24,7 +24,7 @@ export function checkMetaSignature(rawBody: Buffer | undefined, header: string |
  */
 export async function acceptMetaWebhook(
   req: { rawBody?: Buffer; headers: Record<string, any>; body: any },
-  idField: 'page_id' | 'instagram_id',
+  idField: 'page_id' | 'instagram_id' | 'waba_id',
 ): Promise<boolean> {
   const check = checkMetaSignature(req.rawBody, req.headers['x-hub-signature-256']);
   if (check === 'valid' || check === 'unconfigured') return true;
@@ -34,7 +34,7 @@ export async function acceptMetaWebhook(
   const result = await query(
     `SELECT 1 FROM channels
      WHERE credentials->>$1 = ANY($2::text[])
-       AND credentials->>'connected_via' = 'meta_oauth'
+       AND credentials->>'connected_via' IN ('meta_oauth', 'meta_embedded_signup')
        AND status != 'deleted'
      LIMIT 1`,
     [idField, ids],

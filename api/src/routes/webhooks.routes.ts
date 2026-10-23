@@ -1829,8 +1829,10 @@ router.post('/telegram/:botToken?', async (req, res) => {
       }
     }
 
-    // 2. Senão, tentar encontrar por conversa existente (com esse chatId)
-    if (!channelResult || channelResult.rows.length === 0) {
+    // 2. Só para webhooks antigos sem token no URL: procurar por conversa existente.
+    //    (O chat ID de uma pessoa é igual em todos os bots: com token no URL que não bate,
+    //    isto podia entregar a mensagem ao bot de outro cliente.)
+    if ((!channelResult || channelResult.rows.length === 0) && !botTokenParam) {
       channelResult = await query(
         `SELECT DISTINCT c.* FROM channels c
          INNER JOIN conversations conv ON conv.channel_id = c.id
@@ -1844,24 +1846,7 @@ router.post('/telegram/:botToken?', async (req, res) => {
       }
     }
 
-    // 3. Fallback: buscar qualquer canal Telegram ativo (só se houver apenas 1)
-    if (channelResult.rows.length === 0) {
-      console.log('[Telegram Webhook] Nenhuma conversa existente, buscando canal Telegram ativo...');
-      channelResult = await query(
-        `SELECT * FROM channels
-         WHERE type = 'telegram'
-         AND status IN ('active', 'connected')
-         ORDER BY created_at DESC`
-      );
-      // Se houver múltiplos canais e nenhum match, logar aviso
-      if (channelResult.rows.length > 1) {
-        console.warn('[Telegram Webhook] Múltiplos canais Telegram ativos encontrados sem match de bot_token. Usando o mais recente. Canais:', channelResult.rows.map((r: any) => r.id));
-      }
-      // Usar apenas o primeiro (mais recente)
-      if (channelResult.rows.length > 0) {
-        channelResult.rows = [channelResult.rows[0]];
-      }
-    }
+    // Sem "canal qualquer" de recurso: com vários clientes, a mensagem iria parar à conta errada
 
     if (channelResult.rows.length === 0) {
       console.warn('[Telegram Webhook] Nenhum canal Telegram ativo encontrado');
@@ -2447,17 +2432,7 @@ router.post('/facebook', async (req, res) => {
           [recipientId, pageId]
         );
 
-        // Fallback: buscar qualquer canal Facebook ativo (caso page_id não bata)
-        if (channelResult.rows.length === 0) {
-          console.log('[Facebook Webhook] Canal não encontrado por page_id, tentando fallback...');
-          channelResult = await query(
-            `SELECT * FROM channels
-             WHERE type = 'facebook'
-             AND status = 'active'
-             ORDER BY created_at DESC
-             LIMIT 1`
-          );
-        }
+        // Sem "canal qualquer" de recurso: com vários clientes, a mensagem iria parar à conta errada
 
         if (channelResult.rows.length === 0) {
           console.warn('[Facebook Webhook] Nenhum canal Facebook ativo encontrado. Page ID:', recipientId || pageId);
@@ -3395,6 +3370,8 @@ router.get('/whatsapp-cloud/:channelId?', async (req, res) => {
 // ✅ Webhook para receber mensagens do WhatsApp Cloud API
 router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
   try {
+    // Números ligados pelo Embedded Signup da LeadsFlow: eventos têm de vir assinados pela Meta
+    if (!(await acceptMetaWebhook(req as any, 'waba_id'))) return res.sendStatus(403);
     console.log('[WhatsApp Cloud Webhook] ===== WEBHOOK RECEBIDO =====');
     console.log('[WhatsApp Cloud Webhook] Body:', JSON.stringify(req.body).substring(0, 2000));
 
@@ -3496,24 +3473,9 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
             );
           }
 
-          // Fallback: buscar qualquer canal whatsapp_cloud (priorizar active/connected)
+          // Sem "canal qualquer" de recurso: com vários clientes, a mensagem iria parar à conta errada
           if (channelResult.rows.length === 0) {
-            console.warn('[WhatsApp Cloud Webhook] Canal não encontrado por phone_number_id:', phoneNumberId, '- tentando fallback...');
-            channelResult = await query(
-              `SELECT * FROM channels
-               WHERE type = 'whatsapp_cloud'
-               ORDER BY
-                 CASE WHEN status IN ('active','connected') THEN 0 ELSE 1 END,
-                 updated_at DESC
-               LIMIT 1`
-            );
-          }
-
-          if (channelResult.rows.length === 0) {
-            console.warn('[WhatsApp Cloud Webhook] Nenhum canal whatsapp_cloud encontrado! phone_number_id:', phoneNumberId);
-            // Listar todos os canais para debug
-            const allChannels = await query(`SELECT id, type, status, credentials->>'phone_number_id' as pnid FROM channels WHERE type = 'whatsapp_cloud'`);
-            console.warn('[WhatsApp Cloud Webhook] Canais whatsapp_cloud existentes:', JSON.stringify(allChannels.rows));
+            console.warn('[WhatsApp Cloud Webhook] Nenhum canal com este phone_number_id:', phoneNumberId);
             continue;
           }
 
