@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { SettingsHub } from './SettingsHub';
-import { Upload, User, Loader2, Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog } from 'lucide-react';
+import { SettingsHub, Group, Row } from './SettingsHub';
+import { ProfileSection } from './ProfileSection';
+import { Loader2, Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog, ChevronRight } from 'lucide-react';
 import { PageHeader } from '../base/PageHeader';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -34,19 +35,24 @@ interface ApiToken {
   created_at: string;
 }
 
-type TabType = 'avatar' | 'name' | 'security' | 'team';
+type TabType = 'profile' | 'security' | 'team';
 
 export default function AccountSettingsPage({ user, onUpdateUser, initialTab, onOpenChannels, onHelp, onFeedback, onLogout }: AccountSettingsPageProps) {
   const confirm = useConfirm();
-  const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'avatar');
+  // null = lista; uma secção = subpágina (com entrada no histórico: voltar fecha-a)
+  const [activeTab, setActiveTab] = useState<TabType | null>(initialTab || null);
+  const openSection = (section: TabType) => {
+    window.history.pushState({ subpage: true, accountSection: section }, '');
+    setActiveTab(section);
+  };
+  // Fechar a subpágina: seta do cabeçalho / botão voltar do Android (history.back → popstate)
+  useEffect(() => {
+    if (initialTab) return; // aberta diretamente numa secção (ex.: /segurança)
+    const onPop = () => setActiveTab((window.history.state?.accountSection as TabType) || null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [initialTab]);
   const [loading, setLoading] = useState(false);
-
-  // Avatar state
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-
-  // Name state
-  const [name, setName] = useState(user?.name || '');
 
   // ── Security state ────────────────────────────────────────────────────────
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -137,7 +143,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
   };
 
   const handleVerify2FA = async () => {
-    if (!verificationCode || verificationCode.length !== 6) { toast.error('Digite o código de 6 dígitos'); return; }
+    if (!verificationCode || verificationCode.length !== 6) { toast.error('Escreva o código de 6 dígitos'); return; }
     setLoading(true);
     try {
       const response = await fetch(getApiUrl('/security/2fa/verify'), { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ code: verificationCode }) });
@@ -148,7 +154,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
   };
 
   const handleDisable2FA = async () => {
-    if (!disablePassword) { toast.error('Digite sua palavra-passe'); return; }
+    if (!disablePassword) { toast.error('Escreva a sua palavra-passe'); return; }
     setLoading(true);
     try {
       const response = await fetch(getApiUrl('/security/2fa/disable'), { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ password: disablePassword }) });
@@ -159,7 +165,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
   };
 
   const handleCreateToken = async () => {
-    if (!newTokenName.trim()) { toast.error('Digite um nome para o token'); return; }
+    if (!newTokenName.trim()) { toast.error('Escreva um nome para o token'); return; }
     setLoading(true);
     try {
       const response = await fetch(getApiUrl('/security/tokens'), { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ name: newTokenName, expiresInDays: parseInt(newTokenExpireDays) || null }) });
@@ -184,7 +190,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
   };
 
   const handleChangePassword = async () => {
-    if (!currentPassword) { toast.error('Digite sua palavra-passe atual'); return; }
+    if (!currentPassword) { toast.error('Escreva a sua palavra-passe atual'); return; }
     if (!newPassword || newPassword.length < 8) { toast.error('A nova palavra-passe deve ter pelo menos 8 caracteres'); return; }
     if (newPassword !== confirmPassword) { toast.error('As palavras-passe não coincidem'); return; }
     setLoading(true);
@@ -201,150 +207,50 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString(getLocale()) : 'Nunca';
   // ─────────────────────────────────────────────────────────────────────────
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAvatarFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => { setAvatarPreview(reader.result as string); };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSaveAvatar = async () => {
-    if (!avatarFile) { toast.error('Selecione uma imagem'); return; }
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('avatar', avatarFile);
-      const token = localStorage.getItem('leadflow_access_token');
-      const apiBaseUrl = getApiBaseUrl();
-      const response = await fetch(`${apiBaseUrl}/api/users/avatar`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.details || 'Erro ao fazer upload');
-      }
-      const data = await response.json();
-      const updatedUser = data.user || data;
-      onUpdateUser({ ...user, ...updatedUser });
-      toast.success('Avatar atualizado com sucesso!');
-      setAvatarFile(null); setAvatarPreview(null);
-    } catch (error: any) { toast.error(error.message || 'Erro ao atualizar avatar'); }
-    finally { setLoading(false); }
-  };
-
-  const handleSaveName = async () => {
-    if (!name.trim()) { toast.error('Nome não pode estar vazio'); return; }
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('leadflow_access_token');
-      const apiBaseUrl = getApiBaseUrl();
-      const response = await fetch(`${apiBaseUrl}/api/users/profile`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ name }),
-      });
-      if (!response.ok) throw new Error('Erro ao atualizar nome');
-      const updatedProfile = await response.json();
-      onUpdateUser(updatedProfile);
-      toast.success('Nome atualizado com sucesso!');
-    } catch (error) { toast.error('Erro ao atualizar nome'); }
-    finally { setLoading(false); }
-  };
-
-  const tabs = [
-    { id: 'avatar'    as TabType, label: 'Avatar',    icon: Upload },
-    { id: 'name'      as TabType, label: 'Nome',      icon: User },
-    { id: 'security'  as TabType, label: 'Segurança', icon: Shield },
-    { id: 'team'      as TabType, label: 'Equipa',    icon: Users },
-  ];
-
   return (
     <div>
-      <PageHeader title="Definições" description="Canais, suporte, perfil, segurança e equipa" icon={UserCog} />
+      <PageHeader title="Definições" description="Perfil, segurança, equipa, canais e suporte" icon={UserCog} />
 
-      <SettingsHub onOpenChannels={onOpenChannels} onHelp={onHelp} onFeedback={onFeedback} onLogout={onLogout} />
-
-      {/* Tabs */}
-      <div className="border-b border-border dark:border-border mb-6">
-        <div className="flex sm:gap-6">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
+      {activeTab === null && (
+        <SettingsHub
+          onOpenChannels={onOpenChannels}
+          onHelp={onHelp}
+          onFeedback={onFeedback}
+          onLogout={onLogout}
+          before={
+            <Group title="Conta">
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 sm:flex-none flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 py-2.5 sm:py-3 border-b-2 transition-colors whitespace-nowrap text-xs sm:text-sm font-medium ${
-                  activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-muted-foreground hover:text-foreground/80'
-                }`}
+                type="button"
+                onClick={() => openSection('profile')}
+                className="flex w-full min-h-[64px] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/60 active:bg-muted"
               >
-                <Icon className="w-4 h-4" />
-                {tab.label}
+                <Avatar key={user?.avatar_url || 'none'} className="h-10 w-10 flex-shrink-0">
+                  <AvatarImage src={user?.avatar_url || undefined} alt="" />
+                  <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">
+                    {(user?.name || '').split(' ').filter(Boolean).map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-medium text-foreground">{user?.name || 'Perfil'}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{user?.email}</span>
+                </span>
+                <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
               </button>
-            );
-          })}
+              <Row icon={Shield} label="Segurança" hint="Palavra-passe, verificação em dois passos e tokens" onClick={() => openSection('security')} />
+              <Row icon={Users} label="Equipa" hint="Membros e permissões" onClick={() => openSection('team')} />
+            </Group>
+          }
+        />
+      )}
+
+      {activeTab !== null && (
+        <div className="mb-5">
+          <h2 className="text-lg font-semibold text-foreground">{({ profile: 'Perfil', security: 'Segurança', team: 'Equipa' })[activeTab]}</h2>
         </div>
-      </div>
+      )}
 
-      {/* Tab Content */}
-      <div className={activeTab !== 'security' && activeTab !== 'team' ? 'bg-card dark:bg-card rounded-xl border border-border dark:border-border p-6' : ''}>
-        {activeTab === 'avatar' && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium text-foreground dark:text-foreground mb-4">Alterar Avatar</h3>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-6">Atualize sua foto de perfil</p>
-            </div>
-            <div className="flex items-start gap-6">
-              <Avatar key={user?.avatar_url || 'no-avatar'} className="h-24 w-24">
-                <AvatarImage src={avatarPreview || user?.avatar_url} alt={user?.name || 'User'} />
-                <AvatarFallback className="text-2xl bg-blue-600 text-white">
-                  {user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <input type="file" id="avatar-upload" accept="image/*" onChange={handleAvatarChange} className="hidden" />
-                <label htmlFor="avatar-upload" className="inline-flex items-center px-4 py-2 border border-border dark:border-border rounded-lg text-sm font-medium text-foreground dark:text-foreground bg-card dark:bg-card hover:bg-muted dark:hover:bg-muted cursor-pointer transition-colors">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Escolher Ficheiro
-                </label>
-                <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">JPG, PNG ou GIF. Máximo 2MB.</p>
-              </div>
-            </div>
-            {avatarFile && (
-              <div className="flex justify-end">
-                <Button onClick={handleSaveAvatar} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />A guardar...</> : 'Guardar Avatar'}
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'name' && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium text-foreground dark:text-foreground mb-4">Alterar Nome</h3>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-6">Atualize seu nome de exibição</p>
-            </div>
-            <div className="max-w-md space-y-4">
-              <div>
-                <Label htmlFor="name" className="text-sm">Nome Completo</Label>
-                <Input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome completo" className="mt-1.5" />
-              </div>
-              <div className="flex justify-end">
-                <Button onClick={handleSaveName} disabled={loading || name === user?.name} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />A guardar...</> : 'Guardar Nome'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+      <div>
+        {activeTab === 'profile' && <ProfileSection user={user} onUpdateUser={onUpdateUser} />}
 
         {activeTab === 'team' && (
           <TeamSettingsPage currentUser={user} />
@@ -360,8 +266,8 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
                     <Smartphone className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <h3 className="font-medium text-foreground mb-1">Autenticação de Dois Fatores</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Adicione uma camada extra de segurança à sua conta usando um aplicativo autenticador</p>
+                    <h3 className="font-medium text-foreground mb-1">Verificação em dois passos</h3>
+                    <p className="text-sm text-muted-foreground mb-4">Uma camada extra de segurança com uma aplicação de autenticação</p>
                     <div className="flex items-center gap-2">
                       {twoFactorEnabled ? (
                         <><div className="w-2 h-2 bg-green-500 rounded-full" /><span className="text-sm text-green-600 dark:text-green-400">Ativado</span></>
@@ -385,11 +291,11 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
                     <Lock className="w-5 h-5 text-purple-600" />
                   </div>
                   <div>
-                    <h3 className="font-medium text-foreground mb-1">Alterar Palavra-passe</h3>
-                    <p className="text-sm text-muted-foreground">Atualize sua palavra-passe regularmente para manter sua conta segura</p>
+                    <h3 className="font-medium text-foreground mb-1">Alterar palavra-passe</h3>
+                    <p className="text-sm text-muted-foreground">Mude a palavra-passe com regularidade para manter a conta segura</p>
                   </div>
                 </div>
-                <Button onClick={() => setShowPasswordModal(true)} variant="outline" disabled={loading}>Alterar Palavra-passe</Button>
+                <Button onClick={() => setShowPasswordModal(true)} variant="outline" disabled={loading}>Alterar palavra-passe</Button>
               </div>
             </div>
 
@@ -402,11 +308,11 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
                   </div>
                   <div>
                     <h3 className="font-medium text-foreground mb-1">Tokens de API</h3>
-                    <p className="text-sm text-muted-foreground">Faça a gestão de tokens para acessar a API do LeadsFlow</p>
+                    <p className="text-sm text-muted-foreground">Tokens para aceder à API do LeadsFlow</p>
                   </div>
                 </div>
                 <Button onClick={() => setShowNewTokenModal(true)} size="sm">
-                  <Plus className="w-4 h-4 mr-2" />Novo Token
+                  <Plus className="w-4 h-4 mr-2" />Novo token
                 </Button>
               </div>
               <div className="space-y-3">
@@ -441,10 +347,10 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       <Dialog open={show2FASetupModal} onOpenChange={setShow2FASetupModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Configurar Autenticação de Dois Fatores</DialogTitle>
+            <DialogTitle>Configurar Verificação em dois passos</DialogTitle>
             <DialogDescription>
               {setupStep === 'qr' && 'Escaneie o QR Code com seu aplicativo autenticador'}
-              {setupStep === 'verify' && 'Digite o código de 6 dígitos do seu aplicativo'}
+              {setupStep === 'verify' && 'Escreva o código de 6 dígitos do seu aplicativo'}
               {setupStep === 'backup' && 'Guarde estes códigos de backup em local seguro'}
             </DialogDescription>
           </DialogHeader>
@@ -487,13 +393,13 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       <Dialog open={show2FADisableModal} onOpenChange={setShow2FADisableModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Desativar Autenticação de Dois Fatores</DialogTitle>
-            <DialogDescription>Digite sua palavra-passe para confirmar a desativação do 2FA</DialogDescription>
+            <DialogTitle>Desativar Verificação em dois passos</DialogTitle>
+            <DialogDescription>Escreva a sua palavra-passe para confirmar a desativação do 2FA</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label htmlFor="disable-password">Palavra-passe</Label>
-              <Input id="disable-password" type="password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} placeholder="Digite sua palavra-passe" className="mt-1.5" />
+              <Input id="disable-password" type="password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} placeholder="Escreva a sua palavra-passe" className="mt-1.5" />
             </div>
             <div className="flex gap-2">
               <Button onClick={() => setShow2FADisableModal(false)} variant="outline" className="flex-1">Cancelar</Button>
@@ -507,7 +413,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       <Dialog open={showNewTokenModal} onOpenChange={setShowNewTokenModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Criar Novo Token de API</DialogTitle>
+            <DialogTitle>Criar Novo token de API</DialogTitle>
             <DialogDescription>Crie um token para acessar a API do LeadsFlow</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -551,14 +457,14 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Alterar Palavra-passe</DialogTitle>
-            <DialogDescription>Digite sua palavra-passe atual e a nova palavra-passe desejada</DialogDescription>
+            <DialogTitle>Alterar palavra-passe</DialogTitle>
+            <DialogDescription>Escreva a sua palavra-passe atual e a nova palavra-passe desejada</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label htmlFor="current-password">Palavra-passe Atual</Label>
               <div className="relative mt-1.5">
-                <Input id="current-password" type={showCurrentPassword ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Digite sua palavra-passe atual" />
+                <Input id="current-password" type={showCurrentPassword ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Escreva a sua palavra-passe atual" />
                 <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
                   {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
@@ -579,7 +485,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
             </div>
             <div className="flex gap-2">
               <Button onClick={() => { setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }} variant="outline" className="flex-1">Cancelar</Button>
-              <Button onClick={handleChangePassword} disabled={loading} className="flex-1">{loading ? 'Alterando...' : 'Alterar Palavra-passe'}</Button>
+              <Button onClick={handleChangePassword} disabled={loading} className="flex-1">{loading ? 'Alterando...' : 'Alterar palavra-passe'}</Button>
             </div>
           </div>
         </DialogContent>

@@ -473,8 +473,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     handleNovoLead();
   };
   const goBack = useCallback(() => {
-    // Entrada criada pelo próprio painel (pushState) → voltar no histórico; senão Início
-    if (window.history.state?.dashboardPage) window.history.back();
+    // Entrada criada pelo próprio painel ou por uma subpágina (pushState) → voltar no histórico; senão Início
+    if (window.history.state?.dashboardPage || window.history.state?.subpage) window.history.back();
     else handleNavigate('dashboard');
   }, [handleNavigate]);
 

@@ -19,6 +19,7 @@
     "@capacitor/android": "^7.6.9",
     "@capacitor/app": "^7.1.2",
     "@capacitor/browser": "^7.0.5",
+    "@capacitor/camera": "^7.0.5",
     "@capacitor/core": "^7.6.9",
     "@capacitor/haptics": "^7.0.5",
     "@capacitor/splash-screen": "^7.0.5",

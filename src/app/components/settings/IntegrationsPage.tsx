@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Webhook, Mail, ChevronDown, ChevronUp, Sheet, BarChart3, Eye, Loader2, CheckCircle2, MessageSquare, Save, Trash2, FlaskConical, Plug } from 'lucide-react';
+import { Webhook, Mail, ChevronRight, Sheet, BarChart3, Eye, Loader2, CheckCircle2, MessageSquare, Save, Trash2, FlaskConical, Plug } from 'lucide-react';
 import { PageHeader } from '../base/PageHeader';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -160,8 +160,15 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   };
 
   const handleToggleSection = (section: IntegrationType) => {
-    setExpandedSection(expandedSection === section ? null : section);
+    if (section) window.history.pushState({ subpage: true, integration: section }, '');
+    setExpandedSection(section);
   };
+  // Fechar a subpágina: seta do cabeçalho / botão voltar do Android (history.back → popstate)
+  useEffect(() => {
+    const onPop = () => setExpandedSection((window.history.state?.integration as IntegrationType) || null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   const handleSaveWebhook = () => {
     toast.success('Webhook configurado com sucesso!');
@@ -709,25 +716,27 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   const integrations = [
     {
       id: 'n8n' as IntegrationType,
-      name: 'Webhooks N8N',
-      description: 'Integração com planilha Google Sheets em tempo real',
+      name: 'Google Sheets (via n8n)',
+      description: 'Envie os leads para uma folha do Google Sheets em tempo real',
       icon: Sheet,
       color: 'text-cyan-600 dark:text-cyan-400',
       borderColor: 'border-cyan-200 dark:border-cyan-800',
-      badge: isN8nConfigured ? '✓ Configurado' : null,
+      configured: isN8nConfigured || isN8nWhatsAppImportConfigured,
     },
     {
       id: 'webhook' as IntegrationType,
       name: 'Webhooks',
       description: 'Receba notificações em tempo real',
       icon: Webhook,
+      configured: !!webhookUrl.trim(),
       color: 'text-blue-600 dark:text-blue-400',
       borderColor: 'border-blue-200 dark:border-blue-800',
     },
     {
       id: 'smtp' as IntegrationType,
-      name: 'SMTP',
-      description: 'Configure seu servidor de email',
+      name: 'Email (SMTP)',
+      description: 'Configure o seu servidor de email',
+      configured: !!smtpHost.trim(),
       icon: Mail,
       color: 'text-purple-600 dark:text-purple-400',
       borderColor: 'border-purple-200 dark:border-purple-800',
@@ -739,7 +748,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       icon: BarChart3,
       color: 'text-indigo-600 dark:text-indigo-400',
       borderColor: 'border-indigo-200 dark:border-indigo-800',
-      badge: isMetaPixelConfigured ? '✓ Configurado' : null,
+      configured: isMetaPixelConfigured,
     },
     {
       id: 'google-analytics' as IntegrationType,
@@ -748,7 +757,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       icon: Eye,
       color: 'text-orange-600 dark:text-orange-400',
       borderColor: 'border-orange-200 dark:border-orange-800',
-      badge: isGoogleAnalyticsConfigured ? '✓ Configurado' : null,
+      configured: isGoogleAnalyticsConfigured,
     },
   ];
 
@@ -756,52 +765,54 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
     <div>
       <PageHeader title="Integrações" description="Serviços externos ligados à sua conta" icon={Plug} />
 
-      {/* Integration Cards */}
-      <div className="space-y-4">
+      {/* Lista (cada linha abre a sua subpágina) */}
+      <div className={expandedSection ? '' : 'overflow-hidden rounded-xl border border-border bg-card divide-y divide-border'}>
         {integrations.map((integration) => {
           const Icon = integration.icon;
           const isExpanded = expandedSection === integration.id;
+          if (expandedSection && !isExpanded) return null;
+
+          if (!expandedSection) {
+            return (
+              <button
+                key={integration.id}
+                type="button"
+                onClick={() => handleToggleSection(integration.id)}
+                className="flex w-full min-h-[64px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+              >
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted">
+                  <Icon className={`h-5 w-5 ${integration.color}`} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline gap-2">
+                    <span className="min-w-0 flex-1 text-[15px] font-medium text-foreground">{integration.name}</span>
+                    <span className="flex-shrink-0 text-xs text-muted-foreground">
+                      {integration.configured ? 'Ligado' : 'Não configurado'}
+                    </span>
+                  </span>
+                  <span className="block text-[13px] leading-snug text-muted-foreground line-clamp-2">{integration.description}</span>
+                </span>
+                <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              </button>
+            );
+          }
 
           return (
-            <div
-              key={integration.id}
-              className="bg-card dark:bg-card rounded-xl border border-border dark:border-border transition-all"
-            >
-              {/* Card Header - Clickable */}
-              <button
-                onClick={() => handleToggleSection(integration.id)}
-                className={`w-full p-4 sm:p-6 flex items-center justify-between gap-3 text-left hover:bg-muted dark:hover:bg-muted/50 transition-colors ${isExpanded ? 'rounded-t-xl' : 'rounded-xl'}`}
-              >
-                <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                  <div className={integrationIconClass}>
-                    <Icon className={`w-6 h-6 ${integration.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-foreground dark:text-foreground">
-                        {integration.name}
-                      </h3>
-                      {'badge' in integration && integration.badge && (
-                        <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                          {integration.badge}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground leading-snug mt-0.5 line-clamp-2">
-                      {integration.description}
-                    </p>
-                  </div>
+            <div key={integration.id}>
+              {/* Subpágina: nome (voltar = seta do cabeçalho) */}
+              <div className="mb-5 flex items-center gap-3">
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted">
+                  <Icon className={`h-5 w-5 ${integration.color}`} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base font-semibold text-foreground">{integration.name}</h2>
+                  <p className="text-[13px] leading-snug text-muted-foreground">{integration.description}</p>
                 </div>
-                {isExpanded ? (
-                  <ChevronUp className="w-5 h-5 text-muted-foreground/70 flex-shrink-0" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-muted-foreground/70 flex-shrink-0" />
-                )}
-              </button>
+              </div>
 
               {/* Expanded Content */}
               {isExpanded && (
-                <div className="px-4 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6 border-t border-border relative">
+                <div className="relative rounded-xl border border-border bg-card p-4 sm:p-6">
 
                   {/* Webhook Content */}
                   {integration.id === 'webhook' && (
@@ -817,7 +828,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           className={integrationInputClass}
                         />
                         <p className="text-xs text-muted-foreground mt-2">
-                          Cole a URL onde deseja receber as notificações via webhook
+                          Cole o URL onde quer receber as notificações
                         </p>
                       </div>
                       <div className="flex justify-end">
@@ -825,7 +836,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           onClick={handleSaveWebhook}
                           className="bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
-                          Guardar Webhook
+                          Guardar webhook
                         </Button>
                       </div>
                     </div>
@@ -1195,7 +1206,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           }}
                         >
                           <Save className="w-4 h-4 mr-2" />
-                          Guardar Todos
+                          Guardar tudo
                         </Button>
                         {isN8nConfigured && (
                           <Button
@@ -1204,7 +1215,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             className="border-green-600 text-green-600 hover:bg-green-50 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-900/20"
                           >
                             <FlaskConical className="w-4 h-4 mr-2" />
-                            Testar Webhook
+                            Testar webhook
                           </Button>
                         )}
                         {(isN8nConfigured || isN8nWhatsAppImportConfigured) && (
@@ -1217,7 +1228,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             className="border-red-600 text-red-600 hover:bg-red-50 dark:border-red-500 dark:text-red-400 dark:hover:bg-red-900/20"
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            Limpar Tudo
+                            Limpar tudo
                           </Button>
                         )}
                       </div>

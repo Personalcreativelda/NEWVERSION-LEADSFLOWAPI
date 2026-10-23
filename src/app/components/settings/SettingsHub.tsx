@@ -8,9 +8,11 @@ interface SettingsHubProps {
   onHelp?: () => void;
   onFeedback?: () => void;
   onLogout?: () => void;
+  /** Grupos mostrados antes dos de Canais/Suporte (ex.: Conta) */
+  before?: ReactNode;
 }
 
-function Row({ icon: Icon, label, hint, onClick, danger, trailing }: {
+export function Row({ icon: Icon, label, hint, onClick, danger, trailing }: {
   icon: LucideIcon;
   label: string;
   hint?: string;
@@ -36,7 +38,7 @@ function Row({ icon: Icon, label, hint, onClick, danger, trailing }: {
   );
 }
 
-function Group({ title, children }: { title: string; children: ReactNode }) {
+export function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
       <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
@@ -49,7 +51,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
  * Definições gerais (fora do perfil): Canais, Suporte e terminar sessão. Antes estavam
  * no menu lateral; o menu ficou só com páginas e o cartão do perfil.
  */
-export function SettingsHub({ onOpenChannels, onHelp, onFeedback, onLogout }: SettingsHubProps) {
+export function SettingsHub({ onOpenChannels, onHelp, onFeedback, onLogout, before }: SettingsHubProps) {
   const [version, setVersion] = useState<string | null>(null);
   useEffect(() => {
     if (isNativeApp()) void getInstalledVersion().then(setVersion);
@@ -57,6 +59,7 @@ export function SettingsHub({ onOpenChannels, onHelp, onFeedback, onLogout }: Se
 
   return (
     <div className="mb-6 space-y-5">
+      {before}
       {onOpenChannels && (
         <Group title="Canais">
           <Row icon={Radio} label="Canais ligados" hint="WhatsApp, Instagram, email e chat do site" onClick={onOpenChannels} />

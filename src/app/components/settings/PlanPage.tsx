@@ -6,7 +6,13 @@ import { plansApi } from '../../utils/api';
 import { toast } from 'sonner';
 import PaymentMethodModal from '../modals/PaymentMethodModal';
 import { SkeletonPlanCards } from '../ui/skeletons';
-import { getLocale } from '../../utils/format';
+import { formatMoney, getLocale } from '../../utils/format';
+
+// Os planos são cobrados pelo Stripe nesta moeda (os preços na BD não têm moeda própria)
+const PLAN_CURRENCY = 'USD';
+const planPrice = (value: number) => formatMoney(value, PLAN_CURRENCY);
+// Aviso de renovação a partir de quantos dias antes de expirar
+const RENEW_WARNING_DAYS = 15;
 
 interface PlanPageProps {
   user: any;
@@ -17,10 +23,10 @@ interface PlanPageProps {
 // Maps plan status to display info
 function getStatusInfo(status: string | undefined, diasRestantes: number | null, plan = 'free') {
   // Only show "Gratuito" when the actual plan is free
-  if (plan === 'free') return { label: 'Gratuito', color: 'bg-gray-500/15 text-gray-400 border-gray-500/30', icon: Zap };
+  if (plan === 'free') return { label: 'Grátis', color: 'bg-gray-500/15 text-gray-400 border-gray-500/30', icon: Zap };
   if (diasRestantes === 0 || status === 'expired') return { label: 'Expirado', color: 'bg-red-500/15 text-red-400 border-red-500/30', icon: XCircle };
   if (status === 'pending') return { label: 'Pendente', color: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30', icon: Clock };
-  if (status === 'overdue' || (diasRestantes !== null && diasRestantes <= 7 && diasRestantes > 0)) return { label: 'Atenção', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30', icon: AlertTriangle };
+  if (status === 'overdue') return { label: 'Em atraso', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30', icon: AlertTriangle };
   return { label: 'Ativo', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', icon: ShieldCheck };
 }
 
@@ -48,7 +54,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
   const subscriptionStatus = user?.subscriptionStatus || user?.subscription_status;
 
   const planNames: Record<string, string> = {
-    free: 'Plano Gratuito',
+    free: 'Plano grátis',
     business: 'Plano Business',
     enterprise: 'Plano Enterprise',
   };
@@ -144,7 +150,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
   return (
     <div className="space-y-6 pb-12">
 
-      <PageHeader title="Planos e Preços" description="O seu plano atual e opções de melhorar o plano" icon={Crown} />
+      <PageHeader title="Planos e preços" description="O seu plano atual e opções de melhorar o plano" icon={Crown} />
 
       {/* ── CARD PLANO ATIVO ── */}
       <div className={`rounded-xl border-2 bg-gradient-to-br ${gradientMap[currentPlan] || 'from-gray-500/10 to-gray-600/5'} ${borderColorMap[currentPlan] || 'border-gray-500/40'} p-6`}>
@@ -163,7 +169,6 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                   {statusInfo.label}
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground mt-0.5">Subscrição atual da sua conta</p>
             </div>
           </div>
 
@@ -183,7 +188,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                 <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1 sm:justify-end">
                   <Clock className="w-3 h-3" /> Expiração
                 </p>
-                <p className={`text-sm font-semibold ${diasRestantes === 0 ? 'text-red-400' : diasRestantes !== null && diasRestantes <= 7 ? 'text-amber-400' : 'text-foreground'}`}>
+                <p className={`text-sm font-semibold ${diasRestantes === 0 ? 'text-red-400' : diasRestantes !== null && diasRestantes <= RENEW_WARNING_DAYS ? 'text-orange-500' : 'text-foreground'}`}>
                   {fmt(user.planExpiresAt || user.plan_expires_at)}
                 </p>
               </div>
@@ -194,38 +199,38 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                 <p className="text-xs text-muted-foreground mb-0.5 sm:justify-end flex items-center gap-1 sm:ml-auto">
                   <ShieldCheck className="w-3 h-3" /> Restam
                 </p>
-                <p className={`text-sm font-semibold ${diasRestantes === 0 ? 'text-red-400' : diasRestantes <= 7 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                <p className={`text-sm font-semibold ${diasRestantes === 0 ? 'text-red-400' : diasRestantes <= RENEW_WARNING_DAYS ? 'text-orange-500' : 'text-emerald-500'}`}>
                   {diasRestantes === 0 ? 'Expirado' : `${diasRestantes} dia${diasRestantes === 1 ? '' : 's'}`}
                 </p>
               </div>
             ) : null}
           </div>
 
-          {/* Botão de renovação + cancelamento */}
-          <div className="flex flex-col gap-2 flex-shrink-0">
-            {diasRestantes !== null && diasRestantes <= 7 && currentPlan !== 'free' && (
-              <button
-                onClick={onUpgrade}
-                className="px-5 py-2.5 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 rounded-lg font-medium transition-all shadow-lg text-sm"
-              >
-                {diasRestantes === 0 ? 'Renovar Agora' : 'Renovar'}
-              </button>
-            )}
-            {currentPlan !== 'free' && (
-              <button
-                onClick={handleOpenPortal}
-                disabled={openingPortal}
-                className="px-5 py-2.5 border border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 rounded-lg font-medium transition-all text-sm flex items-center gap-2 disabled:opacity-50"
-              >
-                {openingPortal ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> A abrir portal...</>
-                ) : (
-                  <><ExternalLink className="w-4 h-4" /> Gerir Subscrição</>
-                )}
-              </button>
-            )}
-          </div>
+          {/* Gerir subscrição: ligação secundária (o portal do Stripe) */}
+          {currentPlan !== 'free' && (
+            <button
+              onClick={handleOpenPortal}
+              disabled={openingPortal}
+              className="inline-flex items-center gap-1.5 self-start text-sm font-medium text-primary hover:underline disabled:opacity-60 sm:self-center"
+            >
+              {openingPortal ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+              {openingPortal ? 'A abrir o portal…' : 'Gerir subscrição'}
+            </button>
+          )}
         </div>
+
+        {/* A expirar (15 dias ou menos) ou expirado: aviso + Renovar */}
+        {currentPlan !== 'free' && diasRestantes !== null && diasRestantes <= RENEW_WARNING_DAYS && (
+          <div className={`mt-5 flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center ${diasRestantes === 0 ? 'border-red-500/30 bg-red-500/10' : 'border-orange-500/30 bg-orange-500/10'}`}>
+            <p className={`flex flex-1 items-center gap-2 text-sm font-medium ${diasRestantes === 0 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'}`}>
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              {diasRestantes === 0 ? 'O seu plano expirou' : `Expira em ${diasRestantes} ${diasRestantes === 1 ? 'dia' : 'dias'}`}
+            </p>
+            <Button onClick={() => handleSelectPlan(currentPlan)} className="w-full sm:w-auto">
+              {diasRestantes === 0 ? 'Renovar agora' : 'Renovar'}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* ── TOGGLE MENSAL / ANUAL ── */}
@@ -277,7 +282,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                 {isCurrentPlan && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <span className={`bg-gradient-to-r ${colorMap[plan.id]} text-white text-xs font-medium px-3 py-1 rounded-full shadow`}>
-                      Plano Atual
+                      Plano atual
                     </span>
                   </div>
                 )}
@@ -288,15 +293,15 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                     <div className={`w-12 h-12 bg-gradient-to-br ${plan.color} rounded-xl flex items-center justify-center`}>
                       <Icon className="w-6 h-6 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
+                    <h3 className="text-xl font-bold text-foreground">{plan.id === 'free' || /^free$/i.test(plan.name) ? 'Grátis' : plan.name}</h3>
                   </div>
 
                   {/* Price */}
                   <div className="mb-5">
-                    <span className="text-4xl font-bold text-foreground">${price}</span>
+                    <span className="text-4xl font-bold tabular-nums text-foreground">{planPrice(price)}</span>
                     <span className="text-muted-foreground text-sm ml-1">/{billingPeriod === 'monthly' ? 'mês' : 'ano'}</span>
                     {billingPeriod === 'annual' && price > 0 && (
-                      <p className="text-xs text-emerald-400 mt-1">≈ ${(price / 12).toFixed(0)}/mês</p>
+                      <p className="text-xs text-emerald-500 mt-1">≈ {planPrice(price / 12)}/mês</p>
                     )}
                   </div>
 
@@ -310,30 +315,19 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                     ))}
                   </ul>
 
-                  {/* Buttons */}
-                  {plan.id === 'free' ? (
-                    <Button disabled className="w-full bg-muted text-muted-foreground cursor-not-allowed">
-                      Plano Gratuito
+                  {/* Botão: o plano atual fica desativado (renovar está no cartão do plano) */}
+                  {isCurrentPlan ? (
+                    <Button disabled variant="outline" className="w-full">
+                      <Check className="w-4 h-4" />
+                      Plano atual
                     </Button>
-                  ) : isCurrentPlan ? (
-                    <div className="grid gap-2">
-                      <Button disabled className="w-full bg-muted text-muted-foreground cursor-not-allowed">
-                        Plano Atual
-                      </Button>
-                      <Button
-                        onClick={() => handleSelectPlan(plan.id)}
-                        className="w-full bg-primary text-primary-foreground hover:opacity-90 transition-all duration-200 hover:scale-105"
-                        size="sm"
-                      >
-                        Renovar Plano
-                      </Button>
-                    </div>
+                  ) : plan.id === 'free' ? (
+                    <Button disabled variant="outline" className="w-full">
+                      Plano grátis
+                    </Button>
                   ) : (
-                    <Button
-                      onClick={() => handleSelectPlan(plan.id)}
-                      className="w-full bg-primary text-primary-foreground hover:opacity-90 transition-all duration-200 hover:scale-105"
-                    >
-                      Selecionar Plano
+                    <Button onClick={() => handleSelectPlan(plan.id)} className="w-full">
+                      Escolher {plan.name}
                     </Button>
                   )}
                 </div>
@@ -347,7 +341,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
           <History className="w-5 h-5 text-muted-foreground" />
-          <h2 className="text-base font-semibold text-foreground">Histórico de Pagamentos</h2>
+          <h2 className="text-base font-semibold text-foreground">Histórico de pagamentos</h2>
         </div>
 
         {historyLoading ? (
