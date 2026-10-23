@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Webhook, Mail, ChevronRight, Sheet, BarChart3, Eye, Loader2, CheckCircle2, MessageSquare, Save, Trash2, FlaskConical, Plug } from 'lucide-react';
 import { PageHeader } from '../base/PageHeader';
+import { SubpageBack } from '../base/SubpageBack';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -800,7 +801,8 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
           return (
             <div key={integration.id}>
-              {/* Subpágina: nome (voltar = seta do cabeçalho) */}
+              {/* Subpágina: voltar (no telemóvel é a seta do cabeçalho) + nome */}
+              <SubpageBack label="Integrações" onClose={() => setExpandedSection(null)} />
               <div className="mb-5 flex items-center gap-3">
                 <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted">
                   <Icon className={`h-5 w-5 ${integration.color}`} />

@@ -3,6 +3,7 @@ import { SettingsHub, Group, Row } from './SettingsHub';
 import { ProfileSection } from './ProfileSection';
 import { Loader2, Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog, ChevronRight } from 'lucide-react';
 import { PageHeader } from '../base/PageHeader';
+import { SubpageBack } from '../base/SubpageBack';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -245,6 +246,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
 
       {activeTab !== null && (
         <div className="mb-5">
+          {!initialTab && <SubpageBack label="Definições" onClose={() => setActiveTab(null)} />}
           <h2 className="text-lg font-semibold text-foreground">{({ profile: 'Perfil', security: 'Segurança', team: 'Equipa' })[activeTab]}</h2>
         </div>
       )}
