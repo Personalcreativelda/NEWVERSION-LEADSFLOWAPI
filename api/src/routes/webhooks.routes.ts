@@ -23,7 +23,7 @@ import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import { widgetTyping } from '../services/widget-typing.service';
 import { secretFingerprint } from '../utils/secret-box';
 import { acceptMetaWebhook } from '../utils/meta-signature';
-import { isInstagramLoginToken } from '../utils/meta-send';
+import { fetchMessengerProfile, isInstagramLoginToken } from '../utils/meta-send';
 import { findOrCreateLead } from '../services/leads-dedup.service';
 
 const router = Router();
@@ -2483,38 +2483,27 @@ router.post('/facebook', async (req, res) => {
           }
         }
 
-        // Buscar nome e foto do remetente via Graph API
+        // Buscar nome e foto do remetente (perfil do Messenger, com alternativas)
         let contactName = senderId;
         let fbProfilePic: string | null = null;
-        try {
-          const accessToken = channel.credentials?.page_access_token || channel.credentials?.access_token;
-          if (accessToken) {
-            const userResponse = await fetch(
-              `https://graph.facebook.com/v21.0/${senderId}?fields=first_name,last_name,name,profile_pic&access_token=${accessToken}`
-            );
-            const userData: any = await userResponse.json();
-            console.log('[Facebook Webhook] Graph API response for', senderId, ':', JSON.stringify(userData));
-            if (userData.error) {
-              console.warn('[Facebook Webhook] ⚠️ Graph API error:', userData.error.message, '| Type:', userData.error.type, '| Code:', userData.error.code);
-            } else if (userData.name) {
-              contactName = userData.name;
-            } else if (userData.first_name) {
-              contactName = [userData.first_name, userData.last_name].filter(Boolean).join(' ');
-            }
-            if (userData.profile_pic) {
-              fbProfilePic = userData.profile_pic;
-            }
+        let nameResolved = false;
+        const pageToken = channel.credentials?.page_access_token || channel.credentials?.access_token;
+        if (pageToken) {
+          const profile = await fetchMessengerProfile(senderId, pageToken, channel.credentials?.page_id || pageId);
+          if (profile.name) {
+            contactName = profile.name;
+            nameResolved = true;
           } else {
-            console.warn('[Facebook Webhook] ⚠️ Sem access_token disponível para buscar perfil do usuário');
+            console.warn('[Facebook Webhook] ⚠️ Nome do remetente indisponível:', profile.error);
           }
-        } catch (e) {
-          console.log('[Facebook Webhook] Não foi possível obter info do usuário:', e);
+          fbProfilePic = profile.picture || null;
+        } else {
+          console.warn('[Facebook Webhook] ⚠️ Sem access_token disponível para buscar perfil do usuário');
         }
 
-        // Se o contactName ainda é o ID numérico, usar nome amigável
-        if (contactName === senderId) {
+        // Sem nome: nome amigável (não substitui um nome real já guardado; ver abaixo)
+        if (!nameResolved) {
           contactName = `Visitante Facebook #${senderId.slice(-4)}`;
-          console.log('[Facebook Webhook] ⚠️ Usando nome fallback:', contactName, '(Graph API não retornou nome)');
         }
 
         // Buscar ou criar lead pelo facebook_id (com fallback se coluna não existe)
@@ -2550,8 +2539,8 @@ router.post('/facebook', async (req, res) => {
             // Atualizar nome e avatar se mudaram
             if (lead.rows[0].name !== contactName || (fbProfilePic && lead.rows[0].avatar_url !== fbProfilePic)) {
               await query(
-                `UPDATE leads SET name = COALESCE(NULLIF($1, $4), name), avatar_url = COALESCE($3, avatar_url) WHERE id = $2`,
-                [contactName, leadId, fbProfilePic, senderId]
+                `UPDATE leads SET name = COALESCE($1, name), avatar_url = COALESCE($3, avatar_url) WHERE id = $2`,
+                [nameResolved ? contactName : null, leadId, fbProfilePic]
               );
             }
           }
