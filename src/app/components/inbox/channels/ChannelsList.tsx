@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { ChannelRow, ChannelDetailSheet, AddChannelSheet } from './ChannelRows';
+import { MetaPagesSheet, readMetaReturn, startMetaConnect, type MetaProduct } from './MetaConnect';
 import { EmptyState } from '../../base/EmptyState';
 import { WhatsAppConnect } from './WhatsAppConnect';
 import { WhatsAppCloudConnect } from './WhatsAppCloudConnect';
@@ -128,6 +129,42 @@ export function ChannelsList() {
     const [channelsExpanded, setChannelsExpanded] = useState(true);
     const [detailChannel, setDetailChannel] = useState<Channel | null>(null);
     const [addOpen, setAddOpen] = useState(false);
+    const [metaSession, setMetaSession] = useState<string | null>(null);
+
+    // Facebook/Instagram: login da Meta; sem a app Meta configurada no servidor, formulário manual
+    const connectMeta = async (product: MetaProduct, fallback: () => void) => {
+        const started = await startMetaConnect(product);
+        if (!started) fallback();
+    };
+
+    // Regresso do Facebook (?meta_session no URL; no app chega pelo evento do deep link)
+    useEffect(() => {
+        const handleReturn = () => {
+            const ret = readMetaReturn();
+            if (ret?.session) setMetaSession(ret.session);
+            else if (ret?.error) toast.error(ret.error);
+        };
+        handleReturn();
+        window.addEventListener('meta-oauth-return', handleReturn);
+        return () => window.removeEventListener('meta-oauth-return', handleReturn);
+    }, []);
+
+    const onMetaConnected = (result: { connected: { name: string }[]; failed: unknown[] }) => {
+        loadChannels();
+        if (!result.connected.length) return;
+        if (!result.failed.length) setMetaSession(null);
+        const names = result.connected.map((c) => c.name).join(', ');
+        toast.success(result.connected.length === 1 ? `${names} ligado` : `Ligados: ${names}`, {
+            description: 'As mensagens começam a chegar à caixa de entrada.',
+            action: {
+                label: 'Ligar assistente',
+                onClick: () => {
+                    window.history.pushState({ dashboardPage: true }, '', '/dashboard/inbox/ai-assistants');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                },
+            },
+        });
+    };
 
     // Abrir modal de edição para qualquer tipo de canal
     const openEditModal = (channel: Channel) => {
@@ -136,8 +173,8 @@ export function ChannelsList() {
             case 'whatsapp': setModalOpen(true); break;
             case 'whatsapp_cloud': setCloudModalOpen(true); break;
             case 'telegram': setTelegramModalOpen(true); break;
-            case 'facebook': setFacebookModalOpen(true); break;
-            case 'instagram': setInstagramModalOpen(true); break;
+            case 'facebook': void connectMeta('facebook', () => setFacebookModalOpen(true)); break;
+            case 'instagram': void connectMeta('instagram', () => setInstagramModalOpen(true)); break;
             case 'website': setWebsiteModalOpen(true); break;
             case 'email': setEmailModalOpen(true); break;
             case 'twilio_sms': setSmsModalOpen(true); break;
@@ -175,9 +212,9 @@ export function ChannelsList() {
         } else if (channelId === 'telegram') {
             setTelegramModalOpen(true);
         } else if (channelId === 'facebook') {
-            setFacebookModalOpen(true);
+            void connectMeta('facebook', () => setFacebookModalOpen(true));
         } else if (channelId === 'instagram') {
-            setInstagramModalOpen(true);
+            void connectMeta('instagram', () => setInstagramModalOpen(true));
         } else if (channelId === 'website') {
             setWebsiteModalOpen(true);
         } else if (channelId === 'email') {
@@ -294,6 +331,12 @@ export function ChannelsList() {
                 onClose={() => setAddOpen(false)}
                 channels={AVAILABLE_CHANNELS}
                 onPick={handleConnect}
+            />
+
+            <MetaPagesSheet
+                sessionId={metaSession}
+                onClose={() => setMetaSession(null)}
+                onConnected={onMetaConnected}
             />
 
             <WhatsAppConnect

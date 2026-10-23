@@ -52,6 +52,17 @@ function reloadAt(pathWithHash: string) {
   if (samePage) window.location.reload();
 }
 
+// Regresso do login da Meta (ligar Facebook/Instagram): fecha o browser e abre os Canais
+// com ?meta_session (o ChannelsList lê-o e mostra as páginas para escolher), sem recarregar.
+function handleMetaDeepLink(url: string) {
+  Browser.close().catch(() => {});
+  const queryIndex = url.indexOf('?');
+  const query = queryIndex >= 0 ? url.slice(queryIndex) : '';
+  window.history.pushState({ dashboardPage: true }, '', `/dashboard/inbox/settings${query}`);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+  window.dispatchEvent(new Event('meta-oauth-return'));
+}
+
 function handleOAuthDeepLink(url: string) {
   oauthCompleting = true;
   Browser.close().catch(() => {});
@@ -221,7 +232,8 @@ export async function initNative() {
   });
 
   App.addListener('appUrlOpen', ({ url }) => {
-    if (url.startsWith(NATIVE_OAUTH_REDIRECT)) handleOAuthDeepLink(url);
+    if (url.startsWith(`${NATIVE_OAUTH_REDIRECT}/meta`)) handleMetaDeepLink(url);
+    else if (url.startsWith(NATIVE_OAUTH_REDIRECT)) handleOAuthDeepLink(url);
   });
 
   const reapplySystemBars = syncSystemBars();

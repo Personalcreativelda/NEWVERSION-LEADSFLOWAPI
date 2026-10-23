@@ -27,6 +27,7 @@ import voiceAgentsRoutes from './voice-agents.routes';
 import userWebhooksRoutes from './user-webhooks.routes';
 import versionRoutes from './version.routes';
 import filesRoutes from './files.routes';
+import metaOAuthRoutes from './meta-oauth.routes';
 // Lead Tracking: Importar rotas de rastreamento de leads
 import leadsTrackingRoutes from './leads-tracking.routes';
 // Conversation Tags: Importar rotas de etiquetas de conversas
@@ -55,6 +56,7 @@ router.use('/plans', plansRoutes);        // must stay accessible so users can u
 router.use('/webhooks', webhooksRoutes);  // external Stripe / provider webhooks
 router.use('/version', versionRoutes);
 router.use('/files', filesRoutes);          // ficheiros guardados (sem expor o MinIO)
+router.use('/oauth/meta', metaOAuthRoutes); // ligar Facebook/Instagram pelo login da Meta (auth dentro das rotas)
 
 // ── Routes with plan enforcement ────────────────────────────────────────────
 router.use('/leads', withPlan, leadsRoutes);

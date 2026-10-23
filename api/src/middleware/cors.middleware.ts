@@ -52,6 +52,7 @@ const noOriginRequiredPaths = [
   '/api/whatsapp/validate-leads',
   '/api/auth/google',
   '/api/auth/google/callback',
+  '/api/oauth/meta/callback', // o Facebook redireciona o browser para aqui (sem Origin)
   '/api/inbox/media-proxy',
   '/api/diagnostics', // direct browser navigation with ?secret= or Bearer token
   '/api/version/mobile/release', // script release:mobile (protegido por MOBILE_RELEASE_KEY)

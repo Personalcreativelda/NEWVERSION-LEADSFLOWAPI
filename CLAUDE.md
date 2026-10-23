@@ -45,6 +45,18 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
   aparece no fundo do menu do telemóvel. APKs anteriores ao 1.1 não recebem atualizações.
 - Chave `MOBILE_RELEASE_KEY` em `.env.release.local` (git-ignored) e no Coolify (API).
 
+## Ligar canais
+
+- Segredos dos canais (tokens, palavras-passe) cifrados com AES-256-GCM (`CHANNEL_SECRETS_KEY`,
+  `api/src/utils/secret-box.ts`); o `query()` decifra as colunas `credentials`. Nenhuma resposta da
+  API leva segredos (`middleware/redact-credentials` → `has_*`). Editar sem token mantém o guardado.
+  Não mudar a `CHANNEL_SECRETS_KEY` depois de definida (os tokens cifrados deixam de ser lidos).
+- O estado `active` só é dado depois de o fornecedor confirmar (`services/channel-validation.service.ts`).
+- Facebook/Instagram: login da Meta (`/api/oauth/meta/*`, `components/inbox/channels/MetaConnect.tsx`).
+  No app volta por `com.leadsflowapi.app://oauth/meta`. Sem `META_APP_ID`/`META_APP_SECRET` usa o formulário manual.
+- Webhooks da Meta de canais ligados pelo login têm de vir assinados com `META_APP_SECRET`.
+- Rotas `/debug` e `/test` dos webhooks só para administradores (`requireAdmin`).
+
 ## Sistema de design (usar sempre, não reinventar)
 
 - Páginas: `PageHeader` + `PageAction` (`src/app/components/base/PageHeader.tsx`). Ação à

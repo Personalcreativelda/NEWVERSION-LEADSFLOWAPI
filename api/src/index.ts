@@ -20,6 +20,7 @@ import { sessionCleanupService } from './services/session-cleanup.service';
 import { diagnosticAlertService } from './services/diagnostic-alert.service';
 import { encryptExistingChannelSecrets } from './services/channel-secrets-migration.service';
 import { redactCredentials } from './middleware/redact-credentials.middleware';
+import { ensureSessionsTable as ensureMetaOAuthSessions } from './services/meta-oauth.service';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -34,7 +35,8 @@ app.use(corsMiddleware);
 app.use(express.json({
   limit: '50mb',
   verify: (req, _res, buf) => {
-    const signature = req.headers['stripe-signature'];
+    // Corpo original para verificar assinaturas (Stripe, webhooks da Meta)
+    const signature = req.headers['stripe-signature'] || req.headers['x-hub-signature-256'];
     if (signature) {
       (req as any).rawBody = buf;
     }
@@ -565,6 +567,8 @@ initDatabase().then(() => {
 
   // Cifrar tokens dos canais que ainda estejam em texto simples (não bloqueia o arranque)
   void encryptExistingChannelSecrets();
+  // Sessões temporárias do login da Meta (Facebook/Instagram)
+  ensureMetaOAuthSessions().catch((err) => console.error('[MetaOAuth] Tabela de sessões:', err?.message));
 
   // ✅ Iniciar scheduler de campanhas agendadas
   campaignScheduler.start();

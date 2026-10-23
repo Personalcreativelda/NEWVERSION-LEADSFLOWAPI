@@ -133,6 +133,41 @@ export const channelsApi = {
 // CONVERSATIONS
 // ============================================
 
+// ============================================
+// LIGAR FACEBOOK / INSTAGRAM PELO LOGIN DA META
+// ============================================
+
+export interface MetaOAuthPage {
+    id: string;
+    name: string;
+    picture: string | null;
+    connected: boolean;
+    instagram: { id: string; username: string | null; picture: string | null; connected: boolean } | null;
+}
+
+export interface MetaConnectResult {
+    connected: { id: string; type: 'facebook' | 'instagram'; name: string }[];
+    failed: { id: string; name: string; error: string }[];
+}
+
+export const metaOAuthApi = {
+    /** URL do diálogo do Facebook. Erro 'meta_not_configured' (503) quando a app Meta ainda não está configurada. */
+    async start(platform: 'web' | 'app'): Promise<string> {
+        const { data } = await api.post<{ url: string }>('/oauth/meta/start', { platform });
+        return data.url;
+    },
+
+    async getSession(sessionId: string): Promise<MetaOAuthPage[]> {
+        const { data } = await api.get<{ pages: MetaOAuthPage[] }>(`/oauth/meta/sessions/${sessionId}`);
+        return data.pages;
+    },
+
+    async connect(sessionId: string, selection: { pages: string[]; instagram: string[] }): Promise<MetaConnectResult> {
+        const { data } = await api.post<MetaConnectResult>(`/oauth/meta/sessions/${sessionId}/connect`, selection);
+        return data;
+    },
+};
+
 export const conversationsApi = {
     /**
      * Lista conversas com filtros

@@ -22,6 +22,7 @@ import { getStorageService } from '../services/storage.service';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import { widgetTyping } from '../services/widget-typing.service';
 import { secretFingerprint } from '../utils/secret-box';
+import { acceptMetaWebhook } from '../utils/meta-signature';
 import { findOrCreateLead } from '../services/leads-dedup.service';
 
 const router = Router();
@@ -2403,6 +2404,8 @@ router.post('/facebook/test', requireAuth, requireAdmin, async (req, res) => {
 // ✅ Webhook para receber mensagens do Facebook Messenger
 router.post('/facebook', async (req, res) => {
   try {
+    // Eventos para páginas ligadas pelo login da LeadsFlow têm de vir assinados pela Meta
+    if (!(await acceptMetaWebhook(req as any, 'page_id'))) return res.sendStatus(403);
     console.log('[Facebook Webhook] ===== WEBHOOK RECEBIDO =====');
     console.log('[Facebook Webhook] Body:', JSON.stringify(req.body).substring(0, 2000));
 
@@ -2922,6 +2925,8 @@ router.post('/instagram/test', requireAuth, requireAdmin, async (req, res) => {
 // ✅ Webhook para receber mensagens do Instagram (Meta Graph API)
 router.post('/instagram', async (req, res) => {
   try {
+    // Eventos para contas ligadas pelo login da LeadsFlow têm de vir assinados pela Meta
+    if (!(await acceptMetaWebhook(req as any, 'instagram_id'))) return res.sendStatus(403);
     console.log('[Instagram Webhook] ===== WEBHOOK RECEBIDO =====');
     console.log('[Instagram Webhook] Body:', JSON.stringify(req.body).substring(0, 2000));
 
