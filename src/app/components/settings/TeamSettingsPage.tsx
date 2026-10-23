@@ -529,7 +529,7 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
                                     <div className="flex-1 min-w-0 basis-[calc(100%-48px)] sm:basis-auto">
                                         <div className="flex items-center gap-2 min-w-0">
                                             <span className="text-sm font-medium truncate">{displayName}</span>
-                                            {isSelf && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">Você</span>}
+                                            {isSelf && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">Eu</span>}
                                             {isPending && (
                                                 <span className="inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded">
                                                     <Clock size={9} />

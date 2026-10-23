@@ -172,7 +172,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Erro ao criar token'); }
       const data = await response.json();
       setGeneratedToken(data.apiToken); setShowGeneratedToken(true); loadTokens(); setNewTokenName('');
-      toast.success('Token criado com sucesso!', { description: 'Copie o token agora. Você não poderá vê-lo novamente.' });
+      toast.success('Token criado com sucesso!', { description: 'Copie o token agora: não o vai poder ver de novo.' });
     } catch (e: any) { toast.error(e.message || 'Erro ao criar token'); }
     finally { setLoading(false); }
   };
@@ -183,7 +183,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
     setLoading(true);
     try {
       const response = await fetch(getApiUrl(`/security/tokens/${tokenId}`), { method: 'DELETE', headers: getAuthHeaders() });
-      if (!response.ok) throw new Error('Erro ao deletar token');
+      if (!response.ok) throw new Error('Erro ao eliminar o token');
       loadTokens(); toast.success('Token apagado com sucesso');
     } catch (e: any) { toast.error(e.message || 'Erro ao apagar token'); }
     finally { setLoading(false); }
@@ -198,12 +198,12 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       const response = await fetch(getApiUrl('/security/change-password'), { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ currentPassword, newPassword }) });
       if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Erro ao alterar senha'); }
       setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
-      toast.success('Palavra-passe alterada com sucesso!', { description: 'Um email de confirmação foi enviado para você.' });
+      toast.success('Palavra-passe alterada com sucesso!', { description: 'Enviámos-lhe um email de confirmação.' });
     } catch (e: any) { toast.error(e.message || 'Erro ao alterar palavra-passe'); }
     finally { setLoading(false); }
   };
 
-  const copyToClipboard = (text: string) => { navigator.clipboard.writeText(text); toast.success('Copiado para área de transferência!'); };
+  const copyToClipboard = (text: string) => { navigator.clipboard.writeText(text); toast.success('Copiado'); };
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString(getLocale()) : 'Nunca';
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -347,11 +347,11 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       <Dialog open={show2FASetupModal} onOpenChange={setShow2FASetupModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Configurar Verificação em dois passos</DialogTitle>
+            <DialogTitle>Configurar verificação em dois passos</DialogTitle>
             <DialogDescription>
-              {setupStep === 'qr' && 'Escaneie o QR Code com seu aplicativo autenticador'}
-              {setupStep === 'verify' && 'Escreva o código de 6 dígitos do seu aplicativo'}
-              {setupStep === 'backup' && 'Guarde estes códigos de backup em local seguro'}
+              {setupStep === 'qr' && 'Leia o código QR com a sua aplicação de autenticação'}
+              {setupStep === 'verify' && 'Escreva o código de 6 dígitos da aplicação'}
+              {setupStep === 'backup' && 'Guarde estes códigos de recuperação num local seguro'}
             </DialogDescription>
           </DialogHeader>
           {setupStep === 'qr' && (
@@ -360,7 +360,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
                 {qrCode && <img src={qrCode} alt="QR Code" className="w-64 h-64" />}
               </div>
               <div className="bg-muted p-3 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Ou digite manualmente:</p>
+                <p className="text-xs text-muted-foreground mb-1">Ou escreva manualmente:</p>
                 <code className="text-sm font-mono">{secret}</code>
               </div>
               <Button onClick={() => setSetupStep('verify')} className="w-full">Próximo</Button>
@@ -369,16 +369,16 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
           {setupStep === 'verify' && (
             <div className="space-y-4">
               <div>
-                <Label htmlFor="verification-code">Código de Verificação</Label>
+                <Label htmlFor="verification-code">Código de verificação</Label>
                 <Input id="verification-code" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" className="text-center text-2xl font-mono mt-1.5" maxLength={6} />
               </div>
-              <Button onClick={handleVerify2FA} disabled={loading} className="w-full">{loading ? 'A verificar...' : 'Verificar e Ativar'}</Button>
+              <Button onClick={handleVerify2FA} disabled={loading} className="w-full">{loading ? 'A verificar...' : 'Verificar e ativar'}</Button>
             </div>
           )}
           {setupStep === 'backup' && (
             <div className="space-y-4">
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">Guarde estes códigos em um local seguro. Você pode usá-los para acessar sua conta se perder acesso ao seu dispositivo.</p>
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">Guarde estes códigos num local seguro. Servem para entrar na conta se perder o acesso ao telemóvel.</p>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {backupCodes.map((code, i) => <code key={i} className="bg-muted p-2 rounded text-sm font-mono text-center">{code}</code>)}
@@ -393,7 +393,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       <Dialog open={show2FADisableModal} onOpenChange={setShow2FADisableModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Desativar Verificação em dois passos</DialogTitle>
+            <DialogTitle>Desativar verificação em dois passos</DialogTitle>
             <DialogDescription>Escreva a sua palavra-passe para confirmar a desativação do 2FA</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -403,7 +403,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
             </div>
             <div className="flex gap-2">
               <Button onClick={() => setShow2FADisableModal(false)} variant="outline" className="flex-1">Cancelar</Button>
-              <Button onClick={handleDisable2FA} disabled={loading} variant="destructive" className="flex-1">{loading ? 'Desativando...' : 'Desativar 2FA'}</Button>
+              <Button onClick={handleDisable2FA} disabled={loading} variant="destructive" className="flex-1">{loading ? 'A desativar...' : 'Desativar 2FA'}</Button>
             </div>
           </div>
         </DialogContent>
@@ -414,13 +414,13 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Criar Novo token de API</DialogTitle>
-            <DialogDescription>Crie um token para acessar a API do LeadsFlow</DialogDescription>
+            <DialogDescription>Crie um token para aceder à API do LeadsFlow</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {!showGeneratedToken ? (
               <>
                 <div>
-                  <Label htmlFor="token-name">Nome do Token</Label>
+                  <Label htmlFor="token-name">Nome do token</Label>
                   <Input id="token-name" value={newTokenName} onChange={(e) => setNewTokenName(e.target.value)} placeholder="Ex: Integração Mobile" className="mt-1.5" />
                 </div>
                 <div>
@@ -430,18 +430,18 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={() => setShowNewTokenModal(false)} variant="outline" className="flex-1">Cancelar</Button>
-                  <Button onClick={handleCreateToken} disabled={loading} className="flex-1">{loading ? 'A criar...' : 'Criar Token'}</Button>
+                  <Button onClick={handleCreateToken} disabled={loading} className="flex-1">{loading ? 'A criar...' : 'Criar token'}</Button>
                 </div>
               </>
             ) : (
               <>
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium mb-2">Copie este token agora!</p>
-                  <p className="text-xs text-yellow-700 dark:text-yellow-300">Você não poderá vê-lo novamente após fechar esta janela.</p>
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300">Depois de fechar esta janela não o vai poder ver de novo.</p>
                 </div>
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <Label className="text-xs">Seu Token de API</Label>
+                    <Label className="text-xs">O seu token de API</Label>
                     <Button onClick={() => copyToClipboard(generatedToken)} size="sm" variant="ghost"><Copy className="w-4 h-4" /></Button>
                   </div>
                   <code className="text-xs font-mono break-all">{generatedToken}</code>
@@ -462,7 +462,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="current-password">Palavra-passe Atual</Label>
+              <Label htmlFor="current-password">Palavra-passe atual</Label>
               <div className="relative mt-1.5">
                 <Input id="current-password" type={showCurrentPassword ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Escreva a sua palavra-passe atual" />
                 <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
@@ -471,21 +471,21 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
               </div>
             </div>
             <div>
-              <Label htmlFor="new-password">Nova Palavra-passe</Label>
+              <Label htmlFor="new-password">Nova palavra-passe</Label>
               <div className="relative mt-1.5">
-                <Input id="new-password" type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Digite a nova palavra-passe (mín. 8 caracteres)" />
+                <Input id="new-password" type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nova palavra-passe (mín. 8 caracteres)" />
                 <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowNewPassword(!showNewPassword)}>
                   {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
               </div>
             </div>
             <div>
-              <Label htmlFor="confirm-password">Confirmar Nova Palavra-passe</Label>
+              <Label htmlFor="confirm-password">Confirmar nova palavra-passe</Label>
               <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirme a nova palavra-passe" className="mt-1.5" />
             </div>
             <div className="flex gap-2">
               <Button onClick={() => { setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }} variant="outline" className="flex-1">Cancelar</Button>
-              <Button onClick={handleChangePassword} disabled={loading} className="flex-1">{loading ? 'Alterando...' : 'Alterar palavra-passe'}</Button>
+              <Button onClick={handleChangePassword} disabled={loading} className="flex-1">{loading ? 'A alterar...' : 'Alterar palavra-passe'}</Button>
             </div>
           </div>
         </DialogContent>

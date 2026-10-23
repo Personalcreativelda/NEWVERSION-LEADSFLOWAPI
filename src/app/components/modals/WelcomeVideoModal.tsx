@@ -25,7 +25,7 @@ export default function WelcomeVideoModal({ isOpen, onClose, onOpenFeedback }: W
               Bem-vindo à LeadsFlow!
  </h2>
             <p className="text-xs sm:text-sm mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
-              Veja o que você pode fazer com a plataforma
+              Veja o que pode fazer com a plataforma
             </p>
           </div>
           <button
@@ -56,7 +56,7 @@ export default function WelcomeVideoModal({ isOpen, onClose, onOpenFeedback }: W
           style={{ borderColor: 'hsl(var(--border))' }}
         >
           <p className="text-xs sm:text-sm hidden sm:block" style={{ color: 'hsl(var(--muted-foreground))' }}>
-            Explore todas as funcionalidades e automatize seu processo de vendas.
+            Explore todas as funcionalidades e automatize o seu processo de vendas.
           </p>
           <div className="flex items-center gap-2 sm:flex-shrink-0">
             <button
