@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { AppModal } from '../base/AppModal';
+import { Capacitor } from '@capacitor/core';
 import { isNativeApp } from '../../../native';
 import { getApiBaseUrl } from '../../utils/api-client';
 
@@ -33,7 +34,8 @@ export function PhotoSourceSheet({ open, onClose, onPicked }: {
   const galleryInput = useRef<HTMLInputElement>(null);
 
   const pick = async (source: 'camera' | 'gallery') => {
-    if (!isNativeApp()) {
+    // Browser, ou APK antigo sem o plugin da câmara: escolher ficheiro
+    if (!isNativeApp() || !Capacitor.isPluginAvailable('Camera')) {
       (source === 'camera' ? cameraInput : galleryInput).current?.click();
       return;
     }
