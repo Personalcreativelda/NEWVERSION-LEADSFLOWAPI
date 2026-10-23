@@ -19,14 +19,28 @@ function signingSecrets(): string[] {
     .filter(Boolean);
 }
 
+/**
+ * A Meta calcula a assinatura sobre o corpo com os caracteres não-ASCII escritos como \uXXXX
+ * (hexadecimal minúsculo): "Olá" assina-se como "Olá". Os emojis ficam em pares
+ * (😀). Ver a documentação dos webhooks da Meta.
+ */
+function escapeUnicode(raw: Buffer): Buffer | null {
+  const text = raw.toString('utf8');
+  if (!/[^\x00-\x7f]/.test(text)) return null;
+  return Buffer.from(text.replace(/[\u0080-￿]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')), 'utf8');
+}
+
 export function checkMetaSignature(rawBody: Buffer | undefined, header: string | undefined): SignatureCheck {
   const secrets = signingSecrets();
   if (!secrets.length) return 'unconfigured';
   if (!header || !rawBody) return 'missing';
   const a = Buffer.from(header);
+  const bodies = [rawBody, escapeUnicode(rawBody)].filter(Boolean) as Buffer[];
   for (const secret of secrets) {
-    const b = Buffer.from('sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex'));
-    if (a.length === b.length && crypto.timingSafeEqual(a, b)) return 'valid';
+    for (const body of bodies) {
+      const b = Buffer.from('sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex'));
+      if (a.length === b.length && crypto.timingSafeEqual(a, b)) return 'valid';
+    }
   }
   return 'invalid';
 }
