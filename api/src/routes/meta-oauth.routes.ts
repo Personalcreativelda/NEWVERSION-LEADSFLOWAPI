@@ -15,8 +15,10 @@ import {
 const router = Router();
 const channelsService = new ChannelsService();
 
+// Campos de subscribed_apps de uma Página (os eventos do Instagram chegam pelo objeto 'instagram'
+// dos webhooks da app; a página só tem de estar subscrita com 'messages')
 const MESSENGER_FIELDS = ['messages', 'messaging_postbacks', 'messaging_optins', 'message_deliveries', 'message_reads'];
-const INSTAGRAM_FIELDS = ['messages', 'messaging_postbacks', 'messaging_seen', 'messaging_reads'];
+const INSTAGRAM_FIELDS = ['messages', 'messaging_postbacks'];
 
 router.post('/start', requireAuth, (req: AuthenticatedRequest, res) => {
   if (!isMetaOAuthConfigured()) {
@@ -107,9 +109,9 @@ router.post('/sessions/:id/connect', requireAuth, async (req: AuthenticatedReque
           connected_via: 'meta_oauth',
         };
         const check = await validateChannelCredentials('facebook', credentials);
-        const subscribed = check.ok && await subscribePage(page.id, page.access_token, MESSENGER_FIELDS);
-        if (!check.ok || !subscribed) {
-          failed.push({ id: page.id, name: page.name, error: check.error || 'A Meta não ativou as mensagens desta página.' });
+        const sub = check.ok ? await subscribePage(page.id, page.access_token, MESSENGER_FIELDS) : null;
+        if (!check.ok || !sub?.ok) {
+          failed.push({ id: page.id, name: page.name, error: check.error || sub?.error || 'A Meta não ativou as mensagens desta página.' });
         } else {
           const existing = await channelsService.findByCredentialField('page_id', page.id, userId);
           const channel = existing && existing.type === 'facebook'
@@ -135,9 +137,9 @@ router.post('/sessions/:id/connect', requireAuth, async (req: AuthenticatedReque
         };
         const name = ig.username ? `@${ig.username}` : page.name;
         const check = await validateChannelCredentials('instagram', credentials);
-        const subscribed = check.ok && await subscribePage(page.id, page.access_token, INSTAGRAM_FIELDS);
-        if (!check.ok || !subscribed) {
-          failed.push({ id: ig.id, name, error: check.error || 'A Meta não ativou as mensagens desta conta do Instagram.' });
+        const sub = check.ok ? await subscribePage(page.id, page.access_token, INSTAGRAM_FIELDS) : null;
+        if (!check.ok || !sub?.ok) {
+          failed.push({ id: ig.id, name, error: check.error || sub?.error || 'A Meta não ativou as mensagens desta conta do Instagram.' });
         } else {
           const existing = await channelsService.findByCredentialField('instagram_id', ig.id, userId);
           const channel = existing && existing.type === 'instagram'

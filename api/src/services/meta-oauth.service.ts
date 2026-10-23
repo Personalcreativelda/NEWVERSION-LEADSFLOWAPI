@@ -174,15 +174,20 @@ async function fetchPages(userToken: string, withInstagram: boolean): Promise<Me
   return pages;
 }
 
-/** Subscreve a app nos eventos de mensagens da página (Messenger e Instagram Direct) */
-export async function subscribePage(pageId: string, pageToken: string, fields: string[]): Promise<boolean> {
+/**
+ * Subscreve a app nos eventos de mensagens da página (Messenger e Instagram Direct).
+ * Devolve o motivo da Meta quando falha, para o mostrar ao cliente.
+ */
+export async function subscribePage(pageId: string, pageToken: string, fields: string[]): Promise<{ ok: boolean; error?: string }> {
   try {
     const url = `${GRAPH}/${encodeURIComponent(pageId)}/subscribed_apps?${new URLSearchParams({ subscribed_fields: fields.join(','), access_token: pageToken })}`;
     const res = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(TIMEOUT_MS) });
     const data = await res.json().catch(() => ({}));
-    return !!data?.success;
+    if (data?.success) return { ok: true };
+    console.warn('[MetaOAuth] subscribed_apps falhou:', pageId, JSON.stringify(data?.error || data));
+    return { ok: false, error: data?.error?.message ? `A Meta recusou ativar as mensagens: ${data.error.message}` : undefined };
   } catch {
-    return false;
+    return { ok: false, error: 'Não foi possível contactar a Meta para ativar as mensagens. Tente de novo.' };
   }
 }
 

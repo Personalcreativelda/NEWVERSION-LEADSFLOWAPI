@@ -55,9 +55,31 @@ async function validateWhatsAppCloud(c: any): Promise<ChannelValidation> {
   return ok({ display_phone_number: r.data.display_phone_number, verified_name: r.data.verified_name });
 }
 
+/**
+ * Confirma um token com o debug_token da Meta, usando as credenciais da app da LeadsFlow
+ * (não precisa de permissões da página). null = não dá para usar aqui (app não configurada
+ * ou token de outra app, como os canais antigos criados com a app de cada cliente).
+ */
+async function debugMetaToken(token: string): Promise<{ valid: boolean; profileId?: string; error?: string } | null> {
+  const appId = process.env.META_APP_ID;
+  const secret = process.env.META_APP_SECRET;
+  if (!appId || !secret) return null;
+  const r = await getJson(`${GRAPH}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(`${appId}|${secret}`)}`);
+  const d = r?.data?.data;
+  if (!d || String(d.app_id) !== String(appId)) return null;
+  return { valid: !!d.is_valid, profileId: d.profile_id ? String(d.profile_id) : undefined, error: d.error?.message };
+}
+
 async function validateFacebook(c: any): Promise<ChannelValidation> {
   const token = c.page_access_token || c.access_token;
   if (!c.page_id || !token) return fail('Falta a página do Facebook ou o token de acesso.');
+  // Token da app da LeadsFlow (ligado pelo login da Meta): confirmar pelo debug_token
+  const debug = await debugMetaToken(token);
+  if (debug) {
+    if (!debug.valid) return fail('O acesso a esta página expirou ou foi retirado. Ligue de novo com o Facebook.');
+    if (debug.profileId && debug.profileId !== String(c.page_id)) return fail('O token não pertence a esta página.');
+    return ok({ page_name: c.page_name });
+  }
   const r = await getJson(`${GRAPH}/${encodeURIComponent(c.page_id)}?fields=id,name&access_token=${encodeURIComponent(token)}`);
   if (!r) return unreachable('a Meta');
   if (r.status !== 200 || String(r.data?.id) !== String(c.page_id)) return fail(metaError(r.data, 'A Meta não confirmou o acesso a esta página.'));
