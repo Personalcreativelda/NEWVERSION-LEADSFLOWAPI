@@ -30,7 +30,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
     useEffect(() => {
         if (isEditing && editingChannel) {
             setBotName(editingChannel.name || '');
-            setBotToken(editingChannel.credentials?.bot_token || '');
+            setBotToken(''); // o token guardado não vem para o app
             setBotInfo({
                 username: editingChannel.credentials?.bot_username,
                 first_name: editingChannel.credentials?.bot_name
@@ -54,8 +54,10 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
 
     // Validate bot token
     const validateToken = async () => {
-        if (!botToken.trim()) {
-            setError('Informe o token do bot');
+        // Ao editar, o token guardado não vem para o app: campo vazio = manter o atual
+        const keepStoredToken = isEditing && !!editingChannel && !botToken.trim();
+        if (!botToken.trim() && !keepStoredToken) {
+            setError('Indique o token do bot');
             return;
         }
 
@@ -64,6 +66,16 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
         setConnectionStatus('validating');
 
         try {
+            if (keepStoredToken && editingChannel) {
+                // O servidor volta a confirmar o token guardado junto do Telegram
+                await channelsApi.update(editingChannel.id, { name: botName || editingChannel.name, status: 'active', credentials: {} });
+                toast.success('Canal Telegram atualizado');
+                setConnectionStatus('connected');
+                setStep('success');
+                setTimeout(() => { onSuccess(); onClose(); }, 1500);
+                return;
+            }
+
             // Validate with Telegram API
             const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
             const data = await response.json();
@@ -198,7 +210,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                     type="text"
                                     value={botToken}
                                     onChange={(e) => setBotToken(e.target.value)}
-                                    placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+                                    placeholder={isEditing ? 'Deixe em branco para manter o token atual' : '123456789:ABCdefGHIjklMNOpqrsTUVwxyz'}
                                     className="w-full px-4 py-3 rounded-lg border text-sm font-mono"
                                     style={{ 
                                         backgroundColor: 'hsl(var(--background))',
@@ -251,7 +263,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 </button>
                                 <button
                                     onClick={validateToken}
-                                    disabled={loading || !botToken.trim()}
+                                    disabled={loading || (!botToken.trim() && !isEditing)}
                                     className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (

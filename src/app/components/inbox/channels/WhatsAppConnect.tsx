@@ -199,66 +199,11 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                         } else {
                             const connectingTime = Date.now() - connectingStartRef.current;
                             
-                            // If in connecting state for more than 8 seconds, assume connected
-                            // Evolution API sometimes stays in "connecting" even after sync
-                            if (connectingTime > 8000) {
-                                console.log('[WhatsApp Channel] ✅ Assuming connected after 8s in connecting state');
-                                setConnectionStatus('connected');
-                                setProfileInfo({
-                                    name: status.profileName,
-                                    picture: status.profilePictureUrl
-                                });
-                                
-                                // Save to channels database
-                                try {
-                                    await channelsApi.create({
-                                        type: 'whatsapp',
-                                        name: instanceName,
-                                        provider: 'evolution_api',
-                                        status: 'active',
-                                        credentials: {
-                                            instance_id: fullInstanceName,
-                                            instance_name: instanceName,
-                                            phone_number: status.profileName || undefined
-                                        }
-                                    });
-                                } catch (e) {
-                                    console.warn('[WhatsApp Channel] Error saving to channels:', e);
-                                }
-
-                                // Save to user settings
-                                try {
-                                    await fetch(`${API_URL}/api/users/settings`, {
-                                        method: 'PUT',
-                                        headers: getAuthHeaders(),
-                                        body: JSON.stringify({
-                                            whatsapp_connected: true,
-                                            whatsapp_instance_name: fullInstanceName,
-                                            whatsapp_profile_name: status.profileName || null,
-                                            whatsapp_connected_at: new Date().toISOString(),
-                                        }),
-                                    });
-                                } catch (e) {
-                                    console.warn('[WhatsApp Channel] Error saving settings:', e);
-                                }
-
-                                window.dispatchEvent(new Event('whatsapp-connected'));
-                                
-                                if (pollIntervalRef.current) {
-                                    clearInterval(pollIntervalRef.current);
-                                    pollIntervalRef.current = null;
-                                }
-                                
-                                setStep('success');
-                                toast.success('WhatsApp ligado com sucesso!');
-                                connectingStartRef.current = 0;
-                                return;
-                            }
-                            
+                            // Só se mostra ligado quando a Evolution confirma "open" (sem assumir ligações)
                             // Timeout after 60 seconds
                             if (connectingTime > 60000) {
                                 console.warn('[WhatsApp Channel] Connection timeout');
-                                setError('Tempo esgotado. Tente escanear o QR Code novamente.');
+                                setError('O WhatsApp não confirmou a ligação. Leia o código QR de novo.');
                                 setConnectionStatus('error');
                                 connectingStartRef.current = 0;
                             }

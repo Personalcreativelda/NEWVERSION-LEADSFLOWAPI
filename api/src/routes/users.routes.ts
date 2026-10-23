@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware';
-import { requireAuth } from '../middleware/auth.middleware';
+import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import { getUserProfile, updateUserAvatar, updateUserProfile } from '../services/users.service';
 
 const router = Router();
@@ -10,8 +10,8 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-// Debug endpoint to check MinIO environment variables (NO AUTH REQUIRED)
-router.get('/debug/minio-config', (_req, res) => {
+// Diagnóstico da configuração do MinIO (só administradores)
+router.get('/debug/minio-config', requireAuth, requireAdmin, (_req, res) => {
   const accessKey = process.env.MINIO_ACCESS_KEY || process.env.SERVICE_USER_MINIO;
   const secretKey = process.env.MINIO_SECRET_KEY || process.env.SERVICE_PASSWORD_MINIO;
 

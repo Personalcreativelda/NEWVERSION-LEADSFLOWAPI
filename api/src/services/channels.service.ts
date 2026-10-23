@@ -1,5 +1,6 @@
 // INBOX: Service para gerenciar canais de comunicação com suporte a migração legado
 import { query } from '../database/connection';
+import { encryptCredentials, isSecretKey, secretFingerprint } from '../utils/secret-box';
 
 export interface Channel {
     id: string;
@@ -120,6 +121,16 @@ export class ChannelsService {
      * Busca canal por campo de credential específico
      */
     async findByCredentialField(field: string, value: string, userId: string): Promise<Channel | null> {
+        // Campos secretos estão cifrados: procura-se pela impressão digital (ou texto simples antigo)
+        if (isSecretKey(field)) {
+            const result = await query(
+                `SELECT * FROM channels
+                 WHERE user_id = $1
+                 AND (credentials->>$2 = $3 OR credentials->>$4 = $5)`,
+                [userId, `${field}_sha256`, secretFingerprint(value), field, value]
+            );
+            return result.rows[0] || null;
+        }
         const result = await query(
             `SELECT * FROM channels
              WHERE user_id = $1
@@ -148,7 +159,7 @@ export class ChannelsService {
                 data.type,
                 data.name,
                 data.status || 'inactive',
-                JSON.stringify(creds),
+                JSON.stringify(encryptCredentials(creds)),
                 JSON.stringify(settings)
             ]
         );
@@ -177,7 +188,7 @@ export class ChannelsService {
             let creds = data.credentials;
             if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch (e) { /* keep as-is */ } }
             fields.push(`credentials = $${paramIndex++}`);
-            values.push(JSON.stringify(creds));
+            values.push(JSON.stringify(encryptCredentials(creds)));
         }
 
         if (data.settings !== undefined) {

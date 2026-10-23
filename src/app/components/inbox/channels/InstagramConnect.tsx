@@ -50,7 +50,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
     // Preencher dados quando for edição
     useEffect(() => {
         if (isEditing && editingChannel) {
-            setAccessToken(editingChannel.credentials?.access_token || '');
+            setAccessToken(''); // o token guardado não vem para o app
             setInstagramId(editingChannel.credentials?.instagram_id || '');
             setAccountInfo({
                 username: editingChannel.credentials?.username || editingChannel.name,
@@ -77,8 +77,10 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
 
     // Validate access token
     const validateToken = async () => {
-        if (!accessToken.trim()) {
-            setError('Informe o token de acesso');
+        // Ao editar, o token guardado não vem para o app: campo vazio = manter o atual
+        const keepStoredToken = isEditing && !!editingChannel && !accessToken.trim();
+        if (!accessToken.trim() && !keepStoredToken) {
+            setError('Indique o token de acesso');
             return;
         }
 
@@ -87,6 +89,16 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
         setConnectionStatus('validating');
 
         try {
+            if (keepStoredToken && editingChannel) {
+                // O servidor volta a confirmar o token guardado junto da Meta
+                await channelsApi.update(editingChannel.id, { status: 'active', credentials: {} });
+                toast.success('Ligação ao Instagram confirmada');
+                setConnectionStatus('connected');
+                setStep('success');
+                setTimeout(() => { onSuccess(); onClose(); }, 2000);
+                return;
+            }
+
             let igAccount = null;
             const token = accessToken.trim();
 
@@ -504,7 +516,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                 <textarea
                                     value={accessToken}
                                     onChange={(e) => setAccessToken(e.target.value)}
-                                    placeholder="EAAxxxxxx... ou EAFxxxxxx..."
+                                    placeholder={isEditing ? 'Deixe em branco para manter o token atual' : 'EAAxxxxxx... ou EAFxxxxxx...'}
                                     rows={3}
                                     className="w-full px-4 py-3 rounded-lg border text-sm font-mono resize-none"
                                     style={{
@@ -618,7 +630,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                 </button>
                                 <button
                                     onClick={validateToken}
-                                    disabled={loading || !accessToken.trim()}
+                                    disabled={loading || (!accessToken.trim() && !isEditing)}
                                     className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg text-sm font-medium text-white bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (

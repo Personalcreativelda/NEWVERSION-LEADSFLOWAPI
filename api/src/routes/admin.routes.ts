@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware';
-import { requireAuth } from '../middleware/auth.middleware';
+import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import { query } from '../database/connection';
 import { plansService } from '../services/plans.service';
 import { planExpirationService } from '../services/plan-expiration.service';
@@ -11,26 +11,6 @@ import bcrypt from 'bcryptjs';
 
 const router = Router();
 
-// ==========================================
-// Middleware: verificar se o usuário é admin
-// ==========================================
-const requireAdmin = async (req: AuthenticatedRequest, res: any, next: any) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const result = await query('SELECT role FROM users WHERE id = $1', [req.user.id]);
-    if (result.rows.length === 0 || result.rows[0].role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    next();
-  } catch (error) {
-    console.error('[Admin] Error checking admin role:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-};
 
 // ==========================================
 // GET /admin/users - Listar todos os usuários

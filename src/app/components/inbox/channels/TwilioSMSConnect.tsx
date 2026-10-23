@@ -37,7 +37,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
             setFormData({
                 name: editingChannel.name || 'Meu SMS Twilio',
                 accountSid: editingChannel.credentials?.accountSid || '',
-                authToken: editingChannel.credentials?.authToken || '',
+                authToken: '', // o token guardado não vem para o app; vazio = manter
                 phoneNumber: editingChannel.credentials?.phoneNumber || ''
             });
         } else {
@@ -86,8 +86,8 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
             return;
         }
 
-        if (!formData.authToken.trim()) {
-            setError('Digite o Auth Token');
+        if (!formData.authToken.trim() && !isEditing) {
+            setError('Indique o Auth Token');
             return;
         }
 
@@ -138,7 +138,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
             }, 1500);
         } catch (err: any) {
             console.error('[TwilioSMS] Error creating/updating channel:', err);
-            setError(err.response?.data?.error || 'Erro ao guardar canal SMS. Verifique as credenciais.');
+            setError(err.message || 'Erro ao guardar o canal SMS. Verifique as credenciais.');
         } finally {
             setLoading(false);
         }
@@ -229,7 +229,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                     type={showAuthToken ? "text" : "password"}
                                     value={formData.authToken}
                                     onChange={(e) => setFormData({ ...formData, authToken: e.target.value })}
-                                    placeholder="********************************"
+                                    placeholder={isEditing ? 'Deixe em branco para manter o atual' : '********************************'}
                                     className="font-mono text-sm pr-10"
                                     disabled={loading}
                                 />

@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/auth.service';
 import { activityService } from '../services/activity.service';
+import { query } from '../database/connection';
 
 const authService = new AuthService();
 
@@ -150,3 +151,18 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
 };
 
 export const authMiddleware = requireAuth;
+
+/** Só administradores (users.role = 'admin'). Usar depois de requireAuth. */
+export const requireAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const result = await query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+    if (result.rows.length === 0 || result.rows[0].role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    next();
+  } catch (error) {
+    console.error('[Auth] Error checking admin role:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};

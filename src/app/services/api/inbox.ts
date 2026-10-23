@@ -55,6 +55,18 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+// Erros da API em texto legível: err.message passa a ser a mensagem do backend
+// (ex.: "O Telegram recusou este token…") em vez de "Request failed with status code 400"
+api.interceptors.response.use(undefined, (error) => {
+    const data = error?.response?.data;
+    const message = typeof data?.error === 'string' ? data.error : typeof data?.message === 'string' ? data.message : null;
+    if (message) {
+        error.message = message;
+        if (data && typeof data === 'object' && !data.message) data.message = message;
+    }
+    return Promise.reject(error);
+});
+
 // ============================================
 // CHANNELS
 // ============================================

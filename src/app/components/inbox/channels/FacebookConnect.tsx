@@ -41,7 +41,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
     // Preencher dados quando for edição
     useEffect(() => {
         if (isEditing && editingChannel) {
-            setPageAccessToken(editingChannel.credentials?.page_access_token || '');
+            setPageAccessToken(''); // o token guardado não vem para o app
             setPageInfo({
                 name: editingChannel.credentials?.page_name || editingChannel.name,
                 id: editingChannel.credentials?.page_id,
@@ -67,8 +67,10 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
 
     // Validate token and create channel
     const validateAndConnect = async () => {
-        if (!pageAccessToken.trim()) {
-            setError('Informe o token de acesso da página');
+        // Ao editar, o token guardado não vem para o app: campo vazio = manter o atual
+        const keepStoredToken = isEditing && !!editingChannel && !pageAccessToken.trim();
+        if (!pageAccessToken.trim() && !keepStoredToken) {
+            setError('Indique o token de acesso da página');
             return;
         }
 
@@ -77,6 +79,16 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
         setConnectionStatus('validating');
 
         try {
+            if (keepStoredToken && editingChannel) {
+                // O servidor volta a confirmar o token guardado junto da Meta
+                await channelsApi.update(editingChannel.id, { status: 'active', credentials: {} });
+                toast.success('Ligação ao Facebook confirmada');
+                setConnectionStatus('connected');
+                setStep('success');
+                setTimeout(() => { onSuccess(); onClose(); }, 2500);
+                return;
+            }
+
             // Validar token com Facebook Graph API
             const response = await fetch(
                 `https://graph.facebook.com/v21.0/me?fields=id,name,picture&access_token=${pageAccessToken}`
@@ -378,7 +390,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                         setPageAccessToken(e.target.value);
                                         setError(null);
                                     }}
-                                    placeholder="EAAxxxxxx..."
+                                    placeholder={isEditing ? 'Deixe em branco para manter o token atual' : 'EAAxxxxxx...'}
                                     rows={3}
                                     className="w-full px-4 py-3 rounded-lg border text-sm font-mono resize-none"
                                     style={{
@@ -446,7 +458,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 )}
                                 <button
                                     onClick={validateAndConnect}
-                                    disabled={loading || !pageAccessToken.trim()}
+                                    disabled={loading || (!pageAccessToken.trim() && !isEditing)}
                                     className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (

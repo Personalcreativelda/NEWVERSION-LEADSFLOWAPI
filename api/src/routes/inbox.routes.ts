@@ -46,6 +46,7 @@ import { webhookDispatcher } from '../services/webhook-dispatcher.service';
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 import { AIService, getAvailableProviders } from '../services/ai.service';
 import { emailService } from '../services/email.service';
+import { encryptCredentials } from '../utils/secret-box';
 
 const router = Router();
 
@@ -1653,7 +1654,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
                 const updatedCreds = { ...channelCredentials, page_id: pageId };
                 await dbQuery(
                   'UPDATE channels SET credentials = $1 WHERE id = $2',
-                  [JSON.stringify(updatedCreds), channelId]
+                  [JSON.stringify(encryptCredentials(updatedCreds)), channelId]
                 );
                 console.log('[Inbox] page_id salvo nas credenciais do canal');
               }
@@ -1679,7 +1680,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
                     const updatedCreds = { ...channelCredentials, page_id: pageId };
                     await dbQuery(
                       'UPDATE channels SET credentials = $1 WHERE id = $2',
-                      [JSON.stringify(updatedCreds), channelId]
+                      [JSON.stringify(encryptCredentials(updatedCreds)), channelId]
                     );
                   }
                 }

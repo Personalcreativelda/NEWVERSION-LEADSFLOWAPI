@@ -19,8 +19,9 @@ import { assistantQueueService } from '../services/assistant-queue.service';
 import { webhookDispatcher } from '../services/webhook-dispatcher.service';
 // Storage: Importar para upload de mídia recebida
 import { getStorageService } from '../services/storage.service';
-import { requireAuth } from '../middleware/auth.middleware';
+import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import { widgetTyping } from '../services/widget-typing.service';
+import { secretFingerprint } from '../utils/secret-box';
 import { findOrCreateLead } from '../services/leads-dedup.service';
 
 const router = Router();
@@ -1814,12 +1815,13 @@ router.post('/telegram/:botToken?', async (req, res) => {
 
     // 1. Se botToken na URL, buscar canal pelo bot_token nos credentials
     if (botTokenParam) {
+      // O token está cifrado na BD: procura pela impressão digital (ou texto simples antigo)
       channelResult = await query(
         `SELECT * FROM channels
          WHERE type = 'telegram'
          AND status IN ('active', 'connected')
-         AND credentials->>'bot_token' = $1`,
-        [botTokenParam]
+         AND (credentials->>'bot_token_sha256' = $1 OR credentials->>'bot_token' = $2)`,
+        [secretFingerprint(botTokenParam), botTokenParam]
       );
       if (channelResult.rows.length > 0) {
         console.log('[Telegram Webhook] Canal encontrado pelo bot_token da URL:', channelResult.rows[0].id);
@@ -2200,7 +2202,7 @@ router.get('/facebook', async (req, res) => {
 });
 
 // ✅ Diagnóstico do webhook do Facebook - retorna status dos canais e subscription
-router.get('/facebook/debug', async (req, res) => {
+router.get('/facebook/debug', requireAuth, requireAdmin, async (req, res) => {
   try {
     // Buscar todos os canais Facebook
     const channelsResult = await query(
@@ -2257,7 +2259,7 @@ router.get('/facebook/debug', async (req, res) => {
 });
 
 // ✅ Endpoint de teste: simula uma mensagem do Facebook para verificar o fluxo
-router.post('/facebook/test', async (req, res) => {
+router.post('/facebook/test', requireAuth, requireAdmin, async (req, res) => {
   try {
     // Buscar primeiro canal Facebook ativo
     const channelResult = await query(
@@ -2770,7 +2772,7 @@ router.get('/instagram', async (req, res) => {
 });
 
 // ✅ Diagnóstico do webhook do Instagram
-router.get('/instagram/debug', async (req, res) => {
+router.get('/instagram/debug', requireAuth, requireAdmin, async (req, res) => {
   try {
     const channelsResult = await query(
       `SELECT id, name, status, credentials, created_at FROM channels WHERE type = 'instagram' ORDER BY created_at DESC`
@@ -2815,7 +2817,7 @@ router.get('/instagram/debug', async (req, res) => {
 });
 
 // ✅ Endpoint de teste: simula uma mensagem do Instagram
-router.post('/instagram/test', async (req, res) => {
+router.post('/instagram/test', requireAuth, requireAdmin, async (req, res) => {
   try {
     const channelResult = await query(
       `SELECT * FROM channels WHERE type = 'instagram' AND status = 'active' ORDER BY created_at DESC LIMIT 1`
@@ -3301,7 +3303,7 @@ router.post('/instagram', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ✅ Debug endpoint para WhatsApp Cloud (DEVE ficar antes da rota com :channelId)
-router.get('/whatsapp-cloud/debug', async (req, res) => {
+router.get('/whatsapp-cloud/debug', requireAuth, requireAdmin, async (req, res) => {
   try {
     const channels = await query(
       `SELECT id, name, type, status,

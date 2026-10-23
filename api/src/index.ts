@@ -18,6 +18,8 @@ import { planExpirationService } from './services/plan-expiration.service';
 import { storageCleanupService } from './services/storage-cleanup.service';
 import { sessionCleanupService } from './services/session-cleanup.service';
 import { diagnosticAlertService } from './services/diagnostic-alert.service';
+import { encryptExistingChannelSecrets } from './services/channel-secrets-migration.service';
+import { redactCredentials } from './middleware/redact-credentials.middleware';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -512,7 +514,8 @@ app.get('/w', (_req, res) => {
   res.send(widgetJs);
 });
 
-app.use('/api', routes);
+// Segredos dos canais nunca saem para o browser (ver middleware/redact-credentials)
+app.use('/api', redactCredentials, routes);
 app.use(errorMiddleware);
 
 // Log MinIO configuration on startup for debugging
@@ -536,10 +539,10 @@ function logMinIOConfig() {
   console.log('[MinIO] MINIO_BUCKET:', process.env.MINIO_BUCKET || '❌ NOT SET');
   console.log('[MinIO] MINIO_REGION:', process.env.MINIO_REGION || '❌ NOT SET');
   console.log('[MinIO] MINIO_PUBLIC_URL:', process.env.MINIO_PUBLIC_URL || '⚠️ NOT SET (optional)');
-  console.log('[MinIO] MINIO_ACCESS_KEY:', process.env.MINIO_ACCESS_KEY ? `✅ ${process.env.MINIO_ACCESS_KEY.substring(0, 10)}...` : '❌ NOT SET');
-  console.log('[MinIO] MINIO_SECRET_KEY:', process.env.MINIO_SECRET_KEY ? `✅ ${process.env.MINIO_SECRET_KEY.substring(0, 10)}...` : '❌ NOT SET');
-  console.log('[MinIO] SERVICE_USER_MINIO:', process.env.SERVICE_USER_MINIO ? `✅ ${process.env.SERVICE_USER_MINIO.substring(0, 10)}...` : '❌ NOT SET');
-  console.log('[MinIO] SERVICE_PASSWORD_MINIO:', process.env.SERVICE_PASSWORD_MINIO ? `✅ ${process.env.SERVICE_PASSWORD_MINIO.substring(0, 10)}...` : '❌ NOT SET');
+  console.log('[MinIO] MINIO_ACCESS_KEY:', process.env.MINIO_ACCESS_KEY ? '✅ definido' : '❌ NOT SET');
+  console.log('[MinIO] MINIO_SECRET_KEY:', process.env.MINIO_SECRET_KEY ? '✅ definido' : '❌ NOT SET');
+  console.log('[MinIO] SERVICE_USER_MINIO:', process.env.SERVICE_USER_MINIO ? '✅ definido' : '❌ NOT SET');
+  console.log('[MinIO] SERVICE_PASSWORD_MINIO:', process.env.SERVICE_PASSWORD_MINIO ? '✅ definido' : '❌ NOT SET');
 
   if (isConfigured) {
     console.log('\n✅ [MinIO] Configurado! Sistema usará MinIO S3 para uploads.');
@@ -559,6 +562,9 @@ function logMinIOConfig() {
 initDatabase().then(() => {
   // Log MinIO config on startup
   logMinIOConfig();
+
+  // Cifrar tokens dos canais que ainda estejam em texto simples (não bloqueia o arranque)
+  void encryptExistingChannelSecrets();
 
   // ✅ Iniciar scheduler de campanhas agendadas
   campaignScheduler.start();

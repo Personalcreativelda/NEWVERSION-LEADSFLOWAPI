@@ -4,6 +4,8 @@ import { authMiddleware } from '../middleware/auth.middleware';
 import { ChannelsService } from '../services/channels.service';
 import { WhatsAppService } from '../services/whatsapp.service';
 import { isValidE164, formatE164ForDisplay } from '../utils/phone-validation';
+import { validateChannelCredentials } from '../services/channel-validation.service';
+import { mergeCredentials } from '../utils/secret-box';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -105,10 +107,28 @@ router.post('/', async (req, res, next) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const { type, name, credentials, settings, status: requestedStatus, provider } = req.body;
+        const { type, name, credentials, settings, provider } = req.body;
 
         if (!type || !name) {
             return res.status(400).json({ error: 'Type and name are required' });
+        }
+
+        // O estado é decidido aqui, depois de o fornecedor confirmar as credenciais — nunca
+        // pelo app (antes o app mandava status 'active' e o canal aparecia ligado sem o estar).
+        const validation = await validateChannelCredentials(type, credentials);
+        if (!validation.ok && type !== 'whatsapp') {
+            return res.status(400).json({
+                error: validation.error,
+                code: validation.unreachable ? 'provider_unreachable' : 'invalid_credentials',
+            });
+        }
+        // WhatsApp (QR): o canal pode ser criado antes de o código ser lido; fica por ligar
+        const requestedStatus = validation.ok ? 'active' : 'inactive';
+        if (validation.ok && validation.details && credentials && typeof credentials === 'object') {
+            // Dados confirmados pelo fornecedor (ex.: @ do bot, nome da página)
+            for (const [k, v] of Object.entries(validation.details)) {
+                if (v !== undefined && v !== null && credentials[k] === undefined) credentials[k] = v;
+            }
         }
 
         // Para WhatsApp Cloud API (API Oficial da Meta)
@@ -125,7 +145,7 @@ router.post('/', async (req, res, next) => {
             if (existingResult) {
                 // Atualizar canal existente
                 const updated = await channelsService.update(existingResult.id, {
-                    status: requestedStatus || 'active',
+                    status: requestedStatus,
                     credentials
                 }, user.id);
                 return res.status(200).json(updated);
@@ -135,7 +155,7 @@ router.post('/', async (req, res, next) => {
             const channel = await channelsService.create({
                 type: 'whatsapp_cloud',
                 name,
-                status: requestedStatus || 'active',
+                status: requestedStatus,
                 credentials: {
                     phone_number_id: phoneNumberId,
                     waba_id: credentials.waba_id || null,
@@ -164,7 +184,7 @@ router.post('/', async (req, res, next) => {
             if (existing) {
                 // Se já existe, atualizar status para active e retornar
                 const updated = await channelsService.update(existing.id, {
-                    status: requestedStatus || 'active',
+                    status: requestedStatus,
                     credentials
                 }, user.id);
 
@@ -174,23 +194,8 @@ router.post('/', async (req, res, next) => {
                 return res.status(200).json(updated);
             }
 
-            // Se o frontend já disse que está 'active', confiar nisso
-            // O frontend só envia 'active' após confirmar conexão via polling
-            let finalStatus = requestedStatus || 'active';
-
-            // Opcionalmente verificar status da instância no Evolution API (mas não sobrescrever)
-            if (!requestedStatus && whatsappService.isReady()) {
-                try {
-                    const status = await whatsappService.getStatus(credentials.instance_id) as any;
-                    const isConnected = status.state === 'open' || status.connected === true;
-                    finalStatus = isConnected ? 'active' : 'inactive';
-                    credentials.phone_number = status.instance?.profileName || status.profileName || null;
-                } catch (error) {
-                    console.error('[Channels] Error checking WhatsApp status:', error);
-                    // Se não conseguir verificar, assumir active (frontend já validou)
-                    finalStatus = 'active';
-                }
-            }
+            // Estado confirmado na Evolution (validateChannelCredentials); sem confirmação fica por ligar
+            const finalStatus = requestedStatus;
 
             const channel = await channelsService.create({
                 type,
@@ -215,7 +220,7 @@ router.post('/', async (req, res, next) => {
             if (existingTelegram) {
                 // Atualizar canal existente
                 const updated = await channelsService.update(existingTelegram.id, {
-                    status: requestedStatus || 'active',
+                    status: requestedStatus,
                     name,
                     credentials
                 }, user.id);
@@ -239,7 +244,7 @@ router.post('/', async (req, res, next) => {
             const telegramChannel = await channelsService.create({
                 type: 'telegram',
                 name,
-                status: requestedStatus || 'active',
+                status: requestedStatus,
                 credentials: {
                     bot_token: credentials.bot_token,
                     bot_username: credentials.bot_username,
@@ -298,7 +303,7 @@ router.post('/', async (req, res, next) => {
             const existing = await channelsService.findByCredentialField('page_id', credentials.page_id, user.id);
             if (existing) {
                 const updated = await channelsService.update(existing.id, {
-                    status: requestedStatus || 'active',
+                    status: requestedStatus,
                     credentials: {
                         ...existing.credentials,
                         page_id: credentials.page_id,
@@ -317,7 +322,7 @@ router.post('/', async (req, res, next) => {
             const channel = await channelsService.create({
                 type: 'facebook',
                 name,
-                status: requestedStatus || 'active',
+                status: requestedStatus,
                 credentials: {
                     page_id: credentials.page_id,
                     page_access_token: pageToken,
@@ -344,7 +349,7 @@ router.post('/', async (req, res, next) => {
             const existing = await channelsService.findByCredentialField('instagram_id', igId, user.id);
             if (existing) {
                 const updated = await channelsService.update(existing.id, {
-                    status: requestedStatus || 'active',
+                    status: requestedStatus,
                     credentials: { ...existing.credentials, ...credentials }
                 }, user.id);
 
@@ -392,7 +397,7 @@ router.post('/', async (req, res, next) => {
             const existing = await channelsService.findByCredentialField('phoneNumber', phoneNumber, user.id);
             if (existing) {
                 const updated = await channelsService.update(existing.id, {
-                    status: requestedStatus || 'active',
+                    status: requestedStatus,
                     name,
                     credentials: {
                         accountSid,
@@ -408,7 +413,7 @@ router.post('/', async (req, res, next) => {
             const channel = await channelsService.create({
                 type: 'twilio_sms',
                 name,
-                status: requestedStatus || 'active',
+                status: requestedStatus,
                 credentials: {
                     accountSid,
                     authToken,
@@ -425,7 +430,7 @@ router.post('/', async (req, res, next) => {
         const channel = await channelsService.create({
             type,
             name,
-            status: requestedStatus || 'active',
+            status: requestedStatus,
             credentials: credentials || {},
             settings: settings || {}
         }, user.id);
@@ -472,9 +477,46 @@ router.put('/:id', async (req, res, next) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const channel = await channelsService.update(req.params.id, req.body, user.id);
-        if (!channel) {
+        const existing = await channelsService.findById(req.params.id, user.id);
+        if (!existing) {
             return res.status(404).json({ error: 'Channel not found' });
+        }
+
+        const { name, settings, credentials, status } = req.body || {};
+        const changes: any = {};
+        if (name !== undefined) changes.name = name;
+        if (settings !== undefined) changes.settings = settings;
+
+        // O app já não recebe os tokens: um segredo vazio no pedido mantém o guardado
+        if (credentials !== undefined) changes.credentials = mergeCredentials(existing.credentials, credentials);
+
+        if (credentials !== undefined || status === 'active') {
+            // Credenciais novas ou pedido para (re)ligar: só fica ligado se o fornecedor confirmar
+            const validation = await validateChannelCredentials(existing.type, changes.credentials ?? existing.credentials);
+            if (!validation.ok && existing.type !== 'whatsapp') {
+                return res.status(400).json({
+                    error: validation.error,
+                    code: validation.unreachable ? 'provider_unreachable' : 'invalid_credentials',
+                });
+            }
+            changes.status = validation.ok ? 'active' : 'inactive';
+        } else if (status === 'inactive') {
+            // Desligar/pausar não precisa de confirmação
+            changes.status = 'inactive';
+        }
+
+        const channel = await channelsService.update(req.params.id, changes, user.id);
+
+        // Token do bot novo: o webhook do Telegram tem de passar a usar o novo token
+        const newBotToken = existing.type === 'telegram' && credentials?.bot_token;
+        const baseUrl = process.env.WEBHOOK_URL || process.env.API_URL || process.env.SERVICE_URL_API;
+        if (newBotToken && baseUrl && changes.status === 'active') {
+            const hookUrl = `${baseUrl.replace(/\/$/, '')}/api/webhooks/telegram/${newBotToken}`;
+            try {
+                await fetch(`https://api.telegram.org/bot${newBotToken}/setWebhook?url=${encodeURIComponent(hookUrl)}`);
+            } catch (err: any) {
+                console.error('[Channels] Error re-configuring Telegram webhook:', err.message);
+            }
         }
 
         res.json(channel);

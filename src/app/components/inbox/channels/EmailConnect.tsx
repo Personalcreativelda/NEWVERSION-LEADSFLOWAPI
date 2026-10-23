@@ -81,7 +81,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
             setFormData({
                 name: editingChannel.name || '',
                 email: editingChannel.credentials?.email || '',
-                password: editingChannel.credentials?.password || '',
+                password: '', // a palavra-passe guardada não vem para o app; vazio = manter
                 smtp_host: editingChannel.credentials?.smtp?.host || '',
                 smtp_port: String(editingChannel.credentials?.smtp?.port || '587'),
                 smtp_secure: editingChannel.credentials?.smtp?.secure || false,
@@ -127,7 +127,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
     };
 
     const handleSubmit = async () => {
-        if (!formData.name.trim() || !formData.email.trim() || !formData.password.trim()) {
+        if (!formData.name.trim() || !formData.email.trim() || (!formData.password.trim() && !isEditing)) {
             setError('Preencha todos os campos obrigatórios');
             return;
         }
@@ -341,7 +341,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                         type={showPassword ? 'text' : 'password'}
                                         value={formData.password}
                                         onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                                        placeholder="Palavra-passe do email ou App Password"
+                                        placeholder={isEditing ? 'Deixe em branco para manter a atual' : 'Palavra-passe do email ou palavra-passe de aplicação'}
                                         className="w-full px-3 py-2.5 pr-10 rounded-lg border text-sm"
                                         style={{
                                             backgroundColor: 'hsl(var(--background))',

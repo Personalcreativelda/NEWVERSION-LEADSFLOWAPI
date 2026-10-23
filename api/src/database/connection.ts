@@ -1,6 +1,7 @@
 import { Pool, PoolClient } from 'pg';
 import * as net from 'net';
 import * as http from 'http';
+import { decryptCredentials } from '../utils/secret-box';
 
 // ─── HTTP CONNECT Proxy Bridge ────────────────────────────────────────────────
 // When HTTP_PROXY is set, we create a local TCP server on 127.0.0.1 that
@@ -194,12 +195,34 @@ const recreatePool = async () => {
   }
 };
 
+// Colunas com credenciais de canais: os segredos vêm cifrados da BD e decifram-se aqui,
+// num só sítio, para todo o código que lê canais (ver utils/secret-box.ts)
+const CREDENTIAL_COLUMNS = ['credentials', 'channel_credentials'];
+
+function decryptCredentialColumns(result: any) {
+  const fields: { name: string }[] | undefined = result?.fields;
+  if (!result?.rows?.length || !fields?.some((f) => CREDENTIAL_COLUMNS.includes(f.name))) return result;
+  for (const row of result.rows) {
+    for (const col of CREDENTIAL_COLUMNS) {
+      const value = row[col];
+      if (!value) continue;
+      if (typeof value === 'object') {
+        row[col] = decryptCredentials(value);
+      } else if (typeof value === 'string' && value.includes('enc:v1:')) {
+        // credenciais guardadas como texto JSON
+        try { row[col] = JSON.stringify(decryptCredentials(JSON.parse(value))); } catch { /* deixa como está */ }
+      }
+    }
+  }
+  return result;
+}
+
 // Função de query com retry automático
 export const query = async (text: string, params?: any[], retries = 3): Promise<any> => {
   await initPool();
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      return await pool.query(text, params);
+      return decryptCredentialColumns(await pool.query(text, params));
     } catch (err: any) {
       const isConnectionError = 
         err.message?.includes('Connection terminated') ||

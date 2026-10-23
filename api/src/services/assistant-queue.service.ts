@@ -13,6 +13,7 @@
  */
 import { query } from '../database/connection';
 import type { IncomingMessageContext } from './assistant-processor.service';
+import { encryptCredentials } from '../utils/secret-box';
 
 const DEBOUNCE_MS = 3000;   // janela de 3s para agrupar mensagens rápidas
 const LOCK_TTL_S  = 90;     // lock expira em 90s (proteção contra travamentos)
@@ -62,7 +63,7 @@ export class AssistantQueueService {
                     ctx.remoteJid            || null,
                     ctx.contactPhone         || null,
                     ctx.contactName          || null,
-                    ctx.credentials ? JSON.stringify(ctx.credentials) : null,
+                    ctx.credentials ? JSON.stringify(encryptCredentials(ctx.credentials)) : null,
                     ctx.mediaType            || null,
                     ctx.mediaUrl             || null,
                     ctx.incomingMessageId    || null,
