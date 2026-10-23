@@ -2,6 +2,7 @@ import { matchesSearch } from '../../utils/search';
 import React, { useState, useEffect } from 'react';
 import { X, Phone, User, Loader2, Search, UserCircle } from 'lucide-react';
 import { leadsApi } from '../../utils/api';
+import { OverlayModal } from '../base/OverlayModal';
 
 interface NewConversationModalProps {
     isOpen: boolean;
@@ -94,21 +95,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
     });
 
     return (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
-            {/* Overlay */}
-            <div 
-                className="absolute inset-0 bg-black/60"
-                onClick={onClose}
-            />
-
-            {/* Modal */}
-            <div 
-                className="relative w-full max-w-md rounded-xl shadow-2xl border overflow-hidden"
-                style={{
-                    backgroundColor: 'hsl(var(--card))',
-                    borderColor: 'hsl(var(--border))'
-                }}
-            >
+        <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-md">
                 {/* Header */}
                 <div 
                     className="flex items-center justify-between px-6 py-4 border-b"
@@ -340,7 +327,6 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                         </div>
                     </div>
                 )}
-            </div>
-        </div>
+            </OverlayModal>
     );
 }

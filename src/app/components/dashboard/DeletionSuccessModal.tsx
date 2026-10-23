@@ -1,4 +1,5 @@
 import { CheckCircle, XCircle } from 'lucide-react';
+import { OverlayModal } from '../base/OverlayModal';
 
 interface DeletionSuccessModalProps {
   isOpen: boolean;
@@ -22,8 +23,7 @@ export default function DeletionSuccessModal({
   const isSuccess = errorCount === 0;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-card rounded-2xl shadow-lg max-w-md w-full p-8 animate-scale-in">
+    <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-md p-8">
         {/* Ícone */}
         <div className="flex justify-center mb-6">
           {isSuccess ? (
@@ -87,29 +87,12 @@ export default function DeletionSuccessModal({
         {/* Botão */}
         <button
           onClick={onClose}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="w-full py-3 bg-primary hover:opacity-90 text-primary-foreground rounded-lg transition-colors"
         >
           Entendi
         </button>
-      </div>
 
-      {/* CSS para animação */}
-      <style>{`
-        @keyframes scale-in {
-          from {
-            opacity: 0;
-            transform: scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        .animate-scale-in {
-          animation: scale-in 0.2s ease-out;
-        }
-      `}</style>
-    </div>
+    </OverlayModal>
   );
 }
 

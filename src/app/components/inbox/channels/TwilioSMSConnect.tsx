@@ -146,7 +146,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
-            <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+            <DialogContent className="sm:max-w-2xl p-4 sm:p-6">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl pr-8">
                         <div className="bg-teal-100 dark:bg-teal-900/30 p-2 rounded-lg">

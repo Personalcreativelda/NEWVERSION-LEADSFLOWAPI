@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
 import { ExternalLink, Copy, Check, Shield, Globe, AlertCircle } from 'lucide-react';
+import { OverlayModal } from '../../base/OverlayModal';
 
 // API URL for webhook generation
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:4000';
@@ -108,12 +109,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn">
-            <div
-                className="rounded-xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all relative z-[100000]"
-                style={{ backgroundColor: 'hsl(var(--card))' }}
-                role="dialog"
-            >
+        <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-lg">
                 {/* Header */}
                 <div 
                     className="px-6 py-4 border-b flex justify-between items-center"
@@ -504,7 +500,6 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
+            </OverlayModal>
     );
 }

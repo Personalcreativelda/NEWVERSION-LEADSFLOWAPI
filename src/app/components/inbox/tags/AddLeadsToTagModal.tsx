@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, Search, Check, Loader, UserPlus, Users } from 'lucide-react';
 import { api } from '../../../../lib/api';
+import { OverlayModal } from '../../base/OverlayModal';
 
 interface Lead {
     id: string;
@@ -123,11 +124,7 @@ export default function AddLeadsToTagModal({
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div
-                className="w-full max-w-lg rounded-lg shadow-lg flex flex-col"
-                style={{ backgroundColor: 'hsl(var(--background))', maxHeight: '80vh' }}
-            >
+        <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-lg flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'hsl(var(--border))' }}>
                     <div className="flex items-center gap-3">
@@ -294,7 +291,6 @@ export default function AddLeadsToTagModal({
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
+            </OverlayModal>
     );
 }

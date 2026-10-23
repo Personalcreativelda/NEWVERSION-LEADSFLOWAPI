@@ -6,7 +6,6 @@
  * seu "sender", registado pelo cliente da API respetivo (registerOutboxSender). O reenvio de
  * mensagens leva o id do cliente para a API não as enviar duas vezes.
  */
-import { useSyncExternalStore } from 'react';
 import { createStore, del, get, set } from 'idb-keyval';
 import { toast } from 'sonner';
 import { currentUserId } from './offlineCache';
@@ -32,26 +31,17 @@ export const OUTBOX_SENT_EVENT = 'leadsflow:outbox-sent';
 /** Disparado com { item, error } quando a API recusa um item (não volta à fila) */
 export const OUTBOX_FAILED_EVENT = 'leadsflow:outbox-failed';
 
-const QUEUED_TOAST = 'Sem ligação ao servidor: fica na fila e é enviado quando a ligação voltar.';
-
 const store = createStore('leadflow-outbox-db', 'items');
 const KEY = 'queue';
 
 let items: OutboxItem[] = [];
 const ready: Promise<void> = get<OutboxItem[]>(KEY, store)
   .then((saved) => { items = Array.isArray(saved) ? saved : []; })
-  .catch(() => {})
-  .then(() => emit());
+  .catch(() => {});
 
-const listeners = new Set<() => void>();
 const senders: Partial<Record<OutboxKind, (item: any) => Promise<unknown>>> = {};
 
-function emit() {
-  listeners.forEach((listener) => listener());
-}
-
 async function persist() {
-  emit();
   try {
     await set(KEY, items, store);
   } catch {
@@ -73,11 +63,10 @@ export function registerOutboxSender<K extends OutboxKind>(
 export async function enqueueOutbox(item: NewOutboxItem): Promise<void> {
   await ready;
   const userId = currentUserId();
-  if (!userId) throw new Error('Sessão sem utilizador: não é possível guardar na fila.');
+  if (!userId) throw new Error('Sessão sem utilizador: sessão terminada.');
   const full = { ...item, userId, createdAt: Date.now() } as OutboxItem;
   const index = items.findIndex((existing) => existing.id === item.id);
   items = index === -1 ? [...items, full] : items.map((existing, i) => (i === index ? full : existing));
-  toast.info(QUEUED_TOAST);
   await persist();
 }
 
@@ -108,7 +97,6 @@ let flushing = false;
 export async function flushOutbox(): Promise<void> {
   if (flushing) return;
   flushing = true;
-  let sent = 0;
   try {
     await ready;
     for (const item of mine()) {
@@ -118,7 +106,6 @@ export async function flushOutbox(): Promise<void> {
         const result = await send(item);
         items = items.filter((existing) => existing.id !== item.id);
         await persist();
-        sent++;
         window.dispatchEvent(new CustomEvent(OUTBOX_SENT_EVENT, { detail: { item, result } }));
       } catch (error) {
         if (isServerDownError(error)) break; // continua em baixo: fica para a próxima
@@ -126,33 +113,21 @@ export async function flushOutbox(): Promise<void> {
         await persist();
         window.dispatchEvent(new CustomEvent(OUTBOX_FAILED_EVENT, { detail: { item, error } }));
         const reason = error instanceof Error ? error.message : String(error);
-        toast.error(`Não foi possível enviar um pedido da fila: ${reason}`);
+        toast.error(`Não foi possível guardar uma alteração: ${reason}`);
       }
     }
   } finally {
     flushing = false;
   }
-  if (sent > 0) toast.success(sent === 1 ? '1 pedido da fila enviado.' : `${sent} pedidos da fila enviados.`);
 }
 
 export async function clearOutbox(): Promise<void> {
   items = [];
-  emit();
   try {
     await del(KEY, store);
   } catch {
     // idem
   }
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-/** Quantos pedidos do utilizador atual estão à espera de envio */
-export function useOutboxCount(): number {
-  return useSyncExternalStore(subscribe, () => mine().length);
 }
 
 // O servidor voltou (ou a internet): envia o que ficou na fila

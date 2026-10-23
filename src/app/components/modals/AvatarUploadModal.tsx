@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Upload, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { leadsApi } from '../../utils/api';
+import { OverlayModal } from '../base/OverlayModal';
 
 interface AvatarUploadModalProps {
     isOpen: boolean;
@@ -71,20 +72,7 @@ export default function AvatarUploadModal({
     if (!isOpen) return null;
 
     return (
-        <>
-            {/* Backdrop */}
-            <div
-                className="fixed inset-0 z-[60] bg-black/60 transition-opacity"
-                onClick={onClose}
-                aria-hidden="true"
-            />
-
-            {/* Modal */}
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                <div
-                    className="w-full max-w-sm rounded-2xl shadow-2xl p-6 bg-card text-foreground"
-                    onClick={(e) => e.stopPropagation()}
-                >
+        <OverlayModal onClose={() => { if (!uploading) onClose(); }} stickyEdges={false} className="max-w-sm p-6">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold">Upload de Avatar</h3>
@@ -151,8 +139,6 @@ export default function AvatarUploadModal({
                             )}
                         </div>
                     </label>
-                </div>
-            </div>
-        </>
+        </OverlayModal>
     );
 }

@@ -4,6 +4,7 @@ import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Globe, Check, AlertCircle, Loader2, Copy, Code, CheckCircle } from 'lucide-react';
+import { OverlayModal } from '../../base/OverlayModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -170,14 +171,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn">
-            <div
-                className="relative w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden animate-fadeIn"
-                style={{
-                    backgroundColor: 'hsl(var(--card))',
-                    borderColor: 'hsl(var(--border))'
-                }}
-            >
+        <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-lg">
                 {/* Header */}
                 <div
                     className="px-6 py-4 border-b flex items-center justify-between"
@@ -552,7 +546,6 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
+            </OverlayModal>
     );
 }

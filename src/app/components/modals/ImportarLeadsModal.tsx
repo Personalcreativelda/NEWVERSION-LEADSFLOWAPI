@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { leadsApi } from '../../utils/api';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
+import { AppModal } from '../base/AppModal';
 import { Button } from '../ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, Download, X, Star, Zap, Rocket, Info } from 'lucide-react';
+import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, Download, Zap, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { NUMBER_OPTS, getLocale } from '../../utils/format';
 
@@ -12,20 +12,17 @@ interface ImportarLeadsModalProps {
  isOpen: boolean;
  onClose: () => void;
  onSuccess: () => void;
- userPlan?: string;
- importLimits?: {
- free: number;
- business: number;
- enterprise: number;
- };
+ planName?: string;
+ /** Máximo de leads por importação (plan_limits.leads); -1 = ilimitado */
+ importLimit?: number;
 }
 
 export default function ImportarLeadsModal({ 
  isOpen, 
  onClose, 
  onSuccess, 
- userPlan = 'free',
- importLimits = { free: 500, business: 3000, enterprise: -1 }
+ planName = 'free',
+ importLimit = -1
 }: ImportarLeadsModalProps) {
  const [file, setFile] = useState<File | null>(null);
  const [loading, setLoading] = useState(false);
@@ -420,252 +417,30 @@ export default function ImportarLeadsModal({
  onClose();
  };
 
+ const planLabel = planName.charAt(0).toUpperCase() + planName.slice(1);
+ const limitText = importLimit === -1
+ ? `O plano ${planLabel} não tem limite de leads por importação.`
+ : `O plano ${planLabel} importa até ${importLimit.toLocaleString(getLocale(), NUMBER_OPTS)} leads por ficheiro; o resto da planilha é ignorado.`;
+
  return (
- <Dialog open={isOpen} onOpenChange={handleClose}>
- <DialogContent className="bg-card max-w-xl w-full max-h-[85vh] flex flex-col shadow-lg animate-in zoom-in-95 duration-200">
- 
- {/* Header */}
- <DialogHeader className="px-5 py-4 border-b border-border shrink-0 relative">
- <div className="flex items-center gap-3">
- <FileSpreadsheet className="w-5 h-5 text-blue-600" />
- <DialogTitle className="text-lg text-foreground">Importar Leads</DialogTitle>
- </div>
- <DialogDescription className="sr-only">
- Importe seus leads através de um ficheiro CSV ou planilha
- </DialogDescription>
- <button
- onClick={handleClose}
- className="absolute top-4 right-5 w-8 h-8 rounded-lg hover:bg-muted/50 flex items-center justify-center transition-colors"
- disabled={loading}
- >
- <X className="w-5 h-5 text-foreground/80" />
- </button>
- </DialogHeader>
-
- {/* Body - Scrollable */}
- <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
-
- <Alert className="border border-[hsl(var(--primary))/0.25] bg-[hsl(var(--primary))/0.08]">
- <Info className="h-4 w-4 text-[hsl(var(--primary))]" />
- <AlertTitle className="text-sm font-semibold text-foreground">
- Antes de importar
- </AlertTitle>
- <AlertDescription className="space-y-1 text-xs text-muted-foreground">
- <p>• Use o modelo para garantir cabeçalhos corretos (nome, telefone, interesse, origem).</p>
- <p>• Corrigimos automaticamente registos sem contacto e ignoramos duplicados.</p>
- <p>• Os limites de importação são aplicados automaticamente de acordo com seu plano.</p>
- </AlertDescription>
- </Alert>
- 
- {/* Planos Cards - Responsivo e Bonito */}
- <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
- {/* Card Free */}
- <div className={`relative p-4 rounded-xl border-2 transition-all ${
- userPlan === 'free' 
- ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-500 shadow-lg' 
- : 'bg-muted/50 border-border opacity-60'
- }`}>
- <div className="flex items-center gap-2 mb-2">
- <div className="p-2 bg-blue-500 rounded-lg">
- <Star className="w-4 h-4 text-white" />
- </div>
- <div>
- <h4 className="font-semibold text-sm text-foreground">Grátis</h4>
- {userPlan === 'free' && (
- <span className="text-xs text-blue-600">Seu plano atual</span>
- )}
- </div>
- </div>
- <div className="mt-3">
- <p className="text-2xl font-bold text-foreground">{importLimits.free.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
- <p className="text-xs text-foreground/80">leads por importação</p>
- </div>
- </div>
-
- {/* Card Business */}
- <div className={`relative p-4 rounded-xl border-2 transition-all ${
- userPlan === 'business' 
- ? 'bg-gradient-to-br from-purple-50 to-purple-100 border-purple-500 shadow-lg' 
- : 'bg-muted/50 border-border opacity-60'
- }`}>
- <div className="flex items-center gap-2 mb-2">
- <div className="p-2 bg-purple-500 rounded-lg">
- <Zap className="w-4 h-4 text-white" />
- </div>
- <div>
- <h4 className="font-semibold text-sm text-foreground">Business</h4>
- {userPlan === 'business' && (
- <span className="text-xs text-purple-600">Seu plano atual</span>
- )}
- </div>
- </div>
- <div className="mt-3">
- <p className="text-2xl font-bold text-foreground">{importLimits.business.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
- <p className="text-xs text-foreground/80">leads por importação</p>
- </div>
- {userPlan === 'free' && (
- <div className="mt-2">
- <span className="text-xs text-purple-600 font-medium">↑ Melhorar plano</span>
- </div>
- )}
- </div>
-
- {/* Card Enterprise */}
- <div className={`relative p-4 rounded-xl border-2 transition-all ${
- userPlan === 'enterprise' 
- ? 'bg-gradient-to-br from-amber-50 to-amber-100 border-amber-500 shadow-lg' 
- : 'bg-muted/50 border-border opacity-60'
- }`}>
- <div className="flex items-center gap-2 mb-2">
- <div className="p-2 bg-amber-500 rounded-lg">
- <Rocket className="w-4 h-4 text-white" />
- </div>
- <div>
- <h4 className="font-semibold text-sm text-foreground">Enterprise</h4>
- {userPlan === 'enterprise' && (
- <span className="text-xs text-amber-600">Seu plano atual</span>
- )}
- </div>
- </div>
- <div className="mt-3">
- <p className="text-2xl font-bold text-foreground">∞</p>
- <p className="text-xs text-foreground/80">Ilimitado</p>
- </div>
- {userPlan !== 'enterprise' && (
- <div className="mt-2">
- <span className="text-xs text-amber-600 font-medium">↑ Melhorar plano</span>
- </div>
- )}
- </div>
- </div>
- 
- {/* Instructions Card */}
- <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 border border-blue-200 rounded-xl p-4 shadow-sm">
- <div className="flex items-start gap-3">
- <div className="p-2 bg-blue-500 rounded-lg shrink-0">
- <FileSpreadsheet className="w-5 h-5 text-white" />
- </div>
- <div className="flex-1">
- <h3 className="text-sm font-semibold text-foreground mb-2">
- Formato da Planilha
- </h3>
- <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-foreground/80">
- <div>
- <p className="font-medium text-blue-900 mb-1">Obrigatórias:</p>
- <ul className="space-y-0.5 ml-2">
- <li>• nome</li>
- <li>• telefone</li>
- <li>• interesse</li>
- <li>• origem</li>
- </ul>
- </div>
- <div>
- <p className="font-medium text-purple-900 mb-1">Opcionais:</p>
- <ul className="space-y-0.5 ml-2">
- <li>• data</li>
- <li>• status</li>
- <li>• observacoes</li>
- <li>• agente_atual</li>
- </ul>
- </div>
- </div>
- <div className="mt-3 p-2 bg-card/60 rounded-lg border border-blue-200">
- <p className="text-xs text-foreground/80">
- <strong>Dica:</strong> Baixe o modelo e veja exemplos de como preencher!
- </p>
- </div>
- </div>
- </div>
- </div>
-
- {/* Download Template */}
- <div className="flex justify-center">
- <Button
- variant="outline"
- onClick={downloadTemplate}
- className="gap-2 h-9 text-sm"
- disabled={loading}
- >
- <Download className="w-4 h-4" />
- Transferir Modelo de Planilha
- </Button>
- </div>
-
- {/* File Upload */}
- <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
- <input
- type="file"
- id="file-upload"
- accept=".csv,.xls,.xlsx"
- onChange={handleFileChange}
- className="hidden"
- disabled={loading}
- />
- <label
- htmlFor="file-upload"
- className="cursor-pointer flex flex-col items-center gap-2"
- >
- <Upload className="w-10 h-10 text-foreground/80" />
- <div>
- <p className="text-sm text-foreground/80 mb-1">
- {file ? file.name : 'Clique para selecionar ou arraste o ficheiro aqui'}
- </p>
- <p className="text-xs text-foreground/80">
- CSV, XLS ou XLSX (max 5MB)
- </p>
- </div>
- </label>
- </div>
-
- {/* Error Message */}
- {error && (
- <Alert variant="destructive" className="border-destructive/40 bg-destructive/10">
- <AlertCircle className="h-4 w-4" />
- <AlertTitle className="text-sm font-semibold">Importação não concluída</AlertTitle>
- <AlertDescription className="space-y-1">
- <p className="text-sm text-destructive/90">{error}</p>
- <p className="text-xs text-muted-foreground">
- Verifique o cabeçalho do ficheiro, confirme que cada linha possui telefone ou email e que o limite do plano não foi excedido.
- </p>
- </AlertDescription>
- </Alert>
- )}
-
- {/* Success Message */}
- {result && (
- <Alert className="border border-emerald-200/60 bg-emerald-50">
- <CheckCircle2 className="h-4 w-4 text-emerald-600" />
- <AlertTitle className="text-sm font-semibold text-emerald-800">
- Importação concluída
- </AlertTitle>
- <AlertDescription className="space-y-1 text-sm text-emerald-900">
- <p>✓ {result.imported} leads importados com sucesso.</p>
- {result.skipped > 0 && (
- <p className="text-xs text-muted-foreground">
-  {result.skipped} registos foram ignorados por estarem duplicados ou incompletos.
- </p>
- )}
- </AlertDescription>
- </Alert>
- )}
-
- </div>
-
- {/* Footer - Fixed */}
- <div className="px-5 py-3 border-t border-border flex gap-3 justify-end shrink-0">
- <Button
- variant="outline"
- onClick={handleClose}
- disabled={loading}
- className="h-9"
- >
+ <AppModal
+ open={isOpen}
+ onOpenChange={(open) => { if (!open && !loading) handleClose(); }}
+ size="lg"
+ title={
+ <span className="flex items-center gap-2">
+ <FileSpreadsheet className="w-5 h-5 text-primary shrink-0" />
+ Importar leads
+ </span>
+ }
+ description="Envie um ficheiro CSV ou Excel com os seus contactos."
+ bodyClassName="space-y-4"
+ footer={
+ <>
+ <Button variant="outline" onClick={handleClose} disabled={loading}>
  Cancelar
  </Button>
- <Button
- onClick={handleImport}
- disabled={!file || loading || !!result}
- className="bg-blue-600 hover:bg-blue-700 text-white h-9"
- >
+ <Button onClick={handleImport} disabled={!file || loading || !!result}>
  {loading ? (
  <>
  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -674,21 +449,93 @@ export default function ImportarLeadsModal({
  ) : result ? (
  <>
  <CheckCircle2 className="w-4 h-4 mr-2" />
- Importado!
+ Importado
  </>
  ) : (
  <>
  <Upload className="w-4 h-4 mr-2" />
- Importar Leads
+ Importar leads
  </>
  )}
  </Button>
+ </>
+ }
+ >
+ {/* Ficheiro */}
+ <div className="border-2 border-dashed border-border rounded-xl p-5 text-center hover:border-primary transition-colors">
+ <input
+ type="file"
+ id="file-upload"
+ accept=".csv,.xls,.xlsx"
+ onChange={handleFileChange}
+ className="hidden"
+ disabled={loading}
+ />
+ <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-2 min-w-0">
+ <Upload className="w-8 h-8 text-muted-foreground" />
+ <p className="text-sm font-medium text-foreground break-all">
+ {file ? file.name : 'Toque para escolher o ficheiro'}
+ </p>
+ <p className="text-xs text-muted-foreground">CSV, XLS ou XLSX (máx. 5 MB)</p>
+ </label>
  </div>
 
- </DialogContent>
- </Dialog>
+ {error && (
+ <Alert variant="destructive" className="border-destructive/40 bg-destructive/10">
+ <AlertCircle className="h-4 w-4" />
+ <AlertTitle className="text-sm font-semibold">Importação não concluída</AlertTitle>
+ <AlertDescription className="space-y-1">
+ <p className="text-sm text-destructive/90">{error}</p>
+ <p className="text-xs text-muted-foreground">
+ Verifique o cabeçalho do ficheiro, confirme que cada linha tem telefone ou email e que o limite do plano não foi excedido.
+ </p>
+ </AlertDescription>
+ </Alert>
+ )}
+
+ {result && (
+ <Alert className="border-emerald-500/30 bg-emerald-500/10">
+ <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+ <AlertTitle className="text-sm font-semibold text-foreground">Importação concluída</AlertTitle>
+ <AlertDescription className="space-y-1 text-sm text-foreground/80">
+ <p>{result.imported} leads importados.</p>
+ {result.skipped > 0 && (
+ <p className="text-xs text-muted-foreground">
+ {result.skipped} registos ignorados por estarem duplicados ou incompletos.
+ </p>
+ )}
+ </AlertDescription>
+ </Alert>
+ )}
+
+ {/* Formato */}
+ <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
+ <div className="flex items-start gap-2">
+ <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+ <p className="text-xs text-muted-foreground min-w-0">
+ Use o modelo para ter os cabeçalhos certos. Linhas sem contacto e duplicados são ignorados.
+ </p>
+ </div>
+ <div className="flex items-start gap-2">
+ <Zap className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+ <p className="text-xs text-muted-foreground min-w-0">{limitText}</p>
+ </div>
+ <div className="grid grid-cols-2 gap-3 text-xs">
+ <div className="min-w-0">
+ <p className="font-medium text-foreground mb-1">Obrigatórias</p>
+ <p className="text-muted-foreground">nome, telefone, interesse, origem</p>
+ </div>
+ <div className="min-w-0">
+ <p className="font-medium text-foreground mb-1">Opcionais</p>
+ <p className="text-muted-foreground break-words">data, status, observacoes, agente_atual</p>
+ </div>
+ </div>
+ <Button variant="outline" onClick={downloadTemplate} className="w-full gap-2" disabled={loading}>
+ <Download className="w-4 h-4" />
+ Transferir modelo
+ </Button>
+ </div>
+
+ </AppModal>
  );
 }
-
-
-

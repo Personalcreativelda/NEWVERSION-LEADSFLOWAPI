@@ -3,6 +3,7 @@ import { AlertTriangle, XCircle, Clock, Zap, X } from 'lucide-react';
 import { plansApi } from '../../utils/api';
 import { toast } from 'sonner';
 import UpgradeModal from './UpgradeModal';
+import { OverlayModal } from '../base/OverlayModal';
 
 interface PlanEnforcementModalProps {
   /** One of PLAN_EXPIRED | PAYMENT_OVERDUE | LEAD_LIMIT_EXCEEDED (null = hidden) */
@@ -71,8 +72,7 @@ export default function PlanEnforcementModal({
   return (
     <>
       {/* Full-screen dimmed overlay — dismissible */}
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70" onClick={onClose}>
-        <div className="bg-card text-foreground border border-border rounded-2xl shadow-2xl p-8 max-w-md w-full text-center relative" onClick={e => e.stopPropagation()}>
+      <OverlayModal onClose={onClose} stickyEdges={false} className="p-8 max-w-md text-center">
 
           {/* Close button */}
           <button
@@ -139,8 +139,7 @@ export default function PlanEnforcementModal({
           <p className="mt-6 text-xs text-muted-foreground">
             Você ainda pode visualizar seus dados. Para criar ou editar, renove seu plano.
           </p>
-        </div>
-      </div>
+        </OverlayModal>
       {showUpgrade && (
         <UpgradeModal
           isOpen={showUpgrade}

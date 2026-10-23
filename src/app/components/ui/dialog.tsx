@@ -77,7 +77,7 @@ function DialogContent({
           {...props}
         >
           {children}
-          <DialogPrimitive.Close className="absolute right-3 top-3 sm:right-4 sm:top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none">
+          <DialogPrimitive.Close data-slot="dialog-close" className="absolute right-3 top-3 sm:right-4 sm:top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none">
             <XIcon className="h-4 w-4" />
             <span className="sr-only">Fechar</span>
           </DialogPrimitive.Close>

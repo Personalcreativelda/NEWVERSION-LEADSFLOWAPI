@@ -93,7 +93,7 @@ export default function UpgradeModal({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         {/* Telemóvel: ecrã inteiro (max-sm:*); a partir de sm: modal centrado */}
-        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-4xl max-h-[92dvh] flex flex-col bg-card text-card-foreground border border-border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-bottom-8 duration-300 p-0 max-sm:mx-0 max-sm:w-screen max-sm:max-w-none max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:rounded-none max-sm:border-0">
+        <DialogContent className="sm:max-w-4xl flex flex-col bg-card text-card-foreground border border-border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-bottom-8 duration-300 p-0 max-sm:mx-0 max-sm:w-screen max-sm:max-w-none max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:rounded-none max-sm:border-0">
 
           {/* Header */}
           <DialogHeader className="px-12 sm:px-6 pt-5 sm:pt-6 pb-2 sm:pb-3 flex-shrink-0">

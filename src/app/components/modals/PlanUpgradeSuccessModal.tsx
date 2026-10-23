@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import { OverlayModal } from '../base/OverlayModal';
 import { X, CheckCircle, Zap, Crown, Rocket, Infinity } from 'lucide-react';
 
 interface PlanUpgradeSuccessModalProps {
@@ -68,16 +69,6 @@ const DEFAULT_CONFIG = {
 export default function PlanUpgradeSuccessModal({ isOpen, plan, onClose }: PlanUpgradeSuccessModalProps) {
   const config = PLAN_CONFIG[plan?.toLowerCase()] ?? DEFAULT_CONFIG;
   const PlanIcon = config.icon;
-  const overlayRef = useRef<HTMLDivElement>(null);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isOpen, onClose]);
-
   // Auto-close after 10s
   useEffect(() => {
     if (!isOpen) return;
@@ -87,31 +78,8 @@ export default function PlanUpgradeSuccessModal({ isOpen, plan, onClose }: PlanU
 
   if (!isOpen) return null;
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) onClose();
-  };
-
   return (
-    <div
-      ref={overlayRef}
-      onClick={handleOverlayClick}
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Plano atualizado com sucesso"
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60" aria-hidden="true" />
-
-      {/* Panel — full-width bottom sheet on mobile, centered card on ≥sm */}
-      <div className={`
-        relative w-full sm:max-w-md
-        bg-card text-foreground border border-border
-        rounded-t-3xl sm:rounded-2xl
-        shadow-2xl ring-1 ${config.ringColor}
-        animate-slide-up sm:animate-scale-in
-        overflow-hidden
-      `}>
+    <OverlayModal onClose={onClose} stickyEdges={false} className={`max-w-md ring-1 ${config.ringColor}`}>
         {/* Top gradient strip */}
         <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${config.gradientFrom.replace('/20', '')} ${config.gradientTo.replace('/20', '')}`} />
 
@@ -199,7 +167,6 @@ export default function PlanUpgradeSuccessModal({ isOpen, plan, onClose }: PlanU
             Fecha automaticamente em alguns segundos
           </p>
         </div>
-      </div>
-    </div>
+    </OverlayModal>
   );
 }

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
-import { Card } from '../ui/card';
+import { AppModal } from '../base/AppModal';
 import { Checkbox } from '../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import {
@@ -13,8 +12,7 @@ import {
  Target,
  DollarSign,
  BarChart3,
- Loader2,
- CheckCircle2
+ Loader2
 } from 'lucide-react';
 import { toast } from"sonner";
 import { format } from 'date-fns';
@@ -417,124 +415,24 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
  };
 
  return (
- <Dialog open={isOpen} onOpenChange={onClose}>
- <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto bg-card border-border mx-auto">
- <DialogHeader>
- <DialogTitle className="flex items-center gap-2 text-foreground">
- <FileText className="w-5 h-5" />
- <span className="text-base md:text-lg">Gerar Relatório</span>
- </DialogTitle>
- <DialogDescription className="text-sm text-foreground/80">
- Personalize e exporte um relatório detalhado
- </DialogDescription>
- </DialogHeader>
-
- <div className="space-y-4 md:space-y-6 mt-4">
- {/* Configurações do Relatório */}
- <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
- <div>
- <label className={`text-sm mb-2 block text-muted-foreground`}>
- Período
- </label>
- <Select value={reportPeriod} onValueChange={setReportPeriod}>
- <SelectTrigger className="bg-background text-foreground border-border">
- <SelectValue />
- </SelectTrigger>
- <SelectContent className="text-popover-foreground border-border shadow-md">
- <SelectItem value="all" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Todos os períodos</SelectItem>
- <SelectItem value="7days" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Últimos 7 dias</SelectItem>
- <SelectItem value="30days" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Últimos 30 dias</SelectItem>
- <SelectItem value="90days" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Últimos 90 dias</SelectItem>
- </SelectContent>
- </Select>
- </div>
-
- <div>
- <label className={`text-sm mb-2 block text-muted-foreground`}>
- Formato
- </label>
- <Select value={reportFormat} onValueChange={setReportFormat}>
- <SelectTrigger className="bg-background text-foreground border-border">
- <SelectValue />
- </SelectTrigger>
- <SelectContent className="text-popover-foreground border-border shadow-md">
- <SelectItem value="pdf" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">PDF (Imprimir)</SelectItem>
- <SelectItem value="html" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">HTML</SelectItem>
- </SelectContent>
- </Select>
- </div>
- </div>
-
- {/* Seções do Relatório */}
- <div>
- <h3 className={`text-sm mb-3 text-muted-foreground`}>
- Seções do Relatório
- </h3>
- <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
- {REPORT_SECTIONS.map(section => {
- const Icon = section.icon;
- const isSelected = selectedSections.includes(section.id);
-
- return (
- <Card
- key={section.id}
- className={`p-4 cursor-pointer transition-all ${
- isSelected
- ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
- : 'hover:bg-muted/50 border-border'
- }`}
- onClick={() => toggleSection(section.id)}
- >
- <div className="flex items-start gap-3">
- <Checkbox checked={isSelected} onCheckedChange={() => toggleSection(section.id)} />
- <div className="flex-1">
- <div className="flex items-center gap-2 mb-1">
- <Icon className="w-4 h-4" />
- <span className="font-medium text-sm text-foreground">
- {section.label}
+ <AppModal
+ open={isOpen}
+ onOpenChange={(open) => { if (!open && !isGenerating) onClose(); }}
+ size="lg"
+ title={
+ <span className="flex items-center gap-2">
+ <FileText className="w-5 h-5 shrink-0" />
+ Gerar relatório
  </span>
- </div>
- <p className={`text-xs text-muted-foreground`}>
- {section.description}
- </p>
- </div>
- </div>
- </Card>
- );
- })}
- </div>
- </div>
-
- {/* Preview Info */}
- <Card className="p-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700">
- <div className="flex items-center gap-3">
- <CheckCircle2 className="w-5 h-5 text-blue-600" />
- <div className="flex-1">
- <p className="text-sm text-blue-900 dark:text-blue-200">
- <strong>{selectedSections.length}</strong> seção(ões) selecionada(s)
- </p>
- <p className="text-xs text-blue-700 dark:text-blue-300">
- Período: {getPeriodLabel(reportPeriod)} • Formato: {reportFormat.toUpperCase()}
- </p>
- </div>
- </div>
- </Card>
-
- {/* Actions */}
- <div className="flex justify-end gap-3">
- <Button
- variant="outline"
- onClick={onClose}
- disabled={isGenerating}
- className="border-border text-foreground/80 hover:bg-muted/50"
- >
+ }
+ description="Escolha o período, o formato e as secções."
+ bodyClassName="space-y-5"
+ footer={
+ <>
+ <Button variant="outline" onClick={onClose} disabled={isGenerating}>
  Cancelar
  </Button>
- <Button
- onClick={handleGenerateReport}
- disabled={isGenerating || selectedSections.length === 0}
- className="bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 border-0"
- >
+ <Button onClick={handleGenerateReport} disabled={isGenerating || selectedSections.length === 0}>
  {isGenerating ? (
  <>
  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -543,15 +441,72 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
  ) : (
  <>
  <Download className="w-4 h-4 mr-2" />
- Gerar Relatório
+ Gerar relatório
  </>
  )}
  </Button>
+ </>
+ }
+ >
+ <div className="grid grid-cols-2 gap-3">
+ <div className="min-w-0">
+ <label className="text-sm mb-2 block text-muted-foreground">Período</label>
+ <Select value={reportPeriod} onValueChange={setReportPeriod}>
+ <SelectTrigger className="bg-background text-foreground border-border">
+ <SelectValue />
+ </SelectTrigger>
+ <SelectContent>
+ <SelectItem value="all">Todos os períodos</SelectItem>
+ <SelectItem value="7days">Últimos 7 dias</SelectItem>
+ <SelectItem value="30days">Últimos 30 dias</SelectItem>
+ <SelectItem value="90days">Últimos 90 dias</SelectItem>
+ </SelectContent>
+ </Select>
+ </div>
+ <div className="min-w-0">
+ <label className="text-sm mb-2 block text-muted-foreground">Formato</label>
+ <Select value={reportFormat} onValueChange={setReportFormat}>
+ <SelectTrigger className="bg-background text-foreground border-border">
+ <SelectValue />
+ </SelectTrigger>
+ <SelectContent>
+ <SelectItem value="pdf">PDF (imprimir)</SelectItem>
+ <SelectItem value="html">HTML</SelectItem>
+ </SelectContent>
+ </Select>
  </div>
  </div>
- </DialogContent>
- </Dialog>
+
+ <div>
+ <div className="flex items-baseline justify-between gap-2 mb-3">
+ <h3 className="text-sm text-muted-foreground">Secções</h3>
+ <span className="text-xs text-muted-foreground">{selectedSections.length} de {REPORT_SECTIONS.length}</span>
+ </div>
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+ {REPORT_SECTIONS.map(section => {
+ const Icon = section.icon;
+ const isSelected = selectedSections.includes(section.id);
+ return (
+ // label: tocar em qualquer parte do cartão alterna a caixa uma só vez
+ <label
+ key={section.id}
+ className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+ isSelected ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/50'
+ }`}
+ >
+ <Checkbox checked={isSelected} onCheckedChange={() => toggleSection(section.id)} className="mt-0.5" />
+ <div className="flex-1 min-w-0">
+ <div className="flex items-center gap-2 mb-0.5">
+ <Icon className="w-4 h-4 shrink-0 text-muted-foreground" />
+ <span className="font-medium text-sm text-foreground">{section.label}</span>
+ </div>
+ <p className="text-xs text-muted-foreground">{section.description}</p>
+ </div>
+ </label>
+ );
+ })}
+ </div>
+ </div>
+ </AppModal>
  );
 }
-
-

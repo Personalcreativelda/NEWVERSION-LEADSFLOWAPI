@@ -5,6 +5,7 @@ import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
 import { BrandIcon } from '../../base/BrandIcon';
+import { OverlayModal } from '../../base/OverlayModal';
 
 // URL base da API (pegar do env ou usar padrão)
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
@@ -371,15 +372,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn">
-            {/* Modal */}
-            <div
-                className="relative w-[95vw] max-w-3xl rounded-2xl border shadow-2xl overflow-hidden animate-fadeIn max-h-[90vh] flex flex-col"
-                style={{ 
-                    backgroundColor: 'hsl(var(--card))',
-                    borderColor: 'hsl(var(--border))'
-                }}
-            >
+        <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-3xl overflow-hidden flex flex-col">
                 {/* Header */}
                 <div 
                     className="px-4 sm:px-6 py-3 sm:py-4 border-b flex items-center justify-between flex-shrink-0"
@@ -677,7 +670,6 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
+            </OverlayModal>
     );
 }

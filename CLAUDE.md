@@ -63,13 +63,17 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
   direita do título também no telemóvel; no telemóvel o botão mostra só o ícone.
 - Modais: `AppModal` (Radix, cabeçalho e botões fixos, só o corpo faz scroll) ou, para
   modais feitos à mão, `OverlayModal` (portal no body, folha no telemóvel, Esc/tocar fora/
-  botão voltar). Nunca criar `fixed inset-0 z-50` novo à mão.
+  botão voltar). Nunca criar `fixed inset-0 z-50` novo à mão. O `DialogContent`/`AppModal` já
+  traz o botão fechar: não desenhar outro X no cabeçalho (ficavam dois). Sem `w-[95vw]` nos
+  modais (no telemóvel são folhas de largura total) e sem cores claras fixas (`bg-blue-50`…).
 - Estados vazios: `EmptyState`.
 - Offline: os GET da API ficam guardados no aparelho (`lib/offlineCache.ts`, IndexedDB, por
   utilizador, apagados no logout). Sem rede ou com 502/503/504/timeout, os três clientes
   (`utils/api.ts`, `lib/api.ts`, axios com `withOfflineCache`) devolvem a última cópia e
   `lib/serverStatus.ts` marca o servidor em baixo (verifica `/api/health` a cada 15 s). O painel
   mostra `ServerStatusBanner` e nunca esconde o conteúdo. Cliente axios novo → `withOfflineCache`.
+  Para o utilizador só aparece o estado ("Sem ligação à internet"/"ao servidor"): nada de textos
+  ou avisos sobre fila, cópias guardadas ou reenvio — o funcionamento offline é invisível.
   Nada de dados falsos (`getMockData`/`mockAuth`) quando a API falha.
 - Fila offline (`lib/outbox.ts`, IndexedDB): mensagens da inbox, alterações de leads (PUT) e
   notas de leads feitas sem servidor (`isServerDownError`) ficam na fila e são enviadas por ordem

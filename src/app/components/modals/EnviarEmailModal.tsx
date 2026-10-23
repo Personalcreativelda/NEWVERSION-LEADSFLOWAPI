@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
+import { AppModal } from '../base/AppModal';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
-import { Mail, X, Send } from 'lucide-react';
+import { Mail, Send } from 'lucide-react';
 import { AppButton } from '../base/AppButton';
 import { FormField } from '../base/FormField';
 
@@ -40,9 +40,6 @@ export default function EnviarEmailModal({
     setLoading(true);
 
     try {
-      // Simular envio de email
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
       if (onSend) {
         await onSend(assunto, mensagem);
       }
@@ -67,104 +64,64 @@ export default function EnviarEmailModal({
   if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="bg-card text-foreground max-w-lg w-full shadow-xl border border-border animate-in zoom-in-95 duration-200">
-
-        {/* Header */}
-        <DialogHeader className="px-5 py-4 border-b border-border flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Mail className="w-5 h-5 text-purple-600" />
-            </div>
-            <div>
-              <DialogTitle className="text-lg text-foreground">Enviar Email</DialogTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Para: {leadNome}</p>
-            </div>
-          </div>
-          <DialogDescription className="sr-only">
-            Enviar email individual para o lead
-          </DialogDescription>
-          <button
-            onClick={handleClose}
-            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
-            disabled={loading}
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </DialogHeader>
-
-        {/* Body */}
-        <div className="px-5 py-4 space-y-4">
-          
-          {/* Info do Lead */}
-          <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
-            <div className="flex items-center gap-2">
-              <Mail className="w-4 h-4 text-purple-600" />
-              <div className="flex-1">
-                <p className="text-xs text-purple-900 font-medium">{leadNome}</p>
-                <p className="text-xs text-purple-700">{leadEmail}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Assunto */}
-          <FormField label="Assunto" htmlFor="assunto">
-            <Input
-              id="assunto"
-              type="text"
-              placeholder="Ex: Proposta comercial - LeadsFlow"
-              value={assunto}
-              onChange={(e) => setAssunto(e.target.value)}
-              disabled={loading}
-              className="w-full"
-            />
-          </FormField>
-
-          {/* Mensagem */}
-          <FormField label="Mensagem" htmlFor="mensagem" hint={`${mensagem.length} caracteres`}>
-            <Textarea
-              id="mensagem"
-              placeholder={`Olá ${leadNome},\n\nEspero que esteja bem!\n\nGostaria de...`}
-              value={mensagem}
-              onChange={(e) => setMensagem(e.target.value)}
-              disabled={loading}
-              rows={8}
-              className="w-full resize-none"
-            />
-          </FormField>
-
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 py-3 border-t border-border flex gap-3 justify-end">
-          <AppButton
-            variant="outline"
-            onClick={handleClose}
-            disabled={loading}
-          >
+    <AppModal
+      open={isOpen}
+      onOpenChange={(open) => { if (!open && !loading) handleClose(); }}
+      title={
+        <span className="flex items-center gap-2">
+          <Mail className="w-5 h-5 text-primary shrink-0" />
+          Enviar email
+        </span>
+      }
+      description={<span className="break-all">Para: {leadNome}{leadEmail ? ` · ${leadEmail}` : ''}</span>}
+      bodyClassName="space-y-4"
+      footer={
+        <>
+          <AppButton variant="outline" onClick={handleClose} disabled={loading}>
             Cancelar
           </AppButton>
           <AppButton
             onClick={handleSend}
             disabled={loading || !assunto.trim() || !mensagem.trim()}
             loading={loading}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
           >
-            {loading ? (
-              'A enviar...'
-            ) : (
+            {loading ? 'A enviar...' : (
               <>
                 <Send />
-                Enviar Email
+                Enviar email
               </>
             )}
           </AppButton>
-        </div>
+        </>
+      }
+    >
+      <FormField label="Assunto" htmlFor="assunto">
+        <Input
+          id="assunto"
+          type="text"
+          placeholder="Ex: Proposta comercial"
+          value={assunto}
+          onChange={(e) => setAssunto(e.target.value)}
+          disabled={loading}
+          className="w-full"
+        />
+      </FormField>
 
-      </DialogContent>
-    </Dialog>
+      <FormField label="Mensagem" htmlFor="mensagem" hint={`${mensagem.length} caracteres`}>
+        <Textarea
+          id="mensagem"
+          placeholder={`Olá ${leadNome},
+
+Espero que esteja bem!
+
+Gostaria de...`}
+          value={mensagem}
+          onChange={(e) => setMensagem(e.target.value)}
+          disabled={loading}
+          rows={8}
+          className="w-full resize-none"
+        />
+      </FormField>
+    </AppModal>
   );
 }
-
-
-

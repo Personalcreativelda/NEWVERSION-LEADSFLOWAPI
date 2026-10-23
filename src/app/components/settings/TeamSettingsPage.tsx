@@ -8,6 +8,7 @@ import {
 import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
 import { getLocale } from '../../utils/format';
+import { OverlayModal } from '../base/OverlayModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -116,9 +117,7 @@ function InviteModal({
     };
 
     return (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-            <div className="relative w-full max-w-md bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
+        <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-md">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                     <h2 className="text-base font-semibold flex items-center gap-2">
@@ -205,8 +204,7 @@ function InviteModal({
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </OverlayModal>
     );
 }
 

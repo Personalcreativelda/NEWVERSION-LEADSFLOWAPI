@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { OverlayModal } from '../../base/OverlayModal';
 
 interface Tag {
     id: string;
@@ -65,11 +66,7 @@ export default function TagEditModal({ tag, onClose, onUpdate }: TagEditModalPro
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div
-                className="w-full max-w-md rounded-lg shadow-lg p-6 space-y-4"
-                style={{ backgroundColor: 'hsl(var(--background))' }}
-            >
+        <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-md p-6 space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold" style={{ color: 'hsl(var(--foreground))' }}>
@@ -254,7 +251,6 @@ export default function TagEditModal({ tag, onClose, onUpdate }: TagEditModalPro
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </OverlayModal>
     );
 }

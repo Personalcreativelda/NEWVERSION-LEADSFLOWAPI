@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getLocale } from '../../../utils/format';
+import { OverlayModal } from '../../base/OverlayModal';
 
 interface Channel {
   id: string;
@@ -150,11 +151,7 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
   const whatsappChannels = channels.filter(c => c.type === 'whatsapp' || !c.type);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 sm:p-4"
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="bg-card border border-border sm:rounded-2xl rounded-t-2xl shadow-2xl w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden">
+    <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-2xl flex flex-col overflow-hidden">
 
         {/* Drag handle (mobile only) */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
@@ -419,7 +416,6 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </OverlayModal>
   );
 };

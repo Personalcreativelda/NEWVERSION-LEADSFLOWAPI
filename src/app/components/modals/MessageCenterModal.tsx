@@ -71,7 +71,7 @@ export default function MessageCenterModal({
 
   return (
     <Dialog open={open} onOpenChange={(value) => (!value ? onClose() : undefined)}>
-      <DialogContent className="sm:max-w-3xl w-[95vw] max-w-[520px] overflow-hidden rounded-2xl border border-border p-0 shadow-2xl [&>[data-slot='dialog-close']]:hidden">
+      <DialogContent className="max-w-[520px] overflow-hidden gap-0 p-0 sm:p-0 [&>[data-slot='dialog-close']]:hidden">
         <div className="flex items-start justify-between border-b border-border/70 px-6 py-4">
           <div className="space-y-1">
             <DialogTitle className="text-lg font-semibold">Central de Mensagens</DialogTitle>

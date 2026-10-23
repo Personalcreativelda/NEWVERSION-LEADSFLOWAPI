@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Star, AlertTriangle, MessageSquare, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { OverlayModal } from '../base/OverlayModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -63,11 +64,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const starLabels = ['', 'Muito ruim', 'Ruim', 'Regular', 'Bom', 'Excelente'];
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-      <div
-        className="relative w-full max-w-md rounded-2xl border shadow-2xl"
-        style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}
-      >
+    <OverlayModal onClose={handleClose} stickyEdges={false} className="max-w-md">
         {/* Header */}
         <div
           className="px-5 py-4 border-b flex items-center justify-between"
@@ -190,7 +187,6 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
             </button>
           </div>
         )}
-      </div>
-    </div>
+      </OverlayModal>
   );
 }

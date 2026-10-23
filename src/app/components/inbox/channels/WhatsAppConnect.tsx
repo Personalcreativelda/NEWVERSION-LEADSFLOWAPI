@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
 import { QrCode, Smartphone, Check, AlertCircle, RefreshCw, Loader2, Wifi, XCircle, CheckCircle } from 'lucide-react';
+import { OverlayModal } from '../../base/OverlayModal';
 
 // API URL
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:4000';
@@ -504,12 +505,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn">
-            <div
-                className="rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all relative z-[100000]"
-                style={{ backgroundColor: 'hsl(var(--card))' }}
-                role="dialog"
-            >
+        <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-md">
                 {/* Header */}
                 <div 
                     className="px-6 py-4 border-b flex justify-between items-center"
@@ -769,8 +765,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
+            </OverlayModal>
     );
 }
 

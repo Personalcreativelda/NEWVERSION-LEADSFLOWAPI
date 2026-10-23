@@ -1418,23 +1418,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     const block = getBlockReason();
     if (block) { showPlanBlock(block.code, block.message); return; }
 
-    // Import limit comes from DB plan_limits.leads (already loaded in user.limits.leads)
-    const maxImport: number = (user?.limits?.leads ?? -1);
-    const currentPlan = (user?.plan || 'free').toUpperCase();
-
-    // Inform about limits before opening modal
-    const confirmMessage = maxImport === -1
-      ? `Importação de Leads\n\nSeu plano ${currentPlan} tem importação ILIMITADA! \n\nVocê pode importar quantos leads quiser.\n\nDeseja continuar?`
-      : `Importação de Leads\n\nSeu plano ${currentPlan} permite importar até ${maxImport} leads.\n\nO sistema irá importar apenas os primeiros ${maxImport} leads da sua planilha.\n\nDeseja continuar?`;
-
-    const importConfirmed = await confirm(confirmMessage, {
-      title: 'Importação de Leads',
-      variant: 'info',
-      confirmLabel: 'Continuar',
-      cancelLabel: 'Cancelar',
-    });
-    if (!importConfirmed) return;
-
+    // O limite do plano (user.limits.leads) aparece no próprio modal
     setModalImportarLeads(true);
   };
 
@@ -2395,12 +2379,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         isOpen={modalImportarLeads}
         onClose={() => setModalImportarLeads(false)}
         onSuccess={carregarLeads}
-        userPlan={user?.plan || 'free'}
-        importLimits={{
-          free: 500,
-          business: 3000,
-          enterprise: -1
-        }}
+        planName={user?.plan || 'free'}
+        importLimit={user?.limits?.leads ?? -1}
       />
 
       <ImportandoWhatsAppModal

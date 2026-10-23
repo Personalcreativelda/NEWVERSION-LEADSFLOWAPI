@@ -5,6 +5,7 @@ import { Input } from '../../ui/input';
 import { Switch } from '../../ui/switch';
 import { apiRequest } from '../../../utils/api';
 import { getLocale } from '../../../utils/format';
+import { OverlayModal } from '../../base/OverlayModal';
 
 interface User {
   id: string;
@@ -46,9 +47,7 @@ export const ActivatePlanModal: React.FC<ActivatePlanModalProps> = ({
   const tinyMutedTextClass = "text-[10px] text-muted-foreground/70";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-gray-900/85 dark:bg-black/85 transition-colors" onClick={onClose} />
-      <div className="relative bg-card border border-border rounded-2xl max-w-md w-full p-6">
+    <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-md p-6">
         <h3 className="text-lg font-bold text-foreground mb-4">
           Ativar Plano - {user.email}
         </h3>
@@ -144,8 +143,7 @@ export const ActivatePlanModal: React.FC<ActivatePlanModalProps> = ({
             {loading ? 'Ativando...' : 'Ativar Plano'}
           </Button>
         </div>
-      </div>
-    </div>
+      </OverlayModal>
   );
 };
 
@@ -217,9 +215,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
   const enabledCount = Object.values(settings).filter(Boolean).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-card border border-border w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh]">
+    <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-lg flex flex-col overflow-hidden">
         {/* Drag handle (mobile) */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
           <div className="w-10 h-1 rounded-full bg-muted" />
@@ -301,8 +297,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
             {loading ? 'A guardar...' : 'Guardar'}
           </Button>
         </div>
-      </div>
-    </div>
+      </OverlayModal>
   );
 };
 
@@ -350,9 +345,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
   const unselectedCard = "border-border bg-muted/50 hover:bg-muted";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-gray-900/85 dark:bg-black/85" onClick={onClose} />
-      <div className="relative bg-card border border-border rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+    <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-md p-6 overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
@@ -462,7 +455,6 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
             {loading ? 'A criar...' : 'Criar Utilizador'}
           </Button>
         </div>
-      </div>
-    </div>
+      </OverlayModal>
   );
 };

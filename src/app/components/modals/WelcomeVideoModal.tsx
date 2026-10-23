@@ -1,4 +1,5 @@
 import { X, Play, Star } from 'lucide-react';
+import { OverlayModal } from '../base/OverlayModal';
 
 interface WelcomeVideoModalProps {
   isOpen: boolean;
@@ -10,11 +11,7 @@ export default function WelcomeVideoModal({ isOpen, onClose, onOpenFeedback }: W
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm sm:p-4 animate-fadeIn">
-      <div
-        className="relative w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl border-t sm:border shadow-2xl overflow-hidden"
-        style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}
-      >
+    <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-2xl">
         {/* Header */}
         <div
           className="px-4 sm:px-6 py-3 sm:py-4 border-b flex items-center justify-between"
@@ -77,7 +74,6 @@ export default function WelcomeVideoModal({ isOpen, onClose, onOpenFeedback }: W
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </OverlayModal>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Send } from 'lucide-react';
 import type { Lead } from '../../types';
 import { getLocale } from '../../utils/format';
+import { OverlayModal } from '../base/OverlayModal';
 
 interface ChatModalProps {
   isOpen: boolean;
@@ -103,8 +104,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
   const inicial = (lead.nome || '?').charAt(0).toUpperCase();
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-card text-foreground rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-xl border border-border">
+    <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-4xl flex flex-col overflow-hidden">
         
         {/* Header */}
         <div className="px-6 py-5 border-b border-border flex justify-between items-center">
@@ -194,8 +194,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
 
         </div>
 
-      </div>
-    </div>
+      </OverlayModal>
   );
 }
 

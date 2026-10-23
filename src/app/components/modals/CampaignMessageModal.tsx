@@ -228,17 +228,17 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
 
           {/* Info sobre variáveis */}
           {message && message.includes('{') && (
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="mt-4 bg-primary/10 border border-primary/25 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <i className="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                <i className="fas fa-info-circle text-primary mt-0.5"></i>
                 <div>
-                  <p className="text-sm font-medium text-blue-900 mb-1">Variáveis Personalizadas</p>
-                  <p className="text-sm text-blue-700">
+                  <p className="text-sm font-medium text-foreground mb-1">Variáveis personalizadas</p>
+                  <p className="text-sm text-muted-foreground">
                     Esta mensagem contém variáveis que serão substituídas automaticamente para cada destinatário:
                   </p>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {message.match(/\{[^}]+\}/g)?.map((variable, idx) => (
-                      <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-mono">
+                      <span key={idx} className="bg-primary/15 text-foreground px-2 py-1 rounded text-xs font-mono">
                         {variable}
                       </span>
                     ))}

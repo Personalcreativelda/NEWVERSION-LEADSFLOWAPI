@@ -1,4 +1,5 @@
 import { Loader2 } from 'lucide-react';
+import { OverlayModal } from '../base/OverlayModal';
 
 interface ImportandoWhatsAppModalProps {
   isOpen: boolean;
@@ -8,8 +9,7 @@ export default function ImportandoWhatsAppModal({ isOpen }: ImportandoWhatsAppMo
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-card text-foreground rounded-2xl p-8 max-w-md w-full shadow-xl border border-border">
+    <OverlayModal onClose={() => {}} stickyEdges={false} className="p-8 max-w-md">
         <div className="flex flex-col items-center text-center space-y-6">
           {/* Ícone Animado */}
           <div className="relative">
@@ -35,8 +35,7 @@ export default function ImportandoWhatsAppModal({ isOpen }: ImportandoWhatsAppMo
             <div className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full animate-pulse w-3/4"></div>
           </div>
         </div>
-      </div>
-    </div>
+      </OverlayModal>
   );
 }
 
