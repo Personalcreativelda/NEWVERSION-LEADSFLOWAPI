@@ -1,6 +1,9 @@
 import { mockAuth } from './auth-mock';
 import { getApiBaseUrl } from './api-client';
 import { logger } from './logger';
+import { GET_TIMEOUT_MS, clearOfflineCache, loadCachedResponse, saveCachedResponse } from '../lib/offlineCache';
+import { ServerDownError, isServerDownError, isServerDownResponse, reportServerDown, reportServerUp, timeoutSignal } from '../lib/serverStatus';
+import { clearOutbox, enqueueOutbox, queuedLeadNotes, queuedLeadUpdates, registerOutboxSender, type OutboxItem } from '../lib/outbox';
 import { isNativeApp, openNativeOAuth, NATIVE_OAUTH_REDIRECT } from '../../native';
 import { usableImageUrl } from './media-url';
 import type { Lead, LeadNote, ScheduledConversation, InboxConversation, Message } from '../types';
@@ -73,11 +76,8 @@ export const shouldRefreshToken = (): boolean => {
   return timeUntilExpiry > 0 && timeUntilExpiry < REFRESH_THRESHOLD_MS;
 };
 
-const DEV_MODE = true;
+const DEV_MODE = import.meta.env.DEV;
 const EMAIL_CONFIRMATION_ENABLED = (import.meta.env.VITE_ENABLE_EMAIL_CONFIRMATION ?? 'true') === 'true';
-
-let networkErrorCount = 0;
-const MAX_NETWORK_ERRORS = 2;
 
 // Validade (exp) do access token JWT, em ms; null se não der para ler
 const getAccessTokenExpiry = (): number | null => {
@@ -204,16 +204,31 @@ async function apiCall(
   const apiEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
   const resourceEndpoint = apiEndpoint.replace(/^\/api/, '') || '/';
 
+  const methodType = (options.method || 'GET').toUpperCase();
+  const isGet = methodType === 'GET';
+
   try {
-    const methodType = options.method || 'GET';
     logger.log(`[API] ${methodType} ${apiEndpoint}`);
 
-    const response = await fetch(`${API_BASE_URL}${apiEndpoint}`, {
-      ...options,
-      headers,
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${apiEndpoint}`, {
+        ...options,
+        headers,
+        signal: options.signal ?? (isGet ? timeoutSignal(GET_TIMEOUT_MS) : undefined),
+      });
+    } catch (fetchError) {
+      // Cancelado pelo próprio ecrã: não é falha do servidor
+      if (options.signal?.aborted) throw fetchError;
+      throw new ServerDownError();
+    }
 
     logger.log(`[API] ${methodType} ${apiEndpoint} - Status: ${response.status}`);
+
+    // Página de erro do proxy (não JSON): o pedido não chegou à API
+    if (isServerDownResponse(response.status, response.headers.get('content-type'))) {
+      throw new ServerDownError();
+    }
 
     if (response.status === 404 && (
       resourceEndpoint === '/admin/notification-settings' ||
@@ -243,6 +258,11 @@ async function apiCall(
         logger.error(`[API] Unexpected non-JSON response for ${apiEndpoint}. Content-Type: ${contentTypeHeader || 'unknown'}`);
         throw new Error('Backend respondeu HTML/texto. Certifique-se de que o dashboard está apontando para o servidor Express (VITE_API_URL).');
       }
+    }
+
+    // A API está viva mas sem base de dados (503 com code SERVER_UNAVAILABLE)
+    if (isServerDownResponse(response.status, contentTypeHeader, data)) {
+      throw new ServerDownError();
     }
 
     if (!response.ok) {
@@ -294,43 +314,36 @@ async function apiCall(
     }
 
     logger.log(`[API] OK ${apiEndpoint}`);
+    reportServerUp();
+    if (isGet) {
+      void saveCachedResponse(apiEndpoint, data);
+    }
     // Slide the inactivity window on every successful authenticated call
     if (useAuth) {
       startSessionExpiryTimer();
     }
     return data;
   } catch (error) {
+    // Servidor inalcançável: um GET devolve a última cópia guardada no aparelho
+    if (error instanceof ServerDownError) {
+      if (isGet) {
+        const cached = await loadCachedResponse(apiEndpoint);
+        if (cached) {
+          logger.warn(`[API] Servidor indisponível — a usar cópia guardada de ${apiEndpoint}`);
+          reportServerDown(cached.savedAt);
+          return cached.data;
+        }
+      }
+      reportServerDown();
+      throw error;
+    }
+
     const isLeadNotFoundError = error instanceof Error &&
       error.message?.toLowerCase().includes('lead not found') &&
       resourceEndpoint.startsWith('/leads/');
 
     if (!isLeadNotFoundError) {
       logger.error(`[API] Error ${apiEndpoint}:`, error);
-    }
-
-    if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      if (networkErrorCount < MAX_NETWORK_ERRORS) {
-        logger.warn(`[API] Backend offline — ${apiEndpoint}`);
-        networkErrorCount++;
-
-        if (networkErrorCount === MAX_NETWORK_ERRORS) {
-          logger.error('[API] Backend offline — app running in mock mode. Operations that write data will not be persisted.');
-          logger.warn('[API] Further network errors will be silenced.');
-        }
-      }
-
-      if (DEV_MODE && (options.method === 'GET' || !options.method)) {
-        return getMockData(resourceEndpoint);
-      }
-
-      if (resourceEndpoint === '/admin/notification-settings' && options.method === 'POST') {
-        return { success: true, settings: JSON.parse(options.body as string) };
-      }
-
-      if (options.method && options.method !== 'GET') {
-        logger.error(`[API] Cannot use mock data for ${options.method} request — backend offline.`);
-        throw new Error('Backend indisponível. O servidor não está respondendo. Por favor, verifique a conexão ou tente novamente mais tarde.');
-      }
     }
 
     if (error instanceof Error &&
@@ -546,35 +559,8 @@ export const authApi = {
       await new Promise((resolve) => setTimeout(resolve, 2000));
       return await authApi.signin(email, password);
     } catch (error: any) {
-      const errorMessage = error?.message || '';
-
-      if (errorMessage.includes('Backend indisponível') || errorMessage.includes('Failed to fetch')) {
-        logger.warn('[Auth] Backend offline - using Mock Auth for signup');
-        const result = await mockAuth.signup(email, password, name);
-
-        if (result.success) {
-          return result;
-        }
-
-        throw new Error(result.error || 'Erro ao criar conta');
-      }
-
-      if (
-        errorMessage.includes('already been registered') ||
-        errorMessage.includes('User already registered') ||
-        errorMessage.includes('já está cadastrado')
-      ) {
-        throw error;
-      }
-
-      logger.warn('[Auth] Trying Mock Auth for signup');
-      const result = await mockAuth.signup(email, password, name);
-
-      if (result.success) {
-        return result;
-      }
-
-      throw new Error(result.error || 'Erro ao criar conta');
+      logger.error('[Auth] Signup error:', error);
+      throw error;
     }
   },
 
@@ -613,15 +599,6 @@ export const authApi = {
       };
     } catch (error: any) {
       const errorMessage = error?.message || '';
-
-      if (
-        errorMessage.includes('Backend indisponível') ||
-        errorMessage.includes('Failed to fetch') ||
-        errorMessage.includes('ECONNREFUSED') ||
-        errorMessage.includes('ERR_SSL_PROTOCOL_ERROR')
-      ) {
-        throw new Error('Não foi possível ligar ao servidor. Verifica se a API está a correr em http://localhost:4000');
-      }
 
       if (errorMessage.toLowerCase().includes('invalid login credentials')) {
         throw new Error('Email ou senha incorretos.');
@@ -675,62 +652,9 @@ export const authApi = {
       await mockAuth.signout();
       clearSessionExpiry();
       return { success: true };
-    }
-  },
-
-  refreshSession: async () => {
-    const refreshToken = localStorage.getItem('leadflow_refresh_token');
-
-    try {
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      const data = await apiCall('/auth/refresh', {
-        method: 'POST',
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
-
-      const session = data?.session;
-
-      if (!session?.access_token) {
-        throw new Error('Resposta inválida do servidor de sessão.');
-      }
-
-      localStorage.setItem('leadflow_access_token', session.access_token);
-      if (session.refresh_token) {
-        localStorage.setItem('leadflow_refresh_token', session.refresh_token);
-      }
-
-      startSessionExpiryTimer();
-
-      return {
-        success: true,
-        session,
-        user: data?.user,
-      };
-    } catch (error: any) {
-      logger.error('[Auth] Refresh session error:', error);
-
-      const mockSession = await mockAuth.getSession();
-      const session = mockSession?.data?.session;
-
-      if (session) {
-        logger.warn('[Auth] Using mock session refresh fallback');
-        startSessionExpiryTimer();
-        return {
-          success: true,
-          session,
-          user: session.user,
-          fallback: 'mock',
-        };
-      }
-
-      clearSessionExpiry();
-      localStorage.removeItem('leadflow_access_token');
-      localStorage.removeItem('leadflow_refresh_token');
-
-      throw error;
+    } finally {
+      // As cópias offline e a fila são do utilizador que sai: não podem ficar no aparelho
+      await Promise.all([clearOfflineCache(), clearOutbox()]);
     }
   },
 
@@ -740,41 +664,19 @@ export const authApi = {
       throw new Error('Informe o código de verificação.');
     }
 
-    try {
-      await apiCall('/auth/verify-email', {
-        method: 'POST',
-        body: JSON.stringify({ email, token: trimmedCode }),
-      });
-      return { success: true };
-    } catch (error: any) {
-      console.error('[Auth] Email verification error:', error);
-      const result = await mockAuth.verifyEmail(email, trimmedCode);
-
-      if (!result.success) {
-        throw new Error(result.error || 'Não foi possível confirmar o email.');
-      }
-
-      return { success: true };
-    }
+    await apiCall('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ email, token: trimmedCode }),
+    });
+    return { success: true };
   },
 
   resendConfirmation: async (email: string) => {
-    try {
-      await apiCall('/auth/resend-confirmation', {
-        method: 'POST',
-        body: JSON.stringify({ email }),
-      });
-      return { success: true };
-    } catch (error: any) {
-      console.error('[Auth] Resend confirmation error:', error);
-      const result = await mockAuth.resendConfirmation(email);
-
-      if (!result.success) {
-        throw new Error(result.error || 'Não foi possível reenviar o email.');
-      }
-
-      return { success: true };
-    }
+    await apiCall('/auth/resend-confirmation', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+    return { success: true };
   },
 
   requestPasswordReset: async (email: string, redirectTo?: string) => {
@@ -1081,6 +983,29 @@ const mapLeadCollection = (collection: any[]): Lead[] => {
     .filter((lead): lead is Lead => lead !== null && lead !== undefined);
 };
 
+/** Aplica aos leads da API (ou da cópia guardada) as alterações que ainda estão na fila offline */
+const withQueuedLeadUpdates = (rawLeads: any[]): any[] => {
+  const updates = queuedLeadUpdates();
+  if (updates.size === 0) return rawLeads;
+  return rawLeads.map((lead) => (lead?.id && updates.has(lead.id) ? { ...lead, ...updates.get(lead.id) } : lead));
+};
+
+registerOutboxSender('lead-update', (item) =>
+  apiCall(`/leads/${item.leadId}`, { method: 'PUT', body: JSON.stringify(item.payload) }, true));
+
+registerOutboxSender('lead-note', (item) =>
+  apiCall(`/lead-notes/${item.leadId}`, { method: 'POST', body: JSON.stringify({ content: item.content }) }, true));
+
+/** Nota ainda na fila, no formato das notas da API (o id "queued_…" não existe no servidor) */
+const queuedNoteToLeadNote = (item: Extract<OutboxItem, { kind: 'lead-note' }>): LeadNote => ({
+  id: item.id,
+  user_id: item.userId,
+  lead_id: item.leadId,
+  content: item.content,
+  created_at: new Date(item.createdAt).toISOString(),
+  updated_at: new Date(item.createdAt).toISOString(),
+});
+
 export const leadsApi = {
   getAll: async () => {
     console.log('[LeadsAPI] 🔄 Fetching leads via backend API (direct sync disabled)...');
@@ -1097,7 +1022,7 @@ export const leadsApi = {
         console.log(`[LeadsAPI] 📄 Backend API page ${page + 1} (offset=${offset}, limit=${limit})...`);
 
         const pageLeads = await apiCall(`/leads?offset=${offset}&limit=${limit}`, {}, true);
-        const leadsArray = Array.isArray(pageLeads) ? mapLeadCollection(pageLeads) : [];
+        const leadsArray = Array.isArray(pageLeads) ? mapLeadCollection(withQueuedLeadUpdates(pageLeads)) : [];
 
         console.log(`[LeadsAPI] 📦 Backend page ${page + 1}: ${leadsArray.length} leads`);
 
@@ -1134,7 +1059,7 @@ export const leadsApi = {
       try {
         console.log('[LeadsAPI] 🔄 Last resort: fetching without pagination...');
         const leads = await apiCall('/leads', {}, true);
-        const leadsArray = Array.isArray(leads) ? mapLeadCollection(leads) : [];
+        const leadsArray = Array.isArray(leads) ? mapLeadCollection(withQueuedLeadUpdates(leads)) : [];
         console.log(`[LeadsAPI] ✅ Fallback successful: ${leadsArray.length} leads`);
         return { success: true, leads: leadsArray };
       } catch (fallbackError) {
@@ -1142,6 +1067,19 @@ export const leadsApi = {
         return { success: false, leads: [] };
       }
     }
+  },
+
+  /** Leads guardados no aparelho (as mesmas páginas que getAll pede), para mostrar já ao abrir o app */
+  getCached: async (): Promise<Lead[]> => {
+    const limit = 1000;
+    let allLeads: Lead[] = [];
+    for (let page = 0; page < 20; page++) {
+      const cached = await loadCachedResponse(`/api/leads?offset=${page * limit}&limit=${limit}`);
+      const pageLeads = Array.isArray(cached?.data) ? mapLeadCollection(withQueuedLeadUpdates(cached.data)) : [];
+      allLeads = [...allLeads, ...pageLeads];
+      if (pageLeads.length < limit) break;
+    }
+    return allLeads;
   },
 
   create: async (leadData: any) => {
@@ -1155,11 +1093,18 @@ export const leadsApi = {
 
   update: async (leadId: string, leadData: any) => {
     const payload = mapLeadToApiPayload(leadData);
-    const lead = await apiCall(`/leads/${leadId}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    }, true);
-    return { success: true, lead: mapLeadFromApi(lead) };
+    try {
+      const lead = await apiCall(`/leads/${leadId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }, true);
+      return { success: true, lead: mapLeadFromApi(lead) };
+    } catch (error) {
+      if (!isServerDownError(error)) throw error;
+      // Sem servidor: a alteração fica na fila e o ecrã mostra-a já
+      await enqueueOutbox({ kind: 'lead-update', id: `lead-update:${leadId}`, leadId, payload });
+      return { success: true, queued: true, lead: { ...mapLeadFromApi({ ...payload, id: leadId }), ...leadData, id: leadId } };
+    }
   },
 
   delete: async (leadId: string) => {
@@ -1181,7 +1126,7 @@ export const leadsApi = {
     console.log(`[LeadsAPI] 🔄 Fetching lead by ID: ${leadId}`);
     const lead = await apiCall(`/leads/${leadId}`, {}, true);
     console.log(`[LeadsAPI] ✅ Lead fetched successfully: ${leadId}`);
-    return mapLeadFromApi(lead);
+    return mapLeadFromApi(withQueuedLeadUpdates([lead])[0]);
   },
 
   importBulk: async (leads: any[], meta?: { source?: string }) => {
@@ -1275,14 +1220,30 @@ export const integrationsApi = {
 
 export const leadNotesApi = {
   getAll: async (leadId: string): Promise<LeadNote[]> => {
-    return apiCall(`/lead-notes/${leadId}`, {}, true);
+    // Notas ainda na fila offline aparecem primeiro (são as mais recentes)
+    const queued = queuedLeadNotes(leadId).map(queuedNoteToLeadNote).reverse();
+    let notes: LeadNote[];
+    try {
+      notes = await apiCall(`/lead-notes/${leadId}`, {}, true);
+    } catch (error) {
+      if (!isServerDownError(error) || queued.length === 0) throw error;
+      notes = [];
+    }
+    return queued.length > 0 ? [...queued, ...(Array.isArray(notes) ? notes : [])] : notes;
   },
 
   create: async (leadId: string, content: string): Promise<LeadNote> => {
-    return apiCall(`/lead-notes/${leadId}`, {
-      method: 'POST',
-      body: JSON.stringify({ content }),
-    }, true);
+    try {
+      return await apiCall(`/lead-notes/${leadId}`, {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      }, true);
+    } catch (error) {
+      if (!isServerDownError(error)) throw error;
+      const id = `queued_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      await enqueueOutbox({ kind: 'lead-note', id, leadId, content });
+      return queuedNoteToLeadNote({ kind: 'lead-note', id, leadId, content, userId: '', createdAt: Date.now() });
+    }
   },
 
   update: async (noteId: string, content: string): Promise<LeadNote> => {

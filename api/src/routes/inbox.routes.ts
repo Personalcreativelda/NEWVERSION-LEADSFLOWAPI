@@ -1223,6 +1223,24 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // Id da mensagem no app. Num reenvio da fila offline, se ela já foi gravada (a resposta
+    // perdeu-se pelo caminho), devolve-se a mesma em vez de a enviar outra vez ao contacto.
+    const clientId = typeof req.body.client_id === 'string' ? req.body.client_id.slice(0, 100) : null;
+    if (clientId && req.body.queued === true) {
+      const { query: dedupQuery } = require('../database/connection');
+      const existing = await dedupQuery(
+        `SELECT * FROM messages
+         WHERE metadata->>'client_id' = $1
+           AND (user_id = $2 OR metadata->>'sent_by' = $2::text)
+           AND created_at > NOW() - INTERVAL '7 days'
+         LIMIT 1`,
+        [clientId, user.id]
+      );
+      if (existing.rows[0]) {
+        return res.json(existing.rows[0]);
+      }
+    }
+
     // Enforce per-plan individual message limit
     const msgCheck = await checkMessageLimit(user.id, 'messages');
     if (!msgCheck.allowed) {
@@ -2052,6 +2070,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
           phone: phone,
           channel_type: messageChannel,
           sent_by: user.id !== channelOwnerId ? user.id : undefined,
+          client_id: clientId || undefined,
         },
       }, channelOwnerId);
       console.log('[Inbox] Message saved to database:', message.id, 'conversation:', conversationId);

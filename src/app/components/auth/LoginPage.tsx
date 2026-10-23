@@ -404,7 +404,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
         }
       } else if (errorMessage.includes('não encontrado') || errorMessage.includes('not found')) {
         setError({ message: 'Email não encontrado. Por favor, crie uma conta clicando em "Criar conta".', type: 'not_found' });
-      } else if (errorMessage.includes('Backend indisponível') || errorMessage.includes('servidor')) {
+      } else if (errorMessage.includes('Backend indisponível') || /servidor/i.test(errorMessage)) {
         setError({ message: errorMessage, type: 'network' });
       } else {
         setError({ message: errorMessage, type: 'general' });

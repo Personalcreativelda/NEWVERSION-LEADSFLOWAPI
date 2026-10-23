@@ -1,15 +1,16 @@
 import axios from 'axios';
+import { withOfflineCache } from '../../lib/axiosOffline';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const baseURL = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
 
 // Axios instance com configuração padrão
-const api = axios.create({
+const api = withOfflineCache(axios.create({
   baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
-});
+}));
 
 // Interceptor para adicionar token de autenticação
 api.interceptors.request.use((config) => {

@@ -1,3 +1,6 @@
+import { GET_TIMEOUT_MS, loadCachedResponse, saveCachedResponse } from '@/app/lib/offlineCache';
+import { ServerDownError, isServerDownResponse, reportServerDown, reportServerUp, timeoutSignal } from '@/app/lib/serverStatus';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 class ApiClient {
@@ -20,17 +23,46 @@ class ApiClient {
       ...options.headers,
     };
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    const isGet = (options.method || 'GET').toUpperCase() === 'GET';
+
+    // Servidor inalcançável: um GET devolve a última cópia guardada no aparelho
+    const serverDown = async (): Promise<T> => {
+      if (isGet) {
+        const cached = await loadCachedResponse(endpoint);
+        if (cached) {
+          reportServerDown(cached.savedAt);
+          return cached.data as T;
+        }
+      }
+      reportServerDown();
+      throw new ServerDownError();
+    };
+
+    let response: Response;
+    try {
+      response = await fetch(`${API_URL}${endpoint}`, {
+        ...options,
+        headers,
+        signal: options.signal ?? (isGet ? timeoutSignal(GET_TIMEOUT_MS) : undefined),
+      });
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      return serverDown();
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (isServerDownResponse(response.status, contentType)) return serverDown();
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
-      throw new Error(errorBody.message || 'API Error');
+      if (isServerDownResponse(response.status, contentType, errorBody)) return serverDown();
+      throw new Error(errorBody.message || errorBody.error || 'API Error');
     }
 
-    return response.json();
+    const data = await response.json();
+    reportServerUp();
+    if (isGet) void saveCachedResponse(endpoint, data);
+    return data;
   }
 
   private buildQuery(params?: Record<string, string | number | boolean | null | undefined>): string {

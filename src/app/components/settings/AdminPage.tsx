@@ -292,12 +292,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
         setShowNotificationSettings(false);
       }
     } catch (error: any) {
-      if (!error.message?.includes('Backend indisponível')) {
-        toast.error('Erro ao guardar definições de notificação: ' + error.message);
-      } else {
-        toast.success('Definições guardadas (modo demo)');
-        setShowNotificationSettings(false);
-      }
+      toast.error('Erro ao guardar definições de notificação: ' + error.message);
     } finally {
       setLoading(false);
     }

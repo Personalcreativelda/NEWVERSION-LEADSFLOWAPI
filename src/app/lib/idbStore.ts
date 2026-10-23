@@ -3,7 +3,7 @@
  *   - Message cache (module-level singleton, large per-conversation data)
  *   - Upload queue (serialisable metadata only — File objects cannot persist)
  */
-import { get, set, del, keys, createStore } from 'idb-keyval';
+import { get, set, del, keys, clear, createStore } from 'idb-keyval';
 import type { AttachmentFileType } from '../types/attachment';
 
 // ── Message cache store ───────────────────────────────────────────────────────
@@ -30,6 +30,10 @@ export async function idbLoadAllMessageKeys(): Promise<string[]> {
 
 export async function idbDeleteMessages(conversationId: string): Promise<void> {
     return del(conversationId, MESSAGE_STORE);
+}
+
+export async function idbClearMessages(): Promise<void> {
+    return clear(MESSAGE_STORE);
 }
 
 // ── Upload queue persistence store ───────────────────────────────────────────

@@ -71,10 +71,11 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { useConfirm } from './ui/ConfirmDialog';
 import { Language, loadLanguage, saveLanguage, translations, Translations } from '../utils/i18n';
 
-import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X, LayoutDashboard, Users, MessageSquare, BarChart2, Menu, FileText, Workflow } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CopyX, Download, MailX, LayoutDashboard, Users, MessageSquare, BarChart2, Menu, FileText, Workflow } from 'lucide-react';
 import { PageHeader, PageAction, PageFab } from './base/PageHeader';
 import { motion } from 'motion/react';
-import { OfflineState } from './base/OfflineState';
+import { ServerStatusBanner } from './base/ServerStatusBanner';
+import { SERVER_BACK_EVENT, checkServerNow } from '../lib/serverStatus';
 import { PullToRefresh } from './base/PullToRefresh';
 import { LatestLeads } from './dashboard/LatestLeads';
 import { formatLeadStatus } from './dashboard/leadDisplay';
@@ -214,13 +215,23 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   // no telemóvel o menu começa fechado)
   const lastIsMobileRef = useRef(false);
   const [isDeletingLeads, setIsDeletingLeads] = useState(false); // ✅ Bloquear auto-refresh durante deleção
-  const [isBackendOffline, setIsBackendOffline] = useState(false); // ✅ Detectar backend offline
 
-  // Sem internet: o painel mostra o ecrã "Sem ligação" em vez de esqueletos sem fim; quando
-  // a ligação volta, a página atual é montada de novo (pedidos refeitos) e avisa-se.
+  // Sem internet ou servidor em baixo: o painel continua a mostrar as cópias guardadas no
+  // aparelho (ServerStatusBanner avisa). Quando o servidor volta a responder, a página atual
+  // é montada de novo (pedidos refeitos), os leads são recarregados e avisa-se.
   const isOnline = useOnlineStatus();
   const [reconnectKey, setReconnectKey] = useState(0);
   const wasOfflineRef = useRef(false);
+  const lastReconnectRef = useRef(0);
+  const carregarLeadsRef = useRef<() => Promise<void>>(async () => {});
+  const reconnect = useCallback(() => {
+    // A internet e o servidor podem voltar ao mesmo tempo: um recarregamento chega
+    if (Date.now() - lastReconnectRef.current < 3000) return;
+    lastReconnectRef.current = Date.now();
+    setReconnectKey((k) => k + 1);
+    void carregarLeadsRef.current();
+    toast.success('Ligação restabelecida');
+  }, []);
   useEffect(() => {
     if (!isOnline) {
       wasOfflineRef.current = true;
@@ -228,12 +239,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     }
     if (wasOfflineRef.current) {
       wasOfflineRef.current = false;
-      setIsBackendOffline(false);
-      setReconnectKey((k) => k + 1);
-      void carregarLeads();
-      toast.success('Ligação restabelecida');
+      void checkServerNow().then((up) => up && reconnect());
     }
-  }, [isOnline]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOnline, reconnect]);
+  useEffect(() => {
+    window.addEventListener(SERVER_BACK_EVENT, reconnect);
+    return () => window.removeEventListener(SERVER_BACK_EVENT, reconnect);
+  }, [reconnect]);
 
   // Estados dos modais
   const [modalNovoLead, setModalNovoLead] = useState(false);
@@ -528,7 +540,15 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     const isFirstLoad = !initialLoadDoneRef.current;
 
     try {
-      if (isFirstLoad) setLoading(true);
+      if (isFirstLoad) {
+        setLoading(true);
+        // Abertura do app: mostra já os leads guardados no aparelho enquanto a API responde
+        const cached = await leadsApi.getCached();
+        if (cached.length > 0) {
+          setLeads((current) => (current.length ? current : cached));
+          setLoading(false);
+        }
+      }
       console.log('[Dashboard] 🔄 Starting to load leads from backend...');
       
       // ✅ VERIFICAR se há webhook N8N que pode estar re-importando leads
@@ -588,18 +608,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         console.error('[Dashboard] ❌ Response not successful:', response);
       }
     } catch (error) {
+      // Servidor em baixo sem cópia guardada: mantém o que já está no ecrã (ServerStatusBanner avisa)
       console.error('[Dashboard] ❌ Error loading leads:', error);
-
-      // ✅ Detectar se é erro de backend offline
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      if (errorMsg.includes('Failed to fetch') || errorMsg.includes('Backend indisponível')) {
-        setIsBackendOffline(true);
-        console.error('[Dashboard] 🚨 Backend OFFLINE detectado!');
-      }
     } finally {
       if (isFirstLoad) setLoading(false);
     }
   };
+  carregarLeadsRef.current = carregarLeads;
 
   // Auto-refresh de leads a cada 15 segundos para detectar novos leads do webhook N8N
   useLeadsAutoRefresh({
@@ -1882,36 +1897,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             onBack={isTabPage ? undefined : goBack}
           />
 
-          {/* ⚠️ BANNER DE BACKEND OFFLINE */}
-          {isBackendOffline && isOnline && (
-            <div role="alert" className="bg-amber-500/10 border-b border-amber-500/30 px-4 sm:px-6 py-3">
-              <div className="max-w-[1720px] mx-auto flex items-center gap-3">
-                <AlertCircle aria-hidden className="w-5 h-5 flex-shrink-0 text-amber-500" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">Sem ligação ao servidor</p>
-                  <p className="text-xs text-muted-foreground">
-                    Verifique a sua internet. As alterações não serão guardadas até a ligação voltar.
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setIsBackendOffline(false);
-                    void carregarLeads();
-                  }}
-                  className="flex-shrink-0 h-9 px-3 rounded-lg text-sm font-medium bg-amber-500 text-white active:bg-amber-600 transition-colors"
-                >
-                  Tentar de novo
-                </button>
-                <button
-                  onClick={() => setIsBackendOffline(false)}
-                  aria-label="Fechar aviso"
-                  className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
+          <ServerStatusBanner />
 
           {/* Main Content */}
           <main className={`flex-1 min-w-0 ${
@@ -1956,9 +1942,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   : undefined
               }
             >
-            {!isOnline ? (
-              <OfflineState onRetry={() => setReconnectKey((k) => k + 1)} />
-            ) : (<>
             {/* Renderizar conteúdo baseado na página atual */}
             {currentPage === 'dashboard' && (
               <div className="space-y-4 sm:space-y-6 lg:space-y-8">
@@ -2222,7 +2205,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             {currentPage === 'admin' && (
               <AdminPage />
             )}
-            </>)}
             </motion.div>
           </PageContainer>
 

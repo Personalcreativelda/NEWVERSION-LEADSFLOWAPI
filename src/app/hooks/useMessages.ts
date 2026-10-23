@@ -4,6 +4,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { conversationsApi, inboxApi } from '../services/api/inbox';
 import type { MessageWithSender } from '../types/inbox';
+import { OUTBOX_FAILED_EVENT, OUTBOX_SENT_EVENT, enqueueOutbox, queuedMessages, type OutboxItem } from '../lib/outbox';
+import { isServerDownError } from '../lib/serverStatus';
 import {
     getCachedMessages,
     setCachedMessages,
@@ -17,6 +19,36 @@ import {
 
 // Helper para gerar ID temporário
 const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+/** Bolha de mensagem enviada por nós que ainda não tem resposta da API (otimista ou na fila) */
+function outgoingBubble(id: string, conversationId: string, content: string, mediaUrl?: string, mediaType?: string, createdAt = new Date().toISOString()): MessageWithSender {
+    return {
+        id,
+        user_id: '',
+        conversation_id: conversationId,
+        lead_id: null,
+        contact_id: null,
+        campaign_id: null,
+        direction: 'out',
+        channel: 'whatsapp',
+        content: content.trim() || (mediaUrl ? '📎 Mídia' : ''),
+        status: 'pending',
+        sent_at: createdAt,
+        media_url: mediaUrl,
+        media_type: mediaType as 'audio' | 'video' | 'image' | 'document' | undefined,
+        metadata: {},
+        created_at: createdAt,
+    };
+}
+
+/** Mensagens desta conversa que estão na fila offline e ainda não aparecem na lista */
+function withQueuedBubbles(conversationId: string, list: MessageWithSender[]): MessageWithSender[] {
+    const present = new Set(list.map((m) => m.id));
+    const queued = queuedMessages(conversationId)
+        .filter((item) => !present.has(item.id))
+        .map((item) => outgoingBubble(item.id, conversationId, item.content, item.mediaUrl, item.mediaType, new Date(item.createdAt).toISOString()));
+    return queued.length > 0 ? [...list, ...queued] : list;
+}
 
 // Intervalo de polling de mensagens (60 segundos) - fallback quando WebSocket falha
 const MESSAGE_POLLING_INTERVAL = 60_000;
@@ -50,10 +82,10 @@ export function useMessages(conversationId: string | null) {
             setError(null);
             const data = await conversationsApi.getMessages(conversationId, { limit: 100 });
 
-            // Preserve any temp_ (optimistic) messages still in-flight
+            // Preserve any temp_ (optimistic) messages still in-flight, and the ones waiting in the offline queue
             setMessages(prev => {
                 const tempMessages = prev.filter(m => m.id.startsWith('temp_'));
-                const merged = [...data, ...tempMessages];
+                const merged = withQueuedBubbles(conversationId, [...data, ...tempMessages]);
                 // Write-through to cache
                 setCachedMessages(conversationId, merged);
                 return merged;
@@ -75,23 +107,7 @@ export function useMessages(conversationId: string | null) {
         
         if (!replaceTempId) {
             // Criar e injectar mensagem otimista nova
-            const optimisticMessage: MessageWithSender = {
-                id: tempId,
-                user_id: '',
-                conversation_id: conversationId,
-                lead_id: null,
-                contact_id: null,
-                campaign_id: null,
-                direction: 'out',
-                channel: 'whatsapp',
-                content: content.trim() || (mediaUrl ? '📎 Mídia' : ''),
-                status: 'pending',
-                sent_at: new Date().toISOString(),
-                media_url: mediaUrl,
-                media_type: mediaType as 'audio' | 'video' | 'image' | 'document' | undefined,
-                metadata: {},
-                created_at: new Date().toISOString(),
-            };
+            const optimisticMessage = outgoingBubble(tempId, conversationId, content, mediaUrl, mediaType);
             setMessages(prev => [...prev, optimisticMessage]);
             setTimeout(() => scrollToBottom(), 50);
         } else {
@@ -110,7 +126,8 @@ export function useMessages(conversationId: string | null) {
             const message = await conversationsApi.sendMessage(conversationId, {
                 content: content.trim() || '',
                 media_url: mediaUrl,
-                media_type: mediaType
+                media_type: mediaType,
+                client_id: tempId,
             });
 
             // Substituir mensagem temporária pela real + dedup
@@ -129,9 +146,15 @@ export function useMessages(conversationId: string | null) {
             });
 
         } catch (err: any) {
+            // Sem servidor: a mensagem fica na fila e a bolha continua "a enviar" (relógio).
+            // Media só entra se já estiver carregada (URL real, não um ficheiro local).
+            if (isServerDownError(err) && (!mediaUrl || /^https?:\/\//.test(mediaUrl))) {
+                await enqueueOutbox({ kind: 'message', id: tempId, conversationId, content: content.trim(), mediaUrl, mediaType });
+                return;
+            }
             console.error('[useMessages] Error sending:', err);
             // Marcar mensagem como falha
-            setMessages(prev => prev.map(m => 
+            setMessages(prev => prev.map(m =>
                 m.id === tempId ? { ...m, status: 'failed' } : m
             ));
             setError(err.message || 'Failed to send message');
@@ -360,6 +383,36 @@ export function useMessages(conversationId: string | null) {
             hadMessagesRef.current = false;
         }
     }, [messages.length, scrollToBottom]);
+
+    // Fila offline: quando uma mensagem desta conversa é enviada, a bolha temporária passa a
+    // ser a mensagem real (o WebSocket pode já a ter trazido: tira-se o duplicado); se a API
+    // a recusar, a bolha fica como falhada.
+    useEffect(() => {
+        if (!conversationId) return;
+        const onSent = (e: Event) => {
+            const { item, result } = (e as CustomEvent<{ item: OutboxItem; result: MessageWithSender }>).detail;
+            if (item.kind !== 'message' || item.conversationId !== conversationId) return;
+            setMessages((prev) => {
+                const seen = new Set<string>();
+                const next = prev
+                    .map((m) => (m.id === item.id && result?.id ? { ...result, status: 'sent' as const } : m))
+                    .filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true)));
+                setCachedMessages(conversationId, next);
+                return next;
+            });
+        };
+        const onFailed = (e: Event) => {
+            const { item } = (e as CustomEvent<{ item: OutboxItem }>).detail;
+            if (item.kind !== 'message' || item.conversationId !== conversationId) return;
+            setMessages((prev) => prev.map((m) => (m.id === item.id ? { ...m, status: 'failed' as const } : m)));
+        };
+        window.addEventListener(OUTBOX_SENT_EVENT, onSent);
+        window.addEventListener(OUTBOX_FAILED_EVENT, onFailed);
+        return () => {
+            window.removeEventListener(OUTBOX_SENT_EVENT, onSent);
+            window.removeEventListener(OUTBOX_FAILED_EVENT, onFailed);
+        };
+    }, [conversationId]);
 
     const deleteMessage = useCallback(async (messageId: string) => {
         if (!conversationId) return;
