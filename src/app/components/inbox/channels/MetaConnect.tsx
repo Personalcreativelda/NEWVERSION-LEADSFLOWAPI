@@ -67,10 +67,13 @@ export async function startWhatsAppConnect(): Promise<boolean> {
 }
 
 const ERRORS: Record<string, string> = {
-  cancelled: 'A ligação foi cancelada no Facebook.',
+  cancelled: 'A ligação foi cancelada.',
   no_pages: 'Esta conta do Facebook não gere nenhuma página. Crie ou peça acesso a uma página e tente de novo.',
   invalid_state: 'O pedido expirou. Toque em "Ligar" de novo.',
   exchange_failed: 'O Facebook não confirmou a autorização. Tente de novo.',
+  ig_exchange_failed: 'O Instagram não confirmou a autorização. Tente de novo.',
+  ig_not_professional: 'Esta conta do Instagram é pessoal. Mude para uma conta profissional (Empresa ou Criador de conteúdo) nas definições do Instagram e tente de novo.',
+  ig_not_tester: 'Enquanto a app está em testes, só ligam contas do Instagram adicionadas como testadoras. Adicione a conta em Funções do app → Testadores do Instagram e aceite o convite no Instagram.',
 };
 
 /** Lê o regresso do Facebook/WhatsApp do URL (?meta_session, ?meta_error, ?wa_connected) e limpa-o */

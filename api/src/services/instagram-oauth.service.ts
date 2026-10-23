@@ -30,6 +30,18 @@ export function buildInstagramAuthorizeUrl(state: string): string {
   return `https://www.instagram.com/oauth/authorize?${params.toString()}`;
 }
 
+/** Erro com um código para o app mostrar a mensagem certa (ver MetaConnect.tsx) */
+export class InstagramOAuthError extends Error {
+  constructor(public code: string, message: string) { super(message); }
+}
+
+/** Motivos conhecidos de o Instagram recusar a ligação */
+function classify(message: string): string | null {
+  if (/tester|developer role|insufficient.*role|app.*not.*(live|active)|não.*testador/i.test(message)) return 'ig_not_tester';
+  if (/professional|business account|creator|account[_ ]type|personal account/i.test(message)) return 'ig_not_professional';
+  return null;
+}
+
 async function json(res: Response): Promise<any> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data?.error || data?.error_message) {
@@ -58,13 +70,20 @@ export async function exchangeInstagramCode(rawCode: string): Promise<InstagramL
     redirect_uri: instagramRedirectUri(),
     code,
   });
-  const short = await json(await fetch('https://api.instagram.com/oauth/access_token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  }));
+  let short: any;
+  try {
+    short = await json(await fetch('https://api.instagram.com/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    }));
+  } catch (err: any) {
+    const message = err?.message || 'O Instagram recusou a autorização';
+    throw new InstagramOAuthError(classify(message) || 'ig_exchange_failed', message);
+  }
   const shortToken: string = short.access_token || short.data?.[0]?.access_token;
+  const shortUserId: string = String(short.user_id || short.data?.[0]?.user_id || '');
   if (!shortToken) throw new Error('O Instagram não devolveu o token.');
 
   const long = await json(await fetch(`https://graph.instagram.com/access_token?${new URLSearchParams({
@@ -75,11 +94,18 @@ export async function exchangeInstagramCode(rawCode: string): Promise<InstagramL
   const token: string = long.access_token || shortToken;
   const expiresAt = long.expires_in ? new Date(Date.now() + Number(long.expires_in) * 1000).toISOString() : undefined;
 
-  const me = await json(await fetch(`${IG_GRAPH}/me?${new URLSearchParams({
-    fields: 'user_id,username,name,profile_picture_url,account_type',
-    access_token: token,
-  })}`, { signal: AbortSignal.timeout(TIMEOUT_MS) }));
-  const id = String(me.user_id || me.id || short.user_id || '');
+  // Perfil: alguns campos (ex.: name) falham em certas contas; tentar depois só o essencial
+  const getMe = (fields: string) => fetch(`${IG_GRAPH}/me?${new URLSearchParams({ fields, access_token: token })}`, { signal: AbortSignal.timeout(TIMEOUT_MS) }).then(json);
+  let me: any;
+  try {
+    me = await getMe('user_id,username,name,profile_picture_url,account_type');
+  } catch {
+    me = await getMe('user_id,username,account_type').catch(() => ({}));
+  }
+  if (me.account_type && !['BUSINESS', 'MEDIA_CREATOR'].includes(String(me.account_type))) {
+    throw new InstagramOAuthError('ig_not_professional', 'Conta do Instagram pessoal');
+  }
+  const id = String(me.user_id || shortUserId || me.id || '');
   if (!id) throw new Error('O Instagram não devolveu a conta.');
   return { id, username: me.username, name: me.name, picture: me.profile_picture_url, access_token: token, token_expires_at: expiresAt };
 }

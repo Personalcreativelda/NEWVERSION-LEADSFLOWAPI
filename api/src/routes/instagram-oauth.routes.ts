@@ -31,8 +31,9 @@ router.get('/callback', async (req, res) => {
     const sessionId = await saveSession(state.userId, '', [], [account]);
     return res.redirect(returnUrl(state.platform, { meta_session: sessionId }));
   } catch (err: any) {
-    console.error('[InstagramOAuth] Erro no retorno do Instagram:', err?.message);
-    return res.redirect(returnUrl(state.platform, { meta_error: 'exchange_failed' }));
+    console.error('[InstagramOAuth] Erro no retorno do Instagram:', err?.code || '', err?.message);
+    // Código conhecido (conta pessoal, não testadora…) ou erro genérico do Instagram
+    return res.redirect(returnUrl(state.platform, { meta_error: err?.code || 'ig_exchange_failed' }));
   }
 });
 
