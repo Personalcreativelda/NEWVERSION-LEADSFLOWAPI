@@ -14,14 +14,19 @@ const TIMEOUT_MS = 15_000;
 
 /** Permissões pedidas (Messenger + Instagram Direct através da página) */
 export const META_SCOPES = [
-  'pages_show_list',
-  'pages_messaging',
-  'pages_manage_metadata',
-  'pages_read_engagement',
-  'business_management',
-  'instagram_basic',
-  'instagram_manage_messages',
+  'pages_show_list',        // listar as páginas
+  'pages_messaging',        // receber e responder no Messenger
+  'pages_manage_metadata',  // subscrever os webhooks da página
+  'business_management',    // páginas geridas pelo Business Manager
+  'instagram_basic',        // conta profissional do Instagram ligada à página
+  'instagram_manage_messages', // receber e responder no Instagram Direct
 ];
+
+/** META_OAUTH_SCOPES (separadas por vírgula) substitui a lista, ex.: só Messenger enquanto o Instagram não está aprovado */
+function requestedScopes(): string[] {
+  const custom = (process.env.META_OAUTH_SCOPES || '').split(',').map((s) => s.trim()).filter(Boolean);
+  return custom.length ? custom : META_SCOPES;
+}
 
 export type OAuthPlatform = 'web' | 'app';
 
@@ -85,7 +90,7 @@ export function buildAuthorizeUrl(state: string): string {
     response_type: 'code',
   });
   if (process.env.META_LOGIN_CONFIG_ID) params.set('config_id', process.env.META_LOGIN_CONFIG_ID);
-  else params.set('scope', META_SCOPES.join(','));
+  else params.set('scope', requestedScopes().join(','));
   return `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth?${params.toString()}`;
 }
 
@@ -129,10 +134,23 @@ export interface MetaPage {
 
 /** Páginas que o utilizador gere, com a conta profissional do Instagram ligada a cada uma */
 export async function listPages(userToken: string): Promise<MetaPage[]> {
+  try {
+    return await fetchPages(userToken, true);
+  } catch (err: any) {
+    // Sem as permissões do Instagram (ex.: META_OAUTH_SCOPES só com Messenger) o campo da
+    // conta do Instagram falha: listar só as páginas
+    if (err?.metaCode === 10 || err?.metaCode === 200 || err?.metaCode === 100) return fetchPages(userToken, false);
+    throw err;
+  }
+}
+
+async function fetchPages(userToken: string, withInstagram: boolean): Promise<MetaPage[]> {
   const pages: MetaPage[] = [];
   let next: string | null = `${GRAPH}/me/accounts`;
   let params: Record<string, string> = {
-    fields: 'id,name,access_token,picture{url},instagram_business_account{id,username,profile_picture_url}',
+    fields: withInstagram
+      ? 'id,name,access_token,picture{url},instagram_business_account{id,username,profile_picture_url}'
+      : 'id,name,access_token,picture{url}',
     limit: '100',
     access_token: userToken,
   };
