@@ -8,14 +8,27 @@ import { query } from '../database/connection';
 
 export type SignatureCheck = 'valid' | 'invalid' | 'missing' | 'unconfigured';
 
+/**
+ * Segredos que podem assinar os webhooks: o da app Meta e, para o Instagram, o "Chave secreta
+ * do app do Instagram" (o caso de uso "API do Instagram" tem ID e chave próprios e a Meta
+ * assina os eventos do Instagram com essa chave).
+ */
+function signingSecrets(): string[] {
+  return [process.env.META_APP_SECRET, process.env.META_INSTAGRAM_APP_SECRET]
+    .map((s) => (s || '').trim())
+    .filter(Boolean);
+}
+
 export function checkMetaSignature(rawBody: Buffer | undefined, header: string | undefined): SignatureCheck {
-  const secret = process.env.META_APP_SECRET;
-  if (!secret) return 'unconfigured';
+  const secrets = signingSecrets();
+  if (!secrets.length) return 'unconfigured';
   if (!header || !rawBody) return 'missing';
-  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
   const a = Buffer.from(header);
-  const b = Buffer.from(expected);
-  return a.length === b.length && crypto.timingSafeEqual(a, b) ? 'valid' : 'invalid';
+  for (const secret of secrets) {
+    const b = Buffer.from('sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex'));
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) return 'valid';
+  }
+  return 'invalid';
 }
 
 /**
