@@ -336,14 +336,10 @@ export default function AIInsightsPage() {
                 { label: 'Em risco', value: formatNumber(insights.stats.high_risk_count ?? 0), icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
                 { label: 'Envolvimento médio', value: formatPercent(insights.stats.avg_engagement ?? 0), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
               ].map(s => (
-                <div key={s.label} className="bg-card border border-border rounded-lg p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${s.bg}`}>
-                      <s.icon className={`w-4 h-4 ${s.color}`} />
-                    </div>
-                    <p className="text-[11px] font-medium text-muted-foreground">{s.label}</p>
-                  </div>
-                  <p className="text-xl font-bold text-foreground">{s.value}</p>
+                <div key={s.label} className="min-w-0 bg-card border border-border rounded-lg p-3">
+                  <s.icon className={`w-4 h-4 ${s.color}`} />
+                  <p className="mt-1.5 text-xl font-bold tabular-nums text-foreground">{s.value}</p>
+                  <p className="text-[11px] font-medium leading-tight text-muted-foreground break-words">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -352,7 +348,7 @@ export default function AIInsightsPage() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Zap className="w-5 h-5 text-amber-500" />
-                <h3 className="text-base font-bold text-foreground">Ações Prioritárias</h3>
+                <h3 className="text-base font-bold text-foreground">Ações prioritárias</h3>
                 <span className="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-1 rounded-full font-semibold">
                   {(insights.hotLeads?.length || 0) + (insights.atRiskLeads?.length || 0)} leads a aguardar
                 </span>
@@ -397,7 +393,7 @@ export default function AIInsightsPage() {
                           <div className="bg-white/30 dark:bg-black/30 rounded-lg border border-emerald-200/50 dark:border-emerald-800/50 p-3 space-y-2">
                             {/* Suggestion Selector */}
                             <div className="space-y-2">
-                              <p className="text-xs font-bold text-foreground">3 Mensagens Sugeridas</p>
+                              <p className="text-xs font-bold text-foreground">3 mensagens sugeridas</p>
                               <div className="space-y-1.5">
                                 {messages[lead.id]?.suggestions.map((suggestion, idx) => (
                                   <button
@@ -561,7 +557,7 @@ export default function AIInsightsPage() {
                               ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                               : <Sparkles className="w-3.5 h-3.5" />
                             }
-                            {generatingFor === lead.id ? 'A gerar...' : 'Gerar Mensagem'}
+                            {generatingFor === lead.id ? 'A gerar...' : 'Gerar mensagem'}
                           </Button>
                         )}
                       </div>
@@ -620,7 +616,7 @@ export default function AIInsightsPage() {
                             <div className="bg-white/30 dark:bg-black/30 rounded-lg border border-red-200/50 dark:border-red-800/50 p-3 space-y-2">
                               {/* Suggestion Selector */}
                               <div className="space-y-2">
-                                <p className="text-xs font-bold text-foreground">3 Mensagens Sugeridas</p>
+                                <p className="text-xs font-bold text-foreground">3 mensagens sugeridas</p>
                                 <div className="space-y-1.5">
                                   {messages[lead.id]?.suggestions.map((suggestion, idx) => (
                                     <button
@@ -784,7 +780,7 @@ export default function AIInsightsPage() {
                                 ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                 : <Zap className="w-3.5 h-3.5" />
                               }
-                              {generatingFor === lead.id ? 'A gerar...' : 'Gerar Mensagem Urgente'}
+                              {generatingFor === lead.id ? 'A gerar...' : 'Gerar mensagem urgente'}
                             </Button>
                           )}
                         </div>
@@ -800,7 +796,7 @@ export default function AIInsightsPage() {
               <div className="space-y-3 mt-6">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-primary" />
-                  <h3 className="text-base font-bold text-foreground">Próximas Ações Automáticas</h3>
+                  <h3 className="text-base font-bold text-foreground">Próximas ações automáticas</h3>
                   <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-semibold">
                     {insights.recommendedActions.length} sugestões
                   </span>

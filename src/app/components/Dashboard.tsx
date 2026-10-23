@@ -2127,7 +2127,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   const handleTourSkip = () => {
     localStorage.setItem('leadsflow_tour_completed', 'true');
     setShowTour(false);
-    toast.info('Visita guiada pulado. Você pode reiniciá-lo a qualquer momento.');
+    toast.info('Visita guiada ignorada. Pode recomeçá-la a qualquer momento.');
   };
 
   const handleStartTour = () => {
