@@ -26,6 +26,8 @@ export interface ResponsiveTableColumn<Row> {
   sortAccessor?: (row: Row) => string | number;
   /** Rótulo mostrado na vista em cartão (mobile); por omissão usa `label`. */
   cardLabel?: string;
+  /** Linha sem valor: no cartão (mobile) a linha não aparece, em vez de mostrar "-". */
+  isEmpty?: (row: Row) => boolean;
 }
 
 interface ResponsiveTableProps<Row> {
@@ -237,10 +239,10 @@ export function ResponsiveTable<Row>({
                 rowClassName?.(row),
               )}
             >
-              {columns.map((column) => (
-                <div key={column.key} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">{column.cardLabel ?? column.label}</span>
-                  <span className="text-foreground text-right">{renderCell(column, row)}</span>
+              {columns.filter((column) => !column.isEmpty?.(row)).map((column) => (
+                <div key={column.key} className="flex items-center justify-between gap-3 text-sm min-w-0">
+                  <span className="text-muted-foreground flex-shrink-0">{column.cardLabel ?? column.label}</span>
+                  <span className="text-foreground text-right min-w-0 truncate">{renderCell(column, row)}</span>
                 </div>
               ))}
             </div>

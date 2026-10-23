@@ -18,6 +18,7 @@ import { EmptyState } from '../../inbox/EmptyState';
 import { ContactDetailsPanel } from '../../inbox/ContactDetailsPanel';
 import { NewConversationModal } from '../../inbox/NewConversationModal';
 import { ResizeHandle } from '../../inbox/ResizeHandle';
+import { PageFab } from '../../base/PageHeader';
 import type { TeamMember } from '../../../types/inbox';
 
 interface ConversasConversationsProps {
@@ -532,7 +533,7 @@ export default function ConversasConversations({
                                             {conversationsRefreshing && (
                                                 <span
                                                     className="relative flex h-2 w-2 flex-shrink-0"
-                                                    title="Atualizando..."
+                                                    title="A atualizar..."
                                                 >
                                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
                                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
@@ -551,13 +552,6 @@ export default function ConversasConversations({
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-0.5 flex-shrink-0">
-                                            <button
-                                                onClick={refreshConversations}
-                                                className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
-                                                title="Atualizar"
-                                            >
-                                                <RefreshCw size={14} className={conversationsLoading || conversationsRefreshing ? 'animate-spin' : ''} />
-                                            </button>
                                             <button
                                                 onClick={() => setShowNewConversationModal(true)}
                                                 className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
@@ -623,7 +617,7 @@ export default function ConversasConversations({
                                         <input
                                             type="text"
                                             value={searchQuery}
-                                            placeholder="Buscar conversas..."
+                                            placeholder="Pesquisar conversas..."
                                             className="w-full rounded-lg py-1.5 pl-8 pr-3 text-xs bg-muted/60 text-foreground border border-border/50 focus:border-primary/40 focus:ring-1 focus:ring-primary/10 transition-all outline-none placeholder:text-muted-foreground/60"
                                             onChange={(e) => handleSearch(e.target.value)}
                                         />
@@ -704,7 +698,7 @@ export default function ConversasConversations({
                                                 className="flex items-center gap-1.5 text-[11px] text-primary hover:text-primary/80 transition-colors disabled:opacity-60"
                                             >
                                                 <RefreshCw size={11} className={isSyncingGroups ? 'animate-spin' : ''} />
-                                                {isSyncingGroups ? 'Sincronizando...' : 'Sincronizar grupos'}
+                                                {isSyncingGroups ? 'A sincronizar...' : 'Sincronizar grupos'}
                                             </button>
                                         </div>
                                     )}
@@ -839,7 +833,7 @@ export default function ConversasConversations({
                                     </span>
                                 )}
                                 {conversationsRefreshing && (
-                                    <span className="relative flex h-2.5 w-2.5 flex-shrink-0" title="Atualizando...">
+                                    <span className="relative flex h-2.5 w-2.5 flex-shrink-0" title="A atualizar...">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
                                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
                                     </span>
@@ -856,12 +850,10 @@ export default function ConversasConversations({
                                 </div>
                             </div>
                             <div className="flex items-center gap-1">
-                                <button onClick={refreshConversations} className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors">
-                                    <RefreshCw size={18} className={conversationsLoading || conversationsRefreshing ? 'animate-spin' : ''} />
-                                </button>
-                                <button onClick={() => setShowNewConversationModal(true)} className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors">
-                                    <Plus size={18} />
-                                </button>
+                                {/* Nova conversa: FAB (padrão de criar da app), só com a lista visível */}
+                                {!selectedConversation && (
+                                    <PageFab label="Nova conversa" onClick={() => setShowNewConversationModal(true)} />
+                                )}
                                 <button
                                     onClick={toggleSelectMode}
                                     className={`p-2 rounded-lg transition-colors ${isSelectMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:bg-muted'}`}
@@ -906,7 +898,7 @@ export default function ConversasConversations({
                             <input
                                 type="text"
                                 value={searchQuery}
-                                placeholder="Buscar conversas..."
+                                placeholder="Pesquisar conversas..."
                                 className="w-full rounded-xl py-2 pl-9 pr-4 text-sm bg-muted/50 text-foreground border border-border/60 focus:border-primary/40 focus:ring-2 focus:ring-primary/10 transition-all outline-none placeholder:text-muted-foreground/60"
                                 onChange={(e) => handleSearch(e.target.value)}
                             />
@@ -963,7 +955,7 @@ export default function ConversasConversations({
                                     className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-60"
                                 >
                                     <RefreshCw size={12} className={isSyncingGroups ? 'animate-spin' : ''} />
-                                    {isSyncingGroups ? 'Sincronizando...' : 'Sincronizar grupos'}
+                                    {isSyncingGroups ? 'A sincronizar...' : 'Sincronizar grupos'}
                                 </button>
                             </div>
                         )}

@@ -317,27 +317,27 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       loadData();
     } catch (error: any) {
       console.error('[VoiceAgentsPage] Error saving agent:', error);
-      toast.error(error.response?.data?.error || 'Erro ao salvar agente');
+      toast.error(error.response?.data?.error || 'Erro ao guardar agente');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    const confirmed = await confirm('Tem certeza que deseja excluir este agente?', {
-      title: 'Excluir agente',
-      confirmLabel: 'Excluir',
+    const confirmed = await confirm('Tem certeza que deseja eliminar este agente?', {
+      title: 'Eliminar agente',
+      confirmLabel: 'Eliminar',
       variant: 'danger',
     });
     if (!confirmed) return;
 
     try {
       await voiceAgentsApi.delete(id);
-      toast.success('Agente excluído com sucesso!');
+      toast.success('Agente eliminado com sucesso!');
       loadData();
     } catch (error) {
       console.error('[VoiceAgentsPage] Error deleting agent:', error);
-      toast.error('Erro ao excluir agente');
+      toast.error('Erro ao eliminar agente');
     }
   };
 
@@ -476,7 +476,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
 
   const handleRegisterSip = async () => {
     if (!sipForm.phone_number || !sipForm.sip_host || !sipForm.sip_username || !sipForm.sip_password) {
-      toast.error('Preencha todos os campos SIP: número, host, usuário e senha.');
+      toast.error('Preencha todos os campos SIP: número, host, utilizador e palavra-passe.');
       return;
     }
     try {
@@ -616,7 +616,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         google: false,
       });
       setSettingsModalOpen(true);
-      toast.error('Erro ao carregar configurações atuais');
+      toast.error('Erro ao carregar definições atuais');
     }
   };
 
@@ -700,7 +700,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         google: savedApiKeys.google || !!dataToSave.google_api_key,
       });
       
-      toast.success('Configurações salvas com sucesso! Recarregando...');
+      toast.success('Definições guardadas com sucesso! Recarregando...');
       
       // Keep modal open for a moment while showing loading state
       // This prevents UI flicker
@@ -748,7 +748,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         console.log('[VoiceAgentsPage] ✅ All data refreshed successfully');
       } catch (reloadError) {
         console.error('[VoiceAgentsPage] Error reloading data:', reloadError);
-        toast.error('Configurações salvas, mas houve erro ao recarregar. Atualize a página.');
+        toast.error('Definições guardadas, mas houve erro ao recarregar. Atualize a página.');
       } finally {
         setLoading(false);
       }
@@ -788,7 +788,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
           console.log('[VoiceAgentsPage] Diagnosis result:', diagResponse);
           if (diagResponse.diagnosis?.missingColumns?.length > 0) {
             toast.error(
-              `❌ Colunas faltando no banco:\n${diagResponse.diagnosis.missingColumns.join(', ')}\n\n` +
+              `Colunas faltando no banco:\n${diagResponse.diagnosis.missingColumns.join(', ')}\n\n` +
               `Execute a migração 014_add_ai_models_support.sql`
             );
           }
@@ -802,7 +802,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
           'Nenhum campo de API foi enviado.\n\n' +
           'Verifique:\n' +
           '- Você preencheu alguma chave de API?\n' +
-          '- Clicou em "Salvar Configurações"?'
+          '- Clicou em "Guardar Definições"?'
         );
       } else {
         toast.error(errorMsg);
@@ -820,23 +820,17 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
           title="Agentes de Voz"
           description="Chamadas automáticas com vozes realistas"
           icon={PhoneCall}
-          actions={
-            <>
-              <PageAction icon={Settings} label="Configurações" onClick={handleOpenSettings} />
-              <PageAction
-                variant="primary"
-                icon={Plus}
-                label={planLimits.limits.voiceAgents === 0 ? 'Criar agente (Pro)' : 'Criar agente'}
-                onClick={handleCreate}
-              />
-            </>
-          }
+          actions={<PageAction icon={Settings} label="Definições" onClick={handleOpenSettings} />}
+          create={{
+            label: planLimits.limits.voiceAgents === 0 ? 'Criar agente (Pro)' : 'Criar agente',
+            onClick: handleCreate,
+          }}
         />
 
         {!elevenLabsConfigured && (
           <p className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
             <Settings className="h-4 w-4 flex-shrink-0" aria-hidden />
-            Configure a API ElevenLabs em Configurações para criar agentes.
+            Configure a API ElevenLabs em Definições para criar agentes.
           </p>
         )}
 
@@ -845,7 +839,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
           <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground`} />
           <Input
             type="text"
-            placeholder="Buscar agentes de voz..."
+            placeholder="Pesquisar agentes de voz..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className={`pl-9 text-sm bg-muted border-border text-foreground`}
@@ -1023,7 +1017,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   </span>
                 </div>
                 <p className={`text-[11px] mb-4 text-muted-foreground`}>
-                  Selecione o agente ConvAI e o número SIP registrado em <strong>Configurações</strong>.
+                  Selecione o agente ConvAI e o número SIP registrado em <strong>Definições</strong>.
                 </p>
 
                 {/* ElevenLabs ConvAI Agent selector + inline create */}
@@ -1057,7 +1051,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     className={`w-full px-3 py-2 border rounded-md text-sm bg-muted border-border text-foreground ${convAILoading ? 'opacity-60' : ''}`}
                   >
                     <option value="">
-                      {convAILoading ? '⏳ Carregando...' : '— Selecione um agente ElevenLabs —'}
+                      {convAILoading ? 'A carregar...' : '— Selecione um agente ElevenLabs —'}
                     </option>
                     {convAIAgents.map((a) => (
                       <option key={a.agent_id} value={a.agent_id}>{a.name}</option>
@@ -1167,7 +1161,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     className={`w-full px-3 py-2 border rounded-md text-sm bg-muted border-border text-foreground ${convAILoading ? 'opacity-60' : ''}`}
                   >
                     <option value="">
-                      {convAILoading ? '⏳ Carregando...' : phoneNumbers.length === 0 ? '— Nenhum número SIP registrado —' : '— Selecione um número —'}
+                      {convAILoading ? 'A carregar...' : phoneNumbers.length === 0 ? '— Nenhum número SIP registrado —' : '— Selecione um número —'}
                     </option>
                     {phoneNumbers.map((p) => (
                       <option key={p.phone_number_id} value={p.phone_number_id}>
@@ -1177,7 +1171,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   </select>
                   {!convAILoading && phoneNumbers.length === 0 && (
                     <p className="mt-1 text-[10px] text-yellow-600 dark:text-yellow-400">
-                      Sem números SIP. Registe-os em Configurações → SIP Wavoip.
+                      Sem números SIP. Registe-os em Definições → SIP Wavoip.
                     </p>
                   )}
                 </div>
@@ -1202,7 +1196,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                 {actionLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Salvando...
+                    A guardar...
                   </>
                 ) : (
                   <>
@@ -1231,7 +1225,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
               <div className={`px-4 py-3 sm:px-6 sm:py-4 border-b bg-card border-border`}>
                 <div className="flex items-center justify-between">
                   <h3 className={`text-base sm:text-lg font-semibold text-foreground`}>
-                    Configurações de API
+                    Definições de API
                   </h3>
                   <button
                     onClick={() => setSettingsModalOpen(false)}
@@ -1269,7 +1263,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       ElevenLabs API Key
                     </label>
                     {savedApiKeys.elevenlabs && (
-                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Salvo</span>
+                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Guardado</span>
                     )}
                   </div>
                   <div className="relative mt-1.5 sm:mt-2">
@@ -1304,7 +1298,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       OpenAI API Key
                     </label>
                     {savedApiKeys.openai && (
-                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Salvo</span>
+                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Guardado</span>
                     )}
                   </div>
                   <div className="relative mt-1.5 sm:mt-2">
@@ -1339,7 +1333,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       Anthropic API Key (Claude)
                     </label>
                     {savedApiKeys.anthropic && (
-                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Salvo</span>
+                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Guardado</span>
                     )}
                   </div>
                   <div className="relative mt-1.5 sm:mt-2">
@@ -1374,7 +1368,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       Google API Key (Gemini)
                     </label>
                     {savedApiKeys.google && (
-                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Salvo</span>
+                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Guardado</span>
                     )}
                   </div>
                   <div className="relative mt-1.5 sm:mt-2">
@@ -1412,7 +1406,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   </div>
                   <p className={`text-xs mb-3 text-muted-foreground`}>
                     Registe as credenciais SIP do Wavoip no ElevenLabs para o agente ligar via WhatsApp.
-                    Encontre as credenciais em: <strong>Wavoip Dashboard → Dispositivos → SIP</strong>
+                    Encontre as credenciais em: <strong>Wavoip Painel → Dispositivos → SIP</strong>
                   </p>
 
                   <div className="space-y-2">
@@ -1447,7 +1441,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>SIP Usuário</label>
+                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>SIP Utilizador</label>
                         <Input
                           value={sipForm.sip_username}
                           onChange={(e) => setSipForm({ ...sipForm, sip_username: e.target.value })}
@@ -1456,13 +1450,13 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                         />
                       </div>
                       <div>
-                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>SIP Senha</label>
+                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>SIP Palavra-passe</label>
                         <div className="relative">
                           <Input
                             type={showSettingsApiKey.sip_password ? 'text' : 'password'}
                             value={sipForm.sip_password}
                             onChange={(e) => setSipForm({ ...sipForm, sip_password: e.target.value })}
-                            placeholder="Senha SIP"
+                            placeholder="Palavra-passe SIP"
                             className={`text-xs pr-8 bg-muted border-border text-foreground`}
                           />
                           <button type="button"
@@ -1537,12 +1531,12 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   {actionLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Salvando...
+                      A guardar...
                     </>
                   ) : (
                     <>
                       <Check className="w-4 h-4 mr-2" />
-                      Salvar Configurações
+                      Guardar Definições
                     </>
                   )}
                 </Button>
@@ -1581,7 +1575,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     activeCall.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
                     'bg-purple-100 text-purple-700'
                   }`}>
-                    {activeCall.status === 'initiated' ? 'Iniciando...' :
+                    {activeCall.status === 'initiated' ? 'A iniciar...' :
                      activeCall.status === 'ringing' ? 'Chamando...' :
                      activeCall.status === 'in-progress' ? 'Em andamento' :
                      activeCall.status === 'completed' ? 'Concluída' : 'Falha'}
@@ -1604,7 +1598,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     <>
                       <Loader2 className="w-6 h-6 animate-spin mb-2 text-purple-500 dark:text-purple-400" />
                       <p className={`text-sm text-muted-foreground`}>
-                        Aguardando início da conversa...
+                        A aguardar início da conversa...
                       </p>
                     </>
                   ) : (

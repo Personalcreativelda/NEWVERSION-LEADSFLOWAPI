@@ -6,6 +6,7 @@ import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { toast } from "sonner";
 import { getApiBaseUrl } from '../../utils/api-client';
+import { getLocale } from '../../utils/format';
 
 interface SecurityPageProps {
   user: any;
@@ -159,7 +160,7 @@ export default function SecurityPage({ user }: SecurityPageProps) {
 
   const handleDisable2FA = async () => {
     if (!disablePassword) {
-      toast.error('Digite sua senha');
+      toast.error('Digite sua palavra-passe');
       return;
     }
 
@@ -225,7 +226,7 @@ export default function SecurityPage({ user }: SecurityPageProps) {
   };
 
   const handleDeleteToken = async (tokenId: string) => {
-    const confirmed = confirm('Tem certeza que deseja deletar este token? Esta ação não pode ser desfeita.');
+    const confirmed = confirm('Tem certeza que deseja apagar este token? Esta ação não pode ser desfeita.');
     if (!confirmed) {
       return;
     }
@@ -242,9 +243,9 @@ export default function SecurityPage({ user }: SecurityPageProps) {
       }
 
       loadTokens();
-      toast.success('Token deletado com sucesso');
+      toast.success('Token apagado com sucesso');
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao deletar token');
+      toast.error(error.message || 'Erro ao apagar token');
     } finally {
       setLoading(false);
     }
@@ -252,15 +253,15 @@ export default function SecurityPage({ user }: SecurityPageProps) {
 
   const handleChangePassword = async () => {
     if (!currentPassword) {
-      toast.error('Digite sua senha atual');
+      toast.error('Digite sua palavra-passe atual');
       return;
     }
     if (!newPassword || newPassword.length < 8) {
-      toast.error('A nova senha deve ter pelo menos 8 caracteres');
+      toast.error('A nova palavra-passe deve ter pelo menos 8 caracteres');
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error('As senhas não coincidem');
+      toast.error('As palavras-passe não coincidem');
       return;
     }
 
@@ -284,11 +285,11 @@ export default function SecurityPage({ user }: SecurityPageProps) {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      toast.success('Senha alterada com sucesso!', {
+      toast.success('Palavra-passe alterada com sucesso!', {
         description: 'Um email de confirmação foi enviado para você.',
       });
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao alterar senha');
+      toast.error(error.message || 'Erro ao alterar palavra-passe');
     } finally {
       setLoading(false);
     }
@@ -301,7 +302,7 @@ export default function SecurityPage({ user }: SecurityPageProps) {
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Nunca';
-    return new Date(dateString).toLocaleDateString('pt-BR');
+    return new Date(dateString).toLocaleDateString(getLocale());
   };
 
   return (
@@ -311,7 +312,7 @@ export default function SecurityPage({ user }: SecurityPageProps) {
           Segurança
         </h1>
         <p className="text-sm text-muted-foreground">
-          Gerencie a segurança da sua conta
+          Faça a gestão de a segurança da sua conta
         </p>
       </div>
 
@@ -364,10 +365,10 @@ export default function SecurityPage({ user }: SecurityPageProps) {
             </div>
             <div>
               <h3 className="font-medium text-foreground mb-1">
-                Alterar Senha
+                Alterar Palavra-passe
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Atualize sua senha regularmente para manter sua conta segura
+                Atualize sua palavra-passe regularmente para manter sua conta segura
               </p>
             </div>
           </div>
@@ -376,7 +377,7 @@ export default function SecurityPage({ user }: SecurityPageProps) {
             variant="outline"
             disabled={loading}
           >
-            Alterar Senha
+            Alterar Palavra-passe
           </Button>
         </div>
       </div>
@@ -393,7 +394,7 @@ export default function SecurityPage({ user }: SecurityPageProps) {
                 Tokens de API
               </h3>
               <p className="text-sm text-muted-foreground">
-                Gerencie tokens para acessar a API do LeadsFlow
+                Faça a gestão de tokens para acessar a API do LeadsFlow
               </p>
             </div>
           </div>
@@ -483,7 +484,7 @@ export default function SecurityPage({ user }: SecurityPageProps) {
                 />
               </div>
               <Button onClick={handleVerify2FA} disabled={loading} className="w-full">
-                {loading ? 'Verificando...' : 'Verificar e Ativar'}
+                {loading ? 'A verificar...' : 'Verificar e Ativar'}
               </Button>
             </div>
           )}
@@ -520,18 +521,18 @@ export default function SecurityPage({ user }: SecurityPageProps) {
           <DialogHeader>
             <DialogTitle>Desativar Autenticação de Dois Fatores</DialogTitle>
             <DialogDescription>
-              Digite sua senha para confirmar a desativação do 2FA
+              Digite sua palavra-passe para confirmar a desativação do 2FA
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="disable-password">Senha</Label>
+              <Label htmlFor="disable-password">Palavra-passe</Label>
               <Input
                 id="disable-password"
                 type="password"
                 value={disablePassword}
                 onChange={(e) => setDisablePassword(e.target.value)}
-                placeholder="Digite sua senha"
+                placeholder="Digite sua palavra-passe"
                 className="mt-1.5"
               />
             </div>
@@ -586,7 +587,7 @@ export default function SecurityPage({ user }: SecurityPageProps) {
                     Cancelar
                   </Button>
                   <Button onClick={handleCreateToken} disabled={loading} className="flex-1">
-                    {loading ? 'Criando...' : 'Criar Token'}
+                    {loading ? 'A criar...' : 'Criar Token'}
                   </Button>
                 </div>
               </>
@@ -594,8 +595,8 @@ export default function SecurityPage({ user }: SecurityPageProps) {
               <>
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium mb-2">
-                    ⚠️ Copie este token agora!
-                  </p>
+                    Copie este token agora!
+ </p>
                   <p className="text-xs text-yellow-700 dark:text-yellow-300">
                     Você não poderá vê-lo novamente após fechar esta janela.
                   </p>
@@ -626,21 +627,21 @@ export default function SecurityPage({ user }: SecurityPageProps) {
       <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Alterar Senha</DialogTitle>
+            <DialogTitle>Alterar Palavra-passe</DialogTitle>
             <DialogDescription>
-              Digite sua senha atual e a nova senha desejada
+              Digite sua palavra-passe atual e a nova palavra-passe desejada
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="current-password">Senha Atual</Label>
+              <Label htmlFor="current-password">Palavra-passe Atual</Label>
               <div className="relative mt-1.5">
                 <Input
                   id="current-password"
                   type={showCurrentPassword ? 'text' : 'password'}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Digite sua senha atual"
+                  placeholder="Digite sua palavra-passe atual"
                 />
                 <Button
                   type="button"
@@ -654,14 +655,14 @@ export default function SecurityPage({ user }: SecurityPageProps) {
               </div>
             </div>
             <div>
-              <Label htmlFor="new-password">Nova Senha</Label>
+              <Label htmlFor="new-password">Nova Palavra-passe</Label>
               <div className="relative mt-1.5">
                 <Input
                   id="new-password"
                   type={showNewPassword ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Digite a nova senha (mín. 8 caracteres)"
+                  placeholder="Digite a nova palavra-passe (mín. 8 caracteres)"
                 />
                 <Button
                   type="button"
@@ -675,13 +676,13 @@ export default function SecurityPage({ user }: SecurityPageProps) {
               </div>
             </div>
             <div>
-              <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
+              <Label htmlFor="confirm-password">Confirmar Nova Palavra-passe</Label>
               <Input
                 id="confirm-password"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirme a nova senha"
+                placeholder="Confirme a nova palavra-passe"
                 className="mt-1.5"
               />
             </div>
@@ -695,7 +696,7 @@ export default function SecurityPage({ user }: SecurityPageProps) {
                 Cancelar
               </Button>
               <Button onClick={handleChangePassword} disabled={loading} className="flex-1">
-                {loading ? 'Alterando...' : 'Alterar Senha'}
+                {loading ? 'Alterando...' : 'Alterar Palavra-passe'}
               </Button>
             </div>
           </div>

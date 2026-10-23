@@ -1,5 +1,5 @@
 import { matchesSearch } from '../../utils/search';
-import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, Megaphone, Instagram, Facebook, Send, Smartphone, Search, Plus, CopyX } from 'lucide-react';
+import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, Megaphone, Instagram, Facebook, Send, Smartphone, Search, Plus, CopyX, Users } from 'lucide-react';
 import { useState } from 'react';
 import type { Lead } from '../../types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -10,6 +10,7 @@ import { AppButton } from '../base/AppButton';
 import { StatusBadge, type StatusTone } from '../base/StatusBadge';
 import { EmptyState } from '../base/EmptyState';
 import { ResponsiveTable, type ResponsiveTableColumn } from '../base/ResponsiveTable';
+import { getLocale } from '../../utils/format';
 
 const LEADS_POR_PAGINA = 50;
 
@@ -117,7 +118,7 @@ const formatDate = (dateStr?: string) => {
   try {
     const date = new Date(dateStr);
     if (!isNaN(date.getTime())) {
-      return date.toLocaleDateString('pt-BR');
+      return date.toLocaleDateString(getLocale());
     }
     return dateStr;
   } catch {
@@ -142,7 +143,7 @@ interface LeadsTableProps {
   onEdit: (leadId: string) => void;
   onDelete: (leadId: string) => void;
   onChat: (leadId: string) => void;
-  onRefresh: () => void;
+  onRefresh?: () => void;
   onExport: () => void;
   onImport: () => void;
   onImportWhatsApp?: () => void;
@@ -197,9 +198,9 @@ export default function LeadsTable({
 
   const handleDeleteSelected = async () => {
     if (selectedIds.length === 0) return;
-    const confirmed = await confirm(`Tem certeza que deseja deletar ${selectedIds.length} lead(s) selecionado(s)?`, {
-      title: 'Excluir leads selecionados',
-      confirmLabel: 'Excluir',
+    const confirmed = await confirm(`Tem certeza que deseja apagar ${selectedIds.length} lead(s) selecionado(s)?`, {
+      title: 'Eliminar leads selecionados',
+      confirmLabel: 'Eliminar',
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -211,8 +212,8 @@ export default function LeadsTable({
 
   const handleDeleteAll = async () => {
     if (leads.length === 0) return;
-    const confirmed = await confirm(`Tem certeza que deseja apagar TODOS os ${leads.length} contatos? Esta ação não pode ser desfeita.`, {
-      title: 'Apagar todos os contatos',
+    const confirmed = await confirm(`Tem certeza que deseja apagar TODOS os ${leads.length} contactos? Esta ação não pode ser desfeita.`, {
+      title: 'Apagar todos os contactos',
       confirmLabel: 'Apagar Todos',
       variant: 'danger',
     });
@@ -258,7 +259,7 @@ export default function LeadsTable({
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <span className="font-medium text-sm text-foreground">{lead.nome || '-'}</span>
+            <span className="font-medium text-sm text-foreground">{lead.nome || lead.telefone || lead.email || 'Sem nome'}</span>
             {lead.marcado_email && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-xs w-fit">
                 <Mail className="w-3 h-3" />
@@ -272,24 +273,25 @@ export default function LeadsTable({
     {
       key: 'email',
       label: 'Email',
+      isEmpty: (lead) => !lead.email,
       render: (lead) =>
         lead.email ? (
           <a href={`mailto:${lead.email}`} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
             {lead.email}
           </a>
-        ) : (
-          <span className="text-sm text-muted-foreground">-</span>
-        ),
+        ) : null,
     },
     {
       key: 'telefone',
       label: 'Telefone',
-      render: (lead) => <span className="text-sm text-muted-foreground">{lead.telefone || '-'}</span>,
+      isEmpty: (lead) => !lead.telefone || lead.telefone === lead.nome,
+      render: (lead) => (lead.telefone ? <span className="text-sm text-muted-foreground">{lead.telefone}</span> : null),
     },
     {
       key: 'interesse',
       label: 'Interesse',
-      render: (lead) => <span className="text-sm text-muted-foreground">{lead.interesse || '-'}</span>,
+      isEmpty: (lead) => !lead.interesse,
+      render: (lead) => (lead.interesse ? <span className="text-sm text-muted-foreground">{lead.interesse}</span> : null),
     },
     {
       key: 'origem',
@@ -298,7 +300,7 @@ export default function LeadsTable({
     },
     {
       key: 'status',
-      label: 'Status',
+      label: 'Estado',
       sortable: true,
       sortAccessor: (lead) => lead.status || '',
       render: (lead) => <StatusBadge label={lead.status} tone={getStatusTone(lead.status)} />,
@@ -327,7 +329,7 @@ export default function LeadsTable({
           <button
             onClick={() => onDelete(lead.id)}
             className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-all duration-150"
-            title="Deletar"
+            title="Apagar"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -350,22 +352,12 @@ export default function LeadsTable({
               type="text"
               value={busca}
               onChange={(e) => handleBuscaChange(e.target.value)}
-              placeholder="Buscar leads..."
+              placeholder="Pesquisar leads..."
               className="w-full pl-9 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all duration-150"
             />
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {onNovoLead && (
-              <AppButton
-                size="icon"
-                onClick={handleNovoLeadClick}
-                disabled={isAdicionarBlocked}
-                title={isAdicionarBlocked ? 'Plano bloqueado' : leadsLimitReached ? 'Limite de leads atingido — clique para fazer upgrade' : 'Adicionar Leads'}
-              >
-                <Plus />
-              </AppButton>
-            )}
             {onRefresh && (
               <AppButton size="icon" variant="outline" onClick={onRefresh} disabled={loading} title="Atualizar">
                 <RefreshCw className={loading ? 'animate-spin' : ''} />
@@ -406,7 +398,7 @@ export default function LeadsTable({
                 size="icon"
                 variant="destructive"
                 onClick={allFilteredSelected ? handleDeleteAll : handleDeleteSelected}
-                title={allFilteredSelected ? `Apagar Todos (${leads.length})` : `Deletar Selecionados (${selectedIds.length})`}
+                title={allFilteredSelected ? `Apagar Todos (${leads.length})` : `Apagar Selecionados (${selectedIds.length})`}
               >
                 <Trash2 />
               </AppButton>
@@ -424,28 +416,17 @@ export default function LeadsTable({
                 type="text"
                 value={busca}
                 onChange={(e) => handleBuscaChange(e.target.value)}
-                placeholder="Buscar leads..."
+                placeholder="Pesquisar leads..."
                 className="pl-9 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all duration-150"
               />
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {onNovoLead && (
-              <AppButton
-                onClick={handleNovoLeadClick}
-                disabled={isAdicionarBlocked}
-                title={isAdicionarBlocked ? 'Plano bloqueado' : leadsLimitReached ? 'Limite de leads atingido — clique para fazer upgrade' : undefined}
-              >
-                <Plus />
-                Adicionar Leads
-              </AppButton>
-            )}
-
             {selectedIds.length > 0 && onDeleteMultiple && (
               <>
                 <AppButton variant="destructive" onClick={allFilteredSelected ? handleDeleteAll : handleDeleteSelected}>
-                  {allFilteredSelected ? `Apagar Todos (${leads.length})` : `Deletar Selecionados (${selectedIds.length})`}
+                  {allFilteredSelected ? `Apagar Todos (${leads.length})` : `Apagar Selecionados (${selectedIds.length})`}
                 </AppButton>
                 <AppButton variant="outline" onClick={() => setSelectedIds([])}>
                   Limpar Seleção
@@ -517,9 +498,19 @@ export default function LeadsTable({
             pagination
             rowsPerPage={LEADS_POR_PAGINA}
             stickyHeader
-            maxHeight="600px"
             rowClassName={(lead) => (lead.marcado_email ? 'bg-primary/5 hover:bg-primary/10' : undefined)}
-            emptyState={<EmptyState title="Nenhum lead encontrado. Adicione seu primeiro lead!" imgSrc="/assets/icons/empty/ic_content.svg" />}
+            emptyState={
+              busca.trim() ? (
+                <EmptyState icon={Search} title="Nenhum lead encontrado" description={`Nada corresponde a "${busca.trim()}".`} />
+              ) : (
+                <EmptyState
+                  icon={Users}
+                  title="Ainda não tem leads"
+                  description="Adicione o primeiro ou importe a sua lista."
+                  action={onNovoLead ? <AppButton onClick={handleNovoLeadClick} disabled={isAdicionarBlocked}><Plus />Adicionar lead</AppButton> : undefined}
+                />
+              )
+            }
           />
         </div>
       )}

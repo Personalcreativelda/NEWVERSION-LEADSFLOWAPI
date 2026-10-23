@@ -31,7 +31,7 @@ const tourSteps: TourStep[] = [
   {
     target: '#plan-limits-card',
     title: 'Limites do seu Plano',
-    description: 'Acompanhe em tempo real o uso de leads, mensagens WhatsApp e campanhas do seu plano. Quando atingir o limite, faça upgrade para não perder oportunidades.',
+    description: 'Acompanhe em tempo real o uso de leads, mensagens WhatsApp e campanhas do seu plano. Quando atingir o limite, faça melhorar o plano para não perder oportunidades.',
     tip: 'Dica: Mantenha sempre abaixo de 80% para garantir que nenhum lead se perde.',
     icon: <BarChart3 className="w-5 h-5" />,
     position: 'bottom',
@@ -47,7 +47,7 @@ const tourSteps: TourStep[] = [
   {
     target: '#leads-today-card',
     title: 'Leads Captados Hoje',
-    description: 'Novos leads entram automaticamente quando alguém fala no WhatsApp conectado ou preenche um formulário. Responda rápido — a velocidade define o resultado.',
+    description: 'Novos leads entram automaticamente quando alguém fala no WhatsApp ligado ou preenche um formulário. Responda rápido — a velocidade define o resultado.',
     tip: 'Dica: Use o Assistente de IA para responder automaticamente fora do horário.',
     icon: <Zap className="w-5 h-5" />,
     position: 'right',
@@ -79,7 +79,7 @@ const tourSteps: TourStep[] = [
   },
   {
     target: '#sidebar-navigation',
-    title: 'Inbox — Central de Mensagens',
+    title: 'Conversas — central de mensagens',
     description: 'Todas as conversas de WhatsApp, email e outros canais num só lugar. Atribua conversas a agentes, use respostas rápidas e nunca perca uma mensagem.',
     tip: 'Dica: Configure SLA de resposta. Leads que esperam mais de 24h perdem o interesse.',
     icon: <MessageSquare className="w-5 h-5" />,
@@ -106,8 +106,8 @@ const tourSteps: TourStep[] = [
   },
   {
     target: '#sidebar-navigation',
-    title: 'Conectar WhatsApp',
-    description: 'Vá em Inbox → Configurações para conectar o seu número de WhatsApp. Após conectado, todas as mensagens chegam aqui e o bot entra em ação automaticamente.',
+    title: 'Ligar WhatsApp',
+    description: 'Vá a Menu → Canais para ligar o seu número de WhatsApp. Após ligado, todas as mensagens chegam aqui e o bot entra em ação automaticamente.',
     tip: 'Dica: Use um número dedicado para o negócio. Misturar pessoal e profissional reduz a confiança.',
     icon: <Plug className="w-5 h-5" />,
     position: 'right',
@@ -133,8 +133,8 @@ const tourSteps: TourStep[] = [
   },
   {
     target: '#user-avatar',
-    title: 'Perfil e Configurações',
-    description: 'Gerencie a sua conta, segurança (2FA, tokens de API), avatar e nome. Aqui também acede ao seu plano e pode fazer upgrade quando precisar de mais capacidade.',
+    title: 'Perfil e Definições',
+    description: 'Faça a gestão de a sua conta, segurança (2FA, tokens de API), avatar e nome. Aqui também acede ao seu plano e pode melhorar o plano quando precisar de mais capacidade.',
     tip: 'Dica: Active a autenticação de dois fatores para proteger o acesso à plataforma.',
     icon: <Users className="w-5 h-5" />,
     position: 'left',
@@ -142,8 +142,8 @@ const tourSteps: TourStep[] = [
   {
     target: '#dashboard-welcome',
     title: 'Está pronto para vender mais!',
-    description: 'Agora conhece todas as ferramentas do LeadsFlow. O próximo passo é conectar o seu WhatsApp, importar os primeiros leads e lançar uma campanha.',
-    tip: '🚀 Meta: nas próximas 24h conecte o WhatsApp e importe pelo menos 10 leads.',
+    description: 'Agora conhece todas as ferramentas do LeadsFlow. O próximo passo é ligar o seu WhatsApp, importar os primeiros leads e lançar uma campanha.',
+    tip: 'Meta: nas próximas 24h conecte o WhatsApp e importe pelo menos 10 leads.',
     icon: <Target className="w-5 h-5" />,
     position: 'bottom',
   },
@@ -278,7 +278,7 @@ export default function ProductTour({ onComplete, onSkip, onNavigate }: ProductT
               <button
                 onClick={handleSkip}
                 className="flex-shrink-0 mt-0.5 p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors"
-                title="Pular tour"
+                title="Pular visita guiada"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -293,7 +293,7 @@ export default function ProductTour({ onComplete, onSkip, onNavigate }: ProductT
 
             {currentTourStep.tip && (
               <div className="flex gap-2 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-lg px-3 py-2.5">
-                <span className="text-blue-500 dark:text-blue-400 flex-shrink-0 mt-px text-xs">💡</span>
+                <span className="text-blue-500 dark:text-blue-400 flex-shrink-0 mt-px text-xs"></span>
                 <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">{currentTourStep.tip}</p>
               </div>
             )}

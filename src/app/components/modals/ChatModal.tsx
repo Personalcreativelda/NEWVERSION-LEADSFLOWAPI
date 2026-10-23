@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Send } from 'lucide-react';
 import type { Lead } from '../../types';
+import { getLocale } from '../../utils/format';
 
 interface ChatModalProps {
   isOpen: boolean;
@@ -39,7 +40,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
     if (!mensagem.trim()) return;
 
     if (!webhookUrl || webhookUrl.trim() === '') {
-      alert('⚠️ Configure o webhook de envio de mensagens nas configurações!');
+      alert('Configure o webhook de envio de mensagens nas definições!');
       return;
     }
 
@@ -48,7 +49,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
     const novaMensagem: Mensagem = {
       texto: mensagem,
       tipo: 'sent',
-      hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      hora: new Date().toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' }),
     };
 
     setMensagens(prev => [...prev, novaMensagem]);
@@ -76,7 +77,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
             const respostaMensagem: Mensagem = {
               texto: data.resposta,
               tipo: 'received',
-              hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+              hora: new Date().toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' }),
             };
             setMensagens(prev => [...prev, respostaMensagem]);
           }, 1000);
@@ -109,7 +110,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
         <div className="px-6 py-5 border-b border-border flex justify-between items-center">
           <div>
             <h2 className="text-xl text-foreground font-semibold">
-              💬 Chat com {lead?.nome || 'Lead'}
+              Chat com{lead?.nome || 'Lead'}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
               {lead?.telefone || 'Sem telefone'}

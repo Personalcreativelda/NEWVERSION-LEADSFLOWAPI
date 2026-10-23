@@ -23,7 +23,7 @@ export default function WhatsAppNotConnectedModal({
               <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
             </div>
             <h2 className="text-xl font-semibold text-foreground dark:text-foreground">
-              WhatsApp Não Conectado
+              WhatsApp Não Ligado
             </h2>
           </div>
           <button
@@ -41,18 +41,18 @@ export default function WhatsAppNotConnectedModal({
             <div className="text-sm text-amber-800 dark:text-amber-200">
               <p className="font-medium mb-1">Conecte sua conta do WhatsApp</p>
               <p>
-                Para importar contatos do WhatsApp, você precisa primeiro conectar sua conta usando o QR Code na página de Configurações.
+                Para importar contactos do WhatsApp, você precisa primeiro ligar sua conta usando o QR Code na página de Definições.
               </p>
             </div>
           </div>
 
           <div className="space-y-2 text-sm text-muted-foreground dark:text-muted-foreground">
-            <p className="font-medium text-foreground dark:text-foreground">Como conectar:</p>
+            <p className="font-medium text-foreground dark:text-foreground">Como ligar:</p>
             <ol className="list-decimal list-inside space-y-1 ml-2">
-              <li>Vá para Configurações → Integrações</li>
+              <li>Vá para Definições → Integrações</li>
               <li>Encontre a seção "WhatsApp / Evolution API"</li>
               <li>Escaneie o QR Code com seu WhatsApp</li>
-              <li>Aguarde a confirmação de conexão</li>
+              <li>Aguarde a confirmação de ligação</li>
             </ol>
           </div>
         </div>
@@ -70,7 +70,7 @@ export default function WhatsAppNotConnectedModal({
             className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
           >
             <QrCode className="w-4 h-4" />
-            Ir para Configurações
+            Ir para Definições
           </button>
         </div>
       </div>

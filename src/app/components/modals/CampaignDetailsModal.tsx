@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
 import { StatusBadge, type StatusTone } from '../base/StatusBadge';
+import { NUMBER_OPTS, getLocale } from '../../utils/format';
 
 interface Campaign {
   id: string;
@@ -65,7 +66,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR', {
+    return date.toLocaleDateString(getLocale(), {
       day: '2-digit',
       month: 'long',
       year: 'numeric',
@@ -136,7 +137,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
     doc.setFont('helvetica', 'bold');
     doc.text('Total de Destinatários:', 30, yPos);
     doc.setFont('helvetica', 'normal');
-    doc.text(campaign.totalRecipients.toLocaleString(), 120, yPos);
+    doc.text(campaign.totalRecipients.toLocaleString(getLocale(), NUMBER_OPTS), 120, yPos);
     yPos += 10;
 
     // Enviadas
@@ -144,7 +145,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
       doc.setFont('helvetica', 'bold');
       doc.text('Mensagens Enviadas:', 30, yPos);
       doc.setFont('helvetica', 'normal');
-      doc.text(campaign.sent.toLocaleString(), 120, yPos);
+      doc.text(campaign.sent.toLocaleString(getLocale(), NUMBER_OPTS), 120, yPos);
       yPos += 10;
     }
 
@@ -153,7 +154,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
       doc.setFont('helvetica', 'bold');
       doc.text('Entregues:', 30, yPos);
       doc.setFont('helvetica', 'normal');
-      doc.text(campaign.delivered.toLocaleString(), 120, yPos);
+      doc.text(campaign.delivered.toLocaleString(getLocale(), NUMBER_OPTS), 120, yPos);
       yPos += 10;
     }
 
@@ -162,7 +163,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
       doc.setFont('helvetica', 'bold');
       doc.text('Visualizadas:', 30, yPos);
       doc.setFont('helvetica', 'normal');
-      doc.text(campaign.read.toLocaleString(), 120, yPos);
+      doc.text(campaign.read.toLocaleString(getLocale(), NUMBER_OPTS), 120, yPos);
       yPos += 10;
     }
 
@@ -171,7 +172,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
       doc.setFont('helvetica', 'bold');
       doc.text('Respostas:', 30, yPos);
       doc.setFont('helvetica', 'normal');
-      doc.text(campaign.replies.toLocaleString(), 120, yPos);
+      doc.text(campaign.replies.toLocaleString(getLocale(), NUMBER_OPTS), 120, yPos);
       yPos += 10;
     }
 
@@ -223,7 +224,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
         doc.setTextColor(220, 38, 38);
         doc.text(`Erro: ${f.error}`, 25, failY + 10);
         doc.setTextColor(150, 150, 150);
-        doc.text(`Horário: ${new Date(f.timestamp).toLocaleString('pt-BR')}`, 25, failY + 15);
+        doc.text(`Horário: ${new Date(f.timestamp).toLocaleString(getLocale())}`, 25, failY + 15);
         doc.setTextColor(0, 0, 0);
 
         failY += 25;
@@ -236,7 +237,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
       doc.setPage(i);
       doc.setFontSize(10);
       doc.setTextColor(150, 150, 150);
-      doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 20, 285);
+      doc.text(`Gerado em ${new Date().toLocaleString(getLocale())}`, 20, 285);
       doc.text(`Página ${i} de ${pageCount}`, 170, 285);
     }
 
@@ -262,7 +263,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
       ...(campaign.deliveryRate !== undefined ? [['Taxa de Entrega', `${campaign.deliveryRate}%`]] : []),
       ...(campaign.progress !== undefined && campaign.status === 'active' ? [['Progresso', `${campaign.progress}%`]] : []),
       [''],
-      ['Gerado em', new Date().toLocaleString('pt-BR')],
+      ['Gerado em', new Date().toLocaleString(getLocale())],
     ];
 
     const csvContent = csvData.map(row => row.join(',')).join('\n');
@@ -293,7 +294,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
           <div className="flex flex-wrap gap-2.5">
             <AppButton onClick={exportToPDF} variant="outline">
               <Download />
-              Baixar PDF
+              Transferir PDF
             </AppButton>
             <AppButton onClick={exportToCSV} variant="outline">
               <Download />
@@ -316,11 +317,11 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
               <div className="bg-muted/50 p-4 rounded-xl border border-border dark:border-zinc-800/60">
                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Canal</p>
                 <p className="text-base font-bold flex items-center gap-2">
-                  {campaign.type === 'whatsapp' ? '📱 WhatsApp' : campaign.type === 'email' ? '📧 Email' : '💬 SMS'}
+                  {campaign.type === 'whatsapp' ? 'WhatsApp' : campaign.type === 'email' ? 'Email' : 'SMS'}
                 </p>
               </div>
               <div className="bg-muted/50 p-4 rounded-xl border border-border dark:border-zinc-800/60">
-                <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Status</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Estado</p>
                 <StatusBadge label={statusInfo.label} tone={statusInfo.tone} />
               </div>
               {campaign.completedDate && (
@@ -341,27 +342,27 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
             <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 p-5 rounded-2xl border border-blue-100 dark:border-blue-900/40">
                 <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-2 tracking-tight">Destinatários</p>
-                <p className="text-3xl font-black text-blue-700 dark:text-blue-300 tracking-tighter">{campaign.totalRecipients.toLocaleString()}</p>
+                <p className="text-3xl font-black text-blue-700 dark:text-blue-300 tracking-tighter">{campaign.totalRecipients.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
               </div>
 
               <div className="bg-emerald-50 dark:bg-emerald-900/20 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-900/40">
                 <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase mb-2 tracking-tight">Enviadas</p>
-                <p className="text-3xl font-black text-emerald-700 dark:text-emerald-300 tracking-tighter">{(campaign.sent || 0).toLocaleString()}</p>
+                <p className="text-3xl font-black text-emerald-700 dark:text-emerald-300 tracking-tighter">{(campaign.sent || 0).toLocaleString(getLocale(), NUMBER_OPTS)}</p>
               </div>
 
               <div className="bg-violet-50 dark:bg-violet-900/20 p-5 rounded-2xl border border-violet-100 dark:border-violet-900/40">
                 <p className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase mb-2 tracking-tight">Entregues</p>
-                <p className="text-3xl font-black text-violet-700 dark:text-violet-300 tracking-tighter">{(campaign.delivered || 0).toLocaleString()}</p>
+                <p className="text-3xl font-black text-violet-700 dark:text-violet-300 tracking-tighter">{(campaign.delivered || 0).toLocaleString(getLocale(), NUMBER_OPTS)}</p>
               </div>
 
               <div className="bg-amber-50 dark:bg-amber-900/20 p-5 rounded-2xl border border-amber-100 dark:border-amber-900/40">
                 <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase mb-2 tracking-tight">Visualizadas</p>
-                <p className="text-3xl font-black text-amber-700 dark:text-amber-300 tracking-tighter">{(campaign.read || 0).toLocaleString()}</p>
+                <p className="text-3xl font-black text-amber-700 dark:text-amber-300 tracking-tighter">{(campaign.read || 0).toLocaleString(getLocale(), NUMBER_OPTS)}</p>
               </div>
 
               <div className="bg-rose-50 dark:bg-rose-900/20 p-5 rounded-2xl border border-rose-100 dark:border-rose-900/40">
                 <p className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase mb-2 tracking-tight">Falhas</p>
-                <p className="text-3xl font-black text-rose-700 dark:text-rose-300 tracking-tighter">{(campaign.failed || failures.length || 0).toLocaleString()}</p>
+                <p className="text-3xl font-black text-rose-700 dark:text-rose-300 tracking-tighter">{(campaign.failed || failures.length || 0).toLocaleString(getLocale(), NUMBER_OPTS)}</p>
               </div>
 
               <div className="bg-green-50 dark:bg-green-900/20 p-5 rounded-2xl border border-green-100 dark:border-green-900/40">
@@ -399,7 +400,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
                             {f.error}
                           </td>
                           <td className="px-4 py-3 text-xs text-muted-foreground text-center">
-                            {new Date(f.timestamp).toLocaleTimeString('pt-BR')}
+                            {new Date(f.timestamp).toLocaleTimeString(getLocale())}
                           </td>
                         </tr>
                       ))}
@@ -415,8 +416,8 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
             <section className="bg-muted/30 p-5 rounded-2xl border border-border/50">
               <div className="flex justify-between items-end mb-3">
                 <div>
-                  <h4 className="text-sm font-bold text-foreground tracking-tight">Status do Envio</h4>
-                  <p className="text-xs text-muted-foreground">Sincronizando com o servidor...</p>
+                  <h4 className="text-sm font-bold text-foreground tracking-tight">Estado do Envio</h4>
+                  <p className="text-xs text-muted-foreground">A sincronizar com o servidor...</p>
                 </div>
                 <span className="text-2xl font-black text-primary">{campaign.progress}%</span>
               </div>

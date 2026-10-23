@@ -41,10 +41,10 @@ export function WebhookSettings() {
         n8nWebhookUrl,
         metaPixelId,
       });
-      toast.success('Configurações de webhook salvas com sucesso!');
+      toast.success('Definições de webhook guardadas com sucesso!');
     } catch (error) {
       console.error('Failed to save webhook settings:', error);
-      toast.error('Erro ao salvar configurações');
+      toast.error('Erro ao guardar definições');
     } finally {
       setSaving(false);
     }
@@ -197,7 +197,7 @@ export function WebhookSettings() {
 
       <div className="flex justify-end px-2 sm:px-0">
         <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto text-sm sm:text-base">
-          {saving ? 'Salvando...' : 'Salvar Configurações'}
+          {saving ? 'A guardar...' : 'Guardar Definições'}
         </Button>
       </div>
     </div>

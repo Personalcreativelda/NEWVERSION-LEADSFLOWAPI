@@ -151,7 +151,7 @@ export default function EnviarEmailModal({
             className="bg-purple-600 hover:bg-purple-700 text-white"
           >
             {loading ? (
-              'Enviando...'
+              'A enviar...'
             ) : (
               <>
                 <Send />

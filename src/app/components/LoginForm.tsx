@@ -79,7 +79,7 @@ export default function LoginForm() {
 
           <div>
             <label htmlFor="senha" className="block text-sm text-foreground/80 mb-2">
-              Senha
+              Palavra-passe
             </label>
             <input
               id="senha"
@@ -88,7 +88,7 @@ export default function LoginForm() {
               onChange={(e) => setSenha(e.target.value)}
               required
               className="w-full px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              placeholder="Digite sua senha"
+              placeholder="Digite sua palavra-passe"
             />
           </div>
 
@@ -100,7 +100,7 @@ export default function LoginForm() {
               className="w-4 h-4 text-blue-600 border-border rounded focus:ring-blue-500"
             />
             <label htmlFor="lembrar" className="ml-2 text-sm text-foreground/80">
-              Manter-me conectado por 8 horas
+              Manter-me ligado por 8 horas
             </label>
           </div>
 
@@ -124,7 +124,7 @@ export default function LoginForm() {
         {/* Links */}
         <div className="mt-6 text-center space-y-3">
           <a href="#" className="block text-sm text-foreground/80 hover:text-blue-600 transition-colors">
-            Esqueci minha senha
+            Esqueci minha palavra-passe
           </a>
           <p className="text-sm text-foreground/80">
             Não tem uma conta?{' '}

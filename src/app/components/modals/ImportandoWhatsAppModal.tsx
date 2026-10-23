@@ -23,10 +23,10 @@ export default function ImportandoWhatsAppModal({ isOpen }: ImportandoWhatsAppMo
           {/* Título */}
           <div className="space-y-2">
             <h3 className="text-xl font-semibold text-foreground">
-              Buscando contatos no WhatsApp
+              A pesquisar contactos no WhatsApp
             </h3>
             <p className="text-sm text-muted-foreground">
-              Aguarde alguns segundos enquanto sincronizamos seus contatos...
+              Aguarde alguns segundos enquanto sincronizamos seus contactos...
             </p>
           </div>
 

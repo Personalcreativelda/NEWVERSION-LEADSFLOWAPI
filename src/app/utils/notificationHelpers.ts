@@ -1,3 +1,4 @@
+import { getLocale } from './format';
 /**
  * ✅ NOTIFICATION HELPERS
  * 
@@ -47,7 +48,7 @@ export async function createNotification(params: CreateNotificationParams) {
 export async function notifyNewLead(leadName: string, source: string) {
   await createNotification({
     type: 'lead_new',
-    title: 'Novo lead cadastrado',
+    title: 'Novo lead registado',
     message: `${leadName} foi adicionado via ${source}`,
     actionLabel: 'Ver lead',
     actionUrl: '/leads',
@@ -65,10 +66,10 @@ export async function notifyLeadRemoved(leadName: string, canUndo: boolean = fal
 }
 
 export async function notifyLeadConverted(leadName: string, value?: number) {
-  const valueText = value ? ` no valor de R$ ${value.toLocaleString('pt-BR')}` : '';
+  const valueText = value ? ` no valor de R$ ${value.toLocaleString(getLocale())}` : '';
   await createNotification({
     type: 'lead_converted',
-    title: 'Lead convertido! 🎉',
+    title: 'Lead convertido!',
     message: `${leadName} fechou negócio${valueText}`,
     actionLabel: 'Ver deal',
     actionUrl: '/leads?filter=converted',
@@ -104,7 +105,7 @@ export async function notifyPlanLimit(currentCount: number, limit: number, resou
   await createNotification({
     type: 'plan_limit',
     title: `Limite de ${resource} atingido`,
-    message: `Você atingiu ${percentage}% do limite do seu plano (${currentCount}/${limit}). Considere fazer upgrade.`,
+    message: `Você atingiu ${percentage}% do limite do seu plano (${currentCount}/${limit}). Considere melhorar o plano.`,
     actionLabel: 'Upgrade',
     actionUrl: '/plan',
   });
@@ -141,8 +142,8 @@ export async function notifyTaskReminder(taskName: string, leadName: string, tim
 export async function notifyWelcome() {
   await createNotification({
     type: 'welcome',
-    title: 'Bem-vindo ao LeadsFlow! 👋',
-    message: 'Comece importando seus leads ou conectando suas integrações.',
+    title: 'Bem-vindo ao LeadsFlow!',
+    message: 'Comece a importar seus leads ou a ligar suas integrações.',
     actionLabel: 'Começar tour',
     actionUrl: '/tour',
   });
@@ -151,7 +152,7 @@ export async function notifyWelcome() {
 export async function notifyTourAvailable() {
   await createNotification({
     type: 'tour',
-    title: 'Tour guiado disponível',
+    title: 'Visita guiada guiado disponível',
     message: 'Conheça todas as funcionalidades da plataforma em 5 minutos.',
     actionLabel: 'Iniciar tour',
     actionUrl: '/tour',

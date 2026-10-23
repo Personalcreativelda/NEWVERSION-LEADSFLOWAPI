@@ -4,6 +4,7 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Switch } from '../../ui/switch';
 import { apiRequest } from '../../../utils/api';
+import { getLocale } from '../../../utils/format';
 
 interface User {
   id: string;
@@ -123,8 +124,7 @@ export const ActivatePlanModal: React.FC<ActivatePlanModalProps> = ({
             <p className="text-sm font-medium text-foreground">
               Expira em:{' '}
               <span className="text-blue-600 dark:text-blue-400">
-                {new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000).toLocaleDateString(
-                  'pt-BR'
+                {new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000).toLocaleDateString(getLocale()
                 )}
               </span>
             </p>
@@ -170,16 +170,16 @@ const NOTIFICATION_TYPES = [
     icon: UserPlus,
     iconBg: 'bg-emerald-500/10',
     iconColor: 'text-emerald-500',
-    label: 'Novo Usuário Cadastrado',
-    description: 'Receba um alerta quando um novo usuário criar conta na plataforma.',
+    label: 'Novo Utilizador Registado',
+    description: 'Receba um alerta quando um novo utilizador criar conta na plataforma.',
   },
   {
     key: 'upgradeNotifications',
     icon: TrendingUp,
     iconBg: 'bg-purple-500/10',
     iconColor: 'text-purple-500',
-    label: 'Upgrade de Plano',
-    description: 'Seja notificado quando um usuário fizer upgrade para um plano superior.',
+    label: 'Melhorar plano de Plano',
+    description: 'Seja notificado quando um utilizador fizer melhorar o plano para um plano superior.',
   },
   {
     key: 'paymentNotifications',
@@ -195,7 +195,7 @@ const NOTIFICATION_TYPES = [
     iconBg: 'bg-amber-500/10',
     iconColor: 'text-amber-500',
     label: 'Plano Expirando',
-    description: 'Aviso quando o plano de um usuário estiver prestes a expirar.',
+    description: 'Aviso quando o plano de um utilizador estiver prestes a expirar.',
   },
   {
     key: 'suspensionNotifications',
@@ -298,7 +298,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
             Cancelar
           </Button>
           <Button onClick={onSave} disabled={loading} className="flex-1">
-            {loading ? 'Salvando...' : 'Salvar'}
+            {loading ? 'A guardar...' : 'Guardar'}
           </Button>
         </div>
       </div>
@@ -324,8 +324,8 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
 
   const handleSubmit = async () => {
     setError(null);
-    if (!form.email || !form.password) { setError('Email e senha são obrigatórios'); return; }
-    if (form.password.length < 6) { setError('Senha deve ter ao menos 6 caracteres'); return; }
+    if (!form.email || !form.password) { setError('Email e palavra-passe são obrigatórios'); return; }
+    if (form.password.length < 6) { setError('Palavra-passe deve ter ao menos 6 caracteres'); return; }
 
     setLoading(true);
     try {
@@ -339,7 +339,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
       onCreated();
       onClose();
     } catch (e: any) {
-      setError(e.message || 'Erro ao criar usuário');
+      setError(e.message || 'Erro ao criar utilizador');
     } finally {
       setLoading(false);
     }
@@ -360,7 +360,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
               <UserPlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-foreground">Adicionar Usuário</h3>
+              <h3 className="text-base font-bold text-foreground">Adicionar Utilizador</h3>
               <p className="text-xs text-muted-foreground">Criar conta manualmente</p>
             </div>
           </div>
@@ -384,7 +384,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Senha <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Palavra-passe <span className="text-red-500">*</span></label>
             <div className="relative">
               <Input
                 type={showPassword ? 'text' : 'password'}
@@ -442,7 +442,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
                 placeholder="Dias personalizados"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Expira em: <span className="font-medium text-foreground">{new Date(Date.now() + form.expirationDays * 86400000).toLocaleDateString('pt-BR')}</span>
+                Expira em: <span className="font-medium text-foreground">{new Date(Date.now() + form.expirationDays * 86400000).toLocaleDateString(getLocale())}</span>
               </p>
             </div>
           )}
@@ -459,7 +459,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
         <div className="flex gap-3 mt-6">
           <Button onClick={onClose} variant="outline" className="flex-1">Cancelar</Button>
           <Button onClick={handleSubmit} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-            {loading ? 'Criando...' : 'Criar Usuário'}
+            {loading ? 'A criar...' : 'Criar Utilizador'}
           </Button>
         </div>
       </div>

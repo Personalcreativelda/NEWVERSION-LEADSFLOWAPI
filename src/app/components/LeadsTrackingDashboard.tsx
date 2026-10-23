@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, Send, TrendingUp, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { getLocale } from '../utils/format';
 
 interface Lead {
   id: string;
@@ -105,7 +106,7 @@ export default function LeadsTrackingDashboard() {
     if (diffMins < 60) return `${diffMins}m atrás`;
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h atrás`;
-    return date.toLocaleDateString('pt-BR');
+    return date.toLocaleDateString(getLocale());
   };
 
   if (loading) {
@@ -115,7 +116,7 @@ export default function LeadsTrackingDashboard() {
           <div className="animate-spin mb-4">
             <MessageCircle className="w-8 h-8 mx-auto text-blue-500" />
           </div>
-          <p>Carregando dados de rastreamento...</p>
+          <p>A carregar dados de rastreamento...</p>
         </div>
       </div>
     );
@@ -129,7 +130,7 @@ export default function LeadsTrackingDashboard() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">📊 Rastreamento de Leads</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-2">Rastreamento de Leads</h1>
           <p className="text-muted-foreground">Monitore leads capturados de múltiplos canais em tempo real</p>
         </div>
 
@@ -181,7 +182,7 @@ export default function LeadsTrackingDashboard() {
         {/* Estatísticas por Canal */}
         {channelStats.length > 0 && (
           <div className="bg-card rounded-lg shadow-sm p-6 mb-8">
-            <h2 className="text-xl font-semibold text-foreground mb-4">📈 Desempenho por Canal</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-4">Desempenho por Canal</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {channelStats.map((stat, idx) => (
                 <div key={idx} className="border rounded-lg p-4 hover:shadow-md transition">
@@ -203,7 +204,7 @@ export default function LeadsTrackingDashboard() {
                   </div>
                   {Object.entries(stat.byStatus).length > 0 && (
                     <div className="mt-3 pt-3 border-t">
-                      <p className="text-xs text-muted-foreground font-semibold mb-2">Por Status:</p>
+                      <p className="text-xs text-muted-foreground font-semibold mb-2">Por Estado:</p>
                       <div className="space-y-1 text-xs">
                         {Object.entries(stat.byStatus).map(([status, count]) => (
                           <p key={status} className="flex justify-between">
@@ -223,7 +224,7 @@ export default function LeadsTrackingDashboard() {
         {/* Lista de Leads Capturados Hoje */}
         <div className="bg-card rounded-lg shadow-sm overflow-hidden">
           <div className="p-6 border-b">
-            <h2 className="text-xl font-semibold text-foreground">🎯 Leads Capturados Hoje</h2>
+            <h2 className="text-xl font-semibold text-foreground">Leads Capturados Hoje</h2>
           </div>
           
           {leadsToday.length === 0 ? (
@@ -237,9 +238,9 @@ export default function LeadsTrackingDashboard() {
                 <thead className="bg-muted/50 border-b">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Canal</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nome/Contato</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nome/Contacto</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email/Telefone</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estado</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Horário</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Interações</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ação</th>
@@ -335,7 +336,7 @@ export default function LeadsTrackingDashboard() {
                 )}
 
                 <div>
-                    <p className="text-xs text-muted-foreground uppercase">Status</p>
+                    <p className="text-xs text-muted-foreground uppercase">Estado</p>
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedLead.status)}`}>
                     {selectedLead.status}
                   </span>

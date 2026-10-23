@@ -8,7 +8,7 @@ export default function InboxChannels() {
                 <MessageSquare className="w-6 h-6 text-blue-500" />
                 Canais de Comunicação
             </h1>
-            <p style={{ color: 'hsl(var(--muted-foreground))' }}>Gerencie seus canais de atendimento (WhatsApp, Instagram, Webchat).</p>
+            <p style={{ color: 'hsl(var(--muted-foreground))' }}>Faça a gestão de seus canais de atendimento (WhatsApp, Instagram, Webchat).</p>
         </div>
     );
 }

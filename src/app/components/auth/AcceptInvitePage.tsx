@@ -212,7 +212,7 @@ export default function AcceptInvitePage({ onSuccess }: AcceptInvitePageProps) {
                     <form onSubmit={handleSubmit} className="p-6 space-y-4">
                         <p className="text-sm text-muted-foreground">
                             {hasAccount
-                                ? <>A conta <strong className="text-foreground">{invite?.email}</strong> já existe. Introduz a tua senha para aceitar.</>
+                                ? <>A conta <strong className="text-foreground">{invite?.email}</strong> já existe. Introduz a tua palavra-passe para aceitar.</>
                                 : <>Cria a tua conta para <strong className="text-foreground">{invite?.email}</strong> e junta-te à equipa.</>
                             }
                         </p>
@@ -240,7 +240,7 @@ export default function AcceptInvitePage({ onSuccess }: AcceptInvitePageProps) {
                         {/* Password */}
                         <div>
                             <label className="block text-sm font-medium mb-1.5 text-foreground">
-                                {hasAccount ? 'Senha *' : 'Cria uma senha *'}
+                                {hasAccount ? 'Palavra-passe *' : 'Cria uma palavra-passe *'}
                             </label>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -248,7 +248,7 @@ export default function AcceptInvitePage({ onSuccess }: AcceptInvitePageProps) {
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
-                                    placeholder={hasAccount ? 'A tua senha' : 'Mínimo 6 caracteres'}
+                                    placeholder={hasAccount ? 'A tua palavra-passe' : 'Mínimo 6 caracteres'}
                                     className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition-all"
                                     autoFocus={hasAccount}
                                 />
@@ -266,7 +266,7 @@ export default function AcceptInvitePage({ onSuccess }: AcceptInvitePageProps) {
                         {!hasAccount && (
                             <div>
                                 <label className="block text-sm font-medium mb-1.5 text-foreground">
-                                    Confirmar senha *
+                                    Confirmar palavra-passe *
                                 </label>
                                 <div className="relative">
                                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -274,7 +274,7 @@ export default function AcceptInvitePage({ onSuccess }: AcceptInvitePageProps) {
                                         type={showPassword ? 'text' : 'password'}
                                         value={confirmPassword}
                                         onChange={e => setConfirmPassword(e.target.value)}
-                                        placeholder="Repete a senha"
+                                        placeholder="Repete a palavra-passe"
                                         className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition-all"
                                     />
                                 </div>

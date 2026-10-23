@@ -3,6 +3,7 @@ import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { TrendingUp, Users, Target, DollarSign, Clock, Zap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
+import { formatPercent, getLocale } from '../../utils/format';
 
 interface Lead {
   id: string;
@@ -176,7 +177,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
         return leadDateStr === date;
       }).length;
 
-      const dayName = new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' });
+      const dayName = new Date(date).toLocaleDateString(getLocale(), { weekday: 'short' });
       return {
         date: dayName.charAt(0).toUpperCase() + dayName.slice(1),
         leads: count,
@@ -416,7 +417,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                 <Target className="w-4 h-4 text-green-600" />
                 <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
               </div>
-              <p className={`text-3xl mb-1 text-green-600`}>{metrics.conversionRate}%</p>
+              <p className={`text-3xl mb-1 text-green-600`}>{formatPercent(metrics.conversionRate)}</p>
               <div className="flex items-center gap-1">
                 <ArrowUpRight className="w-3 h-3 text-green-600" />
                 <span className="text-xs text-green-600">+2.3% vs mês anterior</span>
@@ -438,7 +439,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
               </div>
               <p className={`text-3xl mb-1 text-blue-600`}>
                 {metrics.avgValue > 0
-                  ? `R$ ${metrics.avgValue.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                  ? `R$ ${metrics.avgValue.toLocaleString(getLocale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                   : '-'}
               </p>
               <div className="flex items-center gap-1">
@@ -454,7 +455,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                     </span>
                   </>
                 ) : (
-                  <span className="text-xs text-muted-foreground">Aguardando conversões</span>
+                  <span className="text-xs text-muted-foreground">A aguardar conversões</span>
                 )}
               </div>
             </div>
@@ -495,7 +496,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                     </span>
                   </>
                 ) : (
-                  <span className="text-xs text-muted-foreground">Aguardando conversões</span>
+                  <span className="text-xs text-muted-foreground">A aguardar conversões</span>
                 )}
               </div>
             </div>
@@ -574,7 +575,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
         <Card className="p-6 bg-card border-border">
           <div className="mb-4">
             <h3 className="text-lg text-foreground">
-              Distribuição por Status
+              Distribuição por Estado
             </h3>
             <p className="text-sm text-muted-foreground">
               Leads por estágio do funil
@@ -590,7 +591,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                 outerRadius={100}
                 fill="#8884d8"
                 dataKey="value"
-                label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
+                label={({ percent }) => `${formatPercent(percent * 100)}`}
               >
                 {conversionByStatus.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || PIE_COLORS[index % PIE_COLORS.length]} />
@@ -677,7 +678,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
               Indicadores por status do funil
             </p>
           </div>
-          <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2">
+          <div className="space-y-3">
             {/* ✅ Renderização dinâmica de TODOS os status */}
             {metrics.dynamicStatuses.map((statusItem) => (
               <div key={statusItem.status} className="flex items-center justify-between">
@@ -729,7 +730,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
       <Card className="p-6 bg-card border-border">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center flex-shrink-0">
-            <span className="text-2xl">💡</span>
+            <span className="text-2xl"></span>
           </div>
           <div className="flex-1">
             <h3 className="text-lg mb-2 text-foreground">
@@ -738,14 +739,14 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
             <ul className="space-y-2 text-sm text-foreground/80">
               <li className="flex items-start gap-2">
                 <span className="text-green-600 dark:text-green-400">✓</span>
-                <span>Sua taxa de conversão de {metrics.conversionRate}% está {parseFloat(metrics.conversionRate) > 20 ? 'acima' : 'abaixo'} da média do mercado (20%)</span>
+                <span>Sua taxa de conversão de {formatPercent(metrics.conversionRate)} está {parseFloat(metrics.conversionRate) > 20 ? 'acima' : 'abaixo'} da média do mercado (20%)</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-blue-600 dark:text-blue-400">→</span>
                 <span>A origem "{topOrigins[0]?.name || 'N/A'}" é sua melhor fonte com {topOrigins[0]?.value || 0} leads - considere investir mais nesse canal</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-orange-600 dark:text-orange-400">⚠</span>
+                <span className="text-orange-600 dark:text-orange-400"></span>
                 <span>Você tem {metrics.inNegotiation} leads em negociação - priorize o follow-up para fechar mais vendas</span>
               </li>
               {parseFloat(metrics.lostRate) > 30 && (

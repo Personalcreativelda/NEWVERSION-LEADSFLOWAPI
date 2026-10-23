@@ -98,7 +98,7 @@ export default function ModernHeader({
                     <MessageSquare className="w-4 h-4 mr-3 text-green-600 dark:text-green-400" />
                     <div>
                       <div className="font-medium text-sm">Campanhas</div>
-                      <div className="text-xs text-muted-foreground">Gerenciar campanhas de comunicação</div>
+                      <div className="text-xs text-muted-foreground">Gerir campanhas de comunicação</div>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
@@ -189,7 +189,7 @@ export default function ModernHeader({
                 >
                   <SettingsIcon className="w-4 h-4 mr-3" />
                   <div>
-                    <div className="font-medium text-sm">Configurações</div>
+                    <div className="font-medium text-sm">Definições</div>
                     <div className="text-xs text-muted-foreground">SMTP, integrações e mais</div>
                   </div>
                 </DropdownMenuItem>
@@ -247,7 +247,7 @@ export default function ModernHeader({
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium transition-colors">
               <Home className="w-5 h-5" />
-              Dashboard
+              Painel
             </button>
             <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
               <Users className="w-5 h-5" />
@@ -311,7 +311,7 @@ export default function ModernHeader({
               className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
             >
               <SettingsIcon className="w-5 h-5" />
-              Configurações
+              Definições
             </button>
             <button 
               onClick={onLogout}
@@ -342,7 +342,7 @@ export default function ModernHeader({
           {/* Panel Header */}
             <div className="flex items-center justify-between p-6 border-b border-border">
             <h2 className="text-lg font-semibold text-foreground">
-              Configurações Rápidas
+              Definições Rápidas
             </h2>
             <button
               onClick={() => setIsSettingsPanelOpen(false)}
@@ -404,10 +404,10 @@ export default function ModernHeader({
                 <User className="w-5 h-5 text-gray-600 dark:text-gray-500 dark:text-gray-400" />
                 <div>
                   <div className="text-sm font-medium text-foreground">
-                    Gerenciar Conta
+                    Gerir Conta
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-400">
-                    Perfil, senha e mais
+                    Perfil, palavra-passe e mais
                   </div>
                 </div>
               </button>
@@ -428,7 +428,7 @@ export default function ModernHeader({
                 <SettingsIcon className="w-5 h-5 text-gray-600 dark:text-gray-500 dark:text-gray-400" />
                 <div>
                   <div className="text-sm font-medium text-foreground">
-                    Configurações Gerais
+                    Definições Gerais
                   </div>
                   <div className="text-xs text-gray-600 dark:text-gray-400">
                     SMTP, webhooks, APIs

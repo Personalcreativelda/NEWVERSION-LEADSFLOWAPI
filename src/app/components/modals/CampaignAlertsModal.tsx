@@ -39,7 +39,7 @@ export default function CampaignAlertsModal({ isOpen, onClose, campaign }: Campa
     // Salvar no localStorage
     localStorage.setItem(`campaign_${campaign.id}_alerts`, JSON.stringify(alertsConfig));
 
-    toast.success('🔔 Alertas configurados com sucesso!');
+    toast.success('Alertas configurados com sucesso!');
     onClose();
   };
 
@@ -63,7 +63,7 @@ export default function CampaignAlertsModal({ isOpen, onClose, campaign }: Campa
             Cancelar
           </AppButton>
           <AppButton onClick={handleSave} className="bg-[#10B981] hover:bg-green-600 text-white">
-            Salvar Configurações
+            Guardar Definições
           </AppButton>
         </>
       }
@@ -171,7 +171,7 @@ export default function CampaignAlertsModal({ isOpen, onClose, campaign }: Campa
             <i className="fas fa-info-circle text-blue-500 mt-0.5"></i>
             <p className="text-sm text-blue-700 dark:text-blue-300">
               As notificações serão enviadas de acordo com as preferências selecionadas.
-              Você pode alterar essas configurações a qualquer momento.
+              Você pode alterar essas definições a qualquer momento.
             </p>
           </div>
         </div>

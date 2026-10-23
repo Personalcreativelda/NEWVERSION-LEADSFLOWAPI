@@ -927,7 +927,7 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       <div className="min-h-[100dvh] flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando...</p>
+          <p className="text-muted-foreground">A carregar...</p>
           <p className="text-xs text-gray-500 mt-2">Versão {appVersion} · LeadsFlow</p>
         </div>
       </div>

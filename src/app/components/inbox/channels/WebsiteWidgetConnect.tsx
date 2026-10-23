@@ -192,7 +192,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                                 {isEditing ? 'Editar Canal Website' : 'Chat do Site'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                {isEditing ? 'Atualize as configurações do widget' : 'Widget de chat para seu website'}
+                                {isEditing ? 'Atualize as definições do widget' : 'Widget de chat para seu website'}
                             </p>
                         </div>
                     </div>
@@ -457,7 +457,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            {isEditing ? 'Atualizando...' : 'Criando...'}
+                                            {isEditing ? 'A atualizar...' : 'A criar...'}
                                         </>
                                     ) : (
                                         <>

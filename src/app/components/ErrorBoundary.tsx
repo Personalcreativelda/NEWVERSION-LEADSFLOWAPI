@@ -42,7 +42,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <div className="min-h-screen flex items-center justify-center bg-muted/50 p-4">
                     <div className="bg-white rounded-lg shadow-xl p-8 max-w-2xl w-full border border-red-100">
                         <h1 className="text-2xl font-bold text-red-600 mb-4 flex items-center gap-2">
-                            <span className="text-3xl">⚠️</span> Something went wrong
+                            <span className="text-3xl"></span> Something went wrong
                         </h1>
 
                         <div className="bg-red-50 p-4 rounded-md mb-6 overflow-auto max-h-[300px]">

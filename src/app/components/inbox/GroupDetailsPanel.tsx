@@ -219,7 +219,7 @@ export function GroupDetailsPanel({ conversation, onClose }: GroupDetailsPanelPr
               {(groupInfo?.restrict || groupInfo?.announce) && (
                 <div className="space-y-2">
                   <label className="text-xs font-medium mb-1 block" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                    Configurações
+                    Definições
                   </label>
                   {groupInfo?.announce && (
                     <div className="flex items-center gap-2 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>

@@ -22,6 +22,7 @@ import type { Channel } from '../../types/inbox';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { SkeletonAssistantGrid } from '../ui/skeletons';
+import { getLocale } from '../../utils/format';
 
 interface AssistantsPageProps {
   isDark: boolean;
@@ -232,21 +233,21 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
     // ✅ Validar seleção de canais
     if (selectedChannelIds.length === 0) {
-      toast.error('❌ Selecione pelo menos UM canal para conectar o assistente');
+      toast.error('Selecione pelo menos UM canal para ligar o assistente');
       return;
     }
 
     try {
       setActionLoading(true);
       await assistantsApi.connect(selectedAssistant.id, selectedChannelIds);
-      toast.success(`${selectedAssistant.name} conectado com sucesso!`);
+      toast.success(`${selectedAssistant.name} ligado com sucesso!`);
       setConnectModalOpen(false);
       setSelectedAssistant(null);
       setSelectedChannelIds([]);
       loadData();
     } catch (error: any) {
       console.error('[AssistantsPage] Error connecting:', error);
-      toast.error(error.response?.data?.error || 'Erro ao conectar assistente');
+      toast.error(error.response?.data?.error || 'Erro ao ligar assistente');
     } finally {
       setActionLoading(false);
     }
@@ -254,9 +255,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
   // Handle disconnect
   const handleDisconnect = async (userAssistant: UserAssistant) => {
-    const confirmed = await confirm(`Deseja realmente desconectar ${userAssistant.assistant?.name}?`, {
-      title: 'Desconectar assistente',
-      confirmLabel: 'Desconectar',
+    const confirmed = await confirm(`Deseja realmente desligar ${userAssistant.assistant?.name}?`, {
+      title: 'Desligar assistente',
+      confirmLabel: 'Desligar',
       variant: 'warning',
     });
     if (!confirmed) return;
@@ -264,11 +265,11 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     try {
       setActionLoading(true);
       await assistantsApi.disconnect(userAssistant.id);
-      toast.success('Assistente desconectado');
+      toast.success('Assistente desligado');
       loadData();
     } catch (error) {
       console.error('[AssistantsPage] Error disconnecting:', error);
-      toast.error('Erro ao desconectar assistente');
+      toast.error('Erro ao desligar assistente');
     } finally {
       setActionLoading(false);
     }
@@ -318,7 +319,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         valuesToSave,
         selectedChannelIds.length > 0 ? selectedChannelIds : undefined
       );
-      toast.success('Configuração salva com sucesso!');
+      toast.success('Configuração guardada com sucesso!');
       setConfigModalOpen(false);
       setSelectedUserAssistant(null);
       loadData();
@@ -389,7 +390,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('O arquivo excede o limite de 5MB.');
+      toast.error('O ficheiro excede o limite de 5MB.');
       return;
     }
 
@@ -397,9 +398,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       setUploadingKind(kind);
       const kbFile = await assistantsApi.uploadKnowledgeFile(selectedUserAssistant.id, file, kind);
       if (kbFile.status === 'failed') {
-        toast.warning('Arquivo enviado, mas não foi possível extrair texto dele (documento sem texto selecionável ou formato não suportado).');
+        toast.warning('Ficheiro enviado, mas não foi possível extrair texto dele (documento sem texto selecionável ou formato não suportado).');
       } else {
-        toast.success(kind === 'client' ? 'Arquivo adicionado aos arquivos para clientes!' : 'Documento adicionado à base de conhecimento!');
+        toast.success(kind === 'client' ? 'Ficheiro adicionado aos ficheiros para clientes!' : 'Documento adicionado à base de conhecimento!');
       }
       await loadKnowledgeFiles(selectedUserAssistant.id);
     } catch (err: any) {
@@ -414,7 +415,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     if (!selectedUserAssistant) return;
     try {
       await assistantsApi.deleteKnowledgeFile(selectedUserAssistant.id, fileId);
-      toast.success('Arquivo removido');
+      toast.success('Ficheiro removido');
       const setList = kind === 'client' ? setClientFiles : setKnowledgeFiles;
       setList(prev => prev.filter(f => f.id !== fileId));
       if (kind === 'rag') {
@@ -426,7 +427,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         });
       }
     } catch {
-      toast.error('Erro ao remover arquivo');
+      toast.error('Erro ao remover ficheiro');
     }
   };
 
@@ -502,9 +503,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
   // Handle delete custom assistant
   const handleDeleteAssistant = async (assistant: Assistant) => {
-    const confirmed = await confirm(`Deseja realmente deletar o assistente "${assistant.name}"? Esta ação não pode ser desfeita.`, {
-      title: 'Excluir assistente',
-      confirmLabel: 'Excluir',
+    const confirmed = await confirm(`Deseja realmente apagar o assistente "${assistant.name}"? Esta ação não pode ser desfeita.`, {
+      title: 'Eliminar assistente',
+      confirmLabel: 'Eliminar',
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -515,12 +516,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       // Optimistic update — remove immediately from state
       setAvailableAssistants(prev => prev.filter(a => a.id !== assistant.id));
       setUserAssistants(prev => prev.filter(ua => ua.assistant_id !== assistant.id));
-      toast.success('Assistente deletado com sucesso');
+      toast.success('Assistente apagado com sucesso');
       // Sync from server in background
       loadData();
     } catch (error) {
       console.error('[AssistantsPage] Error deleting assistant:', error);
-      toast.error('Erro ao deletar assistente');
+      toast.error('Erro ao apagar assistente');
     } finally {
       setActionLoading(false);
     }
@@ -729,7 +730,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 <Clock className="w-3.5 h-3.5 text-green-500" />
                 <span className="text-xs text-muted-foreground">
                   {userAssistant.last_triggered_at
-                    ? new Date(userAssistant.last_triggered_at).toLocaleDateString('pt-BR')
+                    ? new Date(userAssistant.last_triggered_at).toLocaleDateString(getLocale())
                     : 'Nunca usado'}
                 </span>
               </div>
@@ -803,7 +804,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   }}
                 >
                   <Link2 className="w-4 h-4 mr-1.5" />
-                  Conectar
+                  Ligar
                 </Button>
                 {/* Edit/Delete for custom assistants */}
                 {assistant.is_custom && (
@@ -882,18 +883,19 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             title="Assistentes de IA"
             description="Atendimento automático nos seus canais"
             icon={Bot}
-            actions={
-              <PageAction
-                variant="primary"
-                icon={canCreate ? Plus : Lock}
-                label={canCreate ? 'Criar assistente' : `Criar assistente (${limitTag})`}
-                disabled={!canCreate}
-                onClick={() => {
-                  resetCreateForm();
-                  setCreateModalOpen(true);
-                }}
-              />
-            }
+            create={{
+              icon: canCreate ? Plus : Lock,
+              label: canCreate ? 'Criar assistente' : `Criar assistente (${limitTag})`,
+              // Sem plano para criar: o mesmo botão abre o aviso de upgrade
+              onClick: () => {
+                if (!canCreate) {
+                  setPremiumModalOpen(true);
+                  return;
+                }
+                resetCreateForm();
+                setCreateModalOpen(true);
+              },
+            }}
           />
         );
       })()}
@@ -902,7 +904,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       <div className="relative mb-6 w-full sm:w-80">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Buscar assistentes..."
+          placeholder="Pesquisar assistentes..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className={`pl-9 bg-background border-border`}
@@ -930,8 +932,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
                 {isFeatureLocked
-                  ? 'O plano Gratuito não inclui Assistentes Personalizados. Faça upgrade para Business para criar os seus próprios.'
-                  : `Você está usando ${customCount} de ${planLimits.limitLabel.customAssistants} assistente(s) permitido(s). Remova um ou faça upgrade para criar mais.`
+                  ? 'O plano Gratuito não inclui Assistentes Personalizados. Faça melhorar o plano para Business para criar os seus próprios.'
+                  : `Você está usando ${customCount} de ${planLimits.limitLabel.customAssistants} assistente(s) permitido(s). Remova um ou faça melhorar o plano para criar mais.`
                 }
               </p>
             </div>
@@ -942,7 +944,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 40%)')}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'hsl(38 92% 50%)')}
             >
-              <Zap size={13} /> Fazer Upgrade
+              <Zap size={13} /> Melhorar plano
             </button>
           </div>
         );
@@ -1033,7 +1035,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         <OverlayModal onClose={() => { setConnectModalOpen(false); setSelectedAssistant(null); setSelectedChannelIds([]); }} className="max-w-md">
             <div className="flex items-center justify-between p-4 border-b border-border">
               <h3 className="text-lg font-semibold text-foreground">
-                Conectar Assistente
+                Ligar Assistente
               </h3>
               <button
                 onClick={() => {
@@ -1074,7 +1076,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               {/* Channel Selection - Multi-select with checkboxes */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-foreground">
-                  Selecione os canais para conectar
+                  Selecione os canais para ligar
                 </label>
                 
                 {/* ✅ Aviso obrigatório */}
@@ -1084,17 +1086,17 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     : 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300'
                 }`}>
                   {selectedChannelIds.length === 0 ? (
-                    <p className="text-xs font-medium">⚠️ Obrigatório selecionar pelo menos 1 canal</p>
+                    <p className="text-xs font-medium">Obrigatório selecionar pelo menos 1 canal</p>
                   ) : (
-                    <p className="text-xs font-medium">✅ {selectedChannelIds.length} {selectedChannelIds.length === 1 ? 'canal' : 'canais'} selecionado(s)</p>
+                    <p className="text-xs font-medium"> {selectedChannelIds.length} {selectedChannelIds.length === 1 ? 'canal' : 'canais'} selecionado(s)</p>
                   )}
                 </div>
                 
                 {channels.length === 0 ? (
                   <div className="text-center py-4 rounded-lg border-2 border-dashed border-border text-muted-foreground">
                     <Hash className="w-6 h-6 mx-auto mb-2 opacity-50" />
-                    <p className="text-xs">Nenhum canal conectado</p>
-                    <p className="text-[10px] mt-1">Conecte canais na página de configurações</p>
+                    <p className="text-xs">Nenhum canal ligado</p>
+                    <p className="text-[10px] mt-1">Conecte canais na página de definições</p>
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -1159,7 +1161,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 ) : (
                   <Link2 className="w-4 h-4 mr-2" />
                 )}
-                Conectar {selectedChannelIds.length > 0 ? `(${selectedChannelIds.length} ${selectedChannelIds.length === 1 ? 'canal' : 'canais'})` : '(selecione canais)'}
+                Ligar {selectedChannelIds.length > 0 ? `(${selectedChannelIds.length} ${selectedChannelIds.length === 1 ? 'canal' : 'canais'})` : '(selecione canais)'}
               </Button>
             </div>
         </OverlayModal>
@@ -1188,7 +1190,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               {/* Channel Selection */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-foreground">
-                  Canais conectados
+                  Canais ligados
                 </label>
                 <div className="space-y-2 max-h-36 overflow-y-auto">
                   {channels.map(channel => {
@@ -1320,7 +1322,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     <label className="text-xs text-muted-foreground">Mensagem enviada ao cliente ao escalar</label>
                     <textarea
                       rows={2}
-                      placeholder="Entendido! Vou te conectar com um atendente humano..."
+                      placeholder="Entendido! Vou te ligar com um atendente humano..."
                       value={configValues.escalation_message || ''}
                       onChange={(e) => setConfigValues({ ...configValues, escalation_message: e.target.value })}
                       className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
@@ -1399,7 +1401,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">Memória de longo prazo</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Construir perfil do contato ao longo do tempo
+                        Construir perfil do contacto ao longo do tempo
                       </p>
                     </div>
                     <button
@@ -1517,7 +1519,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                         Ler PDFs e documentos
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Extrai texto de PDFs, Word e arquivos de texto para responder perguntas sobre o conteúdo
+                        Extrai texto de PDFs, Word e ficheiros de texto para responder perguntas sobre o conteúdo
                       </p>
                     </div>
                     <button
@@ -1539,7 +1541,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                        <span className="text-base leading-none">❤️</span>
+                        <span className="text-base leading-none"></span>
                         Reagir às mensagens
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
@@ -1582,7 +1584,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">Usar base de conhecimento</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        O assistente busca trechos relevantes dos documentos para contextualizar as respostas
+                        O assistente pesquisa trechos relevantes dos documentos para contextualizar as respostas
                       </p>
                     </div>
                     <button
@@ -1612,7 +1614,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       ) : (
                         <Upload className="w-4 h-4" />
                       )}
-                      <span>{uploadingKind === 'rag' ? 'Enviando...' : 'Adicionar documento (PDF, Excel, CSV — máx 5MB)'}</span>
+                      <span>{uploadingKind === 'rag' ? 'A enviar...' : 'Adicionar documento (PDF, Excel, CSV — máx 5MB)'}</span>
                       <input
                         type="file"
                         accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc"
@@ -1625,7 +1627,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
                   {knowledgeLoading ? (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando documentos...
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> A carregar documentos...
                     </div>
                   ) : knowledgeFiles.length === 0 ? (
                     <p className="text-xs text-muted-foreground">Nenhum documento adicionado ainda.</p>
@@ -1666,7 +1668,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                               ) : (
                                 <>
                                   <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words max-h-48 overflow-y-auto bg-muted/40 rounded p-2">
-                                    {fullTextCache[kf.id] ?? kf.preview ?? '—'}
+                                    {fullTextCache[kf.id] ?? kf.preview ?? 'Sem pré-visualização'}
                                   </pre>
                                   {fullTextCache[kf.id] === undefined && kf.char_count > 220 && (
                                     <button
@@ -1694,20 +1696,20 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               <div className="p-4 rounded-lg border bg-muted/30 border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <Send className="w-4 h-4 text-blue-500" />
-                  <h4 className="text-sm font-semibold text-foreground">Arquivos para clientes</h4>
+                  <h4 className="text-sm font-semibold text-foreground">Ficheiros para clientes</h4>
                   <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-medium border border-blue-500/20">
                     Envio pelo canal
                   </span>
                 </div>
 
                 <p className="text-xs text-muted-foreground mb-3">
-                  O assistente <strong>envia</strong> estes arquivos quando o cliente pede pelo <em>nome</em> (ex: "me envia o catálogo"). Cada palavra do nome vira um gatilho de detecção.
+                  O assistente <strong>envia</strong> estes ficheiros quando o cliente pede pelo <em>nome</em> (ex: "me envia o catálogo"). Cada palavra do nome vira um gatilho de detecção.
                 </p>
 
                 <div className="flex flex-col gap-3">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">Enviar arquivos quando pedidos</p>
+                      <p className="text-sm font-medium text-foreground">Enviar ficheiros quando pedidos</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Envia o ficheiro pedido pelo cliente no canal da conversa.
                       </p>
@@ -1730,7 +1732,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   {clientFiles.length >= MAX_KNOWLEDGE_FILES ? (
                     <div className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground">
                       <Lock className="w-4 h-4" />
-                      <span>Limite de {MAX_KNOWLEDGE_FILES} arquivos atingido</span>
+                      <span>Limite de {MAX_KNOWLEDGE_FILES} ficheiros atingido</span>
                     </div>
                   ) : (
                     <label className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 hover:border-blue-500/50 transition-colors">
@@ -1739,7 +1741,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       ) : (
                         <Upload className="w-4 h-4" />
                       )}
-                      <span>{uploadingKind === 'client' ? 'Enviando...' : 'Adicionar arquivo (PDF, Excel, CSV — máx 5MB)'}</span>
+                      <span>{uploadingKind === 'client' ? 'A enviar...' : 'Adicionar ficheiro (PDF, Excel, CSV — máx 5MB)'}</span>
                       <input
                         type="file"
                         accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc"
@@ -1752,10 +1754,10 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
                   {knowledgeLoading ? (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando arquivos...
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> A carregar ficheiros...
                     </div>
                   ) : clientFiles.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nenhum arquivo para clientes adicionado ainda.</p>
+                    <p className="text-xs text-muted-foreground">Nenhum ficheiro para clientes adicionado ainda.</p>
                   ) : (
                     <ul className="space-y-1.5 max-h-96 overflow-y-auto">
                       {clientFiles.map(kf => (
@@ -1770,7 +1772,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                               type="button"
                               onClick={() => handleDeleteKnowledgeFile(kf.id, 'client')}
                               className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                              title="Remover arquivo"
+                              title="Remover ficheiro"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1832,7 +1834,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 ) : (
                   <Check className="w-4 h-4 mr-2" />
                 )}
-                Salvar
+                Guardar
               </Button>
             </div>
         </OverlayModal>
@@ -2017,7 +2019,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 ) : (
                   <Plus className="w-4 h-4 mr-2" />
                 )}
-                {editingAssistantId ? 'Salvar' : 'Criar Assistente'}
+                {editingAssistantId ? 'Guardar' : 'Criar Assistente'}
               </Button>
             </div>
         </OverlayModal>
@@ -2033,7 +2035,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               <h3 className="text-lg font-bold text-foreground">Recurso Premium</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Os assistentes do Marketplace estão disponíveis nos planos pagos.
-                Faça upgrade para conectar e automatizar o seu atendimento.
+                Faça melhorar o plano para ligar e automatizar o seu atendimento.
               </p>
             </div>
             <div className="flex gap-3 w-full">

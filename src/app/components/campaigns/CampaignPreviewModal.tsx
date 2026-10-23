@@ -10,6 +10,7 @@ import {
 import { Button } from '../ui/button';
 import { Upload, X, FileText, Image as ImageIcon, Film, FileType } from 'lucide-react';
 import { toast } from "sonner";
+import { getLocale } from '../../utils/format';
 
 interface CampaignPreviewModalProps {
   isOpen: boolean;
@@ -75,7 +76,7 @@ export default function CampaignPreviewModal({
 
     const filteredFiles = validFiles.filter(file => {
       if (!allowedTypes.includes(file.type)) {
-        toast.error(`${file.name} não é um tipo de arquivo permitido`);
+        toast.error(`${file.name} não é um tipo de ficheiro permitido`);
         return false;
       }
       return true;
@@ -83,7 +84,7 @@ export default function CampaignPreviewModal({
 
     if (filteredFiles.length > 0) {
       onAttachmentsChange([...attachments, ...filteredFiles]);
-      toast.success(`${filteredFiles.length} arquivo(s) adicionado(s)`);
+      toast.success(`${filteredFiles.length} ficheiro(s) adicionado(s)`);
     }
 
     // Reset input
@@ -114,7 +115,7 @@ export default function CampaignPreviewModal({
   const removeAttachment = (index: number) => {
     const newAttachments = attachments.filter((_, i) => i !== index);
     onAttachmentsChange(newAttachments);
-    toast.success('Arquivo removido');
+    toast.success('Ficheiro removido');
   };
 
   const getFileIcon = (file: File) => {
@@ -198,7 +199,7 @@ export default function CampaignPreviewModal({
               )}
 
               <p className="text-xs text-muted-foreground text-right mt-2">
-                {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                {new Date().toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
           </div>
@@ -215,14 +216,14 @@ export default function CampaignPreviewModal({
             <div>
               <p className="font-semibold text-foreground">{subject || 'Sem assunto'}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                De: Sua Empresa &lt;contato@empresa.com&gt;
+                De: Sua Empresa &lt;contacto@empresa.com&gt;
               </p>
               <p className="text-sm text-muted-foreground">
                 Para: {sampleName} &lt;{sampleEmail}&gt;
               </p>
             </div>
             <p className="text-xs text-muted-foreground">
-              {new Date().toLocaleDateString('pt-BR')}
+              {new Date().toLocaleDateString(getLocale())}
             </p>
           </div>
         </div>
@@ -281,7 +282,7 @@ export default function CampaignPreviewModal({
             Prévia da Campanha: {campaignName || 'Sem título'}
           </DialogTitle>
           <DialogDescription>
-            Revise a mensagem e adicione arquivos antes de enviar para {recipientsCount} destinatário(s)
+            Revise a mensagem e adicione ficheiros antes de enviar para {recipientsCount} destinatário(s)
           </DialogDescription>
         </DialogHeader>
 
@@ -327,7 +328,7 @@ export default function CampaignPreviewModal({
                 dragActive ? 'text-green-500' : 'text-muted-foreground/70'
               }`} />
               <p className="text-sm font-medium text-foreground mb-1">
-                Clique ou arraste arquivos para adicionar
+                Clique ou arraste ficheiros para adicionar
               </p>
               <p className="text-xs text-muted-foreground">
                 Imagens, vídeos, PDFs e documentos até 16MB
@@ -338,7 +339,7 @@ export default function CampaignPreviewModal({
             {attachments.length > 0 && (
               <div className="mt-4 space-y-2">
                 <p className="text-sm font-medium text-foreground/80">
-                  Arquivos Anexados ({attachments.length})
+                  Ficheiros Anexados ({attachments.length})
                 </p>
                 {attachments.map((file, index) => (
                   <div

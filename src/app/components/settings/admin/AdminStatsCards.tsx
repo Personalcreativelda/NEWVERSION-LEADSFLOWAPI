@@ -30,7 +30,7 @@ export const AdminStatsCards: React.FC<AdminStatsCardsProps> = ({
             <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <p className={mutedTextClass}>Total Usuários</p>
+            <p className={mutedTextClass}>Total Utilizadores</p>
             <p className="text-2xl font-bold text-foreground">{usersCount}</p>
           </div>
         </div>
@@ -42,7 +42,7 @@ export const AdminStatsCards: React.FC<AdminStatsCardsProps> = ({
             <Users className="w-5 h-5 text-muted-foreground" />
           </div>
           <div>
-            <p className={mutedTextClass}>Free</p>
+            <p className={mutedTextClass}>Grátis</p>
             <p className="text-2xl font-bold text-foreground">{freeCount}</p>
           </div>
         </div>

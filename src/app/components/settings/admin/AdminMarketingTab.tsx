@@ -46,11 +46,11 @@ export const AdminMarketingTab: React.FC<AdminMarketingTabProps> = ({
   const [showPreview, setShowPreview] = useState(false);
 
   const targetOptions: { value: Target; label: string; count: number; icon: React.ReactNode }[] = [
-    { value: 'all', label: 'Todos os usuários', count: totalUsers, icon: <Users className="w-4 h-4" /> },
-    { value: 'free', label: 'Plano Free', count: freeCount, icon: <Users className="w-4 h-4 text-muted-foreground" /> },
+    { value: 'all', label: 'Todos os utilizadores', count: totalUsers, icon: <Users className="w-4 h-4" /> },
+    { value: 'free', label: 'Plano Grátis', count: freeCount, icon: <Users className="w-4 h-4 text-muted-foreground" /> },
     { value: 'business', label: 'Plano Business', count: businessCount, icon: <Rocket className="w-4 h-4 text-primary" /> },
     { value: 'enterprise', label: 'Plano Enterprise', count: enterpriseCount, icon: <Crown className="w-4 h-4 text-violet-500" /> },
-    { value: 'specific', label: 'Usuários específicos', count: selectedUsers.length, icon: <UserCheck className="w-4 h-4 text-teal-500" /> },
+    { value: 'specific', label: 'Utilizadores específicos', count: selectedUsers.length, icon: <UserCheck className="w-4 h-4 text-teal-500" /> },
   ];
 
   const selectedTarget = targetOptions.find(t => t.value === target)!;
@@ -71,15 +71,15 @@ export const AdminMarketingTab: React.FC<AdminMarketingTabProps> = ({
       return;
     }
     if (target === 'specific' && selectedUsers.length === 0) {
-      toast.error('Selecione pelo menos um usuário');
+      toast.error('Selecione pelo menos um utilizador');
       return;
     }
     if (target !== 'specific' && selectedTarget.count === 0) {
-      toast.error('Nenhum usuário no segmento selecionado');
+      toast.error('Nenhum utilizador no segmento selecionado');
       return;
     }
     const count = target === 'specific' ? selectedUsers.length : selectedTarget.count;
-    const confirmed = confirm(`Enviar para ${count} usuário(s)?`);
+    const confirmed = confirm(`Enviar para ${count} utilizador(s)?`);
     if (!confirmed) return;
 
     setSending(true);
@@ -94,7 +94,7 @@ export const AdminMarketingTab: React.FC<AdminMarketingTabProps> = ({
       const res = await apiRequest('/admin/broadcast/email', 'POST', payload);
       if (res.success) {
         setResult({ sent: res.sent, total: res.total, errors: res.errors || [] });
-        toast.success(`Email enviado para ${res.sent} de ${res.total} usuários!`);
+        toast.success(`Email enviado para ${res.sent} de ${res.total} utilizadores!`);
         setSubject('');
         setMessage('');
       }
@@ -233,7 +233,7 @@ ${body}
       const textTemplates: Record<string, { subject: string; message: string }> = {
         welcome: {
           subject: 'Bem-vindo à LeadsFlow API! 🚀',
-          message: `Olá {{name}},\n\nSeja bem-vindo à LeadsFlow API! Estamos felizes em ter você conosco.\n\nCom a nossa plataforma você pode:\n• Gerenciar leads de forma inteligente\n• Enviar campanhas de WhatsApp\n• Automatizar seu atendimento com IA\n\nQualquer dúvida, estamos aqui para ajudar!\n\nAtenciosamente,\nEquipe LeadsFlow API`,
+          message: `Olá {{name}},\n\nSeja bem-vindo à LeadsFlow API! Estamos felizes em ter você conosco.\n\nCom a nossa plataforma você pode:\n• Gerir leads de forma inteligente\n• Enviar campanhas de WhatsApp\n• Automatizar seu atendimento com IA\n\nQualquer dúvida, estamos aqui para ajudar!\n\nAtenciosamente,\nEquipe LeadsFlow API`,
         },
         renewal: {
           subject: '⏰ Seu plano está próximo do vencimento',
@@ -241,11 +241,11 @@ ${body}
         },
         promo: {
           subject: '🎉 Oferta especial para você!',
-          message: `Olá {{name}},\n\nTemos uma oferta especial exclusiva para você!\n\n🚀 Faça upgrade para o plano Business ou Enterprise e tenha acesso a:\n• Leads ilimitados\n• Campanhas em massa\n• Assistentes de IA\n• Suporte prioritário\n\nAproveite agora mesmo em: https://app.leadsflowapi.com/planos\n\nAtenciosamente,\nEquipe LeadsFlow API`,
+          message: `Olá {{name}},\n\nTemos uma oferta especial exclusiva para você!\n\n Faça melhorar o plano para o plano Business ou Enterprise e tenha acesso a:\n• Leads ilimitados\n• Campanhas em massa\n• Assistentes de IA\n• Suporte prioritário\n\nAproveite agora mesmo em: https://app.leadsflowapi.com/planos\n\nAtenciosamente,\nEquipe LeadsFlow API`,
         },
         upgrade: {
           subject: '🎊 Parabéns pelo upgrade! Bem-vindo ao novo plano',
-          message: `Olá {{name}},\n\nParabéns! Seu upgrade foi realizado com sucesso e você já tem acesso a todos os recursos do seu novo plano.\n\n✅ O que você agora tem acesso:\n• Mais leads e mensagens\n• Campanhas em massa avançadas\n• Assistentes de IA personalizados\n• Canais ilimitados\n• Suporte prioritário\n\nComeçe a explorar agora: https://app.leadsflowapi.com\n\nObrigado pela confiança!\nEquipe LeadsFlow API`,
+          message: `Olá {{name}},\n\nParabéns! Seu melhorar o plano foi realizado com sucesso e você já tem acesso a todos os recursos do seu novo plano.\n\n O que você agora tem acesso:\n• Mais leads e mensagens\n• Campanhas em massa avançadas\n• Assistentes de IA personalizados\n• Canais ilimitados\n• Suporte prioritário\n\nComeçe a explorar agora: https://app.leadsflowapi.com\n\nObrigado pela confiança!\nEquipe LeadsFlow API`,
         },
       };
       setSubject(textTemplates[type].subject);
@@ -446,9 +446,9 @@ ${body}
             className="w-full gap-2 h-11 text-base"
           >
             {sending ? (
-              <><Loader2 className="w-5 h-5 animate-spin" /> Enviando...</>
+              <><Loader2 className="w-5 h-5 animate-spin" /> A enviar...</>
             ) : (
-              <><Send className="w-5 h-5" /> Enviar para {target === 'specific' ? selectedUsers.length : selectedTarget.count} usuário(s)</>
+              <><Send className="w-5 h-5" /> Enviar para {target === 'specific' ? selectedUsers.length : selectedTarget.count} utilizador(s)</>
             )}
           </Button>
 
@@ -462,7 +462,7 @@ ${body}
               <CheckCircle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${result.errors.length === 0 ? 'text-green-500' : 'text-orange-500'}`} />
               <div className="text-sm">
                 <p className="font-medium text-foreground">
-                  Enviado para {result.sent} de {result.total} usuários
+                  Enviado para {result.sent} de {result.total} utilizadores
                 </p>
                 {result.errors.length > 0 && (
                   <div className="mt-1 space-y-0.5 text-muted-foreground text-xs">
@@ -491,24 +491,24 @@ ${body}
             </div>
             <div className="flex items-start gap-2 text-xs text-muted-foreground">
               <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-              <span>Apenas usuários ativos receberão o email.</span>
+              <span>Apenas utilizadores ativos receberão o email.</span>
             </div>
           </div>
 
           {/* Templates */}
           <div className="p-4 rounded-xl border border-border bg-card space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm text-foreground">Templates Rápidos</h3>
+              <h3 className="font-semibold text-sm text-foreground">Modelos Rápidos</h3>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                 isHtml ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
               }`}>{isHtml ? 'HTML' : 'Texto'}</span>
             </div>
             <div className="space-y-2">
               {[
-                { key: 'welcome' as const, label: '👋 Boas-vindas', desc: 'Mensagem de boas-vindas à plataforma' },
-                { key: 'upgrade' as const, label: '🎊 Upgrade realizado', desc: 'Parabéns pelo upgrade de plano' },
-                { key: 'renewal' as const, label: '⏰ Renovação', desc: 'Lembrete de vencimento de plano' },
-                { key: 'promo' as const, label: '🎉 Promoção', desc: 'Oferta de upgrade de plano' },
+                { key: 'welcome' as const, label: 'Boas-vindas', desc: 'Mensagem de boas-vindas à plataforma' },
+                { key: 'upgrade' as const, label: 'Melhorar plano realizado', desc: 'Parabéns pelo upgrade de plano' },
+                { key: 'renewal' as const, label: 'Renovação', desc: 'Lembrete de vencimento de plano' },
+                { key: 'promo' as const, label: 'Promoção', desc: 'Oferta de upgrade de plano' },
               ].map(t => (
                 <button
                   key={t.key}
@@ -526,7 +526,7 @@ ${body}
           <div className="p-4 rounded-xl border border-border/50 bg-muted/20 space-y-2">
             <h3 className="font-semibold text-sm text-foreground">Dicas</h3>
             <ul className="space-y-1.5 text-xs text-muted-foreground">
-              <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5">•</span> Use {'{{name}}'} para personalizar com o nome do usuário</li>
+              <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5">•</span> Use {'{{name}}'} para personalizar com o nome do utilizador</li>
               <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5">•</span> Use {'{{email}}'} para incluir o email na mensagem</li>
               {isHtml && <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5">•</span> Clique em <strong>Preview</strong> para visualizar o email renderizado</li>}
               {isHtml && <li className="flex items-start gap-1.5"><span className="text-primary mt-0.5">•</span> Use estilos inline para compatibilidade máxima com clientes de email</li>}

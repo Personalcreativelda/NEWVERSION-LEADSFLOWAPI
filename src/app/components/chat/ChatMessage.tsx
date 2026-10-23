@@ -1,5 +1,6 @@
 import { MessageCircle, User, AlertCircle, RotateCcw } from 'lucide-react';
 import type { Message, QuickReply } from './ChatWidget';
+import { getLocale } from '../../utils/format';
 
 interface ChatMessageProps {
   message: Message;
@@ -48,7 +49,7 @@ export function ChatMessage({ message, onRetry, onQuickReply }: ChatMessageProps
               }`}
             >
               <span>
-                {message.timestamp.toLocaleTimeString('pt-BR', {
+                {message.timestamp.toLocaleTimeString(getLocale(), {
                   hour: '2-digit',
                   minute: '2-digit'
                 })}

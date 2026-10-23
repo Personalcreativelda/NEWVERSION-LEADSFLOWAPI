@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { aiAssistantsApi } from '../../../services/api/inbox';
 import { AssistantForm } from './AssistantForm';
 import type { AIAssistant } from '../../../types/inbox';
+import { EmptyState } from '../../base/EmptyState';
+import { Bot, Plus } from 'lucide-react';
 
 export function AssistantsList() {
     const [assistants, setAssistants] = useState<AIAssistant[]>([]);
@@ -103,7 +105,7 @@ export function AssistantsList() {
                         >
                             <div className="flex items-start gap-4">
                                 <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-xl text-purple-600 dark:text-purple-400">
-                                    {assistant.mode === 'llm' ? '🧠' : '🔗'}
+                                    {assistant.mode === 'llm' ? '' : ''}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
@@ -164,7 +166,7 @@ export function AssistantsList() {
                                     <button
                                         onClick={() => handleDelete(assistant.id)}
                                         className="p-2 text-muted-foreground/70 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                        title="Excluir"
+                                        title="Eliminar"
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -176,35 +178,23 @@ export function AssistantsList() {
                     ))}
 
                     {assistants.length === 0 && (
-                        <div 
-                            className="flex flex-col items-center justify-center p-12 rounded-2xl border-2 border-dashed text-center"
-                            style={{ 
-                                backgroundColor: 'hsl(var(--muted))',
-                                borderColor: 'hsl(var(--border))'
-                            }}
-                        >
-                            <div 
-                                className="w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl"
-                                style={{ backgroundColor: 'hsl(var(--background))' }}
-                            >
-                                🤖
-                            </div>
-                            <h3 className="text-lg font-medium mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                Nenhum assistente criado
-                            </h3>
-                            <p className="max-w-sm mb-6" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Crie um assistente para responder seus clientes automaticamente 24h por dia.
-                            </p>
-                            <button
-                                onClick={() => {
-                                    setSelectedAssistant(undefined);
-                                    setIsEditing(true);
-                                }}
-                                className="text-purple-600 font-medium hover:underline"
-                            >
-                                Criar Primeiro Assistente
-                            </button>
-                        </div>
+                        <EmptyState
+                            icon={Bot}
+                            title="Ainda não tem assistentes"
+                            description="Um assistente responde aos seus clientes automaticamente, a qualquer hora."
+                            action={
+                                <button
+                                    onClick={() => {
+                                        setSelectedAssistant(undefined);
+                                        setIsEditing(true);
+                                    }}
+                                    className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Criar assistente
+                                </button>
+                            }
+                        />
                     )}
                 </div>
             )}

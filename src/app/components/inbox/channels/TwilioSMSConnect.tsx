@@ -138,7 +138,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
             }, 1500);
         } catch (err: any) {
             console.error('[TwilioSMS] Error creating/updating channel:', err);
-            setError(err.response?.data?.error || 'Erro ao salvar canal SMS. Verifique as credenciais.');
+            setError(err.response?.data?.error || 'Erro ao guardar canal SMS. Verifique as credenciais.');
         } finally {
             setLoading(false);
         }
@@ -156,7 +156,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
                     </DialogTitle>
                     <DialogDescription className="text-xs sm:text-sm">
                         {isEditing 
-                            ? 'Atualize as configurações do seu canal SMS' 
+                            ? 'Atualize as definições do seu canal SMS' 
                             : 'Configure suas credenciais Twilio para enviar e receber SMS'}
                     </DialogDescription>
                 </DialogHeader>
@@ -275,7 +275,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
                         <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">
                             <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                             <AlertDescription className="text-xs sm:text-sm text-blue-900 dark:text-blue-100">
-                                <strong className="block mb-2">📋 Após criar o canal:</strong>
+                                <strong className="block mb-2">Após criar o canal:</strong>
                                 <ol className="list-decimal list-inside space-y-1 text-[10px] sm:text-xs break-words">
                                     <li>Vá para <a href="https://console.twilio.com/us1/develop/phone-numbers/manage/incoming" target="_blank" className="underline">Phone Numbers</a> no Twilio</li>
                                     <li>Clique no número que você configurou acima</li>
@@ -311,7 +311,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                 {loading ? (
                                     <>
                                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        {isEditing ? 'Atualizando...' : 'Criando Canal...'}
+                                        {isEditing ? 'A atualizar...' : 'A criar Canal...'}
                                     </>
                                 ) : (
                                     <>

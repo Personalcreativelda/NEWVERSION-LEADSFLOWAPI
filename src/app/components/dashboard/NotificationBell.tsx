@@ -14,6 +14,7 @@ import {
 import { Badge } from '../ui/badge';
 import { apiRequest } from '../../utils/api';
 import { cn } from '../ui/utils';
+import { getLocale } from '../../utils/format';
 
 // ✅ TIPOS DE NOTIFICAÇÃO RELEVANTES AO CRM
 type NotificationType = 
@@ -408,7 +409,7 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
     if (hours < 24) return `${hours}h atrás`;
     if (days === 1) return 'ontem';
     if (days < 7) return `${days}d atrás`;
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+    return date.toLocaleDateString(getLocale(), { day: '2-digit', month: 'short' });
   };
 
   // ✅ AGRUPAMENTO POR DATA

@@ -56,7 +56,7 @@ export default function ConnectionStatus() {
         <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950">
           <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
           <AlertTitle className="text-blue-900 dark:text-blue-100">
-            Verificando conexão...
+            A verificar ligação...
           </AlertTitle>
           <AlertDescription className="text-blue-700 dark:text-blue-300">
             Aguarde enquanto verificamos o backend.
@@ -68,15 +68,15 @@ export default function ConnectionStatus() {
         <Alert className="border-red-500 bg-red-50 dark:bg-red-950 shadow-lg">
           <XCircle className="h-5 w-5 text-red-600" />
           <AlertTitle className="text-red-900 dark:text-red-100 font-semibold text-base">
-            ⚠️ API do LeadFlow está offline
-          </AlertTitle>
+            API do LeadFlow está offline
+ </AlertTitle>
           <AlertDescription className="text-red-700 dark:text-red-300 space-y-3">
             <p className="text-sm font-medium">
               O backend Node/Express + Postgres não respondeu ao health check. Suba o container ou execute o deploy.
             </p>
             
             <div className="bg-white dark:bg-gray-900 rounded p-3 border border-red-200 dark:border-red-800">
-              <p className="font-semibold mb-2 text-sm">⚡ Reiniciar backend local:</p>
+              <p className="font-semibold mb-2 text-sm">Reiniciar backend local:</p>
               
               <div className="space-y-2 text-xs">
                 <div>
@@ -127,7 +127,7 @@ export default function ConnectionStatus() {
 
             {showDetails && (
               <div className="mt-3 p-3 bg-white dark:bg-gray-900 rounded border border-red-200 dark:border-red-800 text-xs">
-                <p className="font-semibold mb-2">🩺 Endpoint monitorado:</p>
+                <p className="font-semibold mb-2">Endpoint monitorado:</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded break-all">{healthEndpoint}</code>
                   <Button size="sm" variant="ghost" className="h-7 px-2" onClick={handleCopyEndpoint}>
@@ -139,7 +139,7 @@ export default function ConnectionStatus() {
                   </Button>
                 </div>
 
-                <p className="font-semibold mt-3 mb-2">📖 Arquivos de ajuda:</p>
+                <p className="font-semibold mt-3 mb-2">Ficheiros de ajuda:</p>
                 <ul className="list-disc list-inside space-y-1">
                   <li><code>BACKEND_DEPLOY_QUICK.md</code> - Passo a passo de deploy</li>
                   <li><code>FIX_BACKEND_OFFLINE.md</code> - Guia de diagnóstico</li>
@@ -147,7 +147,7 @@ export default function ConnectionStatus() {
                   <li><code>deploy-backend.ps1</code> - Script Windows</li>
                 </ul>
                 
-                <p className="font-semibold mt-3 mb-1">✅ Check-list:</p>
+                <p className="font-semibold mt-3 mb-1">Check-list:</p>
                 <ol className="list-decimal list-inside space-y-1">
                   <li>API respondendo em {healthEndpoint}</li>
                   <li>Containers <code>backend</code> e <code>db</code> ativos</li>

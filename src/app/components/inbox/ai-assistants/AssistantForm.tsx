@@ -56,7 +56,7 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
             onSuccess();
         } catch (error) {
             console.error('Error saving assistant:', error);
-            alert('Erro ao salvar assistente');
+            alert('Erro ao guardar assistente');
         } finally {
             setLoading(false);
         }
@@ -112,7 +112,7 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                                 checked={formData.mode === 'llm'}
                                 onChange={() => setFormData({ ...formData, mode: 'llm' })}
                             />
-                            <div className="text-2xl">🧠</div>
+                            <div className="text-2xl"></div>
                             <div>
                                 <div className="font-semibold text-foreground">Inteligência Artificial</div>
                                 <div className="text-xs text-muted-foreground mt-0.5">Gemini, GPT ou Claude</div>
@@ -131,7 +131,7 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                                 checked={formData.mode === 'webhook'}
                                 onChange={() => setFormData({ ...formData, mode: 'webhook' })}
                             />
-                            <div className="text-2xl">🔗</div>
+                            <div className="text-2xl"></div>
                             <div>
                                 <div className="font-semibold text-foreground">Webhook Externo</div>
                                 <div className="text-xs text-muted-foreground mt-0.5">n8n, Typebot, Zapier</div>
@@ -257,7 +257,7 @@ export function AssistantForm({ assistant, onSuccess, onCancel }: AssistantFormP
                         className={`px-6 py-2 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 transition-colors shadow-lg
               ${loading ? 'opacity-70 cursor-not-allowed' : 'active:scale-95 transform transition-transform'}`}
                     >
-                        {loading ? 'Salvando...' : 'Salvar Assistente'}
+                        {loading ? 'A guardar...' : 'Guardar Assistente'}
                     </button>
                 </div>
             </form>

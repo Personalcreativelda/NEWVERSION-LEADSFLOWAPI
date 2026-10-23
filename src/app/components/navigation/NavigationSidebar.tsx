@@ -96,7 +96,7 @@ export default function NavigationSidebar({
     { id: 'users', label: 'Usu\u00e1rios', icon: Users },
     { id: 'activity', label: 'Atividade', icon: BarChart3 },
     { id: 'marketing', label: 'Marketing', icon: Megaphone },
-    { id: 'feedback', label: 'Feedbacks', icon: MessageSquare },
+    { id: 'feedback', label: 'Opiniões', icon: MessageSquare },
     { id: 'diagnostics', label: 'Diagn\u00f3sticos', icon: Activity },
     { id: 'settings', label: 'Configura\u00e7\u00f5es', icon: Settings },
   ];
@@ -480,8 +480,8 @@ export default function NavigationSidebar({
                     value={sidebarSearch}
                     onChange={e => setSidebarSearch(e.target.value)}
                     onKeyDown={handleSearchKeyDown}
-                    placeholder="Buscar páginas..."
-                    aria-label="Buscar páginas"
+                    placeholder="Pesquisar páginas..."
+                    aria-label="Pesquisar páginas"
                     className="sidebar-search-input w-full pl-8 pr-3 py-[7px] text-[12px] rounded-md"
                   />
                 </div>
@@ -587,7 +587,7 @@ export default function NavigationSidebar({
               <div className="sidebar-profile-menu absolute bottom-full left-2 right-2 mb-2 rounded-xl shadow-2xl overflow-hidden z-[500]">
                 <div className="sidebar-section-border px-4 py-3">
                   <p className="text-sm font-semibold truncate text-[hsl(var(--sidebar-foreground))]">
-                    {user?.name || 'Usuário'}
+                    {user?.name || 'Utilizador'}
                   </p>
                   <p className="text-xs truncate mt-0.5 text-[hsl(var(--sidebar-muted))]">
                     {user?.email || ''}
@@ -599,7 +599,7 @@ export default function NavigationSidebar({
                     className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[14px] transition-colors duration-150 text-[hsl(var(--sidebar-foreground)/0.8)] hover:bg-[hsl(var(--sidebar-border))]"
                   >
                     <UserCog className="w-4 h-4 flex-shrink-0" />
-                    Configurações da Conta
+                    Definições da Conta
                   </button>
                 </div>
               </div>
@@ -619,7 +619,7 @@ export default function NavigationSidebar({
                   </span>
                 )}
                 <span className="flex-1 min-w-0">
-                  <span className="block text-[15px] font-semibold truncate text-[hsl(var(--sidebar-foreground))]">{user?.name || 'Usuário'}</span>
+                  <span className="block text-[15px] font-semibold truncate text-[hsl(var(--sidebar-foreground))]">{user?.name || 'Utilizador'}</span>
                   <span className="block text-xs truncate text-[hsl(var(--sidebar-muted))]">{user?.email || ''}</span>
                 </span>
                 <ChevronRight className="w-4 h-4 flex-shrink-0 text-[hsl(var(--sidebar-muted))]" />
@@ -631,7 +631,7 @@ export default function NavigationSidebar({
               <div className="grid grid-cols-4 gap-1 px-2 pt-1 pb-2">
                 {[
                   { label: 'Ajuda', icon: HelpCircle, onClick: () => { onClose(); onHelp?.(); } },
-                  { label: 'Feedback', icon: Star, onClick: () => { onClose(); onFeedback?.(); } },
+                  { label: 'Opinião', icon: Star, onClick: () => { onClose(); onFeedback?.(); } },
                   { label: 'Suporte', icon: LifeBuoy, onClick: () => { onClose(); openSupportChat(); } },
                   ...(onLogout ? [{ label: 'Sair', icon: LogOut, onClick: onLogout, danger: true }] : []),
                 ].map(({ label, icon: ActionIcon, onClick, danger }: any) => (
@@ -689,7 +689,7 @@ export default function NavigationSidebar({
                     <Star className="w-5 h-5" />
                   </button>
                   <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2.5 z-[500] pointer-events-none opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0 transition-all duration-150">
-                    <div className="sidebar-tooltip px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap">Feedback</div>
+                    <div className="sidebar-tooltip px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap">Opinião</div>
                   </div>
                 </div>
               ) : (
@@ -698,7 +698,7 @@ export default function NavigationSidebar({
                   className="sidebar-nav-item sidebar-item-inactive w-full flex items-center gap-2.5 px-3 py-[7px] rounded-lg transition-all duration-150 text-[14px] font-medium"
                 >
                   <Star className="w-[17px] h-[17px] flex-shrink-0 text-[hsl(var(--sidebar-muted))]" />
-                  <span>Feedback</span>
+                  <span>Opinião</span>
                 </button>
               )}
 

@@ -60,7 +60,7 @@ export const AdminRevenueBreakdown: React.FC<AdminRevenueBreakdownProps> = ({ re
                 <p className={tinyMutedTextClass}>${bMonthlyPrice}/mês cada</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-foreground">{revenue.businessMonthlyCount} usuários</p>
+                <p className="font-bold text-foreground">{revenue.businessMonthlyCount} utilizadores</p>
                 <p className="text-sm text-blue-600 dark:text-blue-400">${revenue.businessMonthlyCount * bMonthlyPrice}/mês</p>
               </div>
             </div>
@@ -71,7 +71,7 @@ export const AdminRevenueBreakdown: React.FC<AdminRevenueBreakdownProps> = ({ re
                 <p className={tinyMutedTextClass}>${bAnnualPrice}/ano cada</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-foreground">{revenue.businessAnnualCount} usuários</p>
+                <p className="font-bold text-foreground">{revenue.businessAnnualCount} utilizadores</p>
                 <p className="text-sm text-blue-600 dark:text-blue-400">${revenue.businessAnnualCount * bAnnualPrice}/ano</p>
               </div>
             </div>
@@ -108,7 +108,7 @@ export const AdminRevenueBreakdown: React.FC<AdminRevenueBreakdownProps> = ({ re
                 <p className={tinyMutedTextClass}>${eMonthlyPrice}/mês cada</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-foreground">{revenue.enterpriseMonthlyCount} usuários</p>
+                <p className="font-bold text-foreground">{revenue.enterpriseMonthlyCount} utilizadores</p>
                 <p className="text-sm text-purple-600 dark:text-purple-400">${revenue.enterpriseMonthlyCount * eMonthlyPrice}/mês</p>
               </div>
             </div>
@@ -119,7 +119,7 @@ export const AdminRevenueBreakdown: React.FC<AdminRevenueBreakdownProps> = ({ re
                 <p className={tinyMutedTextClass}>${eAnnualPrice}/ano cada</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-foreground">{revenue.enterpriseAnnualCount} usuários</p>
+                <p className="font-bold text-foreground">{revenue.enterpriseAnnualCount} utilizadores</p>
                 <p className="text-sm text-purple-600 dark:text-purple-400">${revenue.enterpriseAnnualCount * eAnnualPrice}/ano</p>
               </div>
             </div>

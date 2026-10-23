@@ -171,7 +171,7 @@ export function ForwardMessageModal({
                         className="w-full"
                     >
                         {!forwarding && <Forward className="w-4 h-4" />}
-                        {forwarding ? 'Enviando...' : 'Reencaminhar'}
+                        {forwarding ? 'A enviar...' : 'Reencaminhar'}
                     </AppButton>
                 </div>
             </div>

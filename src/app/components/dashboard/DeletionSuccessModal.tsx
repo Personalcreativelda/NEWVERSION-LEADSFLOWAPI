@@ -49,14 +49,14 @@ export default function DeletionSuccessModal({
               <span className="text-green-600 dark:text-green-400">
                 {deletedCount} lead(s)
               </span>{' '}
-              foram deletados permanentemente do servidor.
+              foram apagados permanentemente do servidor.
             </p>
           ) : (
             <p className="text-muted-foreground">
               <span className="text-green-600 dark:text-green-400">
                 {deletedCount} lead(s)
               </span>{' '}
-              deletados,{' '}
+              apagados,{' '}
               <span className="text-amber-600 dark:text-amber-400">
                 {errorCount} erro(s)
               </span>
@@ -72,7 +72,7 @@ export default function DeletionSuccessModal({
             <span className="text-foreground">{totalBefore} leads</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Deletados:</span>
+            <span className="text-muted-foreground">Apagados:</span>
             <span className="text-red-600 dark:text-red-400">-{deletedCount} leads</span>
           </div>
           <div className="h-px bg-border"></div>

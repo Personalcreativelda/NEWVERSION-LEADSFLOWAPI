@@ -21,7 +21,7 @@ export default function PayPalButton({ planId }: PayPalButtonProps) {
     console.error(`PayPal payment link not configured for: ${planId}`);
     return (
       <div className="text-center text-red-500 text-sm p-4">
-        Link de pagamento não configurado. Entre em contato com o suporte.
+        Link de pagamento não configurado. Entre em contacto com o suporte.
       </div>
     );
   }

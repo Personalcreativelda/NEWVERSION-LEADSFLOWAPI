@@ -82,7 +82,7 @@ export default function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPage
                 <p className="text-[15px]" style={{ color: '#6B7280', fontWeight: 300 }}>
                   Se existe uma conta com o email{' '}
                   <span style={{ fontWeight: 500, color: '#1A2C44' }}>{email}</span>,
-                  você receberá um link para redefinir sua senha.
+                  você receberá um link para redefinir sua palavra-passe.
                 </p>
                 <p className="text-[13px] mt-2" style={{ color: '#8A9BB0', fontWeight: 300 }}>
                   Verifique sua caixa de entrada e spam. O link é válido por 1 hora.
@@ -105,7 +105,7 @@ export default function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPage
             /* ── Form state ── */
             <>
               <h1 className="text-[28px] font-semibold leading-[36px] mb-2" style={{ color: '#1A2C44' }}>
-                Recuperar senha
+                Recuperar palavra-passe
               </h1>
               <p className="text-[15px] mb-7" style={{ color: '#6B7280', fontWeight: 300 }}>
                 Digite seu email para receber o link de recuperação.
@@ -161,7 +161,7 @@ export default function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPage
                   }}
                   className="transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading ? 'Enviando...' : 'Enviar link de recuperação'}
+                  {loading ? 'A enviar...' : 'Enviar link de recuperação'}
                 </AppButton>
               </form>
 

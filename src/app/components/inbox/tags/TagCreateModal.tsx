@@ -219,7 +219,7 @@ export default function TagCreateModal({ onClose, onCreate }: TagCreateModalProp
                             }}
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? 'Criando...' : 'Criar'}
+                            {isSubmitting ? 'A criar...' : 'Criar'}
                         </button>
                     </div>
                 </form>

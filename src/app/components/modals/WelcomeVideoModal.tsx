@@ -22,8 +22,8 @@ export default function WelcomeVideoModal({ isOpen, onClose, onOpenFeedback }: W
         >
           <div>
             <h2 className="text-base sm:text-lg font-bold" style={{ color: 'hsl(var(--foreground))' }}>
-              👋 Bem-vindo à LeadsFlow!
-            </h2>
+              Bem-vindo à LeadsFlow!
+ </h2>
             <p className="text-xs sm:text-sm mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
               Veja o que você pode fazer com a plataforma
             </p>

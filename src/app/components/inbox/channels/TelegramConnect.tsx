@@ -99,7 +99,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                         bot_name: data.result.first_name
                     }
                 });
-                toast.success('Telegram conectado com sucesso!');
+                toast.success('Telegram ligado com sucesso!');
             }
 
             setConnectionStatus('connected');
@@ -112,7 +112,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
 
         } catch (err: any) {
             console.error('[Telegram] Error:', err);
-            setError(err.response?.data?.message || err.message || 'Erro ao conectar com Telegram');
+            setError(err.response?.data?.message || err.message || 'Erro ao ligar com Telegram');
             setConnectionStatus('error');
         } finally {
             setLoading(false);
@@ -142,10 +142,10 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                {isEditing ? 'Editar Canal Telegram' : 'Conectar Telegram'}
+                                {isEditing ? 'Editar Canal Telegram' : 'Ligar Telegram'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                {isEditing ? 'Atualize as configurações do bot' : 'Configure seu bot do Telegram'}
+                                {isEditing ? 'Atualize as definições do bot' : 'Configure seu bot do Telegram'}
                             </p>
                         </div>
                     </div>
@@ -225,8 +225,8 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                     }}
                                 >
                                     <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white text-xl">
-                                        🤖
-                                    </div>
+                                        
+ </div>
                                     <div>
                                         <p className="font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
                                             {botInfo.first_name}
@@ -256,12 +256,12 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            {isEditing ? 'Atualizando...' : 'Validando...'}
+                                            {isEditing ? 'A atualizar...' : 'A validar...'}
                                         </>
                                     ) : (
                                         <>
                                             <Check className="w-4 h-4" />
-                                            {isEditing ? 'Atualizar Canal' : 'Conectar'}
+                                            {isEditing ? 'Atualizar Canal' : 'Ligar'}
                                         </>
                                     )}
                                 </button>
@@ -286,13 +286,13 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 <CheckCircle className="w-10 h-10 text-green-500" />
                             </div>
                             <h3 className="text-xl font-semibold mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                Telegram Conectado!
+                                Telegram Ligado!
                             </h3>
                             <p className="text-sm mb-4" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 Seu bot <strong>@{botInfo?.username}</strong> está pronto para receber mensagens.
                             </p>
                             <div className="animate-pulse text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Redirecionando...
+                                A redirecionar...
                             </div>
                         </div>
                     )}

@@ -24,13 +24,13 @@ interface AdminLayoutProps {
 }
 
 const navItems: { id: AdminTab; label: string; icon: React.ComponentType<any> }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'users', label: 'Usuários', icon: Users },
+  { id: 'dashboard', label: 'Painel', icon: LayoutDashboard },
+  { id: 'users', label: 'Utilizadores', icon: Users },
   { id: 'activity', label: 'Atividade', icon: BarChart3 },
   { id: 'marketing', label: 'Marketing', icon: Megaphone },
-  { id: 'feedback', label: 'Feedbacks', icon: MessageSquare },
+  { id: 'feedback', label: 'Opiniões', icon: MessageSquare },
   { id: 'diagnostics', label: 'Diagnósticos', icon: Activity },
-  { id: 'settings', label: 'Configurações', icon: Settings },
+  { id: 'settings', label: 'Definições', icon: Settings },
 ];
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({

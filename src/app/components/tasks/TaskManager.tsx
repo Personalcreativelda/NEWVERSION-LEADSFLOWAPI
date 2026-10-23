@@ -112,7 +112,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
         return updated;
       });
       toast.success(
-        `📅 Agendamento detectado automaticamente!`,
+        `Agendamento detectado automaticamente!`,
         {
           description: task.title,
           duration: 6000,
@@ -192,9 +192,9 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   };
 
   const handleDeleteTask = (taskId: string) => {
-    if (confirm('Tem certeza que deseja deletar esta tarefa?')) {
+    if (confirm('Tem certeza que deseja apagar esta tarefa?')) {
       setTasks(tasks.filter(t => t.id !== taskId));
-      toast.success('Tarefa deletada');
+      toast.success('Tarefa apagada');
     }
   };
 
@@ -225,7 +225,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
         title="Tarefas e Follow-ups"
         description="Atividades e lembretes da sua equipa"
         icon={CheckSquare}
-        actions={<PageAction variant="primary" icon={Plus} label="Nova tarefa" onClick={() => setShowNewTaskModal(true)} />}
+        create={{ label: 'Nova tarefa', onClick: () => setShowNewTaskModal(true) }}
       />
 
       {/* Stats Cards */}
@@ -393,8 +393,8 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
 
                           {(task as any).source === 'ai_assistant' && (
                             <Badge className="gap-1 bg-violet-100 text-violet-700 border-violet-200">
-                              🤖 IA
-                            </Badge>
+                              IA
+ </Badge>
                           )}
 
                           <Badge className={priorityInfo.color}>

@@ -246,7 +246,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
         
         // If the response indicates we need to wait, show message
         if (response.needsWait) {
-          setError({ message: '✅ Conta de teste criada! Aguarde 10 segundos e clique em "Entrar".\n\nEmail: demo@leadflow.com\nSenha: demo123456', type: 'general' });
+          setError({ message: 'Conta de teste criada! Aguarde 10 segundos e clique em "Entrar".\n\nEmail: demo@leadflow.com\nSenha: demo123456', type: 'general' });
           setLoading(false);
           return;
         }
@@ -260,7 +260,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
             onSuccess();
           } catch (loginErr: any) {
             console.error('Auto-login failed:', loginErr);
-            setError({ message: '✅ Conta criada! Clique em "Entrar" para acessar.\n\nEmail: demo@leadflow.com\nSenha: demo123456', type: 'general' });
+            setError({ message: 'Conta criada! Clique em "Entrar" para acessar.\n\nEmail: demo@leadflow.com\nSenha: demo123456', type: 'general' });
             setLoading(false);
           }
         }, 3000);
@@ -292,7 +292,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
       setPassword('admin123456');
 
       // Show success message
-      setError({ message: '✅ Conta admin criada/atualizada!\n\n📧 Email: admin@leadflow.com\n🔑 Senha: admin123456\n\n⏳ Fazendo login em 6 segundos...', type: 'general' });
+      setError({ message: 'Conta admin criada/atualizada!\n\n Email: admin@leadflow.com\n Palavra-passe: admin123456\n\n Fazendo login em 6 segundos...', type: 'general' });
 
       // Wait 6 seconds then try login
       console.log('Waiting 6 seconds before login attempt...');
@@ -310,13 +310,13 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           }
         } catch (loginErr: any) {
           console.error('❌ Auto-login failed:', loginErr);
-          setError({ message: '✅ Conta admin criada!\n\n📧 Email: admin@leadflow.com\n🔑 Senha: admin123456\n\n👆 Os campos estão preenchidos - clique em "Sign in"', type: 'general' });
+          setError({ message: 'Conta admin criada!\n\n Email: admin@leadflow.com\n Palavra-passe: admin123456\n\n Os campos estão preenchidos - clique em "Sign in"', type: 'general' });
           setLoading(false);
         }
       }, 6000);
     } catch (err: any) {
       console.error('❌ Admin setup error:', err);
-      setError({ message: '❌ Erro:\n' + (err.message || 'Não foi possível criar a conta admin.'), type: 'general' });
+      setError({ message: 'Erro:\n' + (err.message || 'Não foi possível criar a conta admin.'), type: 'general' });
       setLoading(false);
     }
   };
@@ -399,7 +399,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           setError({ message: `Muitas tentativas incorretas. Aguarde ${LOCKOUT_SECONDS} segundos para tentar novamente.`, type: 'rate_limit' });
         } else {
           setError({
-            message: `Email ou senha incorretos. ${MAX_ATTEMPTS - newAttempts} tentativa${MAX_ATTEMPTS - newAttempts === 1 ? '' : 's'} restante${MAX_ATTEMPTS - newAttempts === 1 ? '' : 's'}.`,
+            message: `Email ou palavra-passe incorretos. ${MAX_ATTEMPTS - newAttempts} tentativa${MAX_ATTEMPTS - newAttempts === 1 ? '' : 's'} restante${MAX_ATTEMPTS - newAttempts === 1 ? '' : 's'}.`,
             type: 'invalid_credentials',
           });
         }
@@ -564,7 +564,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
     } catch (err: any) {
       console.error('Google sign-in error:', err);
       setError({
-        message: err.message || 'Erro ao conectar com Google. Verifique se o Supabase está configurado corretamente.',
+        message: err.message || 'Erro ao ligar com Google. Verifique se o Supabase está configurado corretamente.',
         type: 'general',
       });
       setLoading(false);
@@ -646,17 +646,17 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label htmlFor="password" style={{ fontSize: '14px', color: c.label, fontWeight: 500 }}>Senha</label>
+                <label htmlFor="password" style={{ fontSize: '14px', color: c.label, fontWeight: 500 }}>Palavra-passe</label>
                 <button type="button"
                   onClick={() => onForgotPassword ? onForgotPassword() : setShowForgotPassword(true)}
                   style={{ fontSize: '14px', color: c.link, fontWeight: 300 }}
                   className="transition-colors hover:text-[#635BFF]">
-                  Esqueceu a senha?
+                  Esqueceu a palavra-passe?
                 </button>
               </div>
               <div className="relative">
                 <Input ref={passwordRef} id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password"
-                  placeholder="Sua senha" value={password}
+                  placeholder="Sua palavra-passe" value={password}
                   onChange={(e) => handlePasswordChange(e.target.value)} required
                   aria-invalid={!!fieldErrors.password} aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                   style={{
@@ -844,7 +844,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
               <AppButton type="submit" loading={twoFAStatus === 'loading'} disabled={twoFACode.length < 6}
                 style={{ width: '100%', background: '#675DFF', borderRadius: '6px', height: '44px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
                 className="transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed">
-                {twoFAStatus === 'loading' ? 'Verificando...' : 'Verificar'}
+                {twoFAStatus === 'loading' ? 'A verificar...' : 'Verificar'}
               </AppButton>
             </form>
             <button type="button" style={{ width: '100%', textAlign: 'center', fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}
@@ -865,7 +865,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           className="p-8 space-y-0"
           title={
             <div className="text-center space-y-1.5 w-full" style={{ fontFamily: FONT }}>
-              <span className="block" style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Recuperar senha</span>
+              <span className="block" style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Recuperar palavra-passe</span>
               <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>Digite seu email para receber o link de recuperação</p>
             </div>
           }
@@ -873,7 +873,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           <div className="space-y-6 pt-6" style={{ fontFamily: FONT }}>
             {resetSuccess && (
               <div className="p-4 rounded-[8px]" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-                <p style={{ fontSize: '14px', color: '#15803D' }}>✅ Email enviado! Verifique sua caixa de entrada.</p>
+                <p style={{ fontSize: '14px', color: '#15803D' }}>Email enviado! Verifique sua caixa de entrada.</p>
               </div>
             )}
             {error && (
@@ -898,7 +898,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
                 <AppButton type="submit" loading={loading}
                   style={{ flex: 1, background: '#675DFF', borderRadius: '6px', height: '44px', fontSize: '14px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
                   className="transition-all hover:brightness-110 disabled:opacity-60">
-                  {loading ? 'Enviando...' : 'Enviar link'}
+                  {loading ? 'A enviar...' : 'Enviar link'}
                 </AppButton>
               </div>
             </form>

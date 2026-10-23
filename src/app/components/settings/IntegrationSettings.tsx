@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Copy, Check, Webhook, BarChart3, Facebook, RefreshCw, Sheet } from 'lucide-react';
+import { Copy, Check, Webhook, BarChart3, Facebook, Sheet, Loader2, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectId } from '../../utils/supabase/info';
 import { canUseFeature } from '../../utils/planUtils';
+import { getLocale } from '../../utils/format';
 
 interface IntegrationSettingsProps {
   user: any;
@@ -132,14 +133,14 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
         }
 
         setSaved(true);
-        toast.success('Configurações salvas com sucesso!');
+        toast.success('Definições guardadas com sucesso!');
         setTimeout(() => setSaved(false), 3000);
       } else {
-        toast.error('Erro ao salvar configurações');
+        toast.error('Erro ao guardar definições');
       }
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast.error('Erro ao salvar configurações');
+      toast.error('Erro ao guardar definições');
     } finally {
       setLoading(false);
     }
@@ -207,15 +208,15 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
 
       const importResult = await importResponse.json();
 
-      setLastSyncDate(new Date().toLocaleString('pt-BR'));
-      toast.success(`✅ ${importResult.count || data.leads.length} leads sincronizados com sucesso!`);
+      setLastSyncDate(new Date().toLocaleString(getLocale()));
+      toast.success(` ${importResult.count || data.leads.length} leads sincronizados com sucesso!`);
 
       // Disparar evento para recarregar leads no dashboard
       window.dispatchEvent(new CustomEvent('leads-updated'));
 
     } catch (error: any) {
       console.error('Error syncing Google Sheets:', error);
-      toast.error('❌ Erro ao sincronizar: ' + (error.message || 'Erro desconhecido'));
+      toast.error('Erro ao sincronizar:' + (error.message || 'Erro desconhecido'));
     } finally {
       setSyncingSheets(false);
     }
@@ -270,7 +271,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
 
                   <div className="mt-4 bg-card rounded-lg p-4 border border-border">
                     <p className="text-sm text-foreground/80 mb-2">
-                      <strong>📋 Exemplo de requisição POST:</strong>
+                      <strong>Exemplo de requisição POST:</strong>
                     </p>
                     <pre className="bg-muted/50 p-3 rounded text-xs overflow-x-auto">
                       {`{
@@ -302,7 +303,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                     O endpoint HTTP para captura automática de leads está disponível apenas nos planos <strong>Business</strong> e <strong>Enterprise</strong>.
                   </p>
                   <Button className="mt-4" size="sm" onClick={onUpgrade}>
-                    Fazer Upgrade
+                    Melhorar plano
                   </Button>
                 </div>
               </div>
@@ -328,7 +329,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                   {/* URL do Webhook */}
                   <div>
                     <Label className="text-sm text-foreground/80 mb-2 block">
-                      <strong>🔗 URL do Webhook N8N (GET)</strong>
+                      <strong>URL do Webhook N8N (GET)</strong>
                     </Label>
                     <Input
                       value={googleSheetsWebhook}
@@ -342,7 +343,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                   <div className="flex items-center justify-between bg-card rounded-lg p-4 border border-border">
                     <div>
                       <p className="text-sm text-foreground/80">
-                        <strong>📊 Sincronizar Leads</strong>
+                        <strong>Sincronizar Leads</strong>
                       </p>
                       {lastSyncDate && (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -357,13 +358,13 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                     >
                       {syncingSheets ? (
                         <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Sincronizando...
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          A sincronizar…
                         </>
                       ) : (
                         <>
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                          Atualizar
+                          <FileSpreadsheet className="w-4 h-4 mr-2" />
+                          Sincronizar agora
                         </>
                       )}
                     </Button>
@@ -372,7 +373,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                   {/* Como funciona */}
                   <div className="bg-card rounded-lg p-4 border border-border">
                     <p className="text-sm text-foreground/80 mb-2">
-                      <strong>🔄 Como configurar o webhook N8N:</strong>
+                      <strong>Como configurar o webhook N8N:</strong>
                     </p>
                     <ol className="text-xs text-muted-foreground space-y-1.5 ml-4 list-decimal">
                       <li>Crie um workflow N8N com trigger "Webhook"</li>
@@ -387,7 +388,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                   {/* Formato esperado */}
                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
                     <p className="text-sm text-foreground/80 mb-2">
-                      <strong>📋 Formato JSON que o webhook deve retornar:</strong>
+                      <strong>Formato JSON que o webhook deve retornar:</strong>
                     </p>
                     <pre className="bg-muted/50 p-3 rounded text-xs overflow-x-auto">
                       {`{
@@ -416,7 +417,7 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
                   {/* Dica */}
                   <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3">
                     <p className="text-xs text-amber-800 dark:text-amber-200">
-                      💡 <strong>Dica:</strong> Configure o webhook com método GET para buscar todos os leads da planilha. O CRM irá detectar automaticamente leads duplicados e evitar duplicações!
+                       <strong>Dica:</strong> Configure o webhook com método GET para pesquisar todos os leads da planilha. O CRM irá detectar automaticamente leads duplicados e evitar duplicações!
                     </p>
                   </div>
                 </div>
@@ -468,15 +469,15 @@ export default function IntegrationSettings({ user, onUpgrade }: IntegrationSett
               {loading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                  Salvando...
+                  A guardar...
                 </>
               ) : saved ? (
                 <>
                   <Check className="w-4 h-4 mr-2" />
-                  Salvo!
+                  Guardado!
                 </>
               ) : (
-                'Salvar Integrações'
+                'Guardar Integrações'
               )}
             </Button>
           </div>

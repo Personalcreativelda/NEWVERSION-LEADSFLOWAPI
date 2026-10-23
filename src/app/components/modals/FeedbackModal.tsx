@@ -74,7 +74,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
           style={{ borderColor: 'hsl(var(--border))' }}
         >
           <h2 className="text-base font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-            {type === 'rating' ? '⭐ Avaliar plataforma' : '🐛 Relatar problema'}
+            {type === 'rating' ? 'Avaliar plataforma' : 'Relatar problema'}
           </h2>
           <button onClick={handleClose} className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors">
             <X className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />
@@ -167,7 +167,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                 placeholder={
                   type === 'rating'
                     ? 'O que achou da plataforma? Sugestões...'
-                    : 'Descreva o que aconteceu, em qual tela e como reproduzir...'
+                    : 'Descreva o que aconteceu, em qual ecrã e como reproduzir...'
                 }
                 rows={4}
                 className="w-full px-3 py-2.5 rounded-lg border text-sm resize-none"
@@ -186,7 +186,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               style={{ backgroundColor: 'hsl(var(--primary))' }}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {loading ? 'Enviando...' : 'Enviar feedback'}
+              {loading ? 'A enviar...' : 'Enviar feedback'}
             </button>
           </div>
         )}

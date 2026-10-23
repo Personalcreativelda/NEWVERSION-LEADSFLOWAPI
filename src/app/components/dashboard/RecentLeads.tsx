@@ -1,4 +1,5 @@
 import type { Lead } from '../../types';
+import { getLocale } from '../../utils/format';
 
 interface RecentLeadsProps {
   leads: Lead[];
@@ -17,7 +18,7 @@ export default function RecentLeads({ leads }: RecentLeadsProps) {
     try {
       const date = new Date(dateStr);
       if (!isNaN(date.getTime())) {
-        return date.toLocaleDateString('pt-BR');
+        return date.toLocaleDateString(getLocale());
       }
       return dateStr;
     } catch {
@@ -63,7 +64,7 @@ export default function RecentLeads({ leads }: RecentLeadsProps) {
 
       {recentLeads.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
-          Nenhum lead cadastrado ainda
+          Nenhum lead registado ainda
         </div>
       ) : (
         <div className="space-y-0">

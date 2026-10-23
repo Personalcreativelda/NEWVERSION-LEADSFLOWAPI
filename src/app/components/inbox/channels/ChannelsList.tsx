@@ -63,7 +63,7 @@ const AVAILABLE_CHANNELS = [
     {
         id: 'facebook',
         name: 'Facebook',
-        description: 'Conectar sua página do Facebook',
+        description: 'Ligar sua página do Facebook',
         icon: Facebook,
         color: 'text-blue-600',
         available: true
@@ -317,7 +317,7 @@ export function ChannelsList() {
                                             <button
                                                 onClick={() => openEditModal(c)}
                                                 className="p-1 rounded hover:bg-muted transition-all"
-                                                title="Configurações do canal"
+                                                title="Definições do canal"
                                             >
                                                 <Settings className="w-3.5 h-3.5" style={{ color: 'hsl(var(--muted-foreground))' }} />
                                             </button>
@@ -345,7 +345,7 @@ export function ChannelsList() {
                     <div className="mb-10">
                         <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
                             <span className="w-1.5 h-6 bg-green-500 rounded-full"></span>
-                            Canais Conectados
+                            Canais Ligados
                         </h2>
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             {channels.map(channel => (
@@ -404,24 +404,6 @@ export function ChannelsList() {
                             )
                         })}
 
-                        {/* Coming Soon Card */}
-                        <div 
-                            className="flex flex-col items-start p-5 border border-dashed rounded-lg opacity-50"
-                            style={{ borderColor: 'hsl(var(--border))' }}
-                        >
-                            <div 
-                                className="p-2.5 rounded-lg mb-3"
-                                style={{ backgroundColor: 'hsl(var(--muted))' }}
-                            >
-                                <Plus size={22} style={{ color: 'hsl(var(--muted-foreground))' }} />
-                            </div>
-                            <h3 className="font-semibold text-sm mb-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Em breve! 🚀
-                            </h3>
-                            <p className="text-xs leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Mais canais serão adicionados futuramente.
-                            </p>
-                        </div>
                     </div>
                 </div>
                 }
@@ -434,7 +416,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setModalOpen);
                     loadChannels();
-                    toast.success('Canal conectado!');
+                    toast.success('Canal ligado!');
                 }}
                 editingChannel={editingChannel?.type === 'whatsapp' ? editingChannel : undefined}
             />
@@ -445,7 +427,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setCloudModalOpen);
                     loadChannels();
-                    toast.success('WhatsApp Cloud API conectada!');
+                    toast.success('WhatsApp Cloud API ligada!');
                 }}
                 editingChannel={editingChannel?.type === 'whatsapp_cloud' ? editingChannel : undefined}
             />
@@ -456,7 +438,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setTelegramModalOpen);
                     loadChannels();
-                    toast.success('Telegram conectado!');
+                    toast.success('Telegram ligado!');
                 }}
                 editingChannel={editingChannel?.type === 'telegram' ? editingChannel : undefined}
             />
@@ -467,7 +449,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setFacebookModalOpen);
                     loadChannels();
-                    toast.success('Facebook Messenger conectado!');
+                    toast.success('Facebook Messenger ligado!');
                 }}
                 editingChannel={editingChannel?.type === 'facebook' ? editingChannel : undefined}
             />
@@ -478,7 +460,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setInstagramModalOpen);
                     loadChannels();
-                    toast.success('Instagram conectado!');
+                    toast.success('Instagram ligado!');
                 }}
                 editingChannel={editingChannel?.type === 'instagram' ? editingChannel : undefined}
             />

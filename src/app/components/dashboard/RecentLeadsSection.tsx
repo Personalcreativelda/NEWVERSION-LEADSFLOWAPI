@@ -2,6 +2,7 @@ import { User, Edit, Trash2, MessageCircle, Mail } from 'lucide-react';
 import type { Lead } from '../../types';
 import { DashboardCard } from '../base/DashboardCard';
 import { EmptyState } from '../base/EmptyState';
+import { getLocale } from '../../utils/format';
 
 // Mapeamento de nomes de canal para exibição amigável
 const channelLabels: Record<string, string> = {
@@ -63,7 +64,7 @@ export default function RecentLeadsSection({
     } else if (statusLower.includes('negociacao') || statusLower.includes('negotiation')) {
       return { bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', label: 'Negociação' };
     } else if (statusLower.includes('qualificado') || statusLower.includes('qualified') || statusLower.includes('aguardando') || statusLower.includes('contato')) {
-      return { bg: 'bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', label: 'Contato' };
+      return { bg: 'bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', label: 'Contacto' };
     } else if (statusLower === 'perdido' || statusLower === 'lost') {
       return { bg: 'bg-red-500/10', text: 'text-red-600 dark:text-red-400', label: 'Perdido' };
     }
@@ -99,14 +100,14 @@ export default function RecentLeadsSection({
     } else if (diffDays < 7) {
       return `${diffDays}d atrás`;
     } else {
-      return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+      return date.toLocaleDateString(getLocale(), { day: '2-digit', month: 'short' });
     }
   };
 
   if (recentLeads.length === 0) {
     return (
       <DashboardCard title="Leads Recentes">
-        <EmptyState title="Nenhum lead cadastrado ainda" imgSrc="/assets/icons/empty/ic_content.svg" />
+        <EmptyState title="Nenhum lead registado ainda" imgSrc="/assets/icons/empty/ic_content.svg" />
       </DashboardCard>
     );
   }
@@ -193,7 +194,7 @@ export default function RecentLeadsSection({
                   <button
                     className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-red-500 transition-colors flex-shrink-0"
                     onClick={() => onDelete(lead.id)}
-                    title="Excluir lead"
+                    title="Eliminar lead"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

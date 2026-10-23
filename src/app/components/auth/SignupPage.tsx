@@ -166,7 +166,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
                 </div>
               ) : (
                 <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
-                  Bem-vindo ao LeadsFlow CRM. Redirecionando para o painel...
+                  Bem-vindo ao LeadsFlow CRM. A redirecionar para o painel...
                 </p>
               )}
             </div>
@@ -273,7 +273,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
 
             {/* Password */}
             <div>
-              <label htmlFor="password" style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: '#414552', marginBottom: '8px' }}>Senha</label>
+              <label htmlFor="password" style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: '#414552', marginBottom: '8px' }}>Palavra-passe</label>
               <div className="relative">
                 <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="Mínimo 6 caracteres" value={password}
                   onChange={(e) => { setPassword(e.target.value); if (error) setError(''); }}
@@ -308,7 +308,7 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
                 transition: 'background-color 200ms ease',
               }}
               className="transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60">
-              {loading ? 'Criando conta...' : 'Criar conta'}
+              {loading ? 'A criar conta...' : 'Criar conta'}
             </AppButton>
           </form>
 

@@ -427,7 +427,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                             <div className="flex items-center gap-2 flex-1">
                                 <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
                                 <span className="text-sm font-medium text-foreground">
-                                    Gravando...
+                                    A gravar...
                                 </span>
                                 <span className="text-sm font-mono text-muted-foreground">
                                     {formatTime(recordingTime)}
@@ -565,7 +565,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                             }
                         }}
                         disabled={disabled || isSending || showRecordingMode}
-                        placeholder={attachments.length > 0 ? "Legenda (opcional)" : showRecordingMode ? "Gravando áudio..." : "Mensagem"}
+                        placeholder={attachments.length > 0 ? "Legenda (opcional)" : showRecordingMode ? "A gravar áudio..." : "Mensagem"}
                         rows={1}
                         className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-[15px] sm:text-sm leading-5 text-foreground placeholder:text-muted-foreground resize-none max-h-[120px] py-[11px] px-1 scrollbar-none outline-none overflow-y-auto"
                     />
@@ -589,7 +589,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                             onClick={() => fileInputRef.current?.click()}
                             disabled={disabled || isSending || showRecordingMode}
                             className="h-[42px] w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-50 text-muted-foreground hover:text-foreground"
-                            title="Anexar arquivo"
+                            title="Anexar ficheiro"
                         >
                             <Paperclip size={19} />
                         </button>

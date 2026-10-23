@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { getApiBaseUrl } from '../../utils/api-client';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { TeamSettingsPage } from './TeamSettingsPage';
+import { getLocale } from '../../utils/format';
 
 interface AccountSettingsPageProps {
   user: any;
@@ -141,7 +142,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
   };
 
   const handleDisable2FA = async () => {
-    if (!disablePassword) { toast.error('Digite sua senha'); return; }
+    if (!disablePassword) { toast.error('Digite sua palavra-passe'); return; }
     setLoading(true);
     try {
       const response = await fetch(getApiUrl('/security/2fa/disable'), { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ password: disablePassword }) });
@@ -165,33 +166,33 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
   };
 
   const handleDeleteToken = async (tokenId: string) => {
-    const confirmed = await confirm('Tem certeza que deseja deletar este token? Esta ação não pode ser desfeita.', { title: 'Excluir token', confirmLabel: 'Excluir', variant: 'danger' });
+    const confirmed = await confirm('Tem certeza que deseja apagar este token? Esta ação não pode ser desfeita.', { title: 'Eliminar token', confirmLabel: 'Eliminar', variant: 'danger' });
     if (!confirmed) return;
     setLoading(true);
     try {
       const response = await fetch(getApiUrl(`/security/tokens/${tokenId}`), { method: 'DELETE', headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Erro ao deletar token');
-      loadTokens(); toast.success('Token deletado com sucesso');
-    } catch (e: any) { toast.error(e.message || 'Erro ao deletar token'); }
+      loadTokens(); toast.success('Token apagado com sucesso');
+    } catch (e: any) { toast.error(e.message || 'Erro ao apagar token'); }
     finally { setLoading(false); }
   };
 
   const handleChangePassword = async () => {
-    if (!currentPassword) { toast.error('Digite sua senha atual'); return; }
-    if (!newPassword || newPassword.length < 8) { toast.error('A nova senha deve ter pelo menos 8 caracteres'); return; }
-    if (newPassword !== confirmPassword) { toast.error('As senhas não coincidem'); return; }
+    if (!currentPassword) { toast.error('Digite sua palavra-passe atual'); return; }
+    if (!newPassword || newPassword.length < 8) { toast.error('A nova palavra-passe deve ter pelo menos 8 caracteres'); return; }
+    if (newPassword !== confirmPassword) { toast.error('As palavras-passe não coincidem'); return; }
     setLoading(true);
     try {
       const response = await fetch(getApiUrl('/security/change-password'), { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ currentPassword, newPassword }) });
       if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Erro ao alterar senha'); }
       setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
-      toast.success('Senha alterada com sucesso!', { description: 'Um email de confirmação foi enviado para você.' });
-    } catch (e: any) { toast.error(e.message || 'Erro ao alterar senha'); }
+      toast.success('Palavra-passe alterada com sucesso!', { description: 'Um email de confirmação foi enviado para você.' });
+    } catch (e: any) { toast.error(e.message || 'Erro ao alterar palavra-passe'); }
     finally { setLoading(false); }
   };
 
   const copyToClipboard = (text: string) => { navigator.clipboard.writeText(text); toast.success('Copiado para área de transferência!'); };
-  const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('pt-BR') : 'Nunca';
+  const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString(getLocale()) : 'Nunca';
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,7 +259,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
 
   return (
     <div>
-      <PageHeader title="Configurações da Conta" description="Perfil, segurança e equipa" icon={UserCog} />
+      <PageHeader title="Definições da Conta" description="Perfil, segurança e equipa" icon={UserCog} />
 
       {/* Tabs */}
       <div className="border-b border-border dark:border-border mb-6">
@@ -302,7 +303,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
                 <input type="file" id="avatar-upload" accept="image/*" onChange={handleAvatarChange} className="hidden" />
                 <label htmlFor="avatar-upload" className="inline-flex items-center px-4 py-2 border border-border dark:border-border rounded-lg text-sm font-medium text-foreground dark:text-foreground bg-card dark:bg-card hover:bg-muted dark:hover:bg-muted cursor-pointer transition-colors">
                   <Upload className="w-4 h-4 mr-2" />
-                  Escolher Arquivo
+                  Escolher Ficheiro
                 </label>
                 <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">JPG, PNG ou GIF. Máximo 2MB.</p>
               </div>
@@ -310,7 +311,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
             {avatarFile && (
               <div className="flex justify-end">
                 <Button onClick={handleSaveAvatar} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</> : 'Salvar Avatar'}
+                  {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />A guardar...</> : 'Guardar Avatar'}
                 </Button>
               </div>
             )}
@@ -330,7 +331,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
               </div>
               <div className="flex justify-end">
                 <Button onClick={handleSaveName} disabled={loading || name === user?.name} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</> : 'Salvar Nome'}
+                  {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />A guardar...</> : 'Guardar Nome'}
                 </Button>
               </div>
             </div>
@@ -376,11 +377,11 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
                     <Lock className="w-5 h-5 text-purple-600" />
                   </div>
                   <div>
-                    <h3 className="font-medium text-foreground mb-1">Alterar Senha</h3>
-                    <p className="text-sm text-muted-foreground">Atualize sua senha regularmente para manter sua conta segura</p>
+                    <h3 className="font-medium text-foreground mb-1">Alterar Palavra-passe</h3>
+                    <p className="text-sm text-muted-foreground">Atualize sua palavra-passe regularmente para manter sua conta segura</p>
                   </div>
                 </div>
-                <Button onClick={() => setShowPasswordModal(true)} variant="outline" disabled={loading}>Alterar Senha</Button>
+                <Button onClick={() => setShowPasswordModal(true)} variant="outline" disabled={loading}>Alterar Palavra-passe</Button>
               </div>
             </div>
 
@@ -393,7 +394,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
                   </div>
                   <div>
                     <h3 className="font-medium text-foreground mb-1">Tokens de API</h3>
-                    <p className="text-sm text-muted-foreground">Gerencie tokens para acessar a API do LeadsFlow</p>
+                    <p className="text-sm text-muted-foreground">Faça a gestão de tokens para acessar a API do LeadsFlow</p>
                   </div>
                 </div>
                 <Button onClick={() => setShowNewTokenModal(true)} size="sm">
@@ -457,7 +458,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
                 <Label htmlFor="verification-code">Código de Verificação</Label>
                 <Input id="verification-code" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" className="text-center text-2xl font-mono mt-1.5" maxLength={6} />
               </div>
-              <Button onClick={handleVerify2FA} disabled={loading} className="w-full">{loading ? 'Verificando...' : 'Verificar e Ativar'}</Button>
+              <Button onClick={handleVerify2FA} disabled={loading} className="w-full">{loading ? 'A verificar...' : 'Verificar e Ativar'}</Button>
             </div>
           )}
           {setupStep === 'backup' && (
@@ -479,12 +480,12 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Desativar Autenticação de Dois Fatores</DialogTitle>
-            <DialogDescription>Digite sua senha para confirmar a desativação do 2FA</DialogDescription>
+            <DialogDescription>Digite sua palavra-passe para confirmar a desativação do 2FA</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="disable-password">Senha</Label>
-              <Input id="disable-password" type="password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} placeholder="Digite sua senha" className="mt-1.5" />
+              <Label htmlFor="disable-password">Palavra-passe</Label>
+              <Input id="disable-password" type="password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} placeholder="Digite sua palavra-passe" className="mt-1.5" />
             </div>
             <div className="flex gap-2">
               <Button onClick={() => setShow2FADisableModal(false)} variant="outline" className="flex-1">Cancelar</Button>
@@ -515,13 +516,13 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={() => setShowNewTokenModal(false)} variant="outline" className="flex-1">Cancelar</Button>
-                  <Button onClick={handleCreateToken} disabled={loading} className="flex-1">{loading ? 'Criando...' : 'Criar Token'}</Button>
+                  <Button onClick={handleCreateToken} disabled={loading} className="flex-1">{loading ? 'A criar...' : 'Criar Token'}</Button>
                 </div>
               </>
             ) : (
               <>
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium mb-2">⚠️ Copie este token agora!</p>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium mb-2">Copie este token agora!</p>
                   <p className="text-xs text-yellow-700 dark:text-yellow-300">Você não poderá vê-lo novamente após fechar esta janela.</p>
                 </div>
                 <div className="bg-muted p-4 rounded-lg">
@@ -542,35 +543,35 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
       <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Alterar Senha</DialogTitle>
-            <DialogDescription>Digite sua senha atual e a nova senha desejada</DialogDescription>
+            <DialogTitle>Alterar Palavra-passe</DialogTitle>
+            <DialogDescription>Digite sua palavra-passe atual e a nova palavra-passe desejada</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="current-password">Senha Atual</Label>
+              <Label htmlFor="current-password">Palavra-passe Atual</Label>
               <div className="relative mt-1.5">
-                <Input id="current-password" type={showCurrentPassword ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Digite sua senha atual" />
+                <Input id="current-password" type={showCurrentPassword ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Digite sua palavra-passe atual" />
                 <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
                   {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
               </div>
             </div>
             <div>
-              <Label htmlFor="new-password">Nova Senha</Label>
+              <Label htmlFor="new-password">Nova Palavra-passe</Label>
               <div className="relative mt-1.5">
-                <Input id="new-password" type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Digite a nova senha (mín. 8 caracteres)" />
+                <Input id="new-password" type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Digite a nova palavra-passe (mín. 8 caracteres)" />
                 <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowNewPassword(!showNewPassword)}>
                   {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
               </div>
             </div>
             <div>
-              <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
-              <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirme a nova senha" className="mt-1.5" />
+              <Label htmlFor="confirm-password">Confirmar Nova Palavra-passe</Label>
+              <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirme a nova palavra-passe" className="mt-1.5" />
             </div>
             <div className="flex gap-2">
               <Button onClick={() => { setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }} variant="outline" className="flex-1">Cancelar</Button>
-              <Button onClick={handleChangePassword} disabled={loading} className="flex-1">{loading ? 'Alterando...' : 'Alterar Senha'}</Button>
+              <Button onClick={handleChangePassword} disabled={loading} className="flex-1">{loading ? 'Alterando...' : 'Alterar Palavra-passe'}</Button>
             </div>
           </div>
         </DialogContent>

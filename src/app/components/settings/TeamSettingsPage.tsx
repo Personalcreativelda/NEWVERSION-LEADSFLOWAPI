@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
+import { getLocale } from '../../utils/format';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -200,7 +201,7 @@ function InviteModal({
                             className="flex-1 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {loading ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
-                            {loading ? 'Enviando...' : 'Enviar convite'}
+                            {loading ? 'A enviar...' : 'Enviar convite'}
                         </button>
                     </div>
                 </form>
@@ -462,7 +463,7 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
                                 <div>
                                     <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Email não enviado — SMTP não configurado</p>
                                     <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
-                                        Partilha este link diretamente com o convidado. Para envio automático, conecta um <strong>canal de email</strong> ou configura o SMTP em <strong>Integrações → Configurações SMTP</strong>.
+                                        Partilha este link diretamente com o convidado. Para envio automático, conecta um <strong>canal de email</strong> ou configura o SMTP em <strong>Integrações → Definições SMTP</strong>.
                                     </p>
                                 </div>
                             )}
@@ -616,7 +617,7 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
                                             {ROLE_LABELS[invite.role] || invite.role} ·{' '}
                                             {isExpiring
                                                 ? <span className="text-amber-600">Expira em breve</span>
-                                                : `Expira ${expiresAt.toLocaleDateString('pt', { day: '2-digit', month: 'short' })}`}
+                                                : `Expira ${expiresAt.toLocaleDateString(getLocale(), { day: '2-digit', month: 'short' })}`}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0">

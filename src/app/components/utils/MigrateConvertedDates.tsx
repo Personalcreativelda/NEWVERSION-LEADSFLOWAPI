@@ -20,7 +20,7 @@ export function MigrateConvertedDates() {
     console.log('[Migration] 🔵 runMigration called');
     try {
       console.log('[Migration] 🔵 Mostrando confirmação...');
-      const confirmed = await confirm('🔧 Isso vai atualizar todos os leads convertidos para adicionar o campo convertedAt. Continuar?', {
+      const confirmed = await confirm('Isso vai atualizar todos os leads convertidos para adicionar o campo convertedAt. Continuar?', {
         title: 'Executar migração',
         confirmLabel: 'Continuar',
         variant: 'warning',
@@ -61,11 +61,11 @@ export function MigrateConvertedDates() {
       const errors = response?.errors || 0;
       
       if (updated > 0) {
-        toast.success('✅ Migração concluída!', {
+        toast.success('Migração concluída!', {
           description: `${updated} leads atualizados, ${skipped} ignorados${errors > 0 ? `, ${errors} erros` : ''}.`
         });
       } else {
-        toast.info('ℹ️ Nenhum lead para atualizar', {
+        toast.info('Nenhum lead para atualizar', {
           description: 'Todos os leads convertidos já têm convertedAt preenchido.'
         });
       }
@@ -112,7 +112,7 @@ export function MigrateConvertedDates() {
   return (
     <div className="fixed bottom-4 right-4 p-4 bg-yellow-100 border-2 border-yellow-500 rounded-lg shadow-lg z-50">
       <div className="mb-2">
-        <h3 className="font-bold text-yellow-900">🔧 Migração de Dados</h3>
+        <h3 className="font-bold text-yellow-900">Migração de Dados</h3>
         <p className="text-sm text-yellow-800">
           Preencher convertedAt para leads convertidos
         </p>
@@ -134,7 +134,7 @@ export function MigrateConvertedDates() {
         disabled={migrating}
         className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {migrating ? '⏳ Migrando...' : '▶️ Executar Migração'}
+        {migrating ? 'Migrando...' : 'Executar Migração'}
       </button>
       
       {result && (

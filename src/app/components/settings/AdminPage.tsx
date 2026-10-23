@@ -19,6 +19,7 @@ import { AdminDiagnosticsTab } from './admin/AdminDiagnosticsTab';
 import { UserDetailsModal } from './admin/UserDetailsModal';
 import { ActivatePlanModal, NotificationSettingsModal, AddUserModal } from './admin/AdminModals';
 import { useConfirm } from '../ui/ConfirmDialog';
+import { getLocale } from '../../utils/format';
 
 interface User {
   id: string;
@@ -127,10 +128,10 @@ export default function AdminPage(_props: AdminPageProps = {}) {
         setUsers(response.users || []);
         setFilteredUsers(response.users || []);
       } else {
-        toast.error(response.message || 'Erro ao carregar usuários');
+        toast.error(response.message || 'Erro ao carregar utilizadores');
       }
     } catch (error: any) {
-      toast.error('Erro ao carregar usuários: ' + error.message);
+      toast.error('Erro ao carregar utilizadores: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -287,14 +288,14 @@ export default function AdminPage(_props: AdminPageProps = {}) {
     try {
       const response = await apiRequest('/admin/notification-settings', 'POST', notificationSettings);
       if (response.success) {
-        toast.success('Configurações de notificação salvas com sucesso!');
+        toast.success('Definições de notificação guardadas com sucesso!');
         setShowNotificationSettings(false);
       }
     } catch (error: any) {
       if (!error.message?.includes('Backend indisponível')) {
-        toast.error('Erro ao salvar configurações de notificação: ' + error.message);
+        toast.error('Erro ao guardar definições de notificação: ' + error.message);
       } else {
-        toast.success('Configurações salvas (modo demo)');
+        toast.success('Definições guardadas (modo demo)');
         setShowNotificationSettings(false);
       }
     } finally {
@@ -305,8 +306,8 @@ export default function AdminPage(_props: AdminPageProps = {}) {
   const handleSuspendUser = async (userId: string, currentStatus?: string) => {
     const isSuspended = currentStatus === 'suspended';
     const action = isSuspended ? 'reativar' : 'suspender';
-    const confirmed = await confirm(`Deseja realmente ${action} este usuário?`, {
-      title: `${isSuspended ? 'Reativar' : 'Suspender'} usuário`,
+    const confirmed = await confirm(`Deseja realmente ${action} este utilizador?`, {
+      title: `${isSuspended ? 'Reativar' : 'Suspender'} utilizador`,
       confirmLabel: action.charAt(0).toUpperCase() + action.slice(1),
       variant: 'warning',
     });
@@ -320,18 +321,18 @@ export default function AdminPage(_props: AdminPageProps = {}) {
       });
 
       if (response.success) {
-        toast.success(`Usuário ${isSuspended ? 'reativado' : 'suspenso'} com sucesso!`);
+        toast.success(`Utilizador ${isSuspended ? 'reativado' : 'suspenso'} com sucesso!`);
         loadUsers();
       }
     } catch (error: any) {
-      toast.error(error.message || `Erro ao ${action} usuário`);
+      toast.error(error.message || `Erro ao ${action} utilizador`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteUser = async (userId: string, userEmail: string) => {
-    const firstConfirm = await confirm(`⚠️ ATENÇÃO: Deseja realmente REMOVER o usuário ${userEmail}?`, {
+    const firstConfirm = await confirm(`ATENÇÃO: Deseja realmente REMOVER o utilizador${userEmail}?`, {
       title: 'Remover utilizador',
       description: 'Esta ação é irreversível.',
       confirmLabel: 'Continuar',
@@ -350,11 +351,11 @@ export default function AdminPage(_props: AdminPageProps = {}) {
     try {
       const response = await apiRequest(`/admin/delete-user/${userId}`, 'DELETE');
       if (response.success) {
-        toast.success('Usuário removido com sucesso!');
+        toast.success('Utilizador removido com sucesso!');
         loadUsers();
       }
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao remover usuário');
+      toast.error(error.message || 'Erro ao remover utilizador');
     } finally {
       setLoading(false);
     }
@@ -378,7 +379,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
             title="Utilizadores"
             description="Todas as contas da plataforma"
             icon={Users}
-            actions={<PageAction variant="primary" icon={UserPlus} label="Adicionar" onClick={() => setShowAddUserModal(true)} />}
+            create={{ label: 'Adicionar utilizador', icon: UserPlus, onClick: () => setShowAddUserModal(true) }}
           />
 
           {/* Search + filter bar */}
@@ -407,7 +408,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
               className="px-3 py-2 text-sm rounded-lg border border-border bg-muted text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
             >
               <option value="all">Todos os planos</option>
-              <option value="free">Free</option>
+              <option value="free">Grátis</option>
               <option value="business">Business</option>
               <option value="enterprise">Enterprise</option>
             </select>
@@ -416,7 +417,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
           {/* Count */}
           {!loading && (
             <p className="text-xs text-muted-foreground mb-3">
-              {filteredUsers.length} {filteredUsers.length === 1 ? 'usuário encontrado' : 'usuários encontrados'}
+              {filteredUsers.length} {filteredUsers.length === 1 ? 'utilizador encontrado' : 'utilizadores encontrados'}
               {searchTerm && ` para "${searchTerm}"`}
             </p>
           )}
@@ -470,17 +471,9 @@ export default function AdminPage(_props: AdminPageProps = {}) {
       {activeTab === 'feedback' && (
         <div>
           <PageHeader
-            title="Feedbacks"
+            title="Opiniões"
             description="Avaliações e problemas reportados pelos utilizadores"
             icon={MessageSquare}
-            actions={
-              <PageAction
-                icon={feedbackLoading ? Loader2 : RefreshCw}
-                label="Atualizar"
-                onClick={loadFeedback}
-                className={feedbackLoading ? '[&>svg]:animate-spin' : undefined}
-              />
-            }
           />
 
           {feedbackLoading && feedbackList.length === 0 ? (
@@ -511,7 +504,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
                     {/* Line 1: name + badge */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-semibold text-foreground truncate max-w-[160px] sm:max-w-none">
-                        {fb.user_name || fb.user_email || 'Usuário anônimo'}
+                        {fb.user_name || fb.user_email || 'Utilizador anônimo'}
                       </span>
                       <span className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
                         fb.type === 'rating' ? 'bg-yellow-500/10 text-yellow-600' : 'bg-red-500/10 text-red-600'
@@ -526,7 +519,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
                         <span className="text-xs text-muted-foreground truncate max-w-[180px]">{fb.user_email}</span>
                       )}
                       <span className="text-xs text-muted-foreground">
-                        {new Date(fb.created_at).toLocaleDateString('pt-BR', {
+                        {new Date(fb.created_at).toLocaleDateString(getLocale(), {
                           day: '2-digit', month: 'short', year: 'numeric',
                           hour: '2-digit', minute: '2-digit'
                         })}
@@ -561,7 +554,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
       {/* Settings tab */}
       {activeTab === 'settings' && (
         <div>
-          <PageHeader title="Configurações Admin" description="Notificações e sistema" icon={Settings} />
+          <PageHeader title="Definições Admin" description="Notificações e sistema" icon={Settings} />
           <div className="max-w-2xl">
             <div className="bg-card rounded-xl p-6 shadow-sm border border-border mb-4">
               <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
@@ -588,7 +581,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
         <AddUserModal
           onClose={() => setShowAddUserModal(false)}
           onCreated={() => {
-            toast.success('Usuário criado com sucesso!');
+            toast.success('Utilizador criado com sucesso!');
             loadUsers();
           }}
         />

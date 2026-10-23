@@ -1,5 +1,6 @@
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
+import { getLocale } from '../../utils/format';
 
 interface Campaign {
   id: string;
@@ -124,7 +125,7 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
                         }
                         return (
                           <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm underline block truncate">
-                            📎 {url.split('/').pop()}
+                             {url.split('/').pop()}
                           </a>
                         );
                       })}
@@ -140,7 +141,7 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
                   )}
                   <div className="flex items-center justify-end gap-1 mt-2">
                     <span className="text-xs text-foreground/80">
-                      {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date().toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     <i className="fas fa-check-double text-blue-500 text-xs"></i>
                   </div>
@@ -185,7 +186,7 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
                       <div className="space-y-1">
                         {mediaUrls.map((url, idx) => (
                           <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm underline flex items-center gap-1">
-                            📎 {url.split('/').pop() || `Anexo ${idx + 1}`}
+                             {url.split('/').pop() || `Anexo ${idx + 1}`}
                           </a>
                         ))}
                       </div>
@@ -209,7 +210,7 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
                   )}
                 </div>
                 <p className="text-xs text-gray-400 text-right mt-1">
-                  {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  {new Date().toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
             </div>

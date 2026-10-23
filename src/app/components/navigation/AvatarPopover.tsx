@@ -47,7 +47,7 @@ export default function AvatarPopover({
         {/* User Info Header */}
         <div className="px-3 py-3 mb-1">
           <p className="text-sm font-semibold text-foreground">
-            {user?.name || 'Usuário'}
+            {user?.name || 'Utilizador'}
           </p>
           <p className="text-xs mt-0.5 text-muted-foreground">
             {user?.email || 'user@example.com'}

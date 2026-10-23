@@ -86,7 +86,7 @@ export function useLeads(webhookConfig: WebhookConfig) {
   // Adicionar novo lead
   const adicionarLead = async (lead: Lead): Promise<boolean> => {
     if (!webhookConfig.cadastrar) {
-      alert('⚠️ Webhook de cadastro não configurado!');
+      alert('Webhook de registo não configurado!');
       return false;
     }
 
@@ -117,7 +117,7 @@ export function useLeads(webhookConfig: WebhookConfig) {
   // Editar lead
   const editarLead = async (telefoneOriginal: string, leadAtualizado: Lead): Promise<boolean> => {
     if (!webhookConfig.editar) {
-      alert('⚠️ Webhook de edição não configurado!');
+      alert('Webhook de edição não configurado!');
       return false;
     }
 
@@ -151,11 +151,11 @@ export function useLeads(webhookConfig: WebhookConfig) {
   // Deletar lead
   const deletarLead = async (lead: Lead): Promise<boolean> => {
     if (!webhookConfig.deletar) {
-      alert('⚠️ Webhook de exclusão não configurado!');
+      alert('Webhook de exclusão não configurado!');
       return false;
     }
 
-    if (!confirm(`⚠️ Tem certeza que deseja excluir o lead "${lead.nome}"?`)) {
+    if (!confirm(`Tem certeza que deseja eliminar o lead "${lead.nome}"?`)) {
       return false;
     }
 
@@ -181,7 +181,7 @@ export function useLeads(webhookConfig: WebhookConfig) {
       return true;
     } catch (err) {
       console.error('Erro ao deletar lead:', err);
-      alert('Erro ao deletar lead. Verifique a configuração do webhook.');
+      alert('Erro ao apagar lead. Verifique a configuração do webhook.');
       return false;
     }
   };

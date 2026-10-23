@@ -97,16 +97,6 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
           )}
         </span>
       }
-      action={
-        <button
-          onClick={() => load(true)}
-          disabled={refreshing}
-          className="text-muted-foreground hover:text-foreground transition-colors"
-          title="Atualizar insights"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-        </button>
-      }
     >
       {error ? (
         <ErrorState
@@ -170,7 +160,7 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-foreground truncate">{lead.name}</p>
                         <p className="text-[10px] text-muted-foreground">
-                          {days !== null ? (days === 0 ? 'hoje' : `${days}d sem contato`) : 'sem contato'}
+                          {days !== null ? (days === 0 ? 'hoje' : `${days}d sem contacto`) : 'sem contacto'}
                         </p>
                       </div>
                       <span className={`text-[10px] font-medium flex-shrink-0 ${

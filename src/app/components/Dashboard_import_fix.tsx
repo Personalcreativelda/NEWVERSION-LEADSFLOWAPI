@@ -15,7 +15,7 @@
       const dataSource = 'evolution_api_direct';
       
       console.log('[WhatsApp Import] 🔗 Buscando contatos diretamente da Evolution API...');
-      toast.info('🔄 Buscando contatos do WhatsApp...', { duration: 2000 });
+      toast.info('A pesquisar contactos do WhatsApp...', { duration: 2000 });
       
       const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-4be966ab/whatsapp/import-contacts-direct?t=${timestamp}`, {
         method: 'POST',

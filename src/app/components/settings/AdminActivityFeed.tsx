@@ -46,13 +46,13 @@ const getFeatureInfo = (activity: ActivityItem): FeatureInfo => {
   if (feature === 'leads' || path.includes('/leads'))
     return { icon: <UserPlus className="w-4 h-4" />, iconColorClass: 'text-blue-500', badgeColorClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20', label: 'Leads' };
   if (feature === 'contacts' || path.includes('/contacts'))
-    return { icon: <Users className="w-4 h-4" />, iconColorClass: 'text-purple-500', badgeColorClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20', label: 'Contatos' };
+    return { icon: <Users className="w-4 h-4" />, iconColorClass: 'text-purple-500', badgeColorClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20', label: 'Contactos' };
   if (feature === 'inbox' || path.includes('/inbox') || path.includes('/messages') || path.includes('/conversations'))
     return { icon: <MessageSquare className="w-4 h-4" />, iconColorClass: 'text-green-500', badgeColorClass: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20', label: 'Inbox' };
   if (feature === 'campaigns' || path.includes('/campaigns'))
     return { icon: <Megaphone className="w-4 h-4" />, iconColorClass: 'text-orange-500', badgeColorClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20', label: 'Campanhas' };
   if (feature === 'analytics' || path.includes('/analytics'))
-    return { icon: <BarChart2 className="w-4 h-4" />, iconColorClass: 'text-cyan-500', badgeColorClass: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20', label: 'Analytics' };
+    return { icon: <BarChart2 className="w-4 h-4" />, iconColorClass: 'text-cyan-500', badgeColorClass: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20', label: 'Relatórios' };
   if (feature === 'channels' || path.includes('/channels'))
     return { icon: <GitBranch className="w-4 h-4" />, iconColorClass: 'text-pink-500', badgeColorClass: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20', label: 'Canais' };
   if (feature === 'assistants' || path.includes('/assistants'))
@@ -116,7 +116,7 @@ export default function AdminActivityFeed({ activities, users = [], loading }: A
         </div>
         <h3 className="text-lg font-medium text-foreground">Nenhuma atividade recente</h3>
         <p className="text-muted-foreground max-w-sm">
-          As atividades dos usuários aparecerão aqui assim que começarem a interagir com a plataforma.
+          As atividades dos utilizadores aparecerão aqui assim que começarem a interagir com a plataforma.
         </p>
       </div>
     );
@@ -129,7 +129,7 @@ export default function AdminActivityFeed({ activities, users = [], loading }: A
           <thead>
             <tr className="border-b border-border bg-muted">
               <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Usuário
+                Utilizador
               </th>
               <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Módulo

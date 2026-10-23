@@ -1,5 +1,6 @@
 import { Target, CheckCircle2, TrendingUp, XCircle } from 'lucide-react';
 import { DashboardCard } from '../base/DashboardCard';
+import { NUMBER_OPTS, getLocale } from '../../utils/format';
 
 interface StatsCardsProps {
   totalLeads: number;
@@ -62,28 +63,28 @@ export default function StatsCards({ leads = [] }: StatsCardsProps) {
   const stats = [
     {
       title: 'Leads Novos',
-      value: leadsNovos.toLocaleString(),
+      value: leadsNovos.toLocaleString(getLocale(), NUMBER_OPTS),
       icon: TrendingUp,
       iconBg: 'bg-blue-500/10',
       iconColor: 'text-blue-600 dark:text-blue-400',
     },
     {
       title: 'Em Negociação',
-      value: leadsEmNegociacao.toLocaleString(),
+      value: leadsEmNegociacao.toLocaleString(getLocale(), NUMBER_OPTS),
       icon: Target,
       iconBg: 'bg-orange-500/10',
       iconColor: 'text-orange-600 dark:text-orange-400',
     },
     {
       title: 'Qualificados',
-      value: leadsQualificados.toLocaleString(),
+      value: leadsQualificados.toLocaleString(getLocale(), NUMBER_OPTS),
       icon: CheckCircle2,
       iconBg: 'bg-purple-500/10',
       iconColor: 'text-purple-600 dark:text-purple-400',
     },
     {
       title: 'Leads Perdidos',
-      value: leadsPerdidos.toLocaleString(),
+      value: leadsPerdidos.toLocaleString(getLocale(), NUMBER_OPTS),
       icon: XCircle,
       iconBg: 'bg-red-500/10',
       iconColor: 'text-red-600 dark:text-red-400',

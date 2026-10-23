@@ -4,6 +4,7 @@ import type { Channel } from '../../../types/inbox';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
 import { RefreshCw, Trash2, CheckCircle2, XCircle, Loader2, MessageCircle, Pencil, X, Check, Send, Facebook, Instagram, Mail, Globe, Cloud, Smartphone, Settings } from 'lucide-react';
+import { getLocale } from '../../../utils/format';
 
 interface ChannelCardProps {
     channel: Channel;
@@ -123,10 +124,10 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onLinkInstance,
 
     const getStatusText = (status: string) => {
         switch (status) {
-            case 'active': return 'Conectado';
-            case 'inactive': return 'Desconectado';
+            case 'active': return 'Ligado';
+            case 'inactive': return 'Desligado';
             case 'error': return 'Erro';
-            case 'connecting': return 'Conectando';
+            case 'connecting': return 'A ligar';
             default: return status;
         }
     };
@@ -145,7 +146,7 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onLinkInstance,
     };
 
     const handleDisconnect = () => {
-        if (!confirm('Deseja realmente desconectar este canal?')) return;
+        if (!confirm('Deseja realmente desligar este canal?')) return;
         onDelete(channel);
     };
 
@@ -226,7 +227,7 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onLinkInstance,
                                 onEdit(channel);
                             }}
                             className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                            title="Configurações do canal"
+                            title="Definições do canal"
                         >
                             <Settings className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />
                         </button>
@@ -401,17 +402,17 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onLinkInstance,
                         {/* Phone number */}
                         {channel.credentials?.phone_number && (
                             <div className="flex items-center gap-2 pt-2 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
-                                <span className="text-lg">📱</span>
+                                <span className="text-lg"></span>
                                 <div>
                                     <span className="font-semibold" style={{ color: 'hsl(var(--foreground))' }}>{channel.credentials.phone_number}</span>
-                                    <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>Canal conectado e pronto para enviar mensagens.</p>
+                                    <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>Canal ligado e pronto para enviar mensagens.</p>
                                 </div>
                             </div>
                         )}
 
                         {channel.last_sync_at && (
                             <div className="text-xs pt-2" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Última sincronização: {new Date(channel.last_sync_at).toLocaleString('pt-BR')}
+                                Última sincronização: {new Date(channel.last_sync_at).toLocaleString(getLocale())}
                             </div>
                         )}
                     </div>
@@ -423,7 +424,7 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onLinkInstance,
                                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-muted/50"
                                 style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}>
                                 {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                                {syncing ? 'Sincronizando...' : 'Sincronizar'}
+                                {syncing ? 'A sincronizar...' : 'Sincronizar'}
                             </button>
 
                             {(channel.status === 'error' || channel.status === 'inactive') && channel.type === 'whatsapp' && (
@@ -444,7 +445,7 @@ export function ChannelCard({ channel, onEdit, onDelete, onSync, onLinkInstance,
                             <button onClick={handleDisconnect} disabled={loading}
                                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors">
                                 <XCircle className="w-4 h-4" />
-                                Desconectar
+                                Desligar
                             </button>
                         </div>
                     </div>

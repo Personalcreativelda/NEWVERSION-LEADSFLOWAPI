@@ -162,7 +162,7 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
             ? ((lastMessage as any).sender_name || (lastMessage as any).contact_name || null)
             : null;
         const content = lastMessage.media_type
-            ? (lastMessage.media_type.startsWith('image') ? '📷 Imagem' : lastMessage.media_type.startsWith('video') ? '🎥 Vídeo' : lastMessage.media_type.startsWith('audio') ? '🎤 Áudio' : '📎 Arquivo')
+            ? (lastMessage.media_type.startsWith('image') ? 'Imagem' : lastMessage.media_type.startsWith('video') ? 'Vídeo' : lastMessage.media_type.startsWith('audio') ? 'Áudio' : 'Ficheiro')
             : (lastMessage.content || '');
         return senderName ? `~ ${senderName}: ${content}` : content;
     })() : 'Nenhuma mensagem...';

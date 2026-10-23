@@ -86,7 +86,7 @@ export function AvatarUpload({ currentAvatar, userName, onAvatarUpdate }: Avatar
             onClick={() => document.getElementById('avatar-upload')?.click()}
           >
             <Upload className="h-4 w-4 mr-2" />
-            {uploading ? 'Enviando...' : 'Alterar Foto'}
+            {uploading ? 'A enviar...' : 'Alterar Foto'}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">

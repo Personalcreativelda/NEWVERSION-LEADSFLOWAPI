@@ -118,7 +118,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                         page_picture: data.picture?.data?.url
                     }
                 });
-                toast.success('Facebook Messenger conectado com sucesso!');
+                toast.success('Facebook Messenger ligado com sucesso!');
             }
 
             setConnectionStatus('connected');
@@ -131,7 +131,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
 
         } catch (err: any) {
             console.error('[Facebook] Error:', err);
-            setError(err.response?.data?.message || err.message || 'Erro ao conectar com Facebook');
+            setError(err.response?.data?.message || err.message || 'Erro ao ligar com Facebook');
             setConnectionStatus('error');
         } finally {
             setLoading(false);
@@ -161,10 +161,10 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                {isEditing ? 'Editar Canal Facebook' : 'Conectar Facebook Messenger'}
+                                {isEditing ? 'Editar Canal Facebook' : 'Ligar Facebook Messenger'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                {isEditing ? 'Atualize o token de acesso' : step === 'webhook' ? 'Passo 1 de 2 — Configurar Webhook' : step === 'token' ? 'Passo 2 de 2 — Token de Acesso' : 'Conectado!'}
+                                {isEditing ? 'Atualize o token de acesso' : step === 'webhook' ? 'Passo 1 de 2 — Configurar Webhook' : step === 'token' ? 'Passo 2 de 2 — Token de Acesso' : 'Ligado!'}
                             </p>
                         </div>
                     </div>
@@ -308,10 +308,10 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                         </a>
                                     </li>
                                     <li>Selecione ou crie seu aplicativo (tipo: <strong>Business</strong>)</li>
-                                    <li>No menu lateral, vá em <strong>Messenger</strong> &gt; <strong>Configurações</strong></li>
+                                    <li>No menu lateral, vá em <strong>Messenger</strong> &gt; <strong>Definições</strong></li>
                                     <li>Na seção <strong>Webhooks</strong>, clique em <strong>Adicionar Callback URL</strong></li>
                                     <li>Cole a <strong>Callback URL</strong> e o <strong>Verify Token</strong> acima</li>
-                                    <li>Clique em <strong>Verificar e salvar</strong></li>
+                                    <li>Clique em <strong>Verificar e guardar</strong></li>
                                     <li>Marque os campos: <strong>messages</strong> e <strong>messaging_postbacks</strong></li>
                                 </ol>
                             </div>
@@ -354,7 +354,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                             Como gerar o token de acesso:
                                         </p>
                                         <ol className="list-decimal list-inside space-y-1">
-                                            <li>No <strong>Meta for Developers</strong>, vá em <strong>Messenger</strong> &gt; <strong>Configurações</strong></li>
+                                            <li>No <strong>Meta for Developers</strong>, vá em <strong>Messenger</strong> &gt; <strong>Definições</strong></li>
                                             <li>Na seção <strong>Token de Acesso</strong>, selecione sua página</li>
                                             <li>Clique em <strong>Gerar Token</strong></li>
                                             <li>Copie o token gerado e cole abaixo</li>
@@ -451,12 +451,12 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            {isEditing ? 'Atualizando...' : 'Validando...'}
+                                            {isEditing ? 'A atualizar...' : 'A validar...'}
                                         </>
                                     ) : (
                                         <>
                                             <Check className="w-4 h-4" />
-                                            {isEditing ? 'Atualizar Canal' : 'Conectar'}
+                                            {isEditing ? 'Atualizar Canal' : 'Ligar'}
                                         </>
                                     )}
                                 </button>
@@ -482,7 +482,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 <CheckCircle className="w-10 h-10 text-green-500" />
                             </div>
                             <h3 className="text-xl font-semibold mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                Facebook Messenger Conectado!
+                                Facebook Messenger Ligado!
                             </h3>
                             <p className="text-sm mb-4" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 Sua página <strong>{pageInfo?.name}</strong> está pronta para receber mensagens.
@@ -491,7 +491,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 As mensagens do Messenger aparecerão automaticamente na sua inbox.
                             </p>
                             <div className="animate-pulse text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Redirecionando...
+                                A redirecionar...
                             </div>
                         </div>
                     )}

@@ -20,7 +20,7 @@ import {
     Smartphone,
     ChevronDown,
     Clock,
-    RefreshCw,
+    RotateCcw,
 } from 'lucide-react';
 
 interface ChatHeaderProps {
@@ -185,7 +185,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
-                            placeholder="Buscar..."
+                            placeholder="Pesquisar..."
                             className="w-32 sm:w-40 bg-transparent text-sm text-foreground outline-none"
                         />
                         <button 
@@ -206,7 +206,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                                     className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-l-lg text-xs font-medium border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all duration-150"
                                     title="Reabrir conversa"
                                 >
-                                    <RefreshCw size={13} />
+                                    <RotateCcw size={13} />
                                     Reabrir
                                 </button>
                             ) : conversation.status === 'pending' ? (
@@ -265,7 +265,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                                         onClick={() => handleStatusChange('open')}
                                         className="w-full px-3 py-2.5 flex items-center gap-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                                     >
-                                        <RefreshCw size={14} />
+                                        <RotateCcw size={14} />
                                         Reabrir
                                     </button>
                                 </div>
@@ -275,7 +275,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                         <button 
                             onClick={() => setShowSearch(true)}
                             className="p-2 rounded-lg text-muted-foreground hover:bg-muted/50 transition-all"
-                            title="Buscar"
+                            title="Pesquisar"
                         >
                             <Search size={16} />
                         </button>

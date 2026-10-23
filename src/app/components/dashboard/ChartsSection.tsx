@@ -7,6 +7,7 @@ import { DashboardCard } from '../base/DashboardCard';
 import { EmptyState } from '../base/EmptyState';
 import { LoadingState } from '../base/LoadingState';
 import { FilterBar, type FilterBarFilter } from '../base/FilterBar';
+import { NUMBER_OPTS, formatPercent, getLocale } from '../../utils/format';
 
 interface ChartsSectionProps {
   leads: Lead[];
@@ -67,7 +68,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
     },
     {
       key: 'status',
-      placeholder: 'Status',
+      placeholder: 'Estado',
       value: filtroStatus,
       options: statusDisponiveis.map((s) => ({ value: s, label: s })),
       onChange: handleStatusChange,
@@ -434,7 +435,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
               </div>
             </>
           ) : (
-            <EmptyState title="Nenhum lead cadastrado" imgSrc="/assets/icons/empty/ic_content.svg" />
+            <EmptyState title="Nenhum lead registado" imgSrc="/assets/icons/empty/ic_content.svg" />
           )}
         </DashboardCard>
 
@@ -496,7 +497,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
 
         {/* Status dos Leads (Pizza) */}
-        <DashboardCard title="Status dos Leads">
+        <DashboardCard title="Estado dos Leads">
           
           {statusChartData.length > 0 ? (
             <>
@@ -510,7 +511,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
                     outerRadius={75}
                     paddingAngle={4}
                     dataKey="value"
-                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                    label={({ percent }) => `${formatPercent(percent * 100, 0)}`}
                     labelLine={false}
                   >
                     {statusChartData.map((entry, index) => (
@@ -559,7 +560,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
           title={
             <span className="flex items-center gap-2">
               <Megaphone className="w-5 h-5 text-[#5B9FED]" />
-              Engajamento em Campanhas
+              Envolvimento em Campanhas
             </span>
           }
           action={engagementLoading && <RefreshCw className="w-4 h-4 text-muted-foreground animate-spin" />}
@@ -607,7 +608,7 @@ export default function ChartsSection({ leads, origens = [], status = [], onFilt
                     padding: '10px 14px',
                   }}
                   formatter={(value: any, _name: any, props: any) => [
-                    `${value.toLocaleString()} msgs`,
+                    `${value.toLocaleString(getLocale(), NUMBER_OPTS)} msgs`,
                     props.payload.name,
                   ]}
                   cursor={{ fill: 'rgba(91,159,237,0.08)' }}

@@ -86,10 +86,10 @@ export function ChatWidget({
         content: 'Olá! Como posso ajudar você hoje?\n\nPosso auxiliar com:\n• Gerenciamento de leads\n• Configurações da conta\n• Dúvidas sobre funcionalidades\n• Problemas técnicos',
         timestamp: new Date(),
         quickReplies: [
-          { text: '📊 Ver Dashboard', action: 'navigate:/dashboard' },
-          { text: '➕ Adicionar Lead', action: 'navigate:/leads' },
-          { text: '💬 Falar com Suporte', action: 'contact_support' },
-          { text: '📚 Central de Ajuda', action: 'navigate:/help' }
+          { text: 'Ver Painel', action: 'navigate:/dashboard' },
+          { text: 'Adicionar Lead', action: 'navigate:/leads' },
+          { text: 'Falar com Suporte', action: 'contact_support' },
+          { text: 'Central de Ajuda', action: 'navigate:/help' }
         ]
       };
       setMessages([welcomeMessage]);
@@ -372,9 +372,9 @@ function getMockResponse(userMessage: string): {
     return {
       response: 'Para adicionar leads, você pode:\n\n1. Importar de CSV/Excel\n2. Adicionar manualmente no dashboard\n3. Conectar via WhatsApp (Evolution API)\n4. Integrar com Facebook/Google Ads\n\nQual método você prefere?',
       quickReplies: [
-        { text: '➕ Adicionar manualmente', action: 'navigate:/leads' },
-        { text: '📤 Importar CSV', action: 'import_csv' },
-        { text: '💬 WhatsApp', action: 'whatsapp_integration' }
+        { text: 'Adicionar manualmente', action: 'navigate:/leads' },
+        { text: 'Importar CSV', action: 'import_csv' },
+        { text: 'WhatsApp', action: 'whatsapp_integration' }
       ]
     };
   }
@@ -383,8 +383,8 @@ function getMockResponse(userMessage: string): {
     return {
       response: 'Nossos planos:\n\n• **Gratuito**: 30 leads/mês\n• **Professional**: 500 leads/mês - R$97\n• **Unlimited**: Leads ilimitados - R$197\n\nTodos os planos incluem 30 dias de acesso.',
       quickReplies: [
-        { text: '💳 Ver Planos', action: 'navigate:/plans' },
-        { text: '📊 Meu Plano Atual', action: 'current_plan' }
+        { text: 'Ver Planos', action: 'navigate:/plans' },
+        { text: 'Meu Plano Atual', action: 'current_plan' }
       ]
     };
   }
@@ -393,8 +393,8 @@ function getMockResponse(userMessage: string): {
     return {
       response: 'Vou transferir você para nossa equipe de suporte. Um atendente humano responderá em breve.\n\nEnquanto isso, você pode:\n• Enviar email: suporte@leadsflow.com\n• WhatsApp: +55 11 98765-4321',
       quickReplies: [
-        { text: '📧 Enviar Email', action: 'email_support' },
-        { text: '💬 WhatsApp', action: 'whatsapp_support' }
+        { text: 'Enviar Email', action: 'email_support' },
+        { text: 'WhatsApp', action: 'whatsapp_support' }
       ],
       showSatisfaction: true
     };
@@ -403,9 +403,9 @@ function getMockResponse(userMessage: string): {
   return {
     response: 'Entendi sua dúvida. Posso ajudar com mais detalhes sobre:\n\n• Gerenciamento de leads\n• Automações e integrações\n• Configurações de conta\n• Planos e pagamentos\n\nSobre qual tema você gostaria de saber mais?',
     quickReplies: [
-      { text: '📊 Dashboard', action: 'navigate:/dashboard' },
-      { text: '⚙️ Configurações', action: 'navigate:/settings' },
-      { text: '💬 Falar com humano', action: 'contact_support' }
+      { text: 'Painel', action: 'navigate:/dashboard' },
+      { text: 'Definições', action: 'navigate:/settings' },
+      { text: 'Falar com humano', action: 'contact_support' }
     ]
   };
 }

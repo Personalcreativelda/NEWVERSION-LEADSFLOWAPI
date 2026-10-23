@@ -117,7 +117,7 @@ export default function PreviewWhatsAppLeadsModal({
  setFilteredContactsCount(filtered);
  console.log(`[PreviewWhatsAppModal] ⚠️ ${filtered} contatos filtrados por limite do plano`);
  toast.warning(
- `Seu plano permite ${leadsLimit} leads. Você pode importar no máximo ${availableSlots} contatos.`,
+ `Seu plano permite ${leadsLimit} leads. Você pode importar no máximo ${availableSlots} contactos.`,
  { duration: 5000 }
  );
  }
@@ -136,7 +136,7 @@ export default function PreviewWhatsAppLeadsModal({
  
  if (duplicates > 0) {
  toast.info(
- `${duplicates} contato(s) duplicado(s) foram automaticamente removidos.`,
+ `${duplicates} contacto(s) duplicado(s) foram automaticamente removidos.`,
  { duration: 4000 }
  );
  }
@@ -164,7 +164,7 @@ export default function PreviewWhatsAppLeadsModal({
  const handleImport = () => {
  const contactsToImport = editedContacts.filter((_, idx) => selectedContacts.has(idx));
  if (contactsToImport.length === 0) {
- toast.error('Selecione pelo menos um contato para importar');
+ toast.error('Selecione pelo menos um contacto para importar');
  return;
  }
  onImport(contactsToImport);
@@ -188,7 +188,7 @@ export default function PreviewWhatsAppLeadsModal({
  });
  setSelectedContacts(newSelected);
  
- toast.success('Contato removido da lista');
+ toast.success('Contacto removido da lista');
  }
  };
 
@@ -205,7 +205,7 @@ export default function PreviewWhatsAppLeadsModal({
  };
  setEditedContacts(newContacts);
  setEditingContact(null);
- toast.success('Contato atualizado');
+ toast.success('Contacto atualizado');
  };
 
  const handleSendMessage = (contact: WhatsAppContact) => {
@@ -231,10 +231,10 @@ export default function PreviewWhatsAppLeadsModal({
  </div>
  <div>
  <h2 className="text-xl font-semibold text-foreground">
- Contatos Importados do WhatsApp
+ Contactos Importados do WhatsApp
  </h2>
  <p className="text-sm text-muted-foreground font-normal">
- {editedContacts.length} contato(s) disponível(is) para importação no CRM
+ {editedContacts.length} contacto(s) disponível(is) para importação no CRM
  </p>
  </div>
  </div>
@@ -242,7 +242,7 @@ export default function PreviewWhatsAppLeadsModal({
  footer={
  <div className="flex items-center justify-between gap-3 w-full">
  <p className="text-sm text-muted-foreground hidden sm:block">
- Os contatos selecionados serão importados como leads no CRM
+ Os contactos selecionados serão importados como leads no CRM
  </p>
  <div className="flex gap-3 ml-auto">
  <AppButton variant="outline" onClick={onClose} disabled={loading}>
@@ -253,7 +253,7 @@ export default function PreviewWhatsAppLeadsModal({
  disabled={selectedContacts.size === 0 || loading || editedContacts.length === 0}
  loading={loading}
  >
- {loading ? 'Importando...' : `Importar para CRM (${selectedContacts.size})`}
+ {loading ? 'A importar...' : `Importar para CRM (${selectedContacts.size})`}
  </AppButton>
  </div>
  </div>
@@ -268,7 +268,7 @@ export default function PreviewWhatsAppLeadsModal({
  <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg flex items-start gap-2">
  <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
  <div className="text-sm text-orange-900 dark:text-orange-200">
- <strong>⚠️ Importação Grande Detectada:</strong> Você está tentando importar {editedContacts.length} contatos. Para melhor performance, recomendamos importar em lotes menores de 50 contatos por vez. Se enfrentar problemas, tente selecionar menos contatos.
+ <strong>Importação Grande Detectada:</strong> Você está tentando importar {editedContacts.length} contactos. Para melhor performance, recomendamos importar em lotes menores de 50 contactos por vez. Se enfrentar problemas, tente selecionar menos contactos.
  </div>
  </div>
  )}
@@ -276,7 +276,7 @@ export default function PreviewWhatsAppLeadsModal({
  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg flex items-start gap-2">
  <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
  <div className="text-sm text-blue-900 dark:text-blue-200">
- <strong>{duplicatesCount}</strong> contato(s) duplicado(s) foram automaticamente removidos para evitar importações duplicadas.
+ <strong>{duplicatesCount}</strong> contacto(s) duplicado(s) foram automaticamente removidos para evitar importações duplicadas.
  </div>
  </div>
  )}
@@ -284,7 +284,7 @@ export default function PreviewWhatsAppLeadsModal({
  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg flex items-start gap-2">
  <CheckCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
  <div className="text-sm text-amber-900 dark:text-amber-200">
- <strong>{filteredContactsCount}</strong> contato(s) foram filtrados devido ao limite do seu plano <strong>({userPlan?.toUpperCase() || 'FREE'})</strong>. Faça upgrade para importar mais leads.
+ <strong>{filteredContactsCount}</strong> contacto(s) foram filtrados devido ao limite do seu plano <strong>({userPlan?.toUpperCase() || 'FREE'})</strong>. Faça melhorar o plano para importar mais leads.
  </div>
  </div>
  )}
@@ -309,7 +309,7 @@ export default function PreviewWhatsAppLeadsModal({
  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
  <User className="w-8 h-8 text-foreground/80" />
  </div>
- <p className="text-muted-foreground">Nenhum contato disponível</p>
+ <p className="text-muted-foreground">Nenhum contacto disponível</p>
  </div>
  ) : (
  <div className="space-y-3">
@@ -402,7 +402,7 @@ export default function PreviewWhatsAppLeadsModal({
  handleSaveEdit(index, nome, numero);
  }}
  className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
- title="Salvar"
+ title="Guardar"
  >
  <CheckCircle className="w-4 h-4" />
  </button>
@@ -426,7 +426,7 @@ export default function PreviewWhatsAppLeadsModal({
  <button
  onClick={() => handleEdit(index)}
  className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
- title="Editar contato"
+ title="Editar contacto"
  >
  <Edit2 className="w-4 h-4" />
  </button>

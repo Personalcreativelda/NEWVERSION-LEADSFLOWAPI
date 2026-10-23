@@ -12,6 +12,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { getLocale } from '../utils/format';
 
 interface FloatingChatProps {
   chatWebhookUrl?: string;
@@ -98,10 +99,10 @@ export function FloatingChat({
         content: `Olá${userName ? ', ' + userName : ''}! 👋 Sou o assistente inteligente do LeadsFlow.\n\nEstou aqui para te ajudar a:\n\n✅ Adicionar e gerenciar leads\n✅ Configurar automações de WhatsApp\n✅ Entender o funil de vendas\n✅ Resolver problemas técnicos\n✅ Tirar dúvidas sobre funcionalidades\n\nQual dessas áreas você precisa de ajuda agora?`,
         timestamp: new Date(),
         quickReplies: [
-          { text: '➕ Como adicionar leads?', action: 'help_add_leads' },
-          { text: '📊 Como funciona o funil?', action: 'help_funnel' },
-          { text: '💬 Configurar WhatsApp', action: 'help_whatsapp' },
-          { text: '🆘 Outro assunto', action: 'help_other' }
+          { text: 'Como adicionar leads?', action: 'help_add_leads' },
+          { text: 'Como funciona o funil?', action: 'help_funnel' },
+          { text: 'Configurar WhatsApp', action: 'help_whatsapp' },
+          { text: 'Outro assunto', action: 'help_other' }
         ]
       };
       setMessages([welcomeMessage]);
@@ -625,7 +626,7 @@ function ChatMessage({
               }`}
             >
               <span>
-                {message.timestamp.toLocaleTimeString('pt-BR', {
+                {message.timestamp.toLocaleTimeString(getLocale(), {
                   hour: '2-digit',
                   minute: '2-digit'
                 })}
@@ -777,9 +778,9 @@ function getMockResponse(userMessage: string): {
     return {
       response: 'Para adicionar leads, você pode:\n\n1. Importar de CSV/Excel\n2. Adicionar manualmente no dashboard\n3. Conectar via WhatsApp (Evolution API)\n4. Integrar com Facebook/Google Ads\n\nQual método você prefere?',
       quickReplies: [
-        { text: '➕ Adicionar manualmente', action: 'navigate:/leads' },
-        { text: '📤 Importar CSV', action: 'import_csv' },
-        { text: '💬 WhatsApp', action: 'whatsapp_integration' }
+        { text: 'Adicionar manualmente', action: 'navigate:/leads' },
+        { text: 'Importar CSV', action: 'import_csv' },
+        { text: 'WhatsApp', action: 'whatsapp_integration' }
       ]
     };
   }
@@ -788,8 +789,8 @@ function getMockResponse(userMessage: string): {
     return {
       response: 'Nossos planos:\n\n• **Gratuito**: 30 leads/mês\n• **Professional**: 500 leads/mês - R$97\n• **Unlimited**: Leads ilimitados - R$197\n\nTodos os planos incluem 30 dias de acesso.',
       quickReplies: [
-        { text: '💳 Ver Planos', action: 'navigate:/plans' },
-        { text: '📊 Meu Plano Atual', action: 'current_plan' }
+        { text: 'Ver Planos', action: 'navigate:/plans' },
+        { text: 'Meu Plano Atual', action: 'current_plan' }
       ]
     };
   }
@@ -798,8 +799,8 @@ function getMockResponse(userMessage: string): {
     return {
       response: 'Vou transferir você para nossa equipe de suporte.\n\n📧 Email: suporte@leadsflowapi.com\n💬 WhatsApp: +55 11 98765-4321\n\nUm atendente humano responderá em breve!',
       quickReplies: [
-        { text: '📧 Enviar Email', action: 'email_support' },
-        { text: '💬 WhatsApp', action: 'whatsapp_support' }
+        { text: 'Enviar Email', action: 'email_support' },
+        { text: 'WhatsApp', action: 'whatsapp_support' }
       ],
       showSatisfaction: true
     };
@@ -808,9 +809,9 @@ function getMockResponse(userMessage: string): {
   return {
     response: 'Entendi sua dúvida. Posso ajudar com mais detalhes sobre:\n\n• Gerenciamento de leads\n• Automações e integrações\n• Configurações de conta\n• Planos e pagamentos\n\nSobre qual tema você gostaria de saber mais?',
     quickReplies: [
-      { text: '📊 Dashboard', action: 'navigate:/dashboard' },
-      { text: '⚙️ Configurações', action: 'navigate:/settings' },
-      { text: '💬 Falar com humano', action: 'contact_support' }
+      { text: 'Painel', action: 'navigate:/dashboard' },
+      { text: 'Definições', action: 'navigate:/settings' },
+      { text: 'Falar com humano', action: 'contact_support' }
     ]
   };
 }

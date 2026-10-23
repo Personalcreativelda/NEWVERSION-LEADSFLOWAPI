@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import EmojiPicker from 'emoji-picker-react';
 import { channelsApi, groupsApi } from '../../services/api/inbox';
 import { uploadAttachment } from '../../services/uploadService';
+import { NUMBER_OPTS, getLocale } from '../../utils/format';
 
 interface Lead {
   id: string;
@@ -125,7 +126,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       }
       setCustomNumbers(collected.join(', '));
       setRecipientMode('custom');
-      toast.success(`${collected.length} contato(s) extraído(s)`);
+      toast.success(`${collected.length} contacto(s) extraído(s)`);
     } catch (error) {
       console.error('Erro ao extrair membros:', error);
       toast.error('Erro ao extrair membros');
@@ -332,9 +333,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             }
 
             const confirmRestore = await confirm(
-              '💾 Encontramos um rascunho salvo.\n\n' +
-              `📝 Nome: ${parsed.campaignName || 'Sem nome'}\n` +
-              `📅 Salvo em: ${new Date(parsed.autoSavedAt || parsed.savedAt).toLocaleString('pt-BR')}\n\n` +
+              'Encontramos um rascunho guardado.\n\n' +
+              `Nome:${parsed.campaignName || 'Sem nome'}\n` +
+              `Guardado em:${new Date(parsed.autoSavedAt || parsed.savedAt).toLocaleString(getLocale())}\n\n` +
               'Deseja restaurar?',
               {
                 title: 'Restaurar rascunho',
@@ -354,7 +355,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
               setScheduleDate(parsed.scheduleDate || '');
               setScheduleTime(parsed.scheduleTime || '');
               setSendSpeed(parsed.sendSpeed || 'normal');
-              toast.success('✅ Rascunho restaurado!');
+              toast.success('Rascunho restaurado!');
             } else {
               localStorage.removeItem('whatsapp_campaign_draft');
               toast.info('Rascunho descartado');
@@ -651,7 +652,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
   const removeAttachment = (index: number) => {
     setAttachments(attachments.filter((_, i) => i !== index));
-    toast.success('Arquivo removido');
+    toast.success('Ficheiro removido');
   };
 
   // ✅ Atualizar legenda de um anexo
@@ -927,20 +928,20 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
     // Validações
     if (!campaignName.trim()) {
-      toast.error('⚠️ Digite um nome para a campanha');
+      toast.error('Digite um nome para a campanha');
       console.log('[Campaign WhatsApp] ❌ Validação falhou: Nome vazio');
       return;
     }
 
     // ✅ Validar instância WhatsApp selecionada
     if (!selectedChannel && whatsappChannels.length > 0) {
-      toast.error('⚠️ Selecione uma instância WhatsApp');
+      toast.error('Selecione uma instância WhatsApp');
       console.log('[Campaign WhatsApp] ❌ Validação falhou: Nenhuma instância selecionada');
       return;
     }
 
     if (whatsappChannels.length === 0) {
-      toast.error('⚠️ Nenhuma instância WhatsApp conectada. Configure em Canais.');
+      toast.error('Nenhuma instância WhatsApp ligada. Configure em Canais.');
       console.log('[Campaign WhatsApp] ❌ Validação falhou: Nenhuma instância disponível');
       return;
     }
@@ -955,13 +956,13 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
     const hasAttachment = attachments.length > 0;
 
     if (!hasMessage && !hasMediaWithCaption && !hasAttachment) {
-      toast.error('⚠️ Digite uma mensagem, adicione mídia com legenda ou anexe um arquivo');
+      toast.error('Digite uma mensagem, adicione mídia com legenda ou anexe um ficheiro');
       console.log('[Campaign WhatsApp] ❌ Validação falhou: Sem conteúdo');
       return;
     }
 
     if (recipientCount === 0) {
-      toast.error('⚠️ Selecione ao menos um destinatário');
+      toast.error('Selecione ao menos um destinatário');
       console.log('[Campaign WhatsApp] ❌ Validação falhou: Sem destinatários');
       return;
     }
@@ -969,7 +970,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
     // Validar agendamento
     if (scheduleMode === 'scheduled') {
       if (!scheduleDate || !scheduleTime) {
-        toast.error('⏰ Defina a data e hora do agendamento');
+        toast.error('Defina a data e hora do agendamento');
         return;
       }
 
@@ -977,7 +978,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       const now = new Date();
 
       if (scheduledDateTime <= now) {
-        toast.error('⚠️ A data/hora do agendamento deve ser futura');
+        toast.error('A data/hora do agendamento deve ser futura');
         return;
       }
     }
@@ -986,8 +987,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
     // Confirmar envio
     const confirmMessage = scheduleMode === 'now'
-      ? `📤 Você está prestes a enviar para ${recipientCount} destinatário(s).\n\n✅ Confirmar envio?`
-      : `📅 Agendar campanha para ${new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString('pt-BR')}?\n\n📤 ${recipientCount} destinatário(s)`;
+      ? `Você está prestes a enviar para ${recipientCount} destinatário(s).\n\nConfirmar envio?`
+      : `Agendar campanha para ${new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString(getLocale())}?\n\n${recipientCount} destinatário(s)`;
 
     const confirmed = await confirm(confirmMessage, {
       title: scheduleMode === 'now' ? 'Confirmar envio' : 'Confirmar agendamento',
@@ -1074,7 +1075,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       }
 
       if (!evolutionInstance) {
-        toast.error('⚠️ Selecione uma instância WhatsApp conectada!');
+        toast.error('Selecione uma instância WhatsApp ligada!');
         setIsSending(false);
         console.log('[Campaign WhatsApp] ❌ Nenhuma instância selecionada');
         return;
@@ -1501,7 +1502,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           );
           if (executeResponse.ok) {
             console.log('[Campaign WhatsApp] ✅ Execução iniciada pelo backend');
-            toast.success('🚀 Disparo iniciado com sucesso!');
+            toast.success('Disparo iniciado com sucesso!');
             // Notificar UI agora que a campanha está 'active' no banco
             const isEditing = !!editingCampaign;
             if (isEditing && onCampaignUpdated) {
@@ -1512,11 +1513,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           } else {
             const err = await executeResponse.json().catch(() => ({ error: 'Erro desconhecido' }));
             console.error('[Campaign WhatsApp] ❌ Erro ao executar:', err);
-            toast.warning(`⚠️ Campanha salva, mas erro ao iniciar: ${err.error || 'Verifique os logs'}`);
+            toast.warning(`Campanha guardada, mas erro ao iniciar:${err.error || 'Verifique os logs'}`);
           }
         } catch (execError: any) {
           console.error('[Campaign WhatsApp] ❌ Erro de rede ao executar:', execError);
-          toast.warning('⚠️ Campanha salva. Iniciando em segundo plano...');
+          toast.warning('Campanha guardada. A iniciar em segundo plano...');
         }
       }
 
@@ -1524,17 +1525,17 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       if (scheduleMode === 'scheduled') {
         const scheduledDateObj = new Date(`${scheduleDate}T${scheduleTime}`);
         toast.success(
-          `📅 Campanha "${campaignName}" agendada!\n\n` +
-          `🗓️ ${scheduledDateObj.toLocaleString('pt-BR')}\n` +
-          `📤 ${recipientCount} destinatário(s)`,
+          `Campanha "${campaignName}" agendada!\n\n` +
+          ` ${scheduledDateObj.toLocaleString(getLocale())}\n` +
+          ` ${recipientCount} destinatário(s)`,
           { duration: 6000 }
         );
         console.log('[Campaign WhatsApp] 📅 Toast de agendamento exibido');
       } else {
         toast.success(
-          `✅ Campanha "${campaignName}" iniciada!\n\n` +
-          `📤 Enviando para ${recipientCount} contato(s)...\n` +
-          `⏱️ Tempo estimado: ${getEstimatedTime()}`,
+          `Campanha "${campaignName}" iniciada!\n\n` +
+          `A enviar para${recipientCount} contacto(s)...\n` +
+          `Tempo estimado:${getEstimatedTime()}`,
           { duration: 5000 }
         );
         console.log('[Campaign WhatsApp] ✅ Toast de envio exibido');
@@ -1556,8 +1557,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
     } catch (error) {
       console.error('[Campaign WhatsApp] ❌ Erro ao processar campanha:', error);
       toast.error(
-        `❌ Erro ao processar campanha\n\n` +
-        `${error instanceof Error ? error.message : 'Verifique as configurações.'}`,
+        `Erro ao processar campanha\n\n` +
+        `${error instanceof Error ? error.message : 'Verifique as definições.'}`,
         { duration: 5000 }
       );
     } finally {
@@ -1684,7 +1685,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       const savedCampaign = await response.json();
       console.log(`[Campaign Save] ✅ Campanha ${isEditing ? 'atualizada' : 'salva'} com sucesso:`, savedCampaign);
 
-      toast.success(`💾 ${isEditing ? 'Alterações salvas' : 'Rascunho salvo'} com sucesso!`, { duration: 3000 });
+      toast.success(` ${isEditing ? 'Alterações guardadas' : 'Rascunho guardado'} com sucesso!`, { duration: 3000 });
 
       // ✅ Notificar componente pai
       if (isEditing && onCampaignUpdated) {
@@ -1700,7 +1701,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
     } catch (error) {
       console.error('[Campaign Save] ❌ Erro ao salvar campanha:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao salvar campanha');
+      toast.error(error instanceof Error ? error.message : 'Erro ao guardar campanha');
     }
   };
 
@@ -1708,12 +1709,12 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const handleClose = async () => {
     if (message.trim() || campaignName.trim() || attachments.length > 0) {
       const confirmDiscard = await confirm(
-        '⚠️ Você tem alterações não salvas.\n\n' +
-        '💾 Deseja salvar como rascunho antes de fechar?',
+        'Você tem alterações não guardadas.\n\n' +
+        'Deseja guardar como rascunho antes de fechar?',
         {
-          title: 'Alterações não salvas',
-          confirmLabel: 'Salvar rascunho',
-          cancelLabel: 'Não salvar',
+          title: 'Alterações não guardadas',
+          confirmLabel: 'Guardar rascunho',
+          cancelLabel: 'Não guardar',
           variant: 'warning',
         }
       );
@@ -1721,7 +1722,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       if (confirmDiscard) {
         handleSaveDraft();
       } else {
-        const confirmDelete = await confirm('❌ Descartar todas as alterações?', {
+        const confirmDelete = await confirm('Descartar todas as alterações?', {
           title: 'Descartar alterações',
           confirmLabel: 'Descartar',
           variant: 'danger',
@@ -1757,7 +1758,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           <div>
             <span>Nova Campanha WhatsApp</span>
             {autoSaveIndicator && (
-              <p className="text-xs text-muted-foreground font-normal">💾 Auto-salvando...</p>
+              <p className="text-xs text-muted-foreground font-normal">Auto-a guardar...</p>
             )}
           </div>
         </div>
@@ -1770,7 +1771,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
           <AppButton type="button" variant="outline" onClick={handleSaveDraft} disabled={isSending}>
             <Save className="w-4 h-4" />
-            Salvar
+            Guardar
           </AppButton>
 
           <AppButton
@@ -1819,13 +1820,13 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                 </Label>
                 {loadingChannels ? (
                   <div className="h-11 flex items-center justify-center bg-muted/50 rounded-lg border border-border">
-                    <span className="text-sm text-muted-foreground">Carregando instâncias...</span>
+                    <span className="text-sm text-muted-foreground">A carregar instâncias...</span>
                   </div>
                 ) : whatsappChannels.length === 0 ? (
                   <div className="h-11 flex items-center justify-center bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-700">
                     <span className="text-sm text-yellow-600 dark:text-yellow-400">
-                      ⚠️ Nenhuma instância conectada. Configure em Canais.
-                    </span>
+                      Nenhuma instância ligada. Configure em Canais.
+ </span>
                   </div>
                 ) : (
                   <select
@@ -1843,7 +1844,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         : (credentials?.instance_name || channel.name);
                       return (
                         <option key={channel.id} value={channel.id}>
-                          {isCloud ? '☁️' : '📱'} {channel.name} ({instanceName})
+                          {isCloud ? '' : ''} {channel.name} ({instanceName})
                         </option>
                       );
                     })}
@@ -1855,7 +1856,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
               {isCloudChannel && (
                 <div className="rounded-xl border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 p-4 space-y-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-base">☁️</span>
+                    <span className="text-base"></span>
                     <span className="text-sm font-semibold text-blue-800 dark:text-blue-300">
                       API Oficial Meta — WhatsApp Cloud
                     </span>
@@ -1864,9 +1865,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   {/* Toggle: Template ou Mensagem Livre */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-medium text-blue-700 dark:text-blue-400">Usar Template Aprovado</p>
+                      <p className="text-xs font-medium text-blue-700 dark:text-blue-400">Usar Modelo Aprovado</p>
                       <p className="text-xs text-blue-600 dark:text-blue-500">
-                        Obrigatório para contatos fora da janela de 24 h
+                        Obrigatório para contactos fora da janela de 24 h
                       </p>
                     </div>
                     <button
@@ -1882,7 +1883,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     <div className="space-y-2">
                       <div>
                         <Label className="text-xs font-medium text-blue-700 dark:text-blue-400 mb-1 block">
-                          Nome do Template *
+                          Nome do Modelo *
                         </Label>
                         <Input
                           value={templateName}
@@ -1908,17 +1909,17 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         </select>
                       </div>
                       <p className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 rounded p-2">
-                        💡 O conteúdo da mensagem abaixo será usado como parâmetro <code>{'{{1}}'}</code> do template.
-                        Certifique-se que o template esteja aprovado no Meta Business Manager.
+                        O conteúdo da mensagem abaixo será usado como parâmetro<code>{'{{1}}'}</code> do modelo.
+                        Certifique-se que o modelo esteja aprovado no Meta Business Manager.
                       </p>
                     </div>
                   )}
 
                   {!useTemplate && (
                     <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 rounded p-2 border border-amber-200">
-                      ⚠️ Mensagem livre funciona apenas para contatos que interagiram nas últimas 24 h.
-                      Para campanhas em frio, ative "Usar Template Aprovado".
-                    </p>
+                      Mensagem livre funciona apenas para contactos que interagiram nas últimas 24 h.
+ Para campanhas em frio, ative "Usar Modelo Aprovado".
+ </p>
                   )}
                 </div>
               )}
@@ -2027,7 +2028,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
                 {/* Variáveis como badges arrastáveis */}
                 <div className="mt-2 flex flex-wrap gap-2 items-center">
-                  <span className="text-xs text-muted-foreground">💡 Arraste ou clique:</span>
+                  <span className="text-xs text-muted-foreground">Arraste ou clique:</span>
                   {[
                     { value: '{name}', label: 'Nome' },
                     { value: '{phone}', label: 'Telefone' },
@@ -2049,11 +2050,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
                 {/* Contador */}
                 <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>📝 {message.length} / 4096 caracteres</span>
+                  <span> {message.length} / 4096 caracteres</span>
                   {message.length > 1000 && (
                     <span className="text-amber-600 dark:text-amber-400">
-                      ⚠️ Mensagens longas podem ser divididas
-                    </span>
+                      Mensagens longas podem ser divididas
+ </span>
                   )}
                 </div>
               </div>
@@ -2074,7 +2075,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     size="sm"
                   >
                     <Paperclip className="w-4 h-4" />
-                    Arquivo
+                    Ficheiro
                   </AppButton>
                   <AppButton
                     type="button"
@@ -2128,8 +2129,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         {/* Info do arquivo */}
                         <div className="flex items-center gap-3 mb-2">
                           <span className="text-xl">
-                            {att.type.startsWith('image/') ? '🖼️' :
-                              att.type.startsWith('video/') ? '🎥' : '📄'}
+                            {att.type.startsWith('image/') ? '' :
+                              att.type.startsWith('video/') ? '' : ''}
                           </span>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium text-foreground/80 truncate">{att.name}</p>
@@ -2192,17 +2193,17 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         {(att.type.startsWith('image/') || att.type.startsWith('video/')) && (
                           <div className="mt-2">
                             <Label className="text-xs text-foreground/80 mb-1 block">
-                              💬 Legenda {att.type.startsWith('image/') ? 'da imagem' : 'do vídeo'} (opcional)
+                              Legenda{att.type.startsWith('image/') ? 'da imagem' : 'do vídeo'} (opcional)
                             </Label>
                             <Textarea
                               value={att.caption || ''}
                               onChange={(e) => updateCaption(index, e.target.value)}
-                              placeholder="Ex: Confira nossa promoção! 🔥"
+                              placeholder="Ex: Confira nossa promoção!"
                               className="text-sm resize-none"
                               rows={2}
                             />
                             <p className="text-xs text-foreground/80 mt-1">
-                              💡 A legenda será exibida junto com {att.type.startsWith('image/') ? 'a imagem' : 'o vídeo'} (estilo WhatsApp)
+                              A legenda será exibida junto com{att.type.startsWith('image/') ? 'a imagem' : 'o vídeo'} (estilo WhatsApp)
                             </p>
                           </div>
                         )}
@@ -2212,8 +2213,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                 )}
 
                 <p className="text-xs text-foreground/80 mt-2">
-                  ⚠️ Limite: 16 MB • ✓ PDF, JPG, PNG, DOC, XLS, MP4, AVI
-                </p>
+                  Limite: 16 MB • ✓ PDF, JPG, PNG, DOC, XLS, MP4, AVI
+ </p>
               </div>
             </div>
 
@@ -2281,8 +2282,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               controls
                             />
                             <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                              🎥 Vídeo
-                            </div>
+                              Vídeo
+ </div>
                           </div>
                         )}
 
@@ -2336,8 +2337,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     {attachments.filter(att => !att.type.startsWith('image/') && !att.type.startsWith('video/')).map((att, i) => (
                       <div key={i} className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3 rounded-lg shadow-sm">
                         <div className="flex items-center gap-2 text-sm text-foreground bg-white/50 dark:bg-black/20 p-2 rounded">
-                          📄
-                          <span className="truncate font-medium">{att.name}</span>
+                          
+ <span className="truncate font-medium">{att.name}</span>
                         </div>
                         <div className="flex items-center justify-end gap-1 mt-2">
                           <span className="text-xs text-muted-foreground">14:32</span>
@@ -2517,11 +2518,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                             className="flex items-center gap-1 text-xs text-[#25D366] hover:text-[#128C7E] transition-colors disabled:opacity-60"
                           >
                             <RefreshCw size={11} className={isSyncingGroups ? 'animate-spin' : ''} />
-                            {isSyncingGroups ? 'Sincronizando...' : 'Sincronizar'}
+                            {isSyncingGroups ? 'A sincronizar...' : 'Sincronizar'}
                           </button>
                         </div>
                         {loadingGroups ? (
-                          <p className="text-xs text-muted-foreground py-2 pl-2">Carregando grupos...</p>
+                          <p className="text-xs text-muted-foreground py-2 pl-2">A carregar grupos...</p>
                         ) : availableGroups.length === 0 ? (
                           <p className="text-xs text-muted-foreground py-2 pl-2">Nenhum grupo encontrado. Clique em Sincronizar.</p>
                         ) : (
@@ -2561,7 +2562,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                 {/* Total */}
                 <div className="mt-2 flex items-center gap-2 text-[#25D366] bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg">
                   <span className="text-sm font-semibold">
-                    Total: {recipientCount.toLocaleString()} destinatários
+                    Total: {recipientCount.toLocaleString(getLocale(), NUMBER_OPTS)} destinatários
                   </span>
                 </div>
               </div>
@@ -2584,8 +2585,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                       className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
                     />
                     <span className="text-sm text-foreground/80">
-                      ✅ Enviar agora
-                    </span>
+                      Enviar agora
+ </span>
                   </label>
 
                   <div className="border border-border rounded-lg overflow-hidden">
@@ -2598,8 +2599,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
                       />
                       <span className="flex-1 text-sm text-foreground/80">
-                        📅 Agendar envio
-                      </span>
+                        Agendar envio
+ </span>
                     </label>
 
                     {scheduleMode === 'scheduled' && (
@@ -2607,8 +2608,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div>
                             <Label className="text-xs text-foreground/80 mb-1 block">
-                              📅 Data
-                            </Label>
+                              Data
+ </Label>
                             <Input
                               type="date"
                               value={scheduleDate}
@@ -2619,8 +2620,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                           </div>
                           <div>
                             <Label className="text-xs text-foreground/80 mb-1 block">
-                              ⏰ Hora
-                            </Label>
+                              Hora
+ </Label>
                             <Input
                               type="time"
                               value={scheduleTime}
@@ -2632,7 +2633,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         </div>
                         {scheduleDate && scheduleTime && (
                           <p className="text-xs text-green-600 dark:text-green-400 mt-2 font-medium">
-                            ✓ {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString('pt-BR')}
+                            ✓ {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString(getLocale())}
                           </p>
                         )}
                       </div>
@@ -2653,7 +2654,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   <div className="flex items-center gap-2">
                     <Settings className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm font-semibold text-foreground">
-                      Configurações Avançadas
+                      Definições Avançadas
                     </span>
                   </div>
                   {advancedOpen ? (
@@ -2675,7 +2676,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         {[
                           { value: 'slow', label: 'Seguro (~2/min)', desc: 'Recomendado — menos risco de ban' },
                           { value: 'normal', label: 'Normal (~3.5/min)', desc: 'Conta com actividade regular' },
-                          { value: 'fast', label: 'Rápido (~5.5/min)', desc: '⚠️ Risco moderado de ban' },
+                          { value: 'fast', label: 'Rápido (~5.5/min)', desc: 'Risco moderado de ban' },
                         ].map(({ value, label, desc }) => (
                           <label key={value} className="flex items-start gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer transition-colors">
                             <input

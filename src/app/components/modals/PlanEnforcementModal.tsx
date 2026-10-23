@@ -95,7 +95,7 @@ export default function PlanEnforcementModal({
 
           {/* Message */}
           <p className="text-muted-foreground mb-8 leading-relaxed text-sm">
-            {message ?? 'Faça upgrade do seu plano para continuar usando a plataforma.'}
+            {message ?? 'Faça melhorar o plano do seu plano para continuar usando a plataforma.'}
           </p>
 
           {/* CTA buttons */}
@@ -112,7 +112,7 @@ export default function PlanEnforcementModal({
                 ) : (
                   <Zap className="w-4 h-4" />
                 )}
-                {loadingPortal ? 'Carregando...' : 'Renovar Assinatura'}
+                {loadingPortal ? 'A carregar...' : 'Renovar Assinatura'}
               </button>
             ) : (
               <button
@@ -120,7 +120,7 @@ export default function PlanEnforcementModal({
                 className="w-full py-3 bg-[#00C48C] hover:bg-[#00aa7a] active:bg-[#009068] text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 <Zap className="w-4 h-4" />
-                Fazer Upgrade
+                Melhorar plano
               </button>
             )}
 

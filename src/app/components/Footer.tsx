@@ -20,7 +20,7 @@ const footerLinks = {
     { label: 'Tutoriais', href: '#' },
     { label: 'Comunidade', href: '#' },
     { label: 'Webinars', href: '#' },
-    { label: 'Status', href: '#' },
+    { label: 'Estado', href: '#' },
   ],
   legal: [
     { label: 'Privacidade', href: '#' },
@@ -61,7 +61,7 @@ export default function Footer() {
               <span className="text-white text-xl font-semibold">LeadsFlow API</span>
             </div>
             <p className="text-muted-foreground/70 mb-6 max-w-sm leading-relaxed">
-              A solução completa para gerenciar seus leads, automatizar processos
+              A solução completa para gerir seus leads, automatizar processos
               e aumentar suas vendas com inteligência.
             </p>
 

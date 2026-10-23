@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { Users, DollarSign, TrendingUp, Activity, Rocket, Crown } from 'lucide-react';
 import { PageHeader } from '../../base/PageHeader';
+import { formatPercent, getLocale } from '../../../utils/format';
 
 interface User {
   id: string;
@@ -42,7 +43,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
 
   const stats = [
     {
-      label: 'Total Usuários',
+      label: 'Total Utilizadores',
       value: users.length,
       sub: `${activeCount} ativos`,
       icon: Users,
@@ -63,7 +64,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
       color: 'bg-purple-500',
     },
     {
-      label: 'Usuários Pagantes',
+      label: 'Utilizadores Pagantes',
       value: businessCount + enterpriseCount,
       sub: `${freeCount} no plano free`,
       icon: Activity,
@@ -85,7 +86,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
 
     for (let i = 5; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthLabel = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+      const monthLabel = date.toLocaleDateString(getLocale(), { month: 'short', year: '2-digit' });
       const monthStart = date;
       const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
@@ -134,7 +135,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
         {/* Bar chart: novos usuários por mês */}
         <div className="bg-card rounded-xl p-6 shadow-sm border border-border">
           <h3 className="text-lg font-semibold text-foreground mb-4">
-            Novos Usuários por Mês
+            Novos Utilizadores por Mês
           </h3>
           {usersByMonth.some(m => m.total > 0) ? (
             <ResponsiveContainer width="100%" height={280}>
@@ -169,7 +170,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
                   cy="50%"
                   labelLine={false}
                   label={({ name, percent }) =>
-                    percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''
+                    percent > 0.05 ? `${name} ${formatPercent(percent * 100, 0)}` : ''
                   }
                   outerRadius={100}
                   dataKey="value"
@@ -184,7 +185,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
             </ResponsiveContainer>
           ) : (
             <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
-              Nenhum usuário cadastrado ainda
+              Nenhum utilizador registado ainda
             </div>
           )}
         </div>
@@ -198,7 +199,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
               <Users className="w-5 h-5 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Plano Free</p>
+              <p className="text-xs text-muted-foreground">Plano Grátis</p>
               <p className="text-2xl font-bold text-foreground">{freeCount}</p>
             </div>
           </div>

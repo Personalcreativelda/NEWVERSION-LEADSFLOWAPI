@@ -15,7 +15,7 @@ const DEFAULT_FUNNEL_STAGES = [
   { id: 'novo', label: 'Novo' },
   { id: 'qualificado', label: 'Qualificado' },
   { id: 'em_negociacao', label: 'Em Negociação' },
-  { id: 'aguardando_resposta', label: 'Aguardando Resposta' },
+  { id: 'aguardando_resposta', label: 'A aguardar Resposta' },
   { id: 'convertido', label: 'Convertido' },
   { id: 'perdido', label: 'Perdido' },
 ];
@@ -156,7 +156,7 @@ export default function EditarLeadModal({ isOpen, lead, onClose, onSave }: Edita
                 <Camera className="w-5 h-5 text-white" />
               </div>
             </div>
-            <span>✏️ Editar Contacto</span>
+            <span>Editar Contacto</span>
           </div>
         }
         footer={
@@ -165,7 +165,7 @@ export default function EditarLeadModal({ isOpen, lead, onClose, onSave }: Edita
               Cancelar
             </AppButton>
             <AppButton type="submit" onClick={handleSubmit} loading={loading}>
-              {loading ? 'Salvando...' : '💾 Salvar Alterações'}
+              {loading ? 'A guardar...' : 'Guardar Alterações'}
             </AppButton>
           </>
         }
@@ -216,7 +216,7 @@ export default function EditarLeadModal({ isOpen, lead, onClose, onSave }: Edita
 
           {/* Status e Agente */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField label="Status" required>
+            <FormField label="Estado" required>
               <select
                 name="status"
                 value={formData.status}
@@ -238,7 +238,7 @@ export default function EditarLeadModal({ isOpen, lead, onClose, onSave }: Edita
           </div>
 
           {/* Valor do Negócio */}
-          <FormField label="💰 Valor do Negócio (R$)" hint="💡 Preencha ao converter o lead para calcular valor médio">
+          <FormField label="Valor do Negócio (R$)" hint="Preencha ao converter o lead para calcular valor médio">
             <Input
               type="number"
               name="valor"

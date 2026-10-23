@@ -7,6 +7,7 @@ import { PageHeader, PageAction } from '../../base/PageHeader';
 import { apiRequest } from '../../../utils/api';
 import { getApiBaseUrl } from '../../../utils/api-client';
 import { toast } from 'sonner';
+import { getLocale } from '../../../utils/format';
 
 interface CheckResult {
   name: string;
@@ -90,7 +91,7 @@ export const AdminDiagnosticsTab: React.FC = () => {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const data = await res.json();
-      toast.success(`✅ ${data.deletedSessions} sessões expiradas removidas`);
+      toast.success(` ${data.deletedSessions} sessões expiradas removidas`);
       void fetchDiagnostics();
     } catch (e: any) {
       toast.error(e?.message || 'Falha ao limpar sessões');
@@ -144,13 +145,6 @@ export const AdminDiagnosticsTab: React.FC = () => {
               disabled={testingAlert || loading}
               className={testingAlert ? '[&>svg]:animate-spin' : undefined}
             />
-            <PageAction
-              icon={loading ? Loader2 : RefreshCw}
-              label="Atualizar"
-              onClick={() => void fetchDiagnostics()}
-              disabled={loading}
-              className={loading ? '[&>svg]:animate-spin' : undefined}
-            />
           </>
         }
       />
@@ -198,7 +192,7 @@ export const AdminDiagnosticsTab: React.FC = () => {
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {report.totalUsers} utilizadores · ambiente {report.environment} ·{' '}
-                  {new Date(report.timestamp).toLocaleString('pt-PT')}
+                  {new Date(report.timestamp).toLocaleString(getLocale())}
                 </p>
               </div>
             </div>
@@ -230,7 +224,7 @@ export const AdminDiagnosticsTab: React.FC = () => {
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="px-5 py-3 border-b border-border">
               <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">
-                Status completo ({report.checks.length} verificações)
+                Estado completo ({report.checks.length} verificações)
               </h2>
             </div>
             <div className="divide-y divide-border">

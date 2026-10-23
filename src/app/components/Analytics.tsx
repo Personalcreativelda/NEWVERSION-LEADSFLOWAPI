@@ -55,7 +55,7 @@ export default function Analytics() {
           <div>
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 text-blue-300 rounded-full mb-6">
               <TrendingUp className="w-4 h-4" />
-              <span className="text-sm font-medium">Analytics & Insights</span>
+              <span className="text-sm font-medium">Relatórios & Insights</span>
             </div>
 
             <h2 className="text-foreground mb-4 text-3xl sm:text-4xl lg:text-5xl font-bold">
@@ -134,7 +134,7 @@ export default function Analytics() {
 
             {/* Leads by Status */}
             <div className="bg-card rounded-2xl p-6 border border-border">
-              <h3 className="text-foreground mb-6 text-lg font-semibold">Status dos Leads</h3>
+              <h3 className="text-foreground mb-6 text-lg font-semibold">Estado dos Leads</h3>
               <div className="space-y-3">
                 {leadsByStatus.map((item, index) => (
                   <div

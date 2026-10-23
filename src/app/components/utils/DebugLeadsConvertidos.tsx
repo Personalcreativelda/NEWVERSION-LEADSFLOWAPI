@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiRequest } from '../../utils/api';
 import { Card } from '../ui/card';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { getLocale } from '../../utils/format';
 
 /**
  * 🔍 COMPONENTE DE DEBUG - Verifica estado dos leads convertidos
@@ -54,8 +55,8 @@ export function DebugLeadsConvertidos() {
     <Card className="p-4 bg-blue-50 border-2 border-blue-500 max-w-2xl">
       <div className="mb-3">
         <h3 className="font-bold text-blue-900 flex items-center gap-2">
-          🔍 Debug - Leads Convertidos
-        </h3>
+          Debug - Leads Convertidos
+ </h3>
         <p className="text-sm text-blue-800">
           Verificar estado dos leads e campo convertedAt
         </p>
@@ -66,7 +67,7 @@ export function DebugLeadsConvertidos() {
         disabled={loading}
         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 mb-4"
       >
-        {loading ? '⏳ Verificando...' : '🔍 Verificar Leads'}
+        {loading ? 'A verificar...' : 'Verificar Leads'}
       </button>
 
       {data && !data.error && (
@@ -111,8 +112,8 @@ export function DebugLeadsConvertidos() {
               <div className="flex items-center gap-2 text-green-700">
                 <CheckCircle className="w-5 h-5" />
                 <span className="font-semibold">
-                  ✅ Todos os leads convertidos têm convertedAt preenchido!
-                </span>
+                  Todos os leads convertidos têm convertedAt preenchido!
+ </span>
               </div>
             )}
           </div>
@@ -137,18 +138,18 @@ export function DebugLeadsConvertidos() {
                       #{idx + 1}: {lead.nome}
                     </div>
                     <div className="grid grid-cols-2 gap-1 mt-1 text-foreground/80">
-                      <div>Status: {lead.status}</div>
+                      <div>Estado: {lead.status}</div>
                       <div>ID: {lead.id.substring(0, 8)}...</div>
                       <div className={lead.hasCreatedAt ? 'text-green-600' : 'text-red-600'}>
-                        createdAt: {lead.hasCreatedAt ? '✅' : '❌'}
+                        createdAt: {lead.hasCreatedAt ? '' : ''}
                       </div>
                       <div className={lead.hasConvertedAt ? 'text-green-600' : 'text-red-600'}>
-                        convertedAt: {lead.hasConvertedAt ? '✅' : '❌'}
+                        convertedAt: {lead.hasConvertedAt ? '' : ''}
                       </div>
                     </div>
                     {lead.convertedAt && (
                       <div className="text-muted-foreground mt-1">
-                        Convertido em: {new Date(lead.convertedAt).toLocaleString('pt-BR')}
+                        Convertido em: {new Date(lead.convertedAt).toLocaleString(getLocale())}
                       </div>
                     )}
                   </div>
@@ -160,7 +161,7 @@ export function DebugLeadsConvertidos() {
           {/* Recomendação */}
           {data.semConvertedAt > 0 && (
             <div className="bg-yellow-50 p-3 rounded border border-yellow-300">
-              <div className="font-semibold text-yellow-900 mb-1">💡 Recomendação:</div>
+              <div className="font-semibold text-yellow-900 mb-1">Recomendação:</div>
               <p className="text-sm text-yellow-800">
                 Execute a migração novamente. Pode haver leads que foram convertidos mas não 
                 tinham o campo convertedAt preenchido no momento da primeira migração.
@@ -172,7 +173,7 @@ export function DebugLeadsConvertidos() {
 
       {data?.error && (
         <div className="bg-red-50 p-3 rounded border border-red-300">
-          <div className="font-semibold text-red-900">❌ Erro:</div>
+          <div className="font-semibold text-red-900">Erro:</div>
           <p className="text-sm text-red-800">{data.error}</p>
         </div>
       )}

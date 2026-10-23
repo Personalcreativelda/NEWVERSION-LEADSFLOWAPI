@@ -250,7 +250,7 @@ export default function TagEditModal({ tag, onClose, onUpdate }: TagEditModalPro
                             }}
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? 'Atualizando...' : 'Atualizar'}
+                            {isSubmitting ? 'A atualizar...' : 'Atualizar'}
                         </button>
                     </div>
                 </form>

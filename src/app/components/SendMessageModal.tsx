@@ -87,7 +87,7 @@ export function SendMessageModal({
         await checkChannelConnection(whatsappChannels[0]);
       } else {
         setConnectionStatus('disconnected');
-        setError('Nenhum canal WhatsApp configurado. Vá em Configurações > Integrações para conectar.');
+        setError('Nenhum canal WhatsApp configurado. Vá em Definições > Integrações para ligar.');
       }
     } catch (err) {
       console.error('[SendMessage] Error loading channels:', err);
@@ -125,7 +125,7 @@ export function SendMessageModal({
 
       if (!response.ok) {
         setConnectionStatus('disconnected');
-        setError('WhatsApp não está conectado. Vá em Configurações > Integrações para conectar.');
+        setError('WhatsApp não está ligado. Vá em Definições > Integrações para ligar.');
         return;
       }
 
@@ -138,15 +138,15 @@ export function SendMessageModal({
       } else {
         setConnectionStatus('disconnected');
         if (data.state === 'connecting' || data.state === 'pending') {
-          setError('WhatsApp em processo de conexão. Aguarde alguns segundos e tente novamente.');
+          setError('WhatsApp em processo de ligação. Aguarde alguns segundos e tente novamente.');
         } else {
-          setError('WhatsApp não está conectado. Vá em Configurações > Integrações para conectar.');
+          setError('WhatsApp não está ligado. Vá em Definições > Integrações para ligar.');
         }
       }
     } catch (err: any) {
       console.error('[SendMessage] Error checking channel connection:', err);
       setConnectionStatus('disconnected');
-      setError('Erro ao verificar conexão do WhatsApp.');
+      setError('Erro ao verificar ligação do WhatsApp.');
     } finally {
       setCheckingConnection(false);
     }
@@ -169,7 +169,7 @@ export function SendMessageModal({
       if (!userStr) {
         console.error('[SendMessage] User not found in localStorage');
         setConnectionStatus('disconnected');
-        setError('Erro: usuário não encontrado. Faça login novamente.');
+        setError('Erro: utilizador não encontrado. Faça login novamente.');
         setCheckingConnection(false);
         return;
       }
@@ -179,7 +179,7 @@ export function SendMessageModal({
       if (!userId) {
         console.error('[SendMessage] User ID not found');
         setConnectionStatus('disconnected');
-        setError('Erro: ID do usuário não encontrado.');
+        setError('Erro: ID do utilizador não encontrado.');
         setCheckingConnection(false);
         return;
       }
@@ -203,7 +203,7 @@ export function SendMessageModal({
       if (!response.ok) {
         console.error('[SendMessage] Status check failed:', response.status);
         setConnectionStatus('disconnected');
-        setError('WhatsApp não está conectado. Vá em Configurações > Integrações para conectar.');
+        setError('WhatsApp não está ligado. Vá em Definições > Integrações para ligar.');
         setCheckingConnection(false);
         return;
       }
@@ -223,16 +223,16 @@ export function SendMessageModal({
 
         // Provide specific error message based on state
         if (data.state === 'connecting' || data.state === 'pending') {
-          setError('WhatsApp em processo de conexão. Aguarde alguns segundos e tente novamente.');
+          setError('WhatsApp em processo de ligação. Aguarde alguns segundos e tente novamente.');
         } else {
-          setError('WhatsApp não está conectado. Vá em Configurações > Integrações para conectar.');
+          setError('WhatsApp não está ligado. Vá em Definições > Integrações para ligar.');
         }
         console.log('[SendMessage] ❌ WhatsApp is not connected. State:', data.state);
       }
     } catch (err: any) {
       console.error('[SendMessage] Error checking WhatsApp connection:', err);
       setConnectionStatus('disconnected');
-      setError('Erro ao verificar conexão do WhatsApp. Verifique se você já conectou sua conta WhatsApp nas Configurações.');
+      setError('Erro ao verificar ligação do WhatsApp. Verifique se você já conectou sua conta WhatsApp nas Definições.');
     } finally {
       setCheckingConnection(false);
     }
@@ -329,11 +329,11 @@ export function SendMessageModal({
       
       // Show specific error for WhatsApp not connected
       if (errorMessage.includes('WhatsApp not connected') || errorMessage.includes('WhatsApp não conectado')) {
-        setError('WhatsApp não conectado! Vá em Configurações > Integrações para conectar seu WhatsApp escaneando o QR Code.');
-        toast.error('WhatsApp não conectado! Configure nas Integrações.');
+        setError('WhatsApp não ligado! Vá em Definições > Integrações para ligar seu WhatsApp escaneando o QR Code.');
+        toast.error('WhatsApp não ligado! Configure nas Integrações.');
       } else if (errorMessage.includes('limit reached') || errorMessage.includes('limit')) {
-        setError('Limite de mensagens atingido! Faça upgrade do seu plano.');
-        toast.error('Limite de mensagens atingido! Faça upgrade do seu plano.');
+        setError('Limite de mensagens atingido! Faça melhorar o plano do seu plano.');
+        toast.error('Limite de mensagens atingido! Faça melhorar o plano do seu plano.');
       } else if (errorMessage.includes('não está registrado no WhatsApp') || errorMessage.includes('not registered')) {
         toast.error('Este número não está registrado no WhatsApp. Verifique o telefone do lead.');
       } else {
@@ -491,17 +491,17 @@ export function SendMessageModal({
                 {connectionStatus === 'connected' ? (
                   <>
                     <Wifi className="w-4 h-4 text-green-600" />
-                    <span className="text-sm text-green-600 dark:text-green-400">✅ WhatsApp Conectado</span>
+                    <span className="text-sm text-green-600 dark:text-green-400">WhatsApp Ligado</span>
                   </>
                 ) : connectionStatus === 'disconnected' ? (
                   <>
                     <WifiOff className="w-4 h-4 text-red-600" />
-                    <span className="text-sm text-red-600 dark:text-red-400">❌ WhatsApp Desconectado</span>
+                    <span className="text-sm text-red-600 dark:text-red-400">WhatsApp Desligado</span>
                   </>
                 ) : (
                   <>
                     <AlertCircle className="w-4 h-4 text-gray-700 dark:text-gray-300" />
-                    <span className="text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">⏳ Verificando...</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-500 dark:text-gray-400">A verificar...</span>
                   </>
                 )}
               </div>
@@ -521,25 +521,25 @@ export function SendMessageModal({
                 {checkingConnection ? (
                   <>
                     <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                    Verificando...
+                    A verificar...
                   </>
                 ) : (
-                  'Verificar Conexão'
+                  'Verificar Ligação'
                 )}
               </Button>
             </div>
             {connectionStatus === 'disconnected' && (
               <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
                 <p className="text-xs text-amber-800 dark:text-amber-200 mb-2">
-                  <strong>⚠️ Atenção:</strong> Seu WhatsApp não está conectado!
+                  <strong>Atenção:</strong> Seu WhatsApp não está ligado!
                 </p>
                 <p className="text-xs text-amber-700 dark:text-amber-300">
-                  <strong>Como conectar:</strong>
+                  <strong>Como ligar:</strong>
                 </p>
                 <ol className="text-xs text-amber-700 dark:text-amber-300 ml-4 mt-1 space-y-1">
-                  <li>1. Clique no ícone de <strong>Configurações</strong> (⚙️) no topo do Dashboard</li>
+                  <li>1. Clique no ícone de <strong>Definições</strong> () no topo do Painel</li>
                   <li>2. Vá até a aba <strong>Integrações</strong></li>
-                  <li>3. Clique em <strong>"Conectar WhatsApp"</strong></li>
+                  <li>3. Clique em <strong>"Ligar WhatsApp"</strong></li>
                   <li>4. Escaneie o <strong>QR Code</strong> com seu WhatsApp</li>
                 </ol>
               </div>
@@ -554,7 +554,7 @@ export function SendMessageModal({
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <p className="text-sm text-purple-900 dark:text-purple-100 mb-1 flex items-center gap-2">
-                      <strong>🚀 Envio via Webhook N8N</strong>
+                      <strong>Envio via Webhook N8N</strong>
                       <Crown className="w-4 h-4 text-amber-500" />
                     </p>
                     <p className="text-xs text-purple-800 dark:text-purple-200">
@@ -576,8 +576,8 @@ export function SendMessageModal({
                     <ul className="text-xs text-blue-800 dark:text-blue-200 ml-4 mt-1 space-y-1">
                       <li>• Dados dos leads serão enviados para seu webhook N8N</li>
                       <li>• Seu workflow N8N processa e envia via Evolution API</li>
-                      <li>• Usa a instância WhatsApp conectada via QR Code</li>
-                      <li>• Configure o webhook em Configurações → Integrações</li>
+                      <li>• Usa a instância WhatsApp ligada via QR Code</li>
+                      <li>• Configure o webhook em Definições → Integrações</li>
                     </ul>
                   </div>
                 )}
@@ -627,9 +627,9 @@ export function SendMessageModal({
                   <p>{error}</p>
                   {error.includes('não está registrado no WhatsApp') && (
                     <p className="text-xs mt-2">
-                      💡 Dica: Verifique se o número do lead está correto e possui WhatsApp ativo.
-                      Vá em "Editar Lead" para corrigir o telefone.
-                    </p>
+                      Dica: Verifique se o número do lead está correto e possui WhatsApp ativo.
+ Vá em "Editar Lead" para corrigir o telefone.
+ </p>
                   )}
                 </div>
               </AlertDescription>
@@ -686,7 +686,7 @@ export function SendMessageModal({
               {sending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Enviando...
+                  A enviar...
                 </>
               ) : success ? (
                 <>
@@ -705,8 +705,8 @@ export function SendMessageModal({
           {/* Helper text when WhatsApp not connected */}
           {connectionStatus === 'disconnected' && (
             <p className="text-xs text-center text-muted-foreground">
-              💡 O botão de envio será habilitado após conectar o WhatsApp
-            </p>
+              O botão de envio será habilitado após ligar o WhatsApp
+ </p>
           )}
         </div>
       </DialogContent>

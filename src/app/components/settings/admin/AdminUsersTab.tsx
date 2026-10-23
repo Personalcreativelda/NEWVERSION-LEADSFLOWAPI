@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MoreVertical, Crown, UserCheck, UserX, Trash2, Eye } from 'lucide-react';
+import { getLocale } from '../../../utils/format';
 
 interface User {
   id: string;
@@ -168,13 +169,13 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
             <thead>
               <tr className="border-b border-border bg-muted">
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Usuário
+                  Utilizador
                 </th>
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Plano
                 </th>
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Status
+                  Estado
                 </th>
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Data de Entrada
@@ -193,13 +194,13 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
             <tbody className="divide-y divide-border bg-card">{loading ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                    Carregando usuários...
+                    A carregar utilizadores...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                    Nenhum usuário encontrado
+                    Nenhum utilizador encontrado
                   </td>
                 </tr>
               ) : (
@@ -240,7 +241,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                       {getStatusBadge(user.status, user.planExpiresAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground/80">
-                      {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                      {new Date(user.createdAt).toLocaleDateString(getLocale())}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                       {calculateMonthlyRevenue(user)}
@@ -285,7 +286,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                               {user.status === 'suspended'
                                 ? <UserCheck className="w-4 h-4 text-green-500" />
                                 : <UserX className="w-4 h-4 text-amber-500" />}
-                              {user.status === 'suspended' ? 'Ativar Usuário' : 'Suspender'}
+                              {user.status === 'suspended' ? 'Ativar Utilizador' : 'Suspender'}
                             </button>
                             <div className="border-t border-border my-1" />
                             <button
@@ -293,7 +294,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
-                              Excluir Usuário
+                              Eliminar Utilizador
                             </button>
                           </div>
                         )}

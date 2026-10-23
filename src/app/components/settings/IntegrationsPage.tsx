@@ -196,7 +196,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
     // Mostrar erros de validação
     if (errors.length > 0) {
-      toast.error(`❌ Erro de validação:\n${errors.join('\n')}`);
+      toast.error(`Erro de validação:\n${errors.join('\n')}`);
       return;
     }
 
@@ -224,7 +224,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
       // Sucesso!
       setSmtpSaveState('saved');
-      toast.success('✅ Configurações SMTP salvas com sucesso!', {
+      toast.success('Definições SMTP guardadas com sucesso!', {
         description: `Host: ${smtpHost}\nEmail: ${smtpUser}`,
         duration: 4000,
       });
@@ -240,7 +240,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
       // Mensagem de erro mais específica
       const errorMessage = error?.message || 'Erro desconhecido';
-      toast.error('❌ Erro ao salvar configurações SMTP', {
+      toast.error('Erro ao guardar definições SMTP', {
         description: errorMessage,
         duration: 5000,
       });
@@ -272,12 +272,12 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       // Sync com localStorage para backward compatibility
       localStorage.setItem('n8n_webhook_url', n8nWebhookUrl);
       setIsN8nConfigured(true);
-      toast.success('✅ Webhook N8N configurado com sucesso!');
+      toast.success('Webhook N8N configurado com sucesso!');
 
       console.log('[N8N Save] URL salva no backend:', n8nWebhookUrl);
     } catch (error) {
       console.error('[N8N Save] Error:', error);
-      toast.error('Erro ao salvar webhook. Tente novamente.');
+      toast.error('Erro ao guardar webhook. Tente novamente.');
     }
   };
 
@@ -290,7 +290,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       localStorage.removeItem('n8n_webhook_url');
       setN8nWebhookUrl('');
       setIsN8nConfigured(false);
-      toast.success('🗑️ Configuração do webhook N8N removida');
+      toast.success('Configuração do webhook N8N removida');
       console.log('[N8N] Configuration cleared from backend');
     } catch (error) {
       console.error('[N8N Clear] Error:', error);
@@ -300,7 +300,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
   const handleTestWebhook = async () => {
     try {
-      toast.info('🧪 Testando webhook N8N...');
+      toast.info('A testar webhook N8N...');
       console.log('[Test Webhook] Starting test...');
 
       const token = localStorage.getItem('leadflow_access_token');
@@ -317,7 +317,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
       if (response.ok && data.success) {
         toast.success(
-          `✅ Webhook testado com sucesso!\\n\\n` +
+          `Webhook testado com sucesso!\\n\\n` +
           `URL: ${data.webhookUrl}\\n` +
           `Instance: ${data.instanceName || 'N/A'}\\n\\n` +
           `Verifique seu workflow N8N!`,
@@ -325,20 +325,20 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
         );
       } else {
         toast.error(
-          `❌ Teste falhou: ${data.error || 'Erro desconhecido'}\\n\\n` +
+          `Teste falhou:${data.error || 'Erro desconhecido'}\\n\\n` +
           (data.help || 'Verifique a configuração'),
           { duration: 6000 }
         );
       }
     } catch (error: any) {
       console.error('[Test Webhook] Error:', error);
-      toast.error(`❌ Erro ao testar webhook: ${error.message}`);
+      toast.error(`Erro ao testar webhook:${error.message}`);
     }
   };
 
   const handleSaveN8nWhatsAppImportUrl = async () => {
     if (!n8nWhatsAppImportUrl) {
-      toast.error('Por favor, insira a URL do webhook N8N de importação de contatos');
+      toast.error('Por favor, insira a URL do webhook N8N de importação de contactos');
       return;
     }
 
@@ -357,12 +357,12 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       // Sync com localStorage
       localStorage.setItem('n8n_whatsapp_import_url', n8nWhatsAppImportUrl);
       setIsN8nWhatsAppImportConfigured(true);
-      toast.success('✅ URL de importação de contatos configurada com sucesso!');
+      toast.success('URL de importação de contactos configurada com sucesso!');
 
       console.log('[N8N WhatsApp Import] URL salva no backend:', n8nWhatsAppImportUrl);
     } catch (error) {
       console.error('[N8N WhatsApp Import] Error:', error);
-      toast.error('Erro ao salvar URL. Tente novamente.');
+      toast.error('Erro ao guardar URL. Tente novamente.');
     }
   };
 
@@ -375,7 +375,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       localStorage.removeItem('n8n_whatsapp_import_url');
       setN8nWhatsAppImportUrl('');
       setIsN8nWhatsAppImportConfigured(false);
-      toast.success('🗑️ Configuração de importação de contatos removida');
+      toast.success('Configuração de importação de contactos removida');
       console.log('[N8N WhatsApp Import] Configuration cleared from backend');
     } catch (error) {
       console.error('[N8N WhatsApp Import Clear] Error:', error);
@@ -389,7 +389,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       return;
     }
 
-    toast.info('🔍 Testando conexão com webhook N8N...');
+    toast.info('A testar ligação com webhook N8N...');
 
     try {
       console.log('[N8N Test] Testing URL:', n8nWebhookUrl);
@@ -407,7 +407,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       // Se GET retornar 404 ou 405, tentar POST
       if (response.status === 404 || response.status === 405) {
         console.log('[N8N Test] GET not supported, trying POST...');
-        toast.info('⚠️ Endpoint não suporta GET. Testando com POST...');
+        toast.info('Endpoint não suporta GET. A testar com POST...');
 
         // Fazer teste com POST
         response = await fetch(n8nWebhookUrl, {
@@ -419,7 +419,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
           body: JSON.stringify({
             test: true,
             action: 'list_all',
-            message: 'Teste de conexão LeadsFlow API'
+            message: 'Teste de ligação LeadsFlow API'
           }),
         });
 
@@ -428,12 +428,12 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
         if (!response.ok) {
           const errorText = await response.text().catch(() => 'Unknown error');
           console.error('[N8N Test] POST error:', errorText);
-          toast.error(`❌ POST retornou erro: ${response.status} ${response.statusText}`);
+          toast.error(`POST retornou erro:${response.status} ${response.statusText}`);
           return;
         }
 
         // POST funcionou
-        toast.success('✅ Conexão OK! Webhook responde a requisições POST.');
+        toast.success('Ligação OK! Webhook responde a requisições POST.');
 
         // Tentar parsear a resposta
         try {
@@ -443,7 +443,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
           // Verificar se há leads na resposta
           const leadsArray = Array.isArray(data) ? data : (data.leads || data.rows || data.data || data.items || []);
           if (Array.isArray(leadsArray) && leadsArray.length > 0) {
-            toast.success(`✅ Encontrados ${leadsArray.length} lead(s) na resposta!`);
+            toast.success(`Encontrados${leadsArray.length} lead(s) na resposta!`);
           }
         } catch (e) {
           console.log('[N8N Test] POST response is not JSON (OK)');
@@ -455,14 +455,14 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
         console.error('[N8N Test] GET error:', errorText);
-        toast.error(`❌ Webhook retornou erro: ${response.status} ${response.statusText}`);
+        toast.error(`Webhook retornou erro:${response.status} ${response.statusText}`);
         return;
       }
 
       // Se GET funcionou, tentar parsear a resposta
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        toast.success('✅ Conexão OK! Webhook está respondendo.');
+        toast.success('Ligação OK! Webhook está respondendo.');
         console.log('[N8N Test] Webhook responding but not JSON');
         return;
       }
@@ -471,15 +471,15 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       const leadsArray = Array.isArray(data) ? data : (data.leads || data.rows || data.data || data.items || []);
 
       if (!Array.isArray(leadsArray)) {
-        toast.warning('⚠️ Webhook está funcionando, mas formato de resposta não reconhecido.');
+        toast.warning('Webhook está funcionando, mas formato de resposta não reconhecido.');
         console.log('[N8N Test] Response data:', data);
         return;
       }
 
       if (leadsArray.length === 0) {
-        toast.success('✅ Conexão OK! Webhook está funcionando (nenhum lead encontrado).');
+        toast.success('Ligação OK! Webhook está funcionando (nenhum lead encontrado).');
       } else {
-        toast.success(`✅ Conexão OK! Encontrados ${leadsArray.length} lead(s) na planilha.`);
+        toast.success(`Ligação OK! Encontrados${leadsArray.length} lead(s) na planilha.`);
       }
 
       console.log('[N8N Test] Sample lead:', leadsArray[0]);
@@ -487,9 +487,9 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       console.error('[N8N Test] Error:', error);
 
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        toast.error('❌ Erro de conexão. Verifique:\n• URL está correta?\n• Workflow está ativo no N8N?\n• CORS está configurado?');
+        toast.error('Erro de ligação. Verifique:\n• URL está correta?\n• Workflow está ativo no N8N?\n• CORS está configurado?');
       } else {
-        toast.error(`❌ Erro ao conectar: ${error.message}`);
+        toast.error(`Erro ao ligar:${error.message}`);
       }
     }
   };
@@ -507,10 +507,10 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       // Sync com localStorage
       localStorage.setItem('meta_pixel_id', metaPixelId);
       setIsMetaPixelConfigured(true);
-      toast.success('✅ Meta Pixel configurado com sucesso!');
+      toast.success('Meta Pixel configurado com sucesso!');
     } catch (error) {
       console.error('[Meta Pixel Save] Error:', error);
-      toast.error('Erro ao salvar Meta Pixel');
+      toast.error('Erro ao guardar Meta Pixel');
     }
   };
 
@@ -527,10 +527,10 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       // Sync com localStorage
       localStorage.setItem('google_analytics_id', googleAnalyticsId);
       setIsGoogleAnalyticsConfigured(true);
-      toast.success('✅ Google Analytics configurado com sucesso!');
+      toast.success('Google Analytics configurado com sucesso!');
     } catch (error) {
       console.error('[Google Analytics Save] Error:', error);
-      toast.error('Erro ao salvar Google Analytics');
+      toast.error('Erro ao guardar Google Analytics');
     }
   };
 
@@ -558,12 +558,12 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       // Sync com localStorage
       localStorage.setItem('chat_webhook_url', chatWebhookUrl);
       setIsChatConfigured(true);
-      toast.success('✅ Webhook de chat configurado com sucesso!');
+      toast.success('Webhook de chat configurado com sucesso!');
 
       console.log('[Chat Save] URL salva no backend:', chatWebhookUrl);
     } catch (error) {
       console.error('[Chat Save] Error:', error);
-      toast.error('Erro ao salvar webhook de chat');
+      toast.error('Erro ao guardar webhook de chat');
     }
   };
 
@@ -576,7 +576,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       localStorage.removeItem('chat_webhook_url');
       setChatWebhookUrl('');
       setIsChatConfigured(false);
-      toast.success('🗑️ Configuração do webhook de chat removida');
+      toast.success('Configuração do webhook de chat removida');
       console.log('[Chat] Configuration cleared from backend');
     } catch (error) {
       console.error('[Chat Clear] Error:', error);
@@ -590,7 +590,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       return;
     }
 
-    toast.info('🔍 Testando conexão com webhook de chat...');
+    toast.info('A testar ligação com webhook de chat...');
 
     try {
       console.log('[Chat Test] Testing URL:', chatWebhookUrl);
@@ -608,7 +608,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       // Se GET retornar 404 ou 405, tentar POST
       if (response.status === 404 || response.status === 405) {
         console.log('[Chat Test] GET not supported, trying POST...');
-        toast.info('⚠️ Endpoint não suporta GET. Testando com POST...');
+        toast.info('Endpoint não suporta GET. A testar com POST...');
 
         // Fazer teste com POST
         response = await fetch(chatWebhookUrl, {
@@ -620,7 +620,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
           body: JSON.stringify({
             test: true,
             action: 'list_all',
-            message: 'Teste de conexão LeadsFlow API'
+            message: 'Teste de ligação LeadsFlow API'
           }),
         });
 
@@ -629,12 +629,12 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
         if (!response.ok) {
           const errorText = await response.text().catch(() => 'Unknown error');
           console.error('[Chat Test] POST error:', errorText);
-          toast.error(`❌ POST retornou erro: ${response.status} ${response.statusText}`);
+          toast.error(`POST retornou erro:${response.status} ${response.statusText}`);
           return;
         }
 
         // POST funcionou
-        toast.success('✅ Conexão OK! Webhook responde a requisições POST.');
+        toast.success('Ligação OK! Webhook responde a requisições POST.');
 
         // Tentar parsear a resposta
         try {
@@ -644,7 +644,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
           // Verificar se há leads na resposta
           const leadsArray = Array.isArray(data) ? data : (data.leads || data.rows || data.data || data.items || []);
           if (Array.isArray(leadsArray) && leadsArray.length > 0) {
-            toast.success(`✅ Encontrados ${leadsArray.length} lead(s) na resposta!`);
+            toast.success(`Encontrados${leadsArray.length} lead(s) na resposta!`);
           }
         } catch (e) {
           console.log('[Chat Test] POST response is not JSON (OK)');
@@ -656,14 +656,14 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
         console.error('[Chat Test] GET error:', errorText);
-        toast.error(`❌ Webhook retornou erro: ${response.status} ${response.statusText}`);
+        toast.error(`Webhook retornou erro:${response.status} ${response.statusText}`);
         return;
       }
 
       // Se GET funcionou, tentar parsear a resposta
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        toast.success('✅ Conexão OK! Webhook está respondendo.');
+        toast.success('Ligação OK! Webhook está respondendo.');
         console.log('[Chat Test] Webhook responding but not JSON');
         return;
       }
@@ -672,15 +672,15 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       const leadsArray = Array.isArray(data) ? data : (data.leads || data.rows || data.data || data.items || []);
 
       if (!Array.isArray(leadsArray)) {
-        toast.warning('⚠️ Webhook está funcionando, mas formato de resposta não reconhecido.');
+        toast.warning('Webhook está funcionando, mas formato de resposta não reconhecido.');
         console.log('[Chat Test] Response data:', data);
         return;
       }
 
       if (leadsArray.length === 0) {
-        toast.success('✅ Conexão OK! Webhook está funcionando (nenhum lead encontrado).');
+        toast.success('Ligação OK! Webhook está funcionando (nenhum lead encontrado).');
       } else {
-        toast.success(`✅ Conexão OK! Encontrados ${leadsArray.length} lead(s) na planilha.`);
+        toast.success(`Ligação OK! Encontrados${leadsArray.length} lead(s) na planilha.`);
       }
 
       console.log('[Chat Test] Sample lead:', leadsArray[0]);
@@ -688,9 +688,9 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       console.error('[Chat Test] Error:', error);
 
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        toast.error('❌ Erro de conexão. Verifique:\n• URL está correta?\n• Workflow está ativo no N8N?\n• CORS está configurado?');
+        toast.error('Erro de ligação. Verifique:\n• URL está correta?\n• Workflow está ativo no N8N?\n• CORS está configurado?');
       } else {
-        toast.error(`❌ Erro ao conectar: ${error.message}`);
+        toast.error(`Erro ao ligar:${error.message}`);
       }
     }
   };
@@ -825,7 +825,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           onClick={handleSaveWebhook}
                           className="bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
-                          Salvar Webhook
+                          Guardar Webhook
                         </Button>
                       </div>
                     </div>
@@ -869,7 +869,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         </div>
                         <div>
                           <Label htmlFor="smtp-user" className="text-sm">
-                            Usuário/Email <span className="text-red-500">*</span>
+                            Utilizador/Email <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             id="smtp-user"
@@ -885,7 +885,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         </div>
                         <div>
                           <Label htmlFor="smtp-password" className="text-sm">
-                            Senha <span className="text-red-500">*</span>
+                            Palavra-passe <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             id="smtp-password"
@@ -896,7 +896,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             className="mt-1.5"
                           />
                           <p className="text-xs text-muted-foreground mt-1">
-                            Senha do email ou senha de aplicativo
+                            Palavra-passe do email ou palavra-passe de aplicativo
                           </p>
                         </div>
                         <div>
@@ -908,7 +908,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             type="email"
                             value={smtpFromEmail}
                             onChange={(e) => setSmtpFromEmail(e.target.value)}
-                            placeholder="contato@seudominio.com"
+                            placeholder="contacto@seudominio.com"
                             className="mt-1.5"
                           />
                           <p className="text-xs text-muted-foreground mt-1">
@@ -941,7 +941,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             </span>
                           ) : (
                             <span className="flex items-center gap-1">
-                              <span className="text-amber-600 dark:text-amber-400">⚠️</span>
+                              <span className="text-amber-600 dark:text-amber-400"></span>
                               Preencha todos os campos obrigatórios
                             </span>
                           )}
@@ -958,16 +958,16 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           {smtpSaveState === 'loading' && (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Salvando...
+                              A guardar...
                             </>
                           )}
                           {smtpSaveState === 'saved' && (
                             <>
                               <CheckCircle2 className="w-4 h-4 mr-2" />
-                              Salvo!
+                              Guardado!
                             </>
                           )}
-                          {smtpSaveState === 'idle' && 'Salvar SMTP'}
+                          {smtpSaveState === 'idle' && 'Guardar SMTP'}
                         </Button>
                       </div>
                     </div>
@@ -979,8 +979,8 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                       <div className={`${infoBlockClass} space-y-2`}>
                         <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
                           <BarChart3 className="w-4 h-4 text-primary" />
-                          📊 Rastreie Conversões no Meta Ads
-                        </h4>
+                          Rastreie Conversões no Meta Ads
+ </h4>
                         <p className="text-xs text-muted-foreground">
                           Configure o Meta Pixel (Facebook Pixel) para rastrear eventos de conversão quando um lead for marcado como "Convertido" na sua CRM.
                         </p>
@@ -998,7 +998,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           </h4>
                           <div className={currentUrlBannerClass}>{dashboardPixelEnv}</div>
                           <p className="text-xs text-muted-foreground">
-                            Definido via variável de ambiente. Atualize aqui apenas o pixel específico do usuário.
+                            Definido via variável de ambiente. Atualize aqui apenas o pixel específico do utilizador.
                           </p>
                         </div>
                       )}
@@ -1023,8 +1023,8 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
                       <div className={`${infoBlockClass} space-y-1.5`}>
                         <h4 className="text-sm font-semibold text-foreground">
-                          ℹ️ Como funciona
-                        </h4>
+                          Como funciona
+ </h4>
                         <ul className="text-xs text-muted-foreground space-y-1.5">
                           <li>• Quando você marcar um lead como "Convertido", o pixel dispara automaticamente</li>
                           <li>• O evento "Lead" é enviado para o Meta com os dados do lead</li>
@@ -1038,7 +1038,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           onClick={handleSaveMetaPixel}
                           className="bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
-                          Salvar Meta Pixel
+                          Guardar Meta Pixel
                         </Button>
                       </div>
                     </div>
@@ -1050,8 +1050,8 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                       <div className={`${infoBlockClass} space-y-2`}>
                         <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
                           <Eye className="w-4 h-4 text-primary" />
-                          📈 Rastreie Conversões no Google Analytics
-                        </h4>
+                          Rastreie Conversões no Google Analytics
+ </h4>
                         <p className="text-xs text-muted-foreground">
                           Configure o Google Analytics 4 (GA4) para rastrear eventos de conversão quando um lead for marcado como "Convertido" na sua CRM.
                         </p>
@@ -1081,8 +1081,8 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
                       <div className={`${infoBlockClass} space-y-1.5`}>
                         <h4 className="text-sm font-semibold text-foreground">
-                          ℹ️ Como funciona
-                        </h4>
+                          Como funciona
+ </h4>
                         <ul className="text-xs text-muted-foreground space-y-1.5">
                           <li>• Quando você marcar um lead como "Convertido", o evento é disparado automaticamente</li>
                           <li>• O evento "generate_lead" é enviado para o GA4 com os dados do lead</li>
@@ -1096,7 +1096,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           onClick={handleSaveGoogleAnalytics}
                           className="bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
-                          Salvar Google Analytics
+                          Guardar Google Analytics
                         </Button>
                       </div>
                     </div>
@@ -1121,7 +1121,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         <div className="flex items-center justify-between mb-1.5">
                           <Label htmlFor="n8n-webhook-url" className="text-sm flex items-center gap-2">
                             <Webhook className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                            Webhook - Cadastrar Leads Externos
+                            Webhook - Registar Leads Externos
                           </Label>
                           {isN8nConfigured && (
                             <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -1148,7 +1148,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           className={n8nInputClass}
                         />
                         <p className="text-xs text-muted-foreground mt-2">
-                          Endpoint para cadastrar leads em tempo real a partir de planilhas externas (Google Sheets, Excel, etc.) via N8N
+                          Endpoint para registar leads em tempo real a partir de planilhas externas (Google Sheets, Excel, etc.) via N8N
                         </p>
                       </div>
 
@@ -1157,7 +1157,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         <div className="flex items-center justify-between mb-1.5">
                           <Label htmlFor="n8n-whatsapp-import-url" className="text-sm flex items-center gap-2">
                             <MessageSquare className="w-4 h-4 text-green-600 dark:text-green-400" />
-                            Webhook - Importação de Contatos WhatsApp
+                            Webhook - Importação de Contactos WhatsApp
                           </Label>
                           {isN8nWhatsAppImportConfigured && (
                             <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -1183,7 +1183,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           className={n8nInputClass}
                         />
                         <p className="text-xs text-muted-foreground mt-2">
-                          Endpoint POST para importar contatos do WhatsApp. Envia: {`{ "instancia": "leadflow_userId", "userId": "id", "action": "listar-contatos" }`}
+                          Endpoint POST para importar contactos do WhatsApp. Envia: {`{ "instancia": "leadflow_userId", "userId": "id", "action": "listar-contactos" }`}
                         </p>
                       </div>
 
@@ -1195,7 +1195,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           }}
                         >
                           <Save className="w-4 h-4 mr-2" />
-                          Salvar Todos
+                          Guardar Todos
                         </Button>
                         {isN8nConfigured && (
                           <Button

@@ -7,6 +7,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import AvatarUploadModal from './AvatarUploadModal';
 import { AppModal } from '../base/AppModal';
 import type { Lead, LeadNote, ScheduledConversation, Message } from '../../types';
+import { formatMoney, getLocale } from '../../utils/format';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,7 +32,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
  novo: { label: 'Novo', color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700/50' },
  qualificado: { label: 'Qualificado', color: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700/50' },
  em_negociacao: { label: 'Em Negociacao', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/50' },
- aguardando_resposta: { label: 'Aguardando', color: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-700/50' },
+ aguardando_resposta: { label: 'A aguardar', color: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-700/50' },
  convertido: { label: 'Convertido', color: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700/50' },
  perdido: { label: 'Perdido', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700/50' },
 };
@@ -43,37 +44,14 @@ function getStatusConfig(status: string) {
  return { label: cfg.label, className: cfg.color };
 }
 
-// Currency support - default to USD
-type CurrencyCode = 'USD' | 'MZN' | 'BRL';
-
-const CURRENCY_CONFIG: Record<CurrencyCode, { locale: string; symbol: string }> = {
- USD: { locale: 'en-US', symbol: '$' },
- MZN: { locale: 'pt-MZ', symbol: 'MT' },
- BRL: { locale: 'pt-BR', symbol: 'R$' },
-};
-
-function formatCurrency(value: number | undefined | null, currency: CurrencyCode = 'USD'): string {
- const numValue = typeof value === 'number' && !isNaN(value) ? value : 0;
- const config = CURRENCY_CONFIG[currency];
-
- try {
- return new Intl.NumberFormat(config.locale, {
- style: 'currency',
- currency: currency,
- minimumFractionDigits: 2,
- maximumFractionDigits: 2,
- }).format(numValue);
- } catch {
- if (currency === 'MZN') {
- return `${config.symbol} ${numValue.toLocaleString(config.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
- }
- return `${config.symbol} ${numValue.toFixed(2)}`;
- }
+// Valores na moeda da conta (MZN → "1 500,00 MT") — ver utils/format.ts
+function formatCurrency(value: number | undefined | null, currency?: string): string {
+ return formatMoney(value ?? 0, currency);
 }
 
 function formatDate(dateString: string): string {
  try {
- return new Date(dateString).toLocaleDateString('pt-BR', {
+ return new Date(dateString).toLocaleDateString(getLocale(), {
  day: '2-digit',
  month: 'short',
  year: 'numeric',
@@ -288,7 +266,7 @@ function NotasTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  className="bg-blue-600 hover:bg-blue-700 text-white"
  >
  <Check className="w-3.5 h-3.5" />
- Salvar
+ Guardar
  </Button>
  </div>
  </div>
@@ -296,7 +274,7 @@ function NotasTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  /* Delete confirmation */
  <div className="flex flex-col gap-2">
  <p className="text-sm text-red-600 dark:text-red-400">
- Tem certeza que deseja excluir esta nota?
+ Tem certeza que deseja eliminar esta nota?
  </p>
  <div className="flex justify-end gap-2">
  <Button variant="ghost" size="sm" onClick={() => setDeletingId(null)}>
@@ -308,7 +286,7 @@ function NotasTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  onClick={() => handleDelete(note.id)}
  >
  <Trash2 className="w-3.5 h-3.5" />
- Excluir
+ Eliminar
  </Button>
  </div>
  </div>
@@ -334,7 +312,7 @@ function NotasTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  <button
  onClick={() => { setDeletingId(note.id); setEditingId(null); }}
  className="p-1.5 rounded-md transition-colors hover:bg-red-50 dark:hover:bg-red-900/40 text-muted-foreground/70 hover:text-red-500 dark:hover:text-red-400"
- title="Excluir nota"
+ title="Eliminar nota"
  >
  <Trash2 className="w-3.5 h-3.5" />
  </button>
@@ -752,7 +730,7 @@ function ValorTab({ lead, isDark, onLeadUpdated }: { lead: Lead; isDark: boolean
  className="bg-emerald-600 hover:bg-emerald-700 text-white"
  >
  {saving ? <Spinner /> : <DollarSign className="w-4 h-4" />}
- Salvar
+ Guardar
  </Button>
  </div>
  </div>
@@ -760,12 +738,12 @@ function ValorTab({ lead, isDark, onLeadUpdated }: { lead: Lead; isDark: boolean
  {/* Status pipeline visual */}
  <div className="flex flex-col gap-3">
  <label className={`text-sm font-medium text-muted-foreground`}>
- Pipeline de status
+ Negociação de status
  </label>
  <div className="rounded-xl border p-4 bg-muted border-border">
  {/* Current status */}
  <div className="flex items-center gap-2 mb-4">
- <span className={`text-xs text-muted-foreground`}>Status atual:</span>
+ <span className={`text-xs text-muted-foreground`}>Estado atual:</span>
  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusCfg.className}`}>
  {statusCfg.label}
  </span>

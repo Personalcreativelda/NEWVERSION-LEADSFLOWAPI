@@ -4,6 +4,7 @@ import { leadsApi, scheduledConversationsApi, leadNotesApi } from '../../utils/a
 import { LeadNote } from '../../types';
 import { toast } from 'sonner';
 import api from '../../../lib/api';
+import { getLocale } from '../../utils/format';
 
 interface Conversation {
   id: string;
@@ -75,7 +76,7 @@ const EMOJI_OPTIONS = ['👋', '🔄', '📋', '🙏', '📅', '💰', '🎯', '
 // Default funnel stages (fallback)
 const DEFAULT_STATUS_OPTIONS = [
   { value: 'novo', label: 'Novo', color: 'bg-cyan-500' },
-  { value: 'contatado', label: 'Contatado', color: 'bg-purple-500' },
+  { value: 'contatado', label: 'Contactado', color: 'bg-purple-500' },
   { value: 'qualificado', label: 'Qualificado', color: 'bg-yellow-500' },
   { value: 'negociacao', label: 'Negociação', color: 'bg-orange-500' },
   { value: 'convertido', label: 'Convertido', color: 'bg-green-500' },
@@ -551,8 +552,8 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
       toast.success('Lead atualizado com sucesso!');
     } catch (err) {
       console.error('Error saving lead:', err);
-      setError('Erro ao salvar alterações');
-      toast.error('Erro ao salvar alterações');
+      setError('Erro ao guardar alterações');
+      toast.error('Erro ao guardar alterações');
     } finally {
       setSaving(false);
     }
@@ -565,7 +566,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
     try {
       await scheduledConversationsApi.create({
         lead_id: leadId,
-        title: `📋 ${taskTitle.trim()}`,
+        title: ` ${taskTitle.trim()}`,
         description: 'Tarefa',
         scheduled_at: new Date(taskDate).toISOString(),
       });
@@ -625,7 +626,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
     try {
       const date = new Date(dateStr);
       if (isNaN(date.getTime())) return null;
-      return date.toLocaleDateString('pt-BR', {
+      return date.toLocaleDateString(getLocale(), {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric'
@@ -651,7 +652,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3.5 border-b border-border flex items-center justify-between bg-card">
         <h3 className="text-sm font-semibold text-foreground">
-          {isEditing ? 'Editar Contato' : 'Contato'}
+          {isEditing ? 'Editar Contacto' : 'Contacto'}
         </h3>
         <div className="flex items-center gap-1">
           {!isEditing ? (
@@ -667,7 +668,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               onClick={handleSave}
               disabled={saving}
               className="p-1.5 rounded-lg transition-colors hover:bg-green-500/20 text-green-500"
-              title="Salvar"
+              title="Guardar"
             >
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             </button>
@@ -734,7 +735,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             {/* Status Selector */}
             <div>
               <label className="text-xs font-medium mb-2 block text-muted-foreground">
-                Status
+                Estado
               </label>
               <div className="grid grid-cols-3 gap-1.5">
                 {statusOptions.map((option) => (
@@ -872,7 +873,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  Salvar Alterações
+                  Guardar Alterações
                 </>
               )}
             </button>
@@ -914,8 +915,8 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                     aiSentiment === 'frustrado' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
                     'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
                   }`}>
-                    {aiSentiment === 'positivo' ? '🟢 Positivo' :
-                     aiSentiment === 'frustrado' ? '🔴 Frustrado' : '🟡 Neutro'}
+                    {aiSentiment === 'positivo' ? 'Positivo' :
+                     aiSentiment === 'frustrado' ? 'Frustrado' : 'Neutro'}
                   </span>
                 </div>
               )}
@@ -932,7 +933,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 </span>
                 {editValue && parseFloat(editValue) > 0 && (
                   <span className="text-sm font-semibold text-green-500">
-                    R$ {parseFloat(editValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {parseFloat(editValue).toLocaleString(getLocale(), { minimumFractionDigits: 2 })}
                   </span>
                 )}
               </div>
@@ -1015,7 +1016,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                   {generatingSummary ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      Analisando Conversa...
+                      A analisar Conversa...
                     </>
                   ) : (
                     <>
@@ -1025,7 +1026,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                   )}
                 </button>
                 <p className="text-[10px] text-center mt-2 text-muted-foreground">
-                  Lê as últimas mensagens e extrai o perfil e o próximo passo. O resumo será salvo nas Notas.
+                  Lê as últimas mensagens e extrai o perfil e o próximo passo. O resumo será guardado nas Notas.
                 </p>
               </div>
             </div>
@@ -1070,7 +1071,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                             : <Trash2 className="w-3 h-3" />}
                         </button>
                         <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                          {new Date(note.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                          {new Date(note.created_at).toLocaleDateString(getLocale(), { day: '2-digit', month: '2-digit' })}
                         </span>
                       </div>
                     </div>
@@ -1196,7 +1197,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                         disabled={!editMsgLabel.trim() || !editMsgText.trim()}
                         className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 transition-all"
                       >
-                        Salvar
+                        Guardar
                       </button>
                     </div>
                   </div>
@@ -1329,7 +1330,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                         </p>
                         <p className="text-[11px] flex items-center gap-1 mt-0.5 text-muted-foreground">
                           <Clock className="w-3 h-3" />
-                          {new Date(schedule.scheduled_at).toLocaleDateString('pt-BR', {
+                          {new Date(schedule.scheduled_at).toLocaleDateString(getLocale(), {
                             day: '2-digit',
                             month: '2-digit',
                             hour: '2-digit',
@@ -1403,7 +1404,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                       <p className="text-foreground/90 leading-relaxed">{note.content}</p>
                       <p className="text-[10px] text-muted-foreground mt-1">
                         {note.author_name && <span className="font-medium">{note.author_name} · </span>}
-                        {new Date(note.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        {new Date(note.created_at).toLocaleDateString(getLocale(), { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
                   ))}

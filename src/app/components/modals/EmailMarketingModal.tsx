@@ -67,7 +67,7 @@ export default function EmailMarketingModal({
  // Simular delay de envio
  await new Promise(resolve => setTimeout(resolve, 2000));
 
- alert(`✅ ${leadsWithEmail.length} email(s) enviado(s) com sucesso!`);
+ alert(` ${leadsWithEmail.length} email(s) enviado(s) com sucesso!`);
  
  setSubject('');
  setMessage('');
@@ -75,7 +75,7 @@ export default function EmailMarketingModal({
  onClose();
  } catch (error) {
  console.error('Erro ao enviar emails:', error);
- alert('❌ Erro ao enviar emails. Verifique suas configurações SMTP e tente novamente.');
+ alert('Erro ao enviar emails. Verifique suas definições SMTP e tente novamente.');
  } finally {
  setSending(false);
  }
@@ -163,7 +163,7 @@ export default function EmailMarketingModal({
  {message && (
  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
  <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
- 📧 Preview do email para <strong>{leadsWithEmail[0]?.nome}</strong>:
+ Preview do email para<strong>{leadsWithEmail[0]?.nome}</strong>:
  </p>
  <div className="bg-card rounded p-3 text-sm">
  <p className="text-foreground mb-2">
@@ -192,7 +192,7 @@ export default function EmailMarketingModal({
  {sending ? (
  <>
  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
- Enviando...
+ A enviar...
  </>
  ) : (
  <>

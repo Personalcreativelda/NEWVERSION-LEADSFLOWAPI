@@ -189,7 +189,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                         }
                         
                         setStep('success');
-                        toast.success('WhatsApp conectado com sucesso! 🎉');
+                        toast.success('WhatsApp ligado com sucesso!');
                     } else if (isConnecting) {
                         setConnectionStatus('connecting');
                         
@@ -250,7 +250,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 }
                                 
                                 setStep('success');
-                                toast.success('WhatsApp conectado com sucesso! 🎉');
+                                toast.success('WhatsApp ligado com sucesso!');
                                 connectingStartRef.current = 0;
                                 return;
                             }
@@ -291,7 +291,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
     // Create instance and get QR code via Evolution API
     const handleCreateInstance = async () => {
         if (!instanceName.trim()) {
-            setError('Digite um nome para a conexão');
+            setError('Digite um nome para a ligação');
             return;
         }
 
@@ -322,7 +322,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                 
                 // Check if instance already exists and is connected
                 if (errorData.message?.includes('already exists') && errorData.state === 'open') {
-                    toast.success('WhatsApp já está conectado!');
+                    toast.success('WhatsApp já está ligado!');
                     setStep('success');
                     setConnectionStatus('connected');
                     onSuccess();
@@ -351,7 +351,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
 
                 // Check if already connected
                 if (instanceData.state === 'open') {
-                    toast.success('WhatsApp já está conectado!');
+                    toast.success('WhatsApp já está ligado!');
                     setStep('success');
                     setConnectionStatus('connected');
                     onSuccess();
@@ -463,7 +463,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
             console.error('[WhatsApp Channel] Error:', err);
             setError(err.message || 'Erro ao criar instância');
             setConnectionStatus('error');
-            toast.error('Erro ao conectar', { description: err.message });
+            toast.error('Erro ao ligar', { description: err.message });
         } finally {
             setLoading(false);
         }
@@ -619,7 +619,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
 
                             <div>
                                 <label className="block text-sm font-medium mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                    Nome da Conexão
+                                    Nome da Ligação
                                 </label>
                                 <input
                                     type="text"
@@ -658,7 +658,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                     <>
                                         <Loader2 className="w-5 h-5 animate-spin" />
                                         <span>
-                                            {connectionStatus === 'creating' ? 'Criando instância...' : 'Gerando QR Code...'}
+                                            {connectionStatus === 'creating' ? 'A criar instância...' : 'A gerar QR Code...'}
                                         </span>
                                     </>
                                 ) : (
@@ -675,10 +675,10 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                         <div className="flex flex-col items-center animate-fadeIn">
                             <div className="text-center mb-6">
                                 <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                    Abra o WhatsApp no celular, vá em
+                                    Abra o WhatsApp no telemóvel, vá em
                                 </p>
                                 <p className="font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                    Aparelhos Conectados → Conectar Aparelho
+                                    Aparelhos Ligados → Ligar Aparelho
                                 </p>
                             </div>
 
@@ -691,7 +691,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 ) : (
                                     <div className="w-64 h-64 flex flex-col items-center justify-center">
                                         <Loader2 className="w-12 h-12 animate-spin text-green-500 mb-3" />
-                                        <span className="text-sm text-muted-foreground">Carregando QR Code...</span>
+                                        <span className="text-sm text-muted-foreground">A carregar QR Code...</span>
                                     </div>
                                 )}
                             </div>
@@ -701,24 +701,24 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 {connectionStatus === 'waiting_qr' && (
                                     <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400">
                                         <Wifi className="w-4 h-4" />
-                                        Aguardando leitura do QR Code...
+                                        A aguardar leitura do QR Code...
                                     </div>
                                 )}
                                 {connectionStatus === 'connecting' && (
                                     <div className="flex flex-col items-center gap-2">
                                         <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            QR Code escaneado! Conectando...
+                                            QR Code escaneado! A ligar...
                                         </div>
                                         <p className="text-xs text-center" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                            Sincronizando... isso pode levar alguns segundos.
+                                            A sincronizar... isso pode levar alguns segundos.
                                         </p>
                                     </div>
                                 )}
                                 {connectionStatus === 'error' && (
                                     <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
                                         <XCircle className="w-4 h-4" />
-                                        {error || 'Erro na conexão'}
+                                        {error || 'Erro na ligação'}
                                     </div>
                                 )}
                             </div>
@@ -760,12 +760,12 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                                 pollIntervalRef.current = null;
                                             }
                                             setStep('success');
-                                            toast.success('WhatsApp conectado com sucesso! 🎉');
+                                            toast.success('WhatsApp ligado com sucesso!');
                                         }}
                                         className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-all duration-150"
                                     >
                                         <CheckCircle className="w-4 h-4" />
-                                        Concluir Conexão
+                                        Concluir Ligação
                                     </button>
                                 ) : (
                                     <button
@@ -805,7 +805,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 <Check className="w-8 h-8" strokeWidth={3} />
                             </div>
                             <h4 className="text-xl font-bold mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                Conectado!
+                                Ligado!
                             </h4>
                             {profileInfo?.name && (
                                 <p className="text-sm mb-2" style={{ color: 'hsl(var(--foreground))' }}>

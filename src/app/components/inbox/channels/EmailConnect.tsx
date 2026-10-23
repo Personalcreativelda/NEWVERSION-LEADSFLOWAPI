@@ -176,7 +176,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                 toast.success('Canal de email atualizado com sucesso!');
             } else {
                 channel = await channelsApi.create(channelData);
-                toast.success('Canal de email conectado!');
+                toast.success('Canal de email ligado!');
             }
 
             if (channel) {
@@ -212,10 +212,10 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                {isEditing ? 'Editar Canal Email' : step === 'provider' ? 'Conectar Email' : step === 'config' ? (selectedProvider?.name || 'Configurar Email') : 'Sucesso!'}
+                                {isEditing ? 'Editar Canal Email' : step === 'provider' ? 'Ligar Email' : step === 'config' ? (selectedProvider?.name || 'Configurar Email') : 'Sucesso!'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                {isEditing ? 'Atualize as configurações do canal' : step === 'provider' ? 'Escolha seu provedor de email' : step === 'config' ? 'Configure SMTP e IMAP' : 'Canal criado com sucesso'}
+                                {isEditing ? 'Atualize as definições do canal' : step === 'provider' ? 'Escolha seu provedor de email' : step === 'config' ? 'Configure SMTP e IMAP' : 'Canal criado com sucesso'}
                             </p>
                         </div>
                     </div>
@@ -334,14 +334,14 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
 
                             <div>
                                 <label className="block text-xs font-medium mb-1.5" style={{ color: 'hsl(var(--foreground))' }}>
-                                    Senha / Senha de App *
+                                    Palavra-passe / Palavra-passe de App *
                                 </label>
                                 <div className="relative">
                                     <input
                                         type={showPassword ? 'text' : 'password'}
                                         value={formData.password}
                                         onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                                        placeholder="Senha do email ou App Password"
+                                        placeholder="Palavra-passe do email ou App Password"
                                         className="w-full px-3 py-2.5 pr-10 rounded-lg border text-sm"
                                         style={{
                                             backgroundColor: 'hsl(var(--background))',
@@ -478,12 +478,12 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            {isEditing ? 'Atualizando...' : 'Conectando...'}
+                                            {isEditing ? 'A atualizar...' : 'A ligar...'}
                                         </>
                                     ) : (
                                         <>
                                             <Check className="w-4 h-4" />
-                                            {isEditing ? 'Atualizar Canal' : 'Conectar Email'}
+                                            {isEditing ? 'Atualizar Canal' : 'Ligar Email'}
                                         </>
                                     )}
                                 </button>
@@ -498,7 +498,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                 <CheckCircle className="w-10 h-10 text-green-500" />
                             </div>
                             <h3 className="text-xl font-semibold mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                Canal de Email Conectado!
+                                Canal de Email Ligado!
                             </h3>
                             <p className="text-sm mb-6" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 Seu email foi configurado via SMTP/IMAP. As mensagens começarão a aparecer na sua caixa de entrada.

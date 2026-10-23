@@ -195,7 +195,7 @@ export default function CampaignSMSModal({
         if (!sendResult.success) {
           throw new Error(sendResult.error || 'Erro ao iniciar envio');
         }
-        toast.success(`Campanha "${campaignName}" iniciada! Enviando para ${sendResult.recipientCount} contatos via Twilio.`);
+        toast.success(`Campanha "${campaignName}" iniciada! A enviar para ${sendResult.recipientCount} contactos via Twilio.`);
       } else {
         toast.success(`Campanha "${campaignName}" agendada com sucesso!`);
       }
@@ -251,7 +251,7 @@ export default function CampaignSMSModal({
             style={{ backgroundColor: '#F22F46' }}
           >
             {isSending ? (
-              'Enviando...'
+              'A enviar...'
             ) : scheduleMode === 'now' ? (
               <><Send />Disparar SMS</>
             ) : (
@@ -270,7 +270,7 @@ export default function CampaignSMSModal({
                 <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Nenhum canal Twilio SMS configurado</p>
                 <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
                   Para enviar SMS em massa, configure um canal Twilio SMS em{' '}
-                  <strong>Configurações → Canais → Twilio SMS</strong>.
+                  <strong>Definições → Canais → Twilio SMS</strong>.
                 </p>
               </div>
             </div>
@@ -293,7 +293,7 @@ export default function CampaignSMSModal({
             {loadingChannels ? (
               <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Carregando canais...
+                A carregar canais...
               </div>
             ) : twilioChannels.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhum canal disponível</p>

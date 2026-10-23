@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import { formatMoney } from '../../utils/format';
 import { OverlayModal } from '../base/OverlayModal';
 import type { UIEvent } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
@@ -8,25 +9,18 @@ import { Phone, Mail, MessageCircle, Trash2, Edit2, MoreVertical, ChevronDown, B
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { haptic } from '../../../native';
 import type { TabKey } from '../modals/LeadDetailModal';
-import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Badge } from '../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
-// Currency configurations
+// Moedas suportadas; por omissão usa-se a moeda da conta (utils/format.ts)
 export type CurrencyCode = 'USD' | 'MZN' | 'BRL';
-
-const CURRENCY_CONFIG: Record<CurrencyCode, { locale: string; symbol: string }> = {
-  USD: { locale: 'en-US', symbol: '$' },
-  MZN: { locale: 'pt-MZ', symbol: 'MT' },
-  BRL: { locale: 'pt-BR', symbol: 'R$' },
-};
 
 // Default funnel stages with colors
 const DEFAULT_FUNNEL_STAGES = [
   { id: 'novo', label: 'Novos', color: 'bg-cyan-500', borderColor: 'border-l-cyan-500', glowColor: 'shadow-cyan-500/20', iconColor: 'text-cyan-400', badgeBg: 'bg-cyan-500/10', badgeText: 'text-cyan-400' },
-  { id: 'contatado', label: 'Contatados', color: 'bg-purple-500', borderColor: 'border-l-purple-500', glowColor: 'shadow-purple-500/20', iconColor: 'text-purple-400', badgeBg: 'bg-purple-500/10', badgeText: 'text-purple-400' },
+  { id: 'contatado', label: 'Contactados', color: 'bg-purple-500', borderColor: 'border-l-purple-500', glowColor: 'shadow-purple-500/20', iconColor: 'text-purple-400', badgeBg: 'bg-purple-500/10', badgeText: 'text-purple-400' },
   { id: 'qualificado', label: 'Qualificados', color: 'bg-yellow-500', borderColor: 'border-l-yellow-500', glowColor: 'shadow-yellow-500/20', iconColor: 'text-yellow-400', badgeBg: 'bg-yellow-500/10', badgeText: 'text-yellow-400' },
   { id: 'negociacao', label: 'Negociação', color: 'bg-orange-500', borderColor: 'border-l-orange-500', glowColor: 'shadow-orange-500/20', iconColor: 'text-orange-400', badgeBg: 'bg-orange-500/10', badgeText: 'text-orange-400' },
   { id: 'convertido', label: 'Convertidos', color: 'bg-green-500', borderColor: 'border-l-green-500', glowColor: 'shadow-green-500/20', iconColor: 'text-green-400', badgeBg: 'bg-green-500/10', badgeText: 'text-green-400' },
@@ -83,7 +77,7 @@ export const FUNNEL_TEMPLATES: Record<string, { name: string; description: strin
     icon: Wrench,
     iconColor: 'text-gray-400',
     stages: [
-      { id: 'contato', label: 'Primeiro Contato', color: 'bg-cyan-500', borderColor: 'border-l-cyan-500', glowColor: 'shadow-cyan-500/20', iconColor: 'text-cyan-400', badgeBg: 'bg-cyan-500/10', badgeText: 'text-cyan-400' },
+      { id: 'contato', label: 'Primeiro Contacto', color: 'bg-cyan-500', borderColor: 'border-l-cyan-500', glowColor: 'shadow-cyan-500/20', iconColor: 'text-cyan-400', badgeBg: 'bg-cyan-500/10', badgeText: 'text-cyan-400' },
       { id: 'orcamento', label: 'Orçamento', color: 'bg-purple-500', borderColor: 'border-l-purple-500', glowColor: 'shadow-purple-500/20', iconColor: 'text-purple-400', badgeBg: 'bg-purple-500/10', badgeText: 'text-purple-400' },
       { id: 'aprovado', label: 'Aprovado', color: 'bg-yellow-500', borderColor: 'border-l-yellow-500', glowColor: 'shadow-yellow-500/20', iconColor: 'text-yellow-400', badgeBg: 'bg-yellow-500/10', badgeText: 'text-yellow-400' },
       { id: 'execucao', label: 'Em Execução', color: 'bg-orange-500', borderColor: 'border-l-orange-500', glowColor: 'shadow-orange-500/20', iconColor: 'text-orange-400', badgeBg: 'bg-orange-500/10', badgeText: 'text-orange-400' },
@@ -195,25 +189,8 @@ const WhatsAppSVG = ({ size = 10 }: { size?: number }) => (
 );
 
 // Format currency with proper NaN handling
-const formatCurrency = (value: number | undefined | null, currency: CurrencyCode = 'USD') => {
-  const numValue = typeof value === 'number' && !isNaN(value) ? value : 0;
-  const config = CURRENCY_CONFIG[currency];
-
-  try {
-    return new Intl.NumberFormat(config.locale, {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(numValue);
-  } catch {
-    // Fallback for MZN which might not be supported in all browsers
-    if (currency === 'MZN') {
-      return `${config.symbol} ${numValue.toLocaleString(config.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    }
-    return `${config.symbol} ${numValue.toFixed(2)}`;
-  }
-};
+// Moeda da conta (MZN → "1 500,00 MT") no locale ativo — ver utils/format.ts
+const formatCurrency = (value: number | undefined | null, currency?: CurrencyCode) => formatMoney(value ?? 0, currency);
 
 interface SalesFunnelProps {
   leads: Lead[];
@@ -232,7 +209,7 @@ interface SalesFunnelProps {
 }
 
 // Card do Lead - design limpo e moderno
-const LeadCard = memo(({ lead, stage, onEdit, onDelete, onResetToInitial, onWhatsApp, onCall, onViewDetails, currency = 'USD' as CurrencyCode, stages = [], onMoveToStage }: any) => {
+const LeadCard = memo(({ lead, stage, onEdit, onDelete, onResetToInitial, onWhatsApp, onCall, onViewDetails, currency, stages = [], onMoveToStage }: any) => {
   // O cartão que segue o dedo/rato é o DragOverlay; o original fica no lugar como marcador
   // (aplicar-lhe também o transform fazia dois cartões mexerem-se ao mesmo tempo).
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -340,7 +317,7 @@ const LeadCard = memo(({ lead, stage, onEdit, onDelete, onResetToInitial, onWhat
               className="text-red-400"
             >
               <Trash2 className="h-3.5 w-3.5 mr-2" />
-              Excluir Lead
+              Eliminar Lead
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -391,9 +368,9 @@ const LeadCard = memo(({ lead, stage, onEdit, onDelete, onResetToInitial, onWhat
                     ? 'bg-amber-500/10 text-amber-500' 
                     : 'bg-blue-500/10 text-blue-500'
               }`}
-              title={`Engajamento: ${lead.lead_score} pts`}
+              title={`Envolvimento: ${lead.lead_score} pts`}
             >
-              {lead.lead_score >= 80 ? '🔥' : lead.lead_score >= 50 ? '🟡' : '🧊'} {lead.lead_score}
+              {lead.lead_score >= 80 ? '' : lead.lead_score >= 50 ? '' : ''} {lead.lead_score}
             </span>
           )}
         </div>
@@ -527,7 +504,7 @@ const FunnelColumn = memo(({
   onViewDetails,
   visibleCount,
   onLoadMore,
-  currency = 'USD' as CurrencyCode,
+  currency,
   stages = [],
   onMoveToStage,
 }: any) => {
@@ -571,7 +548,7 @@ const FunnelColumn = memo(({
         }`}
     >
       <div
-        className={`rounded-xl transition-all duration-300 flex flex-col h-[calc(100vh-140px)] min-h-[600px] ${isOver ? `ring-2 ${stage.color} ring-opacity-50` : ''
+        className={`rounded-xl transition-all duration-300 flex flex-col min-h-[240px] ${isOver ? `ring-2 ${stage.color} ring-opacity-50` : ''
           } ${isExpanded ? 'w-full' : 'w-[50px] shadow-sm'
           } border-0`}
         style={{
@@ -666,7 +643,8 @@ const FunnelColumn = memo(({
 
             {/* Área de leads */}
             <div
-              className="flex-1 overflow-y-auto px-2 pb-3"
+              // Sem scroll próprio: a coluna cresce e quem faz scroll é a página
+              className="flex-1 px-2 pb-3"
               style={{
                 scrollbarWidth: 'thin',
                 scrollbarColor: 'hsl(var(--muted-foreground)) transparent'
@@ -693,16 +671,7 @@ const FunnelColumn = memo(({
                   />
                 ))
               ) : (
-                <div 
-                  className="flex flex-col items-center justify-center h-32 rounded-lg border-2 border-dashed"
-                  style={{
-                    borderColor: 'hsl(var(--border))',
-                    color: 'hsl(var(--muted-foreground))'
-                  }}
-                >
-                  <BarChart3 className="h-5 w-5 mb-1" />
-                  <p className="text-xs">Nenhum lead</p>
-                </div>
+                <p className="py-6 text-center text-xs text-muted-foreground">Sem leads nesta etapa</p>
               )}
 
               {leads.length > 0 && (
@@ -808,7 +777,7 @@ export default function SalesFunnel({
   onWhatsAppLead,
   onViewLeadDetails,
   isDark = false,
-  currency = 'USD',
+  currency,
   customStages,
   onStagesChange,
 }: SalesFunnelProps) {
@@ -1069,93 +1038,12 @@ export default function SalesFunnel({
           actions={<PageAction icon={Settings} label="Personalizar etapas" onClick={() => setShowStageEditor(true)} />}
         />
 
-        {/* Cards de Estatísticas */}
-        <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
-          {/* Total de Leads */}
-          <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[13px] font-medium mb-1 leading-tight truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                  Total de Leads
-                </p>
-                <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
-                  {stats.total.toLocaleString('pt-BR')}
-                </p>
-              </div>
-              <div className="w-10 h-10 rounded-lg hidden sm:flex items-center justify-center flex-shrink-0 bg-purple-100 dark:bg-purple-500/10 group-hover:bg-purple-200 dark:group-hover:bg-purple-500/20">
-                <BarChart3 className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Em Progresso */}
-          <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[13px] font-medium mb-1 leading-tight truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                  Em Progresso
-                </p>
-                <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
-                  {stats.inProgress.toLocaleString('pt-BR')}
-                </p>
-              </div>
-              <div className="w-10 h-10 rounded-lg hidden sm:flex items-center justify-center flex-shrink-0 bg-yellow-100 dark:bg-yellow-500/10 group-hover:bg-yellow-200 dark:group-hover:bg-yellow-500/20">
-                <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Convertidos */}
-          <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[13px] font-medium mb-1 leading-tight truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                  Convertidos
-                </p>
-                <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
-                  {stats.converted.toLocaleString('pt-BR')}
-                </p>
-              </div>
-              <div className="w-10 h-10 rounded-lg hidden sm:flex items-center justify-center flex-shrink-0 bg-green-100 dark:bg-green-500/10 group-hover:bg-green-200 dark:group-hover:bg-green-500/20">
-                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Taxa de Conversão */}
-          <div className="rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[13px] font-medium mb-1 leading-tight truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                  Taxa de Conversão
-                </p>
-                <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
-                  {stats.conversionRate}%
-                </p>
-              </div>
-              <div className="w-10 h-10 rounded-lg hidden sm:flex items-center justify-center flex-shrink-0 bg-orange-100 dark:bg-orange-500/10 group-hover:bg-orange-200 dark:group-hover:bg-orange-500/20">
-                <TrendingUp className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Valor do Pipeline */}
-          <div className="col-span-2 md:col-span-1 rounded-xl p-4 sm:p-5 border" style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[13px] font-medium mb-1 leading-tight truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                  Valor Pipeline
-                </p>
-                <p className="text-2xl font-semibold tabular-nums truncate" style={{ color: 'hsl(var(--foreground))' }}>
-                  {formatCurrency(stats.pipelineValue, currency)}
-                </p>
-              </div>
-              <div className="w-10 h-10 rounded-lg hidden sm:flex items-center justify-center flex-shrink-0 bg-emerald-100 dark:bg-emerald-500/10 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-500/20">
-                <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Total, convertidos e taxa vivem no Início/Relatórios; aqui só o valor em
+            negociação, que é exclusivo do funil */}
+        <p className="mb-4 text-sm text-muted-foreground">
+          Valor em negociação:{' '}
+          <span className="font-semibold text-foreground tabular-nums">{formatCurrency(stats.pipelineValue, currency)}</span>
+        </p>
 
         {/* Stage Editor Modal */}
         {showStageEditor && (
@@ -1177,7 +1065,7 @@ export default function SalesFunnel({
                 <div className="p-4 rounded-xl border bg-muted/50 border-border">
                   <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
                     <Settings className="w-4 h-4" />
-                    Templates Prontos
+                    Modelos Prontos
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {Object.entries(FUNNEL_TEMPLATES).map(([key, template]) => {
@@ -1186,7 +1074,7 @@ export default function SalesFunnel({
                         <button
                           key={key}
                           onClick={async () => {
-                            const confirmed = confirm(`Aplicar template "${template.name}"? Isso substituirá suas etapas atuais.`);
+                            const confirmed = confirm(`Aplicar modelo "${template.name}"? Isso substituirá suas etapas atuais.`);
                             if (confirmed) {
                               setStages(template.stages);
                             }
@@ -1373,17 +1261,18 @@ export default function SalesFunnel({
                   onClick={() => handleSaveStage(editingStage)}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                 >
-                  Salvar
+                  Guardar
                 </button>
               </div>
           </OverlayModal>
         )}
 
         {/* Funil de Vendas - Layout Responsivo */}
-        <Card className="rounded-xl border overflow-hidden flex-1 bg-transparent border-border">
+        {/* Sem cartão à volta das colunas (as colunas já são cartões) */}
+        <div className="flex-1">
 
           <div
-            className="relative w-full p-6 h-full bg-transparent"
+            className="relative w-full h-full bg-transparent"
           >
             {/* Container com scroll horizontal responsivo */}
             <div
@@ -1470,7 +1359,7 @@ export default function SalesFunnel({
               </DndContext>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
     </>
   );

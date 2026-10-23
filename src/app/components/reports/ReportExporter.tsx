@@ -19,6 +19,7 @@ import {
 import { toast } from"sonner";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getLocale } from '../../utils/format';
 
 interface ReportExporterProps {
  isOpen: boolean;
@@ -123,7 +124,7 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
 
  const generateHeader = () => `
  <div class="header">
- <h1>📊 Relatório de Leads - LeadsFlow</h1>
+ <h1>Relatório de Leads - LeadsFlow</h1>
  <p>Gerado em ${format(new Date(),"dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}</p>
  <p>Período: ${getPeriodLabel(reportPeriod)}</p>
  </div>
@@ -131,7 +132,7 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
 
  const generateOverview = (stats: any, filteredLeads: any[]) => `
  <div class="section">
- <h2 class="section-title">📈 Visão Geral</h2>
+ <h2 class="section-title">Visão Geral</h2>
  <div class="stats-grid">
  <div class="stat-card blue">
  <div class="stat-label">Total de Leads</div>
@@ -160,7 +161,7 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
 
  const generateFunnel = (stats: any) => `
  <div class="section">
- <h2 class="section-title">🎯 Funil de Vendas</h2>
+ <h2 class="section-title">Funil de Vendas</h2>
  <div style="margin-top: 20px;">
  ${generateFunnelBar('Novos Leads', stats.byStatus.novo || 0, stats.total)}
  ${generateFunnelBar('Contatados', stats.byStatus.contatado || 0, stats.total)}
@@ -202,7 +203,7 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
 
  return `
  <div class="section">
- <h2 class="section-title">📍 Top 10 Fontes de Leads</h2>
+ <h2 class="section-title">Top 10 Fontes de Leads</h2>
  <table class="table">
  <thead>
  <tr>
@@ -230,7 +231,7 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
 
  const generateTimeline = (filteredLeads: any[]) => `
  <div class="section">
- <h2 class="section-title">📅 Evolução Temporal</h2>
+ <h2 class="section-title">Evolução Temporal</h2>
  <p style="color: #666; margin-top: 10px;">
  Gráfico de evolução temporal será renderizado no PDF final.
  </p>
@@ -239,13 +240,13 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
 
  const generatePerformance = (stats: any) => `
  <div class="section">
- <h2 class="section-title">🎯 Indicadores de Performance</h2>
+ <h2 class="section-title">Indicadores de Performance</h2>
  <table class="table">
  <thead>
  <tr>
  <th>Métrica</th>
  <th>Valor</th>
- <th>Status</th>
+ <th>Estado</th>
  </tr>
  </thead>
  <tbody>
@@ -281,11 +282,11 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
 
  return `
  <div class="section">
- <h2 class="section-title">💰 Receita Estimada</h2>
+ <h2 class="section-title">Receita Estimada</h2>
  <div class="stats-grid">
  <div class="stat-card blue">
  <div class="stat-label">Receita Total</div>
- <div class="stat-value">R$ ${totalRevenue.toLocaleString('pt-BR')}</div>
+ <div class="stat-value">R$ ${totalRevenue.toLocaleString(getLocale())}</div>
  </div>
  <div class="stat-card green">
  <div class="stat-label">Valor Médio por Lead</div>
@@ -537,7 +538,7 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
  {isGenerating ? (
  <>
  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
- Gerando...
+ A gerar...
  </>
  ) : (
  <>

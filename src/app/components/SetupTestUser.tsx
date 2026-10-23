@@ -49,7 +49,7 @@ export default function SetupTestUser({ onBack, onSuccess }: SetupTestUserProps)
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Erro ao configurar usuário de teste');
+      setError(err.message || 'Erro ao configurar utilizador de teste');
     } finally {
       setLoading(false);
     }
@@ -72,7 +72,7 @@ export default function SetupTestUser({ onBack, onSuccess }: SetupTestUserProps)
       }
     } catch (err: any) {
       console.error('Login test failed:', err);
-      setError(`❌ Falha no teste de login: ${err.message}. Aguarde alguns segundos e tente novamente, ou volte para a tela de login.`);
+      setError(`Falha no teste de login:${err.message}. Aguarde alguns segundos e tente novamente, ou volte para a ecrã de login.`);
     } finally {
       setTestingLogin(false);
     }
@@ -92,9 +92,9 @@ export default function SetupTestUser({ onBack, onSuccess }: SetupTestUserProps)
         </div>
 
         <div className="bg-white rounded-2xl shadow-md p-8">
-          <h2 className="text-gray-900 mb-2 text-center">Configurar Usuário de Teste</h2>
+          <h2 className="text-gray-900 mb-2 text-center">Configurar Utilizador de Teste</h2>
           <p className="text-gray-700 dark:text-gray-300 text-center mb-6">
-            Clique no botão abaixo para criar um usuário de teste para desenvolvimento
+            Clique no botão abaixo para criar um utilizador de teste para desenvolvimento
           </p>
 
           {error && (
@@ -116,7 +116,7 @@ export default function SetupTestUser({ onBack, onSuccess }: SetupTestUserProps)
               <div className="flex items-start gap-3 mb-3">
                 <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                 <p className="text-green-700">
-                  {warning ? 'Usuário criado! Aguarde alguns segundos antes de fazer login.' : 'Usuário de teste configurado com sucesso!'}
+                  {warning ? 'Utilizador criado! Aguarde alguns segundos antes de fazer login.' : 'Utilizador de teste configurado com sucesso!'}
                 </p>
               </div>
               <div className="bg-white rounded-lg p-3 border border-green-200">
@@ -124,7 +124,7 @@ export default function SetupTestUser({ onBack, onSuccess }: SetupTestUserProps)
                   <strong>Email:</strong> {credentials.email}
                 </p>
                 <p className="text-gray-700">
-                  <strong>Senha:</strong> {credentials.password}
+                  <strong>Palavra-passe:</strong> {credentials.password}
                 </p>
               </div>
               <p className="text-green-600 mt-3 text-center">
@@ -132,8 +132,8 @@ export default function SetupTestUser({ onBack, onSuccess }: SetupTestUserProps)
               </p>
               {warning && (
                 <p className="text-yellow-600 mt-2 text-center">
-                  ⏰ Aguarde pelo menos 3 segundos antes de fazer login
-                </p>
+                  Aguarde pelo menos 3 segundos antes de fazer login
+ </p>
               )}
             </div>
           )}
@@ -145,12 +145,12 @@ export default function SetupTestUser({ onBack, onSuccess }: SetupTestUserProps)
                 disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               >
-                {loading ? 'Configurando...' : 'Configurar Usuário de Teste'}
+                {loading ? 'Configurando...' : 'Configurar Utilizador de Teste'}
               </Button>
 
               <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-blue-900">
-                  <strong>Nota:</strong> Este botão cria ou atualiza um usuário de teste com o plano Ilimitado. Use apenas para desenvolvimento.
+                  <strong>Nota:</strong> Este botão cria ou atualiza um utilizador de teste com o plano Ilimitado. Use apenas para desenvolvimento.
                 </p>
               </div>
             </>
@@ -162,7 +162,7 @@ export default function SetupTestUser({ onBack, onSuccess }: SetupTestUserProps)
                 className="w-full bg-green-600 hover:bg-green-700 text-white"
               >
                 <LogIn className="w-4 h-4 mr-2" />
-                {testingLogin ? 'Testando Login...' : 'Testar Login Agora'}
+                {testingLogin ? 'A testar Login...' : 'Testar Login Agora'}
               </Button>
               <Button
                 onClick={onBack}

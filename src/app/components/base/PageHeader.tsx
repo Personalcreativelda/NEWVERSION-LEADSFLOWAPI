@@ -1,43 +1,67 @@
-import type { ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { Plus, type LucideIcon } from 'lucide-react';
 import { cn } from '../ui/utils';
 
+interface PageCreateAction {
+  label: string;
+  onClick: () => void;
+  icon?: LucideIcon;
+  disabled?: boolean;
+}
+
 interface PageHeaderProps {
+  /** Título da página — mostrado no cabeçalho do app (RefactoredHeader), não aqui */
   title: string;
-  /** Uma frase curta — no telemóvel mostra-se só a primeira linha */
+  /** Frase curta: só no desktop, por baixo do cabeçalho */
   description?: string;
   icon?: LucideIcon;
-  /** Botões à direita (primário por último). Use PageAction para ações secundárias. */
+  /** Ações secundárias (PageAction) — vão para o cabeçalho, ao lado do título */
   actions?: ReactNode;
+  /** Ação de criar da página — botão redondo (FAB) no canto inferior direito */
+  create?: PageCreateAction;
   className?: string;
 }
 
 /**
- * Cabeçalho único de todas as páginas do painel (sistema de design do app):
- * título 20px (telemóvel) / 24px, descrição numa linha, ícone num quadrado
- * primary/10 e ações com 40px de altura. As margens laterais vêm do contentor
- * da página (PageContainer no Dashboard) — a página não deve somar as suas.
+ * Cabeçalho de todas as páginas do painel. O título aparece uma só vez, no cabeçalho
+ * do app; as ações secundárias são desenhadas lá (slot #page-header-actions) e a ação
+ * de criar é o FAB, igual em toda a app. Na página fica só a descrição (desktop).
  */
-export function PageHeader({ title, description, icon: Icon, actions, className }: PageHeaderProps) {
+export function PageHeader({ description, actions, create, className }: PageHeaderProps) {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setSlot(document.getElementById('page-header-actions'));
+  }, []);
+
   return (
-    // Ações sempre à direita do título, também no telemóvel (numa linha própria por
-    // baixo, um só botão ocupava uma linha inteira de ecrã)
-    <header className={cn('mb-5 flex items-start justify-between gap-3 sm:mb-6 sm:items-center', className)}>
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        {Icon && (
-          <div className="hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:flex">
-            <Icon className="h-5 w-5" aria-hidden />
-          </div>
-        )}
-        <div className="min-w-0">
-          <h1 className="truncate text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{title}</h1>
-          {description && (
-            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{description}</p>
-          )}
-        </div>
-      </div>
-      {actions && <div className="flex flex-shrink-0 items-center gap-2">{actions}</div>}
-    </header>
+    <>
+      {description && (
+        <p className={cn('mb-5 hidden text-sm text-muted-foreground sm:mb-6 lg:block', className)}>{description}</p>
+      )}
+      {actions && (slot ? createPortal(actions, slot) : <div className="mb-5 flex justify-end gap-2">{actions}</div>)}
+      {create && <PageFab {...create} />}
+    </>
+  );
+}
+
+/**
+ * Botão de criar (FAB): redondo, canto inferior direito, acima da barra inferior no
+ * telemóvel e acima do botão do chat de suporte no desktop. Um só padrão em toda a app.
+ */
+export function PageFab({ label, onClick, icon: Icon = Plus, disabled }: PageCreateAction) {
+  return createPortal(
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="fixed right-4 z-[44] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-[transform,filter] duration-150 hover:brightness-110 active:scale-95 disabled:opacity-50 bottom-[calc(5rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-24 animate-in fade-in zoom-in-75 duration-200"
+    >
+      <Icon className="h-6 w-6" strokeWidth={2.25} aria-hidden />
+    </button>,
+    document.body,
   );
 }
 
@@ -52,7 +76,7 @@ interface PageActionProps {
   className?: string;
 }
 
-/** Botão de ação do PageHeader: 40px de altura; no telemóvel só com o ícone (o texto fica no aria-label). */
+/** Botão de ação: secundária no cabeçalho (só ícone no telemóvel) ou primária com texto (estados vazios). */
 export function PageAction({ icon: Icon, label, onClick, disabled, variant = 'secondary', className }: PageActionProps) {
   const primary = variant === 'primary';
   return (
@@ -63,16 +87,17 @@ export function PageAction({ icon: Icon, label, onClick, disabled, variant = 'se
       aria-label={label}
       title={label}
       className={cn(
-        // Telemóvel: só o ícone (40×40), para o título ao lado ter espaço; desktop com texto
-        'inline-flex h-10 w-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 sm:w-auto sm:px-4',
+        'inline-flex h-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50',
         primary
-          ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:bg-primary/80'
-          : 'border border-border bg-card text-foreground hover:bg-muted active:bg-muted',
+          // Primária (ex.: botão de um estado vazio): sempre com texto
+          ? 'px-4 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:bg-primary/80'
+          // Secundária (cabeçalho): só o ícone no telemóvel, com texto no desktop
+          : 'w-10 sm:w-auto sm:px-3 text-foreground hover:bg-muted active:bg-muted',
         className,
       )}
     >
-      <Icon className={cn('flex-shrink-0', primary ? 'h-5 w-5 sm:h-4 sm:w-4' : 'h-4 w-4')} aria-hidden />
-      <span className="hidden sm:inline">{label}</span>
+      <Icon className="h-[18px] w-[18px] flex-shrink-0" aria-hidden />
+      <span className={primary ? undefined : 'hidden sm:inline'}>{label}</span>
     </button>
   );
 }

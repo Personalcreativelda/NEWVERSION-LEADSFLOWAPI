@@ -6,7 +6,7 @@ import {
   ChevronRight, Play, Pause, Copy, Trash2, BarChart3, ArrowRight,
   Tag, ShoppingCart, UserCheck, AlertCircle,
   Layers, Repeat2, Target, Pencil, X, GripVertical, Info,
-  Instagram, Facebook, Send, Split, Mic, RefreshCw,
+  Instagram, Facebook, Send, Split, Mic, RefreshCw, UploadCloud,
 } from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { EmptyState } from '../base/EmptyState';
@@ -103,13 +103,13 @@ const TEMPLATES = [
       { id: 's2', type: 'wait' as ActionType, label: 'Aguardar 3 dias' },
       { id: 's3', type: 'email' as ActionType, label: 'Email: Dicas de uso do produto' },
       { id: 's4', type: 'wait' as ActionType, label: 'Aguardar 7 dias' },
-      { id: 's5', type: 'whatsapp' as ActionType, label: 'NPS + oferta de upgrade' },
+      { id: 's5', type: 'whatsapp' as ActionType, label: 'NPS + oferta de melhorar o plano' },
     ],
   },
   {
     id: 'hot-lead',
     name: 'Lead Quente',
-    description: 'Notifica a equipe e age rapidamente quando um lead atinge score alto.',
+    description: 'Notifica a equipa e age rapidamente quando um lead atinge score alto.',
     icon: Target,
     color: 'text-orange-500',
     bg: 'bg-orange-500/10',
@@ -118,7 +118,7 @@ const TEMPLATES = [
     steps: [
       { id: 's1', type: 'tag' as ActionType, label: 'Tag: quente' },
       { id: 's2', type: 'move_stage' as ActionType, label: 'Mover para "Proposta"' },
-      { id: 's3', type: 'whatsapp' as ActionType, label: 'Contato imediato pelo vendedor' },
+      { id: 's3', type: 'whatsapp' as ActionType, label: 'Contacto imediato pelo vendedor' },
     ],
   },
   {
@@ -213,7 +213,7 @@ const ACTION_OPTIONS: { value: ActionType; label: string }[] = [
 
 const DEFAULT_FUNNEL_STAGES = [
   { value: 'novo',        label: 'Novo Lead' },
-  { value: 'contatado',   label: 'Contatado' },
+  { value: 'contatado',   label: 'Contactado' },
   { value: 'qualificado', label: 'Qualificado' },
   { value: 'negociacao',  label: 'Em Negociação' },
   { value: 'convertido',  label: 'Convertido' },
@@ -348,13 +348,13 @@ function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditM
       title={
         <div className="flex items-center gap-2">
           {isNew ? <Plus className="w-4 h-4 text-muted-foreground" /> : <Pencil className="w-4 h-4 text-muted-foreground" />}
-          <span>{isNew ? 'Novo Flow' : 'Editar Flow'}</span>
+          <span>{isNew ? 'Novo Fluxo' : 'Editar Fluxo'}</span>
         </div>
       }
       footer={
         <>
           <AppButton variant="ghost" size="sm" onClick={onClose}>Cancelar</AppButton>
-          <AppButton size="sm" onClick={handleSave} disabled={!name.trim()}>Salvar</AppButton>
+          <AppButton size="sm" onClick={handleSave} disabled={!name.trim()}>Guardar</AppButton>
         </>
       }
     >
@@ -362,12 +362,12 @@ function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditM
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {/* Name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground">Nome do Flow</label>
+            <label className="text-xs font-medium text-foreground">Nome do Fluxo</label>
             <input
               value={name}
               onChange={e => setName(e.target.value)}
               className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="Nome do flow"
+              placeholder="Nome do fluxo"
             />
           </div>
 
@@ -379,7 +379,7 @@ function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditM
               onChange={e => setDescription(e.target.value)}
               rows={2}
               className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-              placeholder="Descreva o objetivo do flow"
+              placeholder="Descreva o objetivo do fluxo"
             />
           </div>
 
@@ -873,7 +873,7 @@ export default function RemarketingPage() {
         console.error('[Remarketing] ❌ Falha ao salvar flow na API:', err);
         // Show the real error so we can diagnose it
         const msg = err?.message || JSON.stringify(err);
-        toast.error(`Flow salvo localmente. Erro da API: ${msg}`);
+        toast.error(`Fluxo guardado localmente. Erro da API: ${msg}`);
       }
       return;
     }
@@ -890,7 +890,7 @@ export default function RemarketingPage() {
     } catch (err: any) {
       console.error('[Remarketing] ❌ Falha ao atualizar flow na API:', err);
       const msg = err?.message || JSON.stringify(err);
-      toast.error(`Erro ao salvar no servidor: ${msg}`);
+      toast.error(`Erro ao guardar no servidor: ${msg}`);
     }
   };
 
@@ -921,9 +921,9 @@ export default function RemarketingPage() {
       }
     }
     setSyncing(false);
-    if (ok > 0) toast.success(`${ok} flow(s) sincronizados com o servidor!`);
-    if (fail > 0) toast.error(`${fail} flow(s) falharam — veja o console para detalhes.`);
-    if (ok === 0 && fail === 0) toast.info('Todos os flows já estão no servidor.');
+    if (ok > 0) toast.success(`${ok} fluxo(s) sincronizados com o servidor!`);
+    if (fail > 0) toast.error(`${fail} fluxo(s) falharam — veja o console para detalhes.`);
+    if (ok === 0 && fail === 0) toast.info('Todos os fluxos já estão no servidor.');
     fetchFlows(true);
   };
 
@@ -934,14 +934,10 @@ export default function RemarketingPage() {
 
           <PageHeader
             title="Remarketing"
-            description="Flows automáticos para reativar leads"
+            description="Fluxos automáticos para reativar leads"
             icon={Repeat2}
-            actions={
-              <>
-                <PageAction icon={RefreshCw} label={syncing ? 'A sincronizar…' : 'Sincronizar'} onClick={syncToDB} disabled={syncing} />
-                <PageAction variant="primary" icon={Plus} label="Novo flow" onClick={handleCreateBlank} />
-              </>
-            }
+            actions={<PageAction icon={UploadCloud} label={syncing ? 'A sincronizar…' : 'Sincronizar'} onClick={syncToDB} disabled={syncing} />}
+            create={{ label: 'Novo fluxo', onClick: handleCreateBlank }}
           />
 
 
@@ -956,8 +952,8 @@ export default function RemarketingPage() {
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
               >
-                {tab === 'flows' && `Meus Flows (${flows.length})`}
-                {tab === 'templates' && 'Templates'}
+                {tab === 'flows' && `Meus Fluxos (${flows.length})`}
+                {tab === 'templates' && 'Modelos'}
               </button>
             ))}
           </div>
@@ -972,9 +968,9 @@ export default function RemarketingPage() {
               ) : flows.length === 0 ? (
                 <EmptyState
                   icon={GitBranch}
-                  title="Ainda sem flows"
-                  description="Comece por um template ou crie um flow do zero."
-                  action={<PageAction variant="primary" icon={Layers} label="Ver templates" onClick={() => setActiveTab('templates')} />}
+                  title="Ainda sem fluxos"
+                  description="Comece por um modelo ou crie um fluxo do zero."
+                  action={<PageAction variant="primary" icon={Layers} label="Ver modelos" onClick={() => setActiveTab('templates')} />}
                 />
               ) : (
                 <>
@@ -1135,7 +1131,7 @@ export default function RemarketingPage() {
                         onClick={(e) => { e.stopPropagation(); handleUseTemplate(template); }}
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        Usar Template
+                        Usar Modelo
                       </Button>
                     </div>
                   );

@@ -29,12 +29,12 @@ const EMAIL_TEMPLATES = [
 
 É um prazer tê-lo(a) conosco! 
 
-Estamos muito felizes em poder atendê-lo(a). Nossa equipe está à disposição para tirar qualquer dúvida.
+Estamos muito felizes em poder atendê-lo(a). Nossa equipa está à disposição para tirar qualquer dúvida.
 
-Entre em contato conosco pelo telefone {telefone} ou responda este email.
+Entre em contacto conosco pelo telefone {telefone} ou responda este email.
 
 Atenciosamente,
-Equipe LeadFlow CRM`,
+Equipa LeadFlow CRM`,
  },
  {
  id: 'promo',
@@ -44,16 +44,16 @@ Equipe LeadFlow CRM`,
 
 Temos uma promoção especial pensada em você!
 
-🎉 Aproveite condições exclusivas por tempo limitado.
+ Aproveite condições exclusivas por tempo limitado.
 
-Entre em contato conosco para saber mais:
-📧 Email: {email}
-📱 Telefone: {telefone}
+Entre em contacto conosco para saber mais:
+ Email: {email}
+ Telefone: {telefone}
 
 Não perca essa oportunidade!
 
 Atenciosamente,
-Equipe LeadFlow CRM`,
+Equipa LeadFlow CRM`,
  },
  {
  id: 'followup',
@@ -70,7 +70,7 @@ Temos novidades que podem ser do seu interesse. Podemos agendar uma conversa?
 Aguardo seu retorno.
 
 Atenciosamente,
-Equipe LeadFlow CRM`,
+Equipa LeadFlow CRM`,
  },
  {
  id: 'thanks',
@@ -78,14 +78,14 @@ Equipe LeadFlow CRM`,
  subject: 'Obrigado pelo seu contato!',
  message: `Olá {nome},
 
-Obrigado por entrar em contato conosco!
+Obrigado por entrar em contacto conosco!
 
-Recebemos sua mensagem e em breve nossa equipe retornará.
+Recebemos sua mensagem e em breve nossa equipa retornará.
 
-Se precisar de atendimento urgente, entre em contato pelo telefone {telefone}.
+Se precisar de atendimento urgente, entre em contacto pelo telefone {telefone}.
 
 Atenciosamente,
-Equipe LeadFlow CRM`,
+Equipa LeadFlow CRM`,
  },
 ];
 
@@ -136,7 +136,7 @@ export default function EmailMarketingModalV2({
  const handleSelectTemplate = (template: typeof EMAIL_TEMPLATES[0]) => {
  setSubject(template.subject);
  setMessage(template.message);
- toast.success(`Template"${template.name}" aplicado!`);
+ toast.success(`Modelo"${template.name}" aplicado!`);
  };
 
  const handleSend = async () => {
@@ -233,17 +233,17 @@ export default function EmailMarketingModalV2({
  console.error('Erro ao atualizar contador de emails:', error);
  }
  
- toast.success(`✅ ${results.sent} email(s) enviado(s) com sucesso!`);
+ toast.success(` ${results.sent} email(s) enviado(s) com sucesso!`);
  }
  
  if (results.failed > 0) {
- toast.warning(`⚠️ ${results.failed} email(s) falharam.`);
+ toast.warning(` ${results.failed} email(s) falharam.`);
  }
 
  onSendSuccess?.();
  } catch (error) {
  console.error('Erro ao enviar emails:', error);
- toast.error('❌ Erro ao processar envio de emails.');
+ toast.error('Erro ao processar envio de emails.');
  } finally {
  setSending(false);
  }
@@ -358,7 +358,7 @@ export default function EmailMarketingModalV2({
  {/* Templates */}
  <div>
  <Label className="text-foreground/80 mb-3 block">
- 📝 Templates Prontos
+ Modelos Prontos
  </Label>
  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
  {EMAIL_TEMPLATES.map((template) => (
@@ -435,7 +435,7 @@ export default function EmailMarketingModalV2({
  className="w-full resize-none font-mono text-sm"
  />
  <p className="text-xs text-foreground/80 mt-2">
- 💡 Variáveis disponíveis: <code className="bg-muted px-1 rounded">{'{nome}'}</code>, <code className="bg-muted px-1 rounded">{'{email}'}</code>, <code className="bg-muted px-1 rounded">{'{telefone}'}</code>, <code className="bg-muted px-1 rounded">{'{interesse}'}</code>
+ Variáveis disponíveis:<code className="bg-muted px-1 rounded">{'{nome}'}</code>, <code className="bg-muted px-1 rounded">{'{email}'}</code>, <code className="bg-muted px-1 rounded">{'{telefone}'}</code>, <code className="bg-muted px-1 rounded">{'{interesse}'}</code>
  </p>
  </div>
 
@@ -469,9 +469,9 @@ export default function EmailMarketingModalV2({
  <div className="sticky bottom-0 bg-muted/50 border-t border-border px-6 py-4 flex justify-between items-center rounded-b-2xl">
  <p className="text-sm text-muted-foreground">
  {selectedLeads.length === 0 ? (
- '⚠️ Nenhum lead com email disponível'
+ 'Nenhum lead com email disponível'
  ) : (
- `✅ Pronto para enviar ${selectedLeads.length} email(s)`
+ `Pronto para enviar${selectedLeads.length} email(s)`
  )}
  </p>
  <div className="flex gap-3">
@@ -486,7 +486,7 @@ export default function EmailMarketingModalV2({
  {sending ? (
  <>
  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
- Enviando {selectedLeads.length} emails...
+ A enviar {selectedLeads.length} emails...
  </>
  ) : (
  <>

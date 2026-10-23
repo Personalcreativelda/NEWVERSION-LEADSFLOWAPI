@@ -122,12 +122,12 @@ export default function SettingsPage({
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error('As senhas não coincidem');
+      toast.error('As palavras-passe não coincidem');
       return;
     }
 
     if (newPassword.length < 6) {
-      toast.error('A nova senha deve ter pelo menos 6 caracteres');
+      toast.error('A nova palavra-passe deve ter pelo menos 6 caracteres');
       return;
     }
 
@@ -135,7 +135,7 @@ export default function SettingsPage({
     try {
       const response = await userApi.changePassword(currentPassword, newPassword);
       if (response.success) {
-        toast.success('Senha alterada com sucesso!');
+        toast.success('Palavra-passe alterada com sucesso!');
         setShowPasswordModal(false);
         setCurrentPassword('');
         setNewPassword('');
@@ -143,7 +143,7 @@ export default function SettingsPage({
       }
     } catch (error: any) {
       console.error('Error changing password:', error);
-      toast.error(error.message || 'Erro ao alterar senha');
+      toast.error(error.message || 'Erro ao alterar palavra-passe');
     } finally {
       setPasswordLoading(false);
     }
@@ -168,7 +168,7 @@ export default function SettingsPage({
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={onBack}>
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar ao Dashboard
+              Voltar ao Painel
             </Button>
           </div>
         </div>
@@ -176,9 +176,9 @@ export default function SettingsPage({
 
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         <div className="mb-8">
-          <h1 className="text-foreground mb-2">Configurações</h1>
+          <h1 className="text-foreground mb-2">Definições</h1>
           <p className="text-muted-foreground">
-            Gerencie suas preferências e informações da conta
+            Faça a gestão de suas preferências e informações da conta
           </p>
         </div>
 
@@ -251,16 +251,16 @@ export default function SettingsPage({
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       {loading ? (
-                        'Salvando...'
+                        'A guardar...'
                       ) : saved ? (
                         <>
                           <CheckCircle className="w-4 h-4 mr-2" />
-                          Salvo!
+                          Guardado!
                         </>
                       ) : (
                         <>
                           <Save className="w-4 h-4 mr-2" />
-                          Salvar alterações
+                          Guardar alterações
                         </>
                       )}
                     </Button>
@@ -337,7 +337,7 @@ export default function SettingsPage({
                     className="w-full bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
                   >
                     <Zap className="w-4 h-4 mr-2" />
-                    Fazer upgrade do plano
+                    Melhorar o plano do plano
                   </Button>
                 )}
               </div>
@@ -365,7 +365,7 @@ export default function SettingsPage({
                   onClick={() => setShowPasswordModal(true)}
                 >
                   <Lock className="w-4 h-4 mr-2" />
-                  Alterar senha
+                  Alterar palavra-passe
                 </Button>
                 <Button
                   variant="outline"
@@ -384,46 +384,46 @@ export default function SettingsPage({
       <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Alterar senha</DialogTitle>
+            <DialogTitle>Alterar palavra-passe</DialogTitle>
             <DialogDescription>
-              Digite sua senha atual e escolha uma nova senha
+              Digite sua palavra-passe atual e escolha uma nova palavra-passe
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="current-password">Senha atual</Label>
+              <Label htmlFor="current-password">Palavra-passe atual</Label>
               <Input
                 id="current-password"
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 className="mt-1"
-                placeholder="Digite sua senha atual"
+                placeholder="Digite sua palavra-passe atual"
               />
             </div>
             
             <div>
-              <Label htmlFor="new-password">Nova senha</Label>
+              <Label htmlFor="new-password">Nova palavra-passe</Label>
               <Input
                 id="new-password"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="mt-1"
-                placeholder="Digite a nova senha (mín. 6 caracteres)"
+                placeholder="Digite a nova palavra-passe (mín. 6 caracteres)"
               />
             </div>
             
             <div>
-              <Label htmlFor="confirm-password">Confirmar nova senha</Label>
+              <Label htmlFor="confirm-password">Confirmar nova palavra-passe</Label>
               <Input
                 id="confirm-password"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="mt-1"
-                placeholder="Confirme a nova senha"
+                placeholder="Confirme a nova palavra-passe"
               />
             </div>
           </div>
@@ -446,7 +446,7 @@ export default function SettingsPage({
               disabled={passwordLoading}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              {passwordLoading ? 'Alterando...' : 'Alterar senha'}
+              {passwordLoading ? 'Alterando...' : 'Alterar palavra-passe'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -58,8 +58,8 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         <button
           onClick={handleAttachment}
           className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-colors flex-shrink-0"
-          aria-label="Anexar arquivo"
-          title="Anexar arquivo"
+          aria-label="Anexar ficheiro"
+          title="Anexar ficheiro"
           disabled={disabled}
         >
           <Paperclip className="h-5 w-5" />

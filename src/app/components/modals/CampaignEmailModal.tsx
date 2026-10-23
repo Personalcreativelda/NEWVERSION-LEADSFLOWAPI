@@ -81,7 +81,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
       }
       setHtmlContent(content);
       setUseHtml(true);
-      toast.success('Template HTML importado!');
+      toast.success('Modelo HTML importado!');
     };
     reader.readAsText(file);
   };
@@ -225,7 +225,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
 
     setAttachments([...attachments, ...newAttachments]);
     if (newAttachments.length > 0) {
-      toast.success(`${newAttachments.length} arquivo(s) anexado(s)`);
+      toast.success(`${newAttachments.length} ficheiro(s) anexado(s)`);
     }
   };
 
@@ -369,7 +369,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
     // Validar agendamento
     if (scheduleMode === 'scheduled') {
       if (!scheduleDate || !scheduleTime) {
-        toast.error('⏰ Defina a data e hora do agendamento');
+        toast.error('Defina a data e hora do agendamento');
         return;
       }
 
@@ -377,7 +377,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
       const now = new Date();
 
       if (scheduledDateTime <= now) {
-        toast.error('⚠️ A data/hora do agendamento deve ser futura');
+        toast.error('A data/hora do agendamento deve ser futura');
         return;
       }
     }
@@ -442,9 +442,9 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
           throw new Error('Erro ao processar envio no servidor');
         }
 
-        toast.success(`✅ Campanha "${campaignName}" iniciada com sucesso!`);
+        toast.success(`Campanha "${campaignName}" iniciada com sucesso!`);
       } else {
-        toast.success(`📅 Campanha "${campaignName}" agendada com sucesso!`);
+        toast.success(`Campanha "${campaignName}" agendada com sucesso!`);
       }
 
       localStorage.removeItem('email_campaign_draft');
@@ -459,7 +459,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
       onClose();
     } catch (error: any) {
       console.error('Error processing campaign:', error);
-      toast.error(`❌ Erro: ${error.message || 'Erro ao processar campanha'}`);
+      toast.error(`Erro:${error.message || 'Erro ao processar campanha'}`);
     } finally {
       setIsSending(false);
     }
@@ -525,13 +525,13 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
         } else if (campaignId) {
           onCampaignUpdated?.({ ...campaignData, id: campaignId });
         }
-        toast.success('💾 Rascunho salvo no banco de dados!');
+        toast.success('Rascunho guardado no banco de dados!');
       } else {
         throw new Error(result.error || 'Erro ao salvar');
       }
     } catch (error: any) {
       console.error('Error saving draft:', error);
-      toast.error(`❌ Erro ao salvar rascunho: ${error.message || 'Erro desconhecido'}`);
+      toast.error(`Erro ao guardar rascunho:${error.message || 'Erro desconhecido'}`);
     } finally {
       setIsSending(false);
     }
@@ -584,10 +584,10 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
         throw new Error(errorData.error || 'Erro ao enviar email de teste');
       }
 
-      toast.success(`✅ Email de teste enviado para ${userEmail}!`);
+      toast.success(`Email de teste enviado para${userEmail}!`);
     } catch (error: any) {
       console.error('Error sending test email:', error);
-      toast.error(`❌ Erro no teste: ${error.message || 'Erro desconhecido'}`);
+      toast.error(`Erro no teste:${error.message || 'Erro desconhecido'}`);
     } finally {
       setIsSending(false);
     }
@@ -615,7 +615,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             onClick={handleSaveDraft}
           >
             <Save />
-            Salvar Rascunho
+            Guardar Rascunho
           </AppButton>
 
           <div className="flex gap-3">
@@ -643,7 +643,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               className="bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white font-semibold px-6 min-w-[140px]"
             >
               {isSending ? (
-                'Processando...'
+                'A processar...'
               ) : (
                 <>
                   <Send />
@@ -785,8 +785,8 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               className="h-11"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              💡 Assuntos curtos e atrativos têm maior taxa de abertura
-            </p>
+              Assuntos curtos e atrativos têm maior taxa de abertura
+ </p>
           </div>
 
           <div className="border-t border-border"></div>
@@ -866,7 +866,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                 type="button"
                 onClick={() => htmlInputRef.current?.click()}
                 className="flex items-center gap-1.5 px-2 py-1 ml-1 hover:bg-muted/50 text-muted-foreground rounded-md transition-colors"
-                title="Importar arquivo HTML"
+                title="Importar ficheiro HTML"
               >
                 <div className="w-4 h-4 rounded border border-border flex items-center justify-center text-[10px] font-bold">
                   ↓
@@ -926,7 +926,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
 
               {/* Variáveis */}
               <div className="mt-2 flex flex-wrap gap-2 items-center">
-                <span className="text-xs text-muted-foreground">💡 Variáveis:</span>
+                <span className="text-xs text-muted-foreground">Variáveis:</span>
                 {['{name}', '{email}', '{phone}', '{company}'].map(v => (
                   <button
                     key={v}
@@ -941,11 +941,11 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
 
               {/* Contador */}
               <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                <span>📝 {(useHtml ? htmlContent : message).length} caracteres</span>
+                <span> {(useHtml ? htmlContent : message).length} caracteres</span>
                 {!useHtml && message.length > 1000 && (
                   <span className="text-amber-600 dark:text-amber-400">
-                    💡 Considere usar HTML para emails mais elaborados
-                  </span>
+                    Considere usar HTML para emails mais elaborados
+ </span>
                 )}
               </div>
             </div>
@@ -982,7 +982,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             {attachments.length > 0 && (
               <div className="mt-3 space-y-2">
                 <p className="text-xs text-foreground font-medium">
-                  Arquivos anexados:
+                  Ficheiros anexados:
                 </p>
                 {attachments.map((att, index) => (
                   <div key={index} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg group/att">
@@ -994,7 +994,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <span className="text-xl">📄</span>
+                        <span className="text-xl"></span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1005,7 +1005,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary hover:text-primary/80 transition-colors"
-                          title="Visualizar arquivo"
+                          title="Visualizar ficheiro"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </a>
@@ -1025,8 +1025,8 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
             )}
 
             <p className="text-xs text-foreground mt-2">
-              ⚠️ Limite: 25 MB por arquivo • ✓ Formatos: PDF, DOC, XLS, JPG, PNG
-            </p>
+              Limite: 25 MB por ficheiro • ✓ Formatos: PDF, DOC, XLS, JPG, PNG
+ </p>
           </div>
 
           <div className="border-t border-border"></div>
@@ -1096,14 +1096,14 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                   </div>
                   <div>
                     <span className="text-muted-foreground">Anexos:</span>
-                    <p className="font-semibold text-foreground">{attachments.length} arquivo(s)</p>
+                    <p className="font-semibold text-foreground">{attachments.length} ficheiro(s)</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Formato:</span>
                     <p className="font-semibold text-foreground">{useHtml ? 'HTML' : 'Texto'}</p>
                   </div>
                   <div className="col-span-2 mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
-                    <span className="text-muted-foreground">Enviando de:</span>
+                    <span className="text-muted-foreground">A enviar de:</span>
                     {resolvedSender ? (
                       <p className="font-semibold text-foreground text-xs truncate">
                         {resolvedSender.name ? `${resolvedSender.name} <${resolvedSender.email}>` : resolvedSender.email}
@@ -1111,8 +1111,8 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                       </p>
                     ) : (
                       <p className="font-semibold text-amber-600 dark:text-amber-400 text-xs">
-                        ⚠️ Nenhum canal de email ou SMTP configurado
-                      </p>
+                        Nenhum canal de email ou SMTP configurado
+ </p>
                     )}
                   </div>
                 </div>

@@ -136,7 +136,7 @@ export default function AvatarUploadModal({
                             {uploading ? (
                                 <div className="flex items-center justify-center gap-2">
                                     <Loader2 className="w-5 h-5 animate-spin" />
-                                    <span>Enviando...</span>
+                                    <span>A enviar...</span>
                                 </div>
                             ) : (
                                 <>

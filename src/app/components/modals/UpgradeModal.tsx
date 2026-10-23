@@ -67,7 +67,7 @@ export default function UpgradeModal({
     try {
       const response = await plansApi.upgrade(planId);
       if (response.success) {
-        toast.success('Plano atualizado para Free!');
+        toast.success('Plano atualizado para Grátis!');
         onUpgradeSuccess(response.user);
         onClose();
       }
@@ -127,7 +127,7 @@ export default function UpgradeModal({
     try {
       const response = await plansApi.upgrade(planId);
       if (response.success) {
-        toast.success('Plano atualizado para Free!');
+        toast.success('Plano atualizado para Grátis!');
         onUpgradeSuccess(response.user);
         onClose();
       }
@@ -269,7 +269,7 @@ export default function UpgradeModal({
                       {loading && selectedPlan === plan.id ? (
                         <span className="flex items-center justify-center gap-1.5">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Carregando...
+                          A carregar...
                         </span>
                       ) : isCurrentPlan ? 'Plano Atual' : plan.id === 'free' ? 'Fazer Downgrade' : 'Selecionar Plano'}
                     </Button>

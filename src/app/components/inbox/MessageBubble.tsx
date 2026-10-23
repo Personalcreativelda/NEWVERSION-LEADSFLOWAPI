@@ -6,6 +6,7 @@ import { ChevronDown, Forward, Trash2, Reply, Paperclip, ChevronDown as Collapse
 import { toast } from 'sonner';
 import DOMPurify from 'dompurify';
 import { isInternalMediaUrl } from '../../utils/media-url';
+import { getLocale } from '../../utils/format';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -156,7 +157,7 @@ function TranscribeButton({ messageId, apiUrl, isOut, onTranscribed }: {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
             )}
-            {isLoading ? 'Transcrevendo...' : 'Transcrever Áudio'}
+            {isLoading ? 'A transcrever...' : 'Transcrever Áudio'}
         </button>
     );
 }
@@ -198,7 +199,7 @@ export function MessageBubble({
                 date = new Date(dateString);
             }
             if (isNaN(date.getTime())) return '';
-            return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            return date.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' });
         } catch { return ''; }
     };
 
@@ -358,7 +359,7 @@ export function MessageBubble({
                                 message.media_type === 'video' ? (
                                     <video src={displayUrl} className="w-full max-h-64 object-cover" muted preload="metadata" />
                                 ) : (
-                                    <img src={displayUrl} alt="Enviando..." className="w-full max-h-64 object-cover" />
+                                    <img src={displayUrl} alt="A enviar..." className="w-full max-h-64 object-cover" />
                                 )
                             ) : (
                                 <div className="w-full h-32 bg-muted/60 rounded-md flex items-center justify-center">

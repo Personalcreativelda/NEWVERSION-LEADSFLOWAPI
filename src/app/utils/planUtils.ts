@@ -105,10 +105,10 @@ export function getTrialBannerMessage(user: UserProfile | null): string | null {
   const daysRemaining = getTrialDaysRemaining(user);
   
   if (daysRemaining === 0) {
-    return '⏰ Seu trial expira hoje! Aproveite todos os recursos premium.';
+    return 'Seu trial expira hoje! Aproveite todos os recursos premium.';
   } else if (daysRemaining === 1) {
-    return '⏰ 1 dia restante no seu trial com todos os recursos premium!';
+    return '1 dia restante no seu trial com todos os recursos premium!';
   } else {
-    return `🎉 ${daysRemaining} dias restantes no seu trial com TODOS os recursos desbloqueados!`;
+    return ` ${daysRemaining} dias restantes no seu trial com TODOS os recursos desbloqueados!`;
   }
 }

@@ -6,7 +6,6 @@ import { trackLeadStatusChange } from '../utils/tracking';
 import StatsCards from './dashboard/StatsCards';
 import MainStatsCards from './dashboard/MainStatsCards';
 import LeadsTable from './dashboard/LeadsTable';
-import ChartsSection from './dashboard/ChartsSection';
 import PlanoWidget from './dashboard/PlanoWidget';
 import RecentLeadsSection from './dashboard/RecentLeadsSection';
 import SalesFunnel from './dashboard/SalesFunnel';
@@ -15,7 +14,8 @@ import AIIntelligencePanel from './dashboard/AIIntelligencePanel';
 
 // Navigation components
 import RefactoredHeader from './navigation/RefactoredHeader';
-import NavigationSidebar, { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './navigation/NavigationSidebar';
+import NavigationSidebar, { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_COLLAPSED_WIDTH, pathToPageId } from './navigation/NavigationSidebar';
+import { sidebarConfig } from '../config/sidebarConfig';
 import { PageContainer } from './base/PageContainer';
 
 // Tasks
@@ -70,13 +70,15 @@ import { conversationsApi } from '../services/api/inbox';
 import { useLeadsAutoRefresh } from '../hooks/useLeadsAutoRefresh';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useConfirm } from './ui/ConfirmDialog';
-import { Language, loadLanguage, saveLanguage } from '../utils/i18n';
+import { Language, loadLanguage, saveLanguage, translations, Translations } from '../utils/i18n';
 
 import { AlertTriangle, AlertCircle, CheckCircle2, CopyX, Download, MailX, X, LayoutDashboard, Users, MessageSquare, BarChart2, Menu, FileText, Workflow } from 'lucide-react';
-import { PageHeader, PageAction } from './base/PageHeader';
+import { PageHeader, PageAction, PageFab } from './base/PageHeader';
 import { motion } from 'motion/react';
 import { OfflineState } from './base/OfflineState';
+import { PullToRefresh } from './base/PullToRefresh';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { getLocale } from '../utils/format';
 
 // Types
 interface Lead {
@@ -439,6 +441,54 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     }
   }, [subPageToPath, user, enforcementBlock]);
 
+  // Título da página no cabeçalho (o mesmo nome do menu) e seta de voltar no telemóvel
+  // para as páginas fora dos separadores da barra inferior.
+  const pageTitle = useMemo(() => {
+    const tr = translations[language] as Translations;
+    const item = sidebarConfig.find((i) => (pathToPageId[i.path] || i.id) === currentPage);
+    if (item) return tr[item.labelKey as keyof Translations] as string;
+    const extra: Record<string, string> = { 'inbox-team': 'Equipa', security: 'Segurança', admin: 'Administração', contacts: 'Contactos' };
+    return extra[currentPage] || '';
+  }, [currentPage, language]);
+
+  const isTabPage = ['dashboard', 'leads', 'inbox', 'analytics'].includes(currentPage);
+
+  // Puxar para recarregar (substitui os botões de atualizar): a página é montada de novo
+  // (refaz os pedidos) e os leads e limites do plano são recarregados.
+  const handlePullRefresh = useCallback(async () => {
+    setReconnectKey((k) => k + 1);
+    await Promise.all([carregarLeads(), onRefreshUser?.().catch(() => {})]);
+  }, [onRefreshUser]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // FAB "Novo lead": mesmas verificações do antigo botão + da tabela (plano e limite)
+  const leadsLimitReached = (user?.limits?.leads ?? 0) > 0 && (user?.limits?.leads ?? 0) !== -1 && (user?.usage?.leads ?? 0) >= (user?.limits?.leads ?? 0);
+  const handleNovoLeadFab = () => {
+    if (leadsLimitReached) {
+      window.dispatchEvent(new CustomEvent('leadflow:show-upgrade'));
+      return;
+    }
+    handleNovoLead();
+  };
+  const goBack = useCallback(() => {
+    // Entrada criada pelo próprio painel (pushState) → voltar no histórico; senão Início
+    if (window.history.state?.dashboardPage) window.history.back();
+    else handleNavigate('dashboard');
+  }, [handleNavigate]);
+
+  // Botão "voltar" do Android numa página fora dos separadores: volta à anterior
+  useEffect(() => {
+    if (isTabPage || !isMobile) return;
+    const onNativeBack = (e: Event) => {
+      if (e.defaultPrevented) return;
+      // Diálogos abertos fecham primeiro (native.ts trata-os a seguir)
+      if (document.querySelector('[role="dialog"]')) return;
+      e.preventDefault();
+      goBack();
+    };
+    window.addEventListener('native-back', onNativeBack);
+    return () => window.removeEventListener('native-back', onNativeBack);
+  }, [isTabPage, isMobile, goBack]);
+
   // Sync internal page with browser back/forward navigation
   useEffect(() => {
     const handlePopState = () => {
@@ -518,11 +568,11 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
           
           // ✅ Alertar visualmente
           toast.error(
-            `🧟 ${zombieLeads.length} leads deletados VOLTARAM!\n\n` +
+            ` ${zombieLeads.length} leads apagados VOLTARAM!\n\n` +
             `Verifique:\n` +
-            `1. Webhook N8N re-importando?\n` +
+            `1. Webhook N8N re-a importar?\n` +
             `2. Auto-sincronização ativa?\n` +
-            `3. Backend deletando corretamente?`,
+            `3. Backend a apagar corretamente?`,
             { duration: 10000 }
           );
         }
@@ -556,13 +606,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       
       if (n8nWebhookUrl) {
         // Se tiver webhook, sincronizar com N8N
-        toast.info('🔄 Sincronizando leads do N8N...');
+        toast.info('A sincronizar leads do N8N...');
         await sincronizarLeadsN8N();
       } else {
         // Se não tiver webhook, apenas recarregar do banco
-        toast.info('🔄 Atualizando lista de leads...');
+        toast.info('A atualizar lista de leads...');
         await carregarLeads();
-        toast.success('✅ Lista de leads atualizada!');
+        toast.success('Lista de leads atualizada!');
       }
     } catch (error) {
       console.error('[Dashboard] Error updating leads:', error);
@@ -603,25 +653,25 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       const received = result.received || result.total || 0;
 
       if (imported > 0) {
-        toast.success(`✅ ${imported} lead(s) importado(s) via N8N!`);
+        toast.success(` ${imported} lead(s) importado(s) via N8N!`);
       }
 
       if (duplicates > 0) {
-        toast.info(`ℹ️ ${duplicates} lead(s) duplicado(s) ignorado(s).`);
+        toast.info(` ${duplicates} lead(s) duplicado(s) ignorado(s).`);
       }
 
       if (imported === 0 && duplicates === 0) {
-        toast.info('ℹ️ Nenhuma alteração detectada na planilha.');
+        toast.info('Nenhuma alteração detectada na planilha.');
       }
 
       if (received && imported === 0 && duplicates === 0) {
-        toast.warning(`⚠️ ${received} registros recebidos, mas nenhum pôde ser importado. Confira o workflow N8N.`);
+        toast.warning(` ${received} registos recebidos, mas nenhum pôde ser importado. Confira o workflow N8N.`);
       }
 
       console.log('[N8N Sync] ====== SYNC COMPLETED ======');
     } catch (error: any) {
       console.error('[N8N Sync] Error:', error);
-      toast.error(error?.message || '❌ Erro ao sincronizar com o N8N.');
+      toast.error(error?.message || 'Erro ao sincronizar com o N8N.');
 
       try {
         await carregarLeads();
@@ -658,7 +708,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         perdido: 'Perdido',
       };
       const newLabel = statusLabels[data.newStatus] || data.newStatus;
-      toast.success(`🤖 ${data.assistantName || 'Assistente IA'} moveu "${data.leadName || 'Lead'}" para ${newLabel}`, {
+      toast.success(` ${data.assistantName || 'Assistente IA'} moveu "${data.leadName || 'Lead'}" para ${newLabel}`, {
         duration: 5000,
       });
     },
@@ -782,7 +832,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       const response = await leadsApi.delete(leadId);
       if (response.success) {
         setLeads(leads.filter(l => l.id !== leadId));
-        toast.success('Lead deletado com sucesso!');
+        toast.success('Lead apagado com sucesso!');
         try {
           await onRefreshUser?.();
         } catch (_) {
@@ -793,7 +843,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       if (error.message?.toLowerCase().includes('not found')) {
         setLeads(leads.filter(l => l.id !== leadId));
       } else {
-        toast.error('Erro ao deletar lead');
+        toast.error('Erro ao apagar lead');
       }
     }
   };
@@ -829,10 +879,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   };
 
   const handleDelete = async (leadId: string) => {
-    const confirmed = await confirm('Tem certeza que deseja deletar este lead?', {
-      title: 'Deletar Lead',
+    const confirmed = await confirm('Tem certeza que deseja apagar este lead?', {
+      title: 'Apagar Lead',
       variant: 'danger',
-      confirmLabel: 'Deletar',
+      confirmLabel: 'Apagar',
       cancelLabel: 'Cancelar',
     });
     if (!confirmed) return;
@@ -889,7 +939,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       console.log('[Dashboard] 🗑️ Lead IDs to delete:', leadIds);
       
       // ✅ Teste rápido com primeiro lead para verificar se backend está online
-      const toastId = toast.loading('Verificando conexão com servidor...');
+      const toastId = toast.loading('A verificar ligação com servidor...');
       
       try {
         const testResult = await leadsApi.delete(leadIds[0]);
@@ -897,7 +947,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         
         // ✅ Se sucesso, continuar com o resto
         if (testResult.success) {
-          toast.loading(`Deletando ${leadIds.length} lead(s)...`, { id: toastId });
+          toast.loading(`A apagar ${leadIds.length} lead(s)...`, { id: toastId });
         }
       } catch (testError: any) {
         const errorMsg = testError?.message || '';
@@ -906,7 +956,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         if (errorMsg.includes('Backend indisponível') || errorMsg.includes('Failed to fetch')) {
           console.error('[Dashboard] ❌ Backend offline - aborting deletion');
           toast.dismiss(toastId);
-          toast.error('❌ Servidor offline! Não é possível deletar leads no momento. Por favor, tente novamente mais tarde.');
+          toast.error('Servidor offline! Não é possível apagar leads no momento. Por favor, tente novamente mais tarde.');
           return;
         }
         
@@ -914,13 +964,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         if (!errorMsg.toLowerCase().includes('lead not found')) {
           console.error('[Dashboard] ❌ Unexpected error during backend test:', testError);
           toast.dismiss(toastId);
-          toast.error('Erro ao conectar com o servidor. Por favor, tente novamente.');
+          toast.error('Erro ao ligar com o servidor. Por favor, tente novamente.');
           return;
         }
         
         // Se for "not found", lead já estava deletado, continuar normalmente
         console.log('[Dashboard] First lead already deleted, continuing...');
-        toast.loading(`Deletando ${leadIds.length} lead(s)...`, { id: toastId });
+        toast.loading(`A apagar ${leadIds.length} lead(s)...`, { id: toastId });
       }
       
       // ✅ DELETAR EM PARALELO para ser muito mais rápido
@@ -951,7 +1001,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         onUserUpdate({ ...user, usage: { ...user.usage, leads: newUsage } });
         console.log(`[Dashboard] 📊 Uso atualizado: ${user.usage?.leads} → ${newUsage} leads`);
         
-        toast.success('✅ 1 lead deletado com sucesso!');
+        toast.success('1 lead apagado com sucesso!');
         return;
       }
       
@@ -1004,7 +1054,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         
         // ✅ Atualizar progresso (considerando que já deletamos 1 no teste)
         const totalProcessed = deletedCount + errorCount;
-        toast.loading(`Deletando ${totalProcessed}/${leadIds.length} leads...`, { id: toastId });
+        toast.loading(`A apagar ${totalProcessed}/${leadIds.length} leads...`, { id: toastId });
       }
       
       console.log(`[Dashboard] 🗑️ Deletion finished - Success: ${deletedCount}, Errors: ${errorCount}, Backend offline: ${backendOffline}`);
@@ -1014,7 +1064,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       toast.dismiss(toastId);
       
       if (backendOffline) {
-        toast.error('❌ Backend offline! Não foi possível deletar os leads. Por favor, verifique a conexão com o servidor.');
+        toast.error('Backend offline! Não foi possível apagar os leads. Por favor, verifique a ligação com o servidor.');
         setIsDeletingLeads(false); // ✅ Desbloquear auto-refresh
         console.log('[Dashboard] ✅ AUTO-REFRESH DESBLOQUEADO (backend offline)');
         return; // ✅ NÃO atualizar localmente se backend offline
@@ -1033,10 +1083,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       console.log(`[Dashboard] 📊 Uso atualizado: ${user.usage?.leads} → ${newUsage} leads`);
       
       if (errorCount === 0) {
-        toast.success(`✅ ${deletedCount} lead(s) deletado(s) com sucesso!`);
+        toast.success(` ${deletedCount} lead(s) apagado(s) com sucesso!`);
         console.log(`[Dashboard] 🎉 Deleção completa - ${deletedCount} leads deletados sem erros`);
       } else {
-        toast.warning(`⚠️ ${deletedCount} deletados, ${errorCount} erro(s)`);
+        toast.warning(` ${deletedCount} apagados, ${errorCount} erro(s)`);
         console.warn(`[Dashboard] ⚠️ Deleção parcial - ${deletedCount} sucesso, ${errorCount} erros`);
       }
       
@@ -1051,7 +1101,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       
       // ✅ REFRESH DO BACKEND para garantir sincronização total
       console.log('[Dashboard] 🔄 Recarregando leads do backend para verificar sincronização...');
-      toast.loading('🔄 Verificando sincronização com servidor...', { id: toastId });
+      toast.loading('A verificar sincronização com servidor...', { id: toastId });
       
       const leadsAntesRefresh = leads.length;
       await carregarLeads(); // Recarrega do backend
@@ -1091,7 +1141,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       
     } catch (error) {
       console.error('[Dashboard] Error in handleDeleteMultiple:', error);
-      toast.error('Erro ao deletar leads selecionados');
+      toast.error('Erro ao apagar leads selecionados');
       
       // ✅ DESBLOQUEAR em caso de erro também
       setIsDeletingLeads(false);
@@ -1136,7 +1186,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   const formatLimit = (value?: number | null) => {
     if (value === undefined || value === null) return '0';
     if (value === -1) return 'Ilimitado';
-    return value.toLocaleString('pt-BR');
+    return value.toLocaleString(getLocale());
   };
 
   const baseMessageSections = useMemo<MessageCenterSection[]>(() => {
@@ -1188,7 +1238,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       {
         id: 'plan',
         label: 'Plano e limites',
-        description: 'Limites do seu plano e oportunidades de upgrade.',
+        description: 'Limites do seu plano e oportunidades de melhorar o plano.',
         messages: planMessages,
       },
       {
@@ -1200,7 +1250,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       {
         id: 'updates',
         label: 'Novidades',
-        description: 'Confirmações e registros de atividades recentes.',
+        description: 'Confirmações e registos de atividades recentes.',
         messages: [],
       },
     ];
@@ -1281,7 +1331,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       content: (
         <div className="space-y-2">
           <p>
-            Você alcançou o limite de {planLabels[resource]} disponível no seu plano atual. Realize um upgrade para continuar usando este recurso sem interrupções.
+            Você alcançou o limite de {planLabels[resource]} disponível no seu plano atual. Realize um melhorar o plano para continuar usando este recurso sem interrupções.
           </p>
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
             <li>
@@ -1323,10 +1373,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       content: (
         <div className="space-y-2">
           <p>
-            Seu plano atual permite exportar até {formatLimit(maxAllowed)} leads por vez. Você possui {formatLimit(totalCount)} leads cadastrados.
+            Seu plano atual permite exportar até {formatLimit(maxAllowed)} leads por vez. Você possui {formatLimit(totalCount)} leads registados.
           </p>
           <p className="text-xs text-muted-foreground">
-            Exporte a quantidade permitida agora ou faça upgrade para liberar a exportação completa.
+            Exporte a quantidade permitida agora ou faça melhorar o plano para liberar a exportação completa.
           </p>
         </div>
       ),
@@ -1359,7 +1409,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       content: (
         <div className="space-y-2">
           <p>
-            Já existe um lead com o mesmo email ou telefone cadastrado. Evite duplicidades revisando os dados antes de criar um novo contato.
+            Já existe um lead com o mesmo email ou telefone registado. Evite duplicidades revisando os dados antes de criar um novo contacto.
           </p>
           <p className="text-xs text-muted-foreground">
             Dica: utilize a importação incremental ou pesquise o lead antes de cadastrá-lo novamente.
@@ -1368,7 +1418,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       ),
       actions: [
         {
-          label: 'Ver leads cadastrados',
+          label: 'Ver leads registados',
           variant: 'outline',
           onClick: () => {
             closeMessageCenter();
@@ -1660,8 +1710,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
     // Inform about limits before opening modal
     const confirmMessage = maxImport === -1
-      ? `📥 Importação de Leads\n\nSeu plano ${currentPlan} tem importação ILIMITADA! 🚀\n\nVocê pode importar quantos leads quiser.\n\nDeseja continuar?`
-      : `📥 Importação de Leads\n\nSeu plano ${currentPlan} permite importar até ${maxImport} leads.\n\nO sistema irá importar apenas os primeiros ${maxImport} leads da sua planilha.\n\nDeseja continuar?`;
+      ? `Importação de Leads\n\nSeu plano ${currentPlan} tem importação ILIMITADA! \n\nVocê pode importar quantos leads quiser.\n\nDeseja continuar?`
+      : `Importação de Leads\n\nSeu plano ${currentPlan} permite importar até ${maxImport} leads.\n\nO sistema irá importar apenas os primeiros ${maxImport} leads da sua planilha.\n\nDeseja continuar?`;
 
     const importConfirmed = await confirm(confirmMessage, {
       title: 'Importação de Leads',
@@ -1708,7 +1758,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       console.log('[IMPORT WA] ✅ Configurações parseadas:', userSettings);
     } catch (error) {
       console.error('[IMPORT WA] ❌ Erro ao buscar configurações:', error);
-      toast.error('❌ Erro ao carregar configurações. Por favor, tente novamente.');
+      toast.error('Erro ao carregar definições. Por favor, tente novamente.');
       return;
     }
 
@@ -1716,7 +1766,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
     if (!webhookUrl) {
       console.error("[IMPORT WA] Webhook não configurado!");
-      toast.error('❌ Webhook N8N não configurado! Configure o "Webhook - Importação de Contatos do WhatsApp" na aba Integrações.');
+      toast.error('Webhook N8N não configurado! Configure o "Webhook - Importação de Contactos do WhatsApp" na aba Integrações.');
       return;
     }
 
@@ -1738,7 +1788,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     console.log("[IMPORT WA] Payload:", payload);
 
     setModalImportandoWhatsApp(true);
-    toast.info('🔄 Enviando requisição para N8N...', { duration: 2000 });
+    toast.info('A enviar requisição para N8N...', { duration: 2000 });
 
     try {
       const resposta = await fetch(webhookUrl, {
@@ -1760,11 +1810,11 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       const contatos = dados.contatos || dados.data || [];
       
       if (!Array.isArray(contatos) || contatos.length === 0) {
-        toast.warning('⚠️ Nenhum contato foi retornado pelo N8N');
+        toast.warning('Nenhum contacto foi retornado pelo N8N');
         return;
       }
 
-      toast.success(`✅ ${contatos.length} contato(s) recebido(s) do N8N!`);
+      toast.success(` ${contatos.length} contacto(s) recebido(s) do N8N!`);
 
       // Filtrar contatos válidos antes de mostrar
       const contatosFiltrados = contatos.filter(c =>
@@ -1775,7 +1825,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       );
 
       if (contatosFiltrados.length === 0) {
-        toast.warning('⚠️ Nenhum contato válido encontrado após filtragem');
+        toast.warning('Nenhum contacto válido encontrado após filtragem');
         console.log('[IMPORT WA] Contatos filtrados:', contatosFiltrados);
         console.log('[IMPORT WA] Total recebidos:', contatos.length);
         return;
@@ -1806,12 +1856,12 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       setWhatsappImportKey(Date.now()); // Forçar remontagem do modal
       setModalPreviewWhatsApp(true);
 
-      toast.info(`📋 ${contatosFiltrados.length} contato(s) válido(s) prontos para importação. Selecione os que deseja importar.`, { duration: 4000 });
+      toast.info(` ${contatosFiltrados.length} contacto(s) válido(s) prontos para importação. Selecione os que deseja importar.`, { duration: 4000 });
 
     } catch (err) {
       console.error("[IMPORT WA] Erro no fetch:", err);
       setModalImportandoWhatsApp(false);
-      toast.error('❌ Erro ao importar contatos do WhatsApp');
+      toast.error('Erro ao importar contactos do WhatsApp');
     }
   }
 
@@ -1912,15 +1962,15 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       const duplicatesSkipped = result.duplicatesSkipped || 0;
       
       if (duplicatesSkipped > 0) {
-        toast.success(`✅ ${importedCount} contato(s) importado(s) do WhatsApp! (${duplicatesSkipped} duplicados ignorados)`);
+        toast.success(` ${importedCount} contacto(s) importado(s) do WhatsApp! (${duplicatesSkipped} duplicados ignorados)`);
       } else {
-        toast.success(`✅ ${importedCount} contato(s) importado(s) do WhatsApp com sucesso!`);
+        toast.success(` ${importedCount} contacto(s) importado(s) do WhatsApp com sucesso!`);
       }
       
       console.log('[WhatsApp Confirm] ✅ Importação otimizada concluída via backend Express');
     } catch (error: any) {
       console.error('[WhatsApp Confirm] ❌ Erro ao salvar contatos do WhatsApp:', error);
-      toast.error(error.message || 'Erro ao salvar contatos. Tente novamente.');
+      toast.error(error.message || 'Erro ao guardar contactos. Tente novamente.');
     }
   };
 
@@ -1942,7 +1992,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       }
       
       setLoading(true);
-      toast.info('🔍 Procurando leads duplicados...');
+      toast.info('Procurando leads duplicados...');
       const data = await leadsApi.removeDuplicates();
       console.log('[Remove Duplicates] Response:', data);
       
@@ -1957,17 +2007,17 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       // Mostrar resultado
       if (data.removed > 0) {
         toast.success(
-          `✅ ${data.removed} lead(s) duplicado(s) removido(s)!\n\n` +
+          ` ${data.removed} lead(s) duplicado(s) removido(s)!\n\n` +
           `${data.remaining} leads únicos restantes.`,
           { duration: 5000 }
         );
       } else {
-        toast.info('ℹ️ Nenhum lead duplicado encontrado!', { duration: 3000 });
+        toast.info('Nenhum lead duplicado encontrado!', { duration: 3000 });
       }
       
     } catch (error: any) {
       console.error('[Remove Duplicates] Error:', error);
-      toast.error(`❌ Erro ao remover duplicados: ${error.message}`);
+      toast.error(`Erro ao remover duplicados:${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -2059,13 +2109,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   const handleTourComplete = () => {
     localStorage.setItem('leadsflow_tour_completed', 'true');
     setShowTour(false);
-    toast.success('🎉 Tour concluído! Agora você conhece todas as funcionalidades!');
+    toast.success('Visita guiada concluído! Agora você conhece todas as funcionalidades!');
   };
 
   const handleTourSkip = () => {
     localStorage.setItem('leadsflow_tour_completed', 'true');
     setShowTour(false);
-    toast.info('Tour pulado. Você pode reiniciá-lo a qualquer momento.');
+    toast.info('Visita guiada pulado. Você pode reiniciá-lo a qualquer momento.');
   };
 
   const handleStartTour = () => {
@@ -2143,6 +2193,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             onStartTour={handleStartTour}
             language={language}
             onLanguageChange={handleLanguageChange}
+            pageTitle={pageTitle}
+            onBack={isTabPage ? undefined : goBack}
           />
 
           {/* ⚠️ BANNER DE BACKEND OFFLINE */}
@@ -2182,6 +2234,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
               ? 'overflow-hidden flex flex-col min-h-0'
               : isMobile ? 'pb-24' : ''
           }`}>
+            <PullToRefresh onRefresh={handlePullRefresh} disabled={!isMobile || !isOnline} />
             <PageContainer
               className={`w-full min-w-0 ${
                 currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'automations'
@@ -2236,7 +2289,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                     onUpgrade={handleUpgrade}
                     userPlan={user?.plan || 'free'}
                     isTrial={user?.isTrial || false}
-                    onRefresh={onRefreshUser}
                   />
                 )}
 
@@ -2267,15 +2319,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   />
                 )}
 
-                {/* Gráficos de Insights */}
-                <ChartsSection
-                  key={`charts-${leads.length}-${leadsFiltradosPorFiltros.length}`}
-                  leads={leadsFiltradosPorFiltros}
-                  origens={origens}
-                  status={statusList}
-                  isDark={isDark}
-                  onFilterChange={handleAplicarFiltros}
-                />
+                {/* Gráficos detalhados: só em Relatórios (Início é o resumo) */}
+                <PageFab label="Novo lead" onClick={handleNovoLeadFab} />
 
                 {/* Seção de Leads Recentes + Motor de Vendas */}
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
@@ -2301,14 +2346,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onChat={handleChat}
-                  onRefresh={handleAtualizar}
                   onExport={handleExport}
                   onImport={handleImport}
                   onImportWhatsApp={handleImportWhatsApp}
                   onRemoveDuplicates={handleRemoveDuplicates}
+                  onNovoLead={handleNovoLeadFab}
                   onToggleEmailMarketing={handleToggleEmailMarketing}
                   onSendEmail={handleSendEmail}
-                  onNovoLead={handleNovoLead}
                   onCampaigns={() => {
                     const b = getBlockReason();
                     if (b) { showPlanBlock(b.code, b.message); return; }
@@ -2327,59 +2371,26 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
             {currentPage === 'leads' && (
               <div className="space-y-5 sm:space-y-6 xl:space-y-8">
-                <PageHeader title="Leads" description="Todos os seus contactos e oportunidades" icon={Users} />
-
-                {/* Cards Principais de Estatísticas */}
-                {loading && leads.length === 0 ? (
-                  <SkeletonStatCardsRow count={4} />
-                ) : (
-                  <>
-                    {loading && <div className="flex justify-end"><UpdatingBadge /></div>}
-                    <MainStatsCards
-                      totalLeads={stats.total}
-                      leadsNovosHoje={stats.novosHoje}
-                      leadsFechados={stats.convertidos}
-                      limiteLeads={limites.leads === -1 ? 999999 : limites.leads}
-                    />
-                  </>
-                )}
-
-                {/* Cards Secundários */}
-                {(!loading || leads.length > 0) && (
-                  <StatsCards
-                    totalLeads={stats.total}
-                    leadsNovosHoje={stats.novosHoje}
-                    leadsFechados={stats.convertidos}
-                    leads={leadsFiltradosPorFiltros as any}
-                    limites={limites}
-                    isDark={isDark}
-                  />
-                )}
-
-                {/* Seção de Leads Recentes */}
-                <RecentLeadsSection
-                  leads={leads}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  isDark={isDark}
-                  onChat={handleChat}
-                  onSendEmail={handleSendEmail}
+                <PageHeader
+                  title="Leads"
+                  description="Todos os seus contactos e oportunidades"
+                  icon={Users}
+                  create={{ label: 'Novo lead', onClick: handleNovoLeadFab }}
                 />
-                
+
                 {/* Tabela de Leads */}
                 <LeadsTable
                   leads={leads}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onChat={handleChat}
-                  onRefresh={handleAtualizar}
                   onExport={handleExport}
                   onImport={handleImport}
                   onImportWhatsApp={handleImportWhatsApp}
                   onRemoveDuplicates={handleRemoveDuplicates}
+                  onNovoLead={handleNovoLeadFab}
                   onToggleEmailMarketing={handleToggleEmailMarketing}
                   onSendEmail={handleSendEmail}
-                  onNovoLead={handleNovoLead}
                   onCampaigns={() => {
                     const b = getBlockReason();
                     if (b) { showPlanBlock(b.code, b.message); return; }
@@ -2466,10 +2477,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                     setModalEditarLead(true);
                   }}
                   onDeleteLead={async (leadId) => {
-                    const deleteConfirmed = await confirm('Tem certeza que deseja deletar este lead permanentemente?', {
-                      title: 'Deletar Lead',
+                    const deleteConfirmed = await confirm('Tem certeza que deseja apagar este lead permanentemente?', {
+                      title: 'Apagar Lead',
                       variant: 'danger',
-                      confirmLabel: 'Deletar',
+                      confirmLabel: 'Apagar',
                       cancelLabel: 'Cancelar',
                     });
                     if (deleteConfirmed) {
@@ -2510,10 +2521,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             {currentPage === 'analytics' && (
               <div className="space-y-5 sm:space-y-6 xl:space-y-8">
                 <PageHeader
-                  title="Analytics"
+                  title="Relatórios"
                   description="Desempenho dos seus leads e vendas"
                   icon={BarChart2}
-                  actions={<PageAction variant="primary" icon={FileText} label="Exportar relatório" onClick={() => setModalReportExporter(true)} />}
+                  actions={<PageAction icon={FileText} label="Exportar relatório" onClick={() => setModalReportExporter(true)} />}
                 />
                 <AdvancedAnalytics leads={leads as any} isDark={isDark} />
               </div>
@@ -2573,8 +2584,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
           {[
             { page: 'dashboard', icon: <LayoutDashboard size={20} />, label: 'Início' },
             { page: 'leads',     icon: <Users size={20} />,           label: 'Leads' },
-            { page: 'inbox',     icon: <MessageSquare size={20} />,   label: 'Inbox' },
-            { page: 'analytics', icon: <BarChart2 size={20} />,       label: 'Analytics' },
+            { page: 'inbox',     icon: <MessageSquare size={20} />,   label: 'Conversas' },
+            { page: 'analytics', icon: <BarChart2 size={20} />,       label: 'Relatórios' },
           ].map(({ page, icon, label }) => {
             const active = currentPage === page || (page === 'inbox' && ['inbox','inbox-settings','inbox-team','ai-assistants','automations'].includes(currentPage));
             return (

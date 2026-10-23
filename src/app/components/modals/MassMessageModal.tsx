@@ -94,17 +94,17 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
 
   const handleEnviar = async () => {
     if (selecionados.length === 0) {
-      alert('⚠️ Selecione pelo menos um lead!');
+      alert('Selecione pelo menos um lead!');
       return;
     }
 
     if (!mensagem.trim()) {
-      alert('⚠️ Digite uma mensagem!');
+      alert('Digite uma mensagem!');
       return;
     }
 
     if (!webhookUrl || webhookUrl.trim() === '') {
-      alert('⚠️ Configure o webhook de envio em massa nas configurações!');
+      alert('Configure o webhook de envio em massa nas definições!');
       return;
     }
 
@@ -194,7 +194,7 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
       open={isOpen}
       onOpenChange={(open) => !open && onClose()}
       className="p-0 gap-0"
-      title="📢 Envio em Massa via WhatsApp"
+      title="Envio em Massa via WhatsApp"
       footer={
         <>
           <AppButton type="button" variant="outline" onClick={onClose} disabled={enviando}>
@@ -212,9 +212,9 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
                 Recurso Premium
               </>
             ) : enviando ? (
-              'Enviando...'
+              'A enviar...'
             ) : (
-              '📤 Enviar Mensagens'
+              'Enviar Mensagens'
             )}
           </AppButton>
         </>
@@ -230,14 +230,14 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg text-foreground mb-2 flex items-center gap-2">
-                    🚀 Recurso Premium - Envio em Massa
-                  </h3>
+                    Recurso Premium - Envio em Massa
+ </h3>
                   <p className="text-sm text-foreground/80 mb-4">
                     O <strong>Envio em Massa de Mensagens WhatsApp</strong> está disponível apenas nos planos <strong>Business</strong> e <strong>Enterprise</strong>.
                   </p>
                   <div className="bg-card rounded-lg p-4 mb-4 border border-amber-200 dark:border-amber-800">
                     <p className="text-sm text-foreground mb-2">
-                      <strong>✨ Recursos inclusos:</strong>
+                      <strong>Recursos inclusos:</strong>
                     </p>
                     <ul className="text-sm text-foreground/80 space-y-1.5 ml-4">
                       <li className="flex items-start gap-2">
@@ -260,7 +260,7 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
                     className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-md"
                   >
                     <Crown className="w-4 h-4" />
-                    Fazer Upgrade Agora
+                    Melhorar plano Agora
                   </AppButton>
                 </div>
               </div>
@@ -288,8 +288,8 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
           {/* Seletor de Leads */}
           <div className="mb-6">
             <label className="block text-sm text-foreground/80 mb-3">
-              📋 Selecione os Leads
-            </label>
+              Selecione os Leads
+ </label>
 
             {/* Select All */}
             <div className="bg-muted/50 p-3 rounded-lg mb-3">
@@ -328,41 +328,41 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
           {/* Templates */}
           <div className="mb-6">
             <label className="block text-sm text-foreground/80 mb-3">
-              📝 Templates Rápidos
-            </label>
+              Modelos Rápidos
+ </label>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => handleUseTemplate('saudacao')}
                 className="px-4 py-2 border border-border rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-foreground/80"
               >
-                👋 Saudação
-              </button>
+                Saudação
+ </button>
               <button
                 onClick={() => handleUseTemplate('followup')}
                 className="px-4 py-2 border border-border rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-foreground/80"
               >
-                📞 Follow-up
-              </button>
+                Follow-up
+ </button>
               <button
                 onClick={() => handleUseTemplate('promocao')}
                 className="px-4 py-2 border border-border rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-foreground/80"
               >
-                🎁 Promoção
-              </button>
+                Promoção
+ </button>
               <button
                 onClick={() => handleUseTemplate('agradecimento')}
                 className="px-4 py-2 border border-border rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors text-sm text-foreground/80"
               >
-                🙏 Agradecimento
-              </button>
+                Agradecimento
+ </button>
             </div>
           </div>
 
           {/* Mensagem */}
           <div className="mb-6">
             <label className="block text-sm text-foreground/80 mb-2">
-              💬 Mensagem
-            </label>
+              Mensagem
+ </label>
             <textarea
               value={mensagem}
               onChange={(e) => setMensagem(e.target.value)}

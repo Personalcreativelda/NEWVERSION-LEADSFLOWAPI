@@ -40,7 +40,7 @@ export const sidebarConfig: SidebarItemConfig[] = [
     { id: 'voice-agents', labelKey: 'voiceAgents', icon: PhoneCall, path: '/dashboard/voice-agents', keywords: 'voz chamadas telefone ligacoes' },
     { id: 'webhook', labelKey: 'webhook', icon: Globe, path: '/dashboard/automations', keywords: 'webhooks automacoes eventos n8n api' },
     // Configurações
-    { id: 'plan', labelKey: 'plan', icon: Crown, path: '/dashboard/plan', sectionLabel: 'Configurações', keywords: 'plano upgrade assinatura pagamento faturacao preco limites' },
+    { id: 'plan', labelKey: 'plan', icon: Crown, path: '/dashboard/plan', sectionLabel: 'Definições', keywords: 'plano upgrade assinatura pagamento faturacao preco limites' },
     { id: 'integrations', labelKey: 'integrations', icon: Settings, path: '/dashboard/integrations', keywords: 'integracoes chaves api stripe pixel meta google analytics n8n smtp' },
     { id: 'account', labelKey: 'accountSettings', icon: User, path: '/dashboard/account', keywords: 'conta perfil avatar nome senha password seguranca equipa equipe membros convites' },
 ];

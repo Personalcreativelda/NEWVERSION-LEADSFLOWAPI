@@ -1,5 +1,6 @@
 import { Database, TrendingUp, CheckCircle2, Target } from 'lucide-react';
 import { DashboardCard } from '../base/DashboardCard';
+import { NUMBER_OPTS, formatPercent, getLocale } from '../../utils/format';
 
 interface MainStatsCardsProps {
   totalLeads: number;
@@ -24,21 +25,20 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
   
   // Badges com formatação inteligente (mostrar decimal se < 10%)
   const formatPercentage = (value: number): string => {
-    if (value === 0) return '0%';
-    if (value < 0.1) return '<0.1%';
-    if (value < 10) return `${value.toFixed(1)}%`;
-    return `${Math.round(value)}%`;
+    if (value === 0) return formatPercent(0);
+    if (value < 0.1) return `< ${formatPercent(0.1)}`;
+    return formatPercent(value, value < 10 ? 1 : 0);
   };
 
   const badgeTotalLeads = formatPercentage(progressTotalLeads);
   const badgeLeadsHoje = formatPercentage(progressLeadsHoje);
   const badgeConvertidos = formatPercentage(progressConvertidos);
-  const badgeTaxaConversao = `${taxaConversao}%`;
+  const badgeTaxaConversao = formatPercent(parseFloat(taxaConversao));
 
   const stats = [
     {
       id: 'total-leads-card',
-      value: totalLeads.toLocaleString(),
+      value: totalLeads.toLocaleString(getLocale(), NUMBER_OPTS),
       label: 'Total de Leads',
       icon: Database,
       iconColor: '#B794F6',
@@ -48,7 +48,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
     },
     {
       id: 'leads-today-card',
-      value: leadsNovosHoje.toLocaleString(),
+      value: leadsNovosHoje.toLocaleString(getLocale(), NUMBER_OPTS),
       label: 'Leads Captados Hoje',
       icon: TrendingUp,
       iconColor: '#5B9FED',
@@ -58,7 +58,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
     },
     {
       id: 'leads-converted-card',
-      value: leadsFechados.toLocaleString(),
+      value: leadsFechados.toLocaleString(getLocale(), NUMBER_OPTS),
       label: 'Leads Convertidos',
       icon: CheckCircle2,
       iconColor: '#00D9A3',
@@ -68,7 +68,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
     },
     {
       id: 'conversion-rate-card',
-      value: `${taxaConversao}%`,
+      value: formatPercent(parseFloat(taxaConversao)),
       label: 'Taxa de Conversão',
       icon: Target,
       iconColor: '#FFA26B',

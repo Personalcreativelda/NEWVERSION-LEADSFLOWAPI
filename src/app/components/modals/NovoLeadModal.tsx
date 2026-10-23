@@ -60,12 +60,12 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
     }
 
     if (cleanPhone.startsWith('0')) {
-      setPhoneError('⚠️ Adicione o código do país (ex: 258 para Moçambique)');
+      setPhoneError('Adicione o código do país (ex: 258 para Moçambique)');
       return false;
     }
 
     if (cleanPhone.length < 11 && !cleanPhone.startsWith('+')) {
-      setPhoneError('⚠️ Adicione o código do país (ex: 258 para Moçambique)');
+      setPhoneError('Adicione o código do país (ex: 258 para Moçambique)');
       return false;
     }
 
@@ -77,7 +77,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
     e.preventDefault();
 
     if (!validatePhone(formData.telefone)) {
-      setPhoneError('⚠️ Telefone deve incluir código do país (ex: 258840000000 ou +258840000000)');
+      setPhoneError('Telefone deve incluir código do país (ex: 258840000000 ou +258840000000)');
       return;
     }
 
@@ -121,7 +121,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
     <AppModal
       open={isOpen}
       onOpenChange={(open) => !open && handleClose()}
-      title="➡️ Adicionar Novo Lead"
+      title="➡ Adicionar Novo Lead"
       size="lg"
       footer={
         <>
@@ -129,7 +129,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
             Cancelar
           </AppButton>
           <AppButton type="submit" onClick={handleSubmit} loading={loading}>
-            {loading ? 'Salvando...' : '💾 Salvar Lead'}
+            {loading ? 'A guardar...' : 'Guardar Lead'}
           </AppButton>
         </>
       }
@@ -159,7 +159,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
             label="Telefone"
             required
             error={phoneError}
-            hint="📱 Obrigatório incluir código do país (ex: 258 para Moçambique)"
+            hint="Obrigatório incluir código do país (ex: 258 para Moçambique)"
           >
             <Input
               type="tel"
@@ -197,7 +197,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
             </select>
           </FormField>
 
-          <FormField label="Status" required>
+          <FormField label="Estado" required>
             <select
               name="status"
               value={formData.status}
@@ -208,7 +208,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
               <option value="novo">Novo</option>
               <option value="qualificado">Qualificado</option>
               <option value="em_negociacao">Em Negociação</option>
-              <option value="aguardando_resposta">Aguardando Resposta</option>
+              <option value="aguardando_resposta">A aguardar Resposta</option>
               <option value="convertido">Convertido</option>
               <option value="perdido">Perdido</option>
             </select>
@@ -221,7 +221,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
             <Input name="agente_atual" value={formData.agente_atual} onChange={handleChange} placeholder="Ex: Maria Silva" />
           </FormField>
 
-          <FormField label="💰 Valor do Negócio (R$)" hint="💡 Usado para calcular valor médio de conversão">
+          <FormField label="Valor do Negócio (R$)" hint="Usado para calcular valor médio de conversão">
             <Input
               type="number"
               name="valor"

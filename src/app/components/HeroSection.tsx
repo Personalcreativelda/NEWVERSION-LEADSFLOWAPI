@@ -157,8 +157,8 @@ export default function HeroSection({ onGetStarted }: HeroSectionProps) {
                   className="w-full h-auto rounded-xl shadow-[0_25px_70px_-20px_rgba(147,51,234,0.5)] border border-purple-500/30 hover:border-purple-500/50 transition-all duration-300 bg-gradient-to-br from-gray-800 to-gray-900 min-h-96 flex items-center justify-center"
                 >
                   <div className="text-center text-muted-foreground">
-                    <div className="text-6xl mb-4">📊</div>
-                    <p className="text-lg font-semibold">LeadsFlow Dashboard</p>
+                    <div className="text-6xl mb-4"></div>
+                    <p className="text-lg font-semibold">LeadsFlow Painel</p>
                     <p className="text-sm text-muted-foreground">Interface em tempo real</p>
                   </div>
                 </div>
@@ -167,12 +167,12 @@ export default function HeroSection({ onGetStarted }: HeroSectionProps) {
               {/* Floating Badges for highlights */}
               <div className="absolute -top-6 -right-6 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-5 py-3 rounded-full shadow-md font-semibold flex items-center gap-2 animate-bounce z-10">
                 <span className="w-2.5 h-2.5 bg-white rounded-full animate-pulse"></span>
-                Dashboard Real
+                Painel Real
               </div>
               
               <div className="absolute -bottom-6 -left-6 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-5 py-3 rounded-full shadow-md font-semibold z-10">
-                ⚡ Tempo Real
-              </div>
+                Tempo Real
+ </div>
             </div>
           </div>
         </div>

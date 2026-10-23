@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { conversationTagsApi } from '../../../services/api/inbox';
-import { Plus, Trash2, Edit2, GripVertical, Loader } from 'lucide-react';
+import { Plus, Trash2, Edit2, GripVertical, Loader, Tag as TagIcon } from 'lucide-react';
 import TagCreateModal from './TagCreateModal';
 import TagEditModal from './TagEditModal';
+import { EmptyState } from '../../base/EmptyState';
 
 interface Tag {
     id: string;
@@ -65,7 +66,7 @@ export default function TagsList() {
     };
 
     const handleDeleteTag = async (tagId: string) => {
-        if (!window.confirm('Tem certeza que deseja deletar esta etiqueta? As conversas não serão afetadas.')) {
+        if (!window.confirm('Tem certeza que deseja apagar esta etiqueta? As conversas não serão afetadas.')) {
             return;
         }
         try {
@@ -73,7 +74,7 @@ export default function TagsList() {
             await loadTags();
         } catch (err) {
             console.error('Erro ao deletar etiqueta:', err);
-            alert('Erro ao deletar etiqueta. Tente novamente.');
+            alert('Erro ao apagar etiqueta. Tente novamente.');
         }
     };
 
@@ -170,21 +171,20 @@ export default function TagsList() {
 
             {/* Lista de etiquetas */}
             {tags.length === 0 ? (
-                <div
-                    className="text-center py-12 rounded-lg border-2 border-dashed"
-                    style={{
-                        borderColor: 'hsl(var(--border))',
-                        color: 'hsl(var(--muted-foreground))'
-                    }}
-                >
-                    <p className="mb-4">Nenhuma etiqueta criada ainda</p>
-                    <button
-                        onClick={() => setShowCreateModal(true)}
-                        className="text-blue-500 hover:text-blue-600 font-medium"
-                    >
-                        Criar primeira etiqueta
-                    </button>
-                </div>
+                <EmptyState
+                    icon={TagIcon}
+                    title="Ainda não tem etiquetas"
+                    description="Use etiquetas para organizar as conversas."
+                    action={
+                        <button
+                            onClick={() => setShowCreateModal(true)}
+                            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Criar etiqueta
+                        </button>
+                    }
+                />
             ) : (
                 <div className="space-y-2">
                     {tags.map((tag) => (
@@ -262,7 +262,7 @@ export default function TagsList() {
                                 <button
                                     onClick={() => handleDeleteTag(tag.id)}
                                     className="p-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                    title="Deletar etiqueta"
+                                    title="Apagar etiqueta"
                                 >
                                     <Trash2 className="w-4 h-4 text-red-500" />
                                 </button>

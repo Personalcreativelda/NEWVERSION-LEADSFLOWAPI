@@ -32,14 +32,14 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
       setHasAuth(!!token);
       
       if (!token) {
-        setError('❌ Não autenticado - Token não encontrado');
+        setError('Não autenticado - Token não encontrado');
         setStatus('offline');
         return;
       }
 
       // Try to fetch leads
       if (!supabaseEdgeFunctionUrl) {
-        setError('❌ VITE_SUPABASE_URL não configurada');
+        setError('VITE_SUPABASE_URL não configurada');
         setStatus('offline');
         return;
       }
@@ -64,12 +64,12 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
         console.log('✅ Backend ONLINE - Leads encontrados:', data.length);
       } else {
         const errorData = await response.json();
-        setError(`❌ Backend respondeu com erro: ${errorData.error || response.statusText}`);
+        setError(`Backend respondeu com erro:${errorData.error || response.statusText}`);
         setStatus('offline');
         console.error('❌ Backend offline:', errorData);
       }
     } catch (err: any) {
-      setError(`❌ Backend inacessível: ${err.message}`);
+      setError(`Backend inacessível:${err.message}`);
       setStatus('offline');
       console.error('❌ Backend check failed:', err);
     }
@@ -88,11 +88,11 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
               <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
             )}
             <DialogTitle className="text-lg text-foreground">
-              Status do Backend
+              Estado do Backend
             </DialogTitle>
           </div>
           <DialogDescription className="sr-only">
-            Verificação de conexão com o backend Supabase e status da autenticação
+            Verificação de ligação com o backend Supabase e status da autenticação
           </DialogDescription>
           <button
             onClick={onClose}
@@ -121,14 +121,14 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
               )}
               <div>
                 <h3 className="font-semibold text-foreground">
-                  {status === 'checking' && 'Verificando conexão...'}
-                  {status === 'online' && '✅ Backend Online'}
-                  {status === 'offline' && '❌ Backend Offline'}
+                  {status === 'checking' && 'A verificar ligação...'}
+                  {status === 'online' && 'Backend Online'}
+                  {status === 'offline' && 'Backend Offline'}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   {status === 'checking' && 'Aguarde...'}
                   {status === 'online' && `${leadsCount} leads encontrados no banco de dados`}
-                  {status === 'offline' && 'Não foi possível conectar ao servidor'}
+                  {status === 'offline' && 'Não foi possível ligar ao servidor'}
                 </p>
               </div>
             </div>
@@ -139,7 +139,7 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Token de autenticação:</span>
               <span className={`text-sm font-medium ${hasAuth ? 'text-green-600' : 'text-red-600'}`}>
-                {hasAuth ? '✅ Presente' : '❌ Ausente'}
+                {hasAuth ? 'Presente' : 'Ausente'}
               </span>
             </div>
           </div>
@@ -161,13 +161,13 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
               : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800'
           }`}>
             <p className={`text-xs ${status === 'online' ? 'text-blue-800 dark:text-blue-300' : 'text-amber-800 dark:text-amber-300'}`}>
-              <strong>💡 O que isso significa:</strong><br/>
+              <strong>O que isso significa:</strong><br/>
               {status === 'online' && '• Seu backend Supabase está funcionando corretamente'}
-              {status === 'online' && <><br/>• Todos os dados estão sendo salvos no banco de dados real</>}
+              {status === 'online' && <><br/>• Todos os dados estão sendo guardados no banco de dados real</>}
               {status === 'offline' && '• O backend Supabase não está respondendo'}
               {status === 'offline' && <><br/>• Os dados estão sendo simulados (modo mock)</>}
-              {status === 'offline' && <><br/>• ⚠️ Importações e exclusões NÃO estão funcionando</>}
-              {status === 'offline' && <><br/><br/><strong>🚀 Como resolver:</strong></>}
+              {status === 'offline' && <><br/>• Importações e exclusões NÃO estão funcionando</>}
+              {status === 'offline' && <><br/><br/><strong>Como resolver:</strong></>}
               {status === 'offline' && <><br/>1. Abra o terminal na pasta do projeto</>}
               {status === 'offline' && <><br/>2. Execute: <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">chmod +x deploy-backend.sh && ./deploy-backend.sh</code></>}
               {status === 'offline' && <><br/>3. Aguarde o deploy completar</>}
@@ -186,7 +186,7 @@ export default function BackendStatusModal({ isOpen, onClose }: BackendStatusMod
               {status === 'checking' ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Verificando...
+                  A verificar...
                 </>
               ) : (
                 'Verificar Novamente'

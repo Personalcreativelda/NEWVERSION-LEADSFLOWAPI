@@ -62,7 +62,7 @@ export default function SMTPSettings({ user }: SMTPSettingsProps) {
       }
     } catch (error) {
       console.error('Error saving SMTP settings:', error);
-      alert('Erro ao salvar configurações SMTP. Tente novamente.');
+      alert('Erro ao guardar definições SMTP. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ export default function SMTPSettings({ user }: SMTPSettingsProps) {
 
   const handleTestEmail = async () => {
     if (!smtpConfig.host || !smtpConfig.user || !smtpConfig.fromEmail) {
-      alert('Por favor, configure e salve as configurações SMTP primeiro.');
+      alert('Por favor, configure e salve as definições SMTP primeiro.');
       return;
     }
 
@@ -81,13 +81,13 @@ export default function SMTPSettings({ user }: SMTPSettingsProps) {
       });
 
       if (response.success) {
-        alert(`✅ Email de teste enviado para ${user?.email}!`);
+        alert(`Email de teste enviado para${user?.email}!`);
       } else {
-        alert('❌ Falha ao enviar email de teste. Verifique as configurações.');
+        alert('Falha ao enviar email de teste. Verifique as definições.');
       }
     } catch (error: any) {
       console.error('Error sending test email:', error);
-      alert(`❌ Erro ao enviar email de teste: ${error.message || 'Erro desconhecido'}`);
+      alert(`Erro ao enviar email de teste:${error.message || 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
     }
@@ -100,7 +100,7 @@ export default function SMTPSettings({ user }: SMTPSettingsProps) {
           <Mail className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h3 className="text-foreground dark:text-foreground">Configurações SMTP</h3>
+          <h3 className="text-foreground dark:text-foreground">Definições SMTP</h3>
           <p className="text-sm text-muted-foreground dark:text-muted-foreground">
             Configure seu servidor SMTP para envio de email marketing
           </p>
@@ -154,7 +154,7 @@ export default function SMTPSettings({ user }: SMTPSettingsProps) {
 
         <div>
           <Label htmlFor="smtp-user">
-            Usuário SMTP <span className="text-red-500">*</span>
+            Utilizador SMTP <span className="text-red-500">*</span>
           </Label>
           <Input
             id="smtp-user"
@@ -168,7 +168,7 @@ export default function SMTPSettings({ user }: SMTPSettingsProps) {
 
         <div>
           <Label htmlFor="smtp-password">
-            Senha SMTP <span className="text-red-500">*</span>
+            Palavra-passe SMTP <span className="text-red-500">*</span>
           </Label>
           <div className="relative mt-1">
             <Input
@@ -188,7 +188,7 @@ export default function SMTPSettings({ user }: SMTPSettingsProps) {
             </button>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Para Gmail, use uma senha de aplicativo. Não use sua senha principal.
+            Para Gmail, use uma palavra-passe de aplicativo. Não use sua palavra-passe principal.
           </p>
         </div>
 
@@ -240,16 +240,16 @@ export default function SMTPSettings({ user }: SMTPSettingsProps) {
             className="bg-purple-600 hover:bg-purple-700 text-white"
           >
             {loading ? (
-              'Salvando...'
+              'A guardar...'
             ) : saved ? (
               <>
                 <CheckCircle className="w-4 h-4 mr-2" />
-                Salvo!
+                Guardado!
               </>
             ) : (
               <>
                 <Save className="w-4 h-4 mr-2" />
-                Salvar configurações
+                Guardar definições
               </>
             )}
           </Button>
@@ -267,7 +267,7 @@ export default function SMTPSettings({ user }: SMTPSettingsProps) {
 
       <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
         <p className="text-sm text-amber-800 dark:text-amber-200">
-          <strong>Nota:</strong> As configurações SMTP são necessárias para o envio de email marketing em massa.
+          <strong>Nota:</strong> As definições SMTP são necessárias para o envio de email marketing em massa.
           Certifique-se de usar credenciais válidas de um provedor SMTP confiável.
         </p>
       </div>

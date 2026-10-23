@@ -7,6 +7,7 @@ import { apiRequest } from '../../../utils/api';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getLocale } from '../../../utils/format';
 
 interface Channel {
   id: string;
@@ -87,7 +88,7 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
         }
       }
     } catch {
-      toast.error('Erro ao carregar dados do usuário');
+      toast.error('Erro ao carregar dados do utilizador');
     } finally {
       setLoading(false);
     }
@@ -164,7 +165,7 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
         <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
           <h2 className="text-base sm:text-xl font-bold text-foreground flex items-center gap-2">
             <User className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-            Detalhes do Usuário
+            Detalhes do Utilizador
           </h2>
           <button
             onClick={onClose}
@@ -183,7 +184,7 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
             </div>
           ) : !userDetails ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground">
-              Usuário não encontrado
+              Utilizador não encontrado
             </div>
           ) : (
             <div className="p-4 sm:p-6 space-y-5">
@@ -198,7 +199,7 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-base sm:text-lg text-foreground leading-tight">{userDetails.name || '—'}</h3>
+                    <h3 className="font-bold text-base sm:text-lg text-foreground leading-tight">{userDetails.name || userDetails.email || 'Sem nome'}</h3>
                     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${
                       userDetails.is_active
                         ? 'bg-green-500/10 text-green-600 border-green-500/20'
@@ -217,12 +218,12 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
                     {userDetails.plan_expires_at && (
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        Expira: {new Date(userDetails.plan_expires_at).toLocaleDateString('pt-BR')}
+                        Expira: {new Date(userDetails.plan_expires_at).toLocaleDateString(getLocale())}
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      Cadastro: {new Date(userDetails.created_at).toLocaleDateString('pt-BR')}
+                      Registo: {new Date(userDetails.created_at).toLocaleDateString(getLocale())}
                     </span>
                     {userDetails.last_active_at && (
                       <span className="text-xs text-muted-foreground">
@@ -257,7 +258,7 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
               <div>
                 <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-primary" />
-                  Canais Conectados ({channels.length})
+                  Canais Ligados ({channels.length})
                 </h4>
                 {channels.length === 0 ? (
                   <p className="text-sm text-muted-foreground px-1">Nenhum canal configurado.</p>
@@ -367,7 +368,7 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
                     <>
                       {whatsappChannels.length === 0 && (
                         <p className="text-sm text-orange-500 bg-orange-500/10 px-3 py-2 rounded-lg">
-                          Este usuário não tem canais WhatsApp conectados. A mensagem será enviada via canal do próprio usuário se disponível.
+                          Este utilizador não tem canais WhatsApp ligados. A mensagem será enviada via canal do próprio utilizador se disponível.
                         </p>
                       )}
                       {whatsappChannels.length > 1 && (

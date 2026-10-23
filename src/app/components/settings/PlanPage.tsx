@@ -6,6 +6,7 @@ import { plansApi } from '../../utils/api';
 import { toast } from 'sonner';
 import PaymentMethodModal from '../modals/PaymentMethodModal';
 import { SkeletonPlanCards } from '../ui/skeletons';
+import { getLocale } from '../../utils/format';
 
 interface PlanPageProps {
   user: any;
@@ -25,12 +26,12 @@ function getStatusInfo(status: string | undefined, diasRestantes: number | null,
 
 function fmt(dateStr: string | null | undefined) {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return new Date(dateStr).toLocaleDateString(getLocale(), { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function fmtMoney(amount: number | null, currency = 'USD') {
   if (amount === null || amount === undefined) return '—';
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(amount);
+  return new Intl.NumberFormat(getLocale(), { style: 'currency', currency }).format(amount);
 }
 
 export default function PlanPage({ user, onUpgrade, diasRestantes = null }: PlanPageProps) {
@@ -143,7 +144,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
   return (
     <div className="space-y-6 pb-12">
 
-      <PageHeader title="Planos e Preços" description="O seu plano atual e opções de upgrade" icon={Crown} />
+      <PageHeader title="Planos e Preços" description="O seu plano atual e opções de melhorar o plano" icon={Crown} />
 
       {/* ── CARD PLANO ATIVO ── */}
       <div className={`rounded-xl border-2 bg-gradient-to-br ${gradientMap[currentPlan] || 'from-gray-500/10 to-gray-600/5'} ${borderColorMap[currentPlan] || 'border-gray-500/40'} p-6`}>
@@ -352,7 +353,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
         {historyLoading ? (
           <div className="flex justify-center items-center py-10">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            <span className="ml-2 text-sm text-muted-foreground">Carregando histórico...</span>
+            <span className="ml-2 text-sm text-muted-foreground">A carregar histórico...</span>
           </div>
         ) : paymentHistory.length === 0 ? (
           <div className="py-12 text-center">
@@ -384,7 +385,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                         <span className="capitalize font-medium text-foreground">{item.plan_id}</span>
                       </td>
                       <td className="px-6 py-4 text-muted-foreground capitalize">
-                        {item.billing_cycle === 'monthly' ? 'Mensal' : item.billing_cycle === 'annual' ? 'Anual' : item.billing_cycle || '—'}
+                        {item.billing_cycle === 'monthly' ? 'Mensal' : item.billing_cycle === 'annual' ? 'Anual' : item.billing_cycle || ''}
                       </td>
                       <td className="px-6 py-4 font-semibold text-foreground">
                         {fmtMoney(item.amount, item.currency)}
@@ -402,7 +403,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                         )}
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">
-                        {paymentProviderLabel[item.payment_provider] || item.payment_provider || '—'}
+                        {paymentProviderLabel[item.payment_provider] || item.payment_provider || ''}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${st.cls}`}>{st.label}</span>

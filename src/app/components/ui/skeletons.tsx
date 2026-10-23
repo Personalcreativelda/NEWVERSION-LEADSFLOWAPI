@@ -16,7 +16,7 @@ export function UpdatingBadge({ className }: { className?: string }) {
       className,
     )}>
       <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-      Atualizando...
+      A atualizar...
     </span>
   );
 }

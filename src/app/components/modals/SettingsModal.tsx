@@ -45,7 +45,7 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
       }, 2000);
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
-      alert('Erro ao salvar configurações');
+      alert('Erro ao guardar definições');
     }
   };
 
@@ -60,11 +60,11 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
     });
 
     if (configurados === 0) {
-      alert('❌ Nenhum webhook configurado!\n\nConfigure pelo menos um webhook para começar a usar o sistema.');
+      alert('Nenhum webhook configurado!\n\nConfigure pelo menos um webhook para começar a usar o sistema.');
     } else if (configurados < total) {
-      alert(`⚠️ Configuração parcial!\n\n${configurados} de ${total} webhooks configurados.\n\nAlgumas funcionalidades podem não estar disponíveis.`);
+      alert(`Configuração parcial!\n\n${configurados} de ${total} webhooks configurados.\n\nAlgumas funcionalidades podem não estar disponíveis.`);
     } else {
-      alert('✅ Todos os webhooks configurados!\n\nO sistema está pronto para uso completo.');
+      alert('Todos os webhooks configurados!\n\nO sistema está pronto para uso completo.');
     }
   };
 
@@ -78,8 +78,8 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
     }
     return (
       <span className="ml-2 px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs rounded-md">
-        ⚠ Não configurado
-      </span>
+        Não configurado
+ </span>
     );
   };
 
@@ -90,7 +90,7 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
         
         {/* Header */}
         <div className="px-6 py-5 border-b border-border flex justify-between items-center sticky top-0 bg-[hsl(var(--card))] z-10">
-          <h2 className="text-xl text-foreground">⚙️ Configurações do Sistema</h2>
+          <h2 className="text-xl text-foreground">Definições do Sistema</h2>
           <button
             onClick={onClose}
             className="w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
@@ -113,7 +113,7 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
           {success && (
             <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-300 flex items-center gap-2">
               <Check className="w-5 h-5" />
-              <span>Configurações salvas com sucesso! ✓</span>
+              <span>Definições guardadas com sucesso! ✓</span>
             </div>
           )}
 
@@ -121,14 +121,14 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
             
             {/* Seção: Gestão de Leads */}
             <div>
-              <h4 className="text-foreground mb-4 font-semibold">📡 Webhooks N8N - Gestão de Leads</h4>
+              <h4 className="text-foreground mb-4 font-semibold">Webhooks N8N - Gestão de Leads</h4>
               
               <div className="space-y-4">
                 {/* Cadastrar */}
                 <div>
                   <label className="block text-sm text-muted-foreground mb-2">
-                    🆕 Webhook - Cadastrar Novo Lead
-                    {getStatusBadge(config.cadastrar)}
+                    Webhook - Registar Novo Lead
+ {getStatusBadge(config.cadastrar)}
                   </label>
                   <input
                     type="url"
@@ -143,8 +143,8 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
                 {/* Editar */}
                 <div>
                   <label className="block text-sm text-muted-foreground mb-2">
-                    ✏️ Webhook - Editar Lead
-                    {getStatusBadge(config.editar)}
+                    Webhook - Editar Lead
+ {getStatusBadge(config.editar)}
                   </label>
                   <input
                     type="url"
@@ -159,15 +159,15 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
                 {/* Deletar */}
                 <div>
                   <label className="block text-sm text-muted-foreground mb-2">
-                    🗑️ Webhook - Deletar Lead
-                    {getStatusBadge(config.deletar)}
+                    Webhook - Apagar Lead
+ {getStatusBadge(config.deletar)}
                   </label>
                   <input
                     type="url"
                     value={config.deletar}
                     onChange={(e) => handleChange('deletar', e.target.value)}
                     className={inputClass}
-                    placeholder="https://seu-n8n.com/webhook/deletar-lead"
+                    placeholder="https://seu-n8n.com/webhook/apagar-lead"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">Endpoint DELETE para remover leads da planilha</p>
                 </div>
@@ -175,8 +175,8 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
                 {/* Listar */}
                 <div>
                   <label className="block text-sm text-muted-foreground mb-2">
-                    📋 Webhook - Listar Todos os Leads
-                    {getStatusBadge(config.listar)}
+                    Webhook - Listar Todos os Leads
+ {getStatusBadge(config.listar)}
                   </label>
                   <input
                     type="url"
@@ -192,14 +192,14 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
 
             {/* Seção: WhatsApp */}
             <div>
-              <h4 className="text-foreground mb-4 pt-4 border-t border-border font-semibold">💬 Webhooks N8N - WhatsApp</h4>
+              <h4 className="text-foreground mb-4 pt-4 border-t border-border font-semibold">Webhooks N8N - WhatsApp</h4>
               
               <div className="space-y-4">
                 {/* Enviar Mensagem */}
                 <div>
                   <label className="block text-sm text-muted-foreground mb-2">
-                    💬 Webhook - Enviar Mensagem Individual
-                    {getStatusBadge(config.enviarMsg)}
+                    Webhook - Enviar Mensagem Individual
+ {getStatusBadge(config.enviarMsg)}
                   </label>
                   <input
                     type="url"
@@ -214,8 +214,8 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
                 {/* Enviar em Massa */}
                 <div>
                   <label className="block text-sm text-muted-foreground mb-2">
-                    📤 Webhook - Enviar Mensagem em Massa
-                    {getStatusBadge(config.enviarMassa)}
+                    Webhook - Enviar Mensagem em Massa
+ {getStatusBadge(config.enviarMassa)}
                   </label>
                   <input
                     type="url"
@@ -255,8 +255,8 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
             variant="outline"
             onClick={handleTest}
           >
-            🧪 Testar Webhooks
-          </Button>
+            Testar Webhooks
+ </Button>
           <Button
             type="button"
             variant="outline"
@@ -268,8 +268,8 @@ export default function SettingsModal({ isOpen, onClose, currentConfig, onSave, 
             onClick={handleSave}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
-            💾 Salvar Configurações
-          </Button>
+            Guardar Definições
+ </Button>
         </div>
 
       </div>

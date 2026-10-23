@@ -335,7 +335,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                         page_access_token: igAccount.page_access_token
                     }
                 });
-                toast.success('Instagram conectado com sucesso!');
+                toast.success('Instagram ligado com sucesso!');
             }
 
             setConnectionStatus('connected');
@@ -348,7 +348,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
 
         } catch (err: any) {
             console.error('[Instagram] Error:', err);
-            setError(err.response?.data?.message || err.message || 'Erro ao conectar com Instagram');
+            setError(err.response?.data?.message || err.message || 'Erro ao ligar com Instagram');
             setConnectionStatus('error');
         } finally {
             setLoading(false);
@@ -378,7 +378,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                {isEditing ? 'Editar Canal Instagram' : 'Conectar Instagram'}
+                                {isEditing ? 'Editar Canal Instagram' : 'Ligar Instagram'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 {isEditing ? 'Atualize o token de acesso' : 'Configure sua conta profissional do Instagram'}
@@ -483,7 +483,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                         </p>
                                         <ol className="list-decimal list-inside space-y-1">
                                             <li>Acesse o <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:underline">Meta for Developers</a></li>
-                                            <li>Selecione seu app e vá em <strong>Messenger &gt; Configurações</strong></li>
+                                            <li>Selecione seu app e vá em <strong>Messenger &gt; Definições</strong></li>
                                             <li>Em <strong>Webhooks</strong>, adicione a URL acima</li>
                                             <li>Conecte sua <strong>Página do Facebook</strong> vinculada ao Instagram</li>
                                             <li>Gere um <strong>Page Access Token</strong> (EAA...) ou <strong>System User Token</strong> (EAF... - permanente)</li>
@@ -623,12 +623,12 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                     {loading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            {isEditing ? 'Atualizando...' : 'Validando...'}
+                                            {isEditing ? 'A atualizar...' : 'A validar...'}
                                         </>
                                     ) : (
                                         <>
                                             <Check className="w-4 h-4" />
-                                            {isEditing ? 'Atualizar Canal' : 'Conectar'}
+                                            {isEditing ? 'Atualizar Canal' : 'Ligar'}
                                         </>
                                     )}
                                 </button>
@@ -653,13 +653,13 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                 <CheckCircle className="w-10 h-10 text-green-500" />
                             </div>
                             <h3 className="text-xl font-semibold mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                Instagram Conectado!
+                                Instagram Ligado!
                             </h3>
                             <p className="text-sm mb-4" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 Sua conta <strong>@{accountInfo?.username}</strong> está pronta para receber mensagens.
                             </p>
                             <div className="animate-pulse text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Redirecionando...
+                                A redirecionar...
                             </div>
                         </div>
                     )}

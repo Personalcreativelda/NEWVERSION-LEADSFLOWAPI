@@ -163,7 +163,7 @@ export default function AddLeadsToTagModal({
                             type="text"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Buscar por nome, email ou telefone..."
+                            placeholder="Pesquisar por nome, email ou telefone..."
                             className="w-full pl-10 pr-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             style={{
                                 borderColor: 'hsl(var(--border))',

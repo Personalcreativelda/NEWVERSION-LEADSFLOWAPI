@@ -27,7 +27,7 @@ export function UpgradeButton({
       className={`bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 border-0 ${className}`}
     >
       {showIcon && <Zap className="w-4 h-4 mr-2" />}
-      Upgrade
+      Melhorar plano
     </Button>
   );
 
@@ -64,7 +64,7 @@ export function UpgradeIconButton({ onClick, tooltip }: { onClick?: () => void; 
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{tooltip || 'Faça upgrade para acessar este recurso'}</p>
+          <p>{tooltip || 'Faça melhorar o plano para acessar este recurso'}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

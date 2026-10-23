@@ -19,12 +19,14 @@ import {
 } from '../../../services/api/user-webhooks';
 import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
+import { EmptyState } from '../../base/EmptyState';
+import { getLocale } from '../../../utils/format';
 
 // Cores e ícones por categoria de evento
 const CATEGORY_CONFIG: Record<string, { color: string; bgColor: string; label: string }> = {
   messages: { color: 'text-blue-500', bgColor: 'bg-blue-500/10', label: 'Mensagens' },
   conversations: { color: 'text-green-500', bgColor: 'bg-green-500/10', label: 'Conversas' },
-  contacts: { color: 'text-purple-500', bgColor: 'bg-purple-500/10', label: 'Contatos' },
+  contacts: { color: 'text-purple-500', bgColor: 'bg-purple-500/10', label: 'Contactos' },
   channels: { color: 'text-orange-500', bgColor: 'bg-orange-500/10', label: 'Canais' },
   whatsapp: { color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', label: 'WhatsApp' },
 };
@@ -32,29 +34,29 @@ const CATEGORY_CONFIG: Record<string, { color: string; bgColor: string; label: s
 // Eventos estáticos como fallback (caso a API não responda)
 const STATIC_EVENTS: WebhookEventsResponse = {
   events: {
-    'message.received': { name: 'Mensagem Recebida', description: 'Quando uma nova mensagem é recebida de um contato', category: 'messages' },
-    'message.sent': { name: 'Mensagem Enviada', description: 'Quando uma mensagem é enviada para um contato', category: 'messages' },
+    'message.received': { name: 'Mensagem Recebida', description: 'Quando uma nova mensagem é recebida de um contacto', category: 'messages' },
+    'message.sent': { name: 'Mensagem Enviada', description: 'Quando uma mensagem é enviada para um contacto', category: 'messages' },
     'message.updated': { name: 'Mensagem Atualizada', description: 'Quando o status de uma mensagem é atualizado (entregue, lida)', category: 'messages' },
-    'message.deleted': { name: 'Mensagem Deletada', description: 'Quando uma mensagem é deletada', category: 'messages' },
+    'message.deleted': { name: 'Mensagem Deletada', description: 'Quando uma mensagem é apagada', category: 'messages' },
     'conversation.created': { name: 'Conversa Criada', description: 'Quando uma nova conversa é iniciada', category: 'conversations' },
     'conversation.updated': { name: 'Conversa Atualizada', description: 'Quando uma conversa é atualizada (status, tags, etc.)', category: 'conversations' },
     'conversation.resolved': { name: 'Conversa Resolvida', description: 'Quando uma conversa é marcada como resolvida/fechada', category: 'conversations' },
     'conversation.reopened': { name: 'Conversa Reaberta', description: 'Quando uma conversa fechada é reaberta', category: 'conversations' },
-    'contact.created': { name: 'Contato Criado', description: 'Quando um novo contato/lead é criado', category: 'contacts' },
-    'contact.updated': { name: 'Contato Atualizado', description: 'Quando dados de um contato são atualizados', category: 'contacts' },
-    'channel.connected': { name: 'Canal Conectado', description: 'Quando um canal é conectado com sucesso', category: 'channels' },
-    'channel.disconnected': { name: 'Canal Desconectado', description: 'Quando um canal é desconectado', category: 'channels' },
+    'contact.created': { name: 'Contato Criado', description: 'Quando um novo contacto/lead é criado', category: 'contacts' },
+    'contact.updated': { name: 'Contato Atualizado', description: 'Quando dados de um contacto são atualizados', category: 'contacts' },
+    'channel.connected': { name: 'Canal Conectado', description: 'Quando um canal é ligado com sucesso', category: 'channels' },
+    'channel.disconnected': { name: 'Canal Desconectado', description: 'Quando um canal é desligado', category: 'channels' },
     'channel.qr_updated': { name: 'QR Code Atualizado', description: 'Quando o QR Code do WhatsApp é atualizado', category: 'channels' },
-    'whatsapp.connection.update': { name: 'Status da Conexão', description: 'Atualizações de conexão do WhatsApp', category: 'whatsapp' },
-    'whatsapp.presence.update': { name: 'Presença Atualizada', description: 'Quando o status de presença muda (online, digitando, etc.)', category: 'whatsapp' },
+    'whatsapp.connection.update': { name: 'Status da Conexão', description: 'Atualizações de ligação do WhatsApp', category: 'whatsapp' },
+    'whatsapp.presence.update': { name: 'Presença Atualizada', description: 'Quando o status de presença muda (online, a escrever, etc.)', category: 'whatsapp' },
     'whatsapp.groups.update': { name: 'Grupo Atualizado', description: 'Atualizações em grupos do WhatsApp', category: 'whatsapp' },
   },
   categories: {
     messages: [
-      { event: 'message.received', name: 'Mensagem Recebida', description: 'Quando uma nova mensagem é recebida de um contato' },
-      { event: 'message.sent', name: 'Mensagem Enviada', description: 'Quando uma mensagem é enviada para um contato' },
+      { event: 'message.received', name: 'Mensagem Recebida', description: 'Quando uma nova mensagem é recebida de um contacto' },
+      { event: 'message.sent', name: 'Mensagem Enviada', description: 'Quando uma mensagem é enviada para um contacto' },
       { event: 'message.updated', name: 'Mensagem Atualizada', description: 'Quando o status de uma mensagem é atualizado (entregue, lida)' },
-      { event: 'message.deleted', name: 'Mensagem Deletada', description: 'Quando uma mensagem é deletada' },
+      { event: 'message.deleted', name: 'Mensagem Deletada', description: 'Quando uma mensagem é apagada' },
     ],
     conversations: [
       { event: 'conversation.created', name: 'Conversa Criada', description: 'Quando uma nova conversa é iniciada' },
@@ -63,17 +65,17 @@ const STATIC_EVENTS: WebhookEventsResponse = {
       { event: 'conversation.reopened', name: 'Conversa Reaberta', description: 'Quando uma conversa fechada é reaberta' },
     ],
     contacts: [
-      { event: 'contact.created', name: 'Contato Criado', description: 'Quando um novo contato/lead é criado' },
-      { event: 'contact.updated', name: 'Contato Atualizado', description: 'Quando dados de um contato são atualizados' },
+      { event: 'contact.created', name: 'Contato Criado', description: 'Quando um novo contacto/lead é criado' },
+      { event: 'contact.updated', name: 'Contato Atualizado', description: 'Quando dados de um contacto são atualizados' },
     ],
     channels: [
-      { event: 'channel.connected', name: 'Canal Conectado', description: 'Quando um canal é conectado com sucesso' },
-      { event: 'channel.disconnected', name: 'Canal Desconectado', description: 'Quando um canal é desconectado' },
+      { event: 'channel.connected', name: 'Canal Conectado', description: 'Quando um canal é ligado com sucesso' },
+      { event: 'channel.disconnected', name: 'Canal Desconectado', description: 'Quando um canal é desligado' },
       { event: 'channel.qr_updated', name: 'QR Code Atualizado', description: 'Quando o QR Code do WhatsApp é atualizado' },
     ],
     whatsapp: [
-      { event: 'whatsapp.connection.update', name: 'Status da Conexão', description: 'Atualizações de conexão do WhatsApp' },
-      { event: 'whatsapp.presence.update', name: 'Presença Atualizada', description: 'Quando o status de presença muda (online, digitando, etc.)' },
+      { event: 'whatsapp.connection.update', name: 'Status da Conexão', description: 'Atualizações de ligação do WhatsApp' },
+      { event: 'whatsapp.presence.update', name: 'Presença Atualizada', description: 'Quando o status de presença muda (online, a escrever, etc.)' },
       { event: 'whatsapp.groups.update', name: 'Grupo Atualizado', description: 'Atualizações em grupos do WhatsApp' },
     ],
   },
@@ -249,7 +251,7 @@ export default function InboxAutomations() {
       resetForm();
       loadData();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Erro ao salvar webhook');
+      toast.error(error.response?.data?.error || 'Erro ao guardar webhook');
     } finally {
       setActionLoading(null);
     }
@@ -275,7 +277,7 @@ export default function InboxAutomations() {
       setActionLoading(`test-${webhook.id}`);
       const result = await userWebhooksApi.test(webhook.id);
       if (result.success) {
-        toast.success(`Teste enviado! Status: ${result.status}`);
+        toast.success(`Teste enviado! Estado: ${result.status}`);
       } else {
         toast.error(`Falha no teste: ${result.error}`);
       }
@@ -289,15 +291,15 @@ export default function InboxAutomations() {
 
   // Delete webhook
   const handleDelete = async (webhook: UserWebhook) => {
-    if (!confirm(`Deseja realmente excluir o webhook "${webhook.name}"?`)) return;
+    if (!confirm(`Deseja realmente eliminar o webhook "${webhook.name}"?`)) return;
 
     try {
       setActionLoading(webhook.id);
       await userWebhooksApi.delete(webhook.id);
-      toast.success('Webhook excluído');
+      toast.success('Webhook eliminado');
       loadData();
     } catch (error) {
-      toast.error('Erro ao excluir webhook');
+      toast.error('Erro ao eliminar webhook');
     } finally {
       setActionLoading(null);
     }
@@ -343,17 +345,13 @@ export default function InboxAutomations() {
         title="Webhooks"
         description="Eventos em tempo real para n8n, Make, Zapier e outras ferramentas"
         icon={Webhook}
-        actions={
-          <PageAction
-            variant="primary"
-            icon={Plus}
-            label="Novo webhook"
-            onClick={() => {
-              resetForm();
-              setCreateModalOpen(true);
-            }}
-          />
-        }
+        create={{
+          label: 'Novo webhook',
+          onClick: () => {
+            resetForm();
+            setCreateModalOpen(true);
+          },
+        }}
       />
 
       {/* Webhooks List */}
@@ -362,30 +360,17 @@ export default function InboxAutomations() {
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'hsl(var(--muted-foreground))' }} />
         </div>
       ) : webhooks.length === 0 ? (
-        <div
-          className="text-center py-16 rounded-xl border-2 border-dashed"
-          style={{
-            borderColor: 'hsl(var(--border))',
-            backgroundColor: 'hsl(var(--card))',
-          }}
-        >
-          <Webhook className="w-12 h-12 mx-auto mb-4 opacity-50" style={{ color: 'hsl(var(--muted-foreground))' }} />
-          <h3 className="text-lg font-medium mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-            Nenhum webhook configurado
-          </h3>
-          <p className="mb-4" style={{ color: 'hsl(var(--muted-foreground))' }}>
-            Crie webhooks para receber eventos dos seus canais em sistemas externos como n8n, Make ou Zapier.
-          </p>
-          <Button
-            onClick={() => {
-              resetForm();
-              setCreateModalOpen(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Criar primeiro webhook
-          </Button>
-        </div>
+        <EmptyState
+          icon={Webhook}
+          title="Ainda não tem webhooks"
+          description="Envie eventos dos seus canais para o n8n, Make ou Zapier."
+          action={
+            <Button onClick={() => { resetForm(); setCreateModalOpen(true); }}>
+              <Plus className="w-4 h-4" />
+              Criar webhook
+            </Button>
+          }
+        />
       ) : (
         <div className="grid gap-4">
           {webhooks.map(webhook => (
@@ -459,7 +444,7 @@ export default function InboxAutomations() {
                     {webhook.last_triggered_at && (
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        Último: {new Date(webhook.last_triggered_at).toLocaleString('pt-BR')}
+                        Último: {new Date(webhook.last_triggered_at).toLocaleString(getLocale())}
                       </span>
                     )}
                     {webhook.last_error ? (
@@ -827,7 +812,7 @@ export default function InboxAutomations() {
                 ) : (
                   <Check className="w-4 h-4 mr-2" />
                 )}
-                {editingId ? 'Salvar' : 'Criar Webhook'}
+                {editingId ? 'Guardar' : 'Criar Webhook'}
               </Button>
             </div>
         </OverlayModal>
@@ -903,7 +888,7 @@ export default function InboxAutomations() {
                           <code className="text-xs px-1.5 py-0.5 rounded bg-secondary">{log.event}</code>
                         </div>
                         <span className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                          {new Date(log.created_at).toLocaleString('pt-BR')}
+                          {new Date(log.created_at).toLocaleString(getLocale())}
                         </span>
                       </div>
                       {log.error && (

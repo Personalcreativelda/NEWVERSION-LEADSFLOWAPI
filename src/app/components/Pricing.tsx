@@ -38,7 +38,7 @@ const plans = [
     priceAnnual: 'R$79',
     periodAnnual: '/mês',
     annualNote: 'cobrado anualmente · economize R$216/ano',
-    description: 'Para equipes que querem crescer com IA',
+    description: 'Para equipas que querem crescer com IA',
     features: [
       'Até 2.000 leads cadastrados',
       '1.000 mensagens WhatsApp/mês',
@@ -105,7 +105,7 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
             Escolha o plano ideal para você
           </h2>
           <p className="text-gray-400 max-w-2xl mx-auto text-base sm:text-lg">
-            Comece grátis e faça upgrade quando precisar. Sem compromissos ou taxas escondidas.
+            Comece grátis e faça melhorar o plano quando precisar. Sem compromissos ou taxas escondidas.
           </p>
 
           {/* Billing Period Toggle */}
@@ -389,7 +389,7 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
         {/* Bottom Note */}
         <div className="text-center mt-12">
           <p className="text-gray-400 mb-2">
-            🎉 Comece grátis agora - <strong className="text-white">Sem cartão de crédito</strong>
+            Comece grátis agora -<strong className="text-white">Sem cartão de crédito</strong>
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
             Cancele quando quiser, sem multas ou burocracias

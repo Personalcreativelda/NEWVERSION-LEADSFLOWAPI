@@ -87,10 +87,10 @@ export default function InboxTeam() {
         <div className="h-full overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-10 lg:py-8">
           <div className="max-w-3xl">
             <PageHeader
-                title="Equipa da Inbox"
+                title="Equipa"
                 description={`${members.length} membro${members.length !== 1 ? 's' : ''}`}
                 icon={Users}
-                actions={<PageAction variant="primary" icon={UserPlus} label="Adicionar membro" onClick={() => setShowAdd(true)} />}
+                create={{ label: 'Adicionar membro', icon: UserPlus, onClick: () => setShowAdd(true) }}
             />
 
             {/* Add member form */}
@@ -199,7 +199,7 @@ export default function InboxTeam() {
                                     </div>
                                 ) : (
                                     <>
-                                        <p className="text-sm font-medium text-foreground truncate">{m.name || '—'}</p>
+                                        <p className="text-sm font-medium text-foreground truncate">{m.name || m.email || 'Sem nome'}</p>
                                         <p className="text-xs text-muted-foreground truncate">{m.email}</p>
                                         {m.role && (
                                             <p className="sm:hidden text-xs text-muted-foreground truncate">{ROLE_LABELS[m.role] || m.role}{m.team ? ` · ${m.team}` : ''}</p>

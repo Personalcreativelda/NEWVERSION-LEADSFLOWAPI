@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
+import { formatPercent } from '../../utils/format';
 import { Button } from '../ui/button';
 import { CheckCircle, XCircle, Loader2, MessageSquare } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
@@ -49,7 +50,7 @@ export default function CampaignResultsModal({
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="w-12 h-12 text-green-600 dark:text-green-400 animate-spin mb-4" />
             <p className="text-sm text-muted-foreground">
-              Enviando mensagens... Aguarde
+              A enviar mensagens... Aguarde
             </p>
           </div>
         ) : (
@@ -85,7 +86,7 @@ export default function CampaignResultsModal({
                   Taxa de Sucesso
                 </span>
                 <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                  {successPercentage.toFixed(1)}%
+                  {formatPercent(successPercentage)}
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-3 overflow-hidden">

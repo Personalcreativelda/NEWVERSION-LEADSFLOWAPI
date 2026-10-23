@@ -150,8 +150,8 @@ export default function PlanUpgradeSuccessModal({ isOpen, plan, onClose }: PlanU
               {config.label}
             </span>
             <h2 className="text-foreground text-2xl sm:text-3xl font-bold leading-tight">
-              Parabéns! 🎉
-            </h2>
+              Parabéns! 
+ </h2>
             <p className="text-muted-foreground text-sm sm:text-base mt-1">
               Seu plano foi atualizado para{' '}
               <span className={`font-semibold ${config.color}`}>{config.label}</span>

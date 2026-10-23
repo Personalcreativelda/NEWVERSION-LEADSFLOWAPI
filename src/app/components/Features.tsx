@@ -14,7 +14,7 @@ const features = [
     icon: LayoutDashboard,
     title: 'Painel de Controle Inteligente',
     description:
-      'Visualize todas as suas métricas importantes em um único lugar. Dashboard personalizável e intuitivo.',
+      'Visualize todas as suas métricas importantes em um único lugar. Painel personalizável e intuitivo.',
     gradient: 'from-blue-500 to-blue-600',
   },
   {
@@ -35,7 +35,7 @@ const features = [
     icon: Users,
     title: 'Gestão de Leads e Planos Integrados',
     description:
-      'Gerencie todo o ciclo de vida dos leads. Integração perfeita com seus planos de vendas.',
+      'Faça a gestão de todo o ciclo de vida dos leads. Integração perfeita com seus planos de vendas.',
     gradient: 'from-cyan-500 to-cyan-600',
   },
   {
@@ -63,7 +63,7 @@ const features = [
     icon: Smartphone,
     title: 'Mobile First',
     description:
-      'Interface otimizada para dispositivos móveis. Gerencie seus leads em movimento.',
+      'Interface otimizada para dispositivos móveis. Faça a gestão de seus leads em movimento.',
     gradient: 'from-violet-500 to-violet-600',
   },
 ];

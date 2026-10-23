@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { X, CheckCircle, XCircle, Clock, Send, Loader } from 'lucide-react';
 import { Button } from './ui/button';
 import { useCampaignStatus } from '../hooks/useCampaignStatus';
+import { getLocale } from '../utils/format';
 
 interface CampaignProgressProps {
   campaignId: string;
@@ -39,7 +40,7 @@ export default function CampaignProgress({
         <div className="bg-card rounded-lg p-8 max-w-md w-full mx-4">
           <div className="text-center">
             <Loader className="w-12 h-12 text-[#10B981] animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">Carregando status...</p>
+            <p className="text-muted-foreground">A carregar status...</p>
           </div>
         </div>
       </div>
@@ -88,7 +89,7 @@ export default function CampaignProgress({
                 {campaignName}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {isSending && 'Enviando mensagens...'}
+                {isSending && 'A enviar mensagens...'}
                 {isCompleted && 'Envio concluído!'}
                 {isFailed && 'Envio falhou'}
                 {isCancelled && 'Envio cancelado'}
@@ -144,7 +145,7 @@ export default function CampaignProgress({
               <div className="flex items-center justify-center space-x-1 mb-1">
                 <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                  Aguardando
+                  A aguardar
                 </span>
               </div>
               <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
@@ -216,10 +217,10 @@ export default function CampaignProgress({
                   </div>
                   <div className="text-xs text-muted-foreground ml-2">
                     {recipient.status === 'sent' && recipient.sentAt && (
-                      <span>{new Date(recipient.sentAt).toLocaleTimeString('pt-BR')}</span>
+                      <span>{new Date(recipient.sentAt).toLocaleTimeString(getLocale())}</span>
                     )}
-                    {recipient.status === 'sending' && <span className="text-blue-600">Enviando...</span>}
-                    {recipient.status === 'pending' && <span>Aguardando</span>}
+                    {recipient.status === 'sending' && <span className="text-blue-600">A enviar...</span>}
+                    {recipient.status === 'pending' && <span>A aguardar</span>}
                     {recipient.status === 'error' && <span className="text-red-600">Erro</span>}
                   </div>
                 </div>

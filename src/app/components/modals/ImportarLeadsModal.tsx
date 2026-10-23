@@ -6,6 +6,7 @@ import { Button } from '../ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, Download, X, Star, Zap, Rocket, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { NUMBER_OPTS, getLocale } from '../../utils/format';
 
 interface ImportarLeadsModalProps {
  isOpen: boolean;
@@ -44,7 +45,7 @@ export default function ImportarLeadsModal({
  ];
  
  if (!validTypes.includes(selectedFile.type) && !selectedFile.name.endsWith('.csv')) {
- setError('Por favor, selecione um arquivo CSV ou Excel (.csv, .xls, .xlsx)');
+ setError('Por favor, selecione um ficheiro CSV ou Excel (.csv, .xls, .xlsx)');
  setFile(null);
  return;
  }
@@ -77,7 +78,7 @@ export default function ImportarLeadsModal({
 
  const handleImport = async () => {
  if (!file) {
- setError('Por favor, selecione um arquivo');
+ setError('Por favor, selecione um ficheiro');
  return;
  }
 
@@ -298,11 +299,11 @@ export default function ImportarLeadsModal({
  // Verificar se tem pelo menos NOME
  if (headerMap['nome'] === undefined) {
  throw new Error(
- `❌ Coluna NOME não encontrada!\n\n` +
- `📋 Colunas encontradas no seu arquivo:\n${headers.join(', ')}\n\n` +
- `✅ Aceito qualquer uma destas:\n` +
+ `Coluna NOME não encontrada!\n\n` +
+ `Colunas encontradas no seu arquivo:\n${headers.join(', ')}\n\n` +
+ `Aceito qualquer uma destas:\n` +
  `nome, name, cliente, lead, contact, contato, nomecompleto, fullname, client, customer, pessoa\n\n` +
- `💡 Renomeie uma coluna para"nome" ou"name" e tente novamente.`
+ `Renomeie uma coluna para"nome" ou"name" e tente novamente.`
  );
  }
 
@@ -405,8 +406,8 @@ export default function ImportarLeadsModal({
  }, 2000);
  } catch (err: any) {
  console.error('Import error:', err);
- setError(err.message || 'Erro ao importar arquivo');
- toast.error(err.message || 'Erro ao importar arquivo');
+ setError(err.message || 'Erro ao importar ficheiro');
+ toast.error(err.message || 'Erro ao importar ficheiro');
  } finally {
  setLoading(false);
  }
@@ -430,7 +431,7 @@ export default function ImportarLeadsModal({
  <DialogTitle className="text-lg text-foreground">Importar Leads</DialogTitle>
  </div>
  <DialogDescription className="sr-only">
- Importe seus leads através de um arquivo CSV ou planilha
+ Importe seus leads através de um ficheiro CSV ou planilha
  </DialogDescription>
  <button
  onClick={handleClose}
@@ -451,7 +452,7 @@ export default function ImportarLeadsModal({
  </AlertTitle>
  <AlertDescription className="space-y-1 text-xs text-muted-foreground">
  <p>• Use o modelo para garantir cabeçalhos corretos (nome, telefone, interesse, origem).</p>
- <p>• Corrigimos automaticamente registros sem contato e ignoramos duplicados.</p>
+ <p>• Corrigimos automaticamente registos sem contacto e ignoramos duplicados.</p>
  <p>• Os limites de importação são aplicados automaticamente de acordo com seu plano.</p>
  </AlertDescription>
  </Alert>
@@ -469,14 +470,14 @@ export default function ImportarLeadsModal({
  <Star className="w-4 h-4 text-white" />
  </div>
  <div>
- <h4 className="font-semibold text-sm text-foreground">Free</h4>
+ <h4 className="font-semibold text-sm text-foreground">Grátis</h4>
  {userPlan === 'free' && (
  <span className="text-xs text-blue-600">Seu plano atual</span>
  )}
  </div>
  </div>
  <div className="mt-3">
- <p className="text-2xl font-bold text-foreground">{importLimits.free.toLocaleString()}</p>
+ <p className="text-2xl font-bold text-foreground">{importLimits.free.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
  <p className="text-xs text-foreground/80">leads por importação</p>
  </div>
  </div>
@@ -499,12 +500,12 @@ export default function ImportarLeadsModal({
  </div>
  </div>
  <div className="mt-3">
- <p className="text-2xl font-bold text-foreground">{importLimits.business.toLocaleString()}</p>
+ <p className="text-2xl font-bold text-foreground">{importLimits.business.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
  <p className="text-xs text-foreground/80">leads por importação</p>
  </div>
  {userPlan === 'free' && (
  <div className="mt-2">
- <span className="text-xs text-purple-600 font-medium">↑ Upgrade</span>
+ <span className="text-xs text-purple-600 font-medium">↑ Melhorar plano</span>
  </div>
  )}
  </div>
@@ -532,7 +533,7 @@ export default function ImportarLeadsModal({
  </div>
  {userPlan !== 'enterprise' && (
  <div className="mt-2">
- <span className="text-xs text-amber-600 font-medium">↑ Upgrade</span>
+ <span className="text-xs text-amber-600 font-medium">↑ Melhorar plano</span>
  </div>
  )}
  </div>
@@ -546,11 +547,11 @@ export default function ImportarLeadsModal({
  </div>
  <div className="flex-1">
  <h3 className="text-sm font-semibold text-foreground mb-2">
- 📋 Formato da Planilha
+ Formato da Planilha
  </h3>
  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-foreground/80">
  <div>
- <p className="font-medium text-blue-900 mb-1">✅ Obrigatórias:</p>
+ <p className="font-medium text-blue-900 mb-1">Obrigatórias:</p>
  <ul className="space-y-0.5 ml-2">
  <li>• nome</li>
  <li>• telefone</li>
@@ -559,7 +560,7 @@ export default function ImportarLeadsModal({
  </ul>
  </div>
  <div>
- <p className="font-medium text-purple-900 mb-1">⚙️ Opcionais:</p>
+ <p className="font-medium text-purple-900 mb-1">Opcionais:</p>
  <ul className="space-y-0.5 ml-2">
  <li>• data</li>
  <li>• status</li>
@@ -570,7 +571,7 @@ export default function ImportarLeadsModal({
  </div>
  <div className="mt-3 p-2 bg-card/60 rounded-lg border border-blue-200">
  <p className="text-xs text-foreground/80">
- <strong>💡 Dica:</strong> Baixe o modelo e veja exemplos de como preencher!
+ <strong>Dica:</strong> Baixe o modelo e veja exemplos de como preencher!
  </p>
  </div>
  </div>
@@ -586,7 +587,7 @@ export default function ImportarLeadsModal({
  disabled={loading}
  >
  <Download className="w-4 h-4" />
- Baixar Modelo de Planilha
+ Transferir Modelo de Planilha
  </Button>
  </div>
 
@@ -607,7 +608,7 @@ export default function ImportarLeadsModal({
  <Upload className="w-10 h-10 text-foreground/80" />
  <div>
  <p className="text-sm text-foreground/80 mb-1">
- {file ? file.name : 'Clique para selecionar ou arraste o arquivo aqui'}
+ {file ? file.name : 'Clique para selecionar ou arraste o ficheiro aqui'}
  </p>
  <p className="text-xs text-foreground/80">
  CSV, XLS ou XLSX (max 5MB)
@@ -624,7 +625,7 @@ export default function ImportarLeadsModal({
  <AlertDescription className="space-y-1">
  <p className="text-sm text-destructive/90">{error}</p>
  <p className="text-xs text-muted-foreground">
- Verifique o cabeçalho do arquivo, confirme que cada linha possui telefone ou email e que o limite do plano não foi excedido.
+ Verifique o cabeçalho do ficheiro, confirme que cada linha possui telefone ou email e que o limite do plano não foi excedido.
  </p>
  </AlertDescription>
  </Alert>
@@ -641,7 +642,7 @@ export default function ImportarLeadsModal({
  <p>✓ {result.imported} leads importados com sucesso.</p>
  {result.skipped > 0 && (
  <p className="text-xs text-muted-foreground">
- ⚠ {result.skipped} registros foram ignorados por estarem duplicados ou incompletos.
+  {result.skipped} registos foram ignorados por estarem duplicados ou incompletos.
  </p>
  )}
  </AlertDescription>
@@ -668,7 +669,7 @@ export default function ImportarLeadsModal({
  {loading ? (
  <>
  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
- Importando...
+ A importar...
  </>
  ) : result ? (
  <>

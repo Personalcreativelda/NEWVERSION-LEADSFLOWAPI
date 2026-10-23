@@ -2,6 +2,7 @@ import { Users, MessageSquare, Mail, Crown, RefreshCw, AlertTriangle, Clock } fr
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { DashboardCard } from '../base/DashboardCard';
+import { NUMBER_OPTS, getLocale } from '../../utils/format';
 
 interface PlanoWidgetProps {
   limites: {
@@ -31,7 +32,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
       setRefreshing(true);
       try {
         await onRefresh();
-        toast.success('✅ Limites atualizados com sucesso!');
+        toast.success('Limites atualizados com sucesso!');
       } catch (error) {
         console.error('Error refreshing:', error);
         toast.error('Erro ao atualizar limites. Tente novamente.');
@@ -75,7 +76,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
   const limitCards = [
     {
       title: 'Leads',
-      label: isLeadsEsgotado ? '⚠️ Limite Esgotado' : 'Restantes',
+      label: isLeadsEsgotado ? 'Limite Esgotado' : 'Restantes',
       usado: limites.usados.leads,
       restante: restantesLeads,
       total: limites.leads,
@@ -88,7 +89,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
     },
     {
       title: 'Mensagens',
-      label: isMensagensEsgotado ? '⚠️ Limite Esgotado' : 'Restantes',
+      label: isMensagensEsgotado ? 'Limite Esgotado' : 'Restantes',
       usado: limites.usados.mensagens,
       restante: restantesMensagens,
       total: limites.mensagens,
@@ -101,7 +102,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
     },
     {
       title: 'Campanhas',
-      label: isEnviosEsgotado ? '⚠️ Limite Esgotado' : 'Restantes',
+      label: isEnviosEsgotado ? 'Limite Esgotado' : 'Restantes',
       usado: limites.usados.envios,
       restante: restantesEnvios,
       total: limites.envios,
@@ -162,7 +163,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
               className="w-full md:w-auto px-4 py-2 bg-secondary hover:bg-secondary/80 text-foreground/80 rounded-lg transition-all duration-150 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 border border-border"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span>{refreshing ? 'Atualizando...' : 'Atualizar Limites'}</span>
+              <span>{refreshing ? 'A atualizar...' : 'Atualizar Limites'}</span>
             </button>
           )}
         </div>
@@ -172,7 +173,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
           className={`w-full md:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-all duration-150 text-sm font-medium flex items-center justify-center gap-2 shadow-sm hover:shadow-md ${algumLimiteEsgotado ? 'hidden' : ''}`}
         >
           <Crown className="w-4 h-4" />
-          <span>Fazer Upgrade</span>
+          <span>Melhorar plano</span>
         </button>
       </div>
 
@@ -262,7 +263,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
                 Limite do plano atingido!
               </p>
               <p className="text-xs text-red-400/80 dark:text-red-400/60">
-                Faça upgrade para continuar usando todos os recursos sem limitações.
+                Faça melhorar o plano para continuar usando todos os recursos sem limitações.
               </p>
             </div>
           </div>
@@ -271,7 +272,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
             className="w-full sm:w-auto px-6 py-2.5 bg-destructive hover:opacity-90 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
           >
             <Crown className="w-4 h-4" />
-            Upgrade Agora
+            Melhorar plano Agora
           </button>
         </div>
       )}
@@ -299,7 +300,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
                   className="h-9 px-3.5 rounded-full bg-indigo-600 active:bg-indigo-700 text-white text-[13px] font-semibold flex items-center gap-1.5 transition-colors"
                 >
                   <Crown aria-hidden className="w-4 h-4" />
-                  Upgrade
+                  Melhorar plano
                 </button>
               )}
             </div>
@@ -323,7 +324,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
                           ? 'Ilimitado'
                           : card.esgotado
                             ? 'Limite esgotado'
-                            : `${card.restante.toLocaleString()} de ${card.total.toLocaleString()} restantes`}
+                            : `${card.restante.toLocaleString(getLocale(), NUMBER_OPTS)} de ${card.total.toLocaleString(getLocale(), NUMBER_OPTS)} restantes`}
                       </span>
                     </div>
                     <div
@@ -380,10 +381,10 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
                   <div>
                     <div className="flex items-baseline gap-1 mb-1">
                       <span className={`text-2xl font-bold ${card.esgotado ? 'text-red-500 dark:text-red-400' : 'text-foreground'}`}>
-                        {card.total === -1 ? '∞' : card.restante.toLocaleString()}
+                        {card.total === -1 ? '∞' : card.restante.toLocaleString(getLocale(), NUMBER_OPTS)}
                       </span>
                       <span className={`text-xs ${card.esgotado ? 'text-red-400/70' : 'text-muted-foreground'}`}>
-                        / {card.total === -1 ? '∞' : card.total.toLocaleString()}
+                        / {card.total === -1 ? '∞' : card.total.toLocaleString(getLocale(), NUMBER_OPTS)}
                       </span>
                     </div>
                     {card.esgotado ? (
@@ -392,7 +393,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
                         className="mt-1 px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
                       >
                         <Crown className="w-3 h-3" />
-                        Fazer Upgrade
+                        Melhorar plano
                       </button>
                     ) : (
                       <p className="text-xs text-muted-foreground">

@@ -69,7 +69,7 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
       }, 2000);
     } catch (err: any) {
       console.error('Reset password error:', err);
-      setError(err.message || 'Erro ao redefinir senha');
+      setError(err.message || 'Erro ao redefinir palavra-passe');
     } finally {
       setLoading(false);
     }
@@ -108,9 +108,9 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
               </div>
             </div>
             <div className="space-y-2">
-              <h2 style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Senha redefinida!</h2>
+              <h2 style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Palavra-passe redefinida!</h2>
               <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
-                Sua senha foi alterada com sucesso. Redirecionando...
+                Sua palavra-passe foi alterada com sucesso. A redirecionar...
               </p>
             </div>
             <div className="flex items-center justify-center gap-2">
@@ -155,10 +155,10 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
 
           {/* Title */}
           <h1 className="text-[28px] font-semibold leading-[36px] mb-2 text-center" style={{ color: '#1A2C44' }}>
-            Redefinir senha
+            Redefinir palavra-passe
           </h1>
           <p className="text-[15px] mb-7 text-center" style={{ color: '#6B7280', fontWeight: 300 }}>
-            Digite o código recebido por email e sua nova senha para concluir a recuperação.
+            Digite o código recebido por email e sua nova palavra-passe para concluir a recuperação.
           </p>
 
           {/* Error */}
@@ -209,12 +209,12 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
             {/* Password */}
             <div>
               <Label htmlFor="password" style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px', fontWeight: 500 }}>
-                Nova senha
+                Nova palavra-passe
               </Label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px]" style={{ color: '#8A9BB0' }} />
                 <Input
-                  id="password" type={showPassword ? 'text' : 'password'} placeholder="Digite sua nova senha" value={password}
+                  id="password" type={showPassword ? 'text' : 'password'} placeholder="Digite sua nova palavra-passe" value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   style={{ ...fieldStyle, paddingRight: '48px' }}
                   className={fieldClassName}
@@ -241,7 +241,7 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
                     </span>
                   </div>
                   <p style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}>
-                    Força da senha: Use pelo menos 6 caracteres
+                    Força da palavra-passe: Use pelo menos 6 caracteres
                   </p>
                 </div>
               )}
@@ -250,12 +250,12 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
             {/* Confirm password */}
             <div>
               <Label htmlFor="confirmPassword" style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px', fontWeight: 500 }}>
-                Confirmar nova senha
+                Confirmar nova palavra-passe
               </Label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px]" style={{ color: '#8A9BB0' }} />
                 <Input
-                  id="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirme sua nova senha" value={confirmPassword}
+                  id="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirme sua nova palavra-passe" value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   style={{ ...fieldStyle, paddingRight: '48px' }}
                   className={fieldClassName}
@@ -273,12 +273,12 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
                   {password === confirmPassword ? (
                     <p className="flex items-center gap-1" style={{ fontSize: '13px', color: '#059669' }}>
                       <CheckCircle className="w-3.5 h-3.5" />
-                      As senhas coincidem
+                      As palavras-passe coincidem
                     </p>
                   ) : (
                     <p className="flex items-center gap-1" style={{ fontSize: '13px', color: '#E61947' }}>
                       <AlertCircle className="w-3.5 h-3.5" />
-                      As senhas não coincidem
+                      As palavras-passe não coincidem
                     </p>
                   )}
                 </div>
@@ -300,7 +300,7 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
               }}
               className="transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? 'Salvando...' : 'Salvar nova senha'}
+              {loading ? 'A guardar...' : 'Guardar nova palavra-passe'}
             </AppButton>
           </form>
 

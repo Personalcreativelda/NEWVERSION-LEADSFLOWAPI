@@ -183,7 +183,7 @@ export function WhatsAppConnection() {
           setShowQrModal(false);
           setQrCode(null);
 
-          toast.error('Tempo esgotado ao conectar WhatsApp. Tente novamente.', {
+          toast.error('Tempo esgotado ao ligar WhatsApp. Tente novamente.', {
             description: 'Escaneie o QR Code mais rapidamente.',
           });
 
@@ -210,7 +210,7 @@ export function WhatsAppConnection() {
 
       // Show feedback when connecting
       if (isConnecting && !isConnected && showQrModal) {
-        toast.info('Conectando WhatsApp...', {
+        toast.info('A ligar WhatsApp...', {
           description: 'QR Code escaneado! Aguarde a confirmação.',
           duration: 2000,
         });
@@ -246,7 +246,7 @@ export function WhatsAppConnection() {
 
         window.dispatchEvent(new Event('whatsapp-connected'));
 
-        toast.success('WhatsApp conectado com sucesso! 🎉', {
+        toast.success('WhatsApp ligado com sucesso!', {
           description: 'Agora você pode enviar mensagens para seus leads.',
           duration: 5000,
         });
@@ -270,7 +270,7 @@ export function WhatsAppConnection() {
 
       // If already connected, just show message
       if (status.connected) {
-        toast.success('WhatsApp já está conectado!');
+        toast.success('WhatsApp já está ligado!');
         setLoading(false);
         return;
       }
@@ -303,7 +303,7 @@ export function WhatsAppConnection() {
       if (instanceData.message?.includes('already exists') && instanceData.state === 'open') {
         console.log('[WhatsApp Connect] Instance already connected');
         await checkStatus();
-        toast.success('WhatsApp já está conectado!');
+        toast.success('WhatsApp já está ligado!');
         setLoading(false);
         return;
       }
@@ -345,8 +345,8 @@ export function WhatsAppConnection() {
       }
     } catch (err: any) {
       console.error('Connect error:', err);
-      setError(err.message || 'Erro ao conectar WhatsApp');
-      toast.error('Erro ao conectar WhatsApp', {
+      setError(err.message || 'Erro ao ligar WhatsApp');
+      toast.error('Erro ao ligar WhatsApp', {
         description: err.message || 'Tente novamente em alguns instantes.',
       });
     } finally {
@@ -355,7 +355,7 @@ export function WhatsAppConnection() {
   };
 
   const disconnectWhatsApp = async () => {
-    const confirmed = confirm('Tem certeza que deseja desconectar o WhatsApp?');
+    const confirmed = confirm('Tem certeza que deseja desligar o WhatsApp?');
     if (!confirmed) {
       return;
     }
@@ -402,11 +402,11 @@ export function WhatsAppConnection() {
       // Clean up connecting timestamp
       localStorage.removeItem('whatsapp_connecting_start');
 
-      toast.success('WhatsApp desconectado com sucesso');
+      toast.success('WhatsApp desligado com sucesso');
     } catch (err: any) {
       console.error('Disconnect error:', err);
-      setError(err.message || 'Erro ao desconectar WhatsApp');
-      toast.error('Erro ao desconectar WhatsApp', {
+      setError(err.message || 'Erro ao desligar WhatsApp');
+      toast.error('Erro ao desligar WhatsApp', {
         description: err.message,
       });
     } finally {
@@ -428,22 +428,22 @@ export function WhatsAppConnection() {
                 {status.connected ? (
                   <>
                     <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 flex-shrink-0" />
-                    <span className="text-green-600 text-xs sm:text-sm">Conectado</span>
+                    <span className="text-green-600 text-xs sm:text-sm">Ligado</span>
                   </>
                 ) : status.status === 'connecting' ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 animate-spin flex-shrink-0" />
-                    <span className="text-blue-600 text-xs sm:text-sm">Conectando...</span>
+                    <span className="text-blue-600 text-xs sm:text-sm">A ligar...</span>
                   </>
                 ) : status.status === 'pending' ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-600 animate-spin flex-shrink-0" />
-                    <span className="text-yellow-600 text-xs sm:text-sm">Aguardando QR Code...</span>
+                    <span className="text-yellow-600 text-xs sm:text-sm">A aguardar QR Code...</span>
                   </>
                 ) : (
                   <>
                     <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
-                    <span className="text-muted-foreground text-xs sm:text-sm">Desconectado</span>
+                    <span className="text-muted-foreground text-xs sm:text-sm">Desligado</span>
                   </>
                 )}
               </div>
@@ -454,11 +454,11 @@ export function WhatsAppConnection() {
               )}
               <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                 {status.connected
-                  ? 'Seu WhatsApp está conectado e pronto para enviar mensagens.'
+                  ? 'Seu WhatsApp está ligado e pronto para enviar mensagens.'
                   : status.status === 'connecting'
-                  ? 'QR Code escaneado! Finalizando conexão...'
+                  ? 'QR Code escaneado! Finalizando ligação...'
                   : status.status === 'pending'
-                  ? 'Escaneie o QR Code para conectar.'
+                  ? 'Escaneie o QR Code para ligar.'
                   : 'Conecte seu WhatsApp para enviar mensagens aos seus leads.'}
               </p>
             </div>
@@ -475,7 +475,7 @@ export function WhatsAppConnection() {
                 {loading ? (
                   <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
                 ) : (
-                  'Desconectar'
+                  'Desligar'
                 )}
               </Button>
             ) : (
@@ -490,8 +490,8 @@ export function WhatsAppConnection() {
                 ) : (
                   <>
                     <QrCode className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 flex-shrink-0" />
-                    <span className="hidden sm:inline">Conectar WhatsApp</span>
-                    <span className="sm:hidden">Conectar</span>
+                    <span className="hidden sm:inline">Ligar WhatsApp</span>
+                    <span className="sm:hidden">Ligar</span>
                   </>
                 )}
               </Button>
@@ -521,18 +521,18 @@ export function WhatsAppConnection() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <QrCode className="w-5 h-5" />
-              Conectar WhatsApp
+              Ligar WhatsApp
             </DialogTitle>
             <DialogDescription>
-              Escaneie o QR Code abaixo com seu WhatsApp para conectar sua conta
+              Escaneie o QR Code abaixo com seu WhatsApp para ligar sua conta
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <ol className="text-sm text-muted-foreground space-y-1 ml-4 list-decimal">
-              <li>Abra o WhatsApp no seu celular</li>
-              <li>Toque em Mais opções (⋮) &gt; Aparelhos conectados</li>
-              <li>Toque em "Conectar um aparelho"</li>
-              <li>Aponte seu celular para esta tela para escanear o código</li>
+              <li>Abra o WhatsApp no seu telemóvel</li>
+              <li>Toque em Mais opções (⋮) &gt; Aparelhos ligados</li>
+              <li>Toque em "Ligar um aparelho"</li>
+              <li>Aponte seu telemóvel para esta ecrã para escanear o código</li>
             </ol>
 
             {qrCode ? (
@@ -545,24 +545,24 @@ export function WhatsAppConnection() {
                 {status.status === 'connecting' ? (
                   <div className="flex items-center gap-2 text-sm text-blue-600 mt-4">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Conectando... Aguarde!</span>
+                    <span>A ligar... Aguarde!</span>
                   </div>
                 ) : (
                   <p className="text-sm text-foreground/80 mt-4">
-                    Aguardando escaneamento...
+                    A aguardar escaneamento...
                   </p>
                 )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center p-16 bg-muted/50 rounded-lg">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground/70 mb-2" />
-                <p className="text-sm text-foreground/80">Gerando QR Code...</p>
+                <p className="text-sm text-foreground/80">A gerar QR Code...</p>
               </div>
             )}
 
             <Alert>
               <AlertDescription className="text-xs">
-                O QR Code expira após alguns minutos. Se não conseguir conectar,
+                O QR Code expira após alguns minutos. Se não conseguir ligar,
                 feche esta janela e tente novamente.
               </AlertDescription>
             </Alert>

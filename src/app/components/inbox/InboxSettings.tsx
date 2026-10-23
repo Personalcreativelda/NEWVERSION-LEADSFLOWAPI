@@ -33,7 +33,7 @@ export function InboxSettings({ onBack }: InboxSettingsProps) {
                     </svg>
                 </button>
                 <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                    Configurações do Inbox
+                    Definições do Inbox
                 </h2>
             </div>
 

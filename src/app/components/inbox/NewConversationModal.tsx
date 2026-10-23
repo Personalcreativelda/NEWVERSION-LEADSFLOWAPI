@@ -60,7 +60,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
         }
 
         if (!name.trim()) {
-            setError('Digite o nome do contato');
+            setError('Digite o nome do contacto');
             return;
         }
 
@@ -168,7 +168,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                 className="block text-sm font-medium mb-2"
                                 style={{ color: 'hsl(var(--foreground))' }}
                             >
-                                Nome do Contato *
+                                Nome do Contacto *
                             </label>
                             <div className="relative">
                                 <User 
@@ -252,7 +252,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                 {loading ? (
                                     <>
                                         <Loader2 className="w-4 h-4 animate-spin" />
-                                        Criando...
+                                        A criar...
                                     </>
                                 ) : (
                                     'Iniciar Conversa'
@@ -273,7 +273,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Buscar por nome, telefone ou email..."
+                                    placeholder="Pesquisar por nome, telefone ou email..."
                                     className="w-full pl-9 pr-4 py-2 rounded-lg border outline-none focus:ring-2 focus:ring-blue-500/30 text-sm"
                                     style={{
                                         backgroundColor: 'hsl(var(--background))',
@@ -294,7 +294,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                 <div className="text-center py-12">
                                     <UserCircle className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'hsl(var(--muted-foreground))' }} />
                                     <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                        {searchQuery ? 'Nenhum lead encontrado' : 'Nenhum lead cadastrado'}
+                                        {searchQuery ? 'Nenhum lead encontrado' : 'Nenhum lead registado'}
                                     </p>
                                 </div>
                             ) : (
@@ -331,7 +331,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                                 {lead.name || lead.nome || 'Sem nome'}
                                             </p>
                                             <p className="text-xs truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                                {lead.phone || lead.telefone || lead.email || 'Sem contato'}
+                                                {lead.phone || lead.telefone || lead.email || 'Sem contacto'}
                                             </p>
                                         </div>
                                     </button>

@@ -26,6 +26,7 @@ import { useConfirm } from '../ui/ConfirmDialog';
 import { toast } from 'sonner';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
 import { SkeletonCampaignSection, UpdatingBadge } from '../ui/skeletons';
+import { NUMBER_OPTS, getLocale } from '../../utils/format';
 
 interface Lead {
   id: string;
@@ -728,10 +729,10 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   };
 
   const handleDeleteCampaign = async (id: string, name: string) => {
-    const confirmed = await confirm(`Tem certeza que deseja excluir a campanha "${name}"?`, {
-      title: 'Excluir campanha',
+    const confirmed = await confirm(`Tem certeza que deseja eliminar a campanha "${name}"?`, {
+      title: 'Eliminar campanha',
       description: 'Esta ação não pode ser desfeita.',
-      confirmLabel: 'Excluir',
+      confirmLabel: 'Eliminar',
       variant: 'danger',
     });
     if (confirmed) {
@@ -739,7 +740,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
       const snapshot = campaigns.find(c => c.id === id) ?? null;
       setCampaigns(prev => prev.filter(c => c.id !== id));
       setDropdownOpen(null);
-      toast.success(`Campanha "${name}" excluída com sucesso!`);
+      toast.success(`Campanha "${name}" eliminada com sucesso!`);
 
       // Sincronizar com banco em background
       const token = localStorage.getItem('leadflow_access_token');
@@ -755,7 +756,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
         console.error('[CampaignsPage] Erro ao deletar campanha:', error);
         // Restaurar campanha na UI em caso de falha
         if (snapshot) setCampaigns(prev => [snapshot, ...prev]);
-        toast.error('Erro ao excluir campanha — restaurado');
+        toast.error('Erro ao eliminar campanha — restaurado');
       });
     }
   };
@@ -810,7 +811,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
           const result = await executeResponse.json();
           console.log('[CampaignsPage] Campanha iniciada:', result);
 
-          toast.success(`Campanha "${name}" iniciada! Enviando para ${result.totalLeads} contatos...`);
+          toast.success(`Campanha "${name}" iniciada! A enviar para ${result.totalLeads} contactos...`);
         } else if (type === 'sms') {
           // Para campanhas SMS, acionar endpoint de send dedicado
           const smsResponse = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/sms-campaigns/${id}/send`, {
@@ -828,7 +829,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
           }
 
           const smsResult = await smsResponse.json();
-          toast.success(`Campanha SMS "${name}" iniciada! Enviando para ${smsResult.recipientCount} contatos...`);
+          toast.success(`Campanha SMS "${name}" iniciada! A enviar para ${smsResult.recipientCount} contactos...`);
         } else {
           // Para outros tipos (email), apenas atualizar status
           const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/${id}`, {
@@ -901,7 +902,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
       // ✅ Recarregar campanhas do banco
       await reloadCampaigns();
 
-      toast.success(`📋 Campanha "${campaign.name}" duplicada com sucesso!`);
+      toast.success(`Campanha "${campaign.name}" duplicada com sucesso!`);
       setDropdownOpen(null);
     } catch (error) {
       console.error('[CampaignsPage] Erro ao duplicar campanha:', error);
@@ -924,7 +925,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
       ...(campaign.replies ? [['Respostas', campaign.replies.toString()]] : []),
       ...(campaign.deliveryRate ? [['Taxa de Entrega', `${campaign.deliveryRate}%`]] : []),
       [''],
-      ['Exportado em', new Date().toLocaleString('pt-BR')],
+      ['Exportado em', new Date().toLocaleString(getLocale())],
     ];
 
     const csvContent = csvData.map(row => row.join(',')).join('\n');
@@ -934,7 +935,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
     link.download = `campanha_${campaign.id}_dados.csv`;
     link.click();
 
-    toast.success('📤 Dados exportados com sucesso!');
+    toast.success('Dados exportados com sucesso!');
     setDropdownOpen(null);
   };
 
@@ -951,7 +952,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
       // Aqui você implementaria a lógica para reenviar apenas para quem falhou
       // Por enquanto, vamos simular
-      toast.success('🔄 Campanha reenviada para destinatários com falha!');
+      toast.success('Campanha reenviada para destinatários com falha!');
       setDropdownOpen(null);
     })();
   };
@@ -981,7 +982,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR', {
+    return date.toLocaleDateString(getLocale(), {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -1128,7 +1129,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span>Excluir</span>
+                    <span>Eliminar</span>
                   </button>
                 </>
               )}
@@ -1166,7 +1167,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span>Excluir</span>
+                    <span>Eliminar</span>
                   </button>
                 </>
               )}
@@ -1204,7 +1205,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span>Excluir</span>
+                    <span>Eliminar</span>
                   </button>
                 </>
               )}
@@ -1250,7 +1251,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span>Excluir</span>
+                    <span>Eliminar</span>
                   </button>
                 </>
               )}
@@ -1280,7 +1281,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
     if (!planLimits.canCreateActiveCampaign(activeCampaignCount)) {
       planLimits.openUpgradeModal();
       toast.warning(
-        `Limite de ${planLimits.limitLabel.activeCampaigns} campanha(s) ativa(s) atingido. Faça upgrade para criar mais.`,
+        `Limite de ${planLimits.limitLabel.activeCampaigns} campanha(s) ativa(s) atingido. Faça melhorar o plano para criar mais.`,
         { duration: 4000 }
       );
       return;
@@ -1295,13 +1296,13 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
           title="Campanhas"
           description="Envios em massa por WhatsApp, email e SMS"
           icon={Megaphone}
-          actions={<PageAction variant="primary" icon={Plus} label="Nova campanha" onClick={handleNewCampaign} />}
+          create={{ label: 'Nova campanha', onClick: handleNewCampaign }}
         />
 
         <SearchInput
           value={searchTerm}
           onChange={setSearchTerm}
-          placeholder="Buscar campanhas..."
+          placeholder="Pesquisar campanhas..."
           containerClassName="mb-6 w-full sm:w-80"
           className="w-full"
         />
@@ -1377,15 +1378,25 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
               />
             )}
 
+            {/* Canal sem campanhas: um só estado vazio com a ação de criar (sem uma caixa por secção) */}
+            {!isLoadingCampaigns && !isSearching && filteredCampaigns.length === 0 && (
+              <EmptyState
+                icon={Megaphone}
+                title={`Ainda não tem campanhas de ${activeTab === 'whatsapp' ? 'WhatsApp' : activeTab === 'email' ? 'email' : 'SMS'}`}
+                description="Crie a primeira para enviar mensagens aos seus leads."
+                action={<AppButton onClick={handleNewCampaign}><Plus />Criar campanha</AppButton>}
+              />
+            )}
+
             {/* Content: stale or fresh data */}
-            {(!isLoadingCampaigns || campaigns.length > 0) && !(searchTerm.trim() !== '' && searchMatches.length === 0) && (
+            {(!isLoadingCampaigns || campaigns.length > 0) && filteredCampaigns.length > 0 && !(searchTerm.trim() !== '' && searchMatches.length === 0) && (
               <>
                 {isLoadingCampaigns && (
                   <div className="flex items-center justify-end">
                     <UpdatingBadge />
                   </div>
                 )}
-                <section className={isSearching && activeCampaigns.length === 0 ? 'hidden' : undefined}>
+                <section className={activeCampaigns.length === 0 ? 'hidden' : undefined}>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <PlayCircle className="w-5 h-5 text-[#10B981]" />
                     <span>Campanhas Ativas</span>
@@ -1400,7 +1411,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             <div>
                               <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
                               <StatusBadge
-                                label={campaign.status === 'paused' ? '⏸️ Pausada' : 'Enviando agora...'}
+                                label={campaign.status === 'paused' ? 'Pausada' : 'A enviar agora...'}
                                 tone={campaign.status === 'paused' ? 'warning' : 'success'}
                               />
                             </div>
@@ -1409,7 +1420,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
                           <div className="mb-4">
                             <div className="flex justify-between text-sm text-muted-foreground mb-2">
-                              <span>{campaign.sent?.toLocaleString()} / {campaign.totalRecipients.toLocaleString()} enviadas</span>
+                              <span>{campaign.sent?.toLocaleString(getLocale(), NUMBER_OPTS)} / {campaign.totalRecipients.toLocaleString(getLocale(), NUMBER_OPTS)} enviadas</span>
                               <span>{campaign.progress}%</span>
                             </div>
                             <div className="w-full bg-muted dark:bg-muted rounded-full h-2">
@@ -1423,11 +1434,11 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                           <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                             <div>
                               <span className="text-muted-foreground">Entregues</span>
-                              <p className="font-semibold text-foreground">{campaign.delivered?.toLocaleString()}</p>
+                              <p className="font-semibold text-foreground">{campaign.delivered?.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Visualizadas</span>
-                              <p className="font-semibold text-foreground">{campaign.read?.toLocaleString()}</p>
+                              <p className="font-semibold text-foreground">{campaign.read?.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Tempo restante</span>
@@ -1462,15 +1473,11 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                         </DashboardCard>
                       ))}
                     </div>
-                  ) : (
-                    <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha ativa no momento</p>
-                    </div>
-                  )}
+                  ) : null}
                 </section>
 
                 {/* Scheduled Campaigns */}
-                <section className={isSearching && scheduledCampaigns.length === 0 ? 'hidden' : undefined}>
+                <section className={scheduledCampaigns.length === 0 ? 'hidden' : undefined}>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <Clock className="w-5 h-5 text-[#F59E0B]" />
                     <span>Campanhas Agendadas</span>
@@ -1516,7 +1523,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                                   </span>
                                 </div>
                                 <p className={`text-sm ${!hasValidDate ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
-                                  {campaign.totalRecipients.toLocaleString()} destinatários
+                                  {campaign.totalRecipients.toLocaleString(getLocale(), NUMBER_OPTS)} destinatários
                                 </p>
                               </div>
                             </div>
@@ -1544,18 +1551,14 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                         );
                       })}
                     </div>
-                  ) : (
-                    <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha agendada</p>
-                    </div>
-                  )}
+                  ) : null}
                 </section>
 
                 {/* Draft/Saved Campaigns */}
-                <section className={isSearching && draftCampaigns.length === 0 ? 'hidden' : undefined}>
+                <section className={draftCampaigns.length === 0 ? 'hidden' : undefined}>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <Save className="w-5 h-5 text-blue-500" />
-                    <span>Campanhas Salvas (Rascunhos)</span>
+                    <span>Campanhas Guardadas (Rascunhos)</span>
                     <span className="text-sm font-normal text-muted-foreground">({draftCampaigns.length})</span>
                   </h3>
                   {draftCampaigns.length > 0 ? (
@@ -1581,7 +1584,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                               <div className="flex items-center space-x-2 mb-1">
                                 <Users className="w-4 h-4 text-muted-foreground" />
                                 <span className="text-sm font-medium text-foreground/80">
-                                  {campaign.totalRecipients.toLocaleString()} destinatários
+                                  {campaign.totalRecipients.toLocaleString(getLocale(), NUMBER_OPTS)} destinatários
                                 </span>
                               </div>
                               <p className="text-sm text-muted-foreground">
@@ -1612,15 +1615,11 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                         </DashboardCard>
                       ))}
                     </div>
-                  ) : (
-                    <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha salva</p>
-                    </div>
-                  )}
+                  ) : null}
                 </section>
 
                 {/* Completed Campaigns */}
-                <section className={isSearching && completedCampaigns.length === 0 ? 'hidden' : undefined}>
+                <section className={completedCampaigns.length === 0 ? 'hidden' : undefined}>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
                     <span>Campanhas Concluídas</span>
@@ -1645,7 +1644,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                           <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                             <div>
                               <span className="text-muted-foreground">Total enviadas</span>
-                              <p className="font-semibold text-foreground">{campaign.sent?.toLocaleString()}</p>
+                              <p className="font-semibold text-foreground">{campaign.sent?.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Taxa de entrega</span>
@@ -1653,11 +1652,11 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                             </div>
                             <div>
                               <span className="text-muted-foreground">Visualizações</span>
-                              <p className="font-semibold text-foreground">{campaign.read?.toLocaleString()}</p>
+                              <p className="font-semibold text-foreground">{campaign.read?.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Respostas</span>
-                              <p className="font-semibold text-foreground">{campaign.replies?.toLocaleString()}</p>
+                              <p className="font-semibold text-foreground">{campaign.replies?.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
                             </div>
                           </div>
 
@@ -1674,11 +1673,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                         </DashboardCard>
                       ))}
                     </div>
-                  ) : (
-                    <div className="text-center py-12 bg-card dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-                      <p className="text-muted-foreground dark:text-muted-foreground">Nenhuma campanha concluída</p>
-                    </div>
-                  )}
+                  ) : null}
                 </section>
 
                 {/* Failed Campaigns */}
@@ -1707,15 +1702,15 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                           <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                             <div>
                               <span className="text-muted-foreground">Enviadas</span>
-                              <p className="font-semibold text-foreground">{campaign.sent?.toLocaleString() ?? 0}</p>
+                              <p className="font-semibold text-foreground">{campaign.sent?.toLocaleString(getLocale(), NUMBER_OPTS) ?? 0}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Falhadas</span>
-                              <p className="font-semibold text-red-600 dark:text-red-400">{campaign.failed?.toLocaleString() ?? 0}</p>
+                              <p className="font-semibold text-red-600 dark:text-red-400">{campaign.failed?.toLocaleString(getLocale(), NUMBER_OPTS) ?? 0}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Total previsto</span>
-                              <p className="font-semibold text-foreground">{campaign.totalRecipients?.toLocaleString() ?? 0}</p>
+                              <p className="font-semibold text-foreground">{campaign.totalRecipients?.toLocaleString(getLocale(), NUMBER_OPTS) ?? 0}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Taxa de entrega</span>
