@@ -42,6 +42,15 @@ services:
       - SERVICE_PASSWORD_MINIO=${SERVICE_PASSWORD_MINIO:-}
       - N8N_CAMPAIGN_WEBHOOK_URL=${N8N_CAMPAIGN_WEBHOOK_URL:-}
     restart: unless-stopped
+    # O processo 1 de um contentor ignora sinais enviados de dentro dele: com o init (tini)
+    # o vigilante da API consegue terminá-la quando bloqueia (api/src/services/health.service.ts)
+    init: true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:4000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   dashboard:
     build:
@@ -53,3 +62,9 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

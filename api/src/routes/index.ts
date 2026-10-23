@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { isDatabaseHealthy } from '../services/health.service';
 import authRoutes from './auth.routes';
 import leadsRoutes from './leads.routes';
 import contactsRoutes from './contacts.routes';
@@ -100,8 +101,13 @@ router.use('/security', securityRoutes);
 // ── Diagnostics (admin Bearer or ?secret=DIAGNOSTIC_SECRET) ─────────────────
 router.use('/diagnostics', diagnosticsRoutes);
 
-router.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
+// Consultada pelo app enquanto acha que o servidor está em baixo (lib/serverStatus.ts):
+// sem base de dados a API não serve dados, por isso responde 503 SERVER_UNAVAILABLE
+router.get('/health', async (_req, res) => {
+  if (await isDatabaseHealthy()) {
+    return res.json({ status: 'ok' });
+  }
+  return res.status(503).json({ status: 'degraded', code: 'SERVER_UNAVAILABLE', error: 'Base de dados indisponível' });
 });
 
 export default router;

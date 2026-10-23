@@ -263,6 +263,11 @@ export const transaction = async <T>(callback: (client: PoolClient) => Promise<T
   }
 };
 
+/** Fecha as ligações à base de dados (encerramento do processo) */
+export const closePool = async (): Promise<void> => {
+  if (pool) await pool.end().catch(() => {});
+};
+
 // Função para verificar saúde da conexão
 export const checkConnection = async (): Promise<boolean> => {
   try {

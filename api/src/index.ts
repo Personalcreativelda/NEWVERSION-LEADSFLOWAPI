@@ -22,6 +22,7 @@ import { encryptExistingChannelSecrets } from './services/channel-secrets-migrat
 import { redactCredentials } from './middleware/redact-credentials.middleware';
 import { ensureSessionsTable as ensureMetaOAuthSessions } from './services/meta-oauth.service';
 import { refreshExpiringInstagramTokens } from './services/instagram-oauth.service';
+import { setupGracefulShutdown, startWatchdog } from './services/health.service';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -615,6 +616,10 @@ initDatabase().then(() => {
     console.log(`[Leadflow API] Listening on port ${port}`);
     console.log(`[Leadflow API] WebSocket disponível em ws://localhost:${port}`);
   });
+
+  // Recuperação automática (processo bloqueado / base de dados em baixo) e deploy sem cortes
+  startWatchdog();
+  setupGracefulShutdown(server);
 }).catch((error) => {
   console.error('Failed to initialize database:', error);
   process.exit(1);
