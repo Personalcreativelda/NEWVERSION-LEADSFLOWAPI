@@ -1,11 +1,13 @@
-import { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import { formatMoney } from '../../utils/format';
 import { OverlayModal } from '../base/OverlayModal';
+import { AppModal } from '../base/AppModal';
+import { getOriginInfo, leadDisplayName } from './leadDisplay';
 import type { UIEvent } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Phone, Mail, MessageCircle, Trash2, Edit2, MoreVertical, ChevronDown, BarChart3, Clock, CheckCircle2, TrendingUp, GripVertical, DollarSign, StickyNote, Calendar, MessageSquare, Settings, Plus, X, RotateCcw, Globe, Flag, AlertTriangle, AlertCircle, Minus, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, Instagram, Send, Megaphone, MoveRight, Workflow, type LucideIcon } from 'lucide-react';
+import { Phone, Mail, MessageCircle, Trash2, Edit2, MoreVertical, ChevronDown, BarChart3, Clock, CheckCircle2, TrendingUp, GripVertical, DollarSign, StickyNote, Calendar, MessageSquare, Settings, Plus, X, RotateCcw, Globe, Flag, AlertTriangle, AlertCircle, Minus, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, Instagram, Send, Megaphone, MoveRight, Workflow, type LucideIcon, MoreHorizontal } from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { haptic } from '../../../native';
 import type { TabKey } from '../modals/LeadDetailModal';
@@ -209,276 +211,71 @@ interface SalesFunnelProps {
 }
 
 // Card do Lead - design limpo e moderno
-const LeadCard = memo(({ lead, stage, onEdit, onDelete, onResetToInitial, onWhatsApp, onCall, onViewDetails, currency, stages = [], onMoveToStage }: any) => {
-  // O cartão que segue o dedo/rato é o DragOverlay; o original fica no lugar como marcador
-  // (aplicar-lhe também o transform fazia dois cartões mexerem-se ao mesmo tempo).
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: lead.id,
-    data: { lead }
-  });
-
-  // Cores dos avatares vibrantes
-  const avatarColors = [
-    'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-green-500',
-    'bg-yellow-500', 'bg-red-500', 'bg-indigo-500', 'bg-orange-500'
-  ];
-  const avatarColor = avatarColors[lead.nome.length % avatarColors.length];
-
-  // Check if lead has deal value - use Number() to ensure proper comparison
-  const numDealValue = Number(lead.deal_value) || 0;
-  const numValor = Number(lead.valor) || 0;
-  const dealValue = numDealValue > 0 ? numDealValue : numValor;
-  const hasDealValue = dealValue > 0;
+// Cartão do lead (kanban): avatar, nome, origem e valor. Toque abre o detalhe; mudar de
+// etapa por arrastar (tablet/desktop) ou pelo menu ⋯ → "Mover para…".
+const LeadCard = memo(({ lead, onEdit, onDelete, onResetToInitial, onViewDetails, currency, onRequestMove }: any) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: lead.id, data: { lead } });
+  const origin = getOriginInfo(lead.origem, lead.channelSource);
+  const OriginIcon = origin.Icon;
+  const name = leadDisplayName(lead);
+  const dealValue = (Number(lead.deal_value) || 0) > 0 ? Number(lead.deal_value) : Number(lead.valor) || 0;
 
   return (
     <div
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={`group relative rounded-2xl p-3 mb-3 cursor-grab active:cursor-grabbing select-none touch-manipulation [-webkit-touch-callout:none] transition-[opacity,box-shadow,background-color,border-color] duration-200 border animate-in fade-in zoom-in-95 ${isDragging
-          ? 'opacity-40 border-dashed border-primary/40 shadow-none'
-          : 'opacity-100 hover:bg-muted/30 border-border shadow-sm hover:shadow-md'
-        }`}
-      style={{
-        backgroundColor: 'hsl(var(--card))'
-      }}
+      onClick={() => onViewDetails?.(lead, 'notas')}
+      className={`group relative mb-2 flex items-center gap-3 rounded-xl border p-3 cursor-grab active:cursor-grabbing select-none transition-[opacity,box-shadow] duration-200 bg-card ${isDragging ? 'opacity-40 border-dashed border-primary/40' : 'border-border shadow-sm hover:shadow-md'}`}
     >
-      {/* Header: Avatar + Nome + Menu */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center space-x-3 flex-1 min-w-0">
-          {/* Avatar with channel badge */}
-          <div className="relative flex-shrink-0">
-            <Avatar className="h-9 w-9 ring-2 ring-white/10">
-              {lead.avatarUrl ? (
-                <AvatarImage src={lead.avatarUrl} alt={lead.nome} />
-              ) : null}
-              <AvatarFallback className={`${avatarColor} text-white text-xs font-bold`}>
-                {lead.nome.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            {lead.origem && (() => {
-              const key = lead.origem.toLowerCase();
-              const cfg = ORIGIN_CONFIG[key];
-              if (!cfg) return null;
-              const isWhatsApp = key === 'whatsapp' || key === 'whatsapp_cloud';
-              const Icon = cfg.icon;
-              return (
-                <div
-                  className="absolute -bottom-0.5 -right-0.5 w-[16px] h-[16px] rounded-full border-2 border-card flex items-center justify-center"
-                  style={{ backgroundColor: cfg.hexColor }}
-                  title={cfg.label}
-                >
-                  {isWhatsApp ? <WhatsAppSVG size={8} /> : <Icon size={8} className="text-white" />}
-                </div>
-              );
-            })()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm truncate text-foreground">
-              {lead.nome}
-            </p>
-            {lead.empresa && (
-              <p className="text-[10px] uppercase tracking-wide truncate text-muted-foreground">
-                {lead.empresa}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Menu de 3 pontos */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 flex-shrink-0 rounded-full transition-opacity hover:bg-muted/50 text-muted-foreground/70"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-card border-border">
-            <DropdownMenuItem
-              onClick={(e) => { e.stopPropagation(); onEdit?.(lead); }}
-              className="text-foreground"
-            >
-              <Edit2 className="h-3.5 w-3.5 mr-2" />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => { e.stopPropagation(); onResetToInitial?.(lead.id); }}
-              className="text-orange-400"
-            >
-              <RotateCcw className="h-3.5 w-3.5 mr-2" />
-              Voltar ao Início
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => { e.stopPropagation(); onDelete?.(lead.id); }}
-              className="text-red-400"
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-2" />
-              Eliminar Lead
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <Avatar className="h-9 w-9 flex-shrink-0">
+        {lead.avatarUrl ? <AvatarImage src={lead.avatarUrl} alt="" /> : null}
+        <AvatarFallback className="bg-primary/15 text-primary text-xs font-semibold">
+          {(name.match(/\p{L}/gu) || []).slice(0, 2).join('').toUpperCase() || '#'}
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{name}</p>
+        <p className={`mt-0.5 flex items-center gap-1 text-xs ${origin.color}`}>
+          <OriginIcon className="h-3 w-3" />
+          <span className="truncate">{origin.label}</span>
+        </p>
       </div>
-
-      {/* Origin + Priority + Score badges */}
-      {(lead.origem || lead.prioridade || typeof lead.lead_score === 'number') && (
-        <div className="flex items-center gap-1.5 mb-2 px-1 flex-wrap">
-          {lead.origem && (() => {
-            const originKey = lead.origem.toLowerCase();
-            const cfg = ORIGIN_CONFIG[originKey];
-            const isWhatsApp = originKey === 'whatsapp' || originKey === 'whatsapp_cloud';
-            const OriginIcon = cfg?.icon || Globe;
-            const originLabel = cfg?.label || lead.origem;
-            const hexColor = cfg?.hexColor || '#6b7280';
-            return (
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-white"
-                style={{ backgroundColor: hexColor }}
-                title={`Origem: ${originLabel}`}
-              >
-                {isWhatsApp
-                  ? <WhatsAppSVG size={9} />
-                  : <OriginIcon className="h-2.5 w-2.5 text-white" />
-                }
-                <span className="truncate max-w-[60px]">{originLabel}</span>
-              </span>
-            );
-          })()}
-          {lead.prioridade && PRIORITY_CONFIG[lead.prioridade] && (
-            <span
-              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${PRIORITY_CONFIG[lead.prioridade].bgColor} ${PRIORITY_CONFIG[lead.prioridade].color}`}
-              title={`Prioridade: ${PRIORITY_CONFIG[lead.prioridade].label}`}
-            >
-              {(() => {
-                const PriorityIcon = PRIORITY_CONFIG[lead.prioridade].icon;
-                return <PriorityIcon className="h-3 w-3" />;
-              })()}
-              <span>{PRIORITY_CONFIG[lead.prioridade].label}</span>
-            </span>
-          )}
-          {typeof lead.lead_score === 'number' && (
-            <span
-              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                lead.lead_score >= 80 
-                  ? 'bg-red-500/10 text-red-500' 
-                  : lead.lead_score >= 50 
-                    ? 'bg-amber-500/10 text-amber-500' 
-                    : 'bg-blue-500/10 text-blue-500'
-              }`}
-              title={`Envolvimento: ${lead.lead_score} pts`}
-            >
-              {lead.lead_score >= 80 ? '' : lead.lead_score >= 50 ? '' : ''} {lead.lead_score}
-            </span>
-          )}
-        </div>
+      {dealValue > 0 && (
+        <span className="flex-shrink-0 text-xs font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{formatCurrency(dealValue, currency)}</span>
       )}
-
-      {/* Telefone + Valor do negócio */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {lead.telefone && (
-            <span className="text-xs truncate text-muted-foreground">
-              {lead.telefone}
-            </span>
-          )}
-        </div>
-        {hasDealValue && (
-          <Badge variant="outline" className="px-1.5 py-0 h-5 text-[10px] font-bold border-0 bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-            {formatCurrency(dealValue, currency)}
-          </Badge>
-        )}
-      </div>
-
-      {/* Ícones de ação - Separados e Justificados */}
-      <div className={`flex items-center justify-between gap-1 pt-2 border-t border-dashed border-border`}>
-        {/* Chamada */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onCall?.(lead); }}
-          className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors text-muted-foreground hover:bg-blue-50 dark:hover:bg-white/10 hover:text-blue-600 dark:hover:text-blue-400"
-          title="Ligar"
-        >
-          <Phone className="h-3.5 w-3.5" />
-        </button>
-
-        {/* WhatsApp */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onWhatsApp?.(lead); }}
-          className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors text-muted-foreground hover:bg-green-50 dark:hover:bg-white/10 hover:text-green-600 dark:hover:text-green-400"
-          title="WhatsApp"
-        >
-          <MessageCircle className="h-3.5 w-3.5" />
-        </button>
-
-        {/* Notas */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onViewDetails?.(lead, 'notas'); }}
-          className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors text-muted-foreground hover:bg-yellow-50 dark:hover:bg-white/10 hover:text-yellow-600 dark:hover:text-yellow-400"
-          title="Notas"
-        >
-          <StickyNote className="h-3.5 w-3.5" />
-        </button>
-
-        {/* Agendamentos */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onViewDetails?.(lead, 'agendamentos'); }}
-          className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors text-muted-foreground hover:bg-purple-50 dark:hover:bg-white/10 hover:text-purple-600 dark:hover:text-purple-400"
-          title="Agendamentos"
-        >
-          <Calendar className="h-3.5 w-3.5" />
-        </button>
-
-        {/* Histórico */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onViewDetails?.(lead, 'historico'); }}
-          className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors text-muted-foreground hover:bg-orange-50 dark:hover:bg-white/10 hover:text-orange-600 dark:hover:text-orange-400"
-          title="Histórico"
-        >
-          <MessageSquare className="h-3.5 w-3.5" />
-        </button>
-
-        {/* Valor - destacado se tem valor */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onViewDetails?.(lead, 'valor'); }}
-          className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
-            hasDealValue
-              ? 'text-emerald-400 bg-emerald-500/20'
-              : 'text-muted-foreground hover:bg-emerald-50 dark:hover:bg-white/10'
-            }`}
-          title="Valor do negócio"
-        >
-          <DollarSign className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      {/* Mobile Dropdown - Mover para outro estágio */}
-      {stages.length > 0 && onMoveToStage && (
-        <div className="md:hidden mt-3 pt-2 border-t border-dashed border-border/40">
-          <div className="flex items-center gap-2">
-            <MoveRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-            <select
-              value={stage.id}
-              onChange={(e) => {
-                e.stopPropagation();
-                const newStageId = e.target.value;
-                if (newStageId !== stage.id) {
-                  onMoveToStage(lead.id, newStageId);
-                }
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="flex-1 text-xs px-2 py-1 rounded-lg border transition-colors bg-card border-border text-foreground"
-            >
-              {stages.map((s: FunnelStage) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Mais ações"
+            className="h-7 w-7 p-0 flex-shrink-0 rounded-full text-muted-foreground"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="bg-card border-border">
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onRequestMove?.(lead); }} className="text-foreground">
+            <MoveRight className="h-3.5 w-3.5 mr-2" />
+            Mover para…
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(lead); }} className="text-foreground">
+            <Edit2 className="h-3.5 w-3.5 mr-2" />
+            Editar
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onResetToInitial?.(lead.id); }} className="text-foreground">
+            <RotateCcw className="h-3.5 w-3.5 mr-2" />
+            Voltar à primeira etapa
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete?.(lead.id); }} className="text-red-500">
+            <Trash2 className="h-3.5 w-3.5 mr-2" />
+            Eliminar
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 });
@@ -507,6 +304,7 @@ const FunnelColumn = memo(({
   currency,
   stages = [],
   onMoveToStage,
+  onRequestMove,
 }: any) => {
   const { setNodeRef: setDroppableRef } = useDroppable({ id: stage.id });
   const {
@@ -600,8 +398,9 @@ const FunnelColumn = memo(({
                     className="h-6 w-6 p-0 rounded flex-shrink-0 hover:bg-[hsl(var(--muted))]"
                     style={{ color: 'hsl(var(--muted-foreground))' }}
                     onClick={(e) => e.stopPropagation()}
+                    aria-label="Opções da etapa"
                   >
-                    <Settings className="h-3.5 w-3.5" />
+                    <MoreHorizontal className="h-3.5 w-3.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 
@@ -668,6 +467,7 @@ const FunnelColumn = memo(({
                     currency={currency}
                     stages={stages}
                     onMoveToStage={onMoveToStage}
+                    onRequestMove={onRequestMove}
                   />
                 ))
               ) : (
@@ -765,6 +565,128 @@ FunnelColumn.displayName = 'FunnelColumn';
 
 const DEFAULT_VISIBLE_PER_STAGE = 50;
 const LOAD_MORE_STEP = 40;
+
+// Etapa do lead (o id da etapa onde aparece agrupado)
+function stageOfLead(lead: Lead, leadsByStatus: Record<string, Lead[]>) {
+  return Object.keys(leadsByStatus).find(id => leadsByStatus[id].some(l => l.id === lead.id));
+}
+
+// Telemóvel: chips deslizáveis com as etapas e o número de leads; toque mostra a lista.
+const MobileFunnel = ({ stages, leadsByStatus, currency, onOpen, onRequestMove }: any) => {
+  const firstWithLeads = stages.find((st: FunnelStage) => (leadsByStatus[st.id] || []).length > 0)?.id || stages[0]?.id;
+  const [selected, setSelected] = useState<string>(firstWithLeads);
+  useEffect(() => {
+    if (!stages.some((st: FunnelStage) => st.id === selected)) setSelected(firstWithLeads);
+  }, [stages, selected, firstWithLeads]);
+  const list: Lead[] = leadsByStatus[selected] || [];
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressed = useRef(false);
+
+  return (
+    <div className="-mx-1">
+      <div
+        className="flex gap-2 overflow-x-auto scrollbar-none px-1 pb-3 pr-6"
+        style={{ maskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent)', WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent)' }}
+      >
+        {stages.map((st: FunnelStage) => {
+          const count = (leadsByStatus[st.id] || []).length;
+          const active = st.id === selected;
+          return (
+            <button
+              key={st.id}
+              type="button"
+              onClick={() => setSelected(st.id)}
+              className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${active ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground'}`}
+            >
+              <span className={`h-2 w-2 rounded-full ${st.color}`} />
+              {st.label}
+              <span className={`tabular-nums ${active ? 'text-primary' : 'text-foreground'}`}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {list.length === 0 ? (
+        <p className="px-1 py-10 text-center text-sm text-muted-foreground">Sem leads nesta etapa</p>
+      ) : (
+        <ul className="mx-1 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+          {list.map((lead) => {
+            const origin = getOriginInfo(lead.origem, (lead as any).channelSource);
+            const OriginIcon = origin.Icon;
+            const name = leadDisplayName(lead);
+            const value = (Number(lead.deal_value) || 0) > 0 ? Number(lead.deal_value) : Number(lead.valor) || 0;
+            return (
+              <li key={lead.id} className="flex items-center gap-2 pr-2">
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left active:bg-muted/60 select-none"
+                  onClick={() => {
+                    if (longPressed.current) { longPressed.current = false; return; }
+                    onOpen(lead);
+                  }}
+                  onTouchStart={() => {
+                    longPressed.current = false;
+                    pressTimer.current = setTimeout(() => { longPressed.current = true; haptic('medium'); onRequestMove(lead); }, 500);
+                  }}
+                  onTouchMove={() => pressTimer.current && clearTimeout(pressTimer.current)}
+                  onTouchEnd={() => pressTimer.current && clearTimeout(pressTimer.current)}
+                >
+                  <Avatar className="h-10 w-10 flex-shrink-0">
+                    {lead.avatarUrl ? <AvatarImage src={lead.avatarUrl} alt="" /> : null}
+                    <AvatarFallback className="bg-primary/15 text-primary text-xs font-semibold">
+                      {(name.match(/\p{L}/gu) || []).slice(0, 2).join('').toUpperCase() || '#'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-medium text-foreground">{name}</span>
+                    <span className={`mt-0.5 flex items-center gap-1 text-xs ${origin.color}`}>
+                      <OriginIcon className="h-3 w-3" />
+                      {origin.label}
+                      {value > 0 && <span className="ml-auto font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{formatCurrency(value, currency)}</span>}
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRequestMove(lead)}
+                  className="flex-shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground active:bg-muted"
+                >
+                  Mover
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+// Folha com as etapas para mudar o lead de etapa
+const MoveLeadSheet = ({ lead, stages, leadsByStatus, onClose, onMove }: any) => {
+  if (!lead) return null;
+  const current = stageOfLead(lead, leadsByStatus);
+  return (
+    <AppModal open={!!lead} onOpenChange={(o) => !o && onClose()} size="sm" title="Mover para…" description={leadDisplayName(lead)}>
+      <ul className="-mx-1 space-y-1">
+        {stages.map((st: FunnelStage) => (
+          <li key={st.id}>
+            <button
+              type="button"
+              disabled={st.id === current}
+              onClick={() => onMove(st.id)}
+              className="flex w-full min-h-[48px] items-center gap-3 rounded-lg px-3 text-left text-[15px] text-foreground hover:bg-muted active:bg-muted disabled:opacity-60"
+            >
+              <span className={`h-2.5 w-2.5 rounded-full ${st.color}`} />
+              <span className="flex-1">{st.label}</span>
+              {st.id === current && <span className="text-xs text-muted-foreground">Etapa atual</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </AppModal>
+  );
+};
 
 export default function SalesFunnel({
   leads,
@@ -1021,6 +943,26 @@ export default function SalesFunnel({
     }
   }, [localLeads, onUpdateLeadStatus, stages]);
 
+  // Mudar de etapa (menu "Mover para…", botão Mover e toque longo no telemóvel)
+  const [moveLead, setMoveLead] = useState<Lead | null>(null);
+  const moveLeadToStage = useCallback((leadId: string, newStageId: string) => {
+    const newStage = stages.find(s => s.id === newStageId);
+    if (!newStage || !localLeads.some(l => l.id === leadId)) return;
+    // Mesmo valor que o arrastar: id da etapa (ou o nome, nas etapas personalizadas)
+    const newStatus = newStage.id.startsWith('stage_') ? newStage.label : newStage.id;
+    haptic('medium');
+    setLocalLeads(prev => prev.map(l => (l.id === leadId ? { ...l, status: newStatus } : l)));
+    onUpdateLeadStatus(leadId, newStatus).catch(() => setLocalLeads(leads));
+  }, [stages, localLeads, onUpdateLeadStatus, leads]);
+
+  // Telemóvel: chips de etapas + lista (sem arrastar)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const activeLead = useMemo(() =>
     activeId ? localLeads.find(l => l.id === activeId) : null,
     [activeId, localLeads]
@@ -1041,7 +983,7 @@ export default function SalesFunnel({
         {/* Total, convertidos e taxa vivem no Início/Relatórios; aqui só o valor em
             negociação, que é exclusivo do funil */}
         <p className="mb-4 text-sm text-muted-foreground">
-          Valor em negociação:{' '}
+          Valor do funil:{' '}
           <span className="font-semibold text-foreground tabular-nums">{formatCurrency(stats.pipelineValue, currency)}</span>
         </p>
 
@@ -1267,9 +1209,30 @@ export default function SalesFunnel({
           </OverlayModal>
         )}
 
-        {/* Funil de Vendas - Layout Responsivo */}
+        {isMobile && (
+          <MobileFunnel
+            stages={stages}
+            leadsByStatus={leadsByStatus}
+            currency={currency}
+            onOpen={(lead: Lead) => onViewLeadDetails?.(lead, 'notas')}
+            onRequestMove={setMoveLead}
+          />
+        )}
+
+        <MoveLeadSheet
+          lead={moveLead}
+          stages={stages}
+          leadsByStatus={leadsByStatus}
+          onClose={() => setMoveLead(null)}
+          onMove={(stageId: string) => {
+            if (moveLead?.id) moveLeadToStage(moveLead.id, stageId);
+            setMoveLead(null);
+          }}
+        />
+
+        {/* Funil de Vendas - Layout Responsivo (tablet/desktop: kanban com arrastar) */}
         {/* Sem cartão à volta das colunas (as colunas já são cartões) */}
-        <div className="flex-1">
+        <div className={isMobile ? 'hidden' : 'flex-1'}>
 
           <div
             className="relative w-full h-full bg-transparent"
@@ -1321,21 +1284,8 @@ export default function SalesFunnel({
                           onLoadMore={handleLoadMore}
                           currency={currency}
                           stages={stages}
-                          onMoveToStage={(leadId: string, newStageId: string) => {
-                            const lead = localLeads.find(l => l.id === leadId);
-                            const newStage = stages.find(s => s.id === newStageId);
-                            if (lead && newStage) {
-                              // Atualização otimista
-                              setLocalLeads(prev => 
-                                prev.map(l => l.id === leadId ? { ...l, status: newStage.label } : l)
-                              );
-                              // Chamar API
-                              onUpdateLeadStatus(leadId, newStage.label).catch(() => {
-                                // Reverter em caso de erro
-                                setLocalLeads(leads);
-                              });
-                            }
-                          }}
+                          onMoveToStage={moveLeadToStage}
+                          onRequestMove={setMoveLead}
                         />
                       </div>
                     ))}

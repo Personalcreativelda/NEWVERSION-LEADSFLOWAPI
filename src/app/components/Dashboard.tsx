@@ -78,6 +78,7 @@ import { motion } from 'motion/react';
 import { OfflineState } from './base/OfflineState';
 import { PullToRefresh } from './base/PullToRefresh';
 import { LatestLeads } from './dashboard/LatestLeads';
+import { formatLeadStatus } from './dashboard/leadDisplay';
 import { OriginsList } from './dashboard/OriginsList';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { getLocale } from '../utils/format';
@@ -2451,7 +2452,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                         phone: oldLead.phone || oldLead.whatsapp,
                         source: oldLead.source,
                       });
-                      toast.success(`Lead movido para ${newStatus}!`);
+                      toast.success(`Lead movido para ${formatLeadStatus(newStatus)}`);
                     } catch (error) {
                       // Reverte se falhar
                       setLeads(prevLeads);
@@ -2510,7 +2511,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   title="Relatórios"
                   description="Desempenho dos seus leads e vendas"
                   icon={BarChart2}
-                  actions={<PageAction icon={FileText} label="Exportar relatório" onClick={() => setModalReportExporter(true)} />}
+                  actions={<PageAction variant="primary" icon={FileText} label="Exportar" onClick={() => setModalReportExporter(true)} />}
                 />
                 <AdvancedAnalytics leads={leads as any} isDark={isDark} />
               </div>
@@ -2580,7 +2581,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             { page: 'inbox',     icon: <MessageSquare size={20} />,   label: 'Conversas' },
             { page: 'analytics', icon: <BarChart2 size={20} />,       label: 'Relatórios' },
           ].map(({ page, icon, label }) => {
-            const active = currentPage === page || (page === 'inbox' && ['inbox','inbox-settings','inbox-team','ai-assistants','automations'].includes(currentPage));
+            const active = currentPage === page || (page === 'inbox' && ['inbox','inbox-settings','inbox-team','automations'].includes(currentPage));
             return (
               <button
                 key={page}

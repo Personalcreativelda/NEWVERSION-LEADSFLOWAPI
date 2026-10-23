@@ -281,12 +281,12 @@ export class AssistantsService {
             {
                 slug: 'atendente-virtual',
                 name: 'Atendente Virtual',
-                short_description: 'Responde dúvidas, coleta dados e encaminha solicitações automaticamente.',
+                short_description: 'Responde dúvidas, recolhe dados e encaminha solicitações automaticamente.',
                 description: 'Assistente de atendimento ao cliente pronto para uso. Responde perguntas frequentes, coleta informações do cliente e encaminha para humanos quando necessário. Edite as instruções com o nome da sua empresa para começar.',
                 icon: 'headphones',
                 color: '#3B82F6',
                 category: 'support',
-                features: ['Respostas automáticas 24h', 'Coleta de dados do cliente', 'Encaminhamento para humano', 'Mensagens curtas e objetivas'],
+                features: ['Respostas automáticas 24h', 'Recolha de dados do cliente', 'Encaminhamento para humano', 'Mensagens curtas e objetivas'],
                 instructions: `Você é um assistente virtual de atendimento ao cliente da [Nome da Empresa]. Seu papel é ajudar os clientes de forma simpática, clara e eficiente.
 
 ## Diretrizes de comportamento
@@ -313,8 +313,8 @@ export class AssistantsService {
             {
                 slug: 'qualificador-leads',
                 name: 'Qualificador de Leads',
-                short_description: 'Engaja novos contactos, qualifica o interesse e agenda reuniões para a equipe comercial.',
-                description: 'Assistente de vendas especializado em qualificar leads. Identifica o nível de interesse, entende a necessidade do cliente e agenda demonstrações com a equipe comercial quando o lead está pronto.',
+                short_description: 'Engaja novos contactos, qualifica o interesse e agenda reuniões para a equipa comercial.',
+                description: 'Assistente de vendas especializado em qualificar leads. Identifica o nível de interesse, entende a necessidade do cliente e agenda demonstrações com a equipa comercial quando o lead está pronto.',
                 icon: 'briefcase',
                 color: '#10B981',
                 category: 'sales',
@@ -348,7 +348,7 @@ Identificar o interesse real do cliente, entender a necessidade e agendar uma re
                 icon: 'zap',
                 color: '#F59E0B',
                 category: 'support',
-                features: ['Diagnóstico guiado', 'Soluções passo a passo', 'Escalada inteligente', 'Coleta de dados para ticket'],
+                features: ['Diagnóstico guiado', 'Soluções passo a passo', 'Escalada inteligente', 'Recolha de dados para o pedido'],
                 instructions: `Você é o suporte técnico de nível 1 da [Nome da Empresa]. Seu papel é diagnosticar e resolver problemas técnicos dos utilizadores de forma rápida e eficaz.
 
 ## Processo de diagnóstico

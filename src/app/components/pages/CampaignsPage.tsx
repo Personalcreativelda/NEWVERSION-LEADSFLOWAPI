@@ -1318,9 +1318,9 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   : 'border-transparent text-muted-foreground hover:text-[#10B981]'
                   }`}
               >
-                <MessageCircle className="w-4 h-4" />
+                <MessageCircle className="w-4 h-4 flex-shrink-0" />
                 <span>WhatsApp</span>
-                <span className={`${activeTab === 'whatsapp' ? 'bg-[#10B981]' : 'bg-muted text-muted-foreground'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
+                <span className={`min-w-[22px] rounded-full px-1.5 py-0.5 text-center text-xs font-semibold tabular-nums ${activeTab === 'whatsapp' ? 'bg-[#10B981] text-white' : 'bg-muted text-muted-foreground'}`}>
                   {countByChannel('whatsapp')}
                 </span>
               </button>
@@ -1331,9 +1331,9 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   : 'border-transparent text-muted-foreground hover:text-[#3B82F6]'
                   }`}
               >
-                <Mail className="w-4 h-4" />
+                <Mail className="w-4 h-4 flex-shrink-0" />
                 <span>Email</span>
-                <span className={`${activeTab === 'email' ? 'bg-[#3B82F6]' : 'bg-muted text-muted-foreground'} text-white text-xs px-2 py-1 rounded-full font-semibold`}>
+                <span className={`min-w-[22px] rounded-full px-1.5 py-0.5 text-center text-xs font-semibold tabular-nums ${activeTab === 'email' ? 'bg-[#3B82F6] text-white' : 'bg-muted text-muted-foreground'}`}>
                   {countByChannel('email')}
                 </span>
               </button>
@@ -1344,11 +1344,9 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   : 'border-transparent text-muted-foreground hover:text-[#F22F46]'
                   }`}
               >
-                <MessageSquare className="w-4 h-4" />
+                <MessageSquare className="w-4 h-4 flex-shrink-0" />
                 <span>SMS</span>
-                <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                  activeTab === 'sms' ? 'bg-[#F22F46] text-white' : 'bg-muted text-muted-foreground'
-                }`}>
+                <span className={`min-w-[22px] rounded-full px-1.5 py-0.5 text-center text-xs font-semibold tabular-nums ${activeTab === 'sms' ? 'bg-[#F22F46] text-white' : 'bg-muted text-muted-foreground'}`}>
                   {countByChannel('sms')}
                 </span>
               </button>
@@ -1395,6 +1393,14 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   <div className="flex items-center justify-end">
                     <UpdatingBadge />
                   </div>
+                )}
+                {activeCampaigns.length === 0 && scheduledCampaigns.length === 0 && !isSearching && (
+                  <EmptyState
+                    icon={Megaphone}
+                    title="Sem campanhas ativas ou agendadas"
+                    description="Crie uma campanha para enviar mensagens aos seus leads."
+                    action={<AppButton onClick={handleNewCampaign}><Plus />Criar campanha</AppButton>}
+                  />
                 )}
                 <section className={activeCampaigns.length === 0 ? 'hidden' : undefined}>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
@@ -1558,7 +1564,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                 <section className={draftCampaigns.length === 0 ? 'hidden' : undefined}>
                   <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center space-x-2">
                     <Save className="w-5 h-5 text-blue-500" />
-                    <span>Campanhas Guardadas (Rascunhos)</span>
+                    <span>Rascunhos</span>
                     <span className="text-sm font-normal text-muted-foreground">({draftCampaigns.length})</span>
                   </h3>
                   {draftCampaigns.length > 0 ? (

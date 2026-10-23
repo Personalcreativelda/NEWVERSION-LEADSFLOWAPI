@@ -23,6 +23,22 @@ import { usePlanLimits } from '../../hooks/usePlanLimits';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { SkeletonAssistantGrid } from '../ui/skeletons';
 import { getLocale } from '../../utils/format';
+import { channelDisplayName } from '../inbox/channels/ChannelRows';
+
+// O canal do site tem um nome interno (ex.: "Leadsflowapi"): mostra "Chat do site"
+const assistantChannelName = (channel: Channel) =>
+  channel.type === 'website' ? 'Chat do site' : channelDisplayName(channel);
+
+// Textos dos assistentes que vêm da base de dados em pt-BR
+const PT_MZ: [RegExp, string][] = [
+  [/\bcoleta dados\b/gi, 'recolhe dados'],
+  [/\bColeta de dados\b/g, 'Recolha de dados'],
+  [/\bcoleta de dados\b/g, 'recolha de dados'],
+  [/\b(equipe|time) comercial\b/gi, 'equipa comercial'],
+  [/\bequipe\b/g, 'equipa'],
+  [/\bEquipe\b/g, 'Equipa'],
+];
+const ptMZ = (text?: string) => PT_MZ.reduce((t, [re, to]) => t.replace(re, to), text || '');
 
 interface AssistantsPageProps {
   isDark: boolean;
@@ -621,26 +637,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         {isFree && (
           <div className="absolute top-0 left-4 right-4 h-0.5 rounded-full bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-400 opacity-70" />
         )}
-        {/* Featured badge */}
-        {assistant.is_featured && (
-          <div className="absolute -top-2 -right-2">
-            <Badge className="bg-muted text-muted-foreground border border-border/60 gap-1 font-medium text-[11px]">
-              <Star className="h-2.5 w-2.5" />
-              Destaque
-            </Badge>
-          </div>
-        )}
-
-        {/* Custom badge */}
-        {assistant.is_custom && (
-          <div className="absolute -top-2 -right-2">
-            <Badge className="bg-primary text-primary-foreground border-0 gap-1">
-              <Edit3 className="h-3 w-3" />
-              Personalizado
-            </Badge>
-          </div>
-        )}
-
         {/* Header */}
         <div className="flex items-start gap-3 mb-3">
           <div
@@ -650,55 +646,48 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             <IconComponent className="w-6 h-6" style={{ color: assistant.color }} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-base text-foreground">
-              {assistant.name}
-            </h3>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h3 className="font-semibold text-base text-foreground">{assistant.name}</h3>
+              {assistant.is_featured && (
+                <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-0 gap-1 px-1.5 py-0 text-[11px] font-medium">
+                  <Star className="h-2.5 w-2.5" />
+                  Destaque
+                </Badge>
+              )}
+              {assistant.is_custom ? (
+                <Badge className="bg-primary/10 text-primary border-0 px-1.5 py-0 text-[11px] font-medium">Personalizado</Badge>
+              ) : isFree ? (
+                <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 border-0 px-1.5 py-0 text-[11px] font-medium">Grátis</Badge>
+              ) : (
+                <Badge className="bg-muted text-muted-foreground border-0 px-1.5 py-0 text-[11px] font-medium">Pro</Badge>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
               {CATEGORY_LABELS[assistant.category] || assistant.category}
             </p>
           </div>
-          {/* Price badge */}
-          {assistant.is_custom ? (
-            <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30 shrink-0">
-              Grátis
-            </Badge>
-          ) : isFree ? (
-            <Badge className="bg-secondary text-secondary-foreground border border-border shrink-0 gap-1">
-              <Zap className="w-3 h-3" />
-              Grátis
-            </Badge>
-          ) : (
-            <Badge className="bg-muted text-muted-foreground border-0 shrink-0">
-              Pro
-            </Badge>
-          )}
         </div>
 
         {/* Description */}
         {assistant.short_description && (
           <p className="text-sm mb-3 line-clamp-2 text-muted-foreground">
-            {assistant.short_description}
+            {ptMZ(assistant.short_description)}
           </p>
         )}
 
         {/* Features */}
         {(assistant.features?.length || 0) > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
-          {assistant.features?.slice(0, 3).map((feature, idx) => (
+          {assistant.features?.slice(0, 2).map((feature, idx) => (
             <span
               key={idx}
               className={`text-[10px] px-2 py-0.5 rounded-full ${
                   'bg-muted text-muted-foreground'
               }`}
             >
-              {feature}
+              {ptMZ(feature)}
             </span>
           ))}
-          {(assistant.features?.length || 0) > 3 && (
-            <span className="text-[10px] text-muted-foreground">
-              +{(assistant.features?.length || 0) - 3} mais
-            </span>
-          )}
           </div>
         )}
 
@@ -709,7 +698,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             {resolvedChannels.map(channel => (
               <span key={channel.id} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-muted border border-border">
                 {renderChannelIcon(channel.type, 'w-3 h-3')}
-                {channel.name || channel.type}
+                {assistantChannelName(channel)}
                 {connected && <Check className="w-3 h-3 text-green-500 ml-0.5" />}
               </span>
             ))}
@@ -781,10 +770,11 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
                   onClick={() => userAssistant && handleDisconnect(userAssistant)}
                 >
-                  <Unlink2 className="w-4 h-4" />
+                  <Unlink2 className="w-4 h-4 mr-1.5" />
+                  Desligar
                 </Button>
               </>
             ) : (
@@ -851,6 +841,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               <Button
                 variant="outline"
                 size="sm"
+                aria-label="Configurar"
                 onClick={() => userAssistant && openConfigModal(userAssistant)}
               >
                 <Settings className="w-4 h-4" />
@@ -858,10 +849,11 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                className="ml-auto text-red-600 hover:text-red-700 hover:bg-red-500/10"
                 onClick={() => userAssistant && handleDisconnect(userAssistant)}
               >
-                <Trash2 className="w-4 h-4" />
+                <Unlink2 className="w-4 h-4 mr-1.5" />
+                Desligar
               </Button>
             </>
           )}
@@ -900,7 +892,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         );
       })()}
 
-      {/* Search */}
+      {/* Pesquisa só quando há muitos assistentes */}
+      {(availableAssistants.length > 8 || searchTerm) && (
       <div className="relative mb-6 w-full sm:w-80">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
@@ -910,6 +903,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
           className={`pl-9 bg-background border-border`}
         />
       </div>
+      )}
 
       {/* Inline custom-assistant limit banner */}
       {(() => {
@@ -932,8 +926,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
                 {isFeatureLocked
-                  ? 'O plano Gratuito não inclui Assistentes Personalizados. Faça melhorar o plano para Business para criar os seus próprios.'
-                  : `Você está usando ${customCount} de ${planLimits.limitLabel.customAssistants} assistente(s) permitido(s). Remova um ou faça melhorar o plano para criar mais.`
+                  ? 'O plano Gratuito não inclui Assistentes Personalizados. Melhore para o plano Business para criar os seus próprios.'
+                  : `Está a usar ${customCount} de ${planLimits.limitLabel.customAssistants} assistente(s) permitido(s). Remova um ou melhore o plano para criar mais.`
                 }
               </p>
             </div>
@@ -972,7 +966,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
           }`}
         >
           <Bot className="w-4 h-4 inline-block mr-1.5" />
-          Meus Assistentes
+          Os meus
           {userAssistants.length > 0 && (
             <Badge variant="secondary" className="ml-2 h-5 min-w-[20px]">
               {userAssistants.length}
@@ -1121,7 +1115,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                             {isSelected && <Check className="w-3 h-3 text-white" />}
                           </div>
                           {renderChannelIcon(channel.type)}
-                          <span className="flex-1 text-sm font-medium">{channel.name || channel.type}</span>
+                          <span className="flex-1 text-sm font-medium">{assistantChannelName(channel)}</span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                             {channel.type}
                           </span>
@@ -1212,7 +1206,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                           {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
                         {renderChannelIcon(channel.type, 'w-3.5 h-3.5')}
-                        <span className="text-sm">{channel.name || channel.type}</span>
+                        <span className="text-sm">{assistantChannelName(channel)}</span>
                       </button>
                     );
                   })}

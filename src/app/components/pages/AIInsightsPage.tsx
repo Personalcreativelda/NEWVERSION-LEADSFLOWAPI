@@ -9,6 +9,8 @@ import { PageHeader, PageAction } from '../base/PageHeader';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
 import { api } from '../../../lib/api';
+import { formatNumber, formatPercent } from '../../utils/format';
+import { formatLeadStatus } from '../dashboard/leadDisplay';
 import { SkeletonStatCardsRow, SkeletonInsightRow, UpdatingBadge } from '../ui/skeletons';
 
 interface AIInsightsStats {
@@ -49,6 +51,14 @@ interface SendingState {
   leadId: string;
   isSending: boolean;
   sentAt?: Date;
+}
+
+
+// Nomes guardados todos em maiúsculas (ex.: "JOAO SILVA") passam a "Joao Silva"
+function displayName(name?: string) {
+  const n = (name || '').trim();
+  if (!n || n !== n.toUpperCase() || !/\p{L}/u.test(n)) return n || 'Lead';
+  return n.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_, sp, c) => sp + c.toUpperCase());
 }
 
 export default function AIInsightsPage() {
@@ -303,25 +313,28 @@ export default function AIInsightsPage() {
                 <div className="flex-1 min-w-0">
                   <h2 className="text-sm font-bold text-foreground mb-1">Decisões da IA</h2>
                   <p className="text-sm leading-relaxed text-foreground/80">
-                    {insights.stats.hot_count > 0
-                      ? ` ${insights.stats.hot_count} lead${insights.stats.hot_count > 1 ? 's' : ''} com alto potencial pronto para converter. `
-                      : ''}
-                    {insights.stats.high_risk_count > 0
-                      ? ` ${insights.stats.high_risk_count} em risco que precisa intervenção imediata. `
-                      : ''}
-                    Conversão prevista: <span className="font-bold text-emerald-600">+{insights.stats.avg_conversion || 15}%</span>
+                    {insights.stats.hot_count > 0 &&
+                      (insights.stats.hot_count === 1
+                        ? '1 lead com alto potencial, pronto a converter. '
+                        : `${formatNumber(insights.stats.hot_count)} leads com alto potencial, prontos a converter. `)}
+                    {insights.stats.high_risk_count > 0 &&
+                      (insights.stats.high_risk_count === 1
+                        ? '1 em risco precisa de atenção imediata. '
+                        : `${formatNumber(insights.stats.high_risk_count)} em risco precisam de atenção imediata. `)}
+                    {insights.stats.avg_conversion > 0 && (
+                      <>Conversão prevista: <span className="font-bold text-emerald-600">{formatPercent(insights.stats.avg_conversion)}</span></>
+                    )}
                   </p>
                 </div>
               </div>
             </div>
 
             {/* Key Metrics */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {[
-                { label: 'Leads Quentes', value: insights.stats.hot_count ?? 0, icon: Flame, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-                { label: 'Críticos', value: insights.stats.high_risk_count ?? 0, icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
-                { label: 'Envolvimento', value: `↑${insights.stats.avg_engagement ?? 0}%`, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-                { label: 'Conversão', value: `↑${insights.stats.avg_conversion ?? 0}%`, icon: Star, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+                { label: 'Leads quentes', value: formatNumber(insights.stats.hot_count ?? 0), icon: Flame, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+                { label: 'Em risco', value: formatNumber(insights.stats.high_risk_count ?? 0), icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
+                { label: 'Envolvimento médio', value: formatPercent(insights.stats.avg_engagement ?? 0), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
               ].map(s => (
                 <div key={s.label} className="bg-card border border-border rounded-lg p-3 space-y-2">
                   <div className="flex items-center gap-2">
@@ -348,26 +361,26 @@ export default function AIInsightsPage() {
               {/* Hot Leads - Priority 1 */}
               {insights.hotLeads?.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">
-                    Prioridade 1: Conversão Iminente
- </p>
+                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                    Prioridade 1 · Prontos a converter
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {insights.hotLeads.map((lead: any) => (
                       <div key={lead.id} className="bg-gradient-to-br from-emerald-50/50 to-emerald-50/20 dark:from-emerald-950/20 dark:to-emerald-950/5 border-2 border-emerald-200/50 dark:border-emerald-800/30 rounded-lg p-4 space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="font-bold text-foreground truncate">{lead.name}</span>
+                              <span className="font-bold text-foreground truncate">{displayName(lead.name)}</span>
                               <ChannelBadge channel={lead.recommended_channel} />
                               <span className="text-xs font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                {lead.conversion_probability}% chance
+                                {formatPercent(lead.conversion_probability)} de probabilidade
                               </span>
                             </div>
-                            <p className="text-xs text-muted-foreground capitalize">{lead.status}</p>
+                            <p className="text-xs text-muted-foreground">{formatLeadStatus(lead.status)}</p>
                           </div>
-                          <div className="flex items-center gap-1 text-emerald-600 font-bold">
-                            <TrendingUp className="w-4 h-4" />
-                            {lead.engagement_score}
+                          <div className="flex-shrink-0 text-right">
+                            <p className="text-[11px] text-muted-foreground">Pontuação</p>
+                            <p className="font-bold tabular-nums text-emerald-600">{lead.engagement_score}</p>
                           </div>
                         </div>
 
@@ -560,9 +573,9 @@ export default function AIInsightsPage() {
               {/* At-Risk Leads - Priority 2 */}
               {insights.atRiskLeads?.length > 0 && (
                 <div className="space-y-2 mt-4">
-                  <p className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide">
-                    Prioridade 2: Risco de Perda
- </p>
+                  <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+                    Prioridade 2 · Risco de perda
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {insights.atRiskLeads.map((lead: any) => {
                       const days = lead.last_contact_at
@@ -573,24 +586,24 @@ export default function AIInsightsPage() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <span className="font-bold text-foreground truncate">{lead.name}</span>
+                                <span className="font-bold text-foreground truncate">{displayName(lead.name)}</span>
                                 <ChannelBadge channel={lead.recommended_channel} />
                                 <span className="text-xs font-bold bg-red-500/20 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full whitespace-nowrap">
                                   {lead.risk_level === 'high' ? 'Crítico' : 'Médio'}
                                 </span>
                               </div>
-                              <p className="text-xs text-muted-foreground capitalize">{lead.status}</p>
+                              <p className="text-xs text-muted-foreground">{formatLeadStatus(lead.status)}</p>
                             </div>
-                            <div className="flex items-center gap-1 text-red-600 font-bold">
-                              <AlertCircle className="w-4 h-4" />
-                              {lead.engagement_score}
+                            <div className="flex-shrink-0 text-right">
+                              <p className="text-[11px] text-muted-foreground">Pontuação</p>
+                              <p className="font-bold tabular-nums text-red-600">{lead.engagement_score}</p>
                             </div>
                           </div>
 
                           {/* Risk Details */}
                           {days !== null && (
                             <div className="text-xs text-red-600 dark:text-red-400 font-semibold bg-red-50/50 dark:bg-red-950/30 p-2 rounded border border-red-200/30 dark:border-red-800/30">
-                               {days === 0 ? 'Sem contacto hoje!' : `Sem resposta há ${days} dia${days !== 1 ? 's' : ''}`}
+                               {days === 0 ? 'Sem contacto hoje' : `Sem resposta há ${days} dia${days !== 1 ? 's' : ''}`}
                             </div>
                           )}
 
@@ -803,10 +816,10 @@ export default function AIInsightsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                            <p className="text-xs font-bold text-foreground truncate">{lead.name}</p>
+                            <p className="text-xs font-bold text-foreground truncate">{displayName(lead.name)}</p>
                             <ChannelBadge channel={lead.recommended_channel} />
                           </div>
-                          <p className="text-[10px] text-muted-foreground">{lead.conversion_probability}% conversão</p>
+                          <p className="text-[11px] text-muted-foreground">{formatPercent(lead.conversion_probability)} de probabilidade</p>
                         </div>
                       </div>
 

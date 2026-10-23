@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { TrendingUp, Users, Target, DollarSign, Clock, Zap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { TrendingUp, Users, Target, DollarSign, Clock, Zap, ArrowUpRight, ArrowDownRight, Lightbulb } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { formatPercent, getLocale } from '../../utils/format';
+import { formatMoney, formatPercent, getLocale } from '../../utils/format';
 
 interface Lead {
   id: string;
@@ -407,133 +407,71 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
 
   return (
     <div className="space-y-6">
-      {/* KPIs Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Taxa de Conversão */}
-        <Card className="p-5 bg-card border-border">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <Target className="w-4 h-4 text-green-600" />
-                <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
-              </div>
-              <p className={`text-3xl mb-1 text-green-600`}>{formatPercent(metrics.conversionRate)}</p>
-              <div className="flex items-center gap-1">
-                <ArrowUpRight className="w-3 h-3 text-green-600" />
-                <span className="text-xs text-green-600">+2.3% vs mês anterior</span>
-              </div>
+      {/* KPIs: grelha de 2 colunas, só o ícone pequeno; as métricas sem dados viram uma nota no fim */}
+      {(() => {
+        const formatDays = (d: number) =>
+          d < 1 ? `${Math.round(d * 24)} h` : d < 30 ? `${d} dias` : `${Math.round(d / 30)} meses`;
+        const signed = (v: string | number) => {
+          const n = typeof v === 'number' ? v : parseFloat(v);
+          return `${n > 0 ? '+' : ''}${formatPercent(n)}`;
+        };
+        const kpis: { label: string; value: string; note?: string; noteTone?: 'up' | 'down'; icon: any; color: string }[] = [
+          { label: 'Taxa de conversão', value: formatPercent(metrics.conversionRate), icon: Target, color: 'text-green-600' },
+          {
+            label: 'Crescimento (7 dias)',
+            value: `${metrics.absoluteGrowth > 0 ? '+' : ''}${metrics.absoluteGrowth}`,
+            note: `${signed(metrics.growthRate)} vs semana anterior`,
+            noteTone: metrics.absoluteGrowth >= 0 ? 'up' : 'down',
+            icon: Zap,
+            color: 'text-orange-600',
+          },
+        ];
+        if (metrics.avgValue > 0) {
+          kpis.push({
+            label: 'Valor médio',
+            value: formatMoney(metrics.avgValue),
+            note: `${signed(metrics.avgValueChange)} vs mês anterior`,
+            noteTone: parseFloat(metrics.avgValueChange) >= 0 ? 'up' : 'down',
+            icon: DollarSign,
+            color: 'text-blue-600',
+          });
+        }
+        if (metrics.avgTimeInFunnel > 0) {
+          const change = parseFloat(metrics.avgTimeChange);
+          kpis.push({
+            label: 'Tempo médio no funil',
+            value: formatDays(metrics.avgTimeInFunnel),
+            note: change !== 0 ? `${signed(change)} vs mês anterior` : undefined,
+            noteTone: change <= 0 ? 'up' : 'down',
+            icon: Clock,
+            color: 'text-primary',
+          });
+        }
+        const waiting = metrics.avgValue <= 0 || metrics.avgTimeInFunnel <= 0;
+        return (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {kpis.map((k) => (
+                <Card key={k.label} className="p-4 bg-card border-border">
+                  <div className="flex items-center gap-1.5">
+                    <k.icon className={`w-4 h-4 flex-shrink-0 ${k.color}`} />
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate">{k.label}</p>
+                  </div>
+                  <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${k.color}`}>{k.value}</p>
+                  {k.note && (
+                    <p className={`mt-0.5 text-xs ${k.noteTone === 'down' ? 'text-red-600' : 'text-green-600'}`}>{k.note}</p>
+                  )}
+                </Card>
+              ))}
             </div>
-            <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-        </Card>
-
-        {/* Valor Médio */}
-        <Card className="p-5 bg-card border-border">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <DollarSign className="w-4 h-4 text-blue-600" />
-                <p className="text-sm text-muted-foreground">Valor Médio</p>
-              </div>
-              <p className={`text-3xl mb-1 text-blue-600`}>
-                {metrics.avgValue > 0
-                  ? `R$ ${metrics.avgValue.toLocaleString(getLocale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                  : '-'}
+            {waiting && (
+              <p className="text-xs text-muted-foreground">
+                Valor médio e tempo médio aparecem após as primeiras conversões.
               </p>
-              <div className="flex items-center gap-1">
-                {metrics.avgValue > 0 ? (
-                  <>
-                    {parseFloat(metrics.avgValueChange) >= 0 ? (
-                      <ArrowUpRight className="w-3 h-3 text-green-600" />
-                    ) : (
-                      <ArrowDownRight className="w-3 h-3 text-red-600" />
-                    )}
-                    <span className={`text-xs ${parseFloat(metrics.avgValueChange) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {parseFloat(metrics.avgValueChange) >= 0 ? '+' : ''}{metrics.avgValueChange}% vs mês anterior
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-xs text-muted-foreground">A aguardar conversões</span>
-                )}
-              </div>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-blue-600" />
-            </div>
+            )}
           </div>
-        </Card>
-
-        {/* Tempo Médio no Funil */}
-        <Card className="p-5 bg-card border-border">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <Clock className="w-4 h-4 text-primary" />
-                <p className="text-sm text-muted-foreground">Tempo Médio</p>
-              </div>
-              <p className={`text-3xl mb-1 text-primary`}>
-                {metrics.avgTimeInFunnel > 0
-                  ? metrics.avgTimeInFunnel < 1
-                    ? `${Math.round(metrics.avgTimeInFunnel * 24)}h`
-                    : metrics.avgTimeInFunnel < 30
-                      ? `${metrics.avgTimeInFunnel}d`
-                      : `${Math.round(metrics.avgTimeInFunnel / 30)}m`
-                  : '-'}
-              </p>
-              <div className="flex items-center gap-1">
-                {metrics.avgTimeInFunnel > 0 && parseFloat(metrics.avgTimeChange) !== 0 ? (
-                  <>
-                    {parseFloat(metrics.avgTimeChange) < 0 ? (
-                      <ArrowDownRight className="w-3 h-3 text-green-600" />
-                    ) : (
-                      <ArrowUpRight className="w-3 h-3 text-red-600" />
-                    )}
-                    <span className={`text-xs ${parseFloat(metrics.avgTimeChange) < 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {parseFloat(metrics.avgTimeChange) < 0 ? '↓ ' : '↑ '}
-                      {Math.abs(parseFloat(metrics.avgTimeChange))}% vs mês anterior
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-xs text-muted-foreground">A aguardar conversões</span>
-                )}
-              </div>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Clock className="w-6 h-6 text-primary" />
-            </div>
-          </div>
-        </Card>
-
-        {/* Taxa de Crescimento */}
-        <Card className="p-5 bg-card border-border">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <Zap className="w-4 h-4 text-orange-600" />
-                <p className="text-sm text-muted-foreground">Crescimento</p>
-              </div>
-              <p className={`text-3xl mb-1 ${metrics.absoluteGrowth >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
-                {metrics.absoluteGrowth >= 0 ? '+' : ''}{metrics.absoluteGrowth}
-              </p>
-              <div className="flex items-center gap-1">
-                {metrics.absoluteGrowth >= 0 ? (
-                  <ArrowUpRight className="w-3 h-3 text-green-600" />
-                ) : (
-                  <ArrowDownRight className="w-3 h-3 text-red-600" />
-                )}
-                <span className={`text-xs ${metrics.absoluteGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {parseFloat(metrics.growthRate) >= 0 ? '+' : ''}{metrics.growthRate}% últimos 7 dias
-                </span>
-              </div>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-              <Zap className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-        </Card>
-      </div>
+        );
+      })()}
 
       {/* Gráficos de Análise */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -728,31 +666,29 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
 
       {/* Insights e Recomendações */}
       <Card className="p-6 bg-card border-border">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center flex-shrink-0">
-            <span className="text-2xl"></span>
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg mb-2 text-foreground">
-              Insights e Recomendações
+        <div>
+          <div>
+            <h3 className="text-lg mb-2 text-foreground flex items-center gap-2">
+              <Lightbulb className="w-4 h-4 text-amber-500" />
+              Insights e recomendações
             </h3>
             <ul className="space-y-2 text-sm text-foreground/80">
               <li className="flex items-start gap-2">
                 <span className="text-green-600 dark:text-green-400">✓</span>
-                <span>Sua taxa de conversão de {formatPercent(metrics.conversionRate)} está {parseFloat(metrics.conversionRate) > 20 ? 'acima' : 'abaixo'} da média do mercado (20%)</span>
+                <span>A sua taxa de conversão de {formatPercent(metrics.conversionRate)} está {parseFloat(metrics.conversionRate) > 20 ? 'acima' : 'abaixo'} da média do mercado (20%)</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-blue-600 dark:text-blue-400">→</span>
-                <span>A origem "{topOrigins[0]?.name || 'N/A'}" é sua melhor fonte com {topOrigins[0]?.value || 0} leads - considere investir mais nesse canal</span>
+                <span>A origem "{topOrigins[0]?.name || 'N/A'}" é a sua melhor fonte, com {topOrigins[0]?.value || 0} leads - considere investir mais neste canal</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-orange-600 dark:text-orange-400"></span>
-                <span>Você tem {metrics.inNegotiation} leads em negociação - priorize o follow-up para fechar mais vendas</span>
+                <span className="text-orange-600 dark:text-orange-400">→</span>
+                <span>Tem {metrics.inNegotiation} leads em negociação: dê prioridade ao seguimento para fechar mais vendas</span>
               </li>
               {parseFloat(metrics.lostRate) > 30 && (
                 <li className="flex items-start gap-2">
                   <span className="text-red-600 dark:text-red-400">!</span>
-                  <span>Alta taxa de perda ({metrics.lostRate}%) - revise seu processo de qualificação</span>
+                  <span>Alta taxa de perda ({metrics.lostRate}%) - reveja o seu processo de qualificação</span>
                 </li>
               )}
             </ul>

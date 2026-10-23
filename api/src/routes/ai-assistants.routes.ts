@@ -46,7 +46,7 @@ export const MARKETPLACE_TEMPLATES = [
     {
         id: 'vendas-qualificacao',
         name: 'Qualificador de Leads',
-        description: 'Engaja novos contactos, qualifica o interesse e agenda reuniões automaticamente para a sua equipe comercial.',
+        description: 'Engaja novos contactos, qualifica o interesse e agenda reuniões automaticamente para a sua equipa comercial.',
         category: 'Vendas',
         icon: '🎯',
         mode: 'llm' as const,

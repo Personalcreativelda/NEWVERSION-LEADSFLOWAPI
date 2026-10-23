@@ -266,10 +266,12 @@ export class FlowExecutionService {
         }
       }
 
-      // Mark as conversion (successful completion)
+      // Conversão só quando o lead está mesmo convertido (terminar o fluxo não é converter)
       await dbQuery(
-        'UPDATE remarketing_flows SET conversions = conversions + 1 WHERE id = $1',
-        [ctx.flowId]
+        `UPDATE remarketing_flows SET conversions = conversions + 1
+          WHERE id = $1
+            AND EXISTS (SELECT 1 FROM leads WHERE id = $2 AND LOWER(status) IN ('convertido', 'converted', 'ganho', 'won'))`,
+        [ctx.flowId, ctx.leadId]
       );
 
       logger.info(`[FlowExecution] ✅ Flow "${flow.name}" completed`);

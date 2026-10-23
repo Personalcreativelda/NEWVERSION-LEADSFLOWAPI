@@ -24,8 +24,12 @@ import {
   AlertCircle,
   Filter,
   CheckSquare,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
+import { AppModal } from '../base/AppModal';
+import { AppButton } from '../base/AppButton';
+import { EmptyState } from '../base/EmptyState';
 import { format, isToday, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from "sonner";
@@ -146,7 +150,10 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
     today: tasks.filter(t => isToday(new Date(t.dueDate)) && t.status !== 'completed').length,
     overdue: tasks.filter(t => isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate)) && t.status === 'pending').length,
     completed: tasks.filter(t => t.status === 'completed').length,
+    upcoming: tasks.filter(t => !isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate)) && t.status !== 'completed').length,
   };
+  const [showFilters, setShowFilters] = useState(false);
+  const activeFilterCount = (priorityFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0);
 
   const handleCreateTask = () => {
     if (!newTask.title.trim()) {
@@ -222,128 +229,128 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Tarefas e Follow-ups"
+        title="Tarefas e lembretes"
         description="Atividades e lembretes da sua equipa"
         icon={CheckSquare}
         create={{ label: 'Nova tarefa', onClick: () => setShowNewTaskModal(true) }}
       />
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <Card className="p-4 bg-card dark:bg-card border-border dark:border-border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">Total Pendentes</p>
-              <p className="text-2xl mt-1 text-foreground dark:text-foreground">{stats.total}</p>
-            </div>
-            <Circle className="w-8 h-8 text-blue-600" />
-          </div>
-        </Card>
-
-        <Card className="p-4 bg-card dark:bg-card border-border dark:border-border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">Para Hoje</p>
-              <p className={`text-2xl mt-1 text-orange-600`}>{stats.today}</p>
-            </div>
-            <Clock className="w-8 h-8 text-orange-600" />
-          </div>
-        </Card>
-
-        <Card className="p-4 bg-card dark:bg-card border-border dark:border-border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">Atrasadas</p>
-              <p className={`text-2xl mt-1 text-red-600`}>{stats.overdue}</p>
-            </div>
-            <AlertCircle className="w-8 h-8 text-red-600" />
-          </div>
-        </Card>
-
-        <Card className="p-4 bg-card dark:bg-card border-border dark:border-border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">Concluídas</p>
-              <p className={`text-2xl mt-1 text-green-600`}>{stats.completed}</p>
-            </div>
-            <CheckCircle2 className="w-8 h-8 text-green-600" />
-          </div>
-        </Card>
+      {/* Separadores com o número de cada um (em vez de 4 cartões) + botão de filtros */}
+      <div className="flex items-center gap-2 border-b border-border">
+        <div
+          className="flex min-w-0 flex-1 gap-1 overflow-x-auto scrollbar-none pr-6"
+          style={{ maskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent)', WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent)' }}
+        >
+          {([
+            ['all', 'Todas', stats.total],
+            ['today', 'Hoje', stats.today],
+            ['overdue', 'Atrasadas', stats.overdue],
+            ['upcoming', 'Próximas', stats.upcoming],
+            ['completed', 'Concluídas', stats.completed],
+          ] as const).map(([f, label, count]) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={`-mb-px flex flex-shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${filter === f ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            >
+              {label}
+              <span className={`min-w-[20px] rounded-full px-1.5 text-center text-xs font-semibold tabular-nums ${filter === f ? 'bg-primary text-primary-foreground' : f === 'overdue' && count > 0 ? 'bg-red-500/15 text-red-600 dark:text-red-400' : 'bg-muted text-muted-foreground'}`}>
+                {count}
+              </span>
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowFilters(true)}
+          className={`relative mb-1 inline-flex h-9 flex-shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium hover:bg-muted ${activeFilterCount ? 'text-primary' : 'text-muted-foreground'}`}
+          aria-label="Filtrar"
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          <span className="hidden sm:inline">Filtrar</span>
+          {activeFilterCount > 0 && (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground">{activeFilterCount}</span>
+          )}
+        </button>
       </div>
 
-
-      {/* Filtros */}
-      <Card className="p-4 bg-card border-border overflow-hidden">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="flex items-center gap-3">
-            <Filter className="w-5 h-5 text-muted-foreground flex-shrink-0 hidden md:block" />
-
-            <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
-              {['all', 'today', 'overdue', 'upcoming', 'completed'].map(f => (
-                <Button
-                  key={f}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setFilter(f as any)}
-                  className={`transition-colors flex-shrink-0 ${filter === f
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted/50'
-                    }`}
+      <AppModal
+        open={showFilters}
+        onOpenChange={setShowFilters}
+        size="sm"
+        title="Filtrar tarefas"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => { setPriorityFilter('all'); setTypeFilter('all'); setShowFilters(false); }}
+              className="h-10 rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-muted"
+            >
+              Limpar
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowFilters(false)}
+              className="h-10 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Ver tarefas
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          <div>
+            <p className="mb-2 text-sm font-medium text-foreground">Prioridade</p>
+            <div className="flex flex-wrap gap-2">
+              {[{ value: 'all', label: 'Todas' }, ...PRIORITY_LEVELS].map(p => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setPriorityFilter(p.value)}
+                  className={`h-9 rounded-full border px-3.5 text-sm ${priorityFilter === p.value ? 'border-primary bg-primary/10 text-primary' : 'border-border text-foreground'}`}
                 >
-                  {f === 'all' && 'Todas'}
-                  {f === 'today' && 'Hoje'}
-                  {f === 'overdue' && 'Atrasadas'}
-                  {f === 'upcoming' && 'Próximas'}
-                  {f === 'completed' && 'Concluídas'}
-                </Button>
+                  {p.label}
+                </button>
               ))}
             </div>
           </div>
-
-          <div className="hidden md:block h-6 w-px bg-muted" />
-
-          <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-[140px] bg-background text-foreground border-border flex-shrink-0">
-                <SelectValue placeholder="Prioridade" />
-              </SelectTrigger>
-              <SelectContent className="text-popover-foreground border-border shadow-md">
-                <SelectItem value="all" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Todas Prioridades</SelectItem>
-                {PRIORITY_LEVELS.map(p => (
-                  <SelectItem key={p.value} value={p.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{p.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[140px] bg-background text-foreground border-border flex-shrink-0">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent className="text-popover-foreground border-border shadow-md">
-                <SelectItem value="all" className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">Todos os Tipos</SelectItem>
-                {TASK_TYPES.map(t => (
-                  <SelectItem key={t.value} value={t.value} className="text-popover-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer">{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div>
+            <p className="mb-2 text-sm font-medium text-foreground">Tipo</p>
+            <div className="flex flex-wrap gap-2">
+              {[{ value: 'all', label: 'Todos' }, ...TASK_TYPES].map(t => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setTypeFilter(t.value)}
+                  className={`h-9 rounded-full border px-3.5 text-sm ${typeFilter === t.value ? 'border-primary bg-primary/10 text-primary' : 'border-border text-foreground'}`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </Card>
+      </AppModal>
 
       {/* Lista de Tarefas */}
       <div className="space-y-3">
         {filteredTasks.length === 0 ? (
-          <Card className="p-12 text-center bg-card dark:bg-card border-border dark:border-border">
-            <div className="w-16 h-16 rounded-full bg-muted dark:bg-muted mx-auto flex items-center justify-center mb-4">
-              <CheckCircle2 className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <p className="text-lg text-foreground dark:text-foreground">
-              Nenhuma tarefa encontrada
-            </p>
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
-              {filter === 'all' ? 'Crie uma nova tarefa para começar' : 'Tente ajustar os filtros'}
-            </p>
-          </Card>
+          tasks.length === 0 ? (
+            <EmptyState
+              icon={CheckSquare}
+              title="Ainda não tem tarefas"
+              description="Crie tarefas e lembretes para não perder nenhum seguimento."
+              action={<AppButton onClick={() => setShowNewTaskModal(true)}><Plus />Criar tarefa</AppButton>}
+            />
+          ) : (
+            <EmptyState
+              icon={CheckCircle2}
+              title="Nada por aqui"
+              description={activeFilterCount ? 'Nenhuma tarefa com estes filtros.' : 'Não há tarefas neste separador.'}
+              action={activeFilterCount ? <AppButton variant="outline" onClick={() => { setPriorityFilter('all'); setTypeFilter('all'); }}>Limpar filtros</AppButton> : undefined}
+            />
+          )
         ) : (
           filteredTasks.map(task => {
             const typeInfo = getTaskTypeInfo(task.type);

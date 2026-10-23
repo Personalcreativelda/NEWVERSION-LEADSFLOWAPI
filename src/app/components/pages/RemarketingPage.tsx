@@ -6,8 +6,9 @@ import {
   ChevronRight, Play, Pause, Copy, Trash2, BarChart3, ArrowRight,
   Tag, ShoppingCart, UserCheck, AlertCircle,
   Layers, Repeat2, Target, Pencil, X, GripVertical, Info,
-  Instagram, Facebook, Send, Split, Mic, RefreshCw, UploadCloud,
+  Instagram, Facebook, Send, Split, Mic, RefreshCw, UploadCloud, MoreHorizontal,
 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { EmptyState } from '../base/EmptyState';
 import { Button } from '../ui/button';
@@ -16,6 +17,7 @@ import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
 import { DashboardCard } from '../base/DashboardCard';
 import { StatusBadge } from '../base/StatusBadge';
+import { formatNumber, formatPercent } from '../../utils/format';
 
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
@@ -172,6 +174,24 @@ const STEP_ICONS: Record<ActionType, React.ElementType> = {
   ab_test: Split,
   dynamic_audio: Mic,
 };
+
+// Nome curto de cada passo (o ícone sozinho não diz o canal)
+const STEP_NAMES: Record<ActionType, string> = {
+  whatsapp: 'WhatsApp',
+  email: 'Email',
+  wait: 'Aguardar',
+  tag: 'Tag',
+  move_stage: 'Mover etapa',
+  condition: 'Condição',
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  telegram: 'Telegram',
+  ab_test: 'Teste A/B',
+  dynamic_audio: 'Áudio',
+};
+
+// Abaixo disto a taxa de conversão não diz nada
+const MIN_ENROLLED_FOR_RATE = 10;
 
 const STEP_COLORS: Record<ActionType, string> = {
   whatsapp: 'text-emerald-500 bg-emerald-500/10',
@@ -647,6 +667,7 @@ export default function RemarketingPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<typeof TEMPLATES[0] | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingFlow, setEditingFlow] = useState<RemarketingFlow | null>(null);
+  const [analysisFlow, setAnalysisFlow] = useState<RemarketingFlow | null>(null);
 
   // ── Dynamic funnel stages from the real leads table ───────────────────────
   const [funnelStages, setFunnelStages] = useState<{ value: string; label: string }[]>(DEFAULT_FUNNEL_STAGES);
@@ -952,7 +973,7 @@ export default function RemarketingPage() {
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
               >
-                {tab === 'flows' && `Meus Fluxos (${flows.length})`}
+                {tab === 'flows' && `Os meus fluxos (${flows.length})`}
                 {tab === 'templates' && 'Modelos'}
               </button>
             ))}
@@ -981,9 +1002,9 @@ export default function RemarketingPage() {
                   )}
                 <div className="grid gap-4">
                   {flows.map(flow => {
-                    const convRate = flow.enrolledLeads > 0
-                      ? Math.round((flow.conversions / flow.enrolledLeads) * 100)
-                      : 0;
+                    const convRate = flow.enrolledLeads >= MIN_ENROLLED_FOR_RATE
+                      ? Math.round((Math.min(flow.conversions, flow.enrolledLeads) / flow.enrolledLeads) * 100)
+                      : null;
                     return (
                       <DashboardCard key={flow.id} disableContentPadding className="hover:border-border/80 transition-all">
                         <div className="p-5">
@@ -1015,7 +1036,7 @@ export default function RemarketingPage() {
                                   <React.Fragment key={step.id}>
                                     <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium ${colorClass}`}>
                                       <StepIcon className="w-3 h-3" />
-                                      <span className="hidden sm:inline">{step.label.split(':')[0]}</span>
+                                      <span>{STEP_NAMES[step.type] || step.label.split(':')[0]}</span>
                                     </div>
                                     {i < flow.steps.length - 1 && (
                                       <ArrowRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
@@ -1034,7 +1055,14 @@ export default function RemarketingPage() {
                             </div>
                             <div className="text-center sm:text-right">
                               <p className="text-xs text-muted-foreground">Conversão</p>
-                              <p className="text-lg font-semibold text-foreground">{convRate}%</p>
+                              {convRate === null ? (
+                                <>
+                                  <p className="text-lg font-semibold text-muted-foreground">—</p>
+                                  <p className="text-[11px] text-muted-foreground">dados insuficientes</p>
+                                </>
+                              ) : (
+                                <p className="text-lg font-semibold text-foreground">{convRate}%</p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1051,22 +1079,28 @@ export default function RemarketingPage() {
                               : <><Play className="w-3.5 h-3.5" /> Ativar</>
                             }
                           </AppButton>
-                          <AppButton size="sm" variant="ghost" onClick={() => setEditingFlow(flow)}>
-                            <Pencil className="w-3.5 h-3.5" />
-                            <span className="text-xs">Editar</span>
-                          </AppButton>
-                          <AppButton size="sm" variant="ghost" onClick={() => handleDuplicate(flow)}>
-                            <Copy className="w-3.5 h-3.5" />
-                          </AppButton>
-                          <AppButton size="sm" variant="ghost" onClick={() => handleDelete(flow.id)}>
-                            <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                          </AppButton>
-                          <div className="ml-auto">
-                            <AppButton size="sm" variant="ghost" className="text-xs text-muted-foreground">
-                              <BarChart3 className="w-3.5 h-3.5" />
-                              Análise
-                            </AppButton>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <AppButton size="sm" variant="ghost" className="ml-auto" aria-label="Mais ações">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </AppButton>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setEditingFlow(flow)}>
+                                <Pencil className="w-4 h-4 mr-2" /> Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDuplicate(flow)}>
+                                <Copy className="w-4 h-4 mr-2" /> Duplicar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setAnalysisFlow(flow)}>
+                                <BarChart3 className="w-4 h-4 mr-2" /> Ver análise
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleDelete(flow.id)} className="text-destructive focus:text-destructive">
+                                <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                         </div>
                       </DashboardCard>
@@ -1143,6 +1177,38 @@ export default function RemarketingPage() {
       </div>
 
       {/* Edit modal */}
+      <AppModal
+        open={!!analysisFlow}
+        onOpenChange={(o) => !o && setAnalysisFlow(null)}
+        size="sm"
+        title="Análise do fluxo"
+        description={analysisFlow?.name}
+      >
+        {analysisFlow && (
+          <dl className="divide-y divide-border">
+            <div className="flex items-center justify-between py-3">
+              <dt className="text-sm text-muted-foreground">Leads inscritos</dt>
+              <dd className="text-sm font-semibold tabular-nums text-foreground">{formatNumber(analysisFlow.enrolledLeads)}</dd>
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <dt className="text-sm text-muted-foreground">Convertidos</dt>
+              <dd className="text-sm font-semibold tabular-nums text-foreground">{formatNumber(Math.min(analysisFlow.conversions, analysisFlow.enrolledLeads))}</dd>
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <dt className="text-sm text-muted-foreground">Taxa de conversão</dt>
+              <dd className="text-sm font-semibold tabular-nums text-foreground">
+                {analysisFlow.enrolledLeads >= MIN_ENROLLED_FOR_RATE
+                  ? formatPercent((Math.min(analysisFlow.conversions, analysisFlow.enrolledLeads) / analysisFlow.enrolledLeads) * 100)
+                  : <span className="font-normal text-muted-foreground">— dados insuficientes</span>}
+              </dd>
+            </div>
+            <p className="pt-3 text-xs text-muted-foreground">
+              A taxa aparece a partir de {MIN_ENROLLED_FOR_RATE} leads inscritos. Conta como conversão o lead que passa a Convertido.
+            </p>
+          </dl>
+        )}
+      </AppModal>
+
       {editingFlow && (
         <EditModal
           flow={editingFlow}
