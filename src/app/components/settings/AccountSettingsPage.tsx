@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { SettingsHub } from './SettingsHub';
 import { Upload, User, Loader2, Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog } from 'lucide-react';
 import { PageHeader } from '../base/PageHeader';
 import { Button } from '../ui/button';
@@ -16,6 +17,11 @@ interface AccountSettingsPageProps {
   user: any;
   onUpdateUser: (updates: any) => void;
   initialTab?: TabType;
+  /** Definições gerais (Canais, Suporte, terminar sessão) no topo da página */
+  onOpenChannels?: () => void;
+  onHelp?: () => void;
+  onFeedback?: () => void;
+  onLogout?: () => void;
 }
 
 interface ApiToken {
@@ -30,7 +36,7 @@ interface ApiToken {
 
 type TabType = 'avatar' | 'name' | 'security' | 'team';
 
-export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: AccountSettingsPageProps) {
+export default function AccountSettingsPage({ user, onUpdateUser, initialTab, onOpenChannels, onHelp, onFeedback, onLogout }: AccountSettingsPageProps) {
   const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'avatar');
   const [loading, setLoading] = useState(false);
@@ -259,7 +265,9 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab }: 
 
   return (
     <div>
-      <PageHeader title="Definições da Conta" description="Perfil, segurança e equipa" icon={UserCog} />
+      <PageHeader title="Definições" description="Canais, suporte, perfil, segurança e equipa" icon={UserCog} />
+
+      <SettingsHub onOpenChannels={onOpenChannels} onHelp={onHelp} onFeedback={onFeedback} onLogout={onLogout} />
 
       {/* Tabs */}
       <div className="border-b border-border dark:border-border mb-6">

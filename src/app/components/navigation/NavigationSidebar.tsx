@@ -9,7 +9,6 @@ import { sidebarConfig, SidebarItemConfig } from '../../config/sidebarConfig';
 import SidebarGroup from './SidebarGroup';
 import InboxTreeMenu from './InboxTreeMenu';
 import { isNativeApp, openSupportChat } from '../../../native';
-import { getInstalledVersion } from '../../../live-update';
 
 // Mapeamento de path para page id
 export const pathToPageId: Record<string, string> = {
@@ -78,11 +77,9 @@ export default function NavigationSidebar({
   const [adminExpanded, setAdminExpanded] = useState(currentPage === 'admin');
   const [adminActiveSubTab, setAdminActiveSubTab] = useState<string>('');
   const [sidebarSearch, setSidebarSearch] = useState('');
-  // Versão em uso no app (pacote ao vivo ou APK), no fundo do menu do telemóvel
-  const [appVersion, setAppVersion] = useState<string | null>(null);
-  useEffect(() => {
-    if (isNativeApp()) void getInstalledVersion().then(setAppVersion);
-  }, []);
+  // Foto do perfil que não carrega → iniciais
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  useEffect(() => setAvatarFailed(false), [user?.avatar_url]);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
 
@@ -125,8 +122,11 @@ export default function NavigationSidebar({
   // Procura no nome, secção, palavras-chave (sinónimos e sub-páginas, ex.: "leads",
   // "whatsapp", "senha") e nos sub-itens
   const isSearching = sidebarSearch.trim().length > 0;
+  // No telemóvel, Início, Conversas e Leads já estão na barra inferior
+  const TAB_BAR_ITEMS = new Set(['dashboard', 'inbox', 'leads']);
+  const menuItems = isMobile ? sidebarConfig.filter(item => !TAB_BAR_ITEMS.has(item.id)) : sidebarConfig;
   const filteredSidebarConfig = isSearching
-    ? sidebarConfig.filter(item =>
+    ? menuItems.filter(item =>
         matchesSearch(
           sidebarSearch,
           t[item.labelKey as keyof Translations],
@@ -136,7 +136,7 @@ export default function NavigationSidebar({
           ...(item.children || []).map(child => t[child.labelKey as keyof Translations]),
         )
       )
-    : sidebarConfig;
+    : menuItems;
   const showAdminInSearch = isAdmin && (!isSearching ||
     matchesSearch(sidebarSearch, t.admin, 'admin administracao', ...adminSubItems.map(sub => sub.label)));
 
@@ -226,7 +226,7 @@ export default function NavigationSidebar({
             {item.sectionLabel && !isSearching && (
               isCollapsed
                 ? <li className="sidebar-collapsed-divider" />
-                : <li className="px-3 pt-6 pb-1.5 sidebar-section-label">
+                : <li className={`px-3 ${isMobile ? 'pt-4' : 'pt-6'} pb-1.5 sidebar-section-label`}>
                     <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[hsl(var(--sidebar-muted))] opacity-60">
                       {item.sectionLabel}
                     </span>
@@ -254,7 +254,7 @@ export default function NavigationSidebar({
           {item.sectionLabel && !isSearching && (
             isCollapsed
               ? <li className="sidebar-collapsed-divider" />
-              : <li className="px-3 pt-6 pb-1.5 sidebar-section-label">
+              : <li className={`px-3 ${isMobile ? 'pt-4' : 'pt-6'} pb-1.5 sidebar-section-label`}>
                   <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[hsl(var(--sidebar-muted))] opacity-60">
                     {item.sectionLabel}
                   </span>
@@ -292,7 +292,7 @@ export default function NavigationSidebar({
         {item.sectionLabel && !isSearching && (
           isCollapsed
             ? <li className="sidebar-collapsed-divider" />
-            : <li className="px-3 pt-6 pb-1.5 sidebar-section-label">
+            : <li className={`px-3 ${isMobile ? 'pt-4' : 'pt-6'} pb-1.5 sidebar-section-label`}>
                 <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[hsl(var(--sidebar-muted))] opacity-60">
                   {item.sectionLabel}
                 </span>
@@ -374,7 +374,7 @@ export default function NavigationSidebar({
     if (start.horizontal === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
       start.horizontal = Math.abs(dx) > Math.abs(dy);
     }
-    if (start.horizontal) setDragX(Math.min(0, dx));
+    if (start.horizontal) setDragX(Math.max(0, dx));
   };
 
   const handleTouchEnd = () => {
@@ -383,7 +383,7 @@ export default function NavigationSidebar({
     if (!start?.horizontal) return;
     const width = sidebarRef.current?.offsetWidth || 300;
     const velocity = Math.abs(dragX) / Math.max(1, Date.now() - start.t);
-    if (dragX < -width * 0.3 || (dragX < -30 && velocity > 0.5)) onClose();
+    if (dragX > width * 0.3 || (dragX > 30 && velocity > 0.5)) onClose();
     setDragX(0);
   };
 
@@ -399,7 +399,7 @@ export default function NavigationSidebar({
           className={`fixed inset-0 z-[46] bg-black/50 transition-opacity duration-300 ${
             isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
-          style={dragX ? { opacity: Math.max(0, 1 + dragX / 300), transition: 'none' } : undefined}
+          style={dragX ? { opacity: Math.max(0, 1 - dragX / 300), transition: 'none' } : undefined}
           onClick={onClose}
           aria-hidden="true"
         />
@@ -415,7 +415,7 @@ export default function NavigationSidebar({
         className={`sidebar-root flex flex-col flex-shrink-0 ${
           isMobile
             // Fechado: sem sombra — fora do ecrã ela aparecia como uma linha na borda esquerda
-            ? `sidebar-mobile fixed top-0 left-0 z-[47] h-[100dvh] w-[85vw] max-w-[320px] rounded-r-2xl overflow-hidden ease-[cubic-bezier(0.32,0.72,0,1)] ${dragX ? '' : 'transition-transform duration-300'} ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full shadow-none!'}`
+            ? `sidebar-mobile fixed top-0 right-0 z-[47] h-[100dvh] w-[85vw] max-w-[320px] rounded-l-2xl overflow-hidden ease-[cubic-bezier(0.32,0.72,0,1)] ${dragX ? '' : 'transition-transform duration-300'} ${isOpen ? 'translate-x-0 shadow-2xl' : 'translate-x-full shadow-none!'}`
             : `fixed top-0 left-0 h-screen z-40 ${isResizing ? '' : 'transition-[width] duration-200 ease-out'}`
         }`}
         style={!isMobile ? { width: computedWidth } : dragX ? { transform: `translateX(${dragX}px)` } : undefined}
@@ -444,7 +444,6 @@ export default function NavigationSidebar({
                 </div>
                 <div className="flex-1 overflow-hidden">
                   <p className="text-sm font-bold leading-tight truncate text-[hsl(var(--sidebar-foreground))]">LeadsFlow</p>
-                  <p className="text-[11.5px] truncate text-[hsl(var(--sidebar-muted))]">Sales & Automation</p>
                 </div>
                 {!isMobile && onToggleCollapse && (
                   <button
@@ -480,7 +479,7 @@ export default function NavigationSidebar({
                     value={sidebarSearch}
                     onChange={e => setSidebarSearch(e.target.value)}
                     onKeyDown={handleSearchKeyDown}
-                    placeholder="Pesquisar páginas..."
+                    placeholder="Pesquisar..."
                     aria-label="Pesquisar páginas"
                     className="sidebar-search-input w-full pl-8 pr-3 py-[7px] text-[12px] rounded-md"
                   />
@@ -611,8 +610,8 @@ export default function NavigationSidebar({
                 onClick={() => handleItemClick('account')}
                 className="w-[calc(100%-16px)] mx-2 mt-2 flex items-center gap-3 p-2.5 rounded-xl transition-colors duration-150 hover:bg-[hsl(var(--sidebar-border))] active:bg-[hsl(var(--sidebar-border))] text-left"
               >
-                {user?.avatar_url ? (
-                  <img src={user.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                {user?.avatar_url && !avatarFailed ? (
+                  <img src={user.avatar_url} alt="" onError={() => setAvatarFailed(true)} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
                 ) : (
                   <span className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center bg-[hsl(var(--sidebar-primary)/0.15)] text-[hsl(var(--sidebar-primary))] text-sm font-semibold">
                     {userInitials}
@@ -626,34 +625,10 @@ export default function NavigationSidebar({
               </button>
             )}
 
-            {/* Mobile: atalhos secundários numa fila compacta em vez de quatro linhas */}
+            {/* Rodapé no telemóvel: só o cartão do perfil (Ajuda, Opinião, Suporte e
+                Sair estão em Definições → Suporte) */}
             {isMobile ? (
-              <div className="grid grid-cols-4 gap-1 px-2 pt-1 pb-2">
-                {[
-                  { label: 'Ajuda', icon: HelpCircle, onClick: () => { onClose(); onHelp?.(); } },
-                  { label: 'Opinião', icon: Star, onClick: () => { onClose(); onFeedback?.(); } },
-                  { label: 'Suporte', icon: LifeBuoy, onClick: () => { onClose(); openSupportChat(); } },
-                  ...(onLogout ? [{ label: 'Sair', icon: LogOut, onClick: onLogout, danger: true }] : []),
-                ].map(({ label, icon: ActionIcon, onClick, danger }: any) => (
-                  <button
-                    key={label}
-                    onClick={onClick}
-                    className={`flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[11.5px] font-medium transition-colors duration-150 ${
-                      danger
-                        ? 'text-red-400 hover:bg-red-500/10 active:bg-red-500/10'
-                        : 'text-[hsl(var(--sidebar-foreground)/0.7)] hover:bg-[hsl(var(--sidebar-border))] active:bg-[hsl(var(--sidebar-border))]'
-                    }`}
-                  >
-                    <ActionIcon className="w-5 h-5" />
-                    {label}
-                  </button>
-                ))}
-                {appVersion && (
-                  <p className="col-span-4 pt-1 text-center text-[11px] text-[hsl(var(--sidebar-muted))]">
-                    LeadsFlow · versão {appVersion}
-                  </p>
-                )}
-              </div>
+              <div style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }} />
             ) : (
             <div className="px-2 py-2 space-y-0.5">
               {/* Help */}

@@ -92,3 +92,27 @@ export function formatTime(value: unknown): string {
   const d = toDate(value);
   return d ? d.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' }) : '';
 }
+
+/**
+ * Data relativa para listas: hoje → hora (ou "Hoje"), "Ontem", dia da semana nos
+ * últimos 7 dias, e 21/10 (ou 21/10/2025 noutro ano) para mais antigas.
+ */
+export function formatRelativeDay(value: unknown, today: 'time' | 'label' = 'label'): string {
+  const d = toDate(value);
+  if (!d) return '';
+  const now = new Date();
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(d)) / 86400000);
+  if (days <= 0) return today === 'time' ? formatTime(d) : 'Hoje';
+  if (days === 1) return 'Ontem';
+  if (days < 7) {
+    const weekday = d.toLocaleDateString(getLocale(), { weekday: 'long' });
+    const short = weekday.replace(/-feira$/, ''); // "Terça-feira" → "Terça"
+    return short.charAt(0).toUpperCase() + short.slice(1);
+  }
+  return d.toLocaleDateString(getLocale(), {
+    day: '2-digit',
+    month: '2-digit',
+    ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+  });
+}

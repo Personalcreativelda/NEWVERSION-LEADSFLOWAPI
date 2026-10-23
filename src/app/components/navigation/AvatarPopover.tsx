@@ -50,7 +50,7 @@ export default function AvatarPopover({
             {user?.name || 'Utilizador'}
           </p>
           <p className="text-xs mt-0.5 text-muted-foreground">
-            {user?.email || 'user@example.com'}
+            {user?.email || ''}
           </p>
         </div>
         

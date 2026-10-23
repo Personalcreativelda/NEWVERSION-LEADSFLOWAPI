@@ -19,6 +19,7 @@ import { ContactDetailsPanel } from '../../inbox/ContactDetailsPanel';
 import { NewConversationModal } from '../../inbox/NewConversationModal';
 import { ResizeHandle } from '../../inbox/ResizeHandle';
 import { PageFab } from '../../base/PageHeader';
+import { formatNumber } from '../../../utils/format';
 import type { TeamMember } from '../../../types/inbox';
 
 interface ConversasConversationsProps {
@@ -247,9 +248,25 @@ export default function ConversasConversations({
         await handleChangeStatus(isResolved ? 'open' : 'resolved');
     };
 
+    const [showWsBanner, setShowWsBanner] = useState(false);
+    useEffect(() => {
+        if (wsConnected) {
+            setShowWsBanner(false);
+            return;
+        }
+        const t = setTimeout(() => setShowWsBanner(true), 6000);
+        return () => clearTimeout(t);
+    }, [wsConnected]);
+
     const toggleSelectMode = () => {
         setIsSelectMode(prev => !prev);
         setSelectedConvIds(new Set());
+    };
+
+    // Toque longo numa conversa: entra em seleção já com ela marcada
+    const startSelectionWith = (id: string) => {
+        setIsSelectMode(true);
+        setSelectedConvIds(prev => new Set(prev).add(id));
     };
 
     const toggleSelectConv = (id: string) => {
@@ -487,6 +504,15 @@ export default function ConversasConversations({
     // Collapsed stub width (icon-only strip)
     const COLLAPSED_STUB = 40;
 
+    // Ligação em tempo real em baixo: aviso discreto (as conversas continuam a atualizar por consulta)
+    const wsBanner = showWsBanner ? (
+        <div role="status" className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border-b border-amber-500/20 flex-shrink-0">
+            <WifiOff size={14} className="flex-shrink-0" />
+            <span className="flex-1">Ligação em tempo real interrompida. A tentar ligar de novo…</span>
+            <button onClick={() => refreshConversations()} className="font-semibold underline-offset-2 hover:underline">Atualizar</button>
+        </div>
+    ) : null;
+
     return (
         <div className="flex w-full min-w-0 h-full max-h-full overflow-hidden bg-background relative">
 
@@ -519,6 +545,7 @@ export default function ConversasConversations({
                         ) : (
                             /* ── Expanded list ── */
                             <>
+                                {wsBanner}
                                 {/* Header */}
                                 <div className="p-3 border-b border-border bg-card/95 backdrop-blur-sm flex-shrink-0">
                                     <div className="flex items-center justify-between mb-3">
@@ -539,17 +566,6 @@ export default function ConversasConversations({
                                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
                                                 </span>
                                             )}
-                                            <div
-                                                className={`hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] cursor-pointer transition-colors ${
-                                                    wsConnected
-                                                        ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                                                        : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
-                                                }`}
-                                                onClick={() => !wsConnected && refreshConversations()}
-                                                title={wsConnected ? 'Tempo real ativo' : 'Polling ativo'}
-                                            >
-                                                {wsConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
-                                            </div>
                                         </div>
                                         <div className="flex items-center gap-0.5 flex-shrink-0">
                                             <button
@@ -806,6 +822,7 @@ export default function ConversasConversations({
                                         isSelectMode={isSelectMode}
                                         selectedIds={selectedConvIds}
                                         onToggleSelect={toggleSelectConv}
+                                        onLongPress={startSelectionWith}
                                     />
                                 </div>
                             </>
@@ -822,47 +839,11 @@ export default function ConversasConversations({
             {/* Mobile: Conversation List (full width, hidden when chat open) */}
             {isMobile && !selectedConversation && (
                 <div className="flex flex-col w-full h-full bg-card">
+                    {wsBanner}
                     {/* Mobile Header */}
                     <div className="p-4 border-b border-border bg-card/95 backdrop-blur-sm flex-shrink-0">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-lg font-semibold text-foreground">Conversas</h1>
-                                {unreadCount > 0 && (
-                                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold bg-primary text-white">
-                                        {unreadCount}
-                                    </span>
-                                )}
-                                {conversationsRefreshing && (
-                                    <span className="relative flex h-2.5 w-2.5 flex-shrink-0" title="A atualizar...">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
-                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
-                                    </span>
-                                )}
-                                <div
-                                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-pointer ${
-                                        wsConnected
-                                            ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                                            : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
-                                    }`}
-                                    onClick={() => !wsConnected && refreshConversations()}
-                                >
-                                    {wsConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                {/* Nova conversa: FAB (padrão de criar da app), só com a lista visível */}
-                                {!selectedConversation && (
-                                    <PageFab label="Nova conversa" onClick={() => setShowNewConversationModal(true)} />
-                                )}
-                                <button
-                                    onClick={toggleSelectMode}
-                                    className={`p-2 rounded-lg transition-colors ${isSelectMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:bg-muted'}`}
-                                    title={isSelectMode ? 'Cancelar seleção' : 'Selecionar conversas'}
-                                >
-                                    <CheckSquare size={18} />
-                                </button>
-                            </div>
-                        </div>
+                        {/* Nova conversa: FAB (padrão de criar da app), só com a lista visível */}
+                        <PageFab label="Nova conversa" onClick={() => setShowNewConversationModal(true)} />
 
                         {/* Mobile selection toolbar */}
                         {isSelectMode && (
@@ -906,11 +887,15 @@ export default function ConversasConversations({
 
                         {/* Mobile: WhatsApp-style quick filter tabs */}
                         <div className="flex items-center gap-2 mt-3">
-                            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0">
+                            <div
+                                className="flex items-center gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 pr-6"
+                                // Esbate a margem direita para indicar que há mais chips
+                                style={{ maskImage: 'linear-gradient(to right, black calc(100% - 28px), transparent)', WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 28px), transparent)' }}
+                            >
                                 {visibleFilters.map(f => {
                                     const isActive = quickFilter === f.id;
                                     const badge = f.id === 'unread' && totalUnread > 0
-                                        ? totalUnread > 99 ? '99+' : String(totalUnread)
+                                        ? formatNumber(totalUnread, { notation: 'compact', maximumFractionDigits: 1 })
                                         : f.id === 'groups' && groupCount > 0
                                             ? String(groupCount)
                                             : null;
@@ -1008,6 +993,7 @@ export default function ConversasConversations({
                             isSelectMode={isSelectMode}
                             selectedIds={selectedConvIds}
                             onToggleSelect={toggleSelectConv}
+                            onLongPress={startSelectionWith}
                         />
                     </div>
                 </div>

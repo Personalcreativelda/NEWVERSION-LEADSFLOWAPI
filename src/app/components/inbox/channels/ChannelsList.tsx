@@ -1,7 +1,8 @@
 // INBOX: Lista e gestão de canais com UI Moderna inspirada no Chatwoot
 import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
-import { ChannelCard } from './ChannelCard';
+import { ChannelRow, ChannelDetailSheet, AddChannelSheet } from './ChannelRows';
+import { EmptyState } from '../../base/EmptyState';
 import { WhatsAppConnect } from './WhatsAppConnect';
 import { WhatsAppCloudConnect } from './WhatsAppCloudConnect';
 import { TelegramConnect } from './TelegramConnect';
@@ -133,6 +134,8 @@ export function ChannelsList() {
     const [activeStep] = useState(1);
     const [sidebarExpanded, setSidebarExpanded] = useState(true);
     const [channelsExpanded, setChannelsExpanded] = useState(true);
+    const [detailChannel, setDetailChannel] = useState<Channel | null>(null);
+    const [addOpen, setAddOpen] = useState(false);
 
     // Abrir modal de edição para qualquer tipo de canal
     const openEditModal = (channel: Channel) => {
@@ -197,7 +200,7 @@ export function ChannelsList() {
     };
 
     const handleDelete = async (channel: Channel) => {
-        if (!confirm(`Remover canal ${channel.name}?`)) return;
+        if (!confirm(`Desligar o canal ${channel.name || ''}? As conversas antigas mantêm-se.`)) return;
         try {
             await channelsApi.delete(channel.id);
             setChannels(prev => prev.filter(c => c.id !== channel.id));
@@ -234,181 +237,72 @@ export function ChannelsList() {
     };
 
     return (
-        <div
-            className="h-full min-w-0 flex flex-col md:flex-row rounded-xl border overflow-hidden"
-            style={{
-                backgroundColor: 'hsl(var(--background))',
-                borderColor: 'hsl(var(--border))'
-            }}
-        >
-
-            {/* Sidebar Stepper (Visual) - Hidden on mobile */}
-            <div
-                className="hidden md:block w-64 border-r p-6 flex-shrink-0"
-                style={{
-                    backgroundColor: 'hsl(var(--card))',
-                    borderColor: 'hsl(var(--border))'
-                }}
-            >
-                {/* Caixas de Entrada - Dropdown colapsável */}
-                <button
-                    onClick={() => setSidebarExpanded(!sidebarExpanded)}
-                    className="flex items-center justify-between w-full text-lg font-bold mb-4 hover:opacity-80 transition-opacity"
-                    style={{ color: 'hsl(var(--foreground))' }}
-                >
-                    <span>Caixas de Entrada</span>
-                    {sidebarExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                </button>
-
-                {sidebarExpanded && (
-                    <div className="relative space-y-8 mb-8">
-                        <div className="absolute left-[15px] top-8 bottom-8 w-0.5 -z-10" style={{ backgroundColor: 'hsl(var(--border))' }}></div>
-                        <div className="flex gap-4">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 1 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 1 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>1</div>
-                            <div>
-                                <h3 className={`font-medium text-sm ${activeStep === 1 ? 'text-blue-600 dark:text-blue-400' : ''}`} style={activeStep === 1 ? {} : { color: 'hsl(var(--foreground))' }}>Escolha o Canal</h3>
-                                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>Escolha o provedor que deseja integrar.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-4">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 2 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 2 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>2</div>
-                            <div>
-                                <h3 className="font-medium text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>Configuração</h3>
-                                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>Autentique e configure a caixa de entrada.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-4">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${activeStep >= 3 ? 'bg-blue-600 text-white' : ''}`} style={activeStep >= 3 ? {} : { backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>3</div>
-                            <div>
-                                <h3 className="font-medium text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>Pronto!</h3>
-                                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>Comece a atender seus leads.</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Seus Canais Ativos - com engrenagem de configurações */}
-                <div className="pt-4 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
+        <div className="min-w-0">
+            {/* Canais ligados: lista nativa; toque abre o detalhe */}
+            <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-[15px] font-semibold text-foreground">Canais ligados</h2>
+                {channels.length > 0 && (
                     <button
-                        onClick={() => setChannelsExpanded(!channelsExpanded)}
-                        className="flex items-center justify-between w-full mb-3 hover:opacity-80 transition-opacity"
+                        type="button"
+                        onClick={() => setAddOpen(true)}
+                        className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
                     >
-                        <h4 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                            Seus Canais Ativos
-                        </h4>
-                        {channelsExpanded ? <ChevronDown className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} /> : <ChevronRight className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />}
+                        <Plus className="h-4 w-4" />
+                        Adicionar canal
                     </button>
-                    {channelsExpanded && (
-                        <div className="space-y-1">
-                            {channels.length > 0 ? channels.map(c => {
-                                const channelConfig = AVAILABLE_CHANNELS.find(
-                                    ac => ac.id === c.type || (c.type === 'whatsapp' && ac.id === 'whatsapp')
-                                );
-                                const ChannelIcon = channelConfig?.icon || MessageSquare;
-                                const iconColor = channelConfig?.color || 'text-muted-foreground';
-
-                                return (
-                                    <div key={c.id} className="flex items-center gap-2 text-sm group py-1.5 px-2 rounded-lg hover:bg-muted/50 transition-colors" style={{ color: 'hsl(var(--foreground))' }}>
-                                        <ChannelIcon className={`w-4 h-4 flex-shrink-0 ${iconColor}`} />
-                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${c.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                                        <span className="truncate flex-1">{c.name}</span>
-                                        {/* WhatsApp Evolution API não permite edição (precisa reconectar via QR) */}
-                                        {c.type !== 'whatsapp' && (
-                                            <button
-                                                onClick={() => openEditModal(c)}
-                                                className="p-1 rounded hover:bg-muted transition-all"
-                                                title="Definições do canal"
-                                            >
-                                                <Settings className="w-3.5 h-3.5" style={{ color: 'hsl(var(--muted-foreground))' }} />
-                                            </button>
-                                        )}
-                                    </div>
-                                );
-                            }) : (
-                                <p className="text-xs italic px-2" style={{ color: 'hsl(var(--muted-foreground))' }}>Nenhum canal ativo</p>
-                            )}
-                        </div>
-                    )}
-                </div>
+                )}
             </div>
 
-            {/* Main Content: Channel Grid */}
-            <div className="flex-1 overflow-y-auto p-6 md:p-10">
+            {loading && channels.length === 0 ? (
+                <SkeletonChannelGrid count={4} />
+            ) : channels.length === 0 ? (
+                <EmptyState
+                    icon={MessageSquare}
+                    title="Ainda não tem canais ligados"
+                    description="Ligue o WhatsApp, o chat do site ou outro canal para receber conversas."
+                    action={
+                        <button
+                            type="button"
+                            onClick={() => setAddOpen(true)}
+                            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Adicionar canal
+                        </button>
+                    }
+                />
+            ) : (
+                <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+                    {channels.map(channel => (
+                        <ChannelRow key={channel.id} channel={channel} onOpen={setDetailChannel} />
+                    ))}
+                </ul>
+            )}
 
-                {/* Loading skeleton */}
-                {loading && channels.length === 0 && (
-                    <SkeletonChannelGrid count={8} />
-                )}
+            <ChannelDetailSheet
+                channel={detailChannel}
+                onClose={() => setDetailChannel(null)}
+                onRename={async (channel, name) => {
+                    await handleRename(channel, name);
+                    setDetailChannel(prev => (prev && prev.id === channel.id ? { ...prev, name } : prev));
+                }}
+                onOpenSettings={(channel) => {
+                    setDetailChannel(null);
+                    openEditModal(channel);
+                }}
+                onDisconnect={async (channel) => {
+                    await handleDelete(channel);
+                    setDetailChannel(null);
+                }}
+                onSynced={() => loadChannels()}
+            />
 
-                {/* Seção de Canais Ativos (Cards completos) */}
-                {!loading && channels.length > 0 && (
-                    <div className="mb-10">
-                        <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
-                            <span className="w-1.5 h-6 bg-green-500 rounded-full"></span>
-                            Canais Ligados
-                        </h2>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {channels.map(channel => (
-                                <ChannelCard
-                                    key={channel.id}
-                                    channel={channel}
-                                    onDelete={handleDelete}
-                                    onLinkInstance={handleLinkInstance}
-                                    onRename={handleRename}
-                                    onEdit={openEditModal}
-                                    onSync={() => loadChannels()}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Grid de Seleção (Estilo Chatwoot) */}
-                {!loading && <div>
-                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
-                        <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
-                        Adicionar Novo Canal
-                    </h2>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {AVAILABLE_CHANNELS.map((item) => {
-                            const Icon = item.icon;
-                            const svgSrc = CHANNEL_SVG[item.id];
-                            return (
-                                <button
-                                    key={item.id}
-                                    onClick={() => handleConnect(item.id)}
-                                    className="group flex flex-col items-start p-5 border rounded-lg hover:border-foreground/20 hover:shadow-sm transition-all duration-150 text-left active:scale-[0.98]"
-                                    style={{ 
-                                        backgroundColor: 'hsl(var(--card))',
-                                        borderColor: 'hsl(var(--border))'
-                                    }}
-                                >
-                                    <div 
-                                        className="p-2.5 rounded-lg mb-3 group-hover:scale-105 transition-transform duration-150"
-                                        style={{ backgroundColor: 'hsl(var(--muted))' }}
-                                    >
-                                        {svgSrc ? (
-                                            <img src={svgSrc} alt={item.name} width={36} height={36} className="object-contain" />
-                                        ) : (
-                                            <Icon size={36} className={item.color} />
-                                        )}
-                                    </div>
-                                    <h3 className="font-semibold text-sm mb-0.5" style={{ color: 'hsl(var(--foreground))' }}>
-                                        {item.name}
-                                    </h3>
-                                    <p className="text-xs leading-relaxed" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                        {item.description}
-                                    </p>
-                                </button>
-                            )
-                        })}
-
-                    </div>
-                </div>
-                }
-
-            </div>
+            <AddChannelSheet
+                open={addOpen}
+                onClose={() => setAddOpen(false)}
+                channels={AVAILABLE_CHANNELS}
+                onPick={handleConnect}
+            />
 
             <WhatsAppConnect
                 isOpen={modalOpen}

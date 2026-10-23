@@ -69,7 +69,7 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
         title={
           <span className="flex items-center gap-2 text-sm font-semibold">
             <Brain className="w-4 h-4 text-primary" />
-            Motor de Vendas
+            Assistente de vendas IA
           </span>
         }
       >
@@ -88,7 +88,7 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
           <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
             <Brain className="w-3.5 h-3.5 text-primary" />
           </div>
-          <span className="text-sm font-semibold text-foreground">Motor de Vendas</span>
+          <span className="text-sm font-semibold text-foreground">Assistente de vendas IA</span>
           {(stats.hot_count ?? 0) > 0 && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[10px] font-semibold">
               <Flame className="w-2.5 h-2.5" />
@@ -106,7 +106,7 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
       ) : !hasData ? (
         <EmptyState
           title="Ainda sem análise de IA"
-          description="Abra o Motor de Vendas no menu para analisar os seus leads."
+          description="Abra o Assistente de vendas IA no menu para analisar os seus leads."
           imgSrc="/assets/icons/empty/ic_content.svg"
         />
       ) : (

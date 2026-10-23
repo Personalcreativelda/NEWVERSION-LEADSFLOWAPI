@@ -1,5 +1,6 @@
 // INBOX: Conversation item - ManyChat-style
 import type { ConversationWithDetails, ConversationTagInfo } from '../../types/inbox';
+import { formatRelativeDay } from '../../utils/format';
 import { usableImageUrl } from '../../utils/media-url';
 import {
     MessageCircle,
@@ -124,23 +125,9 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
     const leadTags: string[] = (contact as any)?.tags || conversation.metadata?.tags || [];
     const conversationTags: ConversationTagInfo[] = (conversation as any).conversation_tags || [];
 
-    const formatDate = (dateString?: string) => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        const now = new Date();
+    // Hoje → hora; "Ontem"; dia da semana nesta semana; 21/10 para mais antigas (locale ativo)
+    const formatDate = (dateString?: string) => formatRelativeDay(dateString, 'time');
 
-        if (date.toDateString() === now.toDateString()) {
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        }
-        
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        if (date.toDateString() === yesterday.toDateString()) {
-            return 'Ontem';
-        }
-        
-        return date.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
-    };
 
     const getAvatarColor = (name: string) => {
         const colors = [

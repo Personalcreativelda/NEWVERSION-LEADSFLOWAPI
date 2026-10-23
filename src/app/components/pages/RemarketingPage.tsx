@@ -192,7 +192,7 @@ const TRIGGER_OPTIONS: { value: TriggerType; label: string; description: string 
   { value: 'tag', label: 'Tag aplicada', description: 'Dispara quando a tag especificada é adicionada ao lead.' },
   { value: 'inactivity', label: 'Inatividade', description: 'Dispara automaticamente quando o lead não é contactado há X dias (verificação a cada 6h).' },
   { value: 'purchase', label: 'Compra realizada', description: 'Dispara quando o lead é marcado como Convertido no funil.' },
-  { value: 'lead_score', label: 'Motor de Vendas', description: 'Dispara quando o Motor de Vendas calcula um score ≥ X ao analisar os leads.' },
+  { value: 'lead_score', label: 'Assistente de vendas IA', description: 'Dispara quando o Assistente de vendas IA calcula um score ≥ X ao analisar os leads.' },
 ];
 
 const ACTION_OPTIONS: { value: ActionType; label: string }[] = [

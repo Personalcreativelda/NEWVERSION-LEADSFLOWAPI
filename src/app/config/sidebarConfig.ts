@@ -26,7 +26,6 @@ export const sidebarConfig: SidebarItemConfig[] = [
     { id: 'dashboard', labelKey: 'dashboard', icon: Home, path: '/dashboard', keywords: 'inicio home painel visao geral resumo' },
     // Comunicação
     { id: 'inbox', labelKey: 'inbox', icon: MessageSquare, path: '/dashboard/inbox', sectionLabel: 'Comunicação', keywords: 'conversas mensagens chat caixa de entrada whatsapp instagram facebook messenger telegram email' },
-    { id: 'inbox-settings', labelKey: 'canais', icon: Radio, path: '/dashboard/inbox/settings', keywords: 'canais conexoes ligar conectar numero whatsapp instagram facebook telegram email' },
     { id: 'leads', labelKey: 'contactos', icon: Users, path: '/dashboard/leads', keywords: 'leads contatos clientes lista importar exportar' },
     // Vendas
     { id: 'funnel', labelKey: 'salesFunnel', icon: Workflow, path: '/dashboard/funnel', sectionLabel: 'Vendas', keywords: 'funil pipeline kanban etapas negocios oportunidades' },

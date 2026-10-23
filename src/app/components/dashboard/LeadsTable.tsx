@@ -1,4 +1,5 @@
 import { matchesSearch } from '../../utils/search';
+import { LeadListRow } from './LeadListRow';
 import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, Megaphone, Instagram, Facebook, Send, Smartphone, Search, Plus, CopyX, Users } from 'lucide-react';
 import { useState } from 'react';
 import type { Lead } from '../../types';
@@ -10,7 +11,7 @@ import { AppButton } from '../base/AppButton';
 import { StatusBadge, type StatusTone } from '../base/StatusBadge';
 import { EmptyState } from '../base/EmptyState';
 import { ResponsiveTable, type ResponsiveTableColumn } from '../base/ResponsiveTable';
-import { getLocale } from '../../utils/format';
+import { formatNumber, getLocale } from '../../utils/format';
 
 const LEADS_POR_PAGINA = 50;
 
@@ -147,6 +148,8 @@ interface LeadsTableProps {
   onExport: () => void;
   onImport: () => void;
   onImportWhatsApp?: () => void;
+  /** Abrir o detalhe do lead (toque na linha, telemóvel) */
+  onView?: (leadId: string) => void;
   /** Remover leads duplicados (fica na barra da tabela, junto das outras ações) */
   onRemoveDuplicates?: () => void;
   onToggleEmailMarketing?: (leadId: string) => void;
@@ -171,6 +174,7 @@ export default function LeadsTable({
   onExport,
   onImport,
   onImportWhatsApp,
+  onView,
   onRemoveDuplicates,
   onNovoLead,
   onCampaigns,
@@ -338,6 +342,22 @@ export default function LeadsTable({
     },
   ];
 
+
+  // Telemóvel: quantos leads mostrar antes de "Mostrar mais"
+  const [mobileLimit, setMobileLimit] = useState(LEADS_POR_PAGINA);
+  const emptyStateNode = (
+    busca.trim() ? (
+      <EmptyState icon={Search} title="Nenhum lead encontrado" description={`Nada corresponde a "${busca.trim()}".`} />
+    ) : (
+      <EmptyState
+        icon={Users}
+        title="Ainda não tem leads"
+        description="Adicione o primeiro ou importe a sua lista."
+        action={onNovoLead ? <AppButton onClick={handleNovoLeadClick} disabled={isAdicionarBlocked}><Plus />Adicionar lead</AppButton> : undefined}
+      />
+    )
+  );
+
   return (
     <DashboardCard disableContentPadding>
       {/* Header da Tabela */}
@@ -479,7 +499,7 @@ export default function LeadsTable({
         </div>
       </div>
 
-      {/* Tabela */}
+      {/* Tabela (desktop) / lista nativa (telemóvel) */}
       {loading && leads.length === 0 ? (
         <div className="p-4">
           {Array.from({ length: 7 }).map((_, i) => (
@@ -487,7 +507,39 @@ export default function LeadsTable({
           ))}
         </div>
       ) : (
-        <div className="p-4 md:p-5">
+        <>
+        {/* Telemóvel: linhas de lista (toque abre o detalhe; deslizar mostra Mensagem e Eliminar) */}
+        <div className="md:hidden">
+          {leadsFiltrados.length === 0 ? (
+            <div className="p-4">{emptyStateNode}</div>
+          ) : (
+            <>
+              <ul className="divide-y divide-border border-t border-border">
+                {leadsFiltrados.slice(0, mobileLimit).map((lead) => (
+                  <LeadListRow
+                    key={lead.id}
+                    lead={lead}
+                    onOpen={(l) => (onView ? onView(l.id!) : onEdit(l.id!))}
+                    onMessage={(l) => onChat(l.id!)}
+                    onDelete={(l) => onDelete(l.id!)}
+                  />
+                ))}
+              </ul>
+              {leadsFiltrados.length > mobileLimit && (
+                <div className="p-4">
+                  <button
+                    type="button"
+                    onClick={() => setMobileLimit((n) => n + LEADS_POR_PAGINA)}
+                    className="h-11 w-full rounded-xl border border-border text-sm font-medium text-foreground hover:bg-muted"
+                  >
+                    Mostrar mais ({formatNumber(leadsFiltrados.length - mobileLimit)})
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        <div className="hidden md:block p-4 md:p-5">
           <ResponsiveTable
             columns={columns}
             rows={leadsFiltrados}
@@ -499,20 +551,10 @@ export default function LeadsTable({
             rowsPerPage={LEADS_POR_PAGINA}
             stickyHeader
             rowClassName={(lead) => (lead.marcado_email ? 'bg-primary/5 hover:bg-primary/10' : undefined)}
-            emptyState={
-              busca.trim() ? (
-                <EmptyState icon={Search} title="Nenhum lead encontrado" description={`Nada corresponde a "${busca.trim()}".`} />
-              ) : (
-                <EmptyState
-                  icon={Users}
-                  title="Ainda não tem leads"
-                  description="Adicione o primeiro ou importe a sua lista."
-                  action={onNovoLead ? <AppButton onClick={handleNovoLeadClick} disabled={isAdicionarBlocked}><Plus />Adicionar lead</AppButton> : undefined}
-                />
-              )
-            }
+            emptyState={emptyStateNode}
           />
         </div>
+        </>
       )}
     </DashboardCard>
   );

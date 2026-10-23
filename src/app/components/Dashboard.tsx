@@ -77,6 +77,8 @@ import { PageHeader, PageAction, PageFab } from './base/PageHeader';
 import { motion } from 'motion/react';
 import { OfflineState } from './base/OfflineState';
 import { PullToRefresh } from './base/PullToRefresh';
+import { LatestLeads } from './dashboard/LatestLeads';
+import { OriginsList } from './dashboard/OriginsList';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { getLocale } from '../utils/format';
 
@@ -447,7 +449,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     const tr = translations[language] as Translations;
     const item = sidebarConfig.find((i) => (pathToPageId[i.path] || i.id) === currentPage);
     if (item) return tr[item.labelKey as keyof Translations] as string;
-    const extra: Record<string, string> = { 'inbox-team': 'Equipa', security: 'Segurança', admin: 'Administração', contacts: 'Contactos' };
+    const extra: Record<string, string> = { 'inbox-settings': 'Canais', 'inbox-team': 'Equipa', security: 'Segurança', admin: 'Administração', contacts: 'Contactos' };
     return extra[currentPage] || '';
   }, [currentPage, language]);
 
@@ -1552,6 +1554,15 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     }
   };
 
+  // Toque num lead (listas): abre o detalhe
+  const handleViewLead = (leadId: string) => {
+    const lead = leads.find((l) => l.id === leadId);
+    if (!lead) return;
+    setLeadSelecionado(lead);
+    setLeadDetailInitialTab('notas');
+    setModalLeadDetail(true);
+  };
+
   const handleChat = async (leadId: string) => {
     if (!podeExecutar('mensagens')) {
       const block = getBlockReason();
@@ -2322,16 +2333,17 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                 {/* Gráficos detalhados: só em Relatórios (Início é o resumo) */}
                 <PageFab label="Novo lead" onClick={handleNovoLeadFab} />
 
-                {/* Seção de Leads Recentes + Motor de Vendas */}
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-stretch">
-                  <div className="xl:col-span-2 flex flex-col">
-                    <RecentLeadsSection
+                {/* Resumo: origem dos leads (lista), últimos leads e assistente de vendas */}
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 items-start">
+                  <div className="xl:col-span-2 flex flex-col gap-4 sm:gap-6">
+                    <LatestLeads
                       leads={leads}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onChat={handleChat}
-                      onSendEmail={handleSendEmail}
+                      onViewAll={() => handleNavigate('leads')}
+                      onOpen={(lead) => handleViewLead(lead.id!)}
+                      onMessage={(lead) => handleChat(lead.id!)}
+                      onDelete={(lead) => handleDelete(lead.id!)}
                     />
+                    <OriginsList leads={leads} />
                   </div>
                   <div className="xl:col-span-1 flex flex-col">
                     <AIIntelligencePanel
@@ -2339,33 +2351,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                     />
                   </div>
                 </div>
-
-                {/* Tabela de Leads */}
-                <LeadsTable
-                  leads={leads}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onChat={handleChat}
-                  onExport={handleExport}
-                  onImport={handleImport}
-                  onImportWhatsApp={handleImportWhatsApp}
-                  onRemoveDuplicates={handleRemoveDuplicates}
-                  onNovoLead={handleNovoLeadFab}
-                  onToggleEmailMarketing={handleToggleEmailMarketing}
-                  onSendEmail={handleSendEmail}
-                  onCampaigns={() => {
-                    const b = getBlockReason();
-                    if (b) { showPlanBlock(b.code, b.message); return; }
-                    setChannelSelectorOpen(true);
-                  }}
-                  onDeleteMultiple={handleDeleteMultiple}
-                  userPlan={user?.plan || 'free'}
-                  planExpired={planExpired}
-                  limitReached={!!getBlockReason()}
-                  leadsLimitReached={(user?.limits?.leads ?? 0) > 0 && (user?.limits?.leads ?? 0) !== -1 && (user?.usage?.leads ?? 0) >= (user?.limits?.leads ?? 0)}
-                  campaignsLimitReached={(user?.limits?.massMessages ?? 0) > 0 && (user?.limits?.massMessages ?? 0) !== -1 && (user?.usage?.massMessages ?? 0) >= (user?.limits?.massMessages ?? 0)}
-                  loading={loading}
-                />
               </div>
             )}
 
@@ -2388,6 +2373,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   onImport={handleImport}
                   onImportWhatsApp={handleImportWhatsApp}
                   onRemoveDuplicates={handleRemoveDuplicates}
+                  onView={handleViewLead}
                   onNovoLead={handleNovoLeadFab}
                   onToggleEmailMarketing={handleToggleEmailMarketing}
                   onSendEmail={handleSendEmail}
@@ -2549,7 +2535,14 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             )}
 
             {currentPage === 'account' && (
-              <AccountSettingsPage user={user} onUpdateUser={onUserUpdate} />
+              <AccountSettingsPage
+                user={user}
+                onUpdateUser={onUserUpdate}
+                onOpenChannels={() => handleNavigate('inbox-settings')}
+                onHelp={handleStartTour}
+                onFeedback={() => setShowFeedback(true)}
+                onLogout={onLogout}
+              />
             )}
 
             {currentPage === 'admin' && (

@@ -71,15 +71,15 @@
   --tone-danger-foreground: 350 73% 35%;
   
   /* Sidebar - SEMPRE ESCURO (premium dark) em ambos os modos */
-  --sidebar: 220 6% 10%;
-  --sidebar-foreground: 220 6% 93%;
-  --sidebar-primary: 221 70% 55%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 220 9% 15%;
+  --sidebar-primary: 221 83% 53%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 220 6% 16%;
-  --sidebar-accent-foreground: 220 6% 93%;
-  --sidebar-border: 220 6% 18%;
-  --sidebar-ring: 221 70% 55%;
-  --sidebar-muted: 220 4% 48%;
+  --sidebar-accent: 220 14% 96%;
+  --sidebar-accent-foreground: 220 9% 15%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 221 83% 53%;
+  --sidebar-muted: 220 9% 46%;
   
   /* Texto em diferentes níveis - Modo Claro */
   --text-primary: 222 39% 11%;
@@ -207,7 +207,7 @@
   }
 }
 
-/* ─── Sidebar Styles ─── ALWAYS DARK in both themes ─── */
+/* ─── Sidebar Styles ─── seguem o tema (claro/escuro) via --sidebar-* ─── */
 
 /* Root sidebar shell */
 .sidebar-root {
@@ -257,8 +257,8 @@
 
 /* Search input inside sidebar */
 .sidebar-search-input {
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background-color: hsl(var(--sidebar-foreground) / 0.05);
+  border: 1px solid hsl(var(--sidebar-foreground) / 0.07);
   color: hsl(var(--sidebar-foreground) / 0.82);
   outline: none;
   transition: background-color 0.15s ease, border-color 0.15s ease;
@@ -267,8 +267,8 @@
   color: hsl(var(--sidebar-muted));
 }
 .sidebar-search-input:focus {
-  background-color: rgba(255, 255, 255, 0.075);
-  border-color: rgba(255, 255, 255, 0.13);
+  background-color: hsl(var(--sidebar-foreground) / 0.075);
+  border-color: hsl(var(--sidebar-foreground) / 0.13);
 }
 
 /* Nav item base */
@@ -282,7 +282,7 @@
 /* Nav item hover — barely-there fill */
 .sidebar-item-inactive:hover {
   color: hsl(var(--sidebar-foreground) / 0.92);
-  background-color: rgba(255, 255, 255, 0.055);
+  background-color: hsl(var(--sidebar-foreground) / 0.055);
 }
 
 /* Nav item active — Minimal Kit style: primary-tinted pill (bg + text both follow the primary color) */
@@ -304,7 +304,7 @@
 /* Subitem hover */
 .sidebar-nav-subitem:hover {
   color: hsl(var(--sidebar-foreground) / 0.80);
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: hsl(var(--sidebar-foreground) / 0.04);
 }
 
 /* Subitem active — cor primária do tema */
@@ -320,7 +320,7 @@
   position: relative;
   margin-left: 22px;
   padding-left: 10px;
-  border-left: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 1px solid hsl(var(--sidebar-foreground) / 0.07);
 }
 
 /* Section labels */
@@ -374,7 +374,7 @@
 }
 .sidebar-icon-btn-inactive:hover {
   color: hsl(var(--sidebar-foreground) / 0.92);
-  background-color: rgba(255, 255, 255, 0.07);
+  background-color: hsl(var(--sidebar-foreground) / 0.07);
   transform: scale(1.08);
 }
 
@@ -384,7 +384,7 @@
 .sidebar-collapsed-divider {
   height: 1px;
   margin: 12px 10px;
-  background: rgba(255, 255, 255, 0.06);
+  background: hsl(var(--sidebar-foreground) / 0.06);
   list-style: none;
   pointer-events: none;
 }
@@ -448,14 +448,14 @@
 /* Dark mode: all cards get subtle border + hover lift globally */
 .dark .enterprise-card,
 .dark [class*="bg-card"][class*="border"][class*="rounded"] {
-  border-color: rgba(255, 255, 255, 0.06) !important;
+  border-color: hsl(var(--sidebar-foreground) / 0.06) !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .dark .enterprise-card:hover,
 .dark [class*="bg-card"][class*="border"][class*="rounded"]:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  border-color: hsl(var(--sidebar-foreground) / 0.1) !important;
 }
 /* Light mode: clean elevation */
 :root:not(.dark) .enterprise-card {
@@ -470,7 +470,7 @@
 
 /* Primary card variant — slightly larger, stronger presence */
 .dark .enterprise-card-primary {
-  border-color: rgba(255, 255, 255, 0.09) !important;
+  border-color: hsl(var(--sidebar-foreground) / 0.09) !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 :root:not(.dark) .enterprise-card-primary {
@@ -479,7 +479,7 @@
 
 /* Secondary card variant — less contrast */
 .dark .enterprise-card-secondary {
-  border-color: rgba(255, 255, 255, 0.04);
+  border-color: hsl(var(--sidebar-foreground) / 0.04);
   opacity: 0.88;
 }
 .dark .enterprise-card-secondary:hover {
@@ -1289,9 +1289,18 @@ html.native-app #lfw-close {
 /* Menu lateral no telemóvel (gaveta): alvos de toque de ~44px e texto maior,
    como nas gavetas do Slack, Notion e ChatGPT */
 .sidebar-mobile .sidebar-nav-item {
-  padding-top: 11px;
-  padding-bottom: 11px;
+  min-height: 46px;
+  padding-top: 10px;
+  padding-bottom: 10px;
   font-size: 15px;
+}
+/* Nomes inteiros (sem "…"): quebram linha se não couberem */
+.sidebar-mobile .sidebar-nav-item span,
+.sidebar-mobile .sidebar-nav-subitem span {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.25;
 }
 .sidebar-mobile .sidebar-nav-subitem {
   padding-top: 9px;

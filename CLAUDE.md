@@ -86,7 +86,7 @@ Nunca escrever credenciais reais. Sessão de demonstração local no browser (de
 
 ```js
 localStorage.setItem('leadflow_session_expires_at', String(Date.now() + 864e5));
-localStorage.setItem('leadflow_mock_session', JSON.stringify({access_token:'mock_token_demo', user:{id:'demo-user', email:'demo@leadsflow.test', name:'Demo Teste'}}));
+localStorage.setItem('leadflow_mock_session', JSON.stringify({access_token:'mock_token_demo', user:{id:'demo-user', email:'demo@leadsflow.com', name:'Demo Teste'}}));
 ['leadsflow_welcome_video_seen','leadsflow_tour_completed','leadsflow_tour_notification_sent'].forEach(k=>localStorage.setItem(k,'true'));
 location.href = '/dashboard';
 ```

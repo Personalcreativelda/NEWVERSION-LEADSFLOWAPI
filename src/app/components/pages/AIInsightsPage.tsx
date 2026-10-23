@@ -262,7 +262,7 @@ export default function AIInsightsPage() {
   return (
     <div className="w-full">
       <PageHeader
-        title="Motor de Vendas"
+        title="Assistente de vendas IA"
         description="Prioridades e próximas ações para os seus leads"
         icon={Brain}
         actions={
