@@ -27,7 +27,36 @@ function signingSecrets(): string[] {
 function escapeUnicode(raw: Buffer): Buffer | null {
   const text = raw.toString('utf8');
   if (!/[^\x00-\x7f]/.test(text)) return null;
-  return Buffer.from(text.replace(/[\u0080-￿]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')), 'utf8');
+  return Buffer.from(text.replace(/[\u0080-\uffff]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')), 'utf8');
+}
+
+/** "/" escrito como "\/" (como o json_encode da Meta faz por omissão) */
+function escapeSlashes(raw: Buffer): Buffer | null {
+  const text = raw.toString('utf8');
+  if (!text.includes('/')) return null;
+  return Buffer.from(text.replace(/(?<!\\)\//g, '\\/'), 'utf8');
+}
+
+/** Formas do corpo sobre as quais a Meta pode ter calculado a assinatura */
+function signedBodyVariants(raw: Buffer): Buffer[] {
+  const unicode = escapeUnicode(raw);
+  const variants = [raw, unicode, escapeSlashes(raw), unicode ? escapeSlashes(unicode) : null];
+  return variants.filter(Boolean) as Buffer[];
+}
+
+/** Forma do corpo recebido para o registo (sem chaves): ajuda a perceber porque não confere */
+export function describeSignedBody(raw: Buffer | undefined, header: string | undefined): string {
+  if (!raw) return 'sem corpo bruto';
+  const text = raw.toString('utf8');
+  return [
+    `bytes=${raw.length}`,
+    `nao_ascii=${/[^\x00-\x7f]/.test(text)}`,
+    `barras=${text.includes('/')}`,
+    `barras_escapadas=${text.includes('\\/')}`,
+    `unicode_escapado=${/\\u[0-9a-fA-F]{4}/.test(text)}`,
+    `cabecalho=${(header || '').slice(0, 14)}…`,
+    `inicio=${JSON.stringify(text.slice(0, 160))}`,
+  ].join(' ');
 }
 
 export function checkMetaSignature(rawBody: Buffer | undefined, header: string | undefined): SignatureCheck {
@@ -35,7 +64,7 @@ export function checkMetaSignature(rawBody: Buffer | undefined, header: string |
   if (!secrets.length) return 'unconfigured';
   if (!header || !rawBody) return 'missing';
   const a = Buffer.from(header);
-  const bodies = [rawBody, escapeUnicode(rawBody)].filter(Boolean) as Buffer[];
+  const bodies = signedBodyVariants(rawBody);
   for (const secret of secrets) {
     for (const body of bodies) {
       const b = Buffer.from('sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex'));
@@ -69,7 +98,7 @@ export async function acceptMetaWebhook(
   if (result.rows.length) {
     // Diagnóstico sem expor segredos: quantas chaves foram tentadas e a impressão digital de cada
     const tried = signingSecrets().map((s) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 8));
-    console.warn(`[MetaWebhook] Assinatura ${check} para ${idField} ${ids.join(',')}: evento recusado (chaves tentadas: ${tried.length} [${tried.join(', ')}], META_INSTAGRAM_APP_SECRET ${process.env.META_INSTAGRAM_APP_SECRET ? 'definida' : 'NÃO definida'})`);
+    console.warn(`[MetaWebhook] Assinatura ${check} para ${idField} ${ids.join(',')}: evento recusado (chaves tentadas: ${tried.length} [${tried.join(', ')}], META_INSTAGRAM_APP_SECRET ${process.env.META_INSTAGRAM_APP_SECRET ? 'definida' : 'NÃO definida'}) ${describeSignedBody(req.rawBody, req.headers['x-hub-signature-256'])}`);
     return false;
   }
   return true;
