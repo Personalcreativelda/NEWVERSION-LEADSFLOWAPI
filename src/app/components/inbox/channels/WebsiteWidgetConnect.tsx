@@ -185,9 +185,6 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
                                 {isEditing ? 'Editar Canal Website' : 'Chat do Site'}
                             </h2>
-                            <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                {isEditing ? 'Atualize as definições do widget' : 'Widget de chat para seu website'}
-                            </p>
                         </div>
                     </div>
                     <button

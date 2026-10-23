@@ -220,10 +220,6 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                         <p className="font-medium mb-1" style={{ color: 'hsl(var(--foreground))' }}>
                                             Antes de gerar o token, configure o webhook na Meta:
                                         </p>
-                                        <p>
-                                            A Meta exige que a URL de callback esteja configurada e verificada antes de gerar o token da página.
-                                            Copie os dados abaixo e configure no painel do Meta for Developers.
-                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -298,10 +294,9 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                     borderColor: 'hsl(var(--border))'
                                 }}
                             >
-                                <p className="font-medium text-sm mb-3" style={{ color: 'hsl(var(--foreground))' }}>
-                                    Passo a passo:
-                                </p>
-                                <ol className="list-decimal list-inside space-y-2 text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                <details>
+                                <summary className="cursor-pointer select-none font-medium text-foreground">Passo a passo</summary>
+                                <ol className="mt-2 list-decimal list-inside space-y-2 text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                     <li>
                                         Acesse o{' '}
                                         <a
@@ -320,6 +315,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                     <li>Clique em <strong>Verificar e guardar</strong></li>
                                     <li>Marque os campos: <strong>messages</strong> e <strong>messaging_postbacks</strong></li>
                                 </ol>
+                                </details>
                             </div>
 
                             {/* Actions */}
@@ -356,15 +352,15 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 <div className="flex items-start gap-3">
                                     <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
                                     <div className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                        <p className="font-medium mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                            Como gerar o token de acesso:
-                                        </p>
-                                        <ol className="list-decimal list-inside space-y-1">
+                                        <details>
+                                        <summary className="cursor-pointer select-none font-medium text-foreground">Como gerar o token de acesso</summary>
+                                        <ol className="mt-2 list-decimal list-inside space-y-1">
                                             <li>No <strong>Meta for Developers</strong>, vá em <strong>Messenger</strong> &gt; <strong>Definições</strong></li>
                                             <li>Na seção <strong>Token de Acesso</strong>, selecione sua página</li>
                                             <li>Clique em <strong>Gerar Token</strong></li>
                                             <li>Copie o token gerado e cole abaixo</li>
                                         </ol>
+                                        </details>
                                     </div>
                                 </div>
                             </div>

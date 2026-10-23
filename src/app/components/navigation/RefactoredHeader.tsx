@@ -133,7 +133,7 @@ export default function RefactoredHeader({
             {firstName && (
               <div className="min-w-0 leading-tight">
                 <p className="text-[11px] text-muted-foreground">{greeting}</p>
-                <p className="text-[15px] font-semibold text-foreground truncate max-w-[45vw] lg:max-w-xs">{firstName}</p>
+                <p className="font-serif text-lg font-medium text-foreground truncate max-w-[45vw] lg:max-w-xs">{firstName}</p>
               </div>
             )}
           </div>
@@ -151,7 +151,7 @@ export default function RefactoredHeader({
                 <ArrowLeft className="h-5 w-5" />
               </button>
             )}
-            <h1 className="truncate text-[17px] lg:text-lg font-semibold tracking-tight text-foreground">{pageTitle}</h1>
+            <h1 className="truncate font-serif text-[21px] lg:text-xl font-medium text-foreground">{pageTitle}</h1>
           </div>
         )}
 

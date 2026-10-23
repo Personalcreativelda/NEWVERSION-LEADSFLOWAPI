@@ -229,7 +229,6 @@ export default function CampaignSMSModal({
           </div>
           <div>
             <span>{editingCampaign ? 'Editar Campanha SMS' : 'Nova Campanha SMS'}</span>
-            <p className="text-sm text-muted-foreground font-normal">Via Twilio — envio em massa de SMS</p>
           </div>
         </div>
       }

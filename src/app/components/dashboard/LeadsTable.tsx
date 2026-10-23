@@ -360,7 +360,7 @@ export default function LeadsTable({
       <div className="px-4 md:px-5 py-4 border-b border-border">
         {/* Layout Mobile */}
         <div className="block md:hidden space-y-3">
-          <h3 className="text-foreground font-semibold">Tabela de Leads</h3>
+
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />

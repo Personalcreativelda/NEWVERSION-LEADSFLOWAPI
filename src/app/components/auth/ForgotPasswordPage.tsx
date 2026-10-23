@@ -8,7 +8,7 @@ interface ForgotPasswordPageProps {
   onBackToLogin: () => void;
 }
 
-const FONT = '"Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+const FONT = 'var(--font-sans)';
 
 export default function ForgotPasswordPage({ onBackToLogin }: ForgotPasswordPageProps) {
   const [email, setEmail] = useState('');

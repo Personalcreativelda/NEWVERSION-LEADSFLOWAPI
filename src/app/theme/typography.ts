@@ -1,5 +1,5 @@
 // Portado de COPIA/src/theme/typography.ts (Minimal Kit), trocando a fonte
-// para "Public Sans" conforme decidido para a migração visual do LeadFlow.
+// para a fonte do app (--font-sans em globals.css).
 
 export function remToPx(value: string) {
   return Math.round(parseFloat(value) * 16);
@@ -32,7 +32,7 @@ declare module '@mui/material/styles' {
   }
 }
 
-const primaryFont = 'Public Sans, sans-serif';
+const primaryFont = 'var(--font-sans)';
 
 // ----------------------------------------------------------------------
 

@@ -221,11 +221,11 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
                     <ul className="text-sm text-foreground/80 space-y-1.5 ml-4">
                       <li className="flex items-start gap-2">
                         <Zap className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                        <span><strong>Business:</strong> Envio em massa ilimitado + Webhook N8N</span>
+                        <span><strong>Business:</strong> Envio em massa ilimitado</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <Rocket className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                        <span><strong>Enterprise:</strong> Tudo do Business + Webhook N8N dedicado</span>
+                        <span><strong>Enterprise:</strong> Tudo do Business, sem limites</span>
                       </li>
                     </ul>
                   </div>

@@ -429,13 +429,8 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                   <Icon className={`h-5 w-5 ${integration.color}`} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline gap-2">
-                    <span className="min-w-0 flex-1 text-[15px] font-medium text-foreground">{integration.name}</span>
-                    <span className="flex-shrink-0 text-xs text-muted-foreground">
-                      {integration.configured ? 'Ligado' : 'Não configurado'}
-                    </span>
-                  </span>
-                  <span className="block text-[13px] leading-snug text-muted-foreground line-clamp-2">{integration.description}</span>
+                  <span className="block text-base text-foreground">{integration.name}</span>
+                  <span className="block text-sm text-muted-foreground">{integration.configured ? 'Ligado' : 'Não configurado'}</span>
                 </span>
                 <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
               </button>
@@ -452,7 +447,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-base font-semibold text-foreground">{integration.name}</h2>
-                  <p className="text-[13px] leading-snug text-muted-foreground">{integration.description}</p>
                 </div>
               </div>
 
@@ -473,9 +467,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           placeholder="https://seu-dominio.com/webhook"
                           className={integrationInputClass}
                         />
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Cole o URL onde quer receber as notificações
-                        </p>
                       </div>
                       <div className="flex justify-end">
                         <Button
@@ -504,9 +495,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             placeholder="smtp.gmail.com"
                             className="mt-1.5"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Ex: smtp.gmail.com, smtp.hostinger.com
-                          </p>
                         </div>
                         <div>
                           <Label htmlFor="smtp-port" className="text-sm">
@@ -521,7 +509,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             className="mt-1.5"
                           />
                           <p className="text-xs text-muted-foreground mt-1">
-                            Comum: 587 (TLS), 465 (SSL), 25 (Padrão)
+                            587 (TLS) ou 465 (SSL)
                           </p>
                         </div>
                         <div>
@@ -536,9 +524,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             placeholder="seu@email.com"
                             className="mt-1.5"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Email usado para autenticação SMTP
-                          </p>
                         </div>
                         <div>
                           <Label htmlFor="smtp-password" className="text-sm">
@@ -553,7 +538,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             className="mt-1.5"
                           />
                           <p className="text-xs text-muted-foreground mt-1">
-                            Palavra-passe do email ou palavra-passe de aplicativo
+                            No Gmail, use uma palavra-passe de aplicação
                           </p>
                         </div>
                         <div>
@@ -568,9 +553,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             placeholder="contacto@seudominio.com"
                             className="mt-1.5"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Este email aparecerá como o remetente das campanhas
-                          </p>
                         </div>
                         <div>
                           <Label htmlFor="smtp-from-name" className="text-sm font-medium">
@@ -584,25 +566,10 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                             placeholder="Sua Empresa"
                             className="mt-1.5"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Nome que aparecerá na caixa de entrada do cliente
-                          </p>
                         </div>
                       </div>
                       <div className="flex items-center justify-between">
-                        <div className="text-xs text-muted-foreground">
-                          {smtpHost && smtpPort && smtpUser && smtpPassword ? (
-                            <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Todos os campos preenchidos
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <span className="text-amber-600 dark:text-amber-400"></span>
-                              Preencha todos os campos obrigatórios
-                            </span>
-                          )}
-                        </div>
+                        <div />
 
                         <Button
                           onClick={handleSaveSmtp}
@@ -633,32 +600,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                   {/* Meta Pixel Content */}
                   {integration.id === 'meta-pixel' && (
                     <div className="space-y-6">
-                      <div className={`${infoBlockClass} space-y-2`}>
-                        <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                          <BarChart3 className="w-4 h-4 text-primary" />
-                          Rastreie Conversões no Meta Ads
- </h4>
-                        <p className="text-xs text-muted-foreground">
-                          Configure o Meta Pixel (Facebook Pixel) para rastrear eventos de conversão quando um lead for marcado como "Convertido" na sua CRM.
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Evento disparado automaticamente:
-                          <code className="ml-2 bg-card px-1.5 py-0.5 rounded text-xs font-semibold text-foreground">Lead</code>
-                        </p>
-                      </div>
-
-                      {dashboardPixelEnv && (
-                        <div className={`${infoBlockClass} space-y-1`}>
-                          <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                            <BarChart3 className="w-4 h-4 text-primary" />
-                            Pixel padrão do dashboard
-                          </h4>
-                          <div className={currentUrlBannerClass}>{dashboardPixelEnv}</div>
-                          <p className="text-xs text-muted-foreground">
-                            Definido via variável de ambiente. Atualize aqui apenas o pixel específico do utilizador.
-                          </p>
-                        </div>
-                      )}
 
                       <div className="space-y-2">
                         <Label htmlFor="meta-pixel-id" className="text-sm flex items-center gap-2 text-foreground">
@@ -674,21 +615,10 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           className={`${integrationInputClass} font-mono`}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Encontre seu Pixel ID no Gerenciador de Eventos do Meta Business Suite
+                          No Gestor de Eventos da Meta
                         </p>
                       </div>
 
-                      <div className={`${infoBlockClass} space-y-1.5`}>
-                        <h4 className="text-sm font-semibold text-foreground">
-                          Como funciona
- </h4>
-                        <ul className="text-xs text-muted-foreground space-y-1.5">
-                          <li>• Quando você marcar um lead como "Convertido", o pixel dispara automaticamente</li>
-                          <li>• O evento "Lead" é enviado para o Meta com os dados do lead</li>
-                          <li>• Você pode ver as conversões no Gerenciador de Anúncios</li>
-                          <li>• Otimize suas campanhas com base em conversões reais</li>
-                        </ul>
-                      </div>
 
                       <div className="flex justify-end">
                         <Button
@@ -704,19 +634,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                   {/* Google Analytics Content */}
                   {integration.id === 'google-analytics' && (
                     <div className="space-y-6">
-                      <div className={`${infoBlockClass} space-y-2`}>
-                        <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                          <Eye className="w-4 h-4 text-primary" />
-                          Rastreie Conversões no Google Analytics
- </h4>
-                        <p className="text-xs text-muted-foreground">
-                          Configure o Google Analytics 4 (GA4) para rastrear eventos de conversão quando um lead for marcado como "Convertido" na sua CRM.
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Evento disparado automaticamente:
-                          <code className="ml-2 bg-card px-1.5 py-0.5 rounded text-xs font-semibold text-foreground">generate_lead</code>
-                        </p>
-                      </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="google-analytics-id" className="text-sm flex items-center gap-2 text-foreground">
@@ -732,21 +649,10 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           className={`${integrationInputClass} font-mono`}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Encontre seu Measurement ID no Google Analytics (Admin → Data Streams)
+                          Admin → Fluxos de dados
                         </p>
                       </div>
 
-                      <div className={`${infoBlockClass} space-y-1.5`}>
-                        <h4 className="text-sm font-semibold text-foreground">
-                          Como funciona
- </h4>
-                        <ul className="text-xs text-muted-foreground space-y-1.5">
-                          <li>• Quando você marcar um lead como "Convertido", o evento é disparado automaticamente</li>
-                          <li>• O evento "generate_lead" é enviado para o GA4 com os dados do lead</li>
-                          <li>• Você pode ver as conversões em Relatórios → Eventos no GA4</li>
-                          <li>• Configure o evento como conversão no GA4 para otimizar suas campanhas</li>
-                        </ul>
-                      </div>
 
                       <div className="flex justify-end">
                         <Button
@@ -762,23 +668,13 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                   {/* N8N Content */}
                   {integration.id === 'n8n' && (
                     <div className="space-y-4">
-                      {/* Info Box */}
-                      <div className="bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg p-4">
-                        <h4 className="text-sm font-semibold text-cyan-900 dark:text-cyan-100 mb-2 flex items-center gap-2">
-                          <Sheet className="w-4 h-4" />
-                          Configure as URLs dos webhooks do N8N para integração com sua planilha Google Sheets.
-                        </h4>
-                        <p className="text-xs text-cyan-800 dark:text-cyan-200">
-                          As URLs devem ter o formato: <code className="bg-card px-1.5 py-0.5 rounded text-cyan-900 dark:text-cyan-100">https://seu-n8n.com/webhook/nome</code>
-                        </p>
-                      </div>
 
                       {/* Webhook - Cadastrar Novo Lead */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
                           <Label htmlFor="n8n-webhook-url" className="text-sm flex items-center gap-2">
                             <Webhook className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                            Webhook - Registar Leads Externos
+                            Registar leads
                           </Label>
                           {isN8nConfigured && (
                             <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -804,9 +700,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           placeholder="https://seu-n8n.com/webhook/listar-leads"
                           className={n8nInputClass}
                         />
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Endpoint para registar leads em tempo real a partir de planilhas externas (Google Sheets, Excel, etc.) via N8N
-                        </p>
                       </div>
 
                       {/* Webhook - Importação de Contatos WhatsApp */}
@@ -814,7 +707,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         <div className="flex items-center justify-between mb-1.5">
                           <Label htmlFor="n8n-whatsapp-import-url" className="text-sm flex items-center gap-2">
                             <MessageSquare className="w-4 h-4 text-green-600 dark:text-green-400" />
-                            Webhook - Importação de Contactos WhatsApp
+                            Importar contactos do WhatsApp
                           </Label>
                           {isN8nWhatsAppImportConfigured && (
                             <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -839,9 +732,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           placeholder="https://seu-n8n.com/webhook/importar-whatsapp"
                           className={n8nInputClass}
                         />
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Endpoint POST para importar contactos do WhatsApp. Envia: {`{ "instancia": "leadflow_userId", "userId": "id", "action": "listar-contactos" }`}
-                        </p>
                       </div>
 
                       <div className="flex gap-2 justify-end">

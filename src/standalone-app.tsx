@@ -8,6 +8,9 @@ import { ThemeModeProvider } from './app/context/ThemeModeContext';
 import { AppMuiThemeProvider } from './app/theme';
 import { queryClient } from './app/lib/queryClient';
 import { idbPersister } from './app/lib/idbPersister';
+// Fontes no próprio pacote (funcionam sem internet no app): texto e títulos
+import '@fontsource-variable/instrument-sans/wght.css';
+import '@fontsource-variable/source-serif-4/opsz.css';
 import './app/styles/globals.css';
 
 // 24 h — how long persisted cache entries are considered valid after a

@@ -67,6 +67,15 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
   traz o botão fechar: não desenhar outro X no cabeçalho (ficavam dois). Sem `w-[95vw]` nos
   modais (no telemóvel são folhas de largura total) e sem cores claras fixas (`bg-blue-50`…).
 - Estados vazios: `EmptyState`.
+- Tipografia (estilo app Claude): texto em Instrument Sans e títulos de página em Source Serif 4,
+  ambas em `@fontsource-variable` (dentro do pacote — funcionam offline; nada de Google Fonts).
+  Tokens `--font-sans`/`--font-serif` (globals.css). No telemóvel `text-sm` = 15px e `text-xs` = 13px.
+  As fontes do app Claude (Anthropic Sans/Serif) são proprietárias: não usar.
+- Pouco texto: listas de definições só com o título (e um valor curto, ex.: "Ativada"); nada de
+  frases a explicar o óbvio, "Dica:", "Como funciona" ou subtítulos que repetem o título. Passos de
+  configuração necessários ficam num `<details>` fechado. Nunca mostrar nomes internos
+  (Evolution API, instância, n8n interno, MinIO, Supabase, OpenAI/Gemini) ao utilizador.
+- Seleção/destaque sem contornos azuis grossos: `border` neutro (`border-foreground/25`).
 - Offline: os GET da API ficam guardados no aparelho (`lib/offlineCache.ts`, IndexedDB, por
   utilizador, apagados no logout). Sem rede ou com 502/503/504/timeout, os três clientes
   (`utils/api.ts`, `lib/api.ts`, axios com `withOfflineCache`) devolvem a última cópia e

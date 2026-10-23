@@ -1116,9 +1116,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     })}
                   </div>
                 )}
-                <p className="text-xs mt-2 text-muted-foreground">
-                  O assistente responderá nas caixas de entrada dos canais selecionados
-                </p>
               </div>
             </div>
 
@@ -1231,9 +1228,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
                   placeholder="Ex: Você é um assistente de vendas amigável que ajuda clientes a encontrar os melhores produtos..."
                 />
-                <p className="text-xs mt-1 text-muted-foreground">
-                  Descreva como o assistente deve se comportar e responder
-                </p>
               </div>
 
               {/* Business Hours */}
@@ -1342,7 +1336,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">Janela de contexto</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Lembrar da última conversa ao iniciar uma nova sessão
+                        Lembra a última conversa
                       </p>
                     </div>
                     <button
@@ -1387,7 +1381,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">Memória de longo prazo</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Construir perfil do contacto ao longo do tempo
+                        Guarda o que aprende sobre o contacto
                       </p>
                     </div>
                     <button
@@ -1410,7 +1404,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">Movimentação automática do funil</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        O assistente avança leads pelo funil com base nas conversas
+                        Avança os leads no funil
                       </p>
                     </div>
                     <button
@@ -1464,10 +1458,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               <div className="p-4 rounded-lg border bg-muted/30 border-border">
                 <div className="flex items-center gap-2 mb-4">
                   <Image className="w-4 h-4 text-blue-500" />
-                  <h4 className="text-sm font-semibold text-foreground">Multimodalidade</h4>
-                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-medium border border-blue-500/20">
-                    OpenAI / Gemini
-                  </span>
+                  <h4 className="text-sm font-semibold text-foreground">Imagens e documentos</h4>
                 </div>
 
                 <div className="space-y-4">
@@ -1479,7 +1470,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                         Entender imagens
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Entende imagens enviadas pelo cliente (OpenAI Vision ou Gemini).
+                        Entende imagens enviadas pelo cliente.
                       </p>
                     </div>
                     <button
@@ -1505,7 +1496,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                         Ler PDFs e documentos
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Extrai texto de PDFs, Word e ficheiros de texto para responder perguntas sobre o conteúdo
+                        Responde com base em PDFs e documentos
                       </p>
                     </div>
                     <button
@@ -1561,16 +1552,13 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   </span>
                 </div>
 
-                <p className="text-xs text-muted-foreground mb-3">
-                  O assistente <strong>lê</strong> estes documentos para responder dúvidas. O texto é extraído uma única vez e guardado — sem gastar tokens a cada mensagem.
-                </p>
 
                 <div className="flex flex-col gap-3">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">Usar base de conhecimento</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        O assistente pesquisa trechos relevantes dos documentos para contextualizar as respostas
+                        Usa os documentos nas respostas
                       </p>
                     </div>
                     <button
@@ -1616,7 +1604,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       <Loader2 className="w-3.5 h-3.5 animate-spin" /> A carregar documentos...
                     </div>
                   ) : knowledgeFiles.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nenhum documento adicionado ainda.</p>
+                    <p className="text-xs text-muted-foreground">Sem documentos.</p>
                   ) : (
                     <ul className="space-y-1.5 max-h-96 overflow-y-auto">
                       {knowledgeFiles.map(kf => (
@@ -1689,7 +1677,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
 
                 <p className="text-xs text-muted-foreground mb-3">
-                  O assistente <strong>envia</strong> estes ficheiros quando o cliente pede pelo <em>nome</em> (ex: "me envia o catálogo"). Cada palavra do nome vira um gatilho de detecção.
+                  Enviados quando o cliente os pede pelo nome.
                 </p>
 
                 <div className="flex flex-col gap-3">
@@ -1743,7 +1731,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       <Loader2 className="w-3.5 h-3.5 animate-spin" /> A carregar ficheiros...
                     </div>
                   ) : clientFiles.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nenhum ficheiro para clientes adicionado ainda.</p>
+                    <p className="text-xs text-muted-foreground">Sem ficheiros.</p>
                   ) : (
                     <ul className="space-y-1.5 max-h-96 overflow-y-auto">
                       {clientFiles.map(kf => (
@@ -1945,9 +1933,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
                   placeholder="Descreva como o assistente deve se comportar, que tipo de perguntas deve responder, tom de voz, etc..."
                 />
-                <p className="text-xs mt-1 text-muted-foreground">
-                  Estas instruções definem o comportamento do assistente nas conversas
-                </p>
               </div>
 
               {/* Features */}
@@ -2020,8 +2005,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             <div>
               <h3 className="text-lg font-bold text-foreground">Recurso Premium</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Os assistentes do Marketplace estão disponíveis nos planos pagos.
-                Faça melhorar o plano para ligar e automatizar o seu atendimento.
+                Disponível nos planos pagos.
               </p>
             </div>
             <div className="flex gap-3 w-full">

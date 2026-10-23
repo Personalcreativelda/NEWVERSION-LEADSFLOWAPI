@@ -65,16 +65,6 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
     business: 'from-blue-500 to-blue-600',
     enterprise: 'from-purple-500 to-purple-600',
   };
-  const borderColorMap: Record<string, string> = {
-    free: 'border-gray-500/40',
-    business: 'border-blue-500/40',
-    enterprise: 'border-purple-500/40',
-  };
-  const gradientMap: Record<string, string> = {
-    free: 'from-gray-500/10 to-gray-600/5',
-    business: 'from-blue-500/10 to-blue-600/5',
-    enterprise: 'from-purple-500/10 to-purple-600/5',
-  };
 
   const statusInfo = getStatusInfo(subscriptionStatus, diasRestantes, currentPlan);
   const StatusIcon = statusInfo.icon;
@@ -153,7 +143,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
       <PageHeader title="Planos e preços" description="O seu plano atual e opções de melhorar o plano" icon={Crown} />
 
       {/* ── CARD PLANO ATIVO ── */}
-      <div className={`rounded-xl border-2 bg-gradient-to-br ${gradientMap[currentPlan] || 'from-gray-500/10 to-gray-600/5'} ${borderColorMap[currentPlan] || 'border-gray-500/40'} p-6`}>
+      <div className="rounded-xl border border-border bg-card p-6">
         <div className="flex flex-col sm:flex-row sm:items-center gap-6">
 
           {/* Icon + nome */}
@@ -273,9 +263,9 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
             return (
               <div
                 key={plan.id}
-                className={`relative bg-card rounded-xl border-2 transition-all flex flex-col ${
+                className={`relative bg-card rounded-xl border transition-all flex flex-col ${
                   isCurrentPlan
-                    ? `${borderColorMap[plan.id] || 'border-blue-500'} shadow-lg`
+                    ? 'border-foreground/25'
                     : 'border-border hover:border-muted-foreground/40'
                 }`}
               >

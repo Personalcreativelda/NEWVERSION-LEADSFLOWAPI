@@ -111,9 +111,9 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
     return (
         <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-lg">
                 {/* Header */}
-                <div 
+                <div
                     className="px-6 py-4 border-b flex justify-between items-center"
-                    style={{ 
+                    style={{
                         borderColor: 'hsl(var(--border))',
                         backgroundColor: 'hsl(var(--muted))'
                     }}
@@ -146,58 +146,31 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
 
                 {/* Content */}
                 <div className="p-6 max-h-[70vh] overflow-y-auto">
-                    
+
                     {/* Step: Info */}
                     {step === 'info' && (
                         <div className="space-y-6 animate-fadeIn">
-                            <div 
+                            <div
                                 className="p-4 rounded-lg border"
-                                style={{ 
+                                style={{
                                     backgroundColor: 'hsl(var(--muted))',
                                     borderColor: 'hsl(var(--border))'
                                 }}
                             >
-                                <h4 className="font-semibold mb-3 flex items-center gap-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                    <Shield className="w-5 h-5 text-green-500" />
-                                    Sobre a API Oficial
-                                </h4>
-                                <ul className="space-y-2 text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                    <li className="flex items-start gap-2">
-                                        <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                                        <span>Ligação oficial e aprovada pela Meta</span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                                        <span>Suporte a mensagens de modelo e sessão</span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                                        <span>Alta disponibilidade e escalabilidade</span>
-                                    </li>
-                                    <li className="flex items-start gap-2">
-                                        <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                                        <span>Ideal para empresas com alto volume</span>
-                                    </li>
-                                </ul>
+                                <details>
+                                    <summary className="cursor-pointer select-none font-medium text-foreground">O que precisa</summary>
+                                    <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                                        <li>• Conta no Meta Business Suite</li>
+                                        <li>• Conta WhatsApp Business (WABA)</li>
+                                        <li>• Número de telefone verificado</li>
+                                        <li>• Token de acesso do sistema</li>
+                                    </ul>
+                                </details>
                             </div>
 
-                            <div 
-                                className="p-4 rounded-lg border border-yellow-200 dark:border-yellow-900/50 bg-yellow-50 dark:bg-yellow-900/20"
-                            >
-                                <h4 className="font-semibold mb-2 flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
-                                    <AlertCircle className="w-5 h-5" />
-                                    Pré-requisitos
-                                </h4>
-                                <ul className="space-y-1 text-sm text-yellow-600 dark:text-yellow-300">
-                                    <li>• Conta no Meta Business Suite</li>
-                                    <li>• WhatsApp Business Account (WABA) criada</li>
-                                    <li>• Número de telefone verificado</li>
-                                    <li>• Access Token do sistema</li>
-                                </ul>
-                            </div>
 
-                            <a 
-                                href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" 
+                            <a
+                                href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center justify-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
@@ -228,7 +201,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                                     placeholder="Ex: WhatsApp Comercial"
                                     className="w-full px-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
-                                    style={{ 
+                                    style={{
                                         backgroundColor: 'hsl(var(--background))',
                                         borderColor: 'hsl(var(--border))',
                                         color: 'hsl(var(--foreground))'
@@ -246,7 +219,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                     onChange={(e) => setFormData(prev => ({ ...prev, phoneNumberId: e.target.value }))}
                                     placeholder="Ex: 123456789012345"
                                     className="w-full px-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all font-mono text-sm"
-                                    style={{ 
+                                    style={{
                                         backgroundColor: 'hsl(var(--background))',
                                         borderColor: 'hsl(var(--border))',
                                         color: 'hsl(var(--foreground))'
@@ -267,7 +240,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                     onChange={(e) => setFormData(prev => ({ ...prev, wabaId: e.target.value }))}
                                     placeholder="Ex: 123456789012345"
                                     className="w-full px-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all font-mono text-sm"
-                                    style={{ 
+                                    style={{
                                         backgroundColor: 'hsl(var(--background))',
                                         borderColor: 'hsl(var(--border))',
                                         color: 'hsl(var(--foreground))'
@@ -285,7 +258,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                     placeholder="Cole seu token aqui..."
                                     rows={3}
                                     className="w-full px-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all font-mono text-xs"
-                                    style={{ 
+                                    style={{
                                         backgroundColor: 'hsl(var(--background))',
                                         borderColor: 'hsl(var(--border))',
                                         color: 'hsl(var(--foreground))'
@@ -307,7 +280,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                         onChange={(e) => setFormData(prev => ({ ...prev, verifyToken: e.target.value }))}
                                         placeholder="Token de verificação"
                                         className="flex-1 px-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all font-mono text-sm"
-                                        style={{ 
+                                        style={{
                                             backgroundColor: 'hsl(var(--background))',
                                             borderColor: 'hsl(var(--border))',
                                             color: 'hsl(var(--foreground))'
@@ -317,7 +290,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                         onClick={generateVerifyToken}
                                         type="button"
                                         className="px-3 py-2 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
-                                        style={{ 
+                                        style={{
                                             borderColor: 'hsl(var(--border))',
                                             color: 'hsl(var(--foreground))'
                                         }}
@@ -338,7 +311,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                 <button
                                     onClick={() => setStep('info')}
                                     className="flex-1 py-2.5 px-4 rounded-lg font-medium border transition-colors"
-                                    style={{ 
+                                    style={{
                                         borderColor: 'hsl(var(--border))',
                                         color: 'hsl(var(--foreground))'
                                     }}
@@ -385,9 +358,9 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                 </p>
                             </div>
 
-                            <div 
+                            <div
                                 className="p-4 rounded-lg border space-y-4"
-                                style={{ 
+                                style={{
                                     backgroundColor: 'hsl(var(--muted))',
                                     borderColor: 'hsl(var(--border))'
                                 }}
@@ -397,9 +370,9 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                         Callback URL
                                     </label>
                                     <div className="flex items-center gap-2">
-                                        <code 
+                                        <code
                                             className="flex-1 px-3 py-2 rounded-lg text-xs break-all"
-                                            style={{ 
+                                            style={{
                                                 backgroundColor: 'hsl(var(--background))',
                                                 color: 'hsl(var(--foreground))'
                                             }}
@@ -421,9 +394,9 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                         Verify Token
                                     </label>
                                     <div className="flex items-center gap-2">
-                                        <code 
+                                        <code
                                             className="flex-1 px-3 py-2 rounded-lg text-xs"
-                                            style={{ 
+                                            style={{
                                                 backgroundColor: 'hsl(var(--background))',
                                                 color: 'hsl(var(--foreground))'
                                             }}
@@ -446,10 +419,10 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                     </label>
                                     <div className="flex flex-wrap gap-2">
                                         {['messages', 'messaging_postbacks', 'message_deliveries', 'message_reads'].map(field => (
-                                            <span 
+                                            <span
                                                 key={field}
                                                 className="px-2 py-1 rounded text-xs font-mono"
-                                                style={{ 
+                                                style={{
                                                     backgroundColor: 'hsl(var(--background))',
                                                     color: 'hsl(var(--foreground))'
                                                 }}
@@ -461,14 +434,6 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                 </div>
                             </div>
 
-                            <div 
-                                className="p-4 rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-900/20"
-                            >
-                                <p className="text-sm text-blue-700 dark:text-blue-300">
-                                    <strong>Importante:</strong> Após configurar o webhook no Meta Business Suite, 
-                                    clique em "Verificar e Guardar" para testar a ligação.
-                                </p>
-                            </div>
 
                             <button
                                 onClick={() => setStep('success')}

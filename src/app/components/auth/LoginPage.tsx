@@ -563,14 +563,14 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
     } catch (err: any) {
       console.error('Google sign-in error:', err);
       setError({
-        message: err.message || 'Erro ao ligar com Google. Verifique se o Supabase está configurado corretamente.',
+        message: err.message || 'Não foi possível entrar com o Google.',
         type: 'general',
       });
       setLoading(false);
     }
   };
 
-  const FONT = '"Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+  const FONT = 'var(--font-sans)';
 
   return (
     <div className="min-h-[100dvh] relative flex items-center justify-center py-6 sm:py-16 px-4 overflow-hidden"

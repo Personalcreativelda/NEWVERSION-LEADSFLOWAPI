@@ -441,7 +441,7 @@ export function SendMessageModal({
           {/* Channel Selector */}
           {channels.length > 0 && (
             <div className="rounded-lg border border-border dark:border-border surface-muted p-3">
-              <Label className="text-sm font-medium mb-2 block">Selecionar Caixa WhatsApp</Label>
+              <Label className="text-sm font-medium mb-2 block">Enviar de</Label>
               <div className="relative">
                 <select
                   value={selectedChannelId || ''}
@@ -459,12 +459,6 @@ export function SendMessageModal({
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               </div>
-              {channels.length > 1 && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  <Phone className="w-3 h-3 inline mr-1" />
-                  Você tem {channels.length} caixas WhatsApp configuradas. Selecione qual usar para enviar.
-                </p>
-              )}
             </div>
           )}
 
@@ -513,20 +507,7 @@ export function SendMessageModal({
               </Button>
             </div>
             {connectionStatus === 'disconnected' && (
-              <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
-                <p className="text-xs text-amber-800 dark:text-amber-200 mb-2">
-                  <strong>Atenção:</strong> Seu WhatsApp não está ligado!
-                </p>
-                <p className="text-xs text-amber-700 dark:text-amber-300">
-                  <strong>Como ligar:</strong>
-                </p>
-                <ol className="text-xs text-amber-700 dark:text-amber-300 ml-4 mt-1 space-y-1">
-                  <li>1. Clique no ícone de <strong>Definições</strong> () no topo do Painel</li>
-                  <li>2. Vá até a aba <strong>Integrações</strong></li>
-                  <li>3. Clique em <strong>"Ligar WhatsApp"</strong></li>
-                  <li>4. Escaneie o <strong>QR Code</strong> com seu WhatsApp</li>
-                </ol>
-              </div>
+              <p className="mt-2 text-sm text-muted-foreground">Ligue o WhatsApp em Definições → Canais ligados.</p>
             )}
           </div>
 
@@ -538,11 +519,8 @@ export function SendMessageModal({
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <p className="text-sm text-purple-900 dark:text-purple-100 mb-1 flex items-center gap-2">
-                      <strong>Envio via Webhook N8N</strong>
+                      <strong>Enviar pela minha automação</strong>
                       <Crown className="w-4 h-4 text-amber-500" />
-                    </p>
-                    <p className="text-xs text-purple-800 dark:text-purple-200">
-                      Ative para enviar dados para seu workflow N8N automatizar o envio via Evolution API
                     </p>
                   </div>
                   <Switch
@@ -551,20 +529,6 @@ export function SendMessageModal({
                     disabled={sending || success}
                   />
                 </div>
-                {useN8NWebhook && (
-                  <div className="mt-3 p-3 surface-default border border-blue-200/60 dark:border-blue-800/60 rounded-md">
-                    <p className="text-xs text-blue-900 dark:text-blue-100 flex items-center gap-1">
-                      <Info className="w-3 h-3" />
-                      <strong>Como funciona:</strong>
-                    </p>
-                    <ul className="text-xs text-blue-800 dark:text-blue-200 ml-4 mt-1 space-y-1">
-                      <li>• Dados dos leads serão enviados para seu webhook N8N</li>
-                      <li>• Seu workflow N8N processa e envia via Evolution API</li>
-                      <li>• Usa a instância WhatsApp ligada via QR Code</li>
-                      <li>• Configure o webhook em Definições → Integrações</li>
-                    </ul>
-                  </div>
-                )}
               </AlertDescription>
             </Alert>
           )}
@@ -591,7 +555,7 @@ export function SendMessageModal({
             <Label htmlFor="message">Mensagem</Label>
             <Textarea
               id="message"
-              placeholder="Digite sua mensagem aqui..."
+              placeholder="Escreva a mensagem"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={6}
@@ -610,10 +574,7 @@ export function SendMessageModal({
                 <div className="space-y-1">
                   <p>{error}</p>
                   {error.includes('não está registrado no WhatsApp') && (
-                    <p className="text-xs mt-2">
-                      Dica: Verifique se o número do lead está correto e possui WhatsApp ativo.
- Vá em "Editar Lead" para corrigir o telefone.
- </p>
+                    <p className="text-xs mt-2">Confirme o número em Editar lead.</p>
                   )}
                 </div>
               </AlertDescription>
@@ -647,8 +608,7 @@ export function SendMessageModal({
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-xs">
-                O envio em massa pode demorar alguns minutos. As mensagens são enviadas
-                com intervalo de 1-2 segundos entre cada uma para evitar bloqueio.
+                O envio pode demorar alguns minutos.
               </AlertDescription>
             </Alert>
           )}
@@ -686,12 +646,6 @@ export function SendMessageModal({
             </Button>
           </div>
           
-          {/* Helper text when WhatsApp not connected */}
-          {connectionStatus === 'disconnected' && (
-            <p className="text-xs text-center text-muted-foreground">
-              O botão de envio será habilitado após ligar o WhatsApp
- </p>
-          )}
         </div>
       </DialogContent>
     </Dialog>

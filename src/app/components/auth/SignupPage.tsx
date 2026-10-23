@@ -23,7 +23,7 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const FONT = '"Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+const FONT = 'var(--font-sans)';
 
 interface SignupPageProps {
   onSuccess: () => void;

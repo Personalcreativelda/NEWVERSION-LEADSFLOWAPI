@@ -284,10 +284,10 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                         throw new Error('Sem permissão. Verifique se está logado corretamente.');
                     }
                     if (createResponse.status >= 500) {
-                        throw new Error('Erro no servidor. Verifique se a Evolution API está online e configurada.');
+                        throw new Error('Não foi possível ligar o WhatsApp. Tente de novo.');
                     }
 
-                    throw new Error(errorData.message || errorData.error || 'Falha ao criar instância WhatsApp');
+                    throw new Error(errorData.message || errorData.error || 'Não foi possível ligar o WhatsApp');
                 }
             }
 
@@ -320,13 +320,13 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                 console.error('[WhatsApp Channel] QR Code error:', qrResponse.status, errorData);
                 
                 if (qrResponse.status === 403) {
-                    throw new Error('Sem permissão para acessar esta instância.');
+                    throw new Error('Sem permissão para esta ligação.');
                 }
                 if (qrResponse.status === 404) {
                     throw new Error('Instância não encontrada. Tente novamente.');
                 }
                 if (qrResponse.status >= 500) {
-                    throw new Error('Erro no servidor Evolution API. Verifique se está online.');
+                    throw new Error('Não foi possível ligar o WhatsApp. Tente de novo.');
                 }
                 throw new Error(errorData.message || errorData.error || 'Falha ao obter QR Code');
             }
@@ -407,7 +407,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
             }
         } catch (err: any) {
             console.error('[WhatsApp Channel] Error:', err);
-            setError(err.message || 'Erro ao criar instância');
+            setError(err.message || 'Não foi possível ligar o WhatsApp');
             setConnectionStatus('error');
             toast.error('Erro ao ligar', { description: err.message });
         } finally {
@@ -525,7 +525,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 WhatsApp
                             </h3>
                             <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Evolution API
+                                Ligação por código QR
                             </p>
                         </div>
                     </div>
@@ -599,7 +599,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                     <>
                                         <Loader2 className="w-5 h-5 animate-spin" />
                                         <span>
-                                            {connectionStatus === 'creating' ? 'A criar instância...' : 'A gerar QR Code...'}
+                                            {connectionStatus === 'creating' ? 'A preparar...' : 'A gerar QR Code...'}
                                         </span>
                                     </>
                                 ) : (

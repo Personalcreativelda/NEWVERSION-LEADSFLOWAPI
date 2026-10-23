@@ -144,14 +144,12 @@ export default function UpgradeModal({
                 return (
                   <div
                     key={plan.id}
-                    className={`relative rounded-xl p-4 sm:p-5 border-2 transition flex flex-col ${
-                      isBestValue
-                        ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500/20'
-                        : 'bg-muted border-border hover:border-muted-foreground/40'
+                    className={`relative rounded-xl p-4 sm:p-5 border bg-card transition flex flex-col ${
+                      isBestValue ? 'border-foreground/25' : 'border-border hover:border-muted-foreground/40'
                     }`}
                   >
                     {isBestValue && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] px-3 py-0.5 rounded-full font-medium shadow-md whitespace-nowrap">
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-foreground text-background text-[11px] px-3 py-0.5 rounded-full font-medium whitespace-nowrap">
                         Popular
                       </div>
                     )}

@@ -150,9 +150,6 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
                                 {isEditing ? 'Editar Canal Telegram' : 'Ligar Telegram'}
                             </h2>
-                            <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                {isEditing ? 'Atualize as definições do bot' : 'Configure seu bot do Telegram'}
-                            </p>
                         </div>
                     </div>
                     <button 
@@ -178,15 +175,15 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 <div className="flex items-start gap-3">
                                     <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
                                     <div className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                        <p className="font-medium mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                            Como obter o token do bot:
-                                        </p>
-                                        <ol className="list-decimal list-inside space-y-1">
+                                        <details>
+                                        <summary className="cursor-pointer select-none font-medium text-foreground">Como obter o token do bot</summary>
+                                        <ol className="mt-2 list-decimal list-inside space-y-1">
                                             <li>Abra o Telegram e pesquise por <strong>@BotFather</strong></li>
                                             <li>Envie o comando <code className="px-1 py-0.5 rounded bg-muted">/newbot</code></li>
                                             <li>Siga as instruções para criar seu bot</li>
                                             <li>Copie o token gerado e cole abaixo</li>
                                         </ol>
+                                        </details>
                                     </div>
                                 </div>
                             </div>

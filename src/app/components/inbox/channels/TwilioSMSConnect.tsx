@@ -9,6 +9,7 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Alert, AlertDescription } from '../../ui/alert';
+import { getApiBaseUrl } from '../../../utils/api-client';
 
 interface TwilioSMSConnectProps {
     isOpen: boolean;
@@ -275,20 +276,22 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
                         <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">
                             <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                             <AlertDescription className="text-xs sm:text-sm text-blue-900 dark:text-blue-100">
-                                <strong className="block mb-2">Após criar o canal:</strong>
-                                <ol className="list-decimal list-inside space-y-1 text-[10px] sm:text-xs break-words">
+                                <details>
+                                <summary className="cursor-pointer select-none font-medium">Depois de criar o canal</summary>
+                                <ol className="mt-2 list-decimal list-inside space-y-1 text-xs break-words">
                                     <li>Vá para <a href="https://console.twilio.com/us1/develop/phone-numbers/manage/incoming" target="_blank" className="underline">Phone Numbers</a> no Twilio</li>
                                     <li>Clique no número que você configurou acima</li>
                                     <li>Em "Messaging Configuration", configure:</li>
                                     <li className="ml-4">
                                         <strong>Webhook URL:</strong>
                                         <code className="block bg-card p-1 rounded mt-1 text-[10px] sm:text-xs break-all">
-                                            {window.location.origin}/api/webhooks/twilio/sms
+                                            {getApiBaseUrl()}/api/webhooks/twilio/sms
                                         </code>
                                     </li>
                                     <li className="ml-4"><strong>Method:</strong> POST</li>
                                     <li>Clique em "Save Configuration"</li>
                                 </ol>
+                                </details>
                             </AlertDescription>
                         </Alert>
 

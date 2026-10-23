@@ -10,7 +10,7 @@ interface ResetPasswordPageProps {
   onBackToLogin: () => void;
 }
 
-const FONT = '"Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+const FONT = 'var(--font-sans)';
 
 const fieldStyle = {
   width: '100%', height: '48px', paddingLeft: '44px', paddingRight: '14px',

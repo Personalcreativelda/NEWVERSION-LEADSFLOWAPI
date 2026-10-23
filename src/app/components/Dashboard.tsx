@@ -591,15 +591,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
           console.error('🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟🧟');
           console.error('');
           
-          // ✅ Alertar visualmente
-          toast.error(
-            ` ${zombieLeads.length} leads apagados VOLTARAM!\n\n` +
-            `Verifique:\n` +
-            `1. Webhook N8N re-a importar?\n` +
-            `2. Auto-sincronização ativa?\n` +
-            `3. Backend a apagar corretamente?`,
-            { duration: 10000 }
-          );
         }
         
         setLeads(response.leads);
@@ -1108,16 +1099,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   const triggerDuplicateLeadMessage = () => {
     openMessageCenter('alerts', {
       id: 'duplicate-lead',
-      title: 'Lead duplicado detectado',
+      title: 'Lead duplicado',
       tone: 'warning',
       icon: <CopyX className="size-5 text-amber-500" />,
       content: (
         <div className="space-y-2">
           <p>
-            Já existe um lead com o mesmo email ou telefone registado. Evite duplicidades revisando os dados antes de criar um novo contacto.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Dica: utilize a importação incremental ou pesquise o lead antes de cadastrá-lo novamente.
+            Já existe um lead com este email ou telefone.
           </p>
         </div>
       ),
@@ -1464,7 +1452,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
     if (!webhookUrl) {
       console.error("[IMPORT WA] Webhook não configurado!");
-      toast.error('Webhook N8N não configurado! Configure o "Webhook - Importação de Contactos do WhatsApp" na aba Integrações.');
+      toast.error('A importação do WhatsApp não está configurada (Integrações).');
       return;
     }
 
@@ -1486,7 +1474,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     console.log("[IMPORT WA] Payload:", payload);
 
     setModalImportandoWhatsApp(true);
-    toast.info('A enviar requisição para N8N...', { duration: 2000 });
 
     try {
       const resposta = await fetch(webhookUrl, {
@@ -1508,11 +1495,11 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       const contatos = dados.contatos || dados.data || [];
       
       if (!Array.isArray(contatos) || contatos.length === 0) {
-        toast.warning('Nenhum contacto foi retornado pelo N8N');
+        toast.warning('Nenhum contacto encontrado.');
         return;
       }
 
-      toast.success(` ${contatos.length} contacto(s) recebido(s) do N8N!`);
+      toast.success(`${contatos.length} contacto(s) encontrados.`);
 
       // Filtrar contatos válidos antes de mostrar
       const contatosFiltrados = contatos.filter(c =>

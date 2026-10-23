@@ -232,13 +232,13 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
                   </AvatarFallback>
                 </Avatar>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-medium text-foreground">{user?.name || 'Perfil'}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{user?.email}</span>
+                  <span className="block truncate text-base font-medium text-foreground">{user?.name || 'Perfil'}</span>
+                  <span className="block truncate text-sm text-muted-foreground">{user?.email}</span>
                 </span>
                 <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
               </button>
-              <Row icon={Shield} label="Segurança" hint="Palavra-passe, verificação em dois passos e tokens" onClick={() => openSection('security')} />
-              <Row icon={Users} label="Equipa" hint="Membros e permissões" onClick={() => openSection('team')} />
+              <Row icon={Shield} label="Segurança" onClick={() => openSection('security')} />
+              <Row icon={Users} label="Equipa" onClick={() => openSection('team')} />
             </Group>
           }
         />
@@ -247,7 +247,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       {activeTab !== null && (
         <div className="mb-5">
           {!initialTab && <SubpageBack label="Definições" onClose={() => setActiveTab(null)} />}
-          <h2 className="text-lg font-semibold text-foreground">{({ profile: 'Perfil', security: 'Segurança', team: 'Equipa' })[activeTab]}</h2>
+          <h2 className="hidden lg:block text-lg font-semibold text-foreground">{({ profile: 'Perfil', security: 'Segurança', team: 'Equipa' })[activeTab]}</h2>
         </div>
       )}
 
@@ -259,87 +259,37 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
         )}
 
         {activeTab === 'security' && (
-          <div className="space-y-4">
-            {/* Two-Factor Authentication */}
-            <div className="bg-card rounded-lg border border-border p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Smartphone className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-foreground mb-1">Verificação em dois passos</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Uma camada extra de segurança com uma aplicação de autenticação</p>
-                    <div className="flex items-center gap-2">
-                      {twoFactorEnabled ? (
-                        <><div className="w-2 h-2 bg-green-500 rounded-full" /><span className="text-sm text-green-600 dark:text-green-400">Ativado</span></>
-                      ) : (
-                        <><div className="w-2 h-2 bg-muted-foreground/60 rounded-full" /><span className="text-sm text-muted-foreground">Desativado</span></>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <Button onClick={twoFactorEnabled ? () => setShow2FADisableModal(true) : handleSetup2FA} variant={twoFactorEnabled ? 'outline' : 'default'} className={twoFactorEnabled ? '' : 'bg-green-600 hover:bg-green-700 text-white'} disabled={loading}>
-                  {twoFactorEnabled ? 'Desativar' : 'Ativar'}
-                </Button>
-              </div>
-            </div>
+          <div className="space-y-5">
+            <Group title="Acesso">
+              <Row
+                icon={Smartphone}
+                label="Verificação em dois passos"
+                hint={twoFactorEnabled ? 'Ativada' : 'Desativada'}
+                onClick={loading ? undefined : twoFactorEnabled ? () => setShow2FADisableModal(true) : handleSetup2FA}
+              />
+              <Row icon={Lock} label="Alterar palavra-passe" onClick={loading ? undefined : () => setShowPasswordModal(true)} />
+            </Group>
 
-            {/* Password Change */}
-            <div className="bg-card rounded-lg border border-border p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-purple-50 dark:bg-purple-900/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Lock className="w-5 h-5 text-purple-600" />
+            <Group title="Tokens de API">
+              {tokens.map((token) => (
+                <div key={token.id} className="flex min-h-[56px] items-center gap-4 px-4 py-3">
+                  <Key className="h-5 w-5 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base text-foreground">{token.name}</p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      <code className="font-mono">{token.token_prefix}</code>
+                      {' · '}
+                      {token.last_used_at ? `usado ${formatDate(token.last_used_at)}` : `criado ${formatDate(token.created_at)}`}
+                      {token.expires_at && ` · expira ${formatDate(token.expires_at)}`}
+                    </p>
                   </div>
-                  <div>
-                    <h3 className="font-medium text-foreground mb-1">Alterar palavra-passe</h3>
-                    <p className="text-sm text-muted-foreground">Mude a palavra-passe com regularidade para manter a conta segura</p>
-                  </div>
+                  <Button onClick={() => handleDeleteToken(token.id)} variant="ghost" size="icon" aria-label="Apagar token" className="text-red-600 hover:bg-red-500/10">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
-                <Button onClick={() => setShowPasswordModal(true)} variant="outline" disabled={loading}>Alterar palavra-passe</Button>
-              </div>
-            </div>
-
-            {/* API Tokens */}
-            <div className="bg-card rounded-lg border border-border p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                    <Key className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-foreground mb-1">Tokens de API</h3>
-                    <p className="text-sm text-muted-foreground">Tokens para aceder à API do LeadsFlow</p>
-                  </div>
-                </div>
-                <Button onClick={() => setShowNewTokenModal(true)} size="sm">
-                  <Plus className="w-4 h-4 mr-2" />Novo token
-                </Button>
-              </div>
-              <div className="space-y-3">
-                {tokens.length === 0 ? (
-                  <div className="text-center py-8 text-sm text-muted-foreground">Nenhum token criado ainda</div>
-                ) : (
-                  tokens.map((token) => (
-                    <div key={token.id} className="bg-muted rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-foreground">{token.name}</span>
-                        <Button onClick={() => handleDeleteToken(token.id)} variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 h-8">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <code className="text-sm text-muted-foreground font-mono block mb-2">{token.token_prefix}</code>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span>Criado: {formatDate(token.created_at)}</span>
-                        {token.last_used_at && <span>Último uso: {formatDate(token.last_used_at)}</span>}
-                        {token.expires_at && <span>Expira: {formatDate(token.expires_at)}</span>}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+              ))}
+              <Row icon={Plus} label="Novo token" onClick={() => setShowNewTokenModal(true)} />
+            </Group>
           </div>
         )}
       </div>
@@ -396,7 +346,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Desativar verificação em dois passos</DialogTitle>
-            <DialogDescription>Escreva a sua palavra-passe para confirmar a desativação do 2FA</DialogDescription>
+            <DialogDescription>Confirme com a sua palavra-passe.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -416,7 +366,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Criar Novo token de API</DialogTitle>
-            <DialogDescription>Crie um token para aceder à API do LeadsFlow</DialogDescription>
+            <DialogDescription className="sr-only">Novo token de API</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {!showGeneratedToken ? (
@@ -460,7 +410,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Alterar palavra-passe</DialogTitle>
-            <DialogDescription>Escreva a sua palavra-passe atual e a nova palavra-passe desejada</DialogDescription>
+            <DialogDescription className="sr-only">Alterar palavra-passe</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

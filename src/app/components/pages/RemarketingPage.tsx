@@ -1019,7 +1019,7 @@ export default function RemarketingPage() {
                                 tone={flow.status === 'active' ? 'success' : flow.status === 'paused' ? 'warning' : 'default'}
                               />
                             </div>
-                            <p className="text-xs text-muted-foreground mb-3">{flow.description}</p>
+                            
 
                             {/* Trigger pill */}
                             <div className="flex items-center gap-1.5 mb-3">
@@ -1203,9 +1203,6 @@ export default function RemarketingPage() {
                   : <span className="font-normal text-muted-foreground">— dados insuficientes</span>}
               </dd>
             </div>
-            <p className="pt-3 text-xs text-muted-foreground">
-              A taxa aparece a partir de {MIN_ENROLLED_FOR_RATE} leads inscritos. Conta como conversão o lead que passa a Convertido.
-            </p>
           </dl>
         )}
       </AppModal>

@@ -408,7 +408,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         console.log('📱 Canais WhatsApp encontrados:', whatsappOnly.length, whatsappOnly);
       } catch (error) {
         console.error('❌ Erro ao buscar canais WhatsApp:', error);
-        toast.error('Erro ao carregar instâncias WhatsApp');
+        toast.error('Erro ao carregar os números de WhatsApp');
       } finally {
         setLoadingChannels(false);
       }
@@ -541,9 +541,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         xhr.addEventListener('load', () => {
           // MinIO presigned PUT returns 200 on success
           if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(`MinIO PUT ${xhr.status}`));
+          else reject(new Error(`Falha ao enviar o ficheiro (${xhr.status})`));
         });
-        xhr.addEventListener('error', () => reject(new Error('Erro de rede (MinIO)')));
+        xhr.addEventListener('error', () => reject(new Error('Erro de rede ao enviar o ficheiro')));
         xhr.open('PUT', presignedUrl);
         xhr.setRequestHeader('Content-Type', file.type);
         xhr.send(file);
@@ -934,13 +934,13 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
     // ✅ Validar instância WhatsApp selecionada
     if (!selectedChannel && whatsappChannels.length > 0) {
-      toast.error('Selecione uma instância WhatsApp');
+      toast.error('Escolha o número de WhatsApp');
       console.log('[Campaign WhatsApp] ❌ Validação falhou: Nenhuma instância selecionada');
       return;
     }
 
     if (whatsappChannels.length === 0) {
-      toast.error('Nenhuma instância WhatsApp ligada. Configure em Canais.');
+      toast.error('Nenhum WhatsApp ligado. Ligue um em Canais.');
       console.log('[Campaign WhatsApp] ❌ Validação falhou: Nenhuma instância disponível');
       return;
     }
@@ -1074,7 +1074,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       }
 
       if (!evolutionInstance) {
-        toast.error('Selecione uma instância WhatsApp ligada!');
+        toast.error('Escolha um WhatsApp ligado.');
         setIsSending(false);
         console.log('[Campaign WhatsApp] ❌ Nenhuma instância selecionada');
         return;
@@ -1757,7 +1757,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           <div>
             <span>Nova Campanha WhatsApp</span>
             {autoSaveIndicator && (
-              <p className="text-xs text-muted-foreground font-normal">Auto-a guardar...</p>
+              <p className="text-xs text-muted-foreground font-normal">A guardar…</p>
             )}
           </div>
         </div>
@@ -1819,12 +1819,12 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                 </Label>
                 {loadingChannels ? (
                   <div className="h-11 flex items-center justify-center bg-muted/50 rounded-lg border border-border">
-                    <span className="text-sm text-muted-foreground">A carregar instâncias...</span>
+                    <span className="text-sm text-muted-foreground">A carregar...</span>
                   </div>
                 ) : whatsappChannels.length === 0 ? (
                   <div className="h-11 flex items-center justify-center bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-700">
                     <span className="text-sm text-yellow-600 dark:text-yellow-400">
-                      Nenhuma instância ligada. Configure em Canais.
+                      Nenhum WhatsApp ligado. Ligue um em Canais.
  </span>
                   </div>
                 ) : (
@@ -2349,7 +2349,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                     {/* ✅ PLACEHOLDER quando não há conteúdo */}
                     {!message && attachments.length === 0 && (
                       <div className="bg-[#DCF8C6] dark:bg-[#005C4B] p-3 rounded-lg shadow-sm">
-                        <p className="text-sm text-muted-foreground italic">Digite uma mensagem ou adicione uma imagem...</p>
+                        <p className="text-sm text-muted-foreground italic">Escreva uma mensagem ou junte uma imagem</p>
                       </div>
                     )}
                   </div>
