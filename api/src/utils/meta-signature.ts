@@ -53,7 +53,9 @@ export async function acceptMetaWebhook(
     [idField, ids],
   );
   if (result.rows.length) {
-    console.warn(`[MetaWebhook] Assinatura ${check} para ${idField} ${ids.join(',')}: evento recusado`);
+    // Diagnóstico sem expor segredos: quantas chaves foram tentadas e a impressão digital de cada
+    const tried = signingSecrets().map((s) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 8));
+    console.warn(`[MetaWebhook] Assinatura ${check} para ${idField} ${ids.join(',')}: evento recusado (chaves tentadas: ${tried.length} [${tried.join(', ')}], META_INSTAGRAM_APP_SECRET ${process.env.META_INSTAGRAM_APP_SECRET ? 'definida' : 'NÃO definida'})`);
     return false;
   }
   return true;
