@@ -6,6 +6,7 @@ import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Facebook, Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, ChevronRight, ArrowLeft } from 'lucide-react';
+import { BrandIcon } from '../../base/BrandIcon';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -157,7 +158,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                 >
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center">
-                            <Facebook className="w-5 h-5 text-blue-600" />
+                            <BrandIcon brand="messenger" className="w-5 h-5" />
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
@@ -413,7 +414,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                         />
                                     ) : (
                                         <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl">
-                                            <Facebook className="w-6 h-6" />
+                                            <BrandIcon brand="facebook" mono className="w-6 h-6" />
                                         </div>
                                     )}
                                     <div>

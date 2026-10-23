@@ -24,6 +24,7 @@ import { useConfirm } from '../ui/ConfirmDialog';
 import { SkeletonAssistantGrid } from '../ui/skeletons';
 import { getLocale } from '../../utils/format';
 import { channelDisplayName } from '../inbox/channels/ChannelRows';
+import { brandIcon } from '../base/BrandIcon';
 
 // O canal do site tem um nome interno (ex.: "Leadsflowapi"): mostra "Chat do site"
 const assistantChannelName = (channel: Channel) =>
@@ -99,12 +100,12 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CHANNEL_ICONS: Record<string, React.ComponentType<any>> = {
-  'whatsapp': MessageCircle,
-  'whatsapp_cloud': Cloud,
-  'instagram': Instagram,
-  'facebook': Facebook,
-  'messenger': Facebook,
-  'telegram': Send,
+  'whatsapp': brandIcon('whatsapp'),
+  'whatsapp_cloud': brandIcon('whatsapp'),
+  'instagram': brandIcon('instagram'),
+  'facebook': brandIcon('messenger'),
+  'messenger': brandIcon('messenger'),
+  'telegram': brandIcon('telegram'),
   'email': Mail,
   'twilio_sms': Smartphone,
   'sms': Smartphone,

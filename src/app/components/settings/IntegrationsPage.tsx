@@ -6,6 +6,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { toast } from "sonner";
 import { userApi } from '../../utils/api';
+import { brandIcon } from '../base/BrandIcon';
 
 interface IntegrationsPageProps {
   user: any;
@@ -718,7 +719,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       id: 'n8n' as IntegrationType,
       name: 'Google Sheets (via n8n)',
       description: 'Envie os leads para uma folha do Google Sheets em tempo real',
-      icon: Sheet,
+      icon: brandIcon('googlesheets'),
       color: 'text-cyan-600 dark:text-cyan-400',
       borderColor: 'border-cyan-200 dark:border-cyan-800',
       configured: isN8nConfigured || isN8nWhatsAppImportConfigured,
@@ -745,7 +746,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       id: 'meta-pixel' as IntegrationType,
       name: 'Meta Pixel (Facebook)',
       description: 'Rastreie eventos de conversão de leads no Meta Ads',
-      icon: BarChart3,
+      icon: brandIcon('meta'),
       color: 'text-indigo-600 dark:text-indigo-400',
       borderColor: 'border-indigo-200 dark:border-indigo-800',
       configured: isMetaPixelConfigured,
@@ -754,7 +755,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       id: 'google-analytics' as IntegrationType,
       name: 'Google Analytics',
       description: 'Envie eventos de conversão para o Google Analytics',
-      icon: Eye,
+      icon: brandIcon('googleanalytics'),
       color: 'text-orange-600 dark:text-orange-400',
       borderColor: 'border-orange-200 dark:border-orange-800',
       configured: isGoogleAnalyticsConfigured,

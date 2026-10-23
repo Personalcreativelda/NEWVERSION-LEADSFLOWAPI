@@ -6,20 +6,22 @@ import type { Channel } from '../../../types/inbox';
 import { channelsApi } from '../../../services/api/inbox';
 import { AppModal } from '../../base/AppModal';
 import { WhatsAppIcon } from '../../dashboard/leadDisplay';
+import { brandIcon } from '../../base/BrandIcon';
+import type { ComponentType } from 'react';
 
 interface ChannelTypeInfo {
   label: string;
   subtitle: string;
-  Icon: LucideIcon | typeof WhatsAppIcon;
+  Icon: LucideIcon | ComponentType<{ className?: string }>;
   color: string;
 }
 
 const TYPE_INFO: Record<string, ChannelTypeInfo> = {
-  whatsapp: { label: 'WhatsApp', subtitle: 'WhatsApp · API não oficial', Icon: WhatsAppIcon, color: 'text-green-600 dark:text-green-400' },
-  whatsapp_cloud: { label: 'WhatsApp Cloud', subtitle: 'WhatsApp · API oficial da Meta', Icon: Cloud, color: 'text-green-600 dark:text-green-400' },
-  facebook: { label: 'Facebook Messenger', subtitle: 'Facebook · Messenger', Icon: Facebook, color: 'text-blue-600 dark:text-blue-400' },
-  instagram: { label: 'Instagram', subtitle: 'Instagram · Direct', Icon: Instagram, color: 'text-pink-600 dark:text-pink-400' },
-  telegram: { label: 'Telegram', subtitle: 'Telegram · Bot', Icon: Send, color: 'text-sky-600 dark:text-sky-400' },
+  whatsapp: { label: 'WhatsApp', subtitle: 'WhatsApp · API não oficial', Icon: brandIcon('whatsapp'), color: 'text-green-600 dark:text-green-400' },
+  whatsapp_cloud: { label: 'WhatsApp Cloud', subtitle: 'WhatsApp · API oficial da Meta', Icon: brandIcon('whatsapp'), color: 'text-green-600 dark:text-green-400' },
+  facebook: { label: 'Facebook Messenger', subtitle: 'Facebook · Messenger', Icon: brandIcon('messenger'), color: 'text-blue-600 dark:text-blue-400' },
+  instagram: { label: 'Instagram', subtitle: 'Instagram · Direct', Icon: brandIcon('instagram'), color: 'text-pink-600 dark:text-pink-400' },
+  telegram: { label: 'Telegram', subtitle: 'Telegram · Bot', Icon: brandIcon('telegram'), color: 'text-sky-600 dark:text-sky-400' },
   website: { label: 'Chat do site', subtitle: 'Chat do site · Widget', Icon: Globe, color: 'text-violet-600 dark:text-violet-400' },
   email: { label: 'Email', subtitle: 'Email · Caixa de entrada', Icon: Mail, color: 'text-cyan-600 dark:text-cyan-400' },
   twilio_sms: { label: 'SMS', subtitle: 'SMS · Twilio', Icon: Smartphone, color: 'text-teal-600 dark:text-teal-400' },
@@ -183,7 +185,7 @@ export interface AvailableChannel {
   id: string;
   name: string;
   description: string;
-  icon: LucideIcon;
+  icon: LucideIcon | ComponentType<{ className?: string }>;
   color: string;
   available: boolean;
 }
@@ -199,7 +201,7 @@ export function AddChannelSheet({ open, onClose, channels, onPick }: {
     <AppModal open={open} onOpenChange={(o) => !o && onClose()} size="md" title="Adicionar canal" description="Escolha o canal que quer ligar">
       <ul className="-mx-1 divide-y divide-border">
         {channels.filter((c) => c.available).map((c) => {
-          const Icon = c.id === 'whatsapp' ? WhatsAppIcon : c.icon;
+          const Icon = c.icon;
           return (
             <li key={c.id}>
               <button

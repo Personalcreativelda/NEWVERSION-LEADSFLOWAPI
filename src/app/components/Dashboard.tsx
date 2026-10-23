@@ -198,12 +198,16 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     return saved !== null ? Number(JSON.parse(saved)) : SIDEBAR_DEFAULT_WIDTH;
   });
   const [isMobile, setIsMobile] = useState(false);
-  // Com a barra inferior visível o botão flutuante do chat de suporte fica escondido
-  // (abre-se pelo Menu) — ver html.has-bottom-nav em globals.css
+  // Dentro do painel o botão flutuante do chat de suporte fica escondido em todos os
+  // tamanhos: abre-se em Definições → "Falar com o suporte" (ver html.in-dashboard em globals.css)
   useEffect(() => {
     document.documentElement.classList.toggle('has-bottom-nav', isMobile);
     return () => document.documentElement.classList.remove('has-bottom-nav');
   }, [isMobile]);
+  useEffect(() => {
+    document.documentElement.classList.add('in-dashboard');
+    return () => document.documentElement.classList.remove('in-dashboard');
+  }, []);
   const [filtrosAplicados, setFiltrosAplicados] = useState({ origem: '', status: '', busca: '' });
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);

@@ -4,6 +4,7 @@ import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Instagram, Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
+import { BrandIcon } from '../../base/BrandIcon';
 
 // URL base da API (pegar do env ou usar padrão)
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
@@ -374,7 +375,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                 >
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex items-center justify-center">
-                            <Instagram className="w-5 h-5 text-white" />
+                            <BrandIcon brand="instagram" mono className="w-5 h-5 text-white" />
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
@@ -589,7 +590,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                         />
                                     ) : (
                                         <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex items-center justify-center text-white">
-                                            <Instagram className="w-6 h-6" />
+                                            <BrandIcon brand="instagram" mono className="w-6 h-6" />
                                         </div>
                                     )}
                                     <div>

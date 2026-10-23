@@ -12,6 +12,7 @@ import { api } from '../../../lib/api';
 import { formatNumber, formatPercent } from '../../utils/format';
 import { formatLeadStatus } from '../dashboard/leadDisplay';
 import { SkeletonStatCardsRow, SkeletonInsightRow, UpdatingBadge } from '../ui/skeletons';
+import { BrandIcon } from '../base/BrandIcon';
 
 interface AIInsightsStats {
   hot_count: number;
@@ -73,13 +74,13 @@ export default function AIInsightsPage() {
   // ── Ícone, label e badge do canal ─────────────────────────────────────────
   const getChannelInfo = (channel?: string) => {
     const ch = (channel || '').toLowerCase().trim();
-    if (ch === 'facebook' || ch === 'messenger' || ch.includes('facebook')) return { icon: <Facebook className="w-3.5 h-3.5" />, label: 'Facebook', color: 'bg-blue-600' };
-    if (ch === 'instagram' || ch.includes('instagram'))  return { icon: <Instagram className="w-3.5 h-3.5" />, label: 'Instagram', color: 'bg-pink-600' };
-    if (ch === 'telegram' || ch.includes('telegram'))    return { icon: <Send className="w-3.5 h-3.5" />, label: 'Telegram', color: 'bg-sky-500' };
+    if (ch === 'facebook' || ch === 'messenger' || ch.includes('facebook')) return { icon: <BrandIcon brand="messenger" mono className="w-3.5 h-3.5" />, label: 'Messenger', color: 'bg-[#0866FF]' };
+    if (ch === 'instagram' || ch.includes('instagram'))  return { icon: <BrandIcon brand="instagram" mono className="w-3.5 h-3.5" />, label: 'Instagram', color: 'bg-[#E1306C]' };
+    if (ch === 'telegram' || ch.includes('telegram'))    return { icon: <BrandIcon brand="telegram" mono className="w-3.5 h-3.5" />, label: 'Telegram', color: 'bg-[#26A5E4]' };
     if (ch === 'email' || ch.includes('email'))          return { icon: <Mail className="w-3.5 h-3.5" />, label: 'Email', color: 'bg-gray-600' };
-    if (ch === 'whatsapp_cloud')                         return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
-    if (ch === 'whatsapp' || ch.includes('whatsapp') || ch.includes('wapp')) return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
-    return { icon: <MessageSquare className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-green-600' };
+    if (ch === 'whatsapp_cloud')                         return { icon: <BrandIcon brand="whatsapp" mono className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-[#25D366]' };
+    if (ch === 'whatsapp' || ch.includes('whatsapp') || ch.includes('wapp')) return { icon: <BrandIcon brand="whatsapp" mono className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-[#25D366]' };
+    return { icon: <BrandIcon brand="whatsapp" mono className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-[#25D366]' };
   };
 
   const ChannelBadge = ({ channel }: { channel?: string }) => {

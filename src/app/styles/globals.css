@@ -1212,10 +1212,11 @@ html.native-app body {
   touch-action: manipulation; /* sem atraso de 300ms no toque, mantém o zoom por pinça */
 }
 
-/* Botão flutuante do chat de suporte: no app, e na web quando há barra de navegação
-   inferior (painel em < 1024px), abre-se pelo Menu → "Chat de suporte". */
+/* Botão flutuante do chat de suporte: escondido no app e em todo o painel (abre-se em
+   Definições → "Falar com o suporte"); só aparece nas páginas públicas (ex.: entrar). */
 html.native-app #lfw-btn,
-html.has-bottom-nav #lfw-btn {
+html.has-bottom-nav #lfw-btn,
+html.in-dashboard #lfw-btn {
   display: none !important;
 }
 

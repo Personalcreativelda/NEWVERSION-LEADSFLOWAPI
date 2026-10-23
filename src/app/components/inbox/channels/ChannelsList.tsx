@@ -14,6 +14,7 @@ import { TwilioSMSConnect } from './TwilioSMSConnect';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { SkeletonChannelGrid } from '../../ui/skeletons';
+import { brandIcon } from '../../base/BrandIcon';
 import {
     Globe,
     Facebook,
@@ -33,21 +34,12 @@ import {
 
 // Configuração dos canais disponíveis para conexão
 // Ordem: WhatsApp primeiro, depois Facebook, Instagram, Telegram e outros
-const CHANNEL_SVG: Record<string, string> = {
-    whatsapp: '/channel icon/whatsapp-whats-app-svgrepo-com.svg',
-    whatsapp_cloud: '/channel icon/whatsapp-whats-app-svgrepo-com.svg',
-    facebook: '/channel icon/messenger-facebook-svgrepo-com.svg',
-    instagram: '/channel icon/instagram-1-svgrepo-com.svg',
-    telegram: '/channel icon/telegram-svgrepo-com.svg',
-    email: '/channel icon/google-svgrepo-com.svg',
-};
-
 const AVAILABLE_CHANNELS = [
     {
         id: 'whatsapp',
         name: 'WhatsApp',
         description: 'API não oficial',
-        icon: MessageCircle,
+        icon: brandIcon('whatsapp'),
         color: 'text-green-500',
         available: true,
         provider: 'evolution_api'
@@ -55,47 +47,47 @@ const AVAILABLE_CHANNELS = [
     {
         id: 'whatsapp_cloud',
         name: 'WhatsApp Cloud',
-        description: 'API Oficial da Meta',
-        icon: Cloud,
+        description: 'API oficial da Meta',
+        icon: brandIcon('whatsapp'),
         color: 'text-green-600',
         available: true,
         provider: 'cloud_api'
     },
     {
         id: 'facebook',
-        name: 'Facebook',
-        description: 'Ligar sua página do Facebook',
-        icon: Facebook,
+        name: 'Facebook Messenger',
+        description: 'Ligue a sua página do Facebook',
+        icon: brandIcon('messenger'),
         color: 'text-blue-600',
         available: true
     },
     {
         id: 'instagram',
         name: 'Instagram',
-        description: 'Conecte sua conta do Instagram',
-        icon: Instagram,
+        description: 'Ligue a sua conta do Instagram',
+        icon: brandIcon('instagram'),
         color: 'text-pink-600',
         available: true
     },
     {
         id: 'telegram',
         name: 'Telegram',
-        description: 'Conecte seu bot do Telegram',
-        icon: Send,
+        description: 'Ligue o seu bot do Telegram',
+        icon: brandIcon('telegram'),
         color: 'text-blue-400',
         available: true
     },
     {
         id: 'website',
-        name: 'Chat do Site',
-        description: 'Widget de chat para seu website',
+        name: 'Chat do site',
+        description: 'Janela de conversa no seu site',
         icon: Globe,
         color: 'text-violet-500',
         available: true
     },
     {
         id: 'email',
-        name: 'E-Mail',
+        name: 'Email',
         description: 'Receba emails na caixa de entrada',
         icon: Mail,
         color: 'text-cyan-500',
@@ -104,7 +96,7 @@ const AVAILABLE_CHANNELS = [
     {
         id: 'sms',
         name: 'SMS',
-        description: 'Integrar canal SMS (Twilio)',
+        description: 'Mensagens SMS através do Twilio',
         icon: Smartphone,
         color: 'text-teal-500',
         available: true

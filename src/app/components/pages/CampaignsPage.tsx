@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
 import { SkeletonCampaignSection, UpdatingBadge } from '../ui/skeletons';
 import { NUMBER_OPTS, getLocale } from '../../utils/format';
+import { BrandIcon } from '../base/BrandIcon';
 
 interface Lead {
   id: string;
@@ -1318,7 +1319,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   : 'border-transparent text-muted-foreground hover:text-[#10B981]'
                   }`}
               >
-                <MessageCircle className="w-4 h-4 flex-shrink-0" />
+                <BrandIcon brand="whatsapp" className="w-4 h-4 flex-shrink-0" />
                 <span>WhatsApp</span>
                 <span className={`min-w-[22px] rounded-full px-1.5 py-0.5 text-center text-xs font-semibold tabular-nums ${activeTab === 'whatsapp' ? 'bg-[#10B981] text-white' : 'bg-muted text-muted-foreground'}`}>
                   {countByChannel('whatsapp')}

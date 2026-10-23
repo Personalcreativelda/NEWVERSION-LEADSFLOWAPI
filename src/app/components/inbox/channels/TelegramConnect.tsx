@@ -4,6 +4,7 @@ import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Send, Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle } from 'lucide-react';
+import { BrandIcon } from '../../base/BrandIcon';
 
 interface TelegramConnectProps {
     isOpen: boolean;
@@ -138,7 +139,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                 >
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                            <Send className="w-5 h-5 text-blue-400" />
+                            <BrandIcon brand="telegram" className="w-5 h-5" />
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>

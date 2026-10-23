@@ -18,6 +18,7 @@ import { AppButton } from '../base/AppButton';
 import { DashboardCard } from '../base/DashboardCard';
 import { StatusBadge } from '../base/StatusBadge';
 import { formatNumber, formatPercent } from '../../utils/format';
+import { brandIcon } from '../base/BrandIcon';
 
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
@@ -162,15 +163,15 @@ const TEMPLATES = [
 // ─── Step icon helper ─────────────────────────────────────────────────────────
 
 const STEP_ICONS: Record<ActionType, React.ElementType> = {
-  whatsapp: MessageSquare,
+  whatsapp: brandIcon('whatsapp'),
   email: Mail,
   wait: Clock,
   tag: Tag,
   move_stage: GitBranch,
   condition: Filter,
-  facebook: Facebook,
-  instagram: Instagram,
-  telegram: Send,
+  facebook: brandIcon('messenger'),
+  instagram: brandIcon('instagram'),
+  telegram: brandIcon('telegram'),
   ab_test: Split,
   dynamic_audio: Mic,
 };
