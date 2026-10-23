@@ -1,7 +1,7 @@
 import { matchesSearch } from '../../utils/search';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  X, Zap, UserCog, LogOut, ChevronRight, Search, PanelLeft, HelpCircle, Crown, LifeBuoy
+  X, Zap, UserCog, LogOut, ChevronRight, Search, PanelLeft, HelpCircle, LifeBuoy
 } from 'lucide-react';
 import { LayoutDashboard, Users, BarChart3, Megaphone, Settings, MessageSquare, Star, Activity } from 'lucide-react';
 import { Language, translations, Translations } from '../../utils/i18n';

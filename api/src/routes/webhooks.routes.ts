@@ -2,14 +2,12 @@ import { Router } from 'express';
 import multer from 'multer';
 import { query } from '../database/connection';
 // INBOX: Importar services para webhook do Evolution
-import { ChannelsService } from '../services/channels.service';
 import { ConversationsService } from '../services/conversations.service';
-import { LeadsService } from '../services/leads.service';
 import { WhatsAppService } from '../services/whatsapp.service';
 // Lead Tracking: Importar serviço de rastreamento de leads
 import { leadTrackingService } from '../services/lead-tracking.service';
 // Phone validation utilities
-import { extractPhoneFromJid, isValidPhoneNumber, isGroupJid, isInvalidJid, isSamePhoneNumber, normalizePhoneNumber, ensureJidFormat } from '../utils/phone.utils';
+import { extractPhoneFromJid, isValidPhoneNumber, isInvalidJid, isSamePhoneNumber, normalizePhoneNumber, ensureJidFormat } from '../utils/phone.utils';
 // INBOX: Importar WebSocket service para notificações em tempo real
 import { getWebSocketService } from '../services/websocket.service';
 // IA: Importar processador de assistentes
@@ -27,9 +25,7 @@ import { fetchMessengerProfile, isInstagramLoginToken } from '../utils/meta-send
 import { findOrCreateLead } from '../services/leads-dedup.service';
 
 const router = Router();
-const channelsService = new ChannelsService();
 const conversationsService = new ConversationsService();
-const leadsService = new LeadsService();
 const whatsappService = new WhatsAppService();
 
 // GET /webhooks/settings — user integration settings stub
@@ -1226,7 +1222,6 @@ router.post('/evolution/messages', async (req, res) => {
       lidReference = remoteJid;  // Guardar @lid como referência
 
       // Tentar resolver com retry
-      let resolved = false;
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           console.log(`[Evolution Webhook]   - Tentativa ${attempt}/2 de resolver @lid...`);
@@ -1239,7 +1234,6 @@ router.post('/evolution/messages', async (req, res) => {
               workingPhone = normalizedPhone;
               resolvedJid = lidResolution.jid;
               console.log(`[Evolution Webhook] ✅ @lid RESOLVIDO com sucesso: ${remoteJid} → ${resolvedJid} → Número normalizado: ${workingPhone}`);
-              resolved = true;
               break;
             }
           }
@@ -3382,8 +3376,6 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
 
         const value = change.value;
         const phoneNumberId = value.metadata?.phone_number_id;
-        const displayPhoneNumber = value.metadata?.display_phone_number;
-
         // Processar mensagens recebidas
         for (const message of value.messages || []) {
           const senderId = message.from; // Número do remetente
@@ -5033,8 +5025,6 @@ router.post('/telegram/messages', async (req, res) => {
     );
 
     let leadId: string;
-    let isNewLead = false;
-
     if (leadResult.rows.length === 0) {
       // Criar novo lead
       const newLeadResult = await query(
@@ -5044,7 +5034,6 @@ router.post('/telegram/messages', async (req, res) => {
         [internalUserId, contactName]
       );
       leadId = newLeadResult.rows[0].id;
-      isNewLead = true;
 
       // Registrar captura
       await leadTrackingService.recordLeadCapture(
@@ -5077,7 +5066,7 @@ router.post('/telegram/messages', async (req, res) => {
     );
 
     // Salvar mensagem
-    const msgResult = await query(
+    await query(
       `INSERT INTO messages (
         user_id, conversation_id, lead_id, direction, channel,
         content, status, external_id, metadata
@@ -5285,7 +5274,6 @@ router.post('/whatsapp-cloud/messages', async (req, res) => {
 
     const message = update.messages[0];
     const contactInfo = update.contacts?.[0];
-    const businessPhoneNumberId = update.metadata?.phone_number_id;
     const internalUserId = req.body.internal_user_id || req.headers['x-internal-user-id'];
 
     if (!internalUserId) {

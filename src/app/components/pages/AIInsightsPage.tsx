@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Brain, RefreshCw, Flame, TrendingUp, Star,
-  Sparkles, CheckCircle2, MessageSquare, Mail,
-  Zap, AlertCircle, ArrowRight, Lightbulb, Copy, Send,
-  ChevronDown, ChevronUp, Edit3, Instagram, Facebook
-} from 'lucide-react';
+  Brain, Flame, TrendingUp, 
+  Sparkles, CheckCircle2, Mail,
+  Zap, AlertCircle, ArrowRight, Lightbulb, Copy, 
+  ChevronDown, ChevronUp, Edit3} from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../../lib/api';
-import { Brain, Flame, TrendingDown, Sparkles, RefreshCw, ChevronRight } from 'lucide-react';
+import { Brain, Flame, TrendingDown, Sparkles, ChevronRight } from 'lucide-react';
 import { DashboardCard } from '../base/DashboardCard';
 import { LoadingState } from '../base/LoadingState';
 import { EmptyState } from '../base/EmptyState';

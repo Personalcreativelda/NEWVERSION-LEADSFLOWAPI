@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  X, Mail, Users, Send, Clock, Settings,
-  Paperclip, Image as ImageIcon, ChevronDown, ChevronUp,
-  Smile, Bold, Italic, Link2, Check, Eye, Save, Trash2, Type
+  X, Mail, Users, Send, 
+  Paperclip, 
+  Smile, Bold, Italic, Link2, Eye, Save, Trash2, Type
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -31,14 +31,6 @@ interface CampaignEmailModalProps {
   onCampaignUpdated?: (campaign: any) => void;
   editingCampaign?: any;
 }
-
-interface Attachment {
-  name: string;
-  size: number;
-  type: string;
-  file: File;
-}
-
 export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignCreated, onCampaignUpdated, editingCampaign }: CampaignEmailModalProps) {
   const [campaignName, setCampaignName] = useState('');
   const [recipientMode, setRecipientMode] = useState<'all' | 'segments' | 'custom'>('all');
@@ -53,11 +45,9 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
   const [sendSpeed, setSendSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [trackOpens, setTrackOpens] = useState(true);
   const [trackClicks, setTrackClicks] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [resolvedSender, setResolvedSender] = useState<{ email: string; name: string; source: string } | null>(null);

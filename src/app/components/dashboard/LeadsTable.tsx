@@ -1,6 +1,6 @@
 import { matchesSearch } from '../../utils/search';
 import { LeadListRow } from './LeadListRow';
-import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, Megaphone, Instagram, Facebook, Send, Smartphone, Search, Plus, CopyX, Users } from 'lucide-react';
+import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, Megaphone, Smartphone, Search, Plus, CopyX, Users } from 'lucide-react';
 import { useState } from 'react';
 import type { Lead } from '../../types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import multer from 'multer';
-import pool, { query } from '../database/connection';
+import pool from '../database/connection';
 import { requireAuth } from '../middleware/auth.middleware';
 import { getStorageService } from '../services/storage.service';
 

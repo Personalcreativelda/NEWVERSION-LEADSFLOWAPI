@@ -191,7 +191,7 @@ export class ConversationTagsService {
    * Remover etiqueta de uma conversa
    */
   async removeTagFromConversation(conversationId: string, tagId: string): Promise<void> {
-    const result = await query(
+    await query(
       `DELETE FROM conversation_tag_assignments 
        WHERE conversation_id = $1 AND tag_id = $2`,
       [conversationId, tagId]

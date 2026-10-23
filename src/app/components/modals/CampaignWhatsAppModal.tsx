@@ -1,7 +1,7 @@
 // Campaign WhatsApp Modal - Versão Completa com Drag & Drop e Preview
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  X, MessageCircle, Send, Clock, Settings, RefreshCw,
+  MessageCircle, Send, Clock, Settings, RefreshCw,
   Paperclip, Image as ImageIcon, ChevronDown, ChevronUp,
   Smile, Bold, Italic, Link2, Check, Eye, Save, Trash2, Video, Smartphone
 } from 'lucide-react';
@@ -147,7 +147,6 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const [minDelay, setMinDelay] = useState('15');
   const [maxDelay, setMaxDelay] = useState('45');
   const [isSending, setIsSending] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showVariableDropdown, setShowVariableDropdown] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);

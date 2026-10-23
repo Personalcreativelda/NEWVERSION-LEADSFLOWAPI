@@ -45,7 +45,6 @@ const GoogleIcon = () => (
 interface LoginPageProps {
   onSuccess: () => void;
   onSwitchToSignup: () => void;
-  onSetup?: () => void;
   onForgotPassword?: () => void;
   onBackToHome?: () => void;
 }

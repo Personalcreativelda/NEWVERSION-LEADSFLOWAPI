@@ -7,8 +7,6 @@ import type {
     Message,
     MessageWithSender,
     AIAssistant,
-    ApiResponse,
-    PaginatedResponse,
     TeamMember,
     InternalNote,
     ActivityLog,

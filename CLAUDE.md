@@ -15,7 +15,7 @@ Textos da interface e comentários de código em **português (PT)**.
 
 ```bash
 npm run dev                 # web em localhost:3200 (a 3200 pode estar ocupada por um "vite preview" antigo — usar --port 3300)
-npx tsc --noEmit -p .       # tipos do front (há ~59 erros antigos; não pode subir)
+npx tsc --noEmit -p .       # tipos do front (0 erros)
 cd api && npx tsc --noEmit -p .   # tipos da API (0 erros)
 npm run build               # dist/ da web (modo normal)
 npm run android:sync        # build modo android + cap sync — SEMPRE a partir da raiz

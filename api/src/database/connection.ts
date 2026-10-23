@@ -10,8 +10,6 @@ import { decryptCredentials } from '../utils/secret-box';
 // settings and corporate/ISP proxies intercept non-HTTP TCP traffic.
 
 let bridgePort: number | null = null;
-let bridgeServer: net.Server | null = null;
-
 function createConnectTunnel(
   proxyHost: string,
   proxyPort: number,
@@ -101,7 +99,6 @@ async function startProxyBridge(
     });
 
     server.on('error', reject);
-    bridgeServer = server;
   });
 }
 

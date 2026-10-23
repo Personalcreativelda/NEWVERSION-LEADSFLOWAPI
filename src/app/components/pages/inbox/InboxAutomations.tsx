@@ -5,7 +5,7 @@ import {
   Copy, Play, Clock, AlertCircle, CheckCircle2,
   ChevronDown, ChevronRight, Link2, Key, FileJson, History
 } from 'lucide-react';
-import { PageHeader, PageAction } from '../../base/PageHeader';
+import { PageHeader } from '../../base/PageHeader';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';

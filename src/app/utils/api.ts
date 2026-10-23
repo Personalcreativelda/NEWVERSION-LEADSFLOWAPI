@@ -1167,7 +1167,7 @@ export const leadsApi = {
       throw new Error('ID do lead inválido. Não é possível deletar este lead.');
     }
     console.log(`[LeadsAPI] 🗑️ Deleting lead: ${leadId}`);
-    const result = await apiCall(`/leads/${leadId}`, {
+    await apiCall(`/leads/${leadId}`, {
       method: 'DELETE',
     }, true);
     console.log(`[LeadsAPI] ✅ Lead deleted successfully: ${leadId}`);

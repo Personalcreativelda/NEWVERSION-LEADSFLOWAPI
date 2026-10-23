@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../../lib/api';
 import { toast } from 'sonner';
 import {
-  GitBranch, Plus, Zap, Mail, MessageSquare, Clock, Filter,
+  GitBranch, Plus, Zap, Mail, Clock, Filter,
   ChevronRight, Play, Pause, Copy, Trash2, BarChart3, ArrowRight,
-  Tag, ShoppingCart, UserCheck, AlertCircle,
-  Layers, Repeat2, Target, Pencil, X, GripVertical, Info,
-  Instagram, Facebook, Send, Split, Mic, RefreshCw, UploadCloud, MoreHorizontal,
+  Tag, ShoppingCart, UserCheck, 
+  Layers, Repeat2, Target, Pencil, X, Info,
+  Split, Mic, UploadCloud, MoreHorizontal,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { PageHeader, PageAction } from '../base/PageHeader';

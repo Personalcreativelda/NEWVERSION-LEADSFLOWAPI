@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
-import { Send, Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle } from 'lucide-react';
+import { Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle } from 'lucide-react';
 import { BrandIcon } from '../../base/BrandIcon';
 
 interface TelegramConnectProps {

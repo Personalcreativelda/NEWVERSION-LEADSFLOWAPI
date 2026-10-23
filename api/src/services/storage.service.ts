@@ -1,4 +1,3 @@
-import type { Express } from 'express';
 import type { Pool } from 'pg';
 import { storageKeyFromUrl } from '../utils/storage-urls';
 

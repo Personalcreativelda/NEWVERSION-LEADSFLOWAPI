@@ -1,18 +1,6 @@
-import type { Express } from 'express';
 import type { QueryResult } from 'pg';
 import { query } from '../database/connection';
 import { getStorageService } from './storage.service';
-
-const DEFAULT_LIMITS = {
-  leads: 100,
-  messages: 100,
-  massMessages: 50,
-  channels: 1,
-  customAssistants: 0,
-  voiceAgents: 0,
-  activeCampaigns: 1,
-};
-
 const DEFAULT_USAGE = {
   leads: 0,
   messages: 0,

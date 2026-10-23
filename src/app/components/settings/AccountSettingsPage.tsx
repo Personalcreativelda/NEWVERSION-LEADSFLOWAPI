@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SettingsHub, Group, Row } from './SettingsHub';
 import { ProfileSection } from './ProfileSection';
-import { Loader2, Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog, ChevronRight } from 'lucide-react';
+import { Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog, ChevronRight } from 'lucide-react';
 import { PageHeader } from '../base/PageHeader';
 import { SubpageBack } from '../base/SubpageBack';
 import { Button } from '../ui/button';

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '../../ui/button';
 import {
-  AlertCircle, CheckCircle2, AlertTriangle, Loader2, RefreshCw, Mail, Activity, Trash2,
+  AlertCircle, CheckCircle2, AlertTriangle, Loader2, Mail, Activity, Trash2,
 } from 'lucide-react';
 import { PageHeader, PageAction } from '../../base/PageHeader';
 import { apiRequest } from '../../../utils/api';

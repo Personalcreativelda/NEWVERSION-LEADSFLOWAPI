@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check, Crown, Rocket, Zap } from 'lucide-react';
 import { useConfirm } from '../ui/ConfirmDialog';
-import { projectId } from '../../utils/supabase/info';
 import type { Lead } from '../../types';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
@@ -31,8 +30,6 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [stats, setStats] = useState({ enviados: 0, falhas: 0 });
-  const [useN8NWebhook, setUseN8NWebhook] = useState(false);
-
   // Check user plan permissions
   const isFree = !userPlan || userPlan === 'free';
   const isEnterprise = userPlan === 'enterprise';
@@ -157,24 +154,6 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
         enviados: data.enviados !== undefined ? data.enviados : selecionados.length,
         falhas: data.falhas || 0,
       });
-
-      // Atualizar contador de mensagens WhatsApp em massa no backend
-      const sentCount = data.enviados !== undefined ? data.enviados : selecionados.length;
-      if (sentCount > 0) {
-        try {
-          const token = localStorage.getItem('leadflow_access_token');
-          await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-4be966ab/increment-whatsapp-mass-usage`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({ messageCount: sentCount }),
-          });
-        } catch (error) {
-          console.error('Erro ao atualizar contador de mensagens WhatsApp:', error);
-        }
-      }
 
       setSuccess(true);
 

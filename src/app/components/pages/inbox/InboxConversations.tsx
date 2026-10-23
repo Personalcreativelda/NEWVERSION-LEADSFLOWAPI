@@ -7,7 +7,7 @@ import { useInboxFilters } from '../../../hooks/useInboxFilters';
 import { useInboxLayout } from '../../../hooks/useInboxLayout';
 import { conversationsApi, contactsApi, groupsApi, teamApi, channelsApi } from '../../../services/api/inbox';
 import {
-    Search, Filter, Plus, X, Wifi, WifiOff, RefreshCw,
+    Search, Filter, Plus, X, WifiOff, RefreshCw,
     PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
     Maximize2, Minimize2,
     Tag, Users, Settings2, Trash2, CheckSquare, Square,

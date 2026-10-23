@@ -30,11 +30,3 @@ npm-debug.log*
 coverage
 docs
 *.md
-
-# Temp scripts (diagnostic / one-off files)
-tmp-*.js
-check*.js
-diagnostic.js
-direct_test.js
-setup-db.*
-db_report*

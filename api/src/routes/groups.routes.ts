@@ -3,13 +3,11 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { WhatsAppService } from '../services/whatsapp.service';
 import { ChannelsService } from '../services/channels.service';
-import { ConversationsService } from '../services/conversations.service';
 import { query } from '../database/connection';
 
 const router = Router();
 const whatsappService = new WhatsAppService();
 const channelsService = new ChannelsService();
-const conversationsService = new ConversationsService();
 
 // Middleware de autenticação
 router.use(requireAuth);

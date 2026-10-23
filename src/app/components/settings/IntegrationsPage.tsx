@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Webhook, Mail, ChevronRight, Sheet, BarChart3, Eye, Loader2, CheckCircle2, MessageSquare, Save, Trash2, FlaskConical, Plug } from 'lucide-react';
+import { Webhook, Mail, ChevronRight, Sheet, BarChart3, Eye, Loader2, CheckCircle2, MessageSquare, Save, Trash2, Plug } from 'lucide-react';
 import { PageHeader } from '../base/PageHeader';
 import { SubpageBack } from '../base/SubpageBack';
 import { Button } from '../ui/button';
@@ -24,8 +24,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   const [smtpPassword, setSmtpPassword] = useState('');
   const [smtpFromEmail, setSmtpFromEmail] = useState('');
   const [smtpFromName, setSmtpFromName] = useState('');
-  const [whatsappToken, setWhatsappToken] = useState('');
-  const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [smtpSaveState, setSmtpSaveState] = useState<'idle' | 'loading' | 'saved'>('idle');
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState('');
   const [n8nWhatsAppImportUrl, setN8nWhatsAppImportUrl] = useState('');
@@ -35,11 +33,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   const [isMetaPixelConfigured, setIsMetaPixelConfigured] = useState(false);
   const [googleAnalyticsId, setGoogleAnalyticsId] = useState('');
   const [isGoogleAnalyticsConfigured, setIsGoogleAnalyticsConfigured] = useState(false);
-  const [chatWebhookUrl, setChatWebhookUrl] = useState('');
-  const [chatType, setChatType] = useState<'n8n' | 'supabase' | 'custom'>('n8n');
-  const [isChatConfigured, setIsChatConfigured] = useState(false);
-  const [evolutionApiUrl, setEvolutionApiUrl] = useState('');
-  const [evolutionInstanceName, setEvolutionInstanceName] = useState('');
   const [dashboardPixelEnv, setDashboardPixelEnv] = useState('');
 
   useEffect(() => {
@@ -71,19 +64,12 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       applyStringSetting(localStorage.getItem('n8n_whatsapp_import_url'), setN8nWhatsAppImportUrl, setIsN8nWhatsAppImportConfigured);
       applyStringSetting(localStorage.getItem('meta_pixel_id'), setMetaPixelId, setIsMetaPixelConfigured);
       applyStringSetting(localStorage.getItem('google_analytics_id'), setGoogleAnalyticsId, setIsGoogleAnalyticsConfigured);
-      applyStringSetting(localStorage.getItem('chat_webhook_url'), setChatWebhookUrl, setIsChatConfigured);
       applyStringSetting(localStorage.getItem('smtp_host'), setSmtpHost);
       applyStringSetting(localStorage.getItem('smtp_port'), setSmtpPort);
       applyStringSetting(localStorage.getItem('smtp_user'), setSmtpUser);
       applyStringSetting(localStorage.getItem('smtp_password'), setSmtpPassword);
       applyStringSetting(localStorage.getItem('smtp_from_email'), setSmtpFromEmail);
       applyStringSetting(localStorage.getItem('smtp_from_name'), setSmtpFromName);
-      applyStringSetting(localStorage.getItem('evolution_instance_name'), setEvolutionInstanceName);
-
-      const storedChatType = localStorage.getItem('chat_type') as 'n8n' | 'supabase' | 'custom' | null;
-      if (storedChatType && (['n8n', 'supabase', 'custom'] as const).includes(storedChatType)) {
-        setChatType(storedChatType);
-      }
     };
 
     const hydrateFromBackend = async () => {
@@ -97,29 +83,20 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
         applyStringSetting(settings.n8n_whatsapp_import_url, setN8nWhatsAppImportUrl, setIsN8nWhatsAppImportConfigured);
         applyStringSetting(settings.meta_pixel_id, setMetaPixelId, setIsMetaPixelConfigured);
         applyStringSetting(settings.google_analytics_id, setGoogleAnalyticsId, setIsGoogleAnalyticsConfigured);
-        applyStringSetting(settings.chat_webhook_url, setChatWebhookUrl, setIsChatConfigured);
         applyStringSetting(settings.smtp_host, setSmtpHost);
         applyStringSetting(settings.smtp_port, setSmtpPort);
         applyStringSetting(settings.smtp_user, setSmtpUser);
         applyStringSetting(settings.smtp_password, setSmtpPassword);
         applyStringSetting(settings.smtp_from_email, setSmtpFromEmail);
         applyStringSetting(settings.smtp_from_name, setSmtpFromName);
-        applyStringSetting(settings.evolution_instance_name, setEvolutionInstanceName);
-        applyStringSetting(settings.evolution_api_url, setEvolutionApiUrl);
 
         const envOverrides = (settings?.env_overrides || settings?.env || null) as Record<string, string> | null;
         if (envOverrides) {
-          applyStringSetting(envOverrides.evolution_api_url, setEvolutionApiUrl);
-          applyStringSetting(envOverrides.evolution_instance_name, setEvolutionInstanceName);
           applyStringSetting(envOverrides.dashboard_meta_pixel_id, setDashboardPixelEnv);
         }
 
         if (!envOverrides?.dashboard_meta_pixel_id) {
           applyStringSetting((settings as any)?.dashboard_meta_pixel_id, setDashboardPixelEnv);
-        }
-
-        if (settings.chat_type && (['n8n', 'supabase', 'custom'] as const).includes(settings.chat_type)) {
-          setChatType(settings.chat_type);
         }
       } catch (error) {
         console.error('[IntegrationsPage] Failed to load settings:', error);
@@ -144,22 +121,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   console.log('IntegrationsPage - User Plan:', userPlan);
   console.log('IntegrationsPage - Has HTTP Access:', hasHttpAccess);
   console.log('IntegrationsPage - Has Tracking Access:', hasTrackingAccess);
-
-  // Gerar URL do webhook de entrada para receber leads
-  const incomingWebhookUrl = user?.id
-    ? `${window.location.origin}/api/webhook/leads/${user.id}`
-    : '';
-
-  const handleCopyWebhookUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(incomingWebhookUrl);
-      setCopiedWebhook(true);
-      toast.success('URL copiada para a área de transferência!');
-      setTimeout(() => setCopiedWebhook(false), 2000);
-    } catch (err) {
-      toast.error('Erro ao copiar URL');
-    }
-  };
 
   const handleToggleSection = (section: IntegrationType) => {
     if (section) window.history.pushState({ subpage: true, integration: section }, '');
@@ -255,11 +216,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       });
     }
   };
-
-  const handleSaveWhatsApp = () => {
-    toast.success('WhatsApp API configurado com sucesso!');
-  };
-
   const handleSaveN8nWebhook = async () => {
     if (!n8nWebhookUrl) {
       toast.error('Por favor, insira a URL do webhook N8N');
@@ -304,44 +260,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
     } catch (error) {
       console.error('[N8N Clear] Error:', error);
       toast.error('Erro ao remover configuração');
-    }
-  };
-
-  const handleTestWebhook = async () => {
-    try {
-      toast.info('A testar webhook N8N...');
-      console.log('[Test Webhook] Starting test...');
-
-      const token = localStorage.getItem('leadflow_access_token');
-      const response = await fetch(`https://${(await import('../../utils/supabase/info')).projectId}.supabase.co/functions/v1/make-server-4be966ab/test-webhook`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-      console.log('[Test Webhook] Response:', data);
-
-      if (response.ok && data.success) {
-        toast.success(
-          `Webhook testado com sucesso!\\n\\n` +
-          `URL: ${data.webhookUrl}\\n` +
-          `Instance: ${data.instanceName || 'N/A'}\\n\\n` +
-          `Verifique seu workflow N8N!`,
-          { duration: 8000 }
-        );
-      } else {
-        toast.error(
-          `Teste falhou:${data.error || 'Erro desconhecido'}\\n\\n` +
-          (data.help || 'Verifique a configuração'),
-          { duration: 6000 }
-        );
-      }
-    } catch (error: any) {
-      console.error('[Test Webhook] Error:', error);
-      toast.error(`Erro ao testar webhook:${error.message}`);
     }
   };
 
@@ -391,118 +309,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       toast.error('Erro ao remover configuração');
     }
   };
-
-  const handleTestN8nWebhook = async () => {
-    if (!n8nWebhookUrl) {
-      toast.error('Configure o webhook N8N primeiro');
-      return;
-    }
-
-    toast.info('A testar ligação com webhook N8N...');
-
-    try {
-      console.log('[N8N Test] Testing URL:', n8nWebhookUrl);
-
-      // Tentar GET primeiro (para listar leads)
-      let response = await fetch(n8nWebhookUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-
-      console.log('[N8N Test] GET Response status:', response.status);
-
-      // Se GET retornar 404 ou 405, tentar POST
-      if (response.status === 404 || response.status === 405) {
-        console.log('[N8N Test] GET not supported, trying POST...');
-        toast.info('Endpoint não suporta GET. A testar com POST...');
-
-        // Fazer teste com POST
-        response = await fetch(n8nWebhookUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify({
-            test: true,
-            action: 'list_all',
-            message: 'Teste de ligação LeadsFlow API'
-          }),
-        });
-
-        console.log('[N8N Test] POST Response status:', response.status);
-
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => 'Unknown error');
-          console.error('[N8N Test] POST error:', errorText);
-          toast.error(`POST retornou erro:${response.status} ${response.statusText}`);
-          return;
-        }
-
-        // POST funcionou
-        toast.success('Ligação OK! Webhook responde a requisições POST.');
-
-        // Tentar parsear a resposta
-        try {
-          const data = await response.json();
-          console.log('[N8N Test] POST response:', data);
-
-          // Verificar se há leads na resposta
-          const leadsArray = Array.isArray(data) ? data : (data.leads || data.rows || data.data || data.items || []);
-          if (Array.isArray(leadsArray) && leadsArray.length > 0) {
-            toast.success(`Encontrados${leadsArray.length} lead(s) na resposta!`);
-          }
-        } catch (e) {
-          console.log('[N8N Test] POST response is not JSON (OK)');
-        }
-
-        return;
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error('[N8N Test] GET error:', errorText);
-        toast.error(`Webhook retornou erro:${response.status} ${response.statusText}`);
-        return;
-      }
-
-      // Se GET funcionou, tentar parsear a resposta
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        toast.success('Ligação OK! Webhook está respondendo.');
-        console.log('[N8N Test] Webhook responding but not JSON');
-        return;
-      }
-
-      const data = await response.json();
-      const leadsArray = Array.isArray(data) ? data : (data.leads || data.rows || data.data || data.items || []);
-
-      if (!Array.isArray(leadsArray)) {
-        toast.warning('Webhook está funcionando, mas formato de resposta não reconhecido.');
-        console.log('[N8N Test] Response data:', data);
-        return;
-      }
-
-      if (leadsArray.length === 0) {
-        toast.success('Ligação OK! Webhook está funcionando (nenhum lead encontrado).');
-      } else {
-        toast.success(`Ligação OK! Encontrados${leadsArray.length} lead(s) na planilha.`);
-      }
-
-      console.log('[N8N Test] Sample lead:', leadsArray[0]);
-    } catch (error: any) {
-      console.error('[N8N Test] Error:', error);
-
-      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        toast.error('Erro de ligação. Verifique:\n• URL está correta?\n• Workflow está ativo no N8N?\n• CORS está configurado?');
-      } else {
-        toast.error(`Erro ao ligar:${error.message}`);
-      }
-    }
-  };
-
   const handleSaveMetaPixel = async () => {
     if (!metaPixelId) {
       toast.error('Por favor, insira o ID do Meta Pixel');
@@ -543,172 +349,9 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
     }
   };
 
-  const handleSaveChatWebhook = async () => {
-    if (!chatWebhookUrl) {
-      toast.error('Por favor, insira a URL do webhook de chat');
-      return;
-    }
-
-    // Validar URL
-    try {
-      new URL(chatWebhookUrl);
-    } catch (e) {
-      toast.error('URL inválida. Certifique-se de incluir http:// ou https://');
-      return;
-    }
-
-    try {
-      // ✅ SALVAR NO BACKEND
-      await userApi.saveSettings({
-        chat_webhook_url: chatWebhookUrl,
-        chat_type: chatType
-      });
-
-      // Sync com localStorage
-      localStorage.setItem('chat_webhook_url', chatWebhookUrl);
-      setIsChatConfigured(true);
-      toast.success('Webhook de chat configurado com sucesso!');
-
-      console.log('[Chat Save] URL salva no backend:', chatWebhookUrl);
-    } catch (error) {
-      console.error('[Chat Save] Error:', error);
-      toast.error('Erro ao guardar webhook de chat');
-    }
-  };
-
-  const handleClearChatWebhook = async () => {
-    try {
-      // ✅ LIMPAR NO BACKEND
-      await userApi.saveSettings({ chat_webhook_url: '', chat_type: 'n8n' });
-
-      // Sync com localStorage
-      localStorage.removeItem('chat_webhook_url');
-      setChatWebhookUrl('');
-      setIsChatConfigured(false);
-      toast.success('Configuração do webhook de chat removida');
-      console.log('[Chat] Configuration cleared from backend');
-    } catch (error) {
-      console.error('[Chat Clear] Error:', error);
-      toast.error('Erro ao remover configuração');
-    }
-  };
-
-  const handleTestChatWebhook = async () => {
-    if (!chatWebhookUrl) {
-      toast.error('Configure o webhook de chat primeiro');
-      return;
-    }
-
-    toast.info('A testar ligação com webhook de chat...');
-
-    try {
-      console.log('[Chat Test] Testing URL:', chatWebhookUrl);
-
-      // Tentar GET primeiro (para listar leads)
-      let response = await fetch(chatWebhookUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-
-      console.log('[Chat Test] GET Response status:', response.status);
-
-      // Se GET retornar 404 ou 405, tentar POST
-      if (response.status === 404 || response.status === 405) {
-        console.log('[Chat Test] GET not supported, trying POST...');
-        toast.info('Endpoint não suporta GET. A testar com POST...');
-
-        // Fazer teste com POST
-        response = await fetch(chatWebhookUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify({
-            test: true,
-            action: 'list_all',
-            message: 'Teste de ligação LeadsFlow API'
-          }),
-        });
-
-        console.log('[Chat Test] POST Response status:', response.status);
-
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => 'Unknown error');
-          console.error('[Chat Test] POST error:', errorText);
-          toast.error(`POST retornou erro:${response.status} ${response.statusText}`);
-          return;
-        }
-
-        // POST funcionou
-        toast.success('Ligação OK! Webhook responde a requisições POST.');
-
-        // Tentar parsear a resposta
-        try {
-          const data = await response.json();
-          console.log('[Chat Test] POST response:', data);
-
-          // Verificar se há leads na resposta
-          const leadsArray = Array.isArray(data) ? data : (data.leads || data.rows || data.data || data.items || []);
-          if (Array.isArray(leadsArray) && leadsArray.length > 0) {
-            toast.success(`Encontrados${leadsArray.length} lead(s) na resposta!`);
-          }
-        } catch (e) {
-          console.log('[Chat Test] POST response is not JSON (OK)');
-        }
-
-        return;
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error('[Chat Test] GET error:', errorText);
-        toast.error(`Webhook retornou erro:${response.status} ${response.statusText}`);
-        return;
-      }
-
-      // Se GET funcionou, tentar parsear a resposta
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        toast.success('Ligação OK! Webhook está respondendo.');
-        console.log('[Chat Test] Webhook responding but not JSON');
-        return;
-      }
-
-      const data = await response.json();
-      const leadsArray = Array.isArray(data) ? data : (data.leads || data.rows || data.data || data.items || []);
-
-      if (!Array.isArray(leadsArray)) {
-        toast.warning('Webhook está funcionando, mas formato de resposta não reconhecido.');
-        console.log('[Chat Test] Response data:', data);
-        return;
-      }
-
-      if (leadsArray.length === 0) {
-        toast.success('Ligação OK! Webhook está funcionando (nenhum lead encontrado).');
-      } else {
-        toast.success(`Ligação OK! Encontrados${leadsArray.length} lead(s) na planilha.`);
-      }
-
-      console.log('[Chat Test] Sample lead:', leadsArray[0]);
-    } catch (error: any) {
-      console.error('[Chat Test] Error:', error);
-
-      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        toast.error('Erro de ligação. Verifique:\n• URL está correta?\n• Workflow está ativo no N8N?\n• CORS está configurado?');
-      } else {
-        toast.error(`Erro ao ligar:${error.message}`);
-      }
-    }
-  };
-
   const integrationInputClass =
     "mt-1.5 h-11 text-sm rounded-lg border border-border !bg-card !text-foreground dark:shadow-none shadow-sm focus-visible:border-primary focus-visible:ring-primary/15";
-  const integrationIconClass =
-    "w-11 h-11 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted border border-border";
-  const infoBlockClass =
+    const infoBlockClass =
     "rounded-lg border border-border bg-muted p-4";
   const currentUrlBannerClass =
     "px-3 py-2 rounded-md border border-border bg-muted text-xs text-muted-foreground break-all font-mono";
@@ -1211,16 +854,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           <Save className="w-4 h-4 mr-2" />
                           Guardar tudo
                         </Button>
-                        {isN8nConfigured && (
-                          <Button
-                            onClick={handleTestWebhook}
-                            variant="outline"
-                            className="border-green-600 text-green-600 hover:bg-green-50 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-900/20"
-                          >
-                            <FlaskConical className="w-4 h-4 mr-2" />
-                            Testar webhook
-                          </Button>
-                        )}
                         {(isN8nConfigured || isN8nWhatsAppImportConfigured) && (
                           <Button
                             onClick={() => {

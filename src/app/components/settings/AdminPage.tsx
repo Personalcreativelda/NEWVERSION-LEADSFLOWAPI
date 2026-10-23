@@ -5,9 +5,9 @@ import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import {
   Bell, Star, AlertTriangle, Loader2, MessageSquare, Search,
-  RefreshCw, Activity, Megaphone, Settings, Users, UserPlus,
+  Activity, Megaphone, Settings, Users, UserPlus,
 } from 'lucide-react';
-import { PageHeader, PageAction } from '../base/PageHeader';
+import { PageHeader } from '../base/PageHeader';
 
 // New Modular Components
 import { AdminUsersTab } from './admin/AdminUsersTab';

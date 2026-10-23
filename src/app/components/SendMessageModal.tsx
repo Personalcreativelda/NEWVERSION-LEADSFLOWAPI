@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { apiRequest } from '../utils/api';
+import { apiRequest, leadsApi } from '../utils/api';
 import { toast } from 'sonner';
-import { projectId } from '../utils/supabase/info';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -355,33 +354,18 @@ export function SendMessageModal({
     console.log('[N8N Webhook] Sending to:', webhookUrl);
     console.log('[N8N Webhook] Lead IDs:', leadIds);
 
-    // Get token for fetching leads
-    const token = localStorage.getItem('leadflow_access_token');
-    
     // Get all leads data with phones
     const leadsData = [];
     for (const leadId of leadIds) {
       try {
-        const leadResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-4be966ab/leads/${leadId}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-        
-        if (leadResponse.ok) {
-          const lead = await leadResponse.json();
-          if (lead.telefone || lead.phone) {
-            leadsData.push({
-              id: lead.id,
-              name: lead.nome || lead.name,
-              phone: lead.telefone || lead.phone,
-              email: lead.email,
-            });
-          }
+        const lead = await leadsApi.getById(leadId);
+        if (lead?.telefone) {
+          leadsData.push({
+            id: lead.id,
+            name: lead.nome,
+            phone: lead.telefone,
+            email: lead.email,
+          });
         }
       } catch (err) {
         console.error(`Error fetching lead ${leadId}:`, err);

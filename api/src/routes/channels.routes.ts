@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { ChannelsService } from '../services/channels.service';
 import { WhatsAppService } from '../services/whatsapp.service';
-import { isValidE164, formatE164ForDisplay } from '../utils/phone-validation';
+import { isValidE164 } from '../utils/phone-validation';
 import { validateChannelCredentials } from '../services/channel-validation.service';
 import { mergeCredentials } from '../utils/secret-box';
 

@@ -1,7 +1,7 @@
 import {
     Home, Users, MessageSquare, Workflow, BarChart3,
     CheckSquare, Megaphone, Crown, Settings, User,
-    Radio, Bot, PhoneCall, Globe, Target, Brain
+    Bot, PhoneCall, Globe, Target, Brain
 } from 'lucide-react';
 
 export interface SidebarItemConfig {

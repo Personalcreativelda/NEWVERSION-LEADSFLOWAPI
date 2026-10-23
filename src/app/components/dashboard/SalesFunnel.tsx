@@ -7,13 +7,12 @@ import type { UIEvent } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Phone, Mail, MessageCircle, Trash2, Edit2, MoreVertical, ChevronDown, BarChart3, Clock, CheckCircle2, TrendingUp, GripVertical, DollarSign, StickyNote, Calendar, MessageSquare, Settings, Plus, X, RotateCcw, Globe, Flag, AlertTriangle, AlertCircle, Minus, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, Instagram, Send, Megaphone, MoveRight, Workflow, type LucideIcon, MoreHorizontal } from 'lucide-react';
+import { Trash2, Edit2, MoreVertical, ChevronDown, GripVertical, Settings, Plus, X, RotateCcw, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, MoveRight, Workflow, type LucideIcon, MoreHorizontal } from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { haptic } from '../../../native';
 import type { TabKey } from '../modals/LeadDetailModal';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { Badge } from '../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 // Moedas suportadas; por omissão usa-se a moeda da conta (utils/format.ts)
@@ -156,14 +155,6 @@ interface Lead {
   prioridade?: 'baixa' | 'media' | 'alta' | 'urgente';
   lead_score?: number;
 }
-
-// Priority configurations
-const PRIORITY_CONFIG = {
-  baixa: { label: 'Baixa', color: 'text-gray-400', bgColor: 'bg-gray-500/10', icon: Minus },
-  media: { label: 'Média', color: 'text-blue-400', bgColor: 'bg-blue-500/10', icon: Flag },
-  alta: { label: 'Alta', color: 'text-orange-400', bgColor: 'bg-orange-500/10', icon: AlertCircle },
-  urgente: { label: 'Urgente', color: 'text-red-400', bgColor: 'bg-red-500/10', icon: AlertTriangle },
-};
 
 // Format currency with proper NaN handling
 // Moeda da conta (MZN → "1 500,00 MT") no locale ativo — ver utils/format.ts

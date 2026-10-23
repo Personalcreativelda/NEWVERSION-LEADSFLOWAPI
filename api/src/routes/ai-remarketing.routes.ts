@@ -3,14 +3,12 @@ import { authMiddleware, type AuthenticatedRequest } from '../middleware/auth.mi
 import { query } from '../database/connection';
 import { WhatsAppService } from '../services/whatsapp.service';
 import { ChannelsService } from '../services/channels.service';
-import { ConversationsService } from '../services/conversations.service';
 import { MessagesService } from '../services/messages.service';
 import { FlowExecutionService } from '../services/flow-execution.service';
 import { metaMessagesUrl } from '../utils/meta-send';
 
 const whatsappService = new WhatsAppService();
 const channelsService = new ChannelsService();
-const conversationsService = new ConversationsService();
 const messagesService = new MessagesService();
 const flowExecutionService = new FlowExecutionService();
 

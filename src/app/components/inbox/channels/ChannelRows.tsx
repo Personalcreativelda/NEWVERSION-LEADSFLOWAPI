@@ -1,11 +1,10 @@
 // Canais em lista nativa: linha, detalhe (folha) e escolha de canal novo (folha).
 import { useEffect, useState } from 'react';
-import { ChevronRight, Cloud, Facebook, Globe, Instagram, Loader2, Mail, MessageCircle, RefreshCcw, Send, Settings, Smartphone, Trash2, type LucideIcon } from 'lucide-react';
+import { ChevronRight, Globe, Loader2, Mail, MessageCircle, RefreshCcw, Settings, Smartphone, Trash2, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Channel } from '../../../types/inbox';
 import { channelsApi } from '../../../services/api/inbox';
 import { AppModal } from '../../base/AppModal';
-import { WhatsAppIcon } from '../../dashboard/leadDisplay';
 import { brandIcon } from '../../base/BrandIcon';
 import type { ComponentType } from 'react';
 

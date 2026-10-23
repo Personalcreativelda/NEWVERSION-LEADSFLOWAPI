@@ -179,11 +179,6 @@ export async function checkLeadLimit(userId: string): Promise<MessageLimitResult
 // Call this at the start of any message-sending route/service.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DEFAULT_MSG_LIMITS: Record<string, { messages: number; massMessages: number }> = {
-  free:       { messages: 100,  massMessages: 50   },
-  business:   { messages: 1000, massMessages: 5000 },
-  enterprise: { messages: -1,   massMessages: -1   },
-};
 
 export interface MessageLimitResult {
   allowed: boolean;

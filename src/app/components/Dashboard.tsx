@@ -7,7 +7,6 @@ import StatsCards from './dashboard/StatsCards';
 import MainStatsCards from './dashboard/MainStatsCards';
 import LeadsTable from './dashboard/LeadsTable';
 import PlanoWidget from './dashboard/PlanoWidget';
-import RecentLeadsSection from './dashboard/RecentLeadsSection';
 import SalesFunnel from './dashboard/SalesFunnel';
 import AdvancedAnalytics from './dashboard/AdvancedAnalytics';
 import AIIntelligencePanel from './dashboard/AIIntelligencePanel';
@@ -65,7 +64,7 @@ import FeedbackModal from './modals/FeedbackModal';
 // Chat Flutuante
 
 // Utils and Hooks
-import { leadsApi, userApi, integrationsApi } from '../utils/api';
+import { leadsApi, userApi } from '../utils/api';
 import { conversationsApi } from '../services/api/inbox';
 import { useLeadsAutoRefresh } from '../hooks/useLeadsAutoRefresh';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -114,7 +113,6 @@ interface Lead {
 interface DashboardProps {
   user: any;
   onLogout: () => void;
-  onSettings: () => void;
   onAdmin?: () => void;
   onUserUpdate: (user: any) => void;
   onRefreshUser?: () => Promise<any>;
@@ -603,93 +601,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     }
   };
 
-  // Função para atualizar leads - recarrega do banco e opcionalmente sincroniza com N8N
-  const handleAtualizar = async () => {
-    try {
-      setLoading(true);
-      
-      // Verificar se há webhook N8N configurado
-      const n8nWebhookUrl = localStorage.getItem('n8n_webhook_url');
-      
-      if (n8nWebhookUrl) {
-        // Se tiver webhook, sincronizar com N8N
-        toast.info('A sincronizar leads do N8N...');
-        await sincronizarLeadsN8N();
-      } else {
-        // Se não tiver webhook, apenas recarregar do banco
-        toast.info('A atualizar lista de leads...');
-        await carregarLeads();
-        toast.success('Lista de leads atualizada!');
-      }
-    } catch (error) {
-      console.error('[Dashboard] Error updating leads:', error);
-      toast.error('Erro ao atualizar leads');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Função para sincronizar leads do Google Sheets via webhook N8N
-  const sincronizarLeadsN8N = async () => {
-    try {
-      const n8nWebhookUrl = localStorage.getItem('n8n_webhook_url');
-
-      if (!n8nWebhookUrl) {
-        toast.error('Configure o webhook N8N nas Integrações primeiro');
-        return;
-      }
-
-      try {
-        new URL(n8nWebhookUrl);
-      } catch (error) {
-        toast.error('URL do webhook N8N inválida. Verifique a configuração nas Integrações.');
-        console.error('[N8N Sync] Invalid webhook URL:', n8nWebhookUrl, error);
-        return;
-      }
-
-      setLoading(true);
-      console.log('[N8N Sync] Proxying request through Express API...');
-
-      const result = await integrationsApi.syncN8N(n8nWebhookUrl);
-      console.log('[N8N Sync] Result:', result);
-
-      await carregarLeads();
-
-      const imported = result.imported || 0;
-      const duplicates = result.duplicatesSkipped || 0;
-      const received = result.received || result.total || 0;
-
-      if (imported > 0) {
-        toast.success(` ${imported} lead(s) importado(s) via N8N!`);
-      }
-
-      if (duplicates > 0) {
-        toast.info(` ${duplicates} lead(s) duplicado(s) ignorado(s).`);
-      }
-
-      if (imported === 0 && duplicates === 0) {
-        toast.info('Nenhuma alteração detectada na planilha.');
-      }
-
-      if (received && imported === 0 && duplicates === 0) {
-        toast.warning(` ${received} registos recebidos, mas nenhum pôde ser importado. Confira o workflow N8N.`);
-      }
-
-      console.log('[N8N Sync] ====== SYNC COMPLETED ======');
-    } catch (error: any) {
-      console.error('[N8N Sync] Error:', error);
-      toast.error(error?.message || 'Erro ao sincronizar com o N8N.');
-
-      try {
-        await carregarLeads();
-      } catch (reloadError) {
-        console.error('[N8N Sync] Error reloading leads:', reloadError);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Auto-refresh de leads a cada 15 segundos para detectar novos leads do webhook N8N
   useLeadsAutoRefresh({
     onRefresh: carregarLeads,
@@ -928,234 +839,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       }
     }
   };
-
-  const handleDeleteMultiple = async (leadIds: string[]) => {
-    try {
-      console.log('[Dashboard] 🗑️ Deleting multiple leads, IDs:', leadIds.length);
-      
-      // ✅ BLOQUEAR AUTO-REFRESH durante deleção
-      setIsDeletingLeads(true);
-      console.log('[Dashboard] 🚫 AUTO-REFRESH BLOQUEADO');
-      
-      if (leadIds.length === 0) {
-        toast.error('Nenhum lead válido selecionado');
-        setIsDeletingLeads(false);
-        return;
-      }
-      
-      console.log('[Dashboard] 🗑️ Lead IDs to delete:', leadIds);
-      
-      // ✅ Teste rápido com primeiro lead para verificar se backend está online
-      const toastId = toast.loading('A verificar ligação com servidor...');
-      
-      try {
-        const testResult = await leadsApi.delete(leadIds[0]);
-        console.log('[Dashboard] ✅ Backend online - proceeding with batch deletion');
-        
-        // ✅ Se sucesso, continuar com o resto
-        if (testResult.success) {
-          toast.loading(`A apagar ${leadIds.length} lead(s)...`, { id: toastId });
-        }
-      } catch (testError: any) {
-        const errorMsg = testError?.message || '';
-        
-        // Se backend offline, abortar imediatamente
-        if (errorMsg.includes('Backend indisponível') || errorMsg.includes('Failed to fetch')) {
-          console.error('[Dashboard] ❌ Backend offline - aborting deletion');
-          toast.dismiss(toastId);
-          toast.error('Servidor offline! Não é possível apagar leads no momento. Por favor, tente novamente mais tarde.');
-          return;
-        }
-        
-        // Se não for "not found", também abortar
-        if (!errorMsg.toLowerCase().includes('lead not found')) {
-          console.error('[Dashboard] ❌ Unexpected error during backend test:', testError);
-          toast.dismiss(toastId);
-          toast.error('Erro ao ligar com o servidor. Por favor, tente novamente.');
-          return;
-        }
-        
-        // Se for "not found", lead já estava deletado, continuar normalmente
-        console.log('[Dashboard] First lead already deleted, continuing...');
-        toast.loading(`A apagar ${leadIds.length} lead(s)...`, { id: toastId });
-      }
-      
-      // ✅ DELETAR EM PARALELO para ser muito mais rápido
-      // Dividir em chunks de 50 para não sobrecarregar o servidor
-      const CHUNK_SIZE = 50;
-      let deletedCount = 1; // ✅ Já deletamos o primeiro no teste
-      let errorCount = 0;
-      let backendOffline = false;
-      
-      // ✅ RASTREAR LEADS REALMENTE DELETADOS (não todos tentados)
-      const successfullyDeletedIds: string[] = [leadIds[0]]; // Primeiro já deletado
-      
-      // ✅ Processar leads restantes (pulando o primeiro)
-      const remainingIds = leadIds.slice(1);
-      
-      if (remainingIds.length === 0) {
-        // ✅ Era apenas 1 lead e já foi deletado no teste
-        toast.dismiss(toastId);
-        
-        // ✅ Atualizar lista localmente APENAS com os IDs deletados com sucesso
-        console.log('[Dashboard] 📝 Removendo 1 lead da lista local...');
-        const deletedIdsSet = new Set(successfullyDeletedIds);
-        const updatedLeads = leads.filter(lead => !deletedIdsSet.has(lead.id));
-        setLeads(updatedLeads);
-        console.log(`[Dashboard] ✅ Lista local atualizada: ${leads.length} → ${updatedLeads.length} leads`);
-        
-        const newUsage = Math.max(0, (user.usage?.leads || 0) - 1);
-        onUserUpdate({ ...user, usage: { ...user.usage, leads: newUsage } });
-        console.log(`[Dashboard] 📊 Uso atualizado: ${user.usage?.leads} → ${newUsage} leads`);
-        
-        toast.success('1 lead apagado com sucesso!');
-        return;
-      }
-      
-      for (let i = 0; i < remainingIds.length; i += CHUNK_SIZE) {
-        const chunk = remainingIds.slice(i, i + CHUNK_SIZE);
-        
-        console.log(`[Dashboard] 🗑️ Processing chunk ${i / CHUNK_SIZE + 1}, size: ${chunk.length}`);
-        
-        // ✅ Deletar chunk inteiro em paralelo
-        const results = await Promise.allSettled(
-          chunk.map(leadId => leadsApi.delete(leadId))
-        );
-        
-        // ✅ Contar sucessos e rastrear IDs deletados com sucesso
-        results.forEach((result, idx) => {
-          const currentLeadId = chunk[idx];
-          
-          if (result.status === 'fulfilled' && result.value?.success) {
-            deletedCount++;
-            successfullyDeletedIds.push(currentLeadId); // ✅ Rastrear sucesso
-            console.log(`[Dashboard] ✅ Lead deletado: ${currentLeadId}`);
-          } else if (result.status === 'rejected') {
-            // Verificar se é "not found" (ok) ou erro real
-            const error = result.reason;
-            const errorMsg = error?.message || '';
-            
-            // ✅ Detectar se backend está offline
-            if (errorMsg.includes('Backend indisponível') || errorMsg.includes('Failed to fetch')) {
-              backendOffline = true;
-              console.error(`[Dashboard] ❌ Backend offline ao deletar: ${currentLeadId}`);
-            }
-            
-            if (errorMsg.toLowerCase().includes('lead not found') || 
-                errorMsg.toLowerCase().includes('not found')) {
-              deletedCount++;
-              successfullyDeletedIds.push(currentLeadId); // ✅ Já não existe, pode remover
-              console.log(`[Dashboard] ✅ Lead já estava deletado: ${currentLeadId}`);
-            } else if (!errorMsg.includes('Backend indisponível')) {
-              errorCount++;
-              console.error(`[Dashboard] ❌ Erro ao deletar ${currentLeadId}:`, error);
-            }
-          }
-        });
-        
-        // ✅ Se backend offline, parar de tentar
-        if (backendOffline) {
-          console.error('[Dashboard] ❌ Backend offline detected - stopping deletion');
-          break;
-        }
-        
-        // ✅ Atualizar progresso (considerando que já deletamos 1 no teste)
-        const totalProcessed = deletedCount + errorCount;
-        toast.loading(`A apagar ${totalProcessed}/${leadIds.length} leads...`, { id: toastId });
-      }
-      
-      console.log(`[Dashboard] 🗑️ Deletion finished - Success: ${deletedCount}, Errors: ${errorCount}, Backend offline: ${backendOffline}`);
-      console.log(`[Dashboard] 🗑️ Successfully deleted IDs (${successfullyDeletedIds.length}):`, successfullyDeletedIds);
-      
-      // ✅ Mostrar resultado
-      toast.dismiss(toastId);
-      
-      if (backendOffline) {
-        toast.error('Backend offline! Não foi possível apagar os leads. Por favor, verifique a ligação com o servidor.');
-        setIsDeletingLeads(false); // ✅ Desbloquear auto-refresh
-        console.log('[Dashboard] ✅ AUTO-REFRESH DESBLOQUEADO (backend offline)');
-        return; // ✅ NÃO atualizar localmente se backend offline
-      }
-      
-      // ✅ ATUALIZAR LISTA LOCALMENTE APENAS COM LEADS REALMENTE DELETADOS
-      console.log(`[Dashboard] 📝 Removendo ${successfullyDeletedIds.length} leads da lista local...`);
-      const deletedIdsSet = new Set(successfullyDeletedIds);
-      const updatedLeads = leads.filter(lead => !deletedIdsSet.has(lead.id));
-      setLeads(updatedLeads);
-      console.log(`[Dashboard] ✅ Lista local atualizada: ${leads.length} → ${updatedLeads.length} leads`);
-      
-      // ✅ Atualizar uso
-      const newUsage = Math.max(0, (user.usage?.leads || 0) - deletedCount);
-      onUserUpdate({ ...user, usage: { ...user.usage, leads: newUsage } });
-      console.log(`[Dashboard] 📊 Uso atualizado: ${user.usage?.leads} → ${newUsage} leads`);
-      
-      if (errorCount === 0) {
-        toast.success(` ${deletedCount} lead(s) apagado(s) com sucesso!`);
-        console.log(`[Dashboard] 🎉 Deleção completa - ${deletedCount} leads deletados sem erros`);
-      } else {
-        toast.warning(` ${deletedCount} apagados, ${errorCount} erro(s)`);
-        console.warn(`[Dashboard] ⚠️ Deleção parcial - ${deletedCount} sucesso, ${errorCount} erros`);
-      }
-      
-      console.log(`[Dashboard] ✅ Deletion complete - Success: ${deletedCount}, Errors: ${errorCount}`);
-      
-      // ✅ SALVAR IDs deletados no localStorage para rastreamento
-      const deletedIdsKey = `deleted_leads_${user.id}`;
-      const previousDeletedIds = JSON.parse(localStorage.getItem(deletedIdsKey) || '[]');
-      const allDeletedIds = [...new Set([...previousDeletedIds, ...successfullyDeletedIds])];
-      localStorage.setItem(deletedIdsKey, JSON.stringify(allDeletedIds));
-      console.log(`[Dashboard] 💾 Salvos ${allDeletedIds.length} IDs deletados no localStorage para rastreamento`);
-      
-      // ✅ REFRESH DO BACKEND para garantir sincronização total
-      console.log('[Dashboard] 🔄 Recarregando leads do backend para verificar sincronização...');
-      toast.loading('A verificar sincronização com servidor...', { id: toastId });
-      
-      const leadsAntesRefresh = leads.length;
-      await carregarLeads(); // Recarrega do backend
-      
-      // ✅ ATUALIZAR PERFIL DO USUÁRIO PARA REFLETIR NOVO CONTADOR
-      console.log('[Dashboard] 🔄 Updating user profile to reflect deleted leads...');
-      try {
-        await onRefreshUser();
-        console.log('[Dashboard] ✅ User profile updated successfully');
-      } catch (refreshError) {
-        console.warn('[Dashboard] ⚠️ Failed to refresh user profile:', refreshError);
-      }
-      
-      // ✅ Aguardar 500ms para o estado atualizar
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      toast.dismiss(toastId);
-      
-      console.log(`[Dashboard] 📊 Leads antes do refresh: ${leadsAntesRefresh}`);
-      console.log(`[Dashboard] 📊 Leads esperados após deleção: ${leadsAntesRefresh - deletedCount}`);
-      console.log(`[Dashboard] 📊 Deleção confirmada no backend!`);
-      
-      // ✅ Mostrar modal de confirmação visual
-      setDeletionStats({
-        deletedCount,
-        errorCount,
-        totalBefore: leadsAntesRefresh,
-        totalAfter: leadsAntesRefresh - deletedCount,
-      });
-      setDeletionSuccessModal(true);
-      
-      // ✅ DESBLOQUEAR AUTO-REFRESH após 3 segundos (usuário teve tempo de ver o modal)
-      setTimeout(() => {
-        setIsDeletingLeads(false);
-        console.log('[Dashboard] ✅ AUTO-REFRESH DESBLOQUEADO');
-      }, 3000);
-      
-    } catch (error) {
-      console.error('[Dashboard] Error in handleDeleteMultiple:', error);
-      toast.error('Erro ao apagar leads selecionados');
-      
-      // ✅ DESBLOQUEAR em caso de erro também
-      setIsDeletingLeads(false);
-      console.log('[Dashboard] ✅ AUTO-REFRESH DESBLOQUEADO (erro)');
-    }
-  };
-
 
   // Troca de tema instantânea, aproveitando o transition do body
   const handleThemeChange = (mode: 'light' | 'dark') => {
@@ -2043,11 +1726,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     onUserUpdate(updatedUser);
   };
 
-  // Função para aplicar filtros aos cards e gráficos
-  const handleAplicarFiltros = (novosFiltros: { origem: string; status: string; busca: string }) => {
-    setFiltrosAplicados(novosFiltros);
-  };
-
   // Filtrar leads baseado nos filtros aplicados
   const leadsFiltradosPorFiltros = useMemo(() => {
     return leads.filter((lead) => {
@@ -2081,15 +1759,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
     return calculatedStats;
   }, [leadsFiltradosPorFiltros, leads.length, user?.usage?.leads]);
-
-  // Extrair origens e status únicos
-  const origens = useMemo(() => {
-    return Array.from(new Set(leads.map((l) => l.origem).filter(Boolean)));
-  }, [leads]);
-
-  const statusList = useMemo(() => {
-    return Array.from(new Set(leads.map((l) => l.status).filter(Boolean)));
-  }, [leads]);
 
   // Calcular limites para o widget
   const limites = {

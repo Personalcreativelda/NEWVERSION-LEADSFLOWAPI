@@ -6,8 +6,8 @@ import {
   Briefcase, Headphones, Calendar, Users, ShoppingCart,
   Zap, X, Check, Loader2,
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
-  Edit3, MessageCircle, Instagram, Facebook, Send, Mail, Hash, Globe,
-  Brain, Smartphone, Cloud, History, Lock, AlertTriangle, Mic,
+  Edit3, Send, Mail, Hash, Globe,
+  Smartphone, History, Lock, AlertTriangle, Mic,
   Image, FileText, Upload, BookOpen, FileSpreadsheet, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -60,18 +60,6 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   'star': Star,
   'message-square': MessageSquare,
 };
-
-// Detect current user plan from localStorage
-function getUserPlan(): string {
-  try {
-    const raw = localStorage.getItem('leadflow_user');
-    if (raw) {
-      const u = JSON.parse(raw);
-      return (u.plan || 'free').toLowerCase();
-    }
-  } catch { /* ignore */ }
-  return 'free';
-}
 
 const ICON_OPTIONS = [
   { value: 'bot', label: 'Bot', icon: Bot },

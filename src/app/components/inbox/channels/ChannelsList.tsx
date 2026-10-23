@@ -18,20 +18,11 @@ import { SkeletonChannelGrid } from '../../ui/skeletons';
 import { brandIcon } from '../../base/BrandIcon';
 import {
     Globe,
-    Facebook,
-    MessageCircle,
-    Cloud,
     Smartphone,
     Mail,
     Code,
-    Send,
-    Instagram,
     MessageSquare,
-    Plus,
-    Settings,
-    ChevronDown,
-    ChevronRight
-} from 'lucide-react';
+    Plus} from 'lucide-react';
 
 // Configuração dos canais disponíveis para conexão
 // Ordem: WhatsApp primeiro, depois Facebook, Instagram, Telegram e outros
@@ -124,9 +115,6 @@ export function ChannelsList() {
     const [emailModalOpen, setEmailModalOpen] = useState(false);
     const [smsModalOpen, setSmsModalOpen] = useState(false);
     const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
-    const [activeStep] = useState(1);
-    const [sidebarExpanded, setSidebarExpanded] = useState(true);
-    const [channelsExpanded, setChannelsExpanded] = useState(true);
     const [detailChannel, setDetailChannel] = useState<Channel | null>(null);
     const [addOpen, setAddOpen] = useState(false);
     const [metaSession, setMetaSession] = useState<string | null>(null);
@@ -251,20 +239,6 @@ export function ChannelsList() {
             toast.error('Erro ao remover canal');
         }
     };
-
-    const handleLinkInstance = async (channel: Channel, newInstanceId: string) => {
-        try {
-            const updated = await channelsApi.linkInstance(channel.id, newInstanceId);
-            setChannels(prev => prev.map(c =>
-                c.id === channel.id ? { ...c, credentials: updated.credentials } : c
-            ));
-            toast.success('Instância vinculada com sucesso');
-        } catch (error: any) {
-            console.error('Erro ao vincular instância:', error);
-            toast.error(error?.response?.data?.error || 'Erro ao vincular instância');
-        }
-    };
-
     const handleRename = async (channel: Channel, newName: string) => {
         try {
             await channelsApi.update(channel.id, { name: newName });

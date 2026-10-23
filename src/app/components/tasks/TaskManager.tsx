@@ -12,7 +12,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import {
   Plus,
   Calendar as CalendarIcon,
-  Clock,
   CheckCircle2,
   Circle,
   Trash2,
@@ -22,11 +21,10 @@ import {
   Mail,
   MessageCircle,
   AlertCircle,
-  Filter,
   CheckSquare,
   SlidersHorizontal,
 } from 'lucide-react';
-import { PageHeader, PageAction } from '../base/PageHeader';
+import { PageHeader } from '../base/PageHeader';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
 import { EmptyState } from '../base/EmptyState';
@@ -75,7 +73,6 @@ const PRIORITY_LEVELS = [
 export default function TaskManager({ leads, isDark = false }: TaskManagerProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [filter, setFilter] = useState<'all' | 'today' | 'overdue' | 'upcoming' | 'completed'>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');

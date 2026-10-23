@@ -756,7 +756,7 @@ export class FlowExecutionService {
     try {
       const subject = config.subject || 'Mensagem automática';
       const body = config.body || '';
-      const resolved = this.replaceVariables(body, ctx);
+      this.replaceVariables(body, ctx);
 
       logger.info(`[FlowExecution] 📧 Email: "${subject}"`);
       logger.warn(`[FlowExecution] Email sending not yet implemented`);

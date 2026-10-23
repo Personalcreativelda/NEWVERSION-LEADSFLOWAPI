@@ -481,7 +481,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
     }
     try {
       setSipLoading(true);
-      const result = await voiceAgentsApi.registerSipTrunk({
+      await voiceAgentsApi.registerSipTrunk({
         phone_number: sipForm.phone_number,
         sip_host: sipForm.sip_host,
         sip_username: sipForm.sip_username,

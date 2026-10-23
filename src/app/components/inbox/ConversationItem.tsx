@@ -4,9 +4,6 @@ import { formatRelativeDay } from '../../utils/format';
 import { usableImageUrl } from '../../utils/media-url';
 import {
     MessageCircle,
-    Facebook,
-    Instagram,
-    Send,
     Users,
     Check,
     CheckCheck,
@@ -57,14 +54,6 @@ const CHANNEL_COLORS: Record<string, string> = {
     twilio: '#0d9488',
 };
 
-
-// Gmail M icon
-const GmailIcon = ({ size = 10 }: { size?: number }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-        <path d="M2 6l10 7L22 6" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-        <path d="M2 6v12h20V6L12 13 2 6z" fill="white" fillOpacity="0.3" stroke="white" strokeWidth="1.5"/>
-    </svg>
-);
 
 // Outlook icon
 const OutlookIcon = ({ size = 10 }: { size?: number }) => (

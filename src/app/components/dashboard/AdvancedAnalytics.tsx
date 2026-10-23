@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { TrendingUp, Users, Target, DollarSign, Clock, Zap, ArrowUpRight, ArrowDownRight, Lightbulb } from 'lucide-react';
+import { Users, Target, DollarSign, Clock, Zap, Lightbulb } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import { formatMoney, formatPercent, getLocale } from '../../utils/format';
 

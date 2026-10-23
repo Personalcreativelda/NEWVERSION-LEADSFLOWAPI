@@ -36,7 +36,6 @@ import { InboxService } from '../services/inbox.service';
 import { MessagesService } from '../services/messages.service';
 import { WhatsAppService } from '../services/whatsapp.service';
 import { ChannelsService } from '../services/channels.service';
-import { LeadsService } from '../services/leads.service';
 import { ConversationsService } from '../services/conversations.service';
 import { getStorageService, recordFileAttachment } from '../services/storage.service';
 import pool from '../database/connection';
@@ -80,7 +79,6 @@ const inboxService = new InboxService();
 const messagesService = new MessagesService();
 const whatsappService = new WhatsAppService();
 const channelsService = new ChannelsService();
-const leadsService = new LeadsService();
 const conversationsService = new ConversationsService();
 const aiService = new AIService();
 
@@ -384,7 +382,6 @@ router.get('/conversations', async (req, res, next) => {
     // Pure agents (no own workspace) only see their assigned conversations from the team workspace.
 
     let ownWorkspaceId: string | null = null;       // user's own workspace id
-    let ownWorkspaceOwnerId: string   = user.id;    // = user.id when owner
     let teamWorkspaceId: string | null = null;      // external workspace they were invited to
     let teamWorkspaceOwnerId: string | null = null; // owner of that external workspace
     let teamRole: string | null = null;
@@ -399,7 +396,6 @@ router.get('/conversations', async (req, res, next) => {
       );
       if (ownerWs.rows[0]) {
         ownWorkspaceId      = ownerWs.rows[0].id;
-        ownWorkspaceOwnerId = ownerWs.rows[0].owner_id;
         teamRole            = 'owner';
       }
 

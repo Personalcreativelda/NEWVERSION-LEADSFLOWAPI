@@ -1,6 +1,5 @@
 import React from 'react';
 import { RefreshCw, Zap } from 'lucide-react';
-import { Button } from '../../ui/button';
 import AdminActivityFeed from '../AdminActivityFeed';
 
 interface UserInfo {

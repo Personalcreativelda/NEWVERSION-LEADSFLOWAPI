@@ -81,67 +81,6 @@ export default function UpgradeModal({
     }
   };
 
-  const handleUpgrade = async (planId: string) => {
-    if (planId === currentPlan) {
-      return;
-    }
-
-    const selected = plans.find((plan) => plan.id === planId);
-    const stripePriceId = billingPeriod === 'annual'
-      ? selected?.stripe?.priceAnnualId
-      : selected?.stripe?.priceMonthlyId;
-
-    if (planId !== 'free') {
-      if (!stripePriceId) {
-        toast.error('Stripe não está configurado para este plano. Use PayPal para continuar.');
-        return;
-      }
-
-      setLoading(true);
-      setSelectedPlan(planId);
-
-      try {
-        const response = await plansApi.createStripeCheckoutSession(planId, billingPeriod);
-        if (response.success && response.sessionUrl) {
-          window.location.href = response.sessionUrl;
-          return;
-        }
-
-        toast.error('Falha ao iniciar checkout Stripe. Tente novamente ou use outra forma de pagamento.');
-      } catch (error: any) {
-        console.error('Error creating Stripe checkout session:', error);
-        const errorMessage = error.message || 'Erro ao iniciar checkout Stripe.';
-        toast.error(errorMessage);
-      } finally {
-        setLoading(false);
-        setSelectedPlan(null);
-      }
-
-      return;
-    }
-
-    // Para plano free, processar diretamente
-    setLoading(true);
-    setSelectedPlan(planId);
-
-    try {
-      const response = await plansApi.upgrade(planId);
-      if (response.success) {
-        toast.success('Plano atualizado para Grátis!');
-        onUpgradeSuccess(response.user);
-        onClose();
-      }
-    } catch (error: any) {
-      console.error('Error upgrading plan:', error);
-      const errorMessage = error.message || 'Erro ao atualizar plano. Tente novamente.';
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-      setSelectedPlan(null);
-    }
-  };
-
-
   const planConfig = {
     free: { icon: Zap, color: 'text-muted-foreground', bg: 'bg-muted' },
     business: { icon: Rocket, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },

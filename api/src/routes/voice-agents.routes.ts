@@ -1,7 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { query } from '../database/connection';
 import { authMiddleware } from '../middleware/auth.middleware';
-import { elevenLabsService } from '../services/elevenlabs.service';
 import { ElevenLabsService } from '../services/elevenlabs.service';
 import { createWavoipService } from '../services/wavoip.service';
 import { AIService } from '../services/ai.service';

@@ -4,12 +4,12 @@ import {
   Plus, X, Megaphone,
   Pause, BarChart3, FileText, Edit2,
   Send, Trash2, Copy, MoreVertical,
-  FileDown, Bell, Calendar, MessageCircle,
+  FileDown, Bell, Calendar, 
   Mail, MessageSquare, PlayCircle, Clock,
   Timer, Save, Users, CheckCircle, CalendarCheck, XCircle
 } from 'lucide-react';
 import { AppButton } from '../base/AppButton';
-import { PageHeader, PageAction } from '../base/PageHeader';
+import { PageHeader } from '../base/PageHeader';
 import { DashboardCard } from '../base/DashboardCard';
 import { StatusBadge } from '../base/StatusBadge';
 import { SearchInput } from '../base/SearchInput';
@@ -68,9 +68,6 @@ interface Campaign {
   settings?: any;
   media_urls?: string[];
 }
-
-const INITIAL_CAMPAIGNS: Campaign[] = [];
-
 // Estados vindos da API → as secções da página. Estados fora desta lista (ex.: 'sent'
 // do email, 'pending', 'cancelled') não entravam em nenhuma secção e a campanha
 // ficava invisível — mesmo encontrada pela pesquisa.
@@ -105,8 +102,6 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   const confirm = useConfirm();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
-
-  const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [channelSelectorOpen, setChannelSelectorOpen] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);

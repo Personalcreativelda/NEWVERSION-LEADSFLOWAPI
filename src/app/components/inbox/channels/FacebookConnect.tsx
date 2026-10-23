@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
-import { Facebook, Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, ChevronRight, ArrowLeft } from 'lucide-react';
 import { BrandIcon } from '../../base/BrandIcon';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';

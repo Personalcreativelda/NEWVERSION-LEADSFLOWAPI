@@ -58,7 +58,6 @@ export default function CampaignSMSModal({
   const [scheduleMode, setScheduleMode] = useState<'now' | 'scheduled'>('now');
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [campaignId, setCampaignId] = useState<string | null>(null);
 

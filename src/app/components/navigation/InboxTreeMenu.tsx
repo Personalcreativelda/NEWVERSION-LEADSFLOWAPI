@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-    ChevronRight, Inbox, Hash, Tag, AtSign, Bell, Settings, Bot, PhoneCall, Zap,
-    MessageCircle, Instagram, Facebook, Send, Mail, Cloud, Globe, Plus,
-    Edit2, Trash2, UserPlus, ArrowRightLeft, Smartphone, Users
+    ChevronRight, Inbox, Hash, 
+    
+    Edit2, Trash2, UserPlus, ArrowRightLeft, Users
 } from 'lucide-react';
 import { channelsApi, conversationTagsApi } from '../../services/api/inbox';
-import { useInboxFilters, type InboxFilterType } from '../../hooks/useInboxFilters';
+import { useInboxFilters } from '../../hooks/useInboxFilters';
 import { api as apiInstance } from '../../../lib/api';
 import TagEditModal from '../inbox/tags/TagEditModal';
 import AddLeadsToTagModal from '../inbox/tags/AddLeadsToTagModal';
@@ -55,60 +55,6 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
     const isAllConversationsActive = isInboxActive && filters.type === 'all' && !filters.channel && !filters.tag;
     const isMentionsActive = isInboxActive && filters.type === 'mentions';
     const isUnattendedActive = isInboxActive && filters.type === 'unattended';
-
-    // Helper para retornar ícone por tipo de canal
-    const getChannelIcon = (type: string) => {
-        switch(type?.toLowerCase()) {
-            case 'whatsapp':
-                return MessageCircle;
-            case 'whatsapp_cloud':
-                return Cloud;
-            case 'instagram':
-                return Instagram;
-            case 'facebook':
-            case 'messenger':
-                return Facebook;
-            case 'telegram':
-                return Send;
-            case 'email':
-                return Mail;
-            case 'website':
-                return Globe;
-            case 'twilio_sms':
-            case 'sms':
-            case 'twilio':
-                return Smartphone;
-            default:
-                return Hash;
-        }
-    };
-
-    // Helper para retornar cor por tipo de canal
-    const getChannelColor = (type: string) => {
-        switch(type?.toLowerCase()) {
-            case 'whatsapp':
-                return 'text-green-500';
-            case 'whatsapp_cloud':
-                return 'text-green-600';
-            case 'instagram':
-                return 'text-pink-500';
-            case 'facebook':
-            case 'messenger':
-                return 'text-blue-600';
-            case 'telegram':
-                return 'text-sky-500';
-            case 'email':
-                return 'text-cyan-500';
-            case 'website':
-                return 'text-purple-500';
-            case 'twilio_sms':
-            case 'sms':
-            case 'twilio':
-                return 'text-teal-500';
-            default:
-                return 'text-muted-foreground';
-        }
-    };
 
     // Fetch channels and tags when expanding
     useEffect(() => {
@@ -170,39 +116,10 @@ export default function InboxTreeMenu({ currentPage, onNavigate, isExpanded, tra
         clearFilters();
         onNavigate('inbox');
     };
-
-    const handleMentionsClick = () => {
-        setFilterType('mentions');
-        onNavigate('inbox', { filter: 'mentions' });
-    };
-
-    const handleUnattendedClick = () => {
-        setFilterType('unattended');
-        onNavigate('inbox', { filter: 'unattended' });
-    };
-
-    const handleChannelClick = (channelId: string) => {
-        // Definir filtro de canal por ID (mantém outros filtros)
-        setChannelFilter(channelId);
-        onNavigate('inbox', { channel: channelId });
-    };
-
-    const handleTagClick = (tagId: string) => {
-        // Definir filtro de tag (mantém outros filtros)
-        setTagFilter(tagId);
-        onNavigate('inbox', { tag: tagId });
-    };
-
     // ===========================================
     // RIGHT-CLICK CONTEXT MENU
     // ===========================================
 
-    const handleTagContextMenu = useCallback((e: React.MouseEvent, tag: TagItem) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setShowMoveSubmenu(false);
-        setContextMenu({ x: e.clientX, y: e.clientY, tag });
-    }, []);
 
     // Close context menu on outside click or Escape
     useEffect(() => {

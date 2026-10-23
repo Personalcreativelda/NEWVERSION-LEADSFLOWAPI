@@ -13,9 +13,7 @@ import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 import ResetPasswordPage from './components/auth/ResetPasswordPage';
 import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
-import SettingsPage from './components/settings/SettingsPage';
 import AdminPage from './components/settings/AdminPage';
-import SetupTestUser from './components/SetupTestUser';
 import AgentCallPage from './components/pages/AgentCallPage';
 import AcceptInvitePage from './components/auth/AcceptInvitePage';
 import UpgradeModal from './components/modals/UpgradeModal';
@@ -113,7 +111,7 @@ function reportAuthError(code: string, detail?: string): void {
 
 
 // LeadsFlow SAAS - Main App Component
-type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'settings' | 'admin' | 'setup' | 'reset-password' | 'forgot-password' | 'agent-call' | 'accept-invite';
+type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'admin' | 'reset-password' | 'forgot-password' | 'agent-call' | 'accept-invite';
 
 interface AppProps {
   initialPage?: Page;
@@ -128,14 +126,18 @@ const getPageFromPath = (): Page | null => {
   // Dashboard sub-routes (/dashboard, /dashboard/leads, etc.) all map to dashboard
   if (cleanPath === '/dashboard' || cleanPath.startsWith('/dashboard/')) return 'dashboard';
 
+  // Endereço antigo das definições: agora vivem dentro do painel
+  if (cleanPath === '/settings') {
+    window.history.replaceState({ page: 'dashboard' }, '', '/dashboard/account');
+    return 'dashboard';
+  }
+
   const pageMap: Record<string, Page> = {
     '/login': 'login',
     '/signup': 'signup',
     '/forgot-password': 'forgot-password',
     '/reset-password': 'reset-password',
-    '/settings': 'settings',
     '/admin': 'admin',
-    '/setup': 'setup',
     '/agent-call': 'agent-call',
     '/accept-invite': 'accept-invite',
   };
@@ -166,9 +168,7 @@ const setPagePath = (page: Page) => {
     'signup': '/signup',
     'forgot-password': '/forgot-password',
     'reset-password': '/reset-password',
-    'settings': '/settings',
     'admin': '/admin',
-    'setup': '/setup',
     'agent-call': '/agent-call',
     'accept-invite': '/accept-invite',
     'landing': '/',
@@ -640,7 +640,7 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
           if (pageFromUrl === 'agent-call' || pageFromUrl === 'accept-invite') {
             return;
           }
-          const authRequiredPages: Page[] = ['dashboard', 'settings', 'admin'];
+          const authRequiredPages: Page[] = ['dashboard', 'admin'];
           if (pageFromUrl && authRequiredPages.includes(pageFromUrl)) {
             setCurrentPage(pageFromUrl);
           } else {
@@ -886,11 +886,6 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     forceLogout('Manual logout');
   };
 
-  const handleProfileUpdate = (updatedUser: any) => {
-    console.log('[Profile Update] Updating user with avatar:', updatedUser.avatar_url ? 'exists' : 'missing');
-    setUser(updatedUser);
-  };
-
   const refreshUserData = async () => {
     try {
       console.log('[Refresh] Fetching user profile with updated limits...');
@@ -968,7 +963,6 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
         <LoginPage
           onSuccess={handleLoginSuccess}
           onSwitchToSignup={() => setCurrentPage('signup')}
-          onSetup={() => setCurrentPage('setup')}
           onForgotPassword={() => setCurrentPage('forgot-password')}
           onBackToHome={() => setCurrentPage(homePage)}
         />
@@ -998,17 +992,6 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
         />
       )}
 
-      {/* Settings Page */}
-      {currentPage === 'settings' && (
-        <SettingsPage
-          user={user}
-          onBack={() => setCurrentPage('dashboard')}
-          onLogout={handleLogout}
-          onProfileUpdate={handleProfileUpdate}
-          onUpgrade={() => setShowUpgradeModal(true)}
-        />
-      )}
-
       {/* Admin Page */}
       {currentPage === 'admin' && (
         <AdminPage
@@ -1022,20 +1005,11 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
         <Dashboard
           user={user}
           onLogout={handleLogout}
-          onSettings={() => setCurrentPage('settings')}
           onAdmin={() => setCurrentPage('admin')}
           onUserUpdate={setUser}
           onRefreshUser={refreshUserData}
           enforcementBlock={planEnforcementBlock}
           onEnforcementBlockCleared={() => setPlanEnforcementBlock(null)}
-        />
-      )}
-
-      {/* Setup Test User Page */}
-      {currentPage === 'setup' && (
-        <SetupTestUser
-          onBack={() => setCurrentPage('login')}
-          onSuccess={handleLoginSuccess}
         />
       )}
 

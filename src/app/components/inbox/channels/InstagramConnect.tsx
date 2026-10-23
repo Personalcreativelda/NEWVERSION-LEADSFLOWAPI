@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
-import { Instagram, Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
+import { Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
 import { BrandIcon } from '../../base/BrandIcon';
 
 // URL base da API (pegar do env ou usar padrão)
