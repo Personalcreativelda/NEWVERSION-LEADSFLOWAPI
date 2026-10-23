@@ -29,6 +29,7 @@ import versionRoutes from './version.routes';
 import filesRoutes from './files.routes';
 import metaOAuthRoutes from './meta-oauth.routes';
 import whatsappSignupRoutes from './whatsapp-signup.routes';
+import instagramOAuthRoutes from './instagram-oauth.routes';
 // Lead Tracking: Importar rotas de rastreamento de leads
 import leadsTrackingRoutes from './leads-tracking.routes';
 // Conversation Tags: Importar rotas de etiquetas de conversas
@@ -59,6 +60,7 @@ router.use('/version', versionRoutes);
 router.use('/files', filesRoutes);          // ficheiros guardados (sem expor o MinIO)
 router.use('/oauth/meta', metaOAuthRoutes); // ligar Facebook/Instagram pelo login da Meta (auth dentro das rotas)
 router.use('/oauth/whatsapp', whatsappSignupRoutes); // WhatsApp oficial pelo Embedded Signup (auth dentro das rotas)
+router.use('/oauth/instagram', instagramOAuthRoutes); // Instagram com o login do próprio Instagram (auth dentro das rotas)
 
 // ── Routes with plan enforcement ────────────────────────────────────────────
 router.use('/leads', withPlan, leadsRoutes);

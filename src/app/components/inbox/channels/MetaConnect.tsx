@@ -7,10 +7,9 @@ import { toast } from 'sonner';
 import { AppModal } from '../../base/AppModal';
 import { BrandIcon } from '../../base/BrandIcon';
 import { isNativeApp } from '../../../../native';
-import { metaOAuthApi, whatsappSignupApi, type MetaConnectResult, type MetaOAuthPage } from '../../../services/api/inbox';
+import { instagramOAuthApi, metaOAuthApi, whatsappSignupApi, type InstagramLoginAccount, type MetaConnectResult, type MetaOAuthPage } from '../../../services/api/inbox';
 
 export type MetaProduct = 'facebook' | 'instagram';
-const PRODUCT_KEY = 'leadsflow_meta_oauth_product';
 
 /**
  * Abre o login da Meta. Devolve false quando a ligação automática ainda não está
@@ -20,13 +19,31 @@ export async function startMetaConnect(product: MetaProduct): Promise<boolean> {
   try {
     const native = isNativeApp();
     const url = await metaOAuthApi.start(native ? 'app' : 'web');
-    try { sessionStorage.setItem(PRODUCT_KEY, product); } catch { /* sem armazenamento: escolhe-se tudo */ }
     if (native) await Browser.open({ url, presentationStyle: 'popover' });
     else window.location.assign(url);
     return true;
   } catch (err: any) {
     if (err?.response?.data?.code === 'meta_not_configured') return false;
     toast.error(err?.message || 'Não foi possível abrir o login do Facebook');
+    return true;
+  }
+}
+
+/**
+ * Instagram com o login do próprio Instagram (sem página do Facebook). Sem esse login
+ * configurado no servidor, usa o login do Facebook (Instagram associado à página).
+ * Devolve false quando nenhum dos dois está configurado (o app usa o formulário manual).
+ */
+export async function startInstagramConnect(): Promise<boolean> {
+  try {
+    const native = isNativeApp();
+    const url = await instagramOAuthApi.start(native ? 'app' : 'web');
+    if (native) await Browser.open({ url, presentationStyle: 'popover' });
+    else window.location.assign(url);
+    return true;
+  } catch (err: any) {
+    if (err?.response?.data?.code === 'ig_not_configured') return startMetaConnect('instagram');
+    toast.error(err?.message || 'Não foi possível abrir o login do Instagram');
     return true;
   }
 }
@@ -117,6 +134,7 @@ export function MetaPagesSheet({ sessionId, onClose, onConnected }: {
   const [error, setError] = useState<string | null>(null);
   const [selPages, setSelPages] = useState<Set<string>>(new Set());
   const [selIg, setSelIg] = useState<Set<string>>(new Set());
+  const [accounts, setAccounts] = useState<InstagramLoginAccount[]>([]);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<MetaConnectResult['failed']>([]);
 
@@ -125,16 +143,13 @@ export function MetaPagesSheet({ sessionId, onClose, onConnected }: {
     setPages(null);
     setError(null);
     setFailed([]);
-    let product: string | null = null;
-    try { product = sessionStorage.getItem(PRODUCT_KEY); sessionStorage.removeItem(PRODUCT_KEY); } catch { /* ignora */ }
+    // Nada vem marcado: a pessoa escolhe o que quer ligar
+    setSelPages(new Set());
+    setSelIg(new Set());
     metaOAuthApi.getSession(sessionId)
-      .then((list) => {
-        setPages(list);
-        // Pré-seleciona o que a pessoa foi ligar (Messenger ou Instagram) e ainda não está ligado
-        const fresh = list.filter((p) => !p.connected);
-        const freshIg = list.filter((p) => p.instagram && !p.instagram.connected);
-        setSelPages(new Set(product === 'instagram' ? [] : (list.length === 1 ? list : fresh).map((p) => p.id)));
-        setSelIg(new Set(product === 'facebook' ? [] : freshIg.map((p) => p.instagram!.id)));
+      .then((session) => {
+        setPages(session.pages);
+        setAccounts(session.instagram_accounts);
       })
       .catch((err) => setError(err?.message || 'A autorização expirou. Toque em "Ligar" de novo.'));
   }, [sessionId]);
@@ -172,7 +187,7 @@ export function MetaPagesSheet({ sessionId, onClose, onConnected }: {
       title="Escolha o que quer ligar"
       description="As mensagens destas páginas e contas passam a chegar à caixa de entrada."
       footer={
-        pages && pages.length > 0 ? (
+        pages && (pages.length > 0 || accounts.length > 0) ? (
           <>
             <button type="button" onClick={onClose} className="h-10 rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-muted">
               Cancelar
@@ -194,7 +209,7 @@ export function MetaPagesSheet({ sessionId, onClose, onConnected }: {
         <p className="py-6 text-center text-sm text-muted-foreground">{error}</p>
       ) : !pages ? (
         <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> A carregar as suas páginas…
+          <Loader2 className="h-4 w-4 animate-spin" /> A carregar as suas contas…
         </div>
       ) : (
         <div className="-mx-2 space-y-1">
@@ -222,10 +237,20 @@ export function MetaPagesSheet({ sessionId, onClose, onConnected }: {
               )}
             </div>
           ))}
-          {!pages.some((p) => p.instagram) && (
-            <p className="px-2 pt-2 text-xs text-muted-foreground">
-              Para ligar o Instagram, a conta tem de ser profissional e estar associada a uma destas páginas.
-            </p>
+          {accounts.map((a) => (
+            <Row
+              key={a.id}
+              selected={selIg.has(a.id)}
+              onToggle={() => toggle(selIg, a.id, setSelIg)}
+              title={a.username ? `@${a.username}` : 'Instagram'}
+              subtitle="Instagram Direct"
+              picture={a.picture}
+              brand="instagram"
+              connected={a.connected}
+            />
+          ))}
+          {pages.length === 0 && accounts.length === 0 && (
+            <p className="px-2 py-6 text-center text-sm text-muted-foreground">Não há páginas nem contas para ligar.</p>
           )}
           {failed.length > 0 && (
             <div className="mx-2 mt-3 space-y-1 rounded-lg border border-red-500/30 bg-red-500/5 p-3">

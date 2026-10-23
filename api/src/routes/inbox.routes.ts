@@ -47,6 +47,7 @@ import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 import { AIService, getAvailableProviders } from '../services/ai.service';
 import { emailService } from '../services/email.service';
 import { encryptCredentials } from '../utils/secret-box';
+import { isInstagramLoginToken, metaMessagesUrl } from '../utils/meta-send';
 
 const router = Router();
 
@@ -1637,7 +1638,8 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         let pageId = channelCredentials?.page_id;
 
         // Se page_id não existe nas credenciais, buscar dinamicamente via Graph API
-        if (!pageId) {
+        // (o token do login do Instagram não tem página: envia em nome da própria conta)
+        if (!pageId && !isInstagramLoginToken(accessToken)) {
           console.log('[Inbox] page_id não encontrado nas credenciais, buscando via Graph API...');
           try {
             const pagesResponse = await fetch(
@@ -1691,10 +1693,8 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
           }
         }
 
-        // Construir URL da Graph API
-        const graphApiUrl = pageId
-          ? `https://graph.facebook.com/v21.0/${pageId}/messages`
-          : 'https://graph.facebook.com/v21.0/me/messages';
+        // Construir URL da Graph API (graph.instagram.com para tokens do login do Instagram)
+        const graphApiUrl = metaMessagesUrl(accessToken, pageId);
 
         console.log('[Inbox] Graph API URL:', graphApiUrl, pageId ? `(page_id: ${pageId})` : '(fallback /me)');
 
@@ -2463,10 +2463,7 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
       if (!accessToken || !recipientId) {
         return res.status(500).json({ error: 'Instagram/Facebook channel not properly configured' });
       }
-      const pageId = channelCredentials?.page_id;
-      const graphApiUrl = pageId
-        ? `https://graph.facebook.com/v21.0/${pageId}/messages`
-        : 'https://graph.facebook.com/v21.0/me/messages';
+      const graphApiUrl = metaMessagesUrl(accessToken, channelCredentials?.page_id);
       const audioPayload = {
         recipient: { id: recipientId },
         message: {

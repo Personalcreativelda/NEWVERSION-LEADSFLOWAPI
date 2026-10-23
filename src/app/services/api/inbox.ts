@@ -145,6 +145,14 @@ export interface MetaOAuthPage {
     instagram: { id: string; username: string | null; picture: string | null; connected: boolean } | null;
 }
 
+/** Conta ligada pelo login do próprio Instagram */
+export interface InstagramLoginAccount {
+    id: string;
+    username: string | null;
+    picture: string | null;
+    connected: boolean;
+}
+
 export interface MetaConnectResult {
     connected: { id: string; type: 'facebook' | 'instagram'; name: string }[];
     failed: { id: string; name: string; error: string }[];
@@ -157,14 +165,22 @@ export const metaOAuthApi = {
         return data.url;
     },
 
-    async getSession(sessionId: string): Promise<MetaOAuthPage[]> {
-        const { data } = await api.get<{ pages: MetaOAuthPage[] }>(`/oauth/meta/sessions/${sessionId}`);
-        return data.pages;
+    async getSession(sessionId: string): Promise<{ pages: MetaOAuthPage[]; instagram_accounts: InstagramLoginAccount[] }> {
+        const { data } = await api.get<{ pages: MetaOAuthPage[]; instagram_accounts?: InstagramLoginAccount[] }>(`/oauth/meta/sessions/${sessionId}`);
+        return { pages: data.pages || [], instagram_accounts: data.instagram_accounts || [] };
     },
 
     async connect(sessionId: string, selection: { pages: string[]; instagram: string[] }): Promise<MetaConnectResult> {
         const { data } = await api.post<MetaConnectResult>(`/oauth/meta/sessions/${sessionId}/connect`, selection);
         return data;
+    },
+};
+
+export const instagramOAuthApi = {
+    /** URL do login do Instagram. Erro 'ig_not_configured' (503) quando ainda não está configurado. */
+    async start(platform: 'web' | 'app'): Promise<string> {
+        const { data } = await api.post<{ url: string }>('/oauth/instagram/start', { platform });
+        return data.url;
     },
 };
 

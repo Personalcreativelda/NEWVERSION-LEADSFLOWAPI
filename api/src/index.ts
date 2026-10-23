@@ -21,6 +21,7 @@ import { diagnosticAlertService } from './services/diagnostic-alert.service';
 import { encryptExistingChannelSecrets } from './services/channel-secrets-migration.service';
 import { redactCredentials } from './middleware/redact-credentials.middleware';
 import { ensureSessionsTable as ensureMetaOAuthSessions } from './services/meta-oauth.service';
+import { refreshExpiringInstagramTokens } from './services/instagram-oauth.service';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -569,6 +570,10 @@ initDatabase().then(() => {
   void encryptExistingChannelSecrets();
   // Sessões temporárias do login da Meta (Facebook/Instagram)
   ensureMetaOAuthSessions().catch((err) => console.error('[MetaOAuth] Tabela de sessões:', err?.message));
+  // Tokens do login do Instagram (60 dias): renovar os que estão a expirar, uma vez por dia
+  const refreshIg = () => refreshExpiringInstagramTokens().catch((err) => console.error('[InstagramOAuth] Renovação:', err?.message));
+  setTimeout(refreshIg, 60_000);
+  setInterval(refreshIg, 24 * 60 * 60 * 1000);
 
   // ✅ Iniciar scheduler de campanhas agendadas
   campaignScheduler.start();

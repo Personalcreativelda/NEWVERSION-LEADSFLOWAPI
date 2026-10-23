@@ -24,9 +24,21 @@ export const META_SCOPES = [
 ];
 
 /** META_OAUTH_SCOPES (separadas por vírgula) substitui a lista, ex.: só Messenger enquanto o Instagram não está aprovado */
+/** Permissões só do Instagram através da página (não usadas quando há o login próprio do Instagram) */
+const INSTAGRAM_VIA_PAGE_SCOPES = ['pages_read_engagement', 'instagram_basic', 'instagram_manage_messages'];
+
+/**
+ * Com o login próprio do Instagram configurado (META_INSTAGRAM_APP_ID/SECRET), o login do
+ * Facebook serve só para o Messenger; o Instagram liga-se pelo seu próprio login.
+ */
+export function instagramViaFacebook(): boolean {
+  return !(process.env.META_INSTAGRAM_APP_ID && process.env.META_INSTAGRAM_APP_SECRET);
+}
+
 function requestedScopes(): string[] {
   const custom = (process.env.META_OAUTH_SCOPES || '').split(',').map((s) => s.trim()).filter(Boolean);
-  return custom.length ? custom : META_SCOPES;
+  if (custom.length) return custom;
+  return instagramViaFacebook() ? META_SCOPES : META_SCOPES.filter((s) => !INSTAGRAM_VIA_PAGE_SCOPES.includes(s));
 }
 
 export type OAuthPlatform = 'web' | 'app';
@@ -136,7 +148,7 @@ export interface MetaPage {
 /** Páginas que o utilizador gere, com a conta profissional do Instagram ligada a cada uma */
 export async function listPages(userToken: string): Promise<MetaPage[]> {
   try {
-    return await fetchPages(userToken, true);
+    return await fetchPages(userToken, instagramViaFacebook());
   } catch (err: any) {
     // Sem as permissões do Instagram (ex.: META_OAUTH_SCOPES só com Messenger) o campo da
     // conta do Instagram falha: listar só as páginas
@@ -206,10 +218,26 @@ export async function ensureSessionsTable(): Promise<void> {
   `);
 }
 
-export async function saveSession(userId: string, userToken: string, pages: MetaPage[]): Promise<string> {
+/** Conta ligada pelo login do Instagram (sem página do Facebook) */
+export interface InstagramLoginSessionAccount {
+  id: string;
+  username?: string;
+  name?: string;
+  picture?: string;
+  access_token: string;
+  token_expires_at?: string;
+}
+
+export interface OAuthSession {
+  user_access_token?: string;
+  pages: MetaPage[];
+  instagram_login?: InstagramLoginSessionAccount[];
+}
+
+export async function saveSession(userId: string, userToken: string, pages: MetaPage[], instagramLogin?: InstagramLoginSessionAccount[]): Promise<string> {
   await query('DELETE FROM meta_oauth_sessions WHERE expires_at < NOW()');
   // Coluna "credentials": cifrada ao gravar e decifrada pelo query() ao ler
-  const credentials = encryptCredentials({ user_access_token: userToken, pages });
+  const credentials = encryptCredentials({ user_access_token: userToken, pages, ...(instagramLogin ? { instagram_login: instagramLogin } : {}) });
   const result = await query(
     `INSERT INTO meta_oauth_sessions (user_id, credentials, expires_at)
      VALUES ($1, $2, NOW() + ($3 || ' minutes')::interval) RETURNING id`,
@@ -219,14 +247,14 @@ export async function saveSession(userId: string, userToken: string, pages: Meta
 }
 
 /** Só o próprio utilizador lê a sua sessão (outro utilizador recebe null) */
-export async function loadSession(sessionId: string, userId: string): Promise<{ user_access_token: string; pages: MetaPage[] } | null> {
+export async function loadSession(sessionId: string, userId: string): Promise<OAuthSession | null> {
   if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return null;
   const result = await query(
     'SELECT credentials FROM meta_oauth_sessions WHERE id = $1 AND user_id = $2 AND expires_at > NOW()',
     [sessionId, userId],
   );
   const creds = result.rows[0]?.credentials;
-  return creds ? { user_access_token: creds.user_access_token, pages: creds.pages || [] } : null;
+  return creds ? { user_access_token: creds.user_access_token, pages: creds.pages || [], instagram_login: creds.instagram_login || [] } : null;
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {

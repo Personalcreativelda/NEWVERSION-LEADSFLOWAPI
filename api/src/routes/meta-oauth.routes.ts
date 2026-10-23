@@ -9,8 +9,9 @@ import { ChannelsService } from '../services/channels.service';
 import { validateChannelCredentials } from '../services/channel-validation.service';
 import {
   buildAuthorizeUrl, createState, deleteSession, exchangeCodeForUserToken, isMetaOAuthConfigured,
-  listPages, loadSession, readState, returnUrl, saveSession, subscribePage, type MetaPage, type OAuthPlatform,
+  instagramViaFacebook, listPages, loadSession, readState, returnUrl, saveSession, subscribePage, type MetaPage, type OAuthPlatform,
 } from '../services/meta-oauth.service';
+import { subscribeInstagramAccount } from '../services/instagram-oauth.service';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -75,9 +76,16 @@ router.get('/sessions/:id', requireAuth, async (req: AuthenticatedRequest, res, 
         name: p.name,
         picture: p.picture || null,
         connected: connected.pages.has(p.id),
-        instagram: p.instagram
+        instagram: p.instagram && instagramViaFacebook()
           ? { id: p.instagram.id, username: p.instagram.username || null, picture: p.instagram.picture || null, connected: connected.instagram.has(p.instagram.id) }
           : null,
+      })),
+      // Contas do login do Instagram (sem página do Facebook)
+      instagram_accounts: (session.instagram_login || []).map((a) => ({
+        id: a.id,
+        username: a.username || null,
+        picture: a.picture || null,
+        connected: connected.instagram.has(a.id),
       })),
     });
   } catch (err) {
@@ -148,6 +156,34 @@ router.post('/sessions/:id/connect', requireAuth, async (req: AuthenticatedReque
           connected.push({ id: channel?.id, type: 'instagram', name });
         }
       }
+    }
+
+    // Contas do login do Instagram
+    for (const account of session.instagram_login || []) {
+      if (!wantInstagram.has(account.id)) continue;
+      const name = account.username ? `@${account.username}` : (account.name || 'Instagram');
+      const credentials = {
+        instagram_id: account.id,
+        username: account.username,
+        name: account.name,
+        profile_picture_url: account.picture,
+        access_token: account.access_token,
+        token_expires_at: account.token_expires_at,
+        token_type: 'instagram',
+        connected_via: 'instagram_login',
+      };
+      const check = await validateChannelCredentials('instagram', credentials);
+      const sub = check.ok ? await subscribeInstagramAccount(account.access_token) : null;
+      if (!check.ok || !sub?.ok) {
+        failed.push({ id: account.id, name, error: check.error || sub?.error || 'O Instagram não ativou as mensagens desta conta.' });
+        continue;
+      }
+      const existing = await channelsService.findByCredentialField('instagram_id', account.id, userId);
+      // Ligação nova pelo login do Instagram substitui as credenciais antigas (ex.: via página)
+      const channel = existing && existing.type === 'instagram'
+        ? await channelsService.update(existing.id, { status: 'active', name, credentials }, userId)
+        : await channelsService.create({ type: 'instagram', name, status: 'active', credentials, settings: {} }, userId);
+      connected.push({ id: channel?.id, type: 'instagram', name });
     }
 
     if (connected.length) await deleteSession(req.params.id);

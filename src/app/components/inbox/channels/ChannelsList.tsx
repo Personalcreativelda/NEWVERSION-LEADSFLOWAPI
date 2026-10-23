@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { ChannelRow, ChannelDetailSheet, AddChannelSheet } from './ChannelRows';
-import { MetaPagesSheet, readMetaReturn, startMetaConnect, startWhatsAppConnect, type MetaProduct } from './MetaConnect';
+import { MetaPagesSheet, readMetaReturn, startInstagramConnect, startMetaConnect, startWhatsAppConnect, type MetaProduct } from './MetaConnect';
 import { EmptyState } from '../../base/EmptyState';
 import { WhatsAppConnect } from './WhatsAppConnect';
 import { WhatsAppCloudConnect } from './WhatsAppCloudConnect';
@@ -187,7 +187,7 @@ export function ChannelsList() {
             case 'whatsapp_cloud': void startWhatsAppConnect().then((ok) => { if (!ok) setCloudModalOpen(true); }); break;
             case 'telegram': setTelegramModalOpen(true); break;
             case 'facebook': void connectMeta('facebook', () => setFacebookModalOpen(true)); break;
-            case 'instagram': void connectMeta('instagram', () => setInstagramModalOpen(true)); break;
+            case 'instagram': void startInstagramConnect().then((ok) => { if (!ok) setInstagramModalOpen(true); }); break;
             case 'website': setWebsiteModalOpen(true); break;
             case 'email': setEmailModalOpen(true); break;
             case 'twilio_sms': setSmsModalOpen(true); break;
@@ -227,7 +227,7 @@ export function ChannelsList() {
         } else if (channelId === 'facebook') {
             void connectMeta('facebook', () => setFacebookModalOpen(true));
         } else if (channelId === 'instagram') {
-            void connectMeta('instagram', () => setInstagramModalOpen(true));
+            void startInstagramConnect().then((ok) => { if (!ok) setInstagramModalOpen(true); });
         } else if (channelId === 'website') {
             setWebsiteModalOpen(true);
         } else if (channelId === 'email') {

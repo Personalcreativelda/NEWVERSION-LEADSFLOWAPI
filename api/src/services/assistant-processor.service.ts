@@ -9,6 +9,7 @@ import { getStorageService } from './storage.service';
 import { emailService } from './email.service';
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 import { isValidPhoneNumber, isSamePhoneNumber, normalizePhoneNumber } from '../utils/phone.utils';
+import { metaMessagesUrl } from '../utils/meta-send';
 
 const aiService = new AIService();
 const assistantsService = new AssistantsService();
@@ -1488,7 +1489,7 @@ export class AssistantProcessorService {
      * Envia mensagem via Instagram Graph API
      */
     private async sendInstagramMessage(accessToken: string, recipientId: string, text: string): Promise<void> {
-        const response = await fetch(`https://graph.facebook.com/v18.0/me/messages`, {
+        const response = await fetch(metaMessagesUrl(accessToken), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

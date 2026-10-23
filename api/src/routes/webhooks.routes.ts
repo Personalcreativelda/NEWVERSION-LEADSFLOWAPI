@@ -23,6 +23,7 @@ import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import { widgetTyping } from '../services/widget-typing.service';
 import { secretFingerprint } from '../utils/secret-box';
 import { acceptMetaWebhook } from '../utils/meta-signature';
+import { isInstagramLoginToken } from '../utils/meta-send';
 import { findOrCreateLead } from '../services/leads-dedup.service';
 
 const router = Router();
@@ -3034,7 +3035,7 @@ router.post('/instagram', async (req, res) => {
           if (accessToken) {
             // Buscar perfil do remetente (IGSID - Instagram Scoped ID)
             const userResponse = await fetch(
-              `https://graph.facebook.com/v21.0/${senderId}?fields=name,username,profile_pic&access_token=${accessToken}`
+              `${isInstagramLoginToken(accessToken) ? 'https://graph.instagram.com/v21.0' : 'https://graph.facebook.com/v21.0'}/${senderId}?fields=name,username,profile_pic&access_token=${accessToken}`
             );
             const userData = await userResponse.json();
 

@@ -6,6 +6,7 @@ import { ChannelsService } from '../services/channels.service';
 import { ConversationsService } from '../services/conversations.service';
 import { MessagesService } from '../services/messages.service';
 import { FlowExecutionService } from '../services/flow-execution.service';
+import { metaMessagesUrl } from '../utils/meta-send';
 
 const whatsappService = new WhatsAppService();
 const channelsService = new ChannelsService();
@@ -768,7 +769,7 @@ router.post('/send-message', async (req: AuthenticatedRequest, res, next) => {
       if (!accessToken) {
         return res.status(400).json({ error: 'Canal Instagram não tem token configurado' });
       }
-      const igRes = await fetch(`https://graph.facebook.com/v18.0/me/messages`, {
+      const igRes = await fetch(metaMessagesUrl(accessToken), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ recipient: { id: recipientId }, message: { text: content } }),

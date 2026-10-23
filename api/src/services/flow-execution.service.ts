@@ -6,6 +6,7 @@ import { getWebSocketService } from './websocket.service';
 import { AIService } from './ai.service';
 import { getStorageService } from './storage.service';
 import pino from 'pino';
+import { metaMessagesUrl } from '../utils/meta-send';
 
 const logger = pino().child({ module: 'FlowExecutionService' });
 
@@ -563,7 +564,7 @@ export class FlowExecutionService {
   private async _sendAudioMeta(rawBase64: string, recipientId: string, accessToken: string, userId: string): Promise<void> {
     const audioUrl = await this._uploadAudioBuffer(rawBase64, userId);
     if (!audioUrl) throw new Error('Upload de áudio falhou para Meta');
-    const res = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(accessToken)}`, {
+    const res = await fetch(`${metaMessagesUrl(accessToken)}?access_token=${encodeURIComponent(accessToken)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -706,10 +707,7 @@ export class FlowExecutionService {
       logger.warn(`[FlowExecution] ${channelType}: no access token in channel credentials`);
       return;
     }
-    const pageId = creds?.page_id;
-    const apiUrl = pageId
-      ? `https://graph.facebook.com/v21.0/${pageId}/messages`
-      : 'https://graph.facebook.com/v21.0/me/messages';
+    const apiUrl = metaMessagesUrl(accessToken, creds?.page_id);
 
     const res = await fetch(`${apiUrl}?access_token=${accessToken}`, {
       method: 'POST',

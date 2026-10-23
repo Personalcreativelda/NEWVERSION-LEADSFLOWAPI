@@ -90,7 +90,7 @@ export async function acceptMetaWebhook(
   const result = await query(
     `SELECT 1 FROM channels
      WHERE credentials->>$1 = ANY($2::text[])
-       AND credentials->>'connected_via' IN ('meta_oauth', 'meta_embedded_signup')
+       AND credentials->>'connected_via' IN ('meta_oauth', 'meta_embedded_signup', 'instagram_login')
        AND status != 'deleted'
      LIMIT 1`,
     [idField, ids],
