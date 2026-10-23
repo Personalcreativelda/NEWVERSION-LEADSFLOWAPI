@@ -18,6 +18,7 @@ export const META_SCOPES = [
   'pages_messaging',        // receber e responder no Messenger
   'pages_manage_metadata',  // subscrever os webhooks da página
   'business_management',    // páginas geridas pelo Business Manager
+  'pages_read_engagement',  // obrigatória para as mensagens do Instagram com login do Facebook
   'instagram_basic',        // conta profissional do Instagram ligada à página
   'instagram_manage_messages', // receber e responder no Instagram Direct
 ];
