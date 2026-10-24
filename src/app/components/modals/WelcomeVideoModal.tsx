@@ -66,7 +66,7 @@ export default function WelcomeVideoModal({ isOpen, onClose, onOpenFeedback }: W
             </button>
             <button
               onClick={onClose}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 h-10 rounded-lg text-sm font-medium text-white transition-colors"
               style={{ backgroundColor: 'hsl(var(--primary))' }}
             >
               <Play className="w-4 h-4" />

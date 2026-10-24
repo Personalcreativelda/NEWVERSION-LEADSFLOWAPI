@@ -91,7 +91,7 @@ export default function Footer() {
                     className="w-full pl-10 pr-4 py-2 bg-muted border border-purple-500/20 rounded-lg text-white placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
                   />
                 </div>
-                <button className="px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 rounded-lg text-sm">
+                <button className="inline-flex items-center justify-center px-4 h-10 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 rounded-lg text-sm">
                   Assinar
                 </button>
               </div>

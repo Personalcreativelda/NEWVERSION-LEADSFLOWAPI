@@ -65,7 +65,7 @@ function DialogContent({
             "relative flex flex-col gap-5 bg-card text-card-foreground border border-border shadow-2xl",
             "pointer-events-auto w-full max-w-lg",
             "rounded-t-2xl rounded-b-none sm:rounded-2xl",
-            "max-h-[92dvh] sm:max-h-[min(88dvh,820px)] overflow-y-auto overscroll-contain",
+            "max-h-[92dvh] sm:max-h-[min(88dvh,820px)] overflow-y-auto overflow-x-hidden overscroll-contain",
             "p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6",
             "data-[state=open]:animate-in data-[state=closed]:animate-out duration-200",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
@@ -103,9 +103,10 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        // Telemóvel: botões em largura total, o principal em cima. Desktop: à direita.
-        "flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:items-center sm:justify-end",
-        "[&>button]:w-full sm:[&>button]:w-auto [&>button]:min-h-10",
+        // Igual em todo o app: no telemóvel os botões lado a lado com a mesma largura
+        // (Cancelar | ação principal); no desktop à direita.
+        "flex flex-row items-center gap-2 pt-1 sm:justify-end",
+        "[&>*]:flex-1 sm:[&>*]:flex-none",
         className,
       )}
       {...props}

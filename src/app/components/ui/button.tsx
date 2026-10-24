@@ -21,10 +21,12 @@ const buttonVariants = cva(
           "text-foreground hover:bg-muted dark:hover:bg-white/[0.06]",
         link: "text-primary underline-offset-4 hover:underline",
       },
+      // Uma só altura em todo o app (40px); "sm" só é mais baixo no desktop (tabelas,
+      // linhas densas). "lg" ficou igual ao default — cada página tinha o seu tamanho.
       size: {
-        default: "h-10 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 rounded-lg gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-11 rounded-lg px-5 has-[>svg]:px-4 text-[15px]",
+        default: "h-10 px-4",
+        sm: "h-10 sm:h-9 gap-1.5 px-3",
+        lg: "h-10 px-5",
         icon: "size-9 rounded-lg",
       },
     },
@@ -71,6 +73,13 @@ function textOnly(children: React.ReactNode): React.ReactNode {
     );
 }
 
+/** Alturas, paddings verticais e tamanhos de letra avulsos (h-12, py-3, text-base…) que as
+ *  páginas passavam: ignorados, para todos os botões terem o mesmo tamanho. */
+const SIZE_OVERRIDE = /^(?:[a-z]+:)*(?:h-(?:\d|\[)|min-h-|py-|text-(?:xs|sm|base|lg|xl|\[))/;
+function withoutSizeOverrides(className?: string) {
+  return className?.split(/\s+/).filter((token) => !SIZE_OVERRIDE.test(token)).join(" ");
+}
+
 const Button = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button"> &
@@ -84,7 +93,12 @@ const Button = React.forwardRef<
     <Comp
       ref={ref}
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      // Só os botões com texto: os de ícone (ex.: h-8 w-8 p-0) mantêm o tamanho que pedem
+      className={cn(buttonVariants({
+        variant,
+        size,
+        className: size === "icon" || asChild || !hasText(React.Children.toArray(children)) ? className : withoutSizeOverrides(className),
+      }))}
       {...props}
     >
       {asChild || size === "icon" ? children : textOnly(children)}

@@ -160,7 +160,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="w-full md:w-auto px-4 py-2 bg-secondary hover:bg-secondary/80 text-foreground/80 rounded-lg transition-all duration-150 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 border border-border"
+              className="w-full md:w-auto px-4 h-10 bg-secondary hover:bg-secondary/80 text-foreground/80 rounded-lg transition-all duration-150 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 border border-border"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               <span>{refreshing ? 'A atualizar...' : 'Atualizar Limites'}</span>
@@ -193,7 +193,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
           </div>
           <button
             onClick={onUpgrade}
-            className="w-full sm:w-auto px-6 py-2.5 bg-destructive hover:opacity-90 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
+            className="w-full sm:w-auto px-6 h-10.5 bg-destructive hover:opacity-90 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
           >
             <Crown className="w-4 h-4" />
             Renovar Plano
@@ -217,7 +217,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
           </div>
           <button
             onClick={onUpgrade}
-            className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
+            className="w-full sm:w-auto px-6 h-10.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
           >
             <Crown className="w-4 h-4" />
             Regularizar
@@ -243,7 +243,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
           </div>
           <button
             onClick={onUpgrade}
-            className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
+            className="w-full sm:w-auto px-6 h-10.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
           >
             <Crown className="w-4 h-4" />
             Renovar Agora
@@ -269,7 +269,7 @@ export default function PlanoWidget({ limites, diasRestantes, planExpiresAt, sub
           </div>
           <button
             onClick={onUpgrade}
-            className="w-full sm:w-auto px-6 py-2.5 bg-destructive hover:opacity-90 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
+            className="w-full sm:w-auto px-6 h-10.5 bg-destructive hover:opacity-90 text-white font-medium rounded-lg transition-all duration-150 text-sm flex items-center justify-center gap-2 shadow-sm"
           >
             <Crown className="w-4 h-4" />
             Melhorar plano Agora

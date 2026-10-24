@@ -56,7 +56,7 @@ interface TaskManagerProps {
 
 const TASK_TYPES = [
   { value: 'call', label: 'Ligar', icon: Phone, color: 'text-blue-600' },
-  { value: 'email', label: 'Enviar Email', icon: Mail, color: 'text-purple-600' },
+  { value: 'email', label: 'Enviar email', icon: Mail, color: 'text-purple-600' },
   { value: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, color: 'text-green-600' },
   { value: 'meeting', label: 'Reunião', icon: User, color: 'text-orange-600' },
   { value: 'follow-up', label: 'Follow-up', icon: Bell, color: 'text-pink-600' },
@@ -443,9 +443,9 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
       <Dialog open={showNewTaskModal} onOpenChange={setShowNewTaskModal}>
         <DialogContent className="max-w-2xl bg-card border border-border shadow-2xl p-6">
           <DialogHeader>
-            <DialogTitle className="text-foreground dark:text-foreground">Nova Tarefa</DialogTitle>
-            <DialogDescription className="text-muted-foreground dark:text-muted-foreground">
-              Crie uma nova tarefa ou lembrete
+            <DialogTitle className="text-foreground dark:text-foreground">Nova tarefa</DialogTitle>
+            <DialogDescription className="sr-only">
+              Nova tarefa
             </DialogDescription>
           </DialogHeader>
 
@@ -511,7 +511,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
 
             <div>
               <label className="text-sm mb-2 block text-muted-foreground">
-                Lead Relacionado
+                Lead relacionado
               </label>
               <Select
                 value={newTask.leadId || 'none'}
@@ -533,7 +533,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
 
             <div>
               <label className="text-sm mb-2 block text-muted-foreground">
-                Data de Vencimento
+                Data limite
               </label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -554,12 +554,12 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
               </Popover>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end pt-4">
               <Button variant="outline" onClick={() => setShowNewTaskModal(false)}>
                 Cancelar
               </Button>
               <Button onClick={handleCreateTask}>
-                Criar Tarefa
+                Criar tarefa
               </Button>
             </div>
           </div>

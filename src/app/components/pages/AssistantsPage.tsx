@@ -1119,7 +1119,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 p-4 border-t border-border">
+            <div className="flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end p-4 border-t border-border">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1205,7 +1205,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               {/* Greeting */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-foreground">
-                  Mensagem de Boas-vindas
+                  Mensagem de boas-vindas
                 </label>
                 <textarea
                   value={configValues.greeting || ''}
@@ -1219,7 +1219,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               {/* Instructions */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-foreground">
-                  Instruções do Assistente
+                  Instruções do assistente
                 </label>
                 <textarea
                   value={configValues.instructions || ''}
@@ -1233,7 +1233,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               {/* Business Hours */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-foreground">
-                  Horário de Funcionamento
+                  Horário de funcionamento
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -1546,10 +1546,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               <div className="p-4 rounded-lg border bg-muted/30 border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <BookOpen className="w-4 h-4 text-emerald-500" />
-                  <h4 className="text-sm font-semibold text-foreground">Base de Conhecimento</h4>
-                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-medium border border-emerald-500/20">
-                    Consulta (RAG)
-                  </span>
+                  <h4 className="text-sm font-semibold text-foreground">Base de conhecimento</h4>
                 </div>
 
 
@@ -1788,7 +1785,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               )}
             </div>
 
-            <div className="sticky bottom-0 flex items-center justify-end gap-2 p-4 border-t bg-card border-border">
+            <div className="flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end sticky bottom-0 p-4 border-t bg-card border-border">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1910,7 +1907,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               {/* Greeting */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-foreground">
-                  Mensagem de Boas-vindas
+                  Mensagem de boas-vindas
                 </label>
                 <textarea
                   value={createForm.greeting || ''}
@@ -1968,7 +1965,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               </div>
             </div>
 
-            <div className="sticky bottom-0 flex items-center justify-end gap-2 p-4 border-t bg-card border-border">
+            <div className="flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end sticky bottom-0 p-4 border-t bg-card border-border">
               <Button
                 variant="outline"
                 onClick={() => {

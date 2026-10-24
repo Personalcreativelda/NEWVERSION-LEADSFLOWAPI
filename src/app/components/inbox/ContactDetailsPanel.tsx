@@ -866,14 +866,14 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:opacity-90"
+              className="w-full h-10.5 rounded-lg text-sm font-medium transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:opacity-90"
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  Guardar Alterações
+                  Guardar alterações
                 </>
               )}
             </button>
@@ -1011,7 +1011,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 <button
                   onClick={handleGenerateSummary}
                   disabled={generatingSummary}
-                  className="w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white transition-all shadow-sm shadow-purple-500/20 disabled:opacity-70"
+                  className="w-full h-10 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white transition-all shadow-sm shadow-purple-500/20 disabled:opacity-70"
                 >
                   {generatingSummary ? (
                     <>
@@ -1386,7 +1386,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 <button
                   onClick={handleAddInternalNote}
                   disabled={savingInternalNote || !newInternalNote.trim()}
-                  className="px-3 py-2 rounded-lg text-sm bg-amber-500 text-white disabled:opacity-50 hover:bg-amber-600 transition-colors"
+                  className="inline-flex items-center justify-center px-3 h-10 rounded-lg text-sm bg-amber-500 text-white disabled:opacity-50 hover:bg-amber-600 transition-colors"
                 >
                   {savingInternalNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 </button>
@@ -1452,7 +1452,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                       className="w-full px-4 py-3 flex items-center gap-3 text-sm text-foreground hover:bg-muted/50 transition-colors border-t border-border"
                     >
                       <ListTodo className="w-4 h-4 text-blue-500" />
-                      Criar Tarefa
+                      Criar tarefa
                     </button>
                   </div>
                 )}
@@ -1463,7 +1463,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 <div className="rounded-lg border border-border p-3 space-y-3">
                   <div className="flex items-center gap-2">
                     <ListTodo className="w-4 h-4 text-blue-500" />
-                    <span className="text-sm font-medium text-foreground">Nova Tarefa</span>
+                    <span className="text-sm font-medium text-foreground">Nova tarefa</span>
                   </div>
                   <input
                     type="text"
@@ -1488,7 +1488,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                     <button
                       onClick={handleCreateTask}
                       disabled={submittingAction || !taskTitle.trim() || !taskDate}
-                      className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                      className="flex-1 h-10 rounded-lg text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
                     >
                       {submittingAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                       Criar
@@ -1527,7 +1527,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                     <button
                       onClick={handleCreateSchedule}
                       disabled={submittingAction || !scheduleTitle.trim() || !scheduleDate}
-                      className="flex-1 py-2 rounded-lg text-sm font-medium text-white bg-purple-500 hover:bg-purple-600 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                      className="flex-1 h-10 rounded-lg text-sm font-medium text-white bg-purple-500 hover:bg-purple-600 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
                     >
                       {submittingAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
                       Agendar

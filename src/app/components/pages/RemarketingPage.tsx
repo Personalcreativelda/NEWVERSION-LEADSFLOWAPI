@@ -211,7 +211,7 @@ const STEP_COLORS: Record<ActionType, string> = {
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; description: string }[] = [
   { value: 'funnel_stage', label: 'Etapa do funil', description: 'Dispara quando o lead é movido para a etapa escolhida.' },
   { value: 'tag', label: 'Tag aplicada', description: 'Dispara quando a tag especificada é adicionada ao lead.' },
-  { value: 'inactivity', label: 'Inatividade', description: 'Dispara automaticamente quando o lead não é contactado há X dias (verificação a cada 6h).' },
+  { value: 'inactivity', label: 'Inatividade', description: 'Quando o lead fica X dias sem contacto.' },
   { value: 'purchase', label: 'Compra realizada', description: 'Dispara quando o lead é marcado como Convertido no funil.' },
   { value: 'lead_score', label: 'Assistente de vendas IA', description: 'Dispara quando o Assistente de vendas IA calcula um score ≥ X ao analisar os leads.' },
 ];
@@ -221,7 +221,7 @@ const ACTION_OPTIONS: { value: ActionType; label: string }[] = [
   { value: 'facebook', label: 'Mensagem Facebook' },
   { value: 'instagram', label: 'Mensagem Instagram' },
   { value: 'telegram', label: 'Mensagem Telegram' },
-  { value: 'email', label: 'Enviar Email' },
+  { value: 'email', label: 'Enviar email' },
   { value: 'wait', label: 'Aguardar' },
   { value: 'tag', label: 'Aplicar Tag' },
   { value: 'move_stage', label: 'Mover Etapa' },
@@ -233,7 +233,7 @@ const ACTION_OPTIONS: { value: ActionType; label: string }[] = [
 // ─── Funnel stages fallback (used when API is unavailable) ──────────────────
 
 const DEFAULT_FUNNEL_STAGES = [
-  { value: 'novo',        label: 'Novo Lead' },
+  { value: 'novo',        label: 'Novo lead' },
   { value: 'contatado',   label: 'Contactado' },
   { value: 'qualificado', label: 'Qualificado' },
   { value: 'negociacao',  label: 'Em Negociação' },
@@ -251,7 +251,7 @@ function stepLabel(type: ActionType, config: Record<string, any> = {}): string {
     case 'facebook': return config.message ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Facebook';
     case 'instagram': return config.message ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Instagram';
     case 'telegram': return config.message ? config.message.slice(0, 45) + (config.message.length > 45 ? '…' : '') : 'Mensagem Telegram';
-    case 'email': return config.subject ? `Email: ${config.subject}` : 'Enviar Email';
+    case 'email': return config.subject ? `Email: ${config.subject}` : 'Enviar email';
     case 'wait': return config.duration ? `Aguardar ${config.duration} ${config.unit ?? 'dia(s)'}` : 'Aguardar';
     case 'tag': return config.tag ? `Tag: ${config.tag}` : 'Aplicar Tag';
     case 'move_stage': return config.stage ? `Mover para "${FUNNEL_STAGES.find(s => s.value === config.stage)?.label ?? config.stage}"` : 'Mover Etapa';
@@ -368,14 +368,13 @@ function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditM
       className="p-0 gap-0 max-h-[90vh] flex flex-col"
       title={
         <div className="flex items-center gap-2">
-          {isNew ? <Plus className="w-4 h-4 text-muted-foreground" /> : <Pencil className="w-4 h-4 text-muted-foreground" />}
-          <span>{isNew ? 'Novo Fluxo' : 'Editar Fluxo'}</span>
+          <span>{isNew ? 'Novo fluxo' : 'Editar fluxo'}</span>
         </div>
       }
       footer={
         <>
-          <AppButton variant="ghost" size="sm" onClick={onClose}>Cancelar</AppButton>
-          <AppButton size="sm" onClick={handleSave} disabled={!name.trim()}>Guardar</AppButton>
+          <AppButton variant="outline" onClick={onClose}>Cancelar</AppButton>
+          <AppButton onClick={handleSave} disabled={!name.trim()}>Guardar</AppButton>
         </>
       }
     >
@@ -383,7 +382,7 @@ function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditM
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {/* Name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground">Nome do Fluxo</label>
+            <label className="text-sm font-medium text-foreground">Nome do fluxo</label>
             <input
               value={name}
               onChange={e => setName(e.target.value)}
@@ -394,7 +393,7 @@ function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditM
 
           {/* Description */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground">Descrição</label>
+            <label className="text-sm font-medium text-foreground">Descrição</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
@@ -406,7 +405,7 @@ function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditM
 
           {/* Trigger */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-foreground">Gatilho</label>
+            <label className="text-sm font-medium text-foreground">Gatilho</label>
             <select
               value={trigger}
               onChange={e => handleChangeTrigger(e.target.value as TriggerType)}
@@ -482,17 +481,12 @@ function EditModal({ flow, isNew = false, onSave, onClose, funnelStages }: EditM
                 Dispara automaticamente quando marcar o lead como <strong>Convertido</strong> no Kanban ou no perfil do lead.
               </p>
             )}
-            {/* Preview */}
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-              <Info className="w-3 h-3 flex-shrink-0" />
-              Rótulo no card: <span className="font-medium text-foreground ml-1">{computedTriggerLabel()}</span>
-            </p>
           </div>
 
           {/* Steps */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-foreground">Passos da Sequência</label>
+              <label className="text-sm font-medium text-foreground">Passos da sequência</label>
               <button
                 onClick={addStep}
                 className="text-[11px] text-primary hover:opacity-80 transition-opacity flex items-center gap-1"
@@ -677,7 +671,7 @@ export default function RemarketingPage() {
     api.leads.funnelStages()
       .then(rows => {
         const LABEL_MAP: Record<string, string> = {
-          novo: 'Novo Lead',
+          novo: 'Novo lead',
           contatado: 'Contatado',
           qualificado: 'Qualificado',
           negociacao: 'Em Negociação',

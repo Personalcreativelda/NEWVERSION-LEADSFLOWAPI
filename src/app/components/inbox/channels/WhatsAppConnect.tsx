@@ -712,7 +712,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                     <button
                                         onClick={handleRefreshQR}
                                         disabled={loading}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
+                                        className="flex-1 flex items-center justify-center gap-2 h-10.5 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                         style={{ 
                                             borderColor: 'hsl(var(--border))',
                                             color: 'hsl(var(--foreground))'
@@ -724,7 +724,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 )}
                                 <button
                                     onClick={onClose}
-                                    className="flex-1 py-2.5 border rounded-lg text-sm font-medium transition-colors"
+                                    className="flex-1 h-10.5 border rounded-lg text-sm font-medium transition-colors"
                                     style={{ 
                                         borderColor: 'hsl(var(--border))',
                                         color: 'hsl(var(--muted-foreground))'

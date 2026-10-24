@@ -223,7 +223,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                 type="button"
                                 onClick={onClose}
                                 disabled={loading}
-                                className="flex-1 px-4 py-2.5 rounded-lg border font-medium transition-colors hover:bg-muted/50"
+                                className="flex-1 px-4 h-10.5 rounded-lg border font-medium transition-colors hover:bg-muted/50"
                                 style={{
                                     borderColor: 'hsl(var(--border))',
                                     color: 'hsl(var(--foreground))'
@@ -234,7 +234,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                             <button
                                 type="submit"
                                 disabled={loading || !phone.trim() || !name.trim()}
-                                className="flex-1 px-4 py-2.5 rounded-lg bg-[#00C48C] text-white font-medium transition-all hover:bg-[#00B07D] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="flex-1 px-4 h-10.5 rounded-lg bg-[#00C48C] text-white font-medium transition-all hover:bg-[#00B07D] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {loading ? (
                                     <>

@@ -190,14 +190,14 @@ function InviteModal({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-muted/50 transition-colors"
+                            className="flex-1 px-4 h-10 rounded-lg border border-border text-sm font-medium hover:bg-muted/50 transition-colors"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="flex-1 px-4 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {loading ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
                             {loading ? 'A enviar...' : 'Enviar convite'}

@@ -136,11 +136,11 @@ export default function InboxTeam() {
                             className="px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
                         />
                     </div>
-                    <div className="flex justify-end gap-2">
+                    <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end">
                         <button type="button" onClick={() => { setShowAdd(false); setForm(emptyForm); }} className="px-4 py-2 rounded-lg text-sm border border-border text-foreground hover:bg-muted/50">
                             Cancelar
                         </button>
-                        <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg text-sm bg-primary text-primary-foreground disabled:opacity-50 flex items-center gap-1.5">
+                        <button type="submit" disabled={saving} className="px-4 h-10 rounded-lg text-sm bg-primary text-primary-foreground disabled:opacity-50 flex items-center gap-1.5">
                             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                             Guardar
                         </button>

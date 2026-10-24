@@ -291,7 +291,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium mb-1.5" style={{ color: 'hsl(var(--foreground))' }}>
-                                        Nome do Remetente
+                                        Nome do remetente
                                     </label>
                                     <input
                                         type="text"
@@ -467,7 +467,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                 <button
                                     onClick={handleSubmit}
                                     disabled={loading || !formData.name.trim() || !formData.email.trim() || !formData.password.trim() || !formData.smtp_host.trim()}
-                                    className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 px-4 h-10 rounded-lg text-sm font-medium text-white bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <>

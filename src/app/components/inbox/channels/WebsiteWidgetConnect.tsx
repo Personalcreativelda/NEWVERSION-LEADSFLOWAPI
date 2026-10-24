@@ -263,7 +263,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
 
                             <div>
                                 <label className="block text-sm font-medium mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                    Mensagem de Boas-vindas
+                                    Mensagem de boas-vindas
                                 </label>
                                 <textarea
                                     value={formData.welcomeMessage}
@@ -316,7 +316,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                                     onClick={() => setFormData(prev => ({ ...prev, businessHoursEnabled: !prev.businessHoursEnabled }))}
                                 >
                                     <div>
-                                        <p className="text-sm font-medium" style={{ color: 'hsl(var(--foreground))' }}>Horário de Funcionamento</p>
+                                        <p className="text-sm font-medium" style={{ color: 'hsl(var(--foreground))' }}>Horário de funcionamento</p>
                                         <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>Mostra mensagem de indisponibilidade fora do horário</p>
                                     </div>
                                     <div
@@ -435,7 +435,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                             <div className="flex gap-3">
                                 <button
                                     onClick={onClose}
-                                    className="flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
+                                    className="flex-1 px-4 h-10 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                     style={{ borderColor: 'hsl(var(--border))' }}
                                 >
                                     Cancelar
@@ -443,7 +443,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                                 <button
                                     onClick={handleSubmit}
                                     disabled={loading || !formData.name.trim()}
-                                    className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 px-4 h-10 rounded-lg text-sm font-medium text-white bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <>

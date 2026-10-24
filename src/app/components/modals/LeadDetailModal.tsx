@@ -255,7 +255,7 @@ function NotasTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  }`}
  autoFocus
  />
- <div className="flex justify-end gap-2">
+ <div className="flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end">
  <Button variant="ghost" size="sm" onClick={cancelEdit}>
  Cancelar
  </Button>
@@ -276,7 +276,7 @@ function NotasTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  <p className="text-sm text-red-600 dark:text-red-400">
  Tem certeza que deseja eliminar esta nota?
  </p>
- <div className="flex justify-end gap-2">
+ <div className="flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end">
  <Button variant="ghost" size="sm" onClick={() => setDeletingId(null)}>
  Cancelar
  </Button>
@@ -458,7 +458,7 @@ function AgendamentosTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  onChange={(e) => setFormDate(e.target.value)}
  className={inputClasses}
  />
- <div className="flex justify-end gap-2">
+ <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end">
  <Button
  variant="ghost"
  size="sm"

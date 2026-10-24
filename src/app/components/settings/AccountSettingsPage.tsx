@@ -308,14 +308,18 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
           </DialogHeader>
           {setupStep === 'qr' && (
             <div className="space-y-4">
-              <div className="bg-card p-4 rounded-lg flex justify-center">
-                {qrCode && <img src={qrCode} alt="QR Code" className="w-64 h-64" />}
+              <div className="flex justify-center">
+                {qrCode && <img src={qrCode} alt="Código QR" className="w-56 h-56 rounded-lg bg-white p-2" />}
               </div>
-              <div className="bg-muted p-3 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Ou escreva manualmente:</p>
-                <code className="text-sm font-mono">{secret}</code>
+              {/* Chave longa: parte a linha (saía do ecrã no telemóvel) e copia com um toque */}
+              <div className="flex items-center gap-2 rounded-lg bg-muted p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground mb-1">Ou escreva a chave</p>
+                  <code className="block break-all text-sm font-mono text-foreground">{secret}</code>
+                </div>
+                <Button onClick={() => copyToClipboard(secret)} size="icon" variant="ghost" aria-label="Copiar chave"><Copy className="w-4 h-4" /></Button>
               </div>
-              <Button onClick={() => setSetupStep('verify')} className="w-full">Próximo</Button>
+              <Button onClick={() => setSetupStep('verify')} className="w-full">Continuar</Button>
             </div>
           )}
           {setupStep === 'verify' && (
@@ -353,7 +357,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
               <Label htmlFor="disable-password">Palavra-passe</Label>
               <Input id="disable-password" type="password" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} placeholder="Escreva a sua palavra-passe" className="mt-1.5" />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end">
               <Button onClick={() => setShow2FADisableModal(false)} variant="outline" className="flex-1">Cancelar</Button>
               <Button onClick={handleDisable2FA} disabled={loading} variant="destructive" className="flex-1">{loading ? 'A desativar...' : 'Desativar 2FA'}</Button>
             </div>
@@ -365,7 +369,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       <Dialog open={showNewTokenModal} onOpenChange={setShowNewTokenModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Criar Novo token de API</DialogTitle>
+            <DialogTitle>Novo token de API</DialogTitle>
             <DialogDescription className="sr-only">Novo token de API</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -373,24 +377,21 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
               <>
                 <div>
                   <Label htmlFor="token-name">Nome do token</Label>
-                  <Input id="token-name" value={newTokenName} onChange={(e) => setNewTokenName(e.target.value)} placeholder="Ex: Integração Mobile" className="mt-1.5" />
+                  <Input id="token-name" value={newTokenName} onChange={(e) => setNewTokenName(e.target.value)} placeholder="Ex.: Integração do site" className="mt-1.5" />
                 </div>
                 <div>
                   <Label htmlFor="token-expire">Expira em (dias)</Label>
                   <Input id="token-expire" type="number" value={newTokenExpireDays} onChange={(e) => setNewTokenExpireDays(e.target.value)} placeholder="90" className="mt-1.5" />
                   <p className="text-xs text-muted-foreground mt-1">Deixe vazio para nunca expirar</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end">
                   <Button onClick={() => setShowNewTokenModal(false)} variant="outline" className="flex-1">Cancelar</Button>
                   <Button onClick={handleCreateToken} disabled={loading} className="flex-1">{loading ? 'A criar...' : 'Criar token'}</Button>
                 </div>
               </>
             ) : (
               <>
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium mb-2">Copie este token agora!</p>
-                  <p className="text-xs text-yellow-700 dark:text-yellow-300">Depois de fechar esta janela não o vai poder ver de novo.</p>
-                </div>
+                <p className="text-sm text-muted-foreground">Copie o token agora: depois de fechar não o vai poder ver de novo.</p>
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-xs">O seu token de API</Label>
@@ -435,7 +436,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
               <Label htmlFor="confirm-password">Confirmar nova palavra-passe</Label>
               <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirme a nova palavra-passe" className="mt-1.5" />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end">
               <Button onClick={() => { setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }} variant="outline" className="flex-1">Cancelar</Button>
               <Button onClick={handleChangePassword} disabled={loading} className="flex-1">{loading ? 'A alterar...' : 'Alterar palavra-passe'}</Button>
             </div>

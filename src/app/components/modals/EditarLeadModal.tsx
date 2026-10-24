@@ -165,7 +165,7 @@ export default function EditarLeadModal({ isOpen, lead, onClose, onSave }: Edita
               Cancelar
             </AppButton>
             <AppButton type="submit" onClick={handleSubmit} loading={loading}>
-              {loading ? 'A guardar...' : 'Guardar Alterações'}
+              {loading ? 'A guardar...' : 'Guardar alterações'}
             </AppButton>
           </>
         }
@@ -180,7 +180,7 @@ export default function EditarLeadModal({ isOpen, lead, onClose, onSave }: Edita
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Nome e Telefone */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField label="Nome Completo" required>
+            <FormField label="Nome completo" required>
               <Input name="nome" value={formData.nome} onChange={handleChange} required placeholder="Ex: João Silva" />
             </FormField>
 
@@ -232,7 +232,7 @@ export default function EditarLeadModal({ isOpen, lead, onClose, onSave }: Edita
               </select>
             </FormField>
 
-            <FormField label="Agente Responsável">
+            <FormField label="Agente responsável">
               <Input name="agente_atual" value={formData.agente_atual || ''} onChange={handleChange} placeholder="Ex: Maria Silva" />
             </FormField>
           </div>

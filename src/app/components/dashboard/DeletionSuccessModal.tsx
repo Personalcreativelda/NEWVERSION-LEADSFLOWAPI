@@ -87,7 +87,7 @@ export default function DeletionSuccessModal({
         {/* Botão */}
         <button
           onClick={onClose}
-          className="w-full py-3 bg-primary hover:opacity-90 text-primary-foreground rounded-lg transition-colors"
+          className="inline-flex items-center justify-center w-full h-10 bg-primary hover:opacity-90 text-primary-foreground rounded-lg transition-colors"
         >
           Entendi
         </button>

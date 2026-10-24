@@ -1158,7 +1158,7 @@ export default function SalesFunnel({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 p-4 border-t bg-card border-border">
+              <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end items-center p-4 border-t bg-card border-border">
                 <button
                   onClick={() => setEditingStage(null)}
                   className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"

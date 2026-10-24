@@ -301,7 +301,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                                 className="w-full px-3 py-2.5 flex items-center gap-2.5 text-sm text-foreground hover:bg-muted/50 transition-colors"
                             >
                                 <Edit2 className="w-3.5 h-3.5" />
-                                Editar Lead
+                                Editar lead
                             </button>
                             <div className="border-t border-border" />
                             <button

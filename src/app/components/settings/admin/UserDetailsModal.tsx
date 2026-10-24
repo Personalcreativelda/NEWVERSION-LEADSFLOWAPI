@@ -313,7 +313,7 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
                     }`}
                   >
                     <Mail className="w-4 h-4" />
-                    Enviar Email
+                    Enviar email
                   </button>
                   <button
                     onClick={() => setSendTab('whatsapp')}

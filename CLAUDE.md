@@ -79,6 +79,13 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
 - Botões com texto não levam ícone à esquerda: o `Button` (ui/button.tsx) tira-o sozinho
   (fica o spinner e ícones depois do texto, ex.: ▾). Em `<button>` feitos à mão, não pôr.
 - Logótipos de canais/integrações: `h-7 w-7` dentro da caixa de 40px.
+- Tamanhos únicos: botões com texto 40px (o `Button` ignora `h-*`/`py-*`/`text-*` avulsos;
+  botões feitos à mão: `h-10`). Campos: regra global em globals.css ("Campos de texto") dá o
+  mesmo fundo, contorno, cantos, altura mínima (40px) e foco a todos os input/select/textarea,
+  incluindo os feitos à mão; campos embutidos usam `bg-transparent`/`border-0` ou `data-bare`.
+- Fundo dos modais: Cancelar | ação principal lado a lado com a mesma largura no telemóvel,
+  à direita no desktop (`DialogFooter`; feitos à mão: `flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end`).
+- Títulos e rótulos só com a primeira maiúscula ("Nova tarefa", não "Nova Tarefa").
 - Offline: os GET da API ficam guardados no aparelho (`lib/offlineCache.ts`, IndexedDB, por
   utilizador, apagados no logout). Sem rede ou com 502/503/504/timeout, os três clientes
   (`utils/api.ts`, `lib/api.ts`, axios com `withOfflineCache`) devolvem a última cópia e

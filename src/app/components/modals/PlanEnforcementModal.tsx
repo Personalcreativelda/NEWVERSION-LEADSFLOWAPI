@@ -105,7 +105,7 @@ export default function PlanEnforcementModal({
               <button
                 onClick={handlePortal}
                 disabled={loadingPortal}
-                className="w-full py-3 bg-[#00C48C] hover:bg-[#00aa7a] active:bg-[#009068] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full h-10 bg-[#00C48C] hover:bg-[#00aa7a] active:bg-[#009068] text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loadingPortal ? (
                   <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
@@ -117,7 +117,7 @@ export default function PlanEnforcementModal({
             ) : (
               <button
                 onClick={() => setShowUpgrade(true)}
-                className="w-full py-3 bg-[#00C48C] hover:bg-[#00aa7a] active:bg-[#009068] text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 bg-[#00C48C] hover:bg-[#00aa7a] active:bg-[#009068] text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 <Zap className="w-4 h-4" />
                 Melhorar plano

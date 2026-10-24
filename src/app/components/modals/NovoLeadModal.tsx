@@ -121,7 +121,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
     <AppModal
       open={isOpen}
       onOpenChange={(open) => !open && handleClose()}
-      title="➡ Adicionar Novo Lead"
+      title="Novo lead"
       size="lg"
       footer={
         <>
@@ -129,7 +129,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
             Cancelar
           </AppButton>
           <AppButton type="submit" onClick={handleSubmit} loading={loading}>
-            {loading ? 'A guardar...' : 'Guardar Lead'}
+            {loading ? 'A guardar...' : 'Guardar lead'}
           </AppButton>
         </>
       }
@@ -144,7 +144,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Nome e Email */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Nome Completo" required>
+          <FormField label="Nome completo" required>
             <Input name="nome" value={formData.nome} onChange={handleChange} required placeholder="Ex: João Silva" />
           </FormField>
 
@@ -159,7 +159,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
             label="Telefone"
             required
             error={phoneError}
-            hint="Obrigatório incluir código do país (ex: 258 para Moçambique)"
+            hint="Com o código do país (ex.: 258)"
           >
             <Input
               type="tel"
@@ -217,7 +217,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
 
         {/* Agente Responsável e Valor do Negócio */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Agente Responsável">
+          <FormField label="Agente responsável">
             <Input name="agente_atual" value={formData.agente_atual} onChange={handleChange} placeholder="Ex: Maria Silva" />
           </FormField>
 

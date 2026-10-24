@@ -614,7 +614,7 @@ export function SendMessageModal({
           )}
 
           {/* Action buttons */}
-          <div className="flex justify-end gap-2">
+          <div className="flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end">
             <Button
               variant="outline"
               onClick={handleClose}

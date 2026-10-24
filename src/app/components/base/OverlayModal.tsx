@@ -52,7 +52,7 @@ export function OverlayModal({ onClose, children, className, stickyEdges = true 
         className={cn(
           'relative flex flex-col w-full max-w-lg bg-card text-card-foreground border border-border shadow-2xl',
           'rounded-t-2xl rounded-b-none sm:rounded-2xl',
-          'max-h-[92dvh] sm:max-h-[min(88dvh,820px)] overflow-y-auto overscroll-contain',
+          'max-h-[92dvh] sm:max-h-[min(88dvh,820px)] overflow-y-auto overflow-x-hidden overscroll-contain',
           'animate-in fade-in slide-in-from-bottom-10 sm:slide-in-from-bottom-2 sm:zoom-in-[0.97] duration-200',
           stickyEdges && [
             '[&>*:first-child]:sticky [&>*:first-child]:top-0 [&>*:first-child]:z-10 [&>*:first-child]:bg-card',

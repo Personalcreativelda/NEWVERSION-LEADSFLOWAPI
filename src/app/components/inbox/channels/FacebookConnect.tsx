@@ -322,7 +322,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <button
                                     onClick={onClose}
-                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
+                                    className="flex-1 w-full sm:w-auto px-4 h-10 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                     style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
                                 >
                                     Cancelar
@@ -448,7 +448,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 <button
                                     onClick={validateAndConnect}
                                     disabled={loading || (!pageAccessToken.trim() && !isEditing)}
-                                    className="flex-1 w-full sm:w-auto px-4 py-3 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 w-full sm:w-auto px-4 h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
                                         <>

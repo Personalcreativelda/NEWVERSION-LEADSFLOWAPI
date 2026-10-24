@@ -131,7 +131,7 @@ export const ActivatePlanModal: React.FC<ActivatePlanModalProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 mt-6">
+        <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end mt-6">
           <Button
             onClick={onClose}
             variant="outline"
@@ -289,7 +289,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
         </div>
 
         {/* Footer actions */}
-        <div className="flex gap-3 px-5 py-4 border-t border-border shrink-0">
+        <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end px-5 py-4 border-t border-border shrink-0">
           <Button onClick={onClose} variant="outline" className="flex-1">
             Cancelar
           </Button>
@@ -449,7 +449,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 mt-6">
+        <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end mt-6">
           <Button onClick={onClose} variant="outline" className="flex-1">Cancelar</Button>
           <Button onClick={handleSubmit} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
             {loading ? 'A criar...' : 'Criar Utilizador'}

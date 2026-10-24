@@ -22,7 +22,7 @@ export function EmptyState({ onOpenSettings }: EmptyStateProps) {
 
             <button
                 onClick={onOpenSettings}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 hover:opacity-90 active:scale-[0.97] bg-primary text-primary-foreground"
+                className="flex items-center gap-2 px-5 h-10.5 rounded-lg text-sm font-medium transition-all duration-150 hover:opacity-90 active:scale-[0.97] bg-primary text-primary-foreground"
             >
                 <Settings size={16} />
                 Configurar Canais

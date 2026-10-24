@@ -289,7 +289,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                     <button
                                         onClick={generateVerifyToken}
                                         type="button"
-                                        className="px-3 py-2 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
+                                        className="inline-flex items-center justify-center px-3 h-10 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                         style={{
                                             borderColor: 'hsl(var(--border))',
                                             color: 'hsl(var(--foreground))'

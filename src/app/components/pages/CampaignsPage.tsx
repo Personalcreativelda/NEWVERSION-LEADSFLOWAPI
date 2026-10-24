@@ -1028,7 +1028,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
-                    <span>Editar Campanha</span>
+                    <span>Editar campanha</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1039,7 +1039,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <BarChart3 className="w-4 h-4" />
-                    <span>Ver Detalhes</span>
+                    <span>Ver detalhes</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1175,7 +1175,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     className="w-full text-left px-4 py-2 text-sm text-foreground/80 hover:bg-muted/50 flex items-center gap-3 transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
-                    <span>Editar Campanha</span>
+                    <span>Editar campanha</span>
                   </button>
                   <button
                     onClick={() => {

@@ -514,7 +514,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         </div>
                         <div>
                           <Label htmlFor="smtp-user" className="text-sm">
-                            Utilizador/Email <span className="text-red-500">*</span>
+                            Utilizador ou email <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             id="smtp-user"
@@ -543,7 +543,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         </div>
                         <div>
                           <Label htmlFor="smtp-from-email" className="text-sm font-medium">
-                            Email Remetente (Campanhas) <span className="text-red-500">*</span>
+                            Email do remetente <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             id="smtp-from-email"
@@ -556,7 +556,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                         </div>
                         <div>
                           <Label htmlFor="smtp-from-name" className="text-sm font-medium">
-                            Nome do Remetente
+                            Nome do remetente
                           </Label>
                           <Input
                             id="smtp-from-name"
@@ -591,7 +591,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                               Guardado!
                             </>
                           )}
-                          {smtpSaveState === 'idle' && 'Guardar SMTP'}
+                          {smtpSaveState === 'idle' && 'Guardar'}
                         </Button>
                       </div>
                     </div>
@@ -625,7 +625,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           onClick={handleSaveMetaPixel}
                           className="bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
-                          Guardar Meta Pixel
+                          Guardar
                         </Button>
                       </div>
                     </div>
@@ -659,7 +659,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           onClick={handleSaveGoogleAnalytics}
                           className="bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
-                          Guardar Google Analytics
+                          Guardar
                         </Button>
                       </div>
                     </div>
