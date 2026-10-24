@@ -76,6 +76,9 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
   configuração necessários ficam num `<details>` fechado. Nunca mostrar nomes internos
   (Evolution API, instância, n8n interno, MinIO, Supabase, OpenAI/Gemini) ao utilizador.
 - Seleção/destaque sem contornos azuis grossos: `border` neutro (`border-foreground/25`).
+- Botões com texto não levam ícone à esquerda: o `Button` (ui/button.tsx) tira-o sozinho
+  (fica o spinner e ícones depois do texto, ex.: ▾). Em `<button>` feitos à mão, não pôr.
+- Logótipos de canais/integrações: `h-7 w-7` dentro da caixa de 40px.
 - Offline: os GET da API ficam guardados no aparelho (`lib/offlineCache.ts`, IndexedDB, por
   utilizador, apagados no logout). Sem rede ou com 502/503/504/timeout, os três clientes
   (`utils/api.ts`, `lib/api.ts`, axios com `withOfflineCache`) devolvem a última cópia e

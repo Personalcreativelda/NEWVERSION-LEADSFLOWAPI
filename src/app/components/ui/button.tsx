@@ -35,13 +35,49 @@ const buttonVariants = cva(
   },
 );
 
+/** Ícone decorativo: elemento de componente (lucide/marca) sem filhos. O spinner fica. */
+function isDecorativeIcon(node: React.ReactNode): boolean {
+  if (!React.isValidElement(node) || typeof node.type === "string") return false;
+  const props = node.props as { children?: React.ReactNode; className?: string };
+  if (props.children != null) return false;
+  return !/\banimate-spin\b/.test(props.className || "");
+}
+
+function hasText(nodes: React.ReactNode[]): boolean {
+  return nodes.some((node) =>
+    (typeof node === "string" && node.trim() !== "") ||
+    typeof node === "number" ||
+    (React.isValidElement(node) && node.type === React.Fragment &&
+      hasText(React.Children.toArray((node.props as { children?: React.ReactNode }).children))),
+  );
+}
+
+/**
+ * Botão com texto não leva ícone (padrão do app: o ícone mais o gap e o mr-2 deixavam
+ * espaços estranhos). Botões só com ícone, ou com o texto num <span> que se esconde no
+ * telemóvel, ficam como estão.
+ */
+function textOnly(children: React.ReactNode): React.ReactNode {
+  const nodes = React.Children.toArray(children);
+  if (!hasText(nodes)) return children;
+  // Só o ícone à esquerda do texto: setas e ícones depois do texto (ex.: "Mais ▾") ficam
+  const firstText = nodes.findIndex((node) => hasText([node]));
+  return nodes
+    .filter((node, i) => i > firstText || !isDecorativeIcon(node))
+    .map((node) =>
+      React.isValidElement(node) && node.type === React.Fragment
+        ? React.cloneElement(node, undefined, textOnly((node.props as { children?: React.ReactNode }).children))
+        : node,
+    );
+}
+
 const Button = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button"> &
     VariantProps<typeof buttonVariants> & {
       asChild?: boolean;
     }
->(({ className, variant, size, asChild = false, ...props }, ref) => {
+>(({ className, variant, size, asChild = false, children, ...props }, ref) => {
   const Comp = asChild ? Slot : "button";
 
   return (
@@ -50,11 +86,12 @@ const Button = React.forwardRef<
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+    >
+      {asChild || size === "icon" ? children : textOnly(children)}
+    </Comp>
   );
 });
 
 Button.displayName = "Button";
 
 export { Button, buttonVariants };
-

@@ -51,7 +51,7 @@ export function ChannelRow({ channel, onOpen }: { channel: Channel; onOpen: (c: 
         className="flex w-full min-h-[64px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 active:bg-muted"
       >
         <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted ${info.color}`}>
-          <Icon className="h-5 w-5" />
+          <Icon className="h-7 w-7" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block break-words text-[15px] font-medium leading-snug text-foreground">{channelDisplayName(channel)}</span>
@@ -124,7 +124,7 @@ export function ChannelDetailSheet({ channel, onClose, onRename, onOpenSettings,
       title={
         <span className="flex items-center gap-3">
           <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted ${info.color}`}>
-            <Icon className="h-5 w-5" />
+            <Icon className="h-7 w-7" />
           </span>
           <span className="min-w-0">
             <span className="block break-words">{channelDisplayName(channel)}</span>
@@ -209,7 +209,7 @@ export function AddChannelSheet({ open, onClose, channels, onPick }: {
                 className="flex w-full min-h-[60px] items-center gap-3 rounded-lg px-1 py-2.5 text-left hover:bg-muted/50 active:bg-muted"
               >
                 <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted ${c.color}`}>
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-7 w-7" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] font-medium text-foreground">{c.name}</span>

@@ -76,7 +76,9 @@ export function LeadListRow({ lead, onOpen, onMessage, onDelete }: LeadListRowPr
   return (
     <li className="relative overflow-hidden bg-card">
       {/* Ações reveladas ao deslizar */}
-      {maxOffset > 0 && (
+      {/* Só existem enquanto a linha está deslizada: com a linha parada, um toque (fundo
+          de toque) deixava-as ver por trás do conteúdo */}
+      {maxOffset > 0 && (offset < 0 || dragging) && (
         <div className="absolute inset-y-0 right-0 flex" style={{ width: maxOffset }} aria-hidden={offset === 0}>
           {onMessage && (
             <button
@@ -112,7 +114,7 @@ export function LeadListRow({ lead, onOpen, onMessage, onDelete }: LeadListRowPr
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         style={{ transform: `translateX(${offset}px)`, transition: dragging ? 'none' : 'transform 220ms cubic-bezier(0.2,0,0,1)' }}
-        className="relative flex w-full items-center gap-3 bg-card px-4 py-3 text-left active:bg-muted/60"
+        className="relative flex w-full items-center gap-3 bg-card px-4 py-3 text-left active:bg-muted"
       >
         <Avatar className="h-11 w-11 flex-shrink-0">
           {lead.avatarUrl ? <AvatarImage src={lead.avatarUrl} alt="" /> : null}
@@ -128,7 +130,7 @@ export function LeadListRow({ lead, onOpen, onMessage, onDelete }: LeadListRowPr
           </span>
           <span className="mt-1 flex items-center gap-2">
             <span className={`flex-shrink-0 ${origin.color}`} title={origin.label}>
-              <OriginIcon className="h-3.5 w-3.5" />
+              <OriginIcon className="h-4 w-4" />
             </span>
             {showPhone && <span className="min-w-0 truncate text-[13px] text-muted-foreground tabular-nums">{phone}</span>}
             <span className={`ml-auto flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${leadStatusClass(lead.status)}`}>

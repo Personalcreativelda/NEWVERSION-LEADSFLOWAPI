@@ -426,7 +426,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                 className="flex w-full min-h-[64px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 active:bg-muted"
               >
                 <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted">
-                  <Icon className={`h-5 w-5 ${integration.color}`} />
+                  <Icon className={`h-7 w-7 ${integration.color}`} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-base text-foreground">{integration.name}</span>
@@ -443,7 +443,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
               <SubpageBack label="Integrações" onClose={() => setExpandedSection(null)} />
               <div className="mb-5 flex items-center gap-3">
                 <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted">
-                  <Icon className={`h-5 w-5 ${integration.color}`} />
+                  <Icon className={`h-7 w-7 ${integration.color}`} />
                 </span>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-base font-semibold text-foreground">{integration.name}</h2>

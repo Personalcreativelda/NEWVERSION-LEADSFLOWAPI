@@ -71,7 +71,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { useConfirm } from './ui/ConfirmDialog';
 import { Language, loadLanguage, saveLanguage, translations, Translations } from '../utils/i18n';
 
-import { AlertTriangle, CheckCircle2, CopyX, Download, MailX, LayoutDashboard, Users, MessageSquare, BarChart2, Menu, FileText, Workflow } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CopyX, MailX, LayoutDashboard, Users, MessageSquare, BarChart2, Menu, FileText, Workflow } from 'lucide-react';
 import { PageHeader, PageAction, PageFab } from './base/PageHeader';
 import { motion } from 'motion/react';
 import { ServerStatusBanner } from './base/ServerStatusBanner';
@@ -1049,51 +1049,19 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     });
   };
 
-  const triggerExportLimitMessage = (
+  // Limite do plano: confirmação simples (exporta só os permitidos)
+  const triggerExportLimitMessage = async (
     maxAllowed: number,
     totalCount: number,
     onConfirm: () => void,
   ) => {
-    const handleConfirm = () => {
-      closeMessageCenter();
-      setTimeout(() => onConfirm(), 100);
-    };
-
-    openMessageCenter('plan', {
-      id: 'export-limit',
+    const count = formatLimit(Math.min(maxAllowed, totalCount));
+    const ok = await confirm(`O seu plano exporta até ${formatLimit(maxAllowed)} leads de cada vez. Tem ${formatLimit(totalCount)}.`, {
       title: 'Limite de exportação',
-      tone: 'warning',
-      badgeLabel: 'Plano atual',
-      badgeVariant: 'secondary',
-      icon: <AlertTriangle className="size-5 text-amber-500" />,
-      content: (
-        <div className="space-y-2">
-          <p>
-            Seu plano atual permite exportar até {formatLimit(maxAllowed)} leads por vez. Você possui {formatLimit(totalCount)} leads registados.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Exporte a quantidade permitida agora ou faça melhorar o plano para liberar a exportação completa.
-          </p>
-        </div>
-      ),
-      actions: [
-        {
-          label: `Exportar ${formatLimit(Math.min(maxAllowed, totalCount))} leads`,
-          onClick: handleConfirm,
-          icon: <Download className="size-4" />,
-        },
-        {
-          label: 'Ver planos disponíveis',
-          variant: 'outline',
-          onClick: openUpgradeFromMessage,
-        },
-        {
-          label: 'Cancelar',
-          variant: 'ghost',
-          onClick: closeMessageCenter,
-        },
-      ],
+      confirmLabel: `Exportar ${count}`,
+      cancelLabel: 'Cancelar',
     });
+    if (ok) onConfirm();
   };
 
   const triggerDuplicateLeadMessage = () => {

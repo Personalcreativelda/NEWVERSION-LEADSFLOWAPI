@@ -90,13 +90,14 @@ export function PageAction({ icon: Icon, label, onClick, disabled, variant = 'se
         'inline-flex h-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50',
         primary
           // Primária (ex.: botão de um estado vazio): sempre com texto
-          ? 'px-4 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:bg-primary/80'
+          ? 'px-5 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:bg-primary/80'
           // Secundária (cabeçalho): só o ícone no telemóvel, com texto no desktop
           : 'w-10 sm:w-auto sm:px-3 text-foreground hover:bg-muted active:bg-muted',
         className,
       )}
     >
-      <Icon className="h-[18px] w-[18px] flex-shrink-0" aria-hidden />
+      {/* Primária: só texto. Secundária: ícone (e texto a partir do desktop) */}
+      {!primary && <Icon className="h-[18px] w-[18px] flex-shrink-0" aria-hidden />}
       <span className={primary ? undefined : 'hidden sm:inline'}>{label}</span>
     </button>
   );

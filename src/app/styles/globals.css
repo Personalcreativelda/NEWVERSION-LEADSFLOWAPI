@@ -1250,7 +1250,7 @@ html.native-app #lfw-close {
     white-space: nowrap;
   }
   /* ✕ dos diálogos (ui/dialog.tsx) com área de toque de app */
-  html.native-app [data-slot="dialog-content"] > button:last-child {
+  html.native-app [data-slot="dialog-content"] > [data-slot="dialog-close"] {
     top: 6px;
     right: 6px;
     width: 40px;
@@ -1260,7 +1260,7 @@ html.native-app #lfw-close {
     justify-content: center;
     opacity: 0.8;
   }
-  html.native-app [data-slot="dialog-content"] > button:last-child svg {
+  html.native-app [data-slot="dialog-content"] > [data-slot="dialog-close"] svg {
     width: 20px;
     height: 20px;
   }

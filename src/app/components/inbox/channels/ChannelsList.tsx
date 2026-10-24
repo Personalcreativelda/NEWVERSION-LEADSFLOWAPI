@@ -261,9 +261,8 @@ export function ChannelsList() {
                     <button
                         type="button"
                         onClick={() => setAddOpen(true)}
-                        className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
+                        className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
                     >
-                        <Plus className="h-4 w-4" />
                         Adicionar canal
                     </button>
                 )}
@@ -282,7 +281,6 @@ export function ChannelsList() {
                             onClick={() => setAddOpen(true)}
                             className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         >
-                            <Plus className="h-4 w-4" />
                             Adicionar canal
                         </button>
                     }
