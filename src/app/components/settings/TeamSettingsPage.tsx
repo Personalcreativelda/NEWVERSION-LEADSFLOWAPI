@@ -9,6 +9,7 @@ import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
 import { getLocale } from '../../utils/format';
 import { OverlayModal } from '../base/OverlayModal';
+import { Button } from '../ui/button';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
-    owner: 'Owner', admin: 'Admin', manager: 'Manager', agent: 'Agente', viewer: 'Viewer',
+    owner: 'Dono', admin: 'Administrador', manager: 'Gestor', agent: 'Agente', viewer: 'Leitor',
 };
 
 function getInitials(name: string): string {
@@ -121,7 +122,6 @@ function InviteModal({
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                     <h2 className="text-base font-semibold flex items-center gap-2">
-                        <UserPlus size={16} className="text-primary" />
                         Convidar membro
                     </h2>
                     <button onClick={onClose} className="p-1 hover:bg-muted/50 rounded">
@@ -456,24 +456,13 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
                         <ExternalLink size={16} className={`flex-shrink-0 mt-0.5 ${lastEmailSent ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`} />
                         <div className="flex-1 min-w-0">
                             {lastEmailSent ? (
-                                <p className="text-sm font-medium text-green-700 dark:text-green-400">Email enviado! Link de convite (para partilhar também):</p>
+                                <p className="text-sm font-medium text-foreground">Convite enviado por email</p>
                             ) : (
-                                <div>
-                                    <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Email não enviado — SMTP não configurado</p>
-                                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
-                                        Partilha este link diretamente com o convidado. Para envio automático, conecta um <strong>canal de email</strong> ou configura o SMTP em <strong>Integrações → Definições SMTP</strong>.
-                                    </p>
-                                </div>
+                                <p className="text-sm font-medium text-foreground">Partilhe este link com o convidado</p>
                             )}
                             <p className="text-xs text-muted-foreground truncate mt-1 font-mono">{lastInviteUrl}</p>
                         </div>
-                        <button
-                            onClick={() => copyInviteUrl(lastInviteUrl)}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:opacity-90"
-                        >
-                            <Copy size={12} />
-                            Copiar
-                        </button>
+                        <Button size="sm" variant="outline" className="flex-shrink-0" onClick={() => copyInviteUrl(lastInviteUrl)}>Copiar</Button>
                         <button onClick={() => setLastInviteUrl(null)} className="p-1 hover:bg-muted/50 rounded">
                             <X size={14} className="text-muted-foreground" />
                         </button>
@@ -484,21 +473,15 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
             {/* Members section */}
             <div className="rounded-xl border border-border bg-card overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-                    <h3 className="font-semibold text-sm">Membros da equipa</h3>
+                    <h3 className="font-semibold">Membros</h3>
                     {isOwnerOrAdmin && (
-                        <button
-                            onClick={() => setShowInviteModal(true)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-                        >
-                            <UserPlus size={13} />
-                            Convidar
-                        </button>
+                        <Button size="sm" onClick={() => setShowInviteModal(true)}>Convidar</Button>
                     )}
                 </div>
 
                 {members.length === 0 ? (
                     <div className="py-12 text-center text-muted-foreground text-sm">
-                        Nenhum membro ainda. Convida a tua equipa!
+                        Ainda não tem membros.
                     </div>
                 ) : (
                     <div className="divide-y divide-border">
@@ -642,9 +625,9 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
             )}
 
             {/* Role legend */}
-            <div className="rounded-xl border border-border bg-card p-5">
-                <h3 className="font-semibold text-sm mb-3">Permissões por papel</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <details className="rounded-xl border border-border bg-card p-5">
+                <summary className="cursor-pointer select-none font-semibold">Permissões por papel</summary>
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
                         { role: 'owner',   perms: ['Todas as conversas', 'Gestão de membros', 'Configurações do workspace', 'Faturação'] },
                         { role: 'admin',   perms: ['Todas as conversas', 'Gestão de membros', 'Atribuição de conversas', 'Relatórios'] },
@@ -658,8 +641,8 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
                             </span>
                             <ul className="space-y-0.5">
                                 {perms.map(p => (
-                                    <li key={p} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                        <Check size={10} className="text-green-500 flex-shrink-0" />
+                                    <li key={p} className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Check size={14} className="text-green-500 flex-shrink-0" />
                                         {p}
                                     </li>
                                 ))}
@@ -667,7 +650,7 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
                         </div>
                     ))}
                 </div>
-            </div>
+            </details>
 
             {showInviteModal && (
                 <InviteModal

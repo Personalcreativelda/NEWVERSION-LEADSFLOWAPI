@@ -415,15 +415,19 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
           const n = typeof v === 'number' ? v : parseFloat(v);
           return `${n > 0 ? '+' : ''}${formatPercent(n)}`;
         };
-        const kpis: { label: string; value: string; note?: string; noteTone?: 'up' | 'down'; icon: any; color: string }[] = [
+        const kpis: { label: string; value: string; note?: string; noteTone?: 'up' | 'down' | 'neutral'; icon: any; color: string }[] = [
           { label: 'Taxa de conversão', value: formatPercent(metrics.conversionRate), icon: Target, color: 'text-green-600' },
           {
+            // Novos leads da semana (nunca negativo); a comparação só aparece a verde quando
+            // sobe — quando desce mostra só quantos houve na semana anterior, sem vermelho
             label: 'Crescimento (7 dias)',
-            value: `${metrics.absoluteGrowth > 0 ? '+' : ''}${metrics.absoluteGrowth}`,
-            note: `${signed(metrics.growthRate)} vs semana anterior`,
-            noteTone: metrics.absoluteGrowth >= 0 ? 'up' : 'down',
+            value: `+${metrics.recentLeads}`,
+            note: metrics.absoluteGrowth > 0
+              ? `${signed(metrics.growthRate)} vs semana anterior`
+              : `${metrics.previousWeekLeads} na semana anterior`,
+            noteTone: metrics.absoluteGrowth > 0 ? 'up' : 'neutral',
             icon: Zap,
-            color: 'text-orange-600',
+            color: 'text-green-600',
           },
         ];
         if (metrics.avgValue > 0) {
@@ -447,7 +451,6 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
             color: 'text-primary',
           });
         }
-        const waiting = metrics.avgValue <= 0 || metrics.avgTimeInFunnel <= 0;
         return (
           <div className="space-y-3">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -459,16 +462,11 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                   </div>
                   <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${k.color}`}>{k.value}</p>
                   {k.note && (
-                    <p className={`mt-0.5 text-xs ${k.noteTone === 'down' ? 'text-red-600' : 'text-green-600'}`}>{k.note}</p>
+                    <p className={`mt-0.5 text-xs ${k.noteTone === 'down' ? 'text-red-600' : k.noteTone === 'neutral' ? 'text-muted-foreground' : 'text-green-600'}`}>{k.note}</p>
                   )}
                 </Card>
               ))}
             </div>
-            {waiting && (
-              <p className="text-xs text-muted-foreground">
-                Valor médio e tempo médio aparecem após as primeiras conversões.
-              </p>
-            )}
           </div>
         );
       })()}

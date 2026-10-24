@@ -58,6 +58,7 @@ import ProductTour from './onboarding/ProductTour';
 import { notifyTourAvailable } from '../utils/notificationHelpers';
 import WelcomeVideoModal from './modals/WelcomeVideoModal';
 import { isNativeApp } from '../../native';
+import { saveFile } from '../lib/saveFile';
 import { resolveTheme, applyThemeClass, saveThemeChoice, onSystemThemeChange } from '../utils/theme';
 import FeedbackModal from './modals/FeedbackModal';
 
@@ -1344,17 +1345,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       type: 'text/csv;charset=utf-8',
     });
 
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `leads_export_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-
-    toast.success(`Exportação concluída! ${leadsToExport.length} leads exportados.`);
-    triggerSuccessMessage('Exportação concluída', `${leadsToExport.length} leads exportados com sucesso.`);
+    // No app vai para Transferências (com aviso "Abrir"); no browser, download normal
+    void saveFile(`leads_${new Date().toISOString().split('T')[0]}.csv`, blob, 'text/csv').then((saved) => {
+      if (saved && !isNativeApp()) toast.success(`${leadsToExport.length} leads exportados`);
+    });
   };
 
   const handleExport = () => {

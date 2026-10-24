@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SystemBarsPlugin.class);
+        registerPlugin(FileSaverPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Mesmo comportamento em todas as versões: o app desenha por baixo das barras

@@ -86,6 +86,10 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
 - Fundo dos modais: Cancelar | ação principal lado a lado com a mesma largura no telemóvel,
   à direita no desktop (`DialogFooter`; feitos à mão: `flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end`).
 - Títulos e rótulos só com a primeira maiúscula ("Nova tarefa", não "Nova Tarefa").
+- Ficheiros gerados (CSV, modelo, relatório): sempre `saveFile()` (`lib/saveFile.ts`). O WebView
+  ignora `<a download>`; no app vai pelo plugin nativo `FileSaver` (FileSaverPlugin.java, desde o
+  versionCode 3) para Transferências. Publicar com `--min-native 2` enquanto houver APKs 1.1.
+- Modais em ecrã tátil não fazem foco automático (abria o teclado sozinho) — `ui/dialog.tsx`.
 - Offline: os GET da API ficam guardados no aparelho (`lib/offlineCache.ts`, IndexedDB, por
   utilizador, apagados no logout). Sem rede ou com 502/503/504/timeout, os três clientes
   (`utils/api.ts`, `lib/api.ts`, axios com `withOfflineCache`) devolvem a última cópia e

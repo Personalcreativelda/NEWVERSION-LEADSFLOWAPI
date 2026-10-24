@@ -179,7 +179,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full h-10.5 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full h-10 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2"
               style={{ backgroundColor: 'hsl(var(--primary))' }}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

@@ -1332,35 +1332,35 @@ html.native-app #lfw-close {
    !important para vencer os style={{ backgroundColor }} antigos. Ficam de fora os
    campos "embutidos" (bg-transparent / border-0: caixa de mensagem, pesquisas em
    pílula) e os que pedirem data-bare. */
-:is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="submit"], [type="button"], [type="image"]), textarea, select):not([data-bare], [class*="bg-transparent"], [class*="border-0"], [class*="border-none"], .sidebar-search-input) {
+:is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="submit"], [type="button"], [type="image"]), textarea, select):not([data-bare], [class*="bg-transparent"], [class*="border-0"], [class*="border-none"], .sidebar-search-input, #lfw-window *, [id^="lfw-"] *) {
   background-color: hsl(var(--input-background)) !important;
   border: 1px solid hsl(var(--border)) !important;
   border-radius: 0.5rem;
   color: hsl(var(--foreground));
 }
-:is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="submit"], [type="button"], [type="image"]), select):not([data-bare], [class*="bg-transparent"], [class*="border-0"], [class*="border-none"], .sidebar-search-input) {
+:is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="submit"], [type="button"], [type="image"]), select):not([data-bare], [class*="bg-transparent"], [class*="border-0"], [class*="border-none"], .sidebar-search-input, #lfw-window *, [id^="lfw-"] *) {
   min-height: 2.5rem;
 }
-:is(input, textarea, select):not([data-bare], [class*="bg-transparent"], [class*="border-0"], [class*="border-none"], .sidebar-search-input):focus-visible {
+:is(input, textarea, select):not([data-bare], [class*="bg-transparent"], [class*="border-0"], [class*="border-none"], .sidebar-search-input, #lfw-window *, [id^="lfw-"] *):focus-visible {
   outline: none !important;
   border-color: hsl(var(--primary)) !important;
   box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15) !important;
 }
-:is(input, textarea, select)::placeholder {
+:is(input, textarea, select):not(#lfw-window *)::placeholder {
   color: hsl(var(--muted-foreground));
   opacity: 1;
 }
 /* Preenchimento automático do browser: sem o fundo azul/amarelo próprio */
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus {
+input:-webkit-autofill:not(#lfw-window *),
+input:-webkit-autofill:hover:not(#lfw-window *),
+input:-webkit-autofill:focus:not(#lfw-window *) {
   -webkit-text-fill-color: hsl(var(--foreground));
   -webkit-box-shadow: 0 0 0 1000px hsl(var(--input-background)) inset !important;
   caret-color: hsl(var(--foreground));
 }
 /* Listas de escolha: as nativas (<select>) e as do Radix com o mesmo aspeto dos campos
    — sem a seta do sistema nem fundos cinzentos postos em cada página */
-select:not([data-bare], [class*="bg-transparent"], [class*="border-0"], [multiple]) {
+select:not([data-bare], [class*="bg-transparent"], [class*="border-0"], [multiple], #lfw-window *) {
   appearance: none;
   -webkit-appearance: none;
   padding-right: 2.25rem !important;
@@ -1368,7 +1368,7 @@ select:not([data-bare], [class*="bg-transparent"], [class*="border-0"], [multipl
   background-repeat: no-repeat !important;
   background-position: right 0.75rem center !important;
 }
-[data-slot="select-trigger"]:not([class*="bg-transparent"], [class*="border-0"]) {
+[data-slot="select-trigger"]:not([class*="bg-transparent"], [class*="border-0"], #lfw-window *) {
   background-color: hsl(var(--input-background)) !important;
   border: 1px solid hsl(var(--border)) !important;
   border-radius: 0.5rem;

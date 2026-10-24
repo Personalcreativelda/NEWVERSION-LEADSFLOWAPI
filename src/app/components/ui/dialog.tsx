@@ -51,6 +51,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 function DialogContent({
   className,
   children,
+  onOpenAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
@@ -74,6 +75,12 @@ function DialogContent({
             "sm:data-[state=open]:zoom-in-[0.97] sm:data-[state=closed]:zoom-out-[0.97]",
             className,
           )}
+          // Ecrã tátil: sem foco automático no 1.º campo/botão (abria o teclado sozinho e
+          // desenhava o contorno de foco no 1.º cartão). Com rato/teclado mantém-se.
+          onOpenAutoFocus={(event) => {
+            onOpenAutoFocus?.(event);
+            if (window.matchMedia?.("(pointer: coarse)").matches) event.preventDefault();
+          }}
           {...props}
         >
           {children}

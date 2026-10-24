@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, Download, Zap, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { NUMBER_OPTS, getLocale } from '../../utils/format';
+import { saveFile } from '../../lib/saveFile';
 
 interface ImportarLeadsModalProps {
  isOpen: boolean;
@@ -59,18 +60,8 @@ export default function ImportarLeadsModal({
  '2024-01-15,Maria Santos,258840000002,Serviço B,facebook,qualificado\n' +
  '2024-01-15,Pedro Costa,258840000003,Produto C,instagram,em_negociacao';
  
- const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
- const link = document.createElement('a');
- const url = URL.createObjectURL(blob);
- 
- link.setAttribute('href', url);
- link.setAttribute('download', 'modelo_importacao_leads.csv');
- link.style.visibility = 'hidden';
- document.body.appendChild(link);
- link.click();
- document.body.removeChild(link);
- 
- toast.success('Modelo baixado com sucesso!');
+ // BOM: o Excel abre os acentos corretamente
+ void saveFile('modelo_importacao_leads.csv', new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), csvContent], { type: 'text/csv' }), 'text/csv');
  };
 
  const handleImport = async () => {

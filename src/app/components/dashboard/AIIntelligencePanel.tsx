@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../../lib/api';
-import { Brain, Flame, TrendingDown, Sparkles, ChevronRight } from 'lucide-react';
-import { DashboardCard } from '../base/DashboardCard';
 import { LoadingState } from '../base/LoadingState';
 import { EmptyState } from '../base/EmptyState';
 import { ErrorState } from '../base/ErrorState';
@@ -64,128 +62,88 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
 
   if (loading) {
     return (
-      <DashboardCard
-        className="h-full flex flex-col"
-        title={
-          <span className="flex items-center gap-2 text-sm font-semibold">
-            <Brain className="w-4 h-4 text-primary" />
-            Assistente de vendas IA
-          </span>
-        }
-      >
+      <section className="h-full rounded-2xl border border-border bg-card p-4 sm:p-5">
+        <h3 className="mb-2 text-[15px] font-semibold text-foreground">Assistente de vendas IA</h3>
         <LoadingState minHeight={140} />
-      </DashboardCard>
+      </section>
     );
   }
 
   const hasData = hotLeads.length > 0 || atRiskLeads.length > 0;
 
+  // Mesmo estilo dos outros cartões do Início (ex.: "Leads por origem"): título simples,
+  // linhas neutras como na lista de leads e um selo à direita
+  const Row = ({ lead, sub, chip, chipClass }: { lead: AILead; sub: string; chip: string; chipClass: string }) => (
+    <li className="flex items-center gap-3 py-2.5">
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-foreground">
+        {(lead.name || 'L').charAt(0).toUpperCase()}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-medium text-foreground">{lead.name}</span>
+        <span className="block truncate text-xs text-muted-foreground">{sub}</span>
+      </span>
+      <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${chipClass}`}>{chip}</span>
+    </li>
+  );
+
   return (
-    <DashboardCard
-      className="h-full flex flex-col"
-      title={
-        <span className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Brain className="w-3.5 h-3.5 text-primary" />
-          </div>
-          <span className="text-sm font-semibold text-foreground">Assistente de vendas IA</span>
-          {(stats.hot_count ?? 0) > 0 && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[10px] font-semibold">
-              <Flame className="w-2.5 h-2.5" />
-              {stats.hot_count}
-            </span>
-          )}
-        </span>
-      }
-    >
+    <section className="h-full rounded-2xl border border-border bg-card p-4 sm:p-5 flex flex-col">
+      <h3 className="mb-2 text-[15px] font-semibold text-foreground">Assistente de vendas IA</h3>
       {error ? (
         <ErrorState
-          title="Não foi possível carregar os insights"
+          title="Não foi possível carregar a análise"
           action={<AppButton size="sm" onClick={() => load(true)}>Tentar novamente</AppButton>}
         />
       ) : !hasData ? (
         <EmptyState
-          title="Ainda sem análise de IA"
-          description="Abra o Assistente de vendas IA no menu para analisar os seus leads."
+          title="Ainda sem análise"
+          description="Abra o Assistente de vendas IA no menu."
           imgSrc="/assets/icons/empty/ic_content.svg"
         />
       ) : (
-        <div className="space-y-4">
-          {/* Hot Leads */}
+        <div className="space-y-3">
           {hotLeads.length > 0 && (
             <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <Flame className="w-3.5 h-3.5 text-orange-500" />
-                <span className="text-xs font-medium text-foreground">Leads Quentes</span>
-              </div>
-              <div className="space-y-1.5">
-                {hotLeads.map(lead => (
-                  <div key={lead.id} className="flex items-center gap-2.5 py-1.5 px-3 rounded-lg bg-orange-500/5 border border-orange-500/10">
-                    <div className="w-6 h-6 rounded-full bg-orange-500/15 flex items-center justify-center flex-shrink-0">
-                      <span className="text-[9px] font-bold text-orange-600 dark:text-orange-400">
-                        {(lead.name || 'L').charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-foreground truncate">{lead.name}</p>
-                      <p className="text-[10px] text-muted-foreground capitalize">{lead.status}</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400">{lead.engagement_score}</span>
-                      <span className="text-[10px] text-muted-foreground">{lead.conversion_probability}%</span>
-                    </div>
-                  </div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mais prováveis de comprar</p>
+              <ul className="divide-y divide-border">
+                {hotLeads.map((lead) => (
+                  <Row
+                    key={lead.id}
+                    lead={lead}
+                    sub={`${lead.conversion_probability}% de probabilidade`}
+                    chip="Quente"
+                    chipClass="bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                  />
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
-          {/* At-Risk Leads */}
           {atRiskLeads.length > 0 && (
             <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <TrendingDown className="w-3.5 h-3.5 text-red-500" />
-                <span className="text-xs font-medium text-foreground">Em Risco</span>
-              </div>
-              <div className="space-y-1.5">
-                {atRiskLeads.map(lead => {
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Em risco</p>
+              <ul className="divide-y divide-border">
+                {atRiskLeads.map((lead) => {
                   const days = daysSince(lead.last_contact_at);
                   return (
-                    <div key={lead.id} className="flex items-center gap-2.5 py-1.5 px-3 rounded-lg bg-red-500/5 border border-red-500/10">
-                      <div className="w-6 h-6 rounded-full bg-red-500/15 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[9px] font-bold text-red-600 dark:text-red-400">
-                          {(lead.name || 'L').charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-foreground truncate">{lead.name}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {days !== null ? (days === 0 ? 'hoje' : `${days}d sem contacto`) : 'sem contacto'}
-                        </p>
-                      </div>
-                      <span className={`text-[10px] font-medium flex-shrink-0 ${
-                        lead.risk_level === 'high' ? 'text-red-500' : 'text-amber-500'
-                      }`}>
-                        {lead.risk_level === 'high' ? 'alto' : 'médio'}
-                      </span>
-                    </div>
+                    <Row
+                      key={lead.id}
+                      lead={lead}
+                      sub={days !== null ? (days === 0 ? 'Contactado hoje' : `${days} dias sem contacto`) : 'Sem contacto'}
+                      chip={lead.risk_level === 'high' ? 'Risco alto' : 'Risco médio'}
+                      chipClass={lead.risk_level === 'high' ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'}
+                    />
                   );
                 })}
-              </div>
+              </ul>
             </div>
           )}
 
-          {/* Footer CTA */}
-          <button
-            onClick={onNavigateToRemarketing}
-            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all"
-          >
-            <Sparkles className="w-3 h-3" />
+          <AppButton variant="outline" className="w-full" onClick={onNavigateToRemarketing}>
             Ver análise completa
-            <ChevronRight className="w-3 h-3" />
-          </button>
+          </AppButton>
         </div>
       )}
-    </DashboardCard>
+    </section>
   );
 }

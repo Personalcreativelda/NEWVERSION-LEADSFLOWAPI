@@ -1837,13 +1837,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                       const credentials = typeof channel.credentials === 'string'
                         ? JSON.parse(channel.credentials)
                         : channel.credentials;
-                      const isCloud = channel.type === 'whatsapp_cloud';
-                      const instanceName = isCloud
-                        ? (credentials?.display_phone_number || credentials?.phone_number_id || 'Cloud')
-                        : (credentials?.instance_name || channel.name);
+                      // Nome do canal e o número; o nome da instância é um pormenor técnico
+                      const phone = credentials?.display_phone_number || credentials?.phone_number || '';
                       return (
                         <option key={channel.id} value={channel.id}>
-                          {isCloud ? '' : ''} {channel.name} ({instanceName})
+                          {phone ? `${channel.name} · ${phone}` : channel.name}
                         </option>
                       );
                     })}

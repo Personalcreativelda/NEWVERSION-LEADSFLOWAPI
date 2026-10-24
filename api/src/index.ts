@@ -205,7 +205,7 @@ app.get('/w', (_req, res) => {
       +'<p class="lfw-lf-sub">Preencha os dados para que possamos ajudá-lo melhor.</p>'
       +'<div><label>Nome *</label><input id="lfw-lf-name" type="text" placeholder="Seu nome completo" autocomplete="name"/></div>'
       +'<div><label>Email</label><input id="lfw-lf-email" type="email" placeholder="seu@email.com" autocomplete="email"/></div>'
-      +'<div><label>WhatsApp</label><input id="lfw-lf-phone" type="tel" placeholder="+55 11 9 0000-0000" autocomplete="tel"/></div>'
+      +'<div><label>WhatsApp</label><input id="lfw-lf-phone" type="tel" placeholder="+258 84 000 0000" autocomplete="tel"/></div>'
       +'<button id="lfw-lead-start">Iniciar conversa →</button>';
 
     // Powered by footer

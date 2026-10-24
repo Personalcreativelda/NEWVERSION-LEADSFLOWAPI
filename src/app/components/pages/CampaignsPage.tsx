@@ -28,6 +28,7 @@ import { usePlanLimits } from '../../hooks/usePlanLimits';
 import { SkeletonCampaignSection, UpdatingBadge } from '../ui/skeletons';
 import { NUMBER_OPTS, getLocale } from '../../utils/format';
 import { BrandIcon } from '../base/BrandIcon';
+import { saveFile } from '../../lib/saveFile';
 
 interface Lead {
   id: string;
@@ -926,12 +927,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
     const csvContent = csvData.map(row => row.join(',')).join('\n');
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `campanha_${campaign.id}_dados.csv`;
-    link.click();
-
-    toast.success('Dados exportados com sucesso!');
+    void saveFile(`campanha_${campaign.id}.csv`, blob, 'text/csv');
     setDropdownOpen(null);
   };
 

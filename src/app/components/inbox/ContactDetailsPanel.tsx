@@ -866,7 +866,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full h-10.5 rounded-lg text-sm font-medium transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:opacity-90"
+              className="w-full h-10 rounded-lg text-sm font-medium transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:opacity-90"
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

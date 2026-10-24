@@ -1,4 +1,5 @@
-import { MessageCircle, Mail, MessageSquare, ChevronRight } from 'lucide-react';
+import { Mail, MessageSquare, ChevronRight } from 'lucide-react';
+import { brandIcon } from '../base/BrandIcon';
 import { AppModal } from '../base/AppModal';
 
 interface ChannelSelectorModalProps {
@@ -11,7 +12,7 @@ const CHANNELS = [
   {
     id: 'whatsapp' as const,
     name: 'WhatsApp',
-    icon: MessageCircle,
+    icon: brandIcon('whatsapp'),
     description: 'Mensagens diretas e personalizadas',
     iconClass: 'bg-[#25D366]/12 text-[#1DA851] dark:text-[#25D366]',
     hoverClass: 'hover:border-[#25D366]/60',
@@ -28,7 +29,7 @@ const CHANNELS = [
     id: 'sms' as const,
     name: 'SMS',
     icon: MessageSquare,
-    description: 'Mensagens curtas via Twilio',
+    description: 'Mensagens de texto curtas',
     iconClass: 'bg-[#F22F46]/12 text-[#E11D48] dark:text-[#FB7185]',
     hoverClass: 'hover:border-[#F22F46]/60',
   },
@@ -65,7 +66,7 @@ export default function ChannelSelectorModal({ isOpen, onClose, onSelectChannel 
                 animate-in fade-in slide-in-from-bottom-2 fill-mode-both ${channel.hoverClass}`}
             >
               <span className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl ${channel.iconClass}`}>
-                <Icon className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={2.2} />
+                <Icon className="h-7 w-7" />
               </span>
               <span className="flex-1 min-w-0">
                 <span className="block text-[15px] font-semibold text-foreground">{channel.name}</span>

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Phone, User, Loader2, Search, UserCircle } from 'lucide-react';
 import { leadsApi } from '../../utils/api';
 import { OverlayModal } from '../base/OverlayModal';
+import { formatPhone } from '../dashboard/leadDisplay';
 
 interface NewConversationModalProps {
     isOpen: boolean;
@@ -95,7 +96,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
     });
 
     return (
-        <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-md">
+        <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-md flex flex-col overflow-hidden">
                 {/* Header */}
                 <div 
                     className="flex items-center justify-between px-6 py-4 border-b"
@@ -105,7 +106,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                         className="text-lg font-semibold"
                         style={{ color: 'hsl(var(--foreground))' }}
                     >
-                        Nova Conversa
+                        Nova conversa
                     </h2>
                     <button
                         onClick={onClose}
@@ -122,27 +123,27 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                         onClick={() => setMode('new')}
                         className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                             mode === 'new' 
-                                ? 'border-b-2 border-[#00C48C]' 
+                                ? 'border-b-2 border-primary' 
                                 : 'border-b-2 border-transparent'
                         }`}
                         style={{ 
-                            color: mode === 'new' ? '#00C48C' : 'hsl(var(--muted-foreground))',
+                            color: mode === 'new' ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
                         }}
                     >
-                        Novo Número
+                        Novo número
                     </button>
                     <button
                         onClick={() => setMode('existing')}
                         className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                             mode === 'existing' 
-                                ? 'border-b-2 border-[#00C48C]' 
+                                ? 'border-b-2 border-primary' 
                                 : 'border-b-2 border-transparent'
                         }`}
                         style={{ 
-                            color: mode === 'existing' ? '#00C48C' : 'hsl(var(--muted-foreground))',
+                            color: mode === 'existing' ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
                         }}
                     >
-                        Lead Existente
+                        Lead existente
                     </button>
                 </div>
 
@@ -155,7 +156,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                 className="block text-sm font-medium mb-2"
                                 style={{ color: 'hsl(var(--foreground))' }}
                             >
-                                Nome do Contacto *
+                                Nome *
                             </label>
                             <div className="relative">
                                 <User 
@@ -184,7 +185,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                 className="block text-sm font-medium mb-2"
                                 style={{ color: 'hsl(var(--foreground))' }}
                             >
-                                Número de Telefone *
+                                Telefone *
                             </label>
                             <div className="relative">
                                 <Phone 
@@ -195,7 +196,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                     type="tel"
                                     value={phone}
                                     onChange={(e) => handlePhoneChange(e.target.value)}
-                                    placeholder="5511987654321"
+                                    placeholder="258840000000"
                                     disabled={loading}
                                     className="w-full pl-10 pr-4 py-2.5 rounded-lg border outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
                                     style={{
@@ -206,7 +207,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                 />
                             </div>
                             <p className="mt-1.5 text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Digite com código do país (Ex: 5511987654321 para Brasil, 258846070380 para Moçambique)
+                                Com o código do país (ex.: 258)
                             </p>
                         </div>
 
@@ -223,7 +224,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                 type="button"
                                 onClick={onClose}
                                 disabled={loading}
-                                className="flex-1 px-4 h-10.5 rounded-lg border font-medium transition-colors hover:bg-muted/50"
+                                className="flex-1 px-4 h-10 rounded-lg border font-medium transition-colors hover:bg-muted/50"
                                 style={{
                                     borderColor: 'hsl(var(--border))',
                                     color: 'hsl(var(--foreground))'
@@ -234,7 +235,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                             <button
                                 type="submit"
                                 disabled={loading || !phone.trim() || !name.trim()}
-                                className="flex-1 px-4 h-10.5 rounded-lg bg-[#00C48C] text-white font-medium transition-all hover:bg-[#00B07D] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="flex-1 px-4 h-10 rounded-lg bg-primary text-primary-foreground font-medium transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {loading ? (
                                     <>
@@ -248,7 +249,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                         </div>
                     </form>
                 ) : (
-                    <div className="max-h-[500px] flex flex-col">
+                    <div className="flex min-h-0 flex-1 flex-col">
                         {/* Search */}
                         <div className="p-4 border-b" style={{ borderColor: 'hsl(var(--border))' }}>
                             <div className="relative">
@@ -260,7 +261,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Pesquisar por nome, telefone ou email..."
+                                    placeholder="Pesquisar leads"
                                     className="w-full pl-9 pr-4 py-2 rounded-lg border outline-none focus:ring-2 focus:ring-blue-500/30 text-sm"
                                     style={{
                                         backgroundColor: 'hsl(var(--background))',
@@ -275,7 +276,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                         <div className="flex-1 overflow-y-auto">
                             {loadingLeads ? (
                                 <div className="flex items-center justify-center py-12">
-                                    <Loader2 className="w-6 h-6 animate-spin text-[#00C48C]" />
+                                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                                 </div>
                             ) : filteredLeads.length === 0 ? (
                                 <div className="text-center py-12">
@@ -289,7 +290,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                     <button
                                         key={lead.id}
                                         onClick={() => handleSelectLead(lead)}
-                                        className="w-full p-4 flex items-center gap-3 hover:bg-muted/50/50 transition-colors border-b"
+                                        className="w-full min-w-0 px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors border-b"
                                         style={{ borderColor: 'hsl(var(--border))' }}
                                     >
                                         {(lead.avatarUrl || lead.avatar_url) ? (
@@ -306,10 +307,10 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                             />
                                         ) : null}
                                         <div
-                                            className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 items-center justify-center flex-shrink-0"
+                                            className="w-10 h-10 rounded-full bg-muted items-center justify-center flex-shrink-0"
                                             style={{ display: (lead.avatarUrl || lead.avatar_url) ? 'none' : 'flex' }}
                                         >
-                                            <span className="text-white font-semibold text-sm">
+                                            <span className="text-foreground font-semibold text-sm">
                                                 {(lead.name || lead.nome || '?').charAt(0).toUpperCase()}
                                             </span>
                                         </div>
@@ -318,7 +319,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                                                 {lead.name || lead.nome || 'Sem nome'}
                                             </p>
                                             <p className="text-xs truncate" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                                {lead.phone || lead.telefone || lead.email || 'Sem contacto'}
+                                                {formatPhone(lead.phone || lead.telefone) || lead.email || 'Sem contacto'}
                                             </p>
                                         </div>
                                     </button>

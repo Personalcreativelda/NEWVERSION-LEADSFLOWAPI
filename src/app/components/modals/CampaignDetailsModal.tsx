@@ -4,6 +4,7 @@ import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
 import { StatusBadge, type StatusTone } from '../base/StatusBadge';
 import { NUMBER_OPTS, getLocale } from '../../utils/format';
+import { saveFile } from '../../lib/saveFile';
 
 interface Campaign {
   id: string;
@@ -268,10 +269,7 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
 
     const csvContent = csvData.map(row => row.join(',')).join('\n');
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `campanha_${campaign.id}_dados.csv`;
-    link.click();
+    void saveFile(`campanha_${campaign.id}.csv`, blob, 'text/csv');
   };
 
   const failures = campaign.metadata?.failures || [];
