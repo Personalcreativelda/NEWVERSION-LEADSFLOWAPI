@@ -11,6 +11,7 @@ import { channelsApi } from '../../services/api/inbox';
 import type { Channel } from '../../types/inbox';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
+import { ChoiceList, CheckList } from '../base/ChoiceList';
 
 interface Lead {
   id: string;
@@ -31,12 +32,12 @@ interface CampaignSMSModalProps {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  novo: 'Novo',
-  contatado: 'Contatado',
-  qualificado: 'Qualificado',
-  negociacao: 'Negociação',
-  ganho: 'Ganho',
-  perdido: 'Perdido',
+  novo: 'Novos',
+  contatado: 'Contactados',
+  qualificado: 'Qualificados',
+  negociacao: 'Em negociação',
+  ganho: 'Convertidos',
+  perdido: 'Perdidos',
 };
 
 export default function CampaignSMSModal({
@@ -222,41 +223,20 @@ export default function CampaignSMSModal({
       onOpenChange={(open) => !open && onClose()}
       size="lg"
       className="campaign-modal p-0 gap-0 max-h-[90vh] flex flex-col"
-      title={
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#F22F46' }}>
-            <Smartphone className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <span>{editingCampaign ? 'Editar Campanha SMS' : 'Nova Campanha SMS'}</span>
-          </div>
-        </div>
-      }
+      title={editingCampaign ? 'Editar campanha de SMS' : 'Nova campanha de SMS'}
       footer={
-        <div className="flex items-center justify-between w-full">
-          <button
-            onClick={onClose}
-            disabled={isSending}
-            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
+        <>
+          <AppButton type="button" variant="outline" onClick={onClose} disabled={isSending}>
             Cancelar
-          </button>
+          </AppButton>
           <AppButton
             onClick={handleSend}
             disabled={isSending || twilioChannels.length === 0 || !message.trim() || recipientCount === 0}
             loading={isSending}
-            className="text-white font-medium px-6"
-            style={{ backgroundColor: '#F22F46' }}
           >
-            {isSending ? (
-              'A enviar...'
-            ) : scheduleMode === 'now' ? (
-              <><Send />Disparar SMS</>
-            ) : (
-              <><Clock />Agendar</>
-            )}
+            {isSending ? 'A enviar…' : scheduleMode === 'now' ? 'Enviar' : 'Agendar'}
           </AppButton>
-        </div>
+        </>
       }
     >
         <div className="px-6 pb-2 space-y-6">
@@ -265,29 +245,25 @@ export default function CampaignSMSModal({
             <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
               <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Nenhum canal Twilio SMS configurado</p>
-                <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                  Para enviar SMS em massa, configure um canal Twilio SMS em{' '}
-                  <strong>Definições → Canais → Twilio SMS</strong>.
-                </p>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Ainda não tem um canal de SMS</p>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">Ligue um em Definições → Canais ligados.</p>
               </div>
             </div>
           )}
 
           {/* Campaign Name */}
           <div>
-            <Label className="text-sm font-medium text-foreground mb-2 block">Nome da campanha *</Label>
+            <Label className="text-sm font-semibold text-foreground mb-2 block">Nome da campanha</Label>
             <Input
               value={campaignName}
               onChange={e => setCampaignName(e.target.value)}
-              placeholder="Ex: Promoção Setembro — SMS"
-              className="bg-background"
+              placeholder="Ex.: Promoção de setembro"
             />
           </div>
 
           {/* Twilio Channel Selector */}
           <div>
-            <Label className="text-sm font-medium text-foreground mb-2 block">Canal Twilio *</Label>
+            <Label className="text-sm font-semibold text-foreground mb-2 block">Enviar de</Label>
             {loadingChannels ? (
               <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -299,24 +275,20 @@ export default function CampaignSMSModal({
               <select
                 value={selectedChannelId}
                 onChange={e => setSelectedChannelId(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#10B981]"
+                className="w-full px-3 text-sm text-foreground"
               >
-                {twilioChannels.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
+                {twilioChannels.map(c => {
+                  const phone = (c.credentials as any)?.phoneNumber;
+                  return <option key={c.id} value={c.id}>{phone ? `${c.name} · ${phone}` : c.name}</option>;
+                })}
               </select>
-            )}
-            {selectedChannel && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Número de origem: {(selectedChannel.credentials as any)?.phoneNumber || '—'}
-              </p>
             )}
           </div>
 
           {/* Message */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <Label className="text-sm font-medium text-foreground">Mensagem *</Label>
+              <Label className="text-sm font-semibold text-foreground">Mensagem</Label>
               <div className="flex gap-1">
                 {['{{nome}}', '{{empresa}}', '{{telefone}}'].map(v => (
                   <button
@@ -332,138 +304,73 @@ export default function CampaignSMSModal({
             <Textarea
               value={message}
               onChange={e => setMessage(e.target.value)}
-              placeholder="Olá {{nome}}, temos uma oferta especial para você!"
-              className="min-h-[120px] bg-background resize-none"
+              placeholder="Olá {{nome}}, temos uma oferta especial!"
+              className="min-h-[120px] resize-none"
               maxLength={1600}
             />
-            <div className="flex justify-between mt-1">
-              <p className="text-xs text-muted-foreground">
-                Personalize com {'{{nome}}'}, {'{{empresa}}'}, {'{{telefone}}'}
-              </p>
+            <div className="flex justify-end mt-1">
               <p className="text-xs text-muted-foreground">{message.length}/1600</p>
             </div>
           </div>
 
           {/* Recipients */}
           <div>
-            <Label className="text-sm font-medium text-foreground mb-3 block">Destinatários</Label>
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {(['all', 'segments', 'custom'] as const).map(mode => (
-                <button
-                  key={mode}
-                  onClick={() => setRecipientMode(mode)}
-                  className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
-                    recipientMode === mode
-                      ? 'border-[#F22F46] bg-red-50 dark:bg-red-900/20 text-[#F22F46]'
-                      : 'border-border bg-card text-muted-foreground hover:border-[#F22F46]/50'
-                  }`}
-                >
-                  {mode === 'all' && 'Todos os leads'}
-                  {mode === 'segments' && 'Segmentos'}
-                  {mode === 'custom' && 'Personalizado'}
-                </button>
-              ))}
-            </div>
-
-            {recipientMode === 'segments' && (
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(STATUS_LABELS).map(([status, label]) => (
-                  <button
-                    key={status}
-                    onClick={() => toggleStatus(status)}
-                    className={`flex items-center justify-between p-2.5 rounded-lg border text-sm transition-all ${
-                      selectedStatuses.includes(status)
-                        ? 'border-[#F22F46] bg-red-50 dark:bg-red-900/20 text-[#F22F46]'
-                        : 'border-border bg-card text-muted-foreground hover:border-[#F22F46]/50'
-                    }`}
-                  >
-                    <span>{label}</span>
-                    <span className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                      {statusCounts[status] || 0}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {recipientMode === 'custom' && (
-              <Textarea
-                value={customPhones}
-                onChange={e => setCustomPhones(e.target.value)}
-                placeholder="+5511999887766, +5521987654321"
-                className="min-h-[80px] bg-background text-sm"
-              />
-            )}
-
-            <div className="mt-3 flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-              <Users className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-foreground font-medium">
-                {recipientCount} destinatário{recipientCount !== 1 ? 's' : ''} com telefone
-              </span>
-            </div>
+            <Label className="text-sm font-semibold text-foreground mb-3 block">Destinatários</Label>
+            <ChoiceList
+              value={recipientMode}
+              onChange={setRecipientMode}
+              options={[
+                { value: 'all', label: 'Todos os leads com telefone' },
+                {
+                  value: 'segments',
+                  label: 'Por etapa do funil',
+                  children: (
+                    <CheckList
+                      items={Object.entries(STATUS_LABELS).map(([status, label]) => ({ value: status, label, meta: statusCounts[status] || 0 }))}
+                      selected={selectedStatuses}
+                      onToggle={toggleStatus}
+                    />
+                  ),
+                },
+                {
+                  value: 'custom',
+                  label: 'Lista de números',
+                  children: (
+                    <Textarea
+                      value={customPhones}
+                      onChange={e => setCustomPhones(e.target.value)}
+                      placeholder="+258 84 321 0987, +258 84 765 4321"
+                      className="min-h-[80px] resize-none"
+                    />
+                  ),
+                },
+              ]}
+            />
+            <p className="mt-3 text-sm text-muted-foreground">{recipientCount} destinatários</p>
           </div>
 
           {/* Schedule */}
           <div>
-            <Label className="text-sm font-medium text-foreground mb-3 block">Envio</Label>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              {(['now', 'scheduled'] as const).map(mode => (
-                <button
-                  key={mode}
-                  onClick={() => setScheduleMode(mode)}
-                  className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
-                    scheduleMode === mode
-                      ? 'border-[#F22F46] bg-red-50 dark:bg-red-900/20 text-[#F22F46]'
-                      : 'border-border bg-card text-muted-foreground hover:border-[#F22F46]/50'
-                  }`}
-                >
-                  {mode === 'now' ? (
-                    <span className="flex items-center justify-center gap-2"><Send className="w-4 h-4" />Enviar agora</span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2"><Clock className="w-4 h-4" />Agendar</span>
-                  )}
-                </button>
-              ))}
-            </div>
-            {scheduleMode === 'scheduled' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">Data</Label>
-                  <Input
-                    type="date"
-                    value={scheduleDate}
-                    onChange={e => setScheduleDate(e.target.value)}
-                    className="bg-background"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">Hora</Label>
-                  <Input
-                    type="time"
-                    value={scheduleTime}
-                    onChange={e => setScheduleTime(e.target.value)}
-                    className="bg-background"
-                  />
-                </div>
-              </div>
-            )}
+            <Label className="text-sm font-semibold text-foreground mb-3 block">Envio</Label>
+            <ChoiceList
+              value={scheduleMode}
+              onChange={setScheduleMode}
+              options={[
+                { value: 'now', label: 'Enviar agora' },
+                {
+                  value: 'scheduled',
+                  label: 'Agendar',
+                  children: (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} />
+                      <Input type="time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)} />
+                    </div>
+                  ),
+                },
+              ]}
+            />
           </div>
 
-          {/* Summary */}
-          <div className="p-4 bg-muted/30 rounded-xl border border-border text-sm space-y-1.5">
-            <p className="font-medium text-foreground">Resumo</p>
-            <p className="text-muted-foreground">
-              Canal: <span className="text-foreground">{selectedChannel?.name || '—'}</span>
-            </p>
-            <p className="text-muted-foreground">
-              Destinatários: <span className="text-foreground">{recipientCount}</span>
-            </p>
-            <p className="text-muted-foreground">
-              Envio: <span className="text-foreground">
-                {scheduleMode === 'now' ? 'Imediato' : scheduleDate && scheduleTime ? `${scheduleDate} às ${scheduleTime}` : 'Agendado (definir data)'}
-              </span>
-            </p>
-          </div>
         </div>
     </AppModal>
   );

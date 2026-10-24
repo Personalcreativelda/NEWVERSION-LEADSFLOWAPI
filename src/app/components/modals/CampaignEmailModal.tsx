@@ -13,6 +13,12 @@ import { EMAIL_TEMPLATES } from '../../utils/emailTemplates';
 import { Layout } from 'lucide-react';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
+import { ChoiceList, CheckList } from '../base/ChoiceList';
+
+const STAGE_LABELS: Record<string, string> = {
+  novo: 'Novos', contatado: 'Contactados', qualificado: 'Qualificados',
+  negociacao: 'Em negociação', ganho: 'Convertidos', convertido: 'Convertidos', perdido: 'Perdidos',
+};
 
 interface Lead {
   id: string;
@@ -589,60 +595,19 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
       onOpenChange={(open) => !open && onClose()}
       size="lg"
       className="p-0 gap-0 max-h-[90vh] flex flex-col"
-      title={
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-            <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          </div>
-          <span>{editingCampaign ? 'Editar Campanha de Email' : 'Nova Campanha de Email'}</span>
-        </div>
-      }
+      title={editingCampaign ? 'Editar campanha de email' : 'Nova campanha de email'}
       footer={
-        <div className="flex items-center justify-between gap-3 w-full">
-          <AppButton
-            type="button"
-            variant="outline"
-            onClick={handleSaveDraft}
-          >
-            <Save />
-            Guardar Rascunho
+        <>
+          <AppButton type="button" variant="outline" onClick={onClose} disabled={isSending}>
+            Cancelar
           </AppButton>
-
-          <div className="flex gap-3">
-            <AppButton
-              type="button"
-              variant="outline"
-              onClick={handleTestEmail}
-              disabled={isSending || !subject.trim() || (!message.trim() && !htmlContent.trim())}
-            >
-              <Eye />
-              Enviar Teste
-            </AppButton>
-            <AppButton
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSending}
-            >
-              Cancelar
-            </AppButton>
-            <AppButton
-              onClick={handleSend}
-              disabled={isSending || recipientCount === 0}
-              loading={isSending}
-              className="bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white font-semibold px-6 min-w-[140px]"
-            >
-              {isSending ? (
-                'A processar...'
-              ) : (
-                <>
-                  <Send />
-                  {scheduleMode === 'scheduled' ? 'Agendar' : 'Enviar Agora'}
-                </>
-              )}
-            </AppButton>
-          </div>
-        </div>
+          <AppButton type="button" variant="outline" onClick={handleSaveDraft}>
+            Guardar
+          </AppButton>
+          <AppButton onClick={handleSend} disabled={isSending || recipientCount === 0} loading={isSending}>
+            {isSending ? 'A enviar…' : scheduleMode === 'scheduled' ? 'Agendar' : 'Enviar'}
+          </AppButton>
+        </>
       }
     >
         {/* Content */}
@@ -650,8 +615,8 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
 
           {/* Nome da Campanha */}
           <div>
-            <Label className="text-sm font-medium text-foreground mb-2">
-              Nome da Campanha
+            <Label className="text-sm font-semibold text-foreground mb-2 block">
+              Nome da campanha
             </Label>
             <Input
               value={campaignName}
@@ -669,96 +634,37 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               Destinatários
             </Label>
 
-            <div className="space-y-3">
-              {/* Todos */}
-              <label className="flex items-center gap-3 p-3 rounded-lg border-2 border-border hover:border-[#3B82F6] cursor-pointer transition-colors">
-                <input
-                  type="radio"
-                  name="recipient"
-                  checked={recipientMode === 'all'}
-                  onChange={() => setRecipientMode('all')}
-                  className="w-4 h-4 text-[#3B82F6] focus:ring-[#3B82F6]"
-                />
-                <span className="flex-1 text-sm font-medium text-foreground">
-                  Todos os leads com email ({leads.filter(l => l.email).length})
-                </span>
-              </label>
-
-              {/* Segmentos */}
-              <div className="border-2 border-border rounded-lg overflow-hidden">
-                <label className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer transition-colors">
-                  <input
-                    type="radio"
-                    name="recipient"
-                    checked={recipientMode === 'segments'}
-                    onChange={() => setRecipientMode('segments')}
-                    className="w-4 h-4 text-[#3B82F6] focus:ring-[#3B82F6]"
-                  />
-                  <span className="flex-1 text-sm font-medium text-foreground">
-                    Filtrar por segmentos
-                  </span>
-                </label>
-
-                {recipientMode === 'segments' && (
-                  <div className="px-3 pb-3 space-y-2 bg-muted/50">
-                    {Object.entries(statusCounts).map(([status, count]) => (
-                      <label key={status} className="flex items-center gap-2 pl-7">
-                        <input
-                          type="checkbox"
-                          checked={selectedStatuses.includes(status)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedStatuses([...selectedStatuses, status]);
-                            } else {
-                              setSelectedStatuses(selectedStatuses.filter(s => s !== status));
-                            }
-                          }}
-                          className="w-4 h-4 text-[#3B82F6] focus:ring-[#3B82F6] rounded"
-                        />
-                        <span className="text-sm text-foreground capitalize">
-                          {status} ({count})
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Lista personalizada */}
-              <div className="border-2 border-border rounded-lg overflow-hidden">
-                <label className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer transition-colors">
-                  <input
-                    type="radio"
-                    name="recipient"
-                    checked={recipientMode === 'custom'}
-                    onChange={() => setRecipientMode('custom')}
-                    className="w-4 h-4 text-[#3B82F6] focus:ring-[#3B82F6]"
-                  />
-                  <span className="flex-1 text-sm font-medium text-foreground">
-                    Lista personalizada
-                  </span>
-                </label>
-
-                {recipientMode === 'custom' && (
-                  <div className="px-3 pb-3 bg-muted/50">
+            <ChoiceList
+              value={recipientMode}
+              onChange={setRecipientMode}
+              options={[
+                { value: 'all', label: 'Todos os leads com email', meta: leads.filter(l => l.email).length },
+                {
+                  value: 'segments',
+                  label: 'Por etapa do funil',
+                  children: (
+                    <CheckList
+                      items={Object.entries(statusCounts).map(([status, count]) => ({ value: status, label: STAGE_LABELS[status] || status, meta: count }))}
+                      selected={selectedStatuses}
+                      onToggle={(status) => setSelectedStatuses(selectedStatuses.includes(status) ? selectedStatuses.filter(s => s !== status) : [...selectedStatuses, status])}
+                    />
+                  ),
+                },
+                {
+                  value: 'custom',
+                  label: 'Lista de emails',
+                  children: (
                     <Textarea
                       value={customEmails}
                       onChange={(e) => setCustomEmails(e.target.value)}
-                      placeholder="Digite os emails separados por vírgula&#10;Ex: email1@example.com, email2@example.com, email3@example.com"
-                      className="min-h-[100px] text-sm"
+                      placeholder="email1@exemplo.com, email2@exemplo.com"
+                      className="min-h-[80px] resize-none"
                     />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Total Recipients */}
-            <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center gap-2">
-              <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                {recipientCount} destinatário(s) selecionado(s)
-              </span>
-            </div>
+                  ),
+                },
+              ]}
+            />
+            <p className="mt-3 text-sm text-muted-foreground">{recipientCount} destinatários</p>
           </div>
 
           <div className="border-t border-border"></div>
@@ -766,17 +672,14 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
           {/* Assunto */}
           <div>
             <Label className="text-sm font-semibold text-foreground mb-2 block">
-              ASSUNTO DO EMAIL
+              Assunto
             </Label>
             <Input
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Ex: Novidades desta semana - Promoções imperdíveis!"
+              placeholder="Ex.: Novidades desta semana"
               className="h-11"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Assuntos curtos e atrativos têm maior taxa de abertura
- </p>
           </div>
 
           <div className="border-t border-border"></div>
@@ -785,35 +688,34 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
           <div>
             <div className="flex items-center justify-between mb-3">
               <Label className="text-sm font-semibold text-foreground">
-                CONTEÚDO DO EMAIL
+                Conteúdo
               </Label>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setUseHtml(false)}
-                  className={`px-3 py-1 text-xs rounded-md transition-colors ${!useHtml
-                    ? 'bg-[#3B82F6] text-white'
-                    : 'bg-muted text-foreground hover:bg-muted/50'
+                  className={`px-3 h-8 text-sm rounded-md transition-colors ${!useHtml
+                    ? 'bg-foreground text-background'
+                    : 'text-muted-foreground hover:bg-muted'
                     }`}
                 >
-                  <Type className="w-3 h-3 inline mr-1" />
                   Texto
                 </button>
                 <button
                   type="button"
                   onClick={() => setUseHtml(true)}
-                  className={`px-3 py-1 text-xs rounded-md transition-colors ${useHtml
-                    ? 'bg-[#3B82F6] text-white'
-                    : 'bg-muted text-foreground hover:bg-muted/50'
+                  className={`px-3 h-8 text-sm rounded-md transition-colors ${useHtml
+                    ? 'bg-foreground text-background'
+                    : 'text-muted-foreground hover:bg-muted'
                     }`}
                 >
-                  {'</>'} HTML
+                  HTML
                 </button>
               </div>
             </div>
 
             {/* Toolbar */}
-            <div className="flex items-center gap-1 p-2 bg-muted border border-border rounded-t-lg">
+            <div className="flex flex-wrap items-center gap-1 p-1.5 bg-muted border border-border border-b-0 rounded-t-lg">
               <button
                 type="button"
                 onClick={() => insertVariable('{name}')}
@@ -843,7 +745,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               <button
                 type="button"
                 onClick={() => setShowTemplates(!showTemplates)}
-                className={`flex items-center gap-1.5 px-2 py-1 ml-2 rounded-md transition-colors ${showTemplates
+                className={`flex items-center gap-1.5 px-2 h-9 rounded-md transition-colors ${showTemplates
                   ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
                   : 'hover:bg-muted/50 text-muted-foreground'
                   }`}
@@ -855,7 +757,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               <button
                 type="button"
                 onClick={() => htmlInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-2 py-1 ml-1 hover:bg-muted/50 text-muted-foreground rounded-md transition-colors"
+                className="flex items-center gap-1.5 px-2 h-9 hover:bg-muted/50 text-muted-foreground rounded-md transition-colors"
                 title="Importar ficheiro HTML"
               >
                 <div className="w-4 h-4 rounded border border-border flex items-center justify-center text-[10px] font-bold">
@@ -909,9 +811,9 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                 value={useHtml ? htmlContent : message}
                 onChange={(e) => useHtml ? setHtmlContent(e.target.value) : setMessage(e.target.value)}
                 placeholder={useHtml
-                  ? "Digite o código HTML do email...&#10;&#10;<h1>Olá {name}!</h1>&#10;<p>Confira nossas novidades...</p>"
-                  : "Digite o conteúdo do email aqui...&#10;&#10;Use {name} para inserir o nome do destinatário"}
-                className="min-h-[200px] rounded-t-none focus:ring-[#3B82F6] focus:border-[#3B82F6] font-mono text-sm"
+                  ? '<h1>Olá {name}!</h1>\n<p>As nossas novidades…</p>'
+                  : 'Olá {name},\n\nEscreva aqui a mensagem.'}
+                className={`min-h-[200px] !rounded-t-none text-sm ${useHtml ? 'font-mono' : ''}`}
               />
 
               {/* Variáveis */}
@@ -922,7 +824,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                     key={v}
                     type="button"
                     onClick={() => insertVariable(v)}
-                    className="px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded text-xs hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                    className="px-2 h-7 bg-muted text-foreground rounded-md text-xs font-mono hover:bg-muted/70 transition-colors"
                   >
                     {v}
                   </button>
@@ -932,11 +834,6 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               {/* Contador */}
               <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                 <span> {(useHtml ? htmlContent : message).length} caracteres</span>
-                {!useHtml && message.length > 1000 && (
-                  <span className="text-amber-600 dark:text-amber-400">
-                    Considere usar HTML para emails mais elaborados
- </span>
-                )}
               </div>
             </div>
           </div>
@@ -946,7 +843,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
           {/* Anexos */}
           <div>
             <Label className="text-sm font-semibold text-foreground mb-3 block">
-              ANEXOS (Opcional)
+              Anexos (opcional)
             </Label>
 
             <div className="flex gap-2">
@@ -1014,8 +911,8 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
               </div>
             )}
 
-            <p className="text-xs text-foreground mt-2">
-              Limite: 25 MB por ficheiro • ✓ Formatos: PDF, DOC, XLS, JPG, PNG
+            <p className="text-xs text-muted-foreground mt-2">
+              Até 25 MB por ficheiro
  </p>
           </div>
 
@@ -1024,90 +921,60 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
           {/* Agendamento */}
           <div>
             <Label className="text-sm font-semibold text-foreground mb-3 block">
-              Agendamento
+              Envio
             </Label>
-
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 p-3 rounded-lg border-2 border-border hover:border-[#3B82F6] cursor-pointer transition-colors">
-                <input
-                  type="radio"
-                  name="schedule"
-                  checked={scheduleMode === 'now'}
-                  onChange={() => setScheduleMode('now')}
-                  className="w-4 h-4 text-[#3B82F6] focus:ring-[#3B82F6]"
-                />
-                <span className="text-sm font-medium text-foreground">
-                  Enviar agora
-                </span>
-              </label>
-
-              <div className="border-2 border-border rounded-lg overflow-hidden">
-                <label className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer transition-colors">
-                  <input
-                    type="radio"
-                    name="schedule"
-                    checked={scheduleMode === 'scheduled'}
-                    onChange={() => setScheduleMode('scheduled')}
-                    className="w-4 h-4 text-[#3B82F6] focus:ring-[#3B82F6]"
-                  />
-                  <span className="flex-1 text-sm font-medium text-foreground">
-                    Agendar:
-                  </span>
-                </label>
-
-                {scheduleMode === 'scheduled' && (
-                  <div className="px-3 pb-3 bg-muted/50 flex gap-2">
-                    <Input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="h-9 flex-1" />
-                    <Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} className="h-9 flex-1" />
-                  </div>
-                )}
-              </div>
-            </div>
+            <ChoiceList
+              value={scheduleMode}
+              onChange={setScheduleMode}
+              options={[
+                { value: 'now', label: 'Enviar agora' },
+                {
+                  value: 'scheduled',
+                  label: 'Agendar',
+                  children: (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} />
+                      <Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} />
+                    </div>
+                  ),
+                },
+              ]}
+            />
           </div>
 
 
 
-          {/* Summary */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Send className="w-5 h-5 text-white" />
+          {/* Resumo */}
+          <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-muted-foreground">Destinatários</p>
+                <p className="font-medium text-foreground">{recipientCount}</p>
               </div>
-              <div className="flex-1">
-                <h4 className="font-semibold text-foreground mb-2">Resumo da Campanha</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Destinatários:</span>
-                    <p className="font-semibold text-foreground">{recipientCount} emails</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Tempo estimado:</span>
-                    <p className="font-semibold text-foreground">{getEstimatedTime()}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Anexos:</span>
-                    <p className="font-semibold text-foreground">{attachments.length} ficheiro(s)</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Formato:</span>
-                    <p className="font-semibold text-foreground">{useHtml ? 'HTML' : 'Texto'}</p>
-                  </div>
-                  <div className="col-span-2 mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
-                    <span className="text-muted-foreground">A enviar de:</span>
-                    {resolvedSender ? (
-                      <p className="font-semibold text-foreground text-xs truncate">
-                        {resolvedSender.name ? `${resolvedSender.name} <${resolvedSender.email}>` : resolvedSender.email}
-                        <span className="text-muted-foreground font-normal ml-1">({resolvedSender.source})</span>
-                      </p>
-                    ) : (
-                      <p className="font-semibold text-amber-600 dark:text-amber-400 text-xs">
-                        Nenhum canal de email ou SMTP configurado
- </p>
-                    )}
-                  </div>
-                </div>
+              <div>
+                <p className="text-muted-foreground">Tempo estimado</p>
+                <p className="font-medium text-foreground">{getEstimatedTime()}</p>
+              </div>
+              <div className="col-span-2 min-w-0">
+                <p className="text-muted-foreground">Remetente</p>
+                {resolvedSender ? (
+                  <p className="font-medium text-foreground truncate">
+                    {resolvedSender.name ? `${resolvedSender.name} <${resolvedSender.email}>` : resolvedSender.email}
+                  </p>
+                ) : (
+                  <p className="font-medium text-amber-600 dark:text-amber-400">Ligue um email em Canais ou em Integrações</p>
+                )}
               </div>
             </div>
+            <AppButton
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleTestEmail}
+              disabled={isSending || !subject.trim() || (!message.trim() && !htmlContent.trim())}
+            >
+              Enviar email de teste
+            </AppButton>
           </div>
         </div>
     </AppModal>

@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getLocale } from '../../utils/format';
 import { saveFile } from '../../lib/saveFile';
+import { htmlToPdf } from '../../lib/htmlToPdf';
 
 interface ReportExporterProps {
  isOpen: boolean;
@@ -388,18 +389,10 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
  // Download HTML
  await saveFile(`relatorio-leadsflow-${format(new Date(), 'yyyy-MM-dd')}.html`, html, 'text/html');
  } else {
- // Para PDF, abrir em nova janela para imprimir
- const printWindow = window.open('', '_blank');
- if (printWindow) {
- printWindow.document.write(html);
- printWindow.document.close();
- setTimeout(() => {
- printWindow.print();
- }, 500);
- }
+ // PDF gerado aqui e descarregado (no app vai para Transferências)
+ await saveFile(`relatorio-leadsflow-${format(new Date(), 'yyyy-MM-dd')}.pdf`, await htmlToPdf(html), 'application/pdf');
  }
 
- toast.success('Relatório gerado com sucesso!');
  onClose();
  } catch (error) {
  console.error('Error generating report:', error);
@@ -465,7 +458,7 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
  <SelectValue />
  </SelectTrigger>
  <SelectContent>
- <SelectItem value="pdf">PDF (imprimir)</SelectItem>
+ <SelectItem value="pdf">PDF</SelectItem>
  <SelectItem value="html">HTML</SelectItem>
  </SelectContent>
  </Select>

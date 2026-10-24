@@ -90,6 +90,10 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
   ignora `<a download>`; no app vai pelo plugin nativo `FileSaver` (FileSaverPlugin.java, desde o
   versionCode 3) para Transferências. Publicar com `--min-native 2` enquanto houver APKs 1.1.
 - Modais em ecrã tátil não fazem foco automático (abria o teclado sozinho) — `ui/dialog.tsx`.
+- Nunca `window.open('')` + `print()`: no app o WebView fica preso nessa página. PDFs com
+  `htmlToPdf()` (`lib/htmlToPdf.ts`, iframe escondido + jsPDF) e depois `saveFile()`.
+- Escolhas em formulários (destinatários, envio): `ChoiceList`/`CheckList` (`base/ChoiceList.tsx`),
+  iguais nos modais de campanha; nada de grelhas de botões coloridos nem listas com scroll próprio.
 - Offline: os GET da API ficam guardados no aparelho (`lib/offlineCache.ts`, IndexedDB, por
   utilizador, apagados no logout). Sem rede ou com 502/503/504/timeout, os três clientes
   (`utils/api.ts`, `lib/api.ts`, axios com `withOfflineCache`) devolvem a última cópia e

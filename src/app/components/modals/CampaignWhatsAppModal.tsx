@@ -10,6 +10,8 @@ import { AppButton } from '../base/AppButton';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
+import { Button } from '../ui/button';
+import { ChoiceList, CheckList } from '../base/ChoiceList';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { toast } from "sonner";
 import EmojiPicker from 'emoji-picker-react';
@@ -64,7 +66,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [isSyncingGroups, setIsSyncingGroups] = useState(false);
 
-  const syncGroupsFromEvolution = async () => {
+  const autoSyncedGroups = useRef(false);
+  const syncGroupsFromEvolution = async (silent = false) => {
     if (isSyncingGroups) return;
     setIsSyncingGroups(true);
     try {
@@ -78,10 +81,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         return true;
       });
       setAvailableGroups(deduped);
-      toast.success(`${groups.length} grupo(s) sincronizado(s)`);
+      if (!silent) toast.success(`${deduped.length} grupos sincronizados`);
     } catch (error) {
       console.error('Erro ao sincronizar grupos:', error);
-      toast.error('Erro ao sincronizar grupos');
+      if (!silent) toast.error('Erro ao sincronizar grupos');
     } finally {
       setIsSyncingGroups(false);
     }
@@ -432,6 +435,12 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           return true;
         });
         setAvailableGroups(deduped);
+        // Grupos vindos de mensagens antes de sincronizar não têm nome: sincroniza uma vez
+        // sozinho para os nomes aparecerem (o identificador …@g.us nunca é mostrado)
+        if (!autoSyncedGroups.current && deduped.some((g: any) => !(g.metadata?.group_name || g.display_name))) {
+          autoSyncedGroups.current = true;
+          void syncGroupsFromEvolution(true);
+        }
       } catch (error) {
         console.error('❌ Erro ao buscar grupos:', error);
         toast.error('Erro ao carregar grupos WhatsApp');
@@ -454,8 +463,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   };
 
   const statusLabels: Record<string, string> = {
-    novo: 'Novos', contatado: 'Contatados', qualificado: 'Qualificados',
-    negociacao: 'Negociação', convertido: 'Convertidos', perdido: 'Perdidos',
+    novo: 'Novos', contatado: 'Contactados', qualificado: 'Qualificados',
+    negociacao: 'Em negociação', convertido: 'Convertidos', perdido: 'Perdidos',
   };
 
   const statusCounts = useMemo(() => {
@@ -1752,14 +1761,9 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       size="2xl"
       className="campaign-modal p-0 gap-0 max-h-[90vh] flex flex-col"
       title={
-        <div className="flex items-center gap-3">
-          <MessageCircle className="w-6 h-6 text-[#25D366]" />
-          <div>
-            <span>Nova Campanha WhatsApp</span>
-            {autoSaveIndicator && (
-              <p className="text-xs text-muted-foreground font-normal">A guardar…</p>
-            )}
-          </div>
+        <div className="min-w-0">
+          <span>{editingCampaign ? 'Editar campanha de WhatsApp' : 'Nova campanha de WhatsApp'}</span>
+          {autoSaveIndicator && <p className="text-xs text-muted-foreground font-normal">A guardar…</p>}
         </div>
       }
       footer={
@@ -1783,10 +1787,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
               (!message.trim() && attachments.length === 0)
             }
             loading={isSending}
-            className="bg-[#10B981] hover:bg-[#059669] text-white"
           >
-            <Send className="w-4 h-4" />
-            {scheduleMode === 'now' ? 'Enviar Campanha' : 'Agendar Campanha'}
+            {scheduleMode === 'now' ? 'Enviar' : 'Agendar'}
           </AppButton>
         </>
       }
@@ -2357,286 +2359,113 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
               <div className="border-t border-border"></div>
 
               {/* Destinatários */}
-              <div>
-                <Label className="text-sm font-semibold text-foreground mb-3 block">
-                  Destinatários *
-                </Label>
-
-                <div className="space-y-2">
-                  {/* Todos */}
-                  <label className="flex items-center gap-3 p-2 rounded-lg border border-border hover:border-[#25D366] cursor-pointer transition-colors">
-                    <input
-                      type="radio"
-                      name="recipient"
-                      checked={recipientMode === 'all'}
-                      onChange={() => setRecipientMode('all')}
-                      className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
-                    />
-                    <span className="flex-1 text-sm text-foreground/80">
-                      Todos ({leads.length})
-                    </span>
-                  </label>
-
-                  {/* Segmentos */}
-                  <div className="border border-border rounded-lg overflow-hidden">
-                    <label className="flex items-center gap-3 p-2 hover:bg-muted/50 cursor-pointer transition-colors">
-                      <input
-                        type="radio"
-                        name="recipient"
-                        checked={recipientMode === 'segments'}
-                        onChange={() => setRecipientMode('segments')}
-                        className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
-                      />
-                      <span className="flex-1 text-sm text-foreground/80">
-                        Filtrar por segmentos
-                      </span>
-                    </label>
-
-                    {recipientMode === 'segments' && (
-                      <div className="px-2 pb-2 bg-muted/50">
-                        <div className="max-h-[160px] overflow-y-auto space-y-1 pr-0.5">
-                        {Object.entries(statusCounts).map(([status, count]) => (
-                          <label key={status} className="flex items-center gap-2 pl-7 py-1 hover:bg-muted/60 rounded cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedStatuses.includes(status)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedStatuses([...selectedStatuses, status]);
-                                } else {
-                                  setSelectedStatuses(selectedStatuses.filter(s => s !== status));
-                                }
-                              }}
-                              className="w-3 h-3 text-[#25D366] focus:ring-[#25D366] rounded"
-                            />
-                            <span className="text-xs text-foreground/80">
-                              {statusLabels[status] || status} ({count})
-                            </span>
-                          </label>
-                        ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Lista personalizada */}
-                  <div className="border border-border rounded-lg overflow-hidden">
-                    <label className="flex items-center gap-3 p-2 hover:bg-muted/50 cursor-pointer transition-colors">
-                      <input
-                        type="radio"
-                        name="recipient"
-                        checked={recipientMode === 'custom'}
-                        onChange={() => setRecipientMode('custom')}
-                        className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
-                      />
-                      <span className="flex-1 text-sm text-foreground/80">
-                        Lista personalizada
-                      </span>
-                    </label>
-
-                    {recipientMode === 'custom' && (
-                      <div className="px-2 pb-2 bg-muted/50">
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold text-foreground block">Destinatários</Label>
+                <ChoiceList
+                  value={recipientMode}
+                  onChange={setRecipientMode}
+                  options={[
+                    { value: 'all', label: 'Todos os leads', meta: leads.length },
+                    {
+                      value: 'segments',
+                      label: 'Por etapa do funil',
+                      children: (
+                        <CheckList
+                          items={Object.entries(statusCounts).map(([status, count]) => ({ value: status, label: statusLabels[status] || status, meta: count }))}
+                          selected={selectedStatuses}
+                          onToggle={(status) => setSelectedStatuses(selectedStatuses.includes(status) ? selectedStatuses.filter((s) => s !== status) : [...selectedStatuses, status])}
+                        />
+                      ),
+                    },
+                    {
+                      value: 'custom',
+                      label: 'Lista de números',
+                      children: (
                         <Textarea
                           value={customNumbers}
                           onChange={(e) => setCustomNumbers(e.target.value)}
-                          placeholder="+258843210987, +258847654321, 258843210987@lid..."
-                          className="min-h-[60px] max-h-[120px] overflow-y-auto text-xs resize-none"
+                          placeholder="+258 84 321 0987, +258 84 765 4321"
+                          className="min-h-[80px] resize-none"
                         />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Grupos */}
-                  <div className="border border-border rounded-lg overflow-hidden">
-                    <label className="flex items-center gap-3 p-2 hover:bg-muted/50 cursor-pointer transition-colors">
-                      <input
-                        type="radio"
-                        name="recipient"
-                        checked={recipientMode === 'groups'}
-                        onChange={() => setRecipientMode('groups')}
-                        className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
-                      />
-                      <span className="flex-1 text-sm text-foreground/80">
-                        Grupos WhatsApp
-                      </span>
-                    </label>
-
-                    {recipientMode === 'groups' && (
-                      <div className="px-2 pb-2 space-y-2 bg-muted/50">
-
-                        {/* Send mode sub-toggle */}
-                        <div className="flex gap-1 pt-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setGroupSendMode('group')}
-                            className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors border ${
-                              groupSendMode === 'group'
-                                ? 'bg-[#25D366]/10 border-[#25D366] text-[#25D366]'
-                                : 'border-border text-muted-foreground hover:border-[#25D366]/50'
-                            }`}
-                          >
-                            Enviar no grupo
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setGroupSendMode('private')}
-                            className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors border ${
-                              groupSendMode === 'private'
-                                ? 'bg-[#25D366]/10 border-[#25D366] text-[#25D366]'
-                                : 'border-border text-muted-foreground hover:border-[#25D366]/50'
-                            }`}
-                          >
-                            Privado dos membros
-                          </button>
-                        </div>
-
-                        {/* Extrair button — only in private mode */}
-                        {groupSendMode === 'private' && (
-                          <button
-                            type="button"
-                            onClick={extractGroupMembers}
-                            disabled={isExtractingMembers || selectedGroupJids.length === 0}
-                            className="w-full py-1 px-2 rounded text-xs font-medium border border-dashed border-[#25D366]/60 text-[#25D366] hover:bg-[#25D366]/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                          >
-                            {isExtractingMembers ? (
-                              <><RefreshCw size={11} className="animate-spin" /> Extraindo...</>
-                            ) : (
-                              <>↗ Extrair para lista personalizada</>
-                            )}
-                          </button>
-                        )}
-
-                        <div className="flex items-center justify-between pb-0.5">
-                          <span className="text-xs text-muted-foreground">{availableGroups.length} grupo(s)</span>
-                          <button
-                            type="button"
-                            onClick={syncGroupsFromEvolution}
-                            disabled={isSyncingGroups || loadingGroups}
-                            className="flex items-center gap-1 text-xs text-[#25D366] hover:text-[#128C7E] transition-colors disabled:opacity-60"
-                          >
-                            <RefreshCw size={11} className={isSyncingGroups ? 'animate-spin' : ''} />
-                            {isSyncingGroups ? 'A sincronizar...' : 'Sincronizar'}
-                          </button>
-                        </div>
-                        {loadingGroups ? (
-                          <p className="text-xs text-muted-foreground py-2 pl-2">A carregar grupos...</p>
-                        ) : availableGroups.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2 pl-2">Nenhum grupo encontrado. Clique em Sincronizar.</p>
-                        ) : (
-                          <div className="max-h-[180px] overflow-y-auto space-y-0.5 pr-0.5">
-                            {availableGroups.map(group => {
-                              const jid = group.remote_jid;
-                              const name = group.metadata?.group_name || group.display_name || jid;
-                              const memberCount = group.metadata?.participants_count;
-                              return (
-                                <label key={jid} className="flex items-center gap-2 pl-7 py-1 hover:bg-muted/60 rounded cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedGroupJids.includes(jid)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedGroupJids([...selectedGroupJids, jid]);
-                                      } else {
-                                        setSelectedGroupJids(selectedGroupJids.filter(j => j !== jid));
-                                      }
-                                    }}
-                                    className="w-3 h-3 text-[#25D366] focus:ring-[#25D366] rounded flex-shrink-0"
-                                  />
-                                  <span className="text-xs text-foreground/80 flex-1 truncate">{name}</span>
-                                  {groupSendMode === 'private' && memberCount != null && (
-                                    <span className="text-[10px] text-muted-foreground flex-shrink-0 mr-1">~{memberCount}</span>
-                                  )}
-                                </label>
-                              );
-                            })}
+                      ),
+                    },
+                    {
+                      value: 'groups',
+                      label: 'Grupos do WhatsApp',
+                      children: (
+                        <div className="space-y-3">
+                          <ChoiceList
+                            value={groupSendMode}
+                            onChange={setGroupSendMode}
+                            options={[
+                              { value: 'group', label: 'Enviar no grupo' },
+                              { value: 'private', label: 'Em privado a cada membro' },
+                            ]}
+                          />
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">{availableGroups.length} grupos</span>
+                            <Button variant="ghost" size="sm" onClick={() => void syncGroupsFromEvolution()} disabled={isSyncingGroups || loadingGroups}>
+                              {isSyncingGroups ? 'A sincronizar…' : 'Sincronizar'}
+                            </Button>
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Total */}
-                <div className="mt-2 flex items-center gap-2 text-[#25D366] bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg">
-                  <span className="text-sm font-semibold">
-                    Total: {recipientCount.toLocaleString(getLocale(), NUMBER_OPTS)} destinatários
-                  </span>
-                </div>
+                          {loadingGroups ? (
+                            <p className="py-2 text-sm text-muted-foreground">A carregar grupos…</p>
+                          ) : (
+                            <CheckList
+                              items={availableGroups.map((group) => ({
+                                value: group.remote_jid,
+                                // Nunca o identificador técnico (…@g.us): sem nome, "Grupo sem nome"
+                                label: group.metadata?.group_name || group.display_name || 'Grupo sem nome',
+                                meta: groupSendMode === 'private' && group.metadata?.participants_count != null ? `${group.metadata.participants_count} membros` : undefined,
+                              }))}
+                              selected={selectedGroupJids}
+                              onToggle={(jid) => setSelectedGroupJids(selectedGroupJids.includes(jid) ? selectedGroupJids.filter((j) => j !== jid) : [...selectedGroupJids, jid])}
+                              empty="Nenhum grupo. Toque em Sincronizar."
+                            />
+                          )}
+                          {groupSendMode === 'private' && (
+                            <Button variant="outline" className="w-full" onClick={extractGroupMembers} disabled={isExtractingMembers || selectedGroupJids.length === 0}>
+                              {isExtractingMembers ? 'A obter membros…' : 'Passar membros para a lista de números'}
+                            </Button>
+                          )}
+                        </div>
+                      ),
+                    },
+                  ]}
+                />
+                <p className="text-sm text-muted-foreground">
+                  {recipientCount.toLocaleString(getLocale(), NUMBER_OPTS)} destinatários
+                </p>
               </div>
 
               <div className="border-t border-border"></div>
 
               {/* Agendamento */}
-              <div>
-                <Label className="text-sm font-semibold text-foreground mb-3 block">
-                  Agendamento
-                </Label>
-
-                <div className="space-y-2">
-                  <label className="flex items-center gap-3 p-2 rounded-lg border border-border hover:border-[#25D366] cursor-pointer transition-colors">
-                    <input
-                      type="radio"
-                      name="schedule"
-                      checked={scheduleMode === 'now'}
-                      onChange={() => setScheduleMode('now')}
-                      className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
-                    />
-                    <span className="text-sm text-foreground/80">
-                      Enviar agora
- </span>
-                  </label>
-
-                  <div className="border border-border rounded-lg overflow-hidden">
-                    <label className="flex items-center gap-3 p-2 hover:bg-muted/50 cursor-pointer transition-colors">
-                      <input
-                        type="radio"
-                        name="schedule"
-                        checked={scheduleMode === 'scheduled'}
-                        onChange={() => setScheduleMode('scheduled')}
-                        className="w-4 h-4 text-[#25D366] focus:ring-[#25D366]"
-                      />
-                      <span className="flex-1 text-sm text-foreground/80">
-                        Agendar envio
- </span>
-                    </label>
-
-                    {scheduleMode === 'scheduled' && (
-                      <div className="px-2 pb-2 bg-muted/50">
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                          <div>
-                            <Label className="text-xs text-foreground/80 mb-1 block">
-                              Data
- </Label>
-                            <Input
-                              type="date"
-                              value={scheduleDate}
-                              onChange={(e) => setScheduleDate(e.target.value)}
-                              min={minDate}
-                              className="h-9 text-sm !bg-card !text-foreground dark:!text-foreground !border-border dark:!border-border"
-                            />
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold text-foreground block">Envio</Label>
+                <ChoiceList
+                  value={scheduleMode}
+                  onChange={setScheduleMode}
+                  options={[
+                    { value: 'now', label: 'Enviar agora' },
+                    {
+                      value: 'scheduled',
+                      label: 'Agendar',
+                      children: (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="min-w-0">
+                            <Label className="text-sm text-muted-foreground mb-1.5 block">Data</Label>
+                            <Input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} min={minDate} />
                           </div>
-                          <div>
-                            <Label className="text-xs text-foreground/80 mb-1 block">
-                              Hora
- </Label>
-                            <Input
-                              type="time"
-                              value={scheduleTime}
-                              onChange={(e) => setScheduleTime(e.target.value)}
-                              min={scheduleDate === minDate ? minTime : undefined}
-                              className="h-9 text-sm !bg-card !text-foreground dark:!text-foreground !border-border dark:!border-border"
-                            />
+                          <div className="min-w-0">
+                            <Label className="text-sm text-muted-foreground mb-1.5 block">Hora</Label>
+                            <Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} min={scheduleDate === minDate ? minTime : undefined} />
                           </div>
                         </div>
-                        {scheduleDate && scheduleTime && (
-                          <p className="text-xs text-green-600 dark:text-green-400 mt-2 font-medium">
-                            ✓ {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString(getLocale())}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                      ),
+                    },
+                  ]}
+                />
               </div>
 
               <div className="border-t border-border"></div>
@@ -2651,7 +2480,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   <div className="flex items-center gap-2">
                     <Settings className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm font-semibold text-foreground">
-                      Definições Avançadas
+                      Definições avançadas
                     </span>
                   </div>
                   {advancedOpen ? (
