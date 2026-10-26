@@ -1,5 +1,8 @@
 import { query } from '../database/connection';
 
+/** Colunas que nenhum pedido pode alterar */
+const PROTECTED_LEAD_COLUMNS = new Set(['id', 'user_id', 'created_at']);
+
 export class LeadsService {
   private normalizePhone(phone?: string | null) {
     if (!phone) {
@@ -213,8 +216,11 @@ export class LeadsService {
     let paramIndex = 1;
 
     Object.keys(data).forEach((key) => {
-      if (data[key] !== undefined && key !== 'id' && key !== 'user_id') {
-        fields.push(`${key} = $${paramIndex}`);
+      // O nome da coluna vem do JSON do pedido: só identificadores simples (e entre aspas),
+      // senão uma chave forjada entrava no SQL. Colunas de sistema nunca se alteram.
+      if (!/^[a-z][a-z0-9_]{0,62}$/.test(key) || PROTECTED_LEAD_COLUMNS.has(key)) return;
+      if (data[key] !== undefined) {
+        fields.push(`"${key}" = $${paramIndex}`);
         values.push(data[key]);
         paramIndex++;
       }

@@ -293,7 +293,9 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
                 className="mt-0.5 w-4 h-4 rounded cursor-pointer accent-[#675DFF]" />
               <label htmlFor="terms" className="cursor-pointer" style={{ fontSize: '13px', color: '#3C4257', fontWeight: 300 }}>
                 Concordo com os{' '}
-                <a href="#terms" style={{ color: '#533AFD' }} className="underline transition-colors hover:text-[#635BFF]">Termos e Condições</a>
+                <a href="/termos" target="_blank" rel="noopener" style={{ color: '#533AFD' }} className="underline transition-colors hover:text-[#635BFF]">Termos de uso</a>
+                {' '}e a{' '}
+                <a href="/privacidade" target="_blank" rel="noopener" style={{ color: '#533AFD' }} className="underline transition-colors hover:text-[#635BFF]">Política de privacidade</a>
               </label>
             </div>
 

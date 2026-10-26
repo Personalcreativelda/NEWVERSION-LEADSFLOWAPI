@@ -384,6 +384,12 @@ export class AuthService {
     return true;
   }
 
+  /** Utilizador ativo (sem campos sensíveis) — usado pelos tokens da API pública */
+  async getActiveUser(userId: string) {
+    const user = await this.getUserById(userId);
+    return user && user.is_active ? sanitizeUser(user) : null;
+  }
+
   async validateToken(token: string) {
     try {
       const payload = jwt.verify(token, config.jwtSecret) as { userId: string };

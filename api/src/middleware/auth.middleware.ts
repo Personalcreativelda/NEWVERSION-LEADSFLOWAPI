@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/auth.service';
 import { activityService } from '../services/activity.service';
 import { query } from '../database/connection';
+import { isPublicApiRoute, scopeAllows, takeRateLimit, validateApiToken } from '../services/api-token.service';
 
 const authService = new AuthService();
 
@@ -40,7 +41,31 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     }
 
     const token = authHeader.substring(7);
-    console.log('[Auth] Token received (first 20 chars):', token.substring(0, 20) + '...');
+
+    // Token da API pública (lf_…): só nas rotas documentadas e dentro do âmbito do token
+    if (token.startsWith('lf_')) {
+      if (!isPublicApiRoute(req.method, req.originalUrl)) {
+        return res.status(403).json({ error: 'Esta rota não está disponível na API pública' });
+      }
+      const apiAuth = await validateApiToken(token);
+      if (!apiAuth) {
+        return res.status(401).json({ error: 'Token de API inválido ou expirado' });
+      }
+      const retryAfter = takeRateLimit(apiAuth.tokenId);
+      if (retryAfter > 0) {
+        res.setHeader('Retry-After', String(retryAfter));
+        return res.status(429).json({ error: 'Demasiados pedidos: tente de novo dentro de alguns segundos' });
+      }
+      if (!scopeAllows(apiAuth.scopes, req.method)) {
+        return res.status(403).json({ error: 'O token não tem permissão de escrita' });
+      }
+      const apiUser = await authService.getActiveUser(apiAuth.userId);
+      if (!apiUser) {
+        return res.status(401).json({ error: 'Conta inativa' });
+      }
+      req.user = apiUser;
+      return next();
+    }
     
     const user = await authService.validateToken(token);
 

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
@@ -18,7 +19,28 @@ import './app/styles/globals.css';
 // once they are used; this just prevents a total cache bust on every reload.
 const MAX_CACHE_AGE = 24 * 60 * 60_000;
 
+// Páginas públicas: abrem sem sessão e fora do App (que redirecionaria para o login)
+const PUBLIC_ROUTES: Record<string, React.LazyExoticComponent<() => React.JSX.Element>> = {
+  '/privacidade': lazy(() => import('./app/components/public/PrivacyPage')),
+  '/privacy': lazy(() => import('./app/components/public/PrivacyPage')),
+  '/termos': lazy(() => import('./app/components/public/TermsPage')),
+  '/terms': lazy(() => import('./app/components/public/TermsPage')),
+  '/docs': lazy(() => import('./app/components/public/ApiDocsPage')),
+  '/docs/api': lazy(() => import('./app/components/public/ApiDocsPage')),
+};
+
 export default function StandaloneApp() {
+  const PublicPage = PUBLIC_ROUTES[window.location.pathname.replace(/\/$/, '')];
+  if (PublicPage) {
+    return (
+      <ThemeModeProvider>
+        <Suspense fallback={null}>
+          <PublicPage />
+        </Suspense>
+      </ThemeModeProvider>
+    );
+  }
+
   return (
     <PersistQueryClientProvider
       client={queryClient}

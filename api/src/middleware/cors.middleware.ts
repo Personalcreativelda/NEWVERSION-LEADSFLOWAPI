@@ -123,8 +123,12 @@ export const corsMiddleware: RequestHandler = (req, res, next) => {
     return next();
   }
 
+  // API pública (servidor a servidor, curl, n8n): sem Origin mas com token de API lf_…;
+  // o requireAuth só deixa esses tokens nas rotas documentadas
+  const isPublicApiCall = !origin && /^Bearer lf_/.test(String(req.headers.authorization || ''));
+
   // Block origin-less requests to protected routes in production
-  if (!origin && !isNoOriginRequired && !isDev) {
+  if (!origin && !isNoOriginRequired && !isPublicApiCall && !isDev) {
     return res.status(403).json({ error: 'Origin header is required' });
   }
 

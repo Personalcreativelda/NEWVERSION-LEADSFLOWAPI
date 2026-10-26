@@ -149,7 +149,7 @@ router.post('/send', async (req, res, next) => {
       }
     }
 
-    res.json({ success: true, result });
+    res.json({ success: true, message_id: (result as any)?.key?.id ?? null, result });
   } catch (error) {
     console.error('[WhatsApp Routes] Error sending message:', error);
     next(error);

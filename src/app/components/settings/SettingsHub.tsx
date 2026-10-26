@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ChevronRight, HelpCircle, LifeBuoy, LogOut, MessageSquareHeart, Radio, type LucideIcon } from 'lucide-react';
+import { ChevronRight, Code2, FileText, HelpCircle, LifeBuoy, LogOut, MessageSquareHeart, Radio, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { isNativeApp, openSupportChat } from '../../../native';
 import { getInstalledVersion } from '../../../live-update';
 
@@ -75,6 +75,12 @@ export function SettingsHub({ onOpenChannels, onHelp, onFeedback, onLogout, befo
             <span className="tabular-nums">{version}</span>
           </div>
         )}
+      </Group>
+
+      <Group title="Sobre">
+        <Row icon={FileText} label="Termos de uso" onClick={() => { window.location.href = '/termos'; }} />
+        <Row icon={ShieldCheck} label="Política de privacidade" onClick={() => { window.location.href = '/privacidade'; }} />
+        <Row icon={Code2} label="Documentação da API" onClick={() => { window.location.href = '/docs'; }} />
       </Group>
 
       {onLogout && (

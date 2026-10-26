@@ -54,6 +54,7 @@ export class CampaignsService {
     let paramIndex = 1;
 
     Object.keys(data).forEach((key) => {
+      if (!/^[a-z][a-z0-9_]{0,62}$/.test(key) || key === 'created_at') return; // nome de coluna vem do pedido
       if (data[key] !== undefined && key !== 'id' && key !== 'user_id') {
         // Convert JSONB fields to JSON string if they're objects
         let value = data[key];

@@ -57,6 +57,18 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
 - Webhooks da Meta de canais ligados pelo login têm de vir assinados com `META_APP_SECRET`.
 - Rotas `/debug` e `/test` dos webhooks só para administradores (`requireAdmin`).
 
+## API pública e páginas públicas
+
+- Tokens de API `lf_…` (Definições → Segurança) entram no `requireAuth` só nas rotas de
+  `PUBLIC_ROUTES` (`api/src/services/api-token.service.ts`): leads (CRUD) e `POST /api/whatsapp/send`.
+  Âmbito `read` = GET; 120 pedidos/min por token (429 + `Retry-After`); pedidos sem `Origin` com
+  `Bearer lf_` passam o CORS. Rota nova na API pública → acrescentar lá E documentar em
+  `src/app/components/public/ApiDocsPage.tsx`.
+- Páginas públicas sem sessão (`src/standalone-app.tsx`, antes do App): `/privacidade` (`/privacy`),
+  `/termos` (`/terms`), `/docs`. Instruções de eliminação de dados da Meta: `/privacidade#eliminacao-de-dados`.
+- SQL com nomes de coluna vindos do pedido: só identificadores `^[a-z][a-z0-9_]*$` (entre aspas)
+  ou lista fechada — houve injeção pelo nome da chave em leads/campanhas/contactos.
+
 ## Sistema de design (usar sempre, não reinventar)
 
 - Páginas: `PageHeader` + `PageAction` (`src/app/components/base/PageHeader.tsx`). Ação à

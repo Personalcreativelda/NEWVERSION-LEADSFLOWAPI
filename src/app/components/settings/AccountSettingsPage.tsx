@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SettingsHub, Group, Row } from './SettingsHub';
 import { ProfileSection } from './ProfileSection';
-import { Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog, ChevronRight } from 'lucide-react';
+import { BookOpen, Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog, ChevronRight } from 'lucide-react';
 import { PageHeader } from '../base/PageHeader';
 import { SubpageBack } from '../base/SubpageBack';
 import { Button } from '../ui/button';
@@ -289,6 +289,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
                 </div>
               ))}
               <Row icon={Plus} label="Novo token" onClick={() => setShowNewTokenModal(true)} />
+              <Row icon={BookOpen} label="Documentação da API" onClick={() => { window.location.href = '/docs'; }} />
             </Group>
           </div>
         )}

@@ -23,11 +23,9 @@ const footerLinks = {
     { label: 'Estado', href: '#' },
   ],
   legal: [
-    { label: 'Privacidade', href: '#' },
-    { label: 'Termos de Uso', href: '#' },
-    { label: 'Segurança', href: '#' },
-    { label: 'LGPD', href: '#' },
-    { label: 'Cookies', href: '#' },
+    { label: 'Privacidade', href: '/privacidade' },
+    { label: 'Termos de uso', href: '/termos' },
+    { label: 'API', href: '/docs' },
   ],
 };
 
