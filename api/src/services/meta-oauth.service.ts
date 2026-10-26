@@ -102,7 +102,8 @@ export function buildAuthorizeUrl(state: string): string {
     state,
     response_type: 'code',
   });
-  if (process.env.META_LOGIN_CONFIG_ID) params.set('config_id', process.env.META_LOGIN_CONFIG_ID);
+  const loginConfigId = (process.env.META_LOGIN_CONFIG_ID || '').trim().replace(/^["']+|["']+$/g, '');
+  if (loginConfigId) params.set('config_id', loginConfigId);
   else params.set('scope', requestedScopes().join(','));
   return `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth?${params.toString()}`;
 }

@@ -8,7 +8,7 @@ import { requireAuth, type AuthenticatedRequest } from '../middleware/auth.middl
 import { ChannelsService } from '../services/channels.service';
 import { validateChannelCredentials } from '../services/channel-validation.service';
 import { apiBaseUrl, createState, GRAPH_VERSION, readState, returnUrl, type OAuthPlatform } from '../services/meta-oauth.service';
-import { completeSignup, isWhatsAppSignupConfigured, signupPageHtml } from '../services/whatsapp-signup.service';
+import { completeSignup, isWhatsAppSignupConfigured, signupPageHtml, waConfigId } from '../services/whatsapp-signup.service';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -47,7 +47,7 @@ router.get('/connect', (req, res) => {
     state,
     nonce,
     appId: process.env.META_APP_ID || '',
-    configId: process.env.META_WA_CONFIG_ID || '',
+    configId: waConfigId(),
     version: GRAPH_VERSION,
   }));
 });

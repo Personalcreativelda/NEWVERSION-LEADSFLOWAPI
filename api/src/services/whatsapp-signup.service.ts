@@ -10,8 +10,22 @@ import { GRAPH_VERSION } from './meta-oauth.service';
 const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
 const TIMEOUT_MS = 15_000;
 
+/**
+ * ID da configuração "WhatsApp Embedded Signup" (Facebook Login for Business). Limpo de
+ * espaços/aspas coladas no Coolify; um valor que não seja só dígitos conta como em falta —
+ * a Meta respondia "config_id é obrigatório" numa janela que o cliente não percebe.
+ */
+export function waConfigId(): string {
+  const raw = (process.env.META_WA_CONFIG_ID || '').trim().replace(/^["']+|["']+$/g, '').trim();
+  if (raw && (!/^\d+$/.test(raw) || raw === (process.env.META_APP_ID || '').trim())) {
+    console.error(`[WhatsApp Signup] META_WA_CONFIG_ID inválido ("${raw.slice(0, 40)}"): tem de ser o Configuration ID numérico da configuração "WhatsApp Embedded Signup" da app ${process.env.META_APP_ID || ''}.`);
+    return '';
+  }
+  return raw;
+}
+
 export function isWhatsAppSignupConfigured(): boolean {
-  return !!(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_WA_CONFIG_ID);
+  return !!(process.env.META_APP_ID && process.env.META_APP_SECRET && waConfigId());
 }
 
 class MetaError extends Error {
