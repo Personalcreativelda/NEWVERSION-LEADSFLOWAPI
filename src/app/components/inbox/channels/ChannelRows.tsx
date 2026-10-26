@@ -16,8 +16,8 @@ interface ChannelTypeInfo {
 }
 
 const TYPE_INFO: Record<string, ChannelTypeInfo> = {
-  whatsapp: { label: 'WhatsApp', subtitle: 'WhatsApp · API não oficial', Icon: brandIcon('whatsapp'), color: 'text-green-600 dark:text-green-400' },
-  whatsapp_cloud: { label: 'WhatsApp Cloud', subtitle: 'WhatsApp · API oficial da Meta', Icon: brandIcon('whatsapp'), color: 'text-green-600 dark:text-green-400' },
+  whatsapp: { label: 'WhatsApp', subtitle: 'WhatsApp', Icon: brandIcon('whatsapp'), color: 'text-green-600 dark:text-green-400' },
+  whatsapp_cloud: { label: 'WhatsApp Business', subtitle: 'WhatsApp Business', Icon: brandIcon('whatsapp'), color: 'text-green-600 dark:text-green-400' },
   facebook: { label: 'Facebook Messenger', subtitle: 'Facebook · Messenger', Icon: brandIcon('messenger'), color: 'text-blue-600 dark:text-blue-400' },
   instagram: { label: 'Instagram', subtitle: 'Instagram · Direct', Icon: brandIcon('instagram'), color: 'text-pink-600 dark:text-pink-400' },
   telegram: { label: 'Telegram', subtitle: 'Telegram · Bot', Icon: brandIcon('telegram'), color: 'text-sky-600 dark:text-sky-400' },

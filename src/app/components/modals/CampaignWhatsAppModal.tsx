@@ -1857,7 +1857,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                   <div className="flex items-center gap-2">
                     <span className="text-base"></span>
                     <span className="text-sm font-semibold text-blue-800 dark:text-blue-300">
-                      API Oficial Meta — WhatsApp Cloud
+                      WhatsApp Business
                     </span>
                   </div>
 

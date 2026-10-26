@@ -28,9 +28,10 @@ import {
 // Ordem: WhatsApp primeiro, depois Facebook, Instagram, Telegram e outros
 const AVAILABLE_CHANNELS = [
     {
+        // Ligação por código QR: só aparece para contas que já a usam (ver pickableChannels)
         id: 'whatsapp',
-        name: 'WhatsApp',
-        description: 'API não oficial',
+        name: 'WhatsApp (código QR)',
+        description: 'Ligação pelo telemóvel',
         icon: brandIcon('whatsapp'),
         color: 'text-green-500',
         available: true,
@@ -38,8 +39,8 @@ const AVAILABLE_CHANNELS = [
     },
     {
         id: 'whatsapp_cloud',
-        name: 'WhatsApp Cloud',
-        description: 'API oficial da Meta',
+        name: 'WhatsApp Business',
+        description: 'Ligue o número da sua empresa',
         icon: brandIcon('whatsapp'),
         color: 'text-green-600',
         available: true,
@@ -105,6 +106,11 @@ const AVAILABLE_CHANNELS = [
 
 export function ChannelsList() {
     const [channels, setChannels] = useState<Channel[]>([]);
+    // O WhatsApp por código QR deixa de ser oferecido a contas novas; quem já o tem ligado
+    // continua a vê-lo (para ligar outro número ou voltar a ligar)
+    const pickableChannels = AVAILABLE_CHANNELS.filter(
+        (c) => c.id !== 'whatsapp' || channels.some((ch) => ch.type === 'whatsapp'),
+    );
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [cloudModalOpen, setCloudModalOpen] = useState(false);
@@ -314,7 +320,7 @@ export function ChannelsList() {
             <AddChannelSheet
                 open={addOpen}
                 onClose={() => setAddOpen(false)}
-                channels={AVAILABLE_CHANNELS}
+                channels={pickableChannels}
                 onPick={handleConnect}
             />
 
@@ -341,7 +347,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setCloudModalOpen);
                     loadChannels();
-                    toast.success('WhatsApp Cloud API ligada!');
+                    toast.success('WhatsApp Business ligado');
                 }}
                 editingChannel={editingChannel?.type === 'whatsapp_cloud' ? editingChannel : undefined}
             />

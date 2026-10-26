@@ -71,6 +71,10 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
   `-s`) usa `public/serve.json`. Nessas regras o "resto vai para o app" é `!**/*.html` — `**` voltava a
   apanhar o `.html` e servia o app vazio. Empresa/morada num só sítio: `COMPANY` em `PublicPageShell.tsx`
   (tem de coincidir com a verificação da empresa na Meta).
+- WhatsApp por código QR (Evolution): escondido na escolha de canal para contas que ainda não o
+  têm (`pickableChannels` em ChannelsList) e sem "API não oficial" nos textos — por causa da revisão
+  da Meta (Tech Provider). Os canais já ligados continuam a funcionar. O oficial aparece como
+  "WhatsApp Business". `POST /api/whatsapp/send` usa o oficial (Cloud API) quando existe.
 - SQL com nomes de coluna vindos do pedido: só identificadores `^[a-z][a-z0-9_]*$` (entre aspas)
   ou lista fechada — houve injeção pelo nome da chave em leads/campanhas/contactos.
 

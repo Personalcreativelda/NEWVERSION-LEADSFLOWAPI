@@ -191,8 +191,13 @@ curl -X PUT ${BASE}/api/leads/3f2b6c1e-8a4d-4c2b-9c3d-1a2b3c4d5e6f \\
       <Section id="whatsapp" title="Mensagens de WhatsApp">
         <Endpoint method="POST" path="/api/whatsapp/send">
           <p>
-            Envia uma mensagem de texto pelo WhatsApp ligado à conta (ligação por código QR em Definições → Canais
-            ligados). A mensagem fica também na caixa de entrada, na conversa com esse número.
+            Envia uma mensagem de texto pelo WhatsApp Business ligado à conta (Definições → Canais ligados). A
+            mensagem fica também na caixa de entrada, na conversa com esse número.
+          </p>
+          <p>
+            Pelas regras do WhatsApp, uma mensagem de texto livre só é entregue a quem escreveu à sua empresa nas
+            últimas 24 horas. Para iniciar conversas fora dessa janela, use uma campanha com um modelo de mensagem
+            aprovado pela Meta.
           </p>
           <table>
             <tbody>
@@ -208,10 +213,11 @@ curl -X POST ${BASE}/api/whatsapp/send \\
   -d '{ "phone": "258841234567", "message": "Olá Ana, recebemos o seu pedido!" }'
 `}</Code>
           <p>Resposta <code>200</code>:</p>
-          <Code>{`{ "success": true, "message_id": "3EB0C767D26A1D8F2B11" }`}</Code>
+          <Code>{`{ "success": true, "message_id": "wamid.HBgMMjU4ODQxMjM0NTY3FQIAERgS..." }`}</Code>
           <p>
-            Conta para o limite mensal de mensagens do plano. Se não houver um WhatsApp ligado, a resposta é{' '}
-            <code>400</code>.
+            Conta para o limite mensal de mensagens do plano. Se não houver um WhatsApp ligado, ou se o WhatsApp recusar
+            a mensagem (por exemplo, fora da janela de 24 horas), a resposta é <code>400</code> com o motivo em{' '}
+            <code>error</code>.
           </p>
         </Endpoint>
       </Section>

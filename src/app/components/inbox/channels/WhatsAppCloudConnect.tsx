@@ -126,7 +126,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                         </div>
                         <div>
                             <h3 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                WhatsApp Cloud API
+                                WhatsApp Business
                             </h3>
                             <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 API Oficial da Meta
@@ -454,7 +454,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                 Configuração Concluída!
                             </h4>
                             <p className="mb-8 max-w-xs mx-auto" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Seu WhatsApp Cloud API está configurado. As mensagens começarão a aparecer assim que o webhook estiver ativo.
+                                O seu WhatsApp Business está configurado. As mensagens começarão a aparecer assim que o webhook estiver ativo.
                             </p>
                             <button
                                 onClick={() => { onSuccess(); onClose(); }}

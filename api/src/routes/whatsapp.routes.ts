@@ -66,6 +66,56 @@ router.post('/send', async (req, res, next) => {
       });
     }
 
+    // WhatsApp oficial (Cloud API) primeiro, quando a conta o tem ligado e o pedido não
+    // escolhe uma instância: é o canal da API pública. Texto livre só chega a quem escreveu
+    // nas últimas 24 h (regra da Meta); fora disso são precisos modelos (campanhas).
+    if (!requestedInstanceId) {
+      const cloudChannels = await channelsService.findByType('whatsapp_cloud', user.id);
+      const cloud = cloudChannels.find((c: any) =>
+        c.status === 'active' && c.credentials?.phone_number_id && (c.credentials?.access_token || c.credentials?.token));
+      if (cloud) {
+        const to = String(phone).replace(/\D/g, '');
+        const response = await fetch(`https://graph.facebook.com/v21.0/${cloud.credentials.phone_number_id}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${cloud.credentials.access_token || cloud.credentials.token}`,
+          },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: String(message) } }),
+        });
+        const cloudResult: any = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          return res.status(400).json({ error: cloudResult?.error?.message || 'O WhatsApp recusou a mensagem' });
+        }
+        const messageId = cloudResult?.messages?.[0]?.id ?? null;
+
+        try {
+          const conversation = await conversationsService.findOrCreate(
+            user.id,
+            cloud.id,
+            `${to}@s.whatsapp.net`,
+            leadId || undefined,
+            { contact_name: leadId ? 'Lead' : to, phone: to },
+          );
+          await messagesService.create({
+            conversation_id: conversation.id,
+            lead_id: leadId || null,
+            direction: 'out',
+            channel: 'whatsapp_cloud',
+            content: String(message).trim(),
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+            external_id: messageId,
+            metadata: { phone: to },
+          }, user.id);
+        } catch (dbError) {
+          console.warn('[WhatsApp Routes] Mensagem enviada (Cloud) mas não guardada na conversa:', dbError);
+        }
+
+        return res.json({ success: true, message_id: messageId });
+      }
+    }
+
     // Get instance and channel to use
     let instanceId = requestedInstanceId;
     let activeChannel: any = null;
