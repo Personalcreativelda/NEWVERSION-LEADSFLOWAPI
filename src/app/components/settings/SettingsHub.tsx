@@ -1,10 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ChevronRight, Code2, FileText, HelpCircle, LifeBuoy, LogOut, MessageSquareHeart, Radio, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { ChevronRight, Code2, FileText, HelpCircle, LifeBuoy, LogOut, MessageCircle, MessageSquareHeart, Radio, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { isNativeApp, openSupportChat } from '../../../native';
 import { getInstalledVersion } from '../../../live-update';
 
 interface SettingsHubProps {
   onOpenChannels?: () => void;
+  /** WhatsApp Business oficial: conta, números, perfil e modelos */
+  onOpenWhatsAppBusiness?: () => void;
   onHelp?: () => void;
   onFeedback?: () => void;
   onLogout?: () => void;
@@ -50,7 +52,7 @@ export function Group({ title, children }: { title: string; children: ReactNode 
  * Definições gerais (fora do perfil): Canais, Suporte e terminar sessão. Antes estavam
  * no menu lateral; o menu ficou só com páginas e o cartão do perfil.
  */
-export function SettingsHub({ onOpenChannels, onHelp, onFeedback, onLogout, before }: SettingsHubProps) {
+export function SettingsHub({ onOpenChannels, onOpenWhatsAppBusiness, onHelp, onFeedback, onLogout, before }: SettingsHubProps) {
   const [version, setVersion] = useState<string | null>(null);
   useEffect(() => {
     if (isNativeApp()) void getInstalledVersion().then(setVersion);
@@ -62,6 +64,7 @@ export function SettingsHub({ onOpenChannels, onHelp, onFeedback, onLogout, befo
       {onOpenChannels && (
         <Group title="Canais">
           <Row icon={Radio} label="Canais ligados" onClick={onOpenChannels} />
+          {onOpenWhatsAppBusiness && <Row icon={MessageCircle} label="WhatsApp Business" onClick={onOpenWhatsAppBusiness} />}
         </Group>
       )}
 

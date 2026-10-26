@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SettingsHub, Group, Row } from './SettingsHub';
+import WhatsAppBusinessSettings from './WhatsAppBusinessSettings';
 import { ProfileSection } from './ProfileSection';
 import { BookOpen, Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog, ChevronRight } from 'lucide-react';
 import { PageHeader } from '../base/PageHeader';
@@ -36,7 +37,7 @@ interface ApiToken {
   created_at: string;
 }
 
-type TabType = 'profile' | 'security' | 'team';
+type TabType = 'profile' | 'security' | 'team' | 'whatsapp';
 
 export default function AccountSettingsPage({ user, onUpdateUser, initialTab, onOpenChannels, onHelp, onFeedback, onLogout }: AccountSettingsPageProps) {
   const confirm = useConfirm();
@@ -215,6 +216,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       {activeTab === null && (
         <SettingsHub
           onOpenChannels={onOpenChannels}
+          onOpenWhatsAppBusiness={() => openSection('whatsapp')}
           onHelp={onHelp}
           onFeedback={onFeedback}
           onLogout={onLogout}
@@ -247,12 +249,14 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       {activeTab !== null && (
         <div className="mb-5">
           {!initialTab && <SubpageBack label="Definições" onClose={() => setActiveTab(null)} />}
-          <h2 className="hidden lg:block text-lg font-semibold text-foreground">{({ profile: 'Perfil', security: 'Segurança', team: 'Equipa' })[activeTab]}</h2>
+          <h2 className="hidden lg:block text-lg font-semibold text-foreground">{({ profile: 'Perfil', security: 'Segurança', team: 'Equipa', whatsapp: 'WhatsApp Business' })[activeTab]}</h2>
         </div>
       )}
 
       <div>
         {activeTab === 'profile' && <ProfileSection user={user} onUpdateUser={onUpdateUser} />}
+
+        {activeTab === 'whatsapp' && <WhatsAppBusinessSettings onOpenChannels={onOpenChannels} />}
 
         {activeTab === 'team' && (
           <TeamSettingsPage currentUser={user} />

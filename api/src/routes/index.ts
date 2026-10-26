@@ -37,6 +37,7 @@ import leadsTrackingRoutes from './leads-tracking.routes';
 import conversationTagsRoutes from './conversation-tags.routes';
 // Groups: Importar rotas de gerenciamento de grupos WhatsApp
 import groupsRoutes from './groups.routes';
+import whatsappBusinessRoutes from './whatsapp-business.routes';
 import aiRemarketingRoutes from './ai-remarketing.routes';
 import remarketingRoutes from './remarketing.routes';
 import teamRoutes from './team.routes';
@@ -84,6 +85,7 @@ router.use('/user-webhooks', withPlan, userWebhooksRoutes);
 router.use('/lead-notes', withPlan, leadNotesRoutes);
 router.use('/scheduled-conversations', withPlan, scheduledConversationsRoutes);
 router.use('/groups', withPlan, groupsRoutes);
+router.use('/whatsapp-business', withPlan, whatsappBusinessRoutes); // WhatsApp Business oficial: conta, números, perfil, modelos
 router.use('/ai-remarketing', withPlan, aiRemarketingRoutes);
 router.use('/remarketing', withPlan, remarketingRoutes);
 router.use('/team', withPlan, teamRoutes);

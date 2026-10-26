@@ -56,6 +56,10 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
   No app volta por `com.leadsflowapi.app://oauth/meta`. Sem `META_APP_ID`/`META_APP_SECRET` usa o formulário manual.
 - Webhooks da Meta de canais ligados pelo login têm de vir assinados com `META_APP_SECRET`.
 - Rotas `/debug` e `/test` dos webhooks só para administradores (`requireAdmin`).
+- WhatsApp oficial (canais `whatsapp_cloud`): Definições → WhatsApp Business
+  (`settings/WhatsAppBusinessSettings.tsx`) gere conta, números (verificar/ativar/usar no canal),
+  perfil e modelos (criar/apagar/estado). API em `/api/whatsapp-business/*`
+  (`services/whatsapp-business.service.ts`); o token vai no cabeçalho, nunca no URL.
 
 ## API pública e páginas públicas
 
