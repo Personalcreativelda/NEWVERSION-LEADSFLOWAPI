@@ -47,9 +47,10 @@ const LEAD_EXAMPLE = `{
   "updated_at": "2026-10-26T09:12:44.000Z"
 }`;
 
-export default function ApiDocsPage() {
+export default function ApiDocsPage({ path }: { path?: string } = {}) {
   return (
     <PublicPageShell
+      path={path}
       title="API"
       intro="Ligue o LeadsFlow aos seus sistemas: crie e atualize leads a partir do seu site, CRM ou automações (n8n, Make, Zapier) e envie mensagens de WhatsApp."
     >

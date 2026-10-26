@@ -10,15 +10,24 @@ export const PUBLIC_PAGES = [
 ] as const;
 
 export const CONTACT_EMAIL = 'suporte@leadsflowapi.com';
+export const SITE_URL = 'https://leadsflowapi.com';
 
-export function PublicPageShell({ title, updated, intro, children }: {
+/** Empresa dona da marca LeadsFlow — tem de coincidir com a verificação da empresa na Meta */
+export const COMPANY = {
+  name: 'Personalcreativelda',
+  address: 'EN1, Paragem Facim, Marracuene, Moçambique',
+};
+
+export function PublicPageShell({ title, updated, intro, children, path }: {
   title: string;
   /** Data da última revisão (texto, ex.: "26 de outubro de 2026") */
   updated?: string;
   intro?: ReactNode;
   children: ReactNode;
+  /** Caminho atual; no HTML gerado no build (sem window) vem por aqui */
+  path?: string;
 }) {
-  const current = window.location.pathname.replace(/\/$/, '');
+  const current = (path ?? (typeof window !== 'undefined' ? window.location.pathname : '')).replace(/\/$/, '');
   useEffect(() => {
     document.title = `${title} · LeadsFlow`;
   }, [title]);
@@ -26,7 +35,7 @@ export function PublicPageShell({ title, updated, intro, children }: {
     <div className="min-h-dvh bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4 sm:px-6">
-          <a href="/" className="flex items-center gap-2 font-semibold">
+          <a href={SITE_URL} className="flex items-center gap-2 font-semibold">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Zap className="h-4 w-4" />
             </span>
@@ -58,7 +67,11 @@ export function PublicPageShell({ title, updated, intro, children }: {
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted-foreground sm:px-6">
-          <span>© {new Date().getFullYear()} LeadsFlow</span>
+          <span>
+            © {new Date().getFullYear()} {COMPANY.name}. LeadsFlow é uma marca da {COMPANY.name}.
+            <br />
+            {COMPANY.address}
+          </span>
           <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-foreground">{CONTACT_EMAIL}</a>
         </div>
       </footer>

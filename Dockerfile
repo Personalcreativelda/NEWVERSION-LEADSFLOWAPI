@@ -26,4 +26,6 @@ COPY --from=build /app/dist ./dist
 
 EXPOSE 3000
 
-CMD ["serve", "-s", "dist", "-l", "tcp://0.0.0.0:3000"]
+# Sem -s: as regras (páginas públicas em HTML já desenhado + resto para o app) estão em
+# dist/serve.json (public/serve.json)
+CMD ["serve", "dist", "-l", "tcp://0.0.0.0:3000"]

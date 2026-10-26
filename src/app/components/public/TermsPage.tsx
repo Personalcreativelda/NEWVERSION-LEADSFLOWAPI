@@ -1,15 +1,20 @@
-import { CONTACT_EMAIL, PublicPageShell, Section } from './PublicPageShell';
+import { COMPANY, CONTACT_EMAIL, PublicPageShell, Section } from './PublicPageShell';
 
 const mail = <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>;
 
-export default function TermsPage() {
+export default function TermsPage({ path }: { path?: string } = {}) {
   return (
     <PublicPageShell
+      path={path}
       title="Termos de uso"
       updated="26 de outubro de 2026"
       intro="Estes termos regem a utilização do LeadsFlow. Ao criar uma conta ou usar o serviço, aceita-os."
     >
       <Section id="servico" title="O serviço">
+        <p>
+          O LeadsFlow é uma marca e um produto da <strong>{COMPANY.name}</strong>, com sede em {COMPANY.address}, que
+          presta o serviço descrito nestes termos.
+        </p>
         <p>
           O LeadsFlow é uma plataforma para gerir leads, conversas em vários canais, campanhas, funis de vendas e
           automações, incluindo assistentes com inteligência artificial. Está disponível na web e na aplicação para
@@ -48,6 +53,23 @@ export default function TermsPage() {
           Ao ligar canais de terceiros (WhatsApp, Facebook, Instagram, Telegram, email ou SMS), compromete-se também a
           cumprir as regras dessas plataformas. Bloqueios ou restrições aplicados por elas às suas contas, por exemplo
           por envio de mensagens em massa, são da sua responsabilidade.
+        </p>
+      </Section>
+
+      <Section id="whatsapp" title="Regras do WhatsApp">
+        <p>Ao enviar mensagens de WhatsApp pelo LeadsFlow, compromete-se a cumprir as políticas do WhatsApp Business, em especial:</p>
+        <ul>
+          <li>só enviar mensagens a quem deu consentimento prévio (opt-in) para as receber da sua empresa, e respeitar de imediato os pedidos para deixar de receber;</li>
+          <li>fora da janela de 24 horas após a última mensagem do cliente, iniciar conversas apenas com modelos de mensagem aprovados pela Meta;</li>
+          <li>não vender nem promover produtos ou serviços proibidos pela Política de Comércio do WhatsApp;</li>
+          <li>usar os assistentes com inteligência artificial apenas para atender os clientes da sua empresa (apoio, vendas, marcações), e não como assistente de uso geral.</li>
+        </ul>
+        <p>
+          Consulte a{' '}
+          <a href="https://www.whatsapp.com/legal/business-policy" target="_blank" rel="noopener noreferrer">Política do WhatsApp Business</a>{' '}
+          e a{' '}
+          <a href="https://www.whatsapp.com/legal/commerce-policy" target="_blank" rel="noopener noreferrer">Política de Comércio</a>.
+          O incumprimento pode levar a Meta a restringir o seu número e o LeadsFlow a suspender o acesso ao canal.
         </p>
       </Section>
 

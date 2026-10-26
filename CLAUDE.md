@@ -66,6 +66,11 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
   `src/app/components/public/ApiDocsPage.tsx`.
 - Páginas públicas sem sessão (`src/standalone-app.tsx`, antes do App): `/privacidade` (`/privacy`),
   `/termos` (`/terms`), `/docs`. Instruções de eliminação de dados da Meta: `/privacidade#eliminacao-de-dados`.
+  O `npm run build` gera também `dist/privacidade.html` etc. já desenhados (`scripts/prerender-public.mjs`
+  + `src/public-pages-ssr.tsx`) para o verificador da Meta ler sem JavaScript; o `serve` (Dockerfile, sem
+  `-s`) usa `public/serve.json`. Nessas regras o "resto vai para o app" é `!**/*.html` — `**` voltava a
+  apanhar o `.html` e servia o app vazio. Empresa/morada num só sítio: `COMPANY` em `PublicPageShell.tsx`
+  (tem de coincidir com a verificação da empresa na Meta).
 - SQL com nomes de coluna vindos do pedido: só identificadores `^[a-z][a-z0-9_]*$` (entre aspas)
   ou lista fechada — houve injeção pelo nome da chave em leads/campanhas/contactos.
 

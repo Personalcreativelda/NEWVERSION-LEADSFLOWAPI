@@ -1,19 +1,25 @@
-import { CONTACT_EMAIL, PublicPageShell, Section } from './PublicPageShell';
+import { COMPANY, CONTACT_EMAIL, PublicPageShell, Section, SITE_URL } from './PublicPageShell';
 
 const mail = <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>;
 
-export default function PrivacyPage() {
+export default function PrivacyPage({ path }: { path?: string } = {}) {
   return (
     <PublicPageShell
+      path={path}
       title="Política de privacidade"
       updated="26 de outubro de 2026"
       intro="Esta política explica que dados o LeadsFlow trata, para quê, com quem os partilha e que direitos tem sobre eles."
     >
       <Section id="quem-somos" title="Quem somos">
         <p>
+          O LeadsFlow é uma marca e um produto da <strong>{COMPANY.name}</strong>, com sede em {COMPANY.address}, a
+          entidade responsável pelo tratamento de dados descrito nesta política. Neste documento, «LeadsFlow», «nós» e
+          «nosso» referem-se à {COMPANY.name}.
+        </p>
+        <p>
           O LeadsFlow é uma plataforma de gestão de leads, conversas e campanhas, disponível em{' '}
-          <a href="https://app.leadsflowapi.com">app.leadsflowapi.com</a> e na aplicação para Android. Para qualquer
-          questão sobre privacidade, contacte-nos em {mail}.
+          <a href={SITE_URL}>leadsflowapi.com</a>, em <a href="https://app.leadsflowapi.com">app.leadsflowapi.com</a> e
+          na aplicação para Android. Para qualquer questão sobre privacidade, contacte-nos em {mail}.
         </p>
         <p>
           Tratamos os dados de duas formas: como <strong>responsável</strong> pelos dados da sua conta (por exemplo, o seu
@@ -108,6 +114,26 @@ export default function PrivacyPage() {
           Para exercer estes direitos, escreva para {mail}. Respondemos no prazo de 30 dias. Se é contacto de um cliente
           do LeadsFlow (por exemplo, recebeu uma mensagem de uma empresa que usa a plataforma), dirija o pedido a essa
           empresa; ajudá-la-emos a responder.
+        </p>
+      </Section>
+
+      <Section id="dados-meta" title="Dados das plataformas da Meta">
+        <p>
+          Quando liga ao LeadsFlow uma conta do WhatsApp Business, uma página do Facebook ou uma conta do Instagram,
+          recebemos através das APIs da Meta os dados necessários para gerir essas conversas: identificadores das contas,
+          números e nomes de perfil dos contactos, mensagens, ficheiros e o estado de entrega das mensagens.
+        </p>
+        <ul>
+          <li>Usamos esses dados apenas para lhe prestar o serviço: mostrar e responder às conversas, enviar as mensagens e campanhas que pedir e executar as automações que configurar.</li>
+          <li>Não os vendemos, não os usamos para publicidade e não os partilhamos com terceiros, exceto os fornecedores necessários ao serviço descritos acima.</li>
+          <li>Não os usamos para treinar modelos de inteligência artificial.</li>
+          <li>Apagamo-los quando remove o canal, quando pede a eliminação da conta ou quando a Meta nos pede.</li>
+        </ul>
+        <p>
+          O tratamento destes dados cumpre também os{' '}
+          <a href="https://developers.facebook.com/terms" target="_blank" rel="noopener noreferrer">Termos da Plataforma da Meta</a>{' '}
+          e as{' '}
+          <a href="https://www.whatsapp.com/legal/business-policy" target="_blank" rel="noopener noreferrer">políticas do WhatsApp Business</a>.
         </p>
       </Section>
 
