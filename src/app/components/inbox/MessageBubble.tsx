@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import DOMPurify from 'dompurify';
 import { isInternalMediaUrl } from '../../utils/media-url';
 import { getLocale } from '../../utils/format';
+import { ImageViewer } from '../base/ImageViewer';
+import { saveRemoteFile } from '../../lib/saveFile';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -173,6 +175,7 @@ export function MessageBubble({
 }: MessageBubbleProps) {
     const isOut = message.direction === 'out';
     const [imageError, setImageError]       = useState(false);
+    const [viewerOpen, setViewerOpen]       = useState(false);
     // Média num host interno do servidor (ex.: MinIO) só abre pelo proxy da API: ir
     // direto ao proxy evita o pedido falhado (ERR_NAME_NOT_RESOLVED) na consola
     const [useProxy, setUseProxy]           = useState(() => isInternalMediaUrl(message.media_url));
@@ -395,17 +398,17 @@ export function MessageBubble({
                                 src={imageUrl}
                                 alt="Mídia"
                                 className="rounded-md w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                                onClick={() => window.open(imageUrl, '_blank')}
+                                onClick={() => setViewerOpen(true)}
                                 onError={handleImageError}
                             />
                         ) : (effectiveMediaType === 'image' || effectiveMediaType === 'sticker') && imageError ? (
-                            <a href={message.media_url} target="_blank" rel="noopener noreferrer"
-                                className={`flex items-center gap-2 p-3 rounded-xl cursor-pointer ${isOut ? 'bg-primary/15 hover:bg-primary/20' : 'bg-muted hover:bg-muted/70'}`}>
+                            <button type="button" onClick={() => void saveRemoteFile(message.media_url!, fileName)}
+                                className={`flex w-full items-center gap-2 p-3 rounded-xl cursor-pointer text-left ${isOut ? 'bg-primary/15 hover:bg-primary/20' : 'bg-muted hover:bg-muted/70'}`}>
                                 <svg className="w-5 h-5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
-                                <span className="text-xs opacity-60">Abrir imagem</span>
-                            </a>
+                                <span className="text-xs opacity-60">Guardar imagem</span>
+                            </button>
                         ) : effectiveMediaType === 'audio' ? (
                             <audio controls src={message.media_url} className="w-full max-w-[280px] h-10" preload="metadata">
                                 <a href={message.media_url} target="_blank" rel="noopener noreferrer">Ouvir áudio</a>
@@ -413,17 +416,19 @@ export function MessageBubble({
                         ) : effectiveMediaType === 'video' ? (
                             <video controls src={message.media_url} className="rounded-md w-full max-h-64" preload="metadata" />
                         ) : (
-                            <a href={message.media_url} target="_blank" rel="noopener noreferrer" download={fileName || undefined}
-                                className={`flex items-center gap-2 p-2.5 rounded-xl ${isOut ? 'bg-primary/15 text-foreground' : 'bg-muted text-foreground'}`}>
+                            <button type="button" onClick={() => void saveRemoteFile(message.media_url!, fileName)}
+                                className={`flex w-full items-center gap-2 p-2.5 rounded-xl text-left ${isOut ? 'bg-primary/15 text-foreground' : 'bg-muted text-foreground'}`}>
                                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                 </svg>
-                                <span className="truncate text-sm">{fileName || 'Documento'}</span>
+                                <span className="min-w-0 flex-1 truncate text-sm">{fileName || 'Documento'}</span>
                                 <svg className="w-4 h-4 flex-shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>
-                            </a>
+                            </button>
                         )}
+
+                        {viewerOpen && <ImageViewer src={imageUrl} fileName={fileName} onClose={() => setViewerOpen(false)} />}
 
                         {effectiveMediaType === 'audio' && message.id && (
                             <div className="mt-2">
@@ -464,13 +469,11 @@ export function MessageBubble({
                         {emailAttachments.length > 0 && (
                             <div className="mt-2 flex flex-col gap-1">
                                 {emailAttachments.map((att, idx) => (
-                                    <a
+                                    <button
                                         key={idx}
-                                        href={att.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        download={att.name}
-                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors
+                                        type="button"
+                                        onClick={() => void saveRemoteFile(att.url, att.name)}
+                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition-colors
                                             ${isOut
                                                 ? 'bg-primary/15 hover:bg-primary/20 text-foreground'
                                                 : 'bg-muted hover:bg-muted/70 text-foreground'
@@ -481,7 +484,7 @@ export function MessageBubble({
                                         <svg className="w-3.5 h-3.5 flex-shrink-0 opacity-50 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                         </svg>
-                                    </a>
+                                    </button>
                                 ))}
                             </div>
                         )}

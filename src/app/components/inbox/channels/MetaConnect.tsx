@@ -1,12 +1,11 @@
 // Ligar Facebook Messenger e Instagram com um toque: abre o login da Meta, e no regresso
 // mostra as páginas/contas da pessoa para escolher. Sem tokens nem URLs para copiar.
 import { useEffect, useState } from 'react';
-import { Browser } from '@capacitor/browser';
 import { Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AppModal } from '../../base/AppModal';
 import { BrandIcon } from '../../base/BrandIcon';
-import { isNativeApp } from '../../../../native';
+import { isNativeApp, openBrowser } from '../../../../native';
 import { instagramOAuthApi, metaOAuthApi, whatsappSignupApi, type InstagramLoginAccount, type MetaConnectResult, type MetaOAuthPage } from '../../../services/api/inbox';
 
 export type MetaProduct = 'facebook' | 'instagram';
@@ -19,7 +18,7 @@ export async function startMetaConnect(product: MetaProduct): Promise<boolean> {
   try {
     const native = isNativeApp();
     const url = await metaOAuthApi.start(native ? 'app' : 'web');
-    if (native) await Browser.open({ url, presentationStyle: 'popover' });
+    if (native) await openBrowser(url);
     else window.location.assign(url);
     return true;
   } catch (err: any) {
@@ -38,7 +37,7 @@ export async function startInstagramConnect(): Promise<boolean> {
   try {
     const native = isNativeApp();
     const url = await instagramOAuthApi.start(native ? 'app' : 'web');
-    if (native) await Browser.open({ url, presentationStyle: 'popover' });
+    if (native) await openBrowser(url);
     else window.location.assign(url);
     return true;
   } catch (err: any) {
@@ -49,14 +48,14 @@ export async function startInstagramConnect(): Promise<boolean> {
 }
 
 /**
- * WhatsApp Business oficial (Embedded Signup): abre a página da LeadsFlow com o login da Meta.
+ * WhatsApp Business oficial (Embedded Signup): abre o login da Meta diretamente.
  * Devolve false quando ainda não está configurado no servidor (o app usa o formulário manual).
  */
 export async function startWhatsAppConnect(): Promise<boolean> {
   try {
     const native = isNativeApp();
     const url = await whatsappSignupApi.start(native ? 'app' : 'web');
-    if (native) await Browser.open({ url, presentationStyle: 'popover' });
+    if (native) await openBrowser(url);
     else window.location.assign(url);
     return true;
   } catch (err: any) {
@@ -82,12 +81,16 @@ export function readMetaReturn(): { session?: string; error?: string; whatsapp?:
   const session = params.get('meta_session') || undefined;
   const error = params.get('meta_error') || undefined;
   const whatsapp = params.get('wa_connected') || undefined;
-  if (!session && !error && !whatsapp) return null;
+  // Mensagem da própria API (já em português) quando o WhatsApp oficial não ligou
+  const waError = params.get('wa_error') || undefined;
+  if (!session && !error && !whatsapp && !waError) return null;
   params.delete('meta_session');
   params.delete('meta_error');
   params.delete('wa_connected');
+  params.delete('wa_error');
   const qs = params.toString();
   window.history.replaceState(window.history.state, '', window.location.pathname + (qs ? `?${qs}` : ''));
+  if (waError) return { error: waError };
   if (error) return { error: ERRORS[error] || 'Não foi possível ligar ao Facebook. Tente de novo.' };
   if (whatsapp) return { whatsapp };
   return { session };

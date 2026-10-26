@@ -23,6 +23,25 @@ function toBase64(blob: Blob): Promise<string> {
   });
 }
 
+/**
+ * Descarrega um ficheiro do servidor (anexo de uma conversa) e guarda-o no aparelho, em vez
+ * de o abrir numa aba do browser com o endereço da API à vista.
+ */
+export async function saveRemoteFile(url: string, filename?: string | null): Promise<boolean> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(String(res.status));
+    const blob = await res.blob();
+    const fromUrl = decodeURIComponent(new URL(url, window.location.href).pathname.split('/').pop() || '');
+    const name = filename || fromUrl || 'ficheiro';
+    return await saveFile(name, blob, blob.type || 'application/octet-stream');
+  } catch {
+    // Ficheiro de fora que não deixa ser lido aqui (CORS): abre como antes
+    window.open(url, '_blank', 'noopener');
+    return false;
+  }
+}
+
 /** Devolve true quando o ficheiro ficou guardado (ou o download começou, no browser) */
 export async function saveFile(filename: string, content: string | Blob, mimeType: string): Promise<boolean> {
   const blob = typeof content === 'string' ? new Blob([content], { type: mimeType }) : content;

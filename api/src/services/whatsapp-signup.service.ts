@@ -5,7 +5,7 @@
 // Configuração: META_APP_ID, META_APP_SECRET e META_WA_CONFIG_ID (configuração do
 // Facebook Login for Business do tipo "WhatsApp Embedded Signup"; exige Tech Provider).
 import crypto from 'crypto';
-import { GRAPH_VERSION } from './meta-oauth.service';
+import { GRAPH_VERSION, metaRedirectUri } from './meta-oauth.service';
 
 const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
 const TIMEOUT_MS = 15_000;
@@ -48,12 +48,33 @@ async function graph(method: 'GET' | 'POST', path: string, token: string, body?:
   return data;
 }
 
-/** Código do Embedded Signup → token de negócio (no Embedded Signup não há redirect_uri) */
-export async function exchangeSignupCode(code: string): Promise<string> {
+/**
+ * Diálogo do Embedded Signup aberto diretamente no Facebook (sem página intermédia da API):
+ * o cliente só vê facebook.com e volta ao /api/oauth/meta/callback com ?code&state.
+ */
+export function buildSignupDialogUrl(state: string): string {
+  const params = new URLSearchParams({
+    client_id: process.env.META_APP_ID || '',
+    redirect_uri: metaRedirectUri(),
+    state,
+    config_id: waConfigId(),
+    response_type: 'code',
+    override_default_response_type: 'true',
+    extras: JSON.stringify({ setup: {}, featureType: '', sessionInfoVersion: '3' }),
+  });
+  return `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth?${params.toString()}`;
+}
+
+/**
+ * Código do Embedded Signup → token de negócio. Pelo SDK (popup) não há redirect_uri; pelo
+ * diálogo direto tem de ir o mesmo redirect_uri do pedido.
+ */
+export async function exchangeSignupCode(code: string, redirectUri?: string): Promise<string> {
   const url = new URL(`${GRAPH}/oauth/access_token`);
   url.searchParams.set('client_id', process.env.META_APP_ID || '');
   url.searchParams.set('client_secret', process.env.META_APP_SECRET || '');
   url.searchParams.set('code', code);
+  if (redirectUri) url.searchParams.set('redirect_uri', redirectUri);
   const res = await fetch(url.toString(), { signal: AbortSignal.timeout(TIMEOUT_MS) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data?.access_token) throw new MetaError(data?.error?.message || 'A Meta não aceitou a autorização.');
@@ -69,16 +90,47 @@ export interface SignupResult {
   pin: string;
 }
 
-/** Liga a conta WhatsApp Business ao LeadsFlow (webhooks + registo do número) */
-export async function completeSignup(input: { code: string; waba_id: string; phone_number_id?: string }): Promise<SignupResult> {
-  const token = await exchangeSignupCode(input.code);
-  const waba = String(input.waba_id);
+/**
+ * Contas WhatsApp Business partilhadas no Embedded Signup. Pelo diálogo direto não chega a
+ * mensagem do SDK com a WABA escolhida: vem nas granular_scopes do token.
+ */
+async function sharedWabaIds(token: string): Promise<string[]> {
+  const appToken = `${process.env.META_APP_ID || ''}|${process.env.META_APP_SECRET || ''}`;
+  const url = new URL(`${GRAPH}/debug_token`);
+  url.searchParams.set('input_token', token);
+  const data = await graph('GET', url.toString(), appToken);
+  const scopes: { scope: string; target_ids?: string[] }[] = data?.data?.granular_scopes || [];
+  const ids = scopes.find((s) => s.scope === 'whatsapp_business_management')?.target_ids
+    || scopes.find((s) => s.scope === 'whatsapp_business_messaging')?.target_ids
+    || [];
+  return ids.map(String);
+}
 
-  // Só a WABA (o número ainda não estava escolhido): usar o primeiro número da conta
+/**
+ * Liga a conta WhatsApp Business ao LeadsFlow (webhooks + registo do número).
+ * Sem waba_id/phone_number_id (diálogo direto): usa a conta partilhada e, nela, o primeiro
+ * número que ainda não esteja em `linkedPhoneIds` (os já ligados a este utilizador).
+ */
+export async function completeSignup(input: {
+  code: string; waba_id?: string; phone_number_id?: string; redirect_uri?: string; linkedPhoneIds?: Set<string>;
+}): Promise<SignupResult> {
+  const token = await exchangeSignupCode(input.code, input.redirect_uri);
+
+  let waba = input.waba_id ? String(input.waba_id) : '';
   let phoneId = input.phone_number_id ? String(input.phone_number_id) : '';
+  if (!waba) {
+    const wabas = await sharedWabaIds(token);
+    if (!wabas.length) throw new MetaError('A Meta não devolveu a conta do WhatsApp. Tente de novo.');
+    // Várias contas: a mais recente é a última da lista
+    waba = wabas[wabas.length - 1];
+  }
+
+  // Só a WABA (o número ainda não estava escolhido): um número da conta ainda por ligar
   if (!phoneId) {
     const list = await graph('GET', `/${encodeURIComponent(waba)}/phone_numbers`, token);
-    phoneId = list?.data?.[0]?.id ? String(list.data[0].id) : '';
+    const numbers: { id: string }[] = list?.data || [];
+    const fresh = numbers.find((n) => !input.linkedPhoneIds?.has(String(n.id))) || numbers[0];
+    phoneId = fresh?.id ? String(fresh.id) : '';
     if (!phoneId) throw new MetaError('A conta WhatsApp Business ainda não tem um número. Adicione um número e tente de novo.');
   }
 

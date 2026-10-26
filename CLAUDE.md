@@ -56,6 +56,12 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
   No app volta por `com.leadsflowapi.app://oauth/meta`. Sem `META_APP_ID`/`META_APP_SECRET` usa o formulário manual.
 - Webhooks da Meta de canais ligados pelo login têm de vir assinados com `META_APP_SECRET`.
 - Rotas `/debug` e `/test` dos webhooks só para administradores (`requireAdmin`).
+- WhatsApp oficial (Embedded Signup): o app abre o diálogo do Facebook diretamente (sem página
+  intermédia com o endereço da API); volta ao mesmo `/api/oauth/meta/callback` (state com `k: 'wa'`)
+  e a WABA vem do `debug_token` (granular_scopes). `META_WA_SIGNUP_PAGE=true` repõe a página com o SDK.
+- Nada de mostrar endereços da API ao utilizador: Custom Tabs só para logins de terceiros
+  (`openBrowser()` em `native.ts`, barra da cor do app); imagens das conversas em `ImageViewer`
+  e anexos com `saveRemoteFile()` (Transferências), não numa aba do browser.
 - WhatsApp oficial (canais `whatsapp_cloud`): Definições → WhatsApp Business
   (`settings/WhatsAppBusinessSettings.tsx`) gere conta, números (verificar/ativar/usar no canal),
   perfil e modelos (criar/apagar/estado). API em `/api/whatsapp-business/*`

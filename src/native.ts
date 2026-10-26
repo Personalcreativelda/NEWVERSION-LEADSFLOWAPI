@@ -21,6 +21,14 @@ export function haptic(strength: 'light' | 'medium' = 'light') {
   Haptics.impact({ style: strength === 'medium' ? ImpactStyle.Medium : ImpactStyle.Light }).catch(() => {});
 }
 
+// Cor atual do fundo do app (syncSystemBars): a barra das Custom Tabs fica igual ao app
+let appBarColor: string | undefined;
+
+/** Abre uma página numa Custom Tab por cima do app, com a barra da cor do app */
+export function openBrowser(url: string) {
+  return Browser.open({ url, toolbarColor: appBarColor, presentationStyle: 'popover' });
+}
+
 let oauthCompleting = false;
 
 // Abre o login Google numa Custom Tab do Chrome (o Google bloqueia login dentro do WebView).
@@ -30,7 +38,7 @@ export async function openNativeOAuth(url: string): Promise<never> {
   await new Promise<void>((resolve) => {
     Browser.addListener('browserFinished', () => {
       if (!oauthCompleting) resolve();
-    }).then(() => Browser.open({ url }));
+    }).then(() => openBrowser(url));
   });
   await Browser.removeAllListeners();
   throw new Error('Login com Google cancelado.');
@@ -97,6 +105,7 @@ function syncSystemBars(): () => void {
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
     const dark = 0.299 * r + 0.587 * g + 0.114 * b < 140;
     const key = color + dark;
+    appBarColor = color;
     if (key === last) return;
     last = key;
     SystemBars.setColors({ color, dark }).catch(() => {});
@@ -147,7 +156,7 @@ function routeExternalUrl(rawUrl: string): 'in-app' | 'overlay' | null {
 function openRouted(rawUrl: string, route: 'in-app' | 'overlay') {
   const href = new URL(rawUrl, window.location.href).href;
   if (route === 'in-app') window.location.href = href;
-  else Browser.open({ url: href }).catch(() => {});
+  else openBrowser(href).catch(() => {});
 }
 
 // Mantém o utilizador dentro do app: pagamentos abrem no próprio app e restantes links

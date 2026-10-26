@@ -12,6 +12,7 @@ import {
   instagramViaFacebook, listPages, loadSession, readState, returnUrl, saveSession, subscribePage, type MetaPage, type OAuthPlatform,
 } from '../services/meta-oauth.service';
 import { subscribeInstagramAccount } from '../services/instagram-oauth.service';
+import { finishWhatsAppSignup } from './whatsapp-signup.routes';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -33,6 +34,9 @@ router.get('/callback', async (req, res) => {
   const state = readState(String(req.query.state || ''));
   // Sem state válido não se sabe de quem é: volta ao painel web com erro
   if (!state) return res.redirect(returnUrl('web', { meta_error: 'invalid_state' }));
+
+  // Embedded Signup do WhatsApp oficial (mesmo redirect_uri, já autorizado na app da Meta)
+  if (state.kind === 'whatsapp') return res.redirect(await finishWhatsAppSignup(state, req.query));
 
   if (req.query.error || !req.query.code) {
     // Cancelado no Facebook ("Agora não") ou permissões recusadas
