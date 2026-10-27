@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { isStorageUrl } from '../utils/storage-urls';
+import { isStorageUrl, publicFileUrl } from '../utils/storage-urls';
+import { convertToM4a, isMetaFriendlyAudio } from '../utils/audio-convert';
 
 /**
  * Destino aceite pelo /media-proxy além do armazenamento: hosts públicos (CDNs de
@@ -2359,6 +2360,8 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
     }
 
     const finalAudioUrl = audioUrl || req.body.audio_url;
+    // O que fica gravado na conversa (no Instagram/Messenger passa a ser o M4A convertido)
+    let messageAudioUrl = finalAudioUrl;
     let result: any = null;
 
     if (channelType === 'whatsapp') {
@@ -2479,12 +2482,29 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
         return res.status(500).json({ error: 'Instagram/Facebook channel not properly configured' });
       }
       const graphApiUrl = metaMessagesUrl(accessToken, channelCredentials?.page_id);
+
+      // O app grava WebM/OGG (Opus): o Instagram só aceita AAC/M4A, MP4 ou WAV e o Messenger
+      // também falha com WebM. Converte para M4A antes de enviar.
+      let metaAudioUrl = finalAudioUrl;
+      if (req.file?.buffer && !isMetaFriendlyAudio(req.file.mimetype)) {
+        try {
+          const m4a = await convertToM4a(req.file.buffer);
+          metaAudioUrl = await getStorageService().uploadBuffer(m4a, `audio_${Date.now()}.m4a`, 'audio/mp4', 'inbox-media', user.id);
+          messageAudioUrl = metaAudioUrl;
+        } catch (convertErr: any) {
+          console.error('[Inbox Audio] Conversão para M4A falhou:', convertErr?.message);
+          return res.status(500).json({ error: 'Não foi possível preparar o áudio para enviar. Tente de novo.' });
+        }
+      }
+
+      // A Meta descarrega o ficheiro: tem de ser o endereço público da API (/api/files/…)
       const audioPayload = {
         recipient: { id: recipientId },
         message: {
           attachment: {
             type: 'audio',
-            payload: { url: finalAudioUrl, is_reusable: true }
+            // is_reusable só existe no Messenger; o Instagram recusa campos que não conhece
+            payload: channelType === 'facebook' ? { url: publicFileUrl(metaAudioUrl), is_reusable: true } : { url: publicFileUrl(metaAudioUrl) }
           }
         }
       };
@@ -2496,7 +2516,8 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
       result = await response.json();
       if (!response.ok) {
         console.error('[Inbox Audio] Instagram/Facebook error:', result);
-        return res.status(500).json({ error: 'Failed to send audio via Instagram/Facebook', details: result?.error?.message });
+        const channelName = channelType === 'instagram' ? 'Instagram' : 'Messenger';
+        return res.status(500).json({ error: `O ${channelName} não aceitou o áudio: ${result?.error?.message || 'erro desconhecido'}`, details: result?.error?.message });
       }
       console.log('[Inbox Audio] Instagram/Facebook result:', result);
 
@@ -2535,7 +2556,7 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
       status: 'sent',
       sent_at: new Date().toISOString(),
       external_id: externalId,
-      media_url: finalAudioUrl,
+      media_url: messageAudioUrl,
       media_type: 'audio',
       metadata: { external_result: result, remote_jid: remoteJid, channel_type: channelType },
     }, user.id);

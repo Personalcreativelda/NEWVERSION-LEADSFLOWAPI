@@ -97,6 +97,14 @@ export function rewriteStorageUrls<T>(value: T): T {
   }
 }
 
+/**
+ * URL público de um ficheiro nosso pela API (/api/files/<chave>), para serviços de fora
+ * (ex.: a Meta descarregar um áudio). Sem endereço público da API, devolve o original.
+ */
+export function publicFileUrl(url: string): string {
+  return JSON.parse(rewriteStorageUrlsInJson(JSON.stringify(url)));
+}
+
 /** true se o URL é um ficheiro do nosso armazenamento (MinIO) */
 export function isStorageUrl(url: string): boolean {
   return storagePrefixes().some((prefix) => url.startsWith(prefix));
