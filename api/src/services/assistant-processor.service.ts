@@ -764,6 +764,12 @@ export class AssistantProcessorService {
         }
         // ─────────────────────────────────────────────────────────────────────────
 
+        // Por último (o que vem no fim pesa mais) e em inglês: com instruções e histórico em
+        // português, a IA respondia "Olá!" a um "Hello"
+        messages[0].content += '\n\n---\nLANGUAGE RULE (highest priority): reply in the language of the customer\'s LATEST message, ' +
+            'even if these instructions or earlier messages are in another language. ' +
+            'If the latest message is "Hello", "Hi" or any English text, reply in English; if it is in Portuguese, reply in Portuguese; and so on.\n---';
+
         messages.push(...history);
 
         // Adicionar mensagem atual (NÃO está em `history` pois fizemos slice(0,-1))
