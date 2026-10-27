@@ -88,7 +88,7 @@ function EmailHtmlBody({ html }: { html: string }) {
     const PREVIEW_HEIGHT = 200;
 
     return (
-        <div className="relative">
+        <div className="relative" translate="no">
             <div
                 className="overflow-hidden transition-all duration-200"
                 style={expanded ? undefined : { maxHeight: PREVIEW_HEIGHT }}
@@ -464,7 +464,7 @@ export function MessageBubble({
                         {emailHtml ? (
                             <EmailHtmlBody html={emailHtml} />
                         ) : (
-                            <div className="whitespace-pre-wrap break-words text-sm">{message.content}</div>
+                            <div translate="no" className="whitespace-pre-wrap break-words text-sm">{message.content}</div>
                         )}
                         {emailAttachments.length > 0 && (
                             <div className="mt-2 flex flex-col gap-1">
@@ -493,7 +493,7 @@ export function MessageBubble({
 
                 {/* Text Content (non-email) */}
                 {showTextContent && (
-                    <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                    <div translate="no" className="whitespace-pre-wrap break-words">{message.content}</div>
                 )}
 
                 {/* Metadata row */}

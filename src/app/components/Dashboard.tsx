@@ -71,6 +71,7 @@ import { useLeadsAutoRefresh } from '../hooks/useLeadsAutoRefresh';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useConfirm } from './ui/ConfirmDialog';
 import { Language, loadLanguage, saveLanguage, translations, Translations } from '../utils/i18n';
+import { setUiLanguage } from '../i18n/domTranslator';
 
 import { AlertTriangle, CheckCircle2, CopyX, MailX, LayoutDashboard, Users, MessageSquare, BarChart2, Menu, FileText, Workflow } from 'lucide-react';
 import { PageHeader, PageAction, PageFab } from './base/PageHeader';
@@ -863,6 +864,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   const handleLanguageChange = (newLanguage: Language) => {
     setLanguage(newLanguage);
     saveLanguage(newLanguage);
+    void setUiLanguage(newLanguage);
     toast.success(`${newLanguage === 'pt' ? 'Idioma' : newLanguage === 'en' ? 'Language' : newLanguage === 'es' ? 'Idioma' : 'Langue'} ${newLanguage === 'pt' ? 'alterado' : newLanguage === 'en' ? 'changed' : newLanguage === 'es' ? 'cambiado' : 'changé'}!`);
   };
 

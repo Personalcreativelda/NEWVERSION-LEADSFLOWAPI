@@ -172,7 +172,7 @@ export default function RefactoredHeader({
                 </button>
 
                 {languageMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-52 rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[1100] bg-card border border-border">
+                  <div translate="no" className="absolute right-0 mt-2 w-52 rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[1100] bg-card border border-border">
                     <div className="p-1">
                       {LANGUAGES.map((lang) => (
                         <button

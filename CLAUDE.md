@@ -155,6 +155,12 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
   Precisa de `init: true` no docker-compose (o PID 1 de um contentor ignora sinais vindos de dentro).
 - SIGTERM (deploy): deixa terminar os pedidos em curso, até 8 s.
 - Pesquisa: `matchesSearch` (`src/app/utils/search.ts`) — sem acentos, várias palavras.
+- Idiomas (en/es/fr): os textos ficam em português no código; `src/app/i18n/domTranslator.ts` troca-os
+  no ecrã pelo dicionário `src/app/i18n/locales/<idioma>.json`. Texto novo na interface →
+  `node scripts/i18n/extract.mjs`, `node scripts/i18n/merge.mjs --split`, traduzir os `chunks/NN.src.txt`
+  em `chunks/NN.json` ({ "índice": [en, es, fr] }, mesmas variáveis `{0}`) e `node scripts/i18n/merge.mjs`.
+  Estados que vêm dos dados em minúsculas: `scripts/i18n/extras.json`. Conteúdo dos clientes
+  (mensagens, emails) e nomes de idiomas levam `translate="no"`.
 - Avisos: `toast` do sonner (`ui/sonner.tsx` deduplica mensagens iguais e tira ✅/❌/⚠️ do início).
 - Ordem das camadas: cabeçalho z-30 < sidebar z-40 < barra inferior z-45 < gaveta 46/47 <
   modais ≥ 50 (Radix 9998/9999). Não voltar a pôr sidebar/cabeçalho com z-index alto.
