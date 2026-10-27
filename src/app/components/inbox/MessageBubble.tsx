@@ -294,6 +294,10 @@ export function MessageBubble({
     const mediaPlaceholders = ['[Mídia]', '[Imagem]', '[Vídeo]', '[Áudio]', '[Documento]', '[Sticker]', '[image]', '[video]', '[audio]', '[document]', '[sticker]'];
     const isMediaPlaceholder = mediaPlaceholders.includes(message.content || '');
     const isAutomated        = (message.metadata as any)?.automated === true || (message.metadata as any)?.source === 'ai_assistant';
+    // Textos do próprio sistema (não escritos por pessoas) seguem o idioma do painel
+    const systemTexts        = ['Mensagem de voz', 'Mídia', 'Imagem', 'Vídeo', 'Áudio', 'Documento', 'Audio'];
+    const isSystemText       = isMediaPlaceholder || systemTexts.includes(message.content || '') || (message.content || '').startsWith('🤖 Assistente ');
+    const contentTranslate   = isSystemText ? undefined : 'no';
 
     // ── Email-specific metadata ───────────────────────────────────────────────
     const isEmail = message.channel === 'email';
@@ -464,7 +468,7 @@ export function MessageBubble({
                         {emailHtml ? (
                             <EmailHtmlBody html={emailHtml} />
                         ) : (
-                            <div translate="no" className="whitespace-pre-wrap break-words text-sm">{message.content}</div>
+                            <div translate={contentTranslate} className="whitespace-pre-wrap break-words text-sm">{message.content}</div>
                         )}
                         {emailAttachments.length > 0 && (
                             <div className="mt-2 flex flex-col gap-1">
@@ -493,7 +497,7 @@ export function MessageBubble({
 
                 {/* Text Content (non-email) */}
                 {showTextContent && (
-                    <div translate="no" className="whitespace-pre-wrap break-words">{message.content}</div>
+                    <div translate={contentTranslate} className="whitespace-pre-wrap break-words">{message.content}</div>
                 )}
 
                 {/* Metadata row */}

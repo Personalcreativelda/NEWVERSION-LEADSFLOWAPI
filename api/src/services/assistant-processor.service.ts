@@ -616,6 +616,16 @@ export class AssistantProcessorService {
         }
     }
 
+    /** Nome do negócio para as instruções: o nome do canal (página, conta, número) */
+    private async businessName(channelId: string): Promise<string> {
+        try {
+            const r = await query('SELECT name FROM channels WHERE id = $1', [channelId]);
+            const name = String(r.rows[0]?.name || '').trim();
+            if (name) return name;
+        } catch { /* sem nome: segue o genérico */ }
+        return 'nossa empresa';
+    }
+
     /**
      * Constrói array de mensagens para enviar à IA,
      * incorporando memória de curto e longo prazo
@@ -642,7 +652,17 @@ export class AssistantProcessorService {
             systemPrompt = `Você é ${assistant.assistant_name}, um assistente virtual inteligente. Responda de forma educada, profissional e útil.`;
         }
 
-        systemPrompt += '\n\nResponda sempre no mesmo idioma do cliente. Mantenha respostas concisas e diretas.';
+        // Os assistentes do marketplace trazem "[Nome da Empresa]" por preencher: usa o nome
+        // do canal (ex.: a página do Facebook) para o cliente nunca ver o marcador
+        if (/\[nome da empresa\]/i.test(systemPrompt)) {
+            const businessName = await this.businessName(ctx.channelId);
+            systemPrompt = systemPrompt.replace(/\[nome da empresa\]/gi, businessName);
+        }
+
+        // O idioma do cliente vence o das instruções (os modelos dizem "responda em português")
+        systemPrompt += '\n\nIDIOMA: responda sempre no idioma em que o cliente escreveu a última mensagem ' +
+            '(ex.: se escrever em inglês, responda em inglês), mesmo que as instruções acima indiquem outro idioma. ' +
+            'Mantenha respostas concisas e diretas.';
 
         // Escalação pela IA: o processador detecta o marcador, remove-o e passa a conversa para um humano
         if (config.escalation_enabled !== false) {

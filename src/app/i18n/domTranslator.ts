@@ -17,6 +17,8 @@ const LOADERS: Record<Exclude<Language, 'pt'>, () => Promise<{ default: Record<s
 
 const ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
 const SKIP_SELECTOR = '[translate="no"], .notranslate, script, style, code, pre, textarea, [contenteditable="true"], #lfw-window';
+// Campos onde se escreve: o texto lá dentro é do utilizador, mas o placeholder/título traduz-se
+const EDITABLE_SELECTOR = 'textarea, [contenteditable="true"]';
 
 let dict: Dict | null = null;
 let observer: MutationObserver | null = null;
@@ -95,7 +97,7 @@ function processText(node: Text) {
 }
 
 function processAttrs(el: Element) {
-  if (skipped(el)) return;
+  if (skipped(el) && !(el.matches(EDITABLE_SELECTOR) && !skipped(el.parentElement))) return;
   for (const name of ATTRS) {
     const value = el.getAttribute(name);
     if (!value) continue;
@@ -114,11 +116,15 @@ function processTree(root: Node) {
   if (root.nodeType === Node.TEXT_NODE) { processText(root as Text); return; }
   if (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) return;
   if (root.nodeType === Node.ELEMENT_NODE) {
-    if (skipped(root as Element)) return;
     processAttrs(root as Element);
+    if (skipped(root as Element)) return;
   }
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
-    acceptNode: (n) => (n.nodeType === Node.ELEMENT_NODE && (n as Element).matches(SKIP_SELECTOR) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    acceptNode: (n) => {
+      if (n.nodeType !== Node.ELEMENT_NODE || !(n as Element).matches(SKIP_SELECTOR)) return NodeFilter.FILTER_ACCEPT;
+      processAttrs(n as Element); // ex.: placeholder de uma textarea
+      return NodeFilter.FILTER_REJECT;
+    },
   });
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     if (n.nodeType === Node.TEXT_NODE) processText(n as Text);
