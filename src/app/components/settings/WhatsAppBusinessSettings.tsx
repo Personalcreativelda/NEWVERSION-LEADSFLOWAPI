@@ -85,6 +85,14 @@ function numberState(n: WaPhoneNumber): { label: string; className: string; next
   return { label: 'Por verificar', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400', next: 'verify' };
 }
 
+/** Nome de exibição ainda sem aprovação da Meta (os números virtuais não enviam até ser aprovado) */
+const NAME_STATUS: Record<string, { label: string; className: string }> = {
+  PENDING_REVIEW: { label: 'Nome em análise', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
+  NONE: { label: 'Nome por aprovar', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
+  DECLINED: { label: 'Nome recusado', className: 'bg-red-500/10 text-red-600 dark:text-red-400' },
+  EXPIRED: { label: 'Nome expirado', className: 'bg-red-500/10 text-red-600 dark:text-red-400' },
+};
+
 const errorText = (error: unknown) => (error instanceof Error ? error.message : 'Não foi possível concluir.');
 
 export default function WhatsAppBusinessSettings({ onOpenChannels }: { onOpenChannels?: () => void }) {
@@ -202,6 +210,9 @@ function AccountTab({ channelId }: { channelId: string }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-base text-foreground tabular-nums">{n.display_phone_number}</span>
                     <Chip className={state.className}>{state.label}</Chip>
+                    {n.name_status && NAME_STATUS[n.name_status] && (
+                      <Chip className={NAME_STATUS[n.name_status].className}>{NAME_STATUS[n.name_status].label}</Chip>
+                    )}
                     {n.in_use && <Chip className="bg-primary/10 text-primary">Neste canal</Chip>}
                   </div>
                   {/* Cada parte no seu próprio elemento: o tradutor do ecrã troca texto a texto */}

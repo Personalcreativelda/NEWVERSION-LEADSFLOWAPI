@@ -26,6 +26,10 @@ export class CloudSendError extends Error {
 
 /** Erros da Meta em texto para quem usa o painel */
 function friendlyError(code: number | undefined, message: string): string {
+  // Números virtuais do WhatsApp: só enviam depois de a Meta aprovar o nome de exibição
+  if (/display name approval/i.test(message)) {
+    return 'Este número só pode enviar mensagens depois de a Meta aprovar o nome de exibição. Veja o estado em Definições → WhatsApp Business.';
+  }
   switch (code) {
     case 131047: return 'Passaram mais de 24 horas desde a última mensagem deste contacto. Só é possível enviar um modelo aprovado.';
     case 131026: return 'Este número não pode receber mensagens no WhatsApp.';

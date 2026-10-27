@@ -63,5 +63,10 @@
  "Não foi possível enviar pelo WhatsApp. Tente de novo.": ["Couldn't send via WhatsApp. Try again.", "No se pudo enviar por WhatsApp. Inténtalo de nuevo.", "Impossible d'envoyer via WhatsApp. Réessayez."],
  "Não foi possível enviar o áudio pelo WhatsApp. Tente de novo.": ["Couldn't send the audio via WhatsApp. Try again.", "No se pudo enviar el audio por WhatsApp. Inténtalo de nuevo.", "Impossible d'envoyer l'audio via WhatsApp. Réessayez."],
  "Ficheiro em falta.": ["File missing.", "Falta el archivo.", "Fichier manquant."],
- "Canal sem token configurado. Reconecte o canal.": ["The channel has no token set up. Reconnect the channel.", "El canal no tiene token configurado. Vuelve a conectar el canal.", "Le canal n'a pas de jeton configuré. Reconnectez le canal."]
+ "Canal sem token configurado. Reconecte o canal.": ["The channel has no token set up. Reconnect the channel.", "El canal no tiene token configurado. Vuelve a conectar el canal.", "Le canal n'a pas de jeton configuré. Reconnectez le canal."],
+ "Este número só pode enviar mensagens depois de a Meta aprovar o nome de exibição. Veja o estado em Definições → WhatsApp Business.": ["This number can only send messages after Meta approves its display name. Check the status in Settings → WhatsApp Business.", "Este número solo puede enviar mensajes cuando Meta apruebe el nombre visible. Consulta el estado en Configuración → WhatsApp Business.", "Ce numéro ne peut envoyer des messages qu'après l'approbation du nom d'affichage par Meta. Vérifiez l'état dans Paramètres → WhatsApp Business."],
+ "Nome em análise": ["Name in review", "Nombre en revisión", "Nom en cours d'examen"],
+ "Nome por aprovar": ["Name not approved yet", "Nombre sin aprobar", "Nom pas encore approuvé"],
+ "Nome recusado": ["Name rejected", "Nombre rechazado", "Nom refusé"],
+ "Nome expirado": ["Name expired", "Nombre caducado", "Nom expiré"]
 }
