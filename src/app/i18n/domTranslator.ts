@@ -69,6 +69,8 @@ export function translateText(text: string): string | null {
   const [, lead, body, trail] = match;
   const core = body.replace(/\s+/g, ' ');
   if (!core || !/[A-Za-zÀ-ÿ]/.test(core)) return null;
+  // Uma ou duas letras soltas são quase sempre iniciais de avatar ("O" virava "The"), não palavras
+  if (core.length <= 2 && core !== 'IA') return null;
   let out = dict.exact.get(core);
   if (out === undefined) {
     for (const p of dict.patterns) {

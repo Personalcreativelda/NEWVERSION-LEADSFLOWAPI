@@ -1,4 +1,5 @@
 // INBOX: Conversation item - ManyChat-style
+import React from 'react';
 import type { ConversationWithDetails, ConversationTagInfo } from '../../types/inbox';
 import { formatRelativeDay } from '../../utils/format';
 import { usableImageUrl } from '../../utils/media-url';
@@ -19,7 +20,7 @@ import { BrandIcon } from '../base/BrandIcon';
 interface ConversationItemProps {
     conversation: ConversationWithDetails;
     isSelected: boolean;
-    onClick: () => void;
+    onClick: (conversation: ConversationWithDetails) => void;
 }
 
 // Mapa de cores para etiquetas do funil de vendas - simplified with opacity pattern
@@ -92,7 +93,7 @@ function ChannelIcon({ type, provider, size = 10 }: { type: string; provider?: s
     }
 }
 
-export function ConversationItem({ conversation, isSelected, onClick }: ConversationItemProps) {
+function ConversationItemView({ conversation, isSelected, onClick }: ConversationItemProps) {
     const contact = conversation.contact;
     const lastMessage = conversation.last_message;
     const channel = conversation.channel;
@@ -141,7 +142,7 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
 
     return (
         <div
-            onClick={onClick}
+            onClick={() => onClick(conversation)}
             className={`
                 group relative flex items-start gap-3 px-4 py-4 cursor-pointer border-b border-border/50
                 transition-colors duration-150
@@ -296,3 +297,6 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
         </div>
     );
 }
+
+// Só redesenha a conversa que mudou (nova mensagem, lida…), não a lista inteira
+export const ConversationItem = React.memo(ConversationItemView);

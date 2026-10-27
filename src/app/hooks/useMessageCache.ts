@@ -17,7 +17,7 @@
  * if cache is populated (same as before).
  */
 import type { MessageWithSender } from '../types/inbox';
-import { idbSaveMessages, idbLoadMessages, idbLoadAllMessageKeys } from '../lib/idbStore';
+import { idbSaveMessages, idbLoadMessages, idbLoadAllMessageKeys, MESSAGE_CACHE_VERSION } from '../lib/idbStore';
 
 interface CacheEntry {
     messages:   MessageWithSender[];
@@ -63,7 +63,7 @@ export async function initMessageCacheFromIDB(): Promise<void> {
             await Promise.all(
                 keys.map(async (convId) => {
                     const entry = await idbLoadMessages(convId);
-                    if (!entry) return;
+                    if (!entry || entry.v !== MESSAGE_CACHE_VERSION) return;
                     if (now - entry.savedAt > IDB_MAX_AGE_MS) return;
                     if (!cache.has(convId)) {
                         cache.set(convId, {

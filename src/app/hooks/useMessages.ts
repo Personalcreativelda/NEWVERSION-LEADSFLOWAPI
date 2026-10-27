@@ -14,10 +14,8 @@ import {
     isCacheFresh,
     patchCachedMessage,
     patchCachedMessageStatus,
-    saveScrollPosition,
-    getScrollPosition,
-    clearScrollPosition,
 } from './useMessageCache';
+import { isSocketConnected } from './useWebSocket';
 
 // Helper para gerar ID temporário
 const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -52,8 +50,39 @@ function withQueuedBubbles(conversationId: string, list: MessageWithSender[]): M
     return queued.length > 0 ? [...list, ...queued] : list;
 }
 
-// Intervalo de polling de mensagens (60 segundos) - fallback quando WebSocket falha
-const MESSAGE_POLLING_INTERVAL = 60_000;
+/** Mensagens por página: a primeira traz as mais recentes, as seguintes vêm ao subir no chat */
+const PAGE_SIZE = 50;
+// Pedido de segurança caso o WebSocket perca eventos: raro com a ligação ativa, mais frequente sem ela
+const POLL_CONNECTED = 60_000;
+const POLL_DISCONNECTED = 15_000;
+
+const isTemp = (m: MessageWithSender) => m.id.startsWith('temp_');
+const time = (m: MessageWithSender) => new Date(m.created_at).getTime();
+
+/**
+ * Junta a página mais recente vinda da API ao que está no ecrã: a página substitui as mesmas
+ * mensagens (estados atualizados), ficam as antigas já carregadas, as que o WebSocket trouxe
+ * enquanto o pedido decorria e as bolhas ainda por confirmar.
+ */
+function mergeLatest(prev: MessageWithSender[], latest: MessageWithSender[]): MessageWithSender[] {
+    const temps = prev.filter(isTemp);
+    if (latest.length === 0) return temps;
+    const ids = new Set(latest.map((m) => m.id));
+    const first = time(latest[0]);
+    const last = time(latest[latest.length - 1]);
+    const older = prev.filter((m) => !isTemp(m) && !ids.has(m.id) && time(m) < first);
+    const newer = prev.filter((m) => !isTemp(m) && !ids.has(m.id) && time(m) > last);
+    return [...older, ...latest, ...newer, ...temps];
+}
+
+/** Lista igual (mesmos ids e estados)? Evita redesenhar o chat quando nada mudou */
+function sameList(a: MessageWithSender[], b: MessageWithSender[]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i].id !== b[i].id || a[i].status !== b[i].status || a[i].media_url !== b[i].media_url) return false;
+    }
+    return true;
+}
 
 export function useMessages(conversationId: string | null) {
     // Initialise from cache instantly — no loading spinner on switch
@@ -63,12 +92,17 @@ export function useMessages(conversationId: string | null) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [sending, setSending] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingOlder, setLoadingOlder] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    /** Conversa aberta agora: respostas que chegam depois de mudar de conversa são ignoradas */
+    const activeIdRef = useRef(conversationId);
+    activeIdRef.current = conversationId;
+    const loadingOlderRef = useRef(false);
+    const messagesRef = useRef(messages);
+    messagesRef.current = messages;
     /** Ref to the scroll container — set by ChatBackground / parent */
     const scrollContainerRef = useRef<HTMLElement | null>(null);
-    /** Track the previous conversation so we can save its scroll position */
-    const prevConversationIdRef = useRef<string | null>(null);
 
     // ── Fetch messages (background-friendly) ────────────────
     const fetchMessages = useCallback(async (opts?: { silent?: boolean }) => {
@@ -82,23 +116,51 @@ export function useMessages(conversationId: string | null) {
         try {
             if (!silent) setLoading(true);
             setError(null);
-            const data = await conversationsApi.getMessages(conversationId, { limit: 100 });
+            const data = await conversationsApi.getMessages(conversationId, { limit: PAGE_SIZE });
+            if (activeIdRef.current !== conversationId) return;
 
-            // Preserve any temp_ (optimistic) messages still in-flight, and the ones waiting in the offline queue
+            // Mantém as antigas já carregadas, as bolhas em envio e as que esperam na fila offline
             setMessages(prev => {
-                const tempMessages = prev.filter(m => m.id.startsWith('temp_'));
-                const merged = withQueuedBubbles(conversationId, [...data, ...tempMessages]);
-                // Write-through to cache
+                const mine = prev.filter((m) => !m.conversation_id || m.conversation_id === conversationId);
+                const merged = withQueuedBubbles(conversationId, mergeLatest(mine, data));
+                if (sameList(prev, merged)) return prev;
                 setCachedMessages(conversationId, merged);
                 return merged;
             });
+            setHasMore((prev) => (data.length < PAGE_SIZE ? false : prev));
         } catch (err: any) {
             console.error('[useMessages] Error fetching:', err);
-            if (!silent) setError(err.message || 'Failed to load messages');
+            if (!silent && activeIdRef.current === conversationId) setError(err.message || 'Failed to load messages');
         } finally {
             if (!silent) setLoading(false);
         }
     }, [conversationId]);
+
+    /** Carrega as mensagens anteriores à mais antiga no ecrã (ao chegar ao topo do chat) */
+    const loadOlder = useCallback(async () => {
+        if (!conversationId || loadingOlderRef.current || !hasMore) return;
+        const oldest = messagesRef.current.find((m) => !isTemp(m));
+        if (!oldest) return;
+        loadingOlderRef.current = true;
+        setLoadingOlder(true);
+        try {
+            const data = await conversationsApi.getMessages(conversationId, { limit: PAGE_SIZE, before: oldest.id });
+            if (activeIdRef.current !== conversationId) return;
+            if (data.length < PAGE_SIZE) setHasMore(false);
+            if (data.length === 0) return;
+            setMessages((prev) => {
+                const present = new Set(prev.map((m) => m.id));
+                const next = [...data.filter((m) => !present.has(m.id)), ...prev];
+                setCachedMessages(conversationId, next);
+                return next;
+            });
+        } catch (err) {
+            console.error('[useMessages] Error loading older:', err);
+        } finally {
+            loadingOlderRef.current = false;
+            setLoadingOlder(false);
+        }
+    }, [conversationId, hasMore]);
 
     // Envio otimista - mostra mensagem imediatamente
     const sendMessage = useCallback(async (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string) => {
@@ -259,14 +321,18 @@ export function useMessages(conversationId: string | null) {
             if (prev.some(m => m.id === message.id)) {
                 return prev;
             }
-            // Para mensagens de saída (out) vindas do WebSocket:
-            // Se existe uma mensagem temp_ pendente com mesmo conteúdo, substituir
+            // Mensagem enviada por nós a chegar pelo WebSocket: troca a bolha temporária dela
+            // (pelo client_id; sem ele, a pendente com o mesmo texto ou tipo de media)
             if (message.direction === 'out') {
-                const tempIdx = prev.findIndex(m => 
-                    m.id.startsWith('temp_') && 
-                    m.direction === 'out' && 
-                    m.status === 'pending'
-                );
+                const clientId = (message.metadata as any)?.client_id;
+                const tempIdx = clientId
+                    ? prev.findIndex(m => m.id === clientId)
+                    : prev.findIndex(m =>
+                        isTemp(m) &&
+                        m.direction === 'out' &&
+                        m.status === 'pending' &&
+                        (m.media_type ? m.media_type === message.media_type : (m.content || '').trim() === (message.content || '').trim())
+                    );
                 if (tempIdx !== -1) {
                     const updated = [...prev];
                     updated[tempIdx] = { ...message, status: message.status || 'sent' };
@@ -276,8 +342,7 @@ export function useMessages(conversationId: string | null) {
             return [...prev, message];
         });
 
-        // Scroll para o final
-        setTimeout(() => scrollToBottom(), 100);
+        if (message.direction === 'out') setTimeout(() => scrollToBottom(), 100);
     }, []);
 
     const updateMessageStatus = useCallback((messageId: string, status: MessageWithSender['status']) => {
@@ -292,35 +357,27 @@ export function useMessages(conversationId: string | null) {
     }, [conversationId]);
 
     const scrollToBottom = useCallback(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // No chat (column-reverse) o fim é scrollTop 0
+        const el = scrollContainerRef.current;
+        if (el) el.scrollTo({ top: 0, behavior: 'smooth' });
+        else messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, []);
 
     // ── Conversation switch: cache-first + background refresh ─────
     useEffect(() => {
-        // 1. Save scroll position for the PREVIOUS conversation
-        const prevId = prevConversationIdRef.current;
-        if (prevId && scrollContainerRef.current) {
-            saveScrollPosition(prevId, scrollContainerRef.current.scrollTop);
-        }
-        prevConversationIdRef.current = conversationId;
-
         if (!conversationId) {
             setMessages([]);
             return;
         }
 
-        // 2. Serve cached messages instantly (no loading spinner)
+        // 2. Serve cached messages instantly (no loading spinner); sem cópia, o chat fica vazio
+        //    (esqueleto) em vez de mostrar as mensagens da conversa anterior
+        setHasMore(true);
+        setError(null);
         const cached = getCachedMessages(conversationId);
+        if (!cached || cached.length === 0) setMessages([]);
         if (cached && cached.length > 0) {
             setMessages(cached);
-            // Restore scroll position after render
-            requestAnimationFrame(() => {
-                const savedScroll = getScrollPosition(conversationId);
-                if (savedScroll != null && scrollContainerRef.current) {
-                    scrollContainerRef.current.scrollTop = savedScroll;
-                    clearScrollPosition(conversationId);
-                }
-            });
         }
 
         // 3. Background refresh — silent if we had cache, blocking if first load
@@ -336,55 +393,31 @@ export function useMessages(conversationId: string | null) {
         }
     }, [conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Polling de fallback: recarregar mensagens silenciosamente caso WebSocket tenha perdido eventos
+    // Pedido de segurança caso o WebSocket perca eventos: só com o app visível, e ao voltar a ele
     useEffect(() => {
         if (!conversationId) return;
-
-        // Limpar polling anterior
-        if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-        }
-
-        pollingRef.current = setInterval(async () => {
-            if (!conversationId) return;
-            try {
-                const data = await conversationsApi.getMessages(conversationId, { limit: 100 });
-                setMessages(prev => {
-                    // Só atualizar se há mensagens novas (evitar re-renders desnecessários)
-                    const prevIds = new Set(prev.filter(m => !m.id.startsWith('temp_')).map(m => m.id));
-                    const hasNew = data.some(m => !prevIds.has(m.id));
-                    if (!hasNew) return prev;
-                    // Preservar mensagens temporárias (em envio)
-                    const tempMessages = prev.filter(m => m.id.startsWith('temp_'));
-                    const merged = [...data, ...tempMessages];
-                    // Write-through to cache
-                    setCachedMessages(conversationId, merged);
-                    return merged;
-                });
-            } catch {
-                // Polling silencioso - não mostrar erro
-            }
-        }, MESSAGE_POLLING_INTERVAL);
-
-        return () => {
-            if (pollingRef.current) {
-                clearInterval(pollingRef.current);
-                pollingRef.current = null;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const schedule = () => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(tick, isSocketConnected() ? POLL_CONNECTED : POLL_DISCONNECTED);
+        };
+        const tick = () => {
+            if (document.visibilityState === 'visible') fetchMessages({ silent: true });
+            schedule();
+        };
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') {
+                fetchMessages({ silent: true });
+                schedule();
             }
         };
-    }, [conversationId]);
-
-    // Auto-scroll only on first load (when messages go from 0 → N)
-    const hadMessagesRef = useRef(false);
-    useEffect(() => {
-        if (messages.length > 0 && !hadMessagesRef.current) {
-            hadMessagesRef.current = true;
-            setTimeout(() => scrollToBottom(), 100);
-        }
-        if (messages.length === 0) {
-            hadMessagesRef.current = false;
-        }
-    }, [messages.length, scrollToBottom]);
+        schedule();
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            if (timer) clearTimeout(timer);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
+    }, [conversationId, fetchMessages]);
 
     // Fila offline: quando uma mensagem desta conversa é enviada, a bolha temporária passa a
     // ser a mensagem real (o WebSocket pode já a ter trazido: tira-se o duplicado); se a API
@@ -449,6 +482,9 @@ export function useMessages(conversationId: string | null) {
         updateMessageStatus,
         deleteMessage,
         refreshMessages: fetchMessages,
+        loadOlder,
+        hasMore,
+        loadingOlder,
         scrollToBottom
     };
 }

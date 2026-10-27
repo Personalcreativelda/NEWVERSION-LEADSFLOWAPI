@@ -68,5 +68,6 @@
  "Nome em análise": ["Name in review", "Nombre en revisión", "Nom en cours d'examen"],
  "Nome por aprovar": ["Name not approved yet", "Nombre sin aprobar", "Nom pas encore approuvé"],
  "Nome recusado": ["Name rejected", "Nombre rechazado", "Nom refusé"],
- "Nome expirado": ["Name expired", "Nombre caducado", "Nom expiré"]
+ "Nome expirado": ["Name expired", "Nombre caducado", "Nom expiré"],
+ "Ir para a última mensagem": ["Go to the latest message","Ir al último mensaje","Aller au dernier message"]
 }

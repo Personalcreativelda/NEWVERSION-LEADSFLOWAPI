@@ -211,7 +211,7 @@ export const conversationsApi = {
      */
     async getMessages(
         conversationId: string,
-        params?: { limit?: number; offset?: number }
+        params?: { limit?: number; before?: string }
     ): Promise<MessageWithSender[]> {
         const { data } = await api.get<MessageWithSender[]>(
             `/inbox/conversations/${conversationId}/messages`,

@@ -1040,19 +1040,21 @@ router.get('/conversations/:conversationIdOrJid/messages', async (req, res, next
     } else if (isPhone) {
       remoteJid = normalizePhoneToJid(conversationIdOrJid);
     } else if (isUUID) {
-      conversationId = conversationIdOrJid;
-      // Try to get remote_jid from conversation
-      try {
-        const convResult = await dbQuery(
-          'SELECT remote_jid FROM conversations WHERE id = $1 AND user_id = $2 LIMIT 1',
-          [conversationId, effectiveUserId]
-        );
-        if (convResult.rows.length > 0) {
-          remoteJid = convResult.rows[0].remote_jid;
-        }
-      } catch (e) {
-        console.warn('[Inbox] Could not find conversation by ID:', e);
+      // Só conversas do próprio, do dono da equipa ou de um espaço de trabalho de que é membro
+      const convResult = await dbQuery(
+        `SELECT c.remote_jid FROM conversations c
+         WHERE c.id = $1 AND (
+           c.user_id = $2 OR c.user_id = $3 OR c.workspace_id IN (
+             SELECT tm.workspace_id FROM team_members tm
+             WHERE tm.user_id = $2 AND tm.status = 'active' AND tm.is_active = true))
+         LIMIT 1`,
+        [conversationIdOrJid, user.id, effectiveUserId]
+      );
+      if (convResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Conversa não encontrada' });
       }
+      conversationId = conversationIdOrJid;
+      remoteJid = convResult.rows[0].remote_jid;
     }
 
     // STEP 1: Try to fetch messages from local database first
@@ -1091,10 +1093,21 @@ router.get('/conversations/:conversationIdOrJid/messages', async (req, res, next
           }
         }
 
-        msgSql += ` ORDER BY m.created_at ASC LIMIT $${paramIdx}`;
-        msgParams.push(req.query.limit ? Number(req.query.limit) : 100);
-        
+        // As mais recentes primeiro (o LIMIT corta as antigas) e devolvidas por ordem cronológica.
+        // `before=<id da mensagem>` carrega as anteriores a essa (ao subir no chat).
+        const beforeId = typeof req.query.before === 'string' && /^[0-9a-f-]{36}$/i.test(req.query.before)
+          ? req.query.before : null;
+        if (beforeId) {
+          msgSql += ` AND (m.created_at, m.id) < (SELECT created_at, id FROM messages WHERE id = $${paramIdx})`;
+          msgParams.push(beforeId);
+          paramIdx++;
+        }
+        const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+        msgSql += ` ORDER BY m.created_at DESC, m.id DESC LIMIT $${paramIdx}`;
+        msgParams.push(limit);
+
         const msgResult = await dbQuery(msgSql, msgParams);
+        msgResult.rows.reverse();
         localMessages = msgResult.rows.map((msg: any) => ({
           id: msg.id,
           conversation_id: msg.conversation_id,

@@ -154,6 +154,16 @@ const runPendingMigrations = async () => {
     console.warn('[DB] Social IDs migration warning:', error.message);
   }
 
+  // Índice para abrir o chat pelas mensagens mais recentes (e carregar as anteriores)
+  try {
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_messages_conversation_created
+        ON messages(conversation_id, created_at DESC, id DESC);
+    `);
+  } catch (error: any) {
+    console.warn('[DB] Messages index warning:', error.message);
+  }
+
   // Migração: Adicionar colunas Stripe à tabela plans
   try {
     await pool.query(`

@@ -4,18 +4,16 @@ import React from 'react';
 interface ChatBackgroundProps {
     children: React.ReactNode;
     className?: string;
-    scrollRef?: React.RefObject<HTMLElement | null>;
+    scrollRef?: React.Ref<HTMLDivElement>;
 }
 
 export function ChatBackground({ children, className = '', scrollRef }: ChatBackgroundProps) {
     return (
         <div
-            ref={scrollRef as React.RefObject<HTMLDivElement>}
+            ref={scrollRef}
             className={`relative bg-[#ECE5DD] dark:bg-[#0B141A] ${className}`}
         >
-            <div className="relative h-full">
-                {children}
-            </div>
+            {children}
         </div>
     );
 }

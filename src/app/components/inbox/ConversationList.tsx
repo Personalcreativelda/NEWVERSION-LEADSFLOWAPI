@@ -1,5 +1,5 @@
 // INBOX: Lista de conversas - ManyChat-style
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { haptic } from '../../../native';
 import { ConversationItem } from './ConversationItem';
 import type { ConversationWithDetails } from '../../types/inbox';
@@ -30,6 +30,20 @@ export function ConversationList({
 }: ConversationListProps) {
     // Toque longo (500 ms) → seleção; o "click" que vem a seguir é ignorado
     const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Clique estável (as conversas memorizadas não redesenham por causa de uma função nova)
+    const clickRef = useRef<(conversation: ConversationWithDetails) => void>(() => {});
+    clickRef.current = (conversation) => {
+        if (suppressClick.current) {
+            suppressClick.current = false;
+            return;
+        }
+        if (isSelectMode) {
+            onToggleSelect?.(conversation.id);
+        } else {
+            onSelect(conversation);
+        }
+    };
+    const handleClick = useCallback((conversation: ConversationWithDetails) => clickRef.current(conversation), []);
     const suppressClick = useRef(false);
     const pressStart = useRef<{ x: number; y: number } | null>(null);
     const cancelPress = () => {
@@ -102,17 +116,7 @@ export function ConversationList({
                         <ConversationItem
                             conversation={conversation}
                             isSelected={!isSelectMode && selectedId === conversation.id}
-                            onClick={() => {
-                                if (suppressClick.current) {
-                                    suppressClick.current = false;
-                                    return;
-                                }
-                                if (isSelectMode) {
-                                    onToggleSelect?.(conversation.id);
-                                } else {
-                                    onSelect(conversation);
-                                }
-                            }}
+                            onClick={handleClick}
                         />
                     </div>
                 </div>

@@ -10,13 +10,18 @@ import type { AttachmentFileType } from '../types/attachment';
 
 const MESSAGE_STORE = createStore('leadflow-messages-db', 'messages');
 
+/** Sobe quando o formato muda: as cópias de outra versão são ignoradas.
+ *  2 = as mais recentes primeiro (antes eram guardadas as 100 mais antigas de cada conversa) */
+export const MESSAGE_CACHE_VERSION = 2;
+
 export interface IdbMessageEntry {
     messages: unknown[];
     savedAt:  number;
+    v?:       number;
 }
 
 export async function idbSaveMessages(conversationId: string, messages: unknown[]): Promise<void> {
-    await set(conversationId, { messages, savedAt: Date.now() } satisfies IdbMessageEntry, MESSAGE_STORE);
+    await set(conversationId, { messages, savedAt: Date.now(), v: MESSAGE_CACHE_VERSION } satisfies IdbMessageEntry, MESSAGE_STORE);
 }
 
 export async function idbLoadMessages(conversationId: string): Promise<IdbMessageEntry | undefined> {

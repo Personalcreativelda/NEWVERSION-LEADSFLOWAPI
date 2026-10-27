@@ -1,7 +1,10 @@
-// INBOX: Hook para gerenciar conexão WebSocket
+// INBOX: Hook para a ligação WebSocket
+// Uma só ligação para o app inteiro (painel, inbox, tarefas, campanhas): cada componente
+// regista os seus callbacks e recebe os eventos dessa ligação partilhada.
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { WebSocketEvents } from '../types/inbox';
+import { SERVER_BACK_EVENT } from '../lib/serverStatus';
 
 // Build WebSocket URL from API URL or use default
 const getWebSocketUrl = () => {
@@ -14,6 +17,7 @@ const getWebSocketUrl = () => {
 };
 
 const WS_URL = getWebSocketUrl();
+const TOKEN_KEY = 'leadflow_access_token';
 
 interface UseWebSocketOptions {
     onNewMessage?: (data: WebSocketEvents['new_message']) => void;
@@ -29,153 +33,166 @@ interface UseWebSocketOptions {
     onCampaignStats?: (data: { campaignId: string; stats: any; progress: { sent: number; failed: number; total: number } }) => void;
 }
 
+/** Evento do servidor → callback correspondente */
+const EVENTS: Record<string, keyof UseWebSocketOptions> = {
+    new_message: 'onNewMessage',
+    new_conversation: 'onNewConversation',
+    message_status_update: 'onMessageStatusUpdate',
+    conversation_update: 'onConversationUpdate',
+    unread_count_update: 'onUnreadCountUpdate',
+    conversation_read: 'onConversationRead',
+    user_typing: 'onUserTyping',
+    lead_funnel_update: 'onLeadFunnelUpdate',
+    ai_task_created: 'onAiTaskCreated',
+    'campaign:stats': 'onCampaignStats',
+};
+
+type ConnState = { isConnected: boolean; error: string | null };
+
+const subscribers = new Set<{ current: UseWebSocketOptions }>();
+const stateListeners = new Set<(s: ConnState) => void>();
+let state: ConnState = { isConnected: false, error: null };
+let socket: Socket | null = null;
+let wasConnected = false;
+let closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Para os pedidos de segurança (polling) abrandarem enquanto a ligação em tempo real funciona */
+export const isSocketConnected = () => state.isConnected;
+
+function setState(patch: Partial<ConnState>) {
+    state = { ...state, ...patch };
+    stateListeners.forEach((fn) => fn(state));
+}
+
+function dispatch(key: keyof UseWebSocketOptions, data?: unknown) {
+    subscribers.forEach((ref) => {
+        try {
+            (ref.current[key] as ((d: unknown) => void) | undefined)?.(data);
+        } catch (err) {
+            console.error('[WebSocket] Erro no callback', key, err);
+        }
+    });
+}
+
+/** Volta a ligar se não estiver ligado (rede de volta, app em primeiro plano, servidor de volta) */
+function wake() {
+    if (subscribers.size === 0) return;
+    if (!socket) openSocket();
+    else if (!socket.connected) socket.connect();
+}
+
+function onVisibility() {
+    if (document.visibilityState === 'visible') wake();
+}
+
+function openSocket() {
+    if (socket || !localStorage.getItem(TOKEN_KEY)) {
+        if (!socket) setState({ error: 'No authentication token found' });
+        return;
+    }
+
+    socket = io(WS_URL, {
+        // O token é lido a cada tentativa: depois de renovado a ligação usa o novo
+        auth: (cb) => cb({ token: localStorage.getItem(TOKEN_KEY) }),
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 10000,
+        timeout: 20000,
+    });
+
+    socket.on('connect', () => {
+        setState({ isConnected: true, error: null });
+        // Depois de uma queda, o que chegou entretanto vem pelo onReconnect
+        if (wasConnected) dispatch('onReconnect');
+        wasConnected = true;
+    });
+
+    socket.on('disconnect', (reason) => {
+        setState({ isConnected: false });
+        // Desligado pelo servidor (ex.: deploy): o cliente não volta sozinho
+        if (reason === 'io server disconnect') setTimeout(() => socket?.connect(), 1000);
+    });
+
+    socket.on('connect_error', (err) => {
+        setState({ isConnected: false, error: err.message });
+        // Recusado pelo servidor (ex.: token expirado): tentar de novo com o token atual
+        if (!socket?.active) setTimeout(() => wake(), 5000);
+    });
+
+    for (const [event, key] of Object.entries(EVENTS)) {
+        socket.on(event, (data) => dispatch(key, data));
+    }
+
+    window.addEventListener('online', wake);
+    window.addEventListener(SERVER_BACK_EVENT, wake);
+    document.addEventListener('visibilitychange', onVisibility);
+}
+
+function closeSocket() {
+    window.removeEventListener('online', wake);
+    window.removeEventListener(SERVER_BACK_EVENT, wake);
+    document.removeEventListener('visibilitychange', onVisibility);
+    if (socket) {
+        socket.removeAllListeners();
+        socket.disconnect();
+        socket = null;
+    }
+    wasConnected = false;
+    setState({ isConnected: false, error: null });
+}
+
 export function useWebSocket(options: UseWebSocketOptions = {}) {
-    const [isConnected, setIsConnected] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const socketRef = useRef<Socket | null>(null);
-    const wasConnectedRef = useRef(false);
-    const reconnectAttemptsRef = useRef(0);
-    const connectingRef = useRef(false);
     // Keep callbacks in a ref so they're always current without causing reconnects
     const callbacksRef = useRef(options);
     useEffect(() => { callbacksRef.current = options; });
 
-    const connect = useCallback(() => {
-        // Prevent multiple simultaneous connection attempts
-        if (connectingRef.current || socketRef.current?.connected) {
-            console.log('[WebSocket] Already connecting or connected, skipping');
-            return;
+    const [conn, setConn] = useState<ConnState>(state);
+
+    useEffect(() => {
+        subscribers.add(callbacksRef);
+        stateListeners.add(setConn);
+        setConn(state);
+        if (closeTimer) {
+            clearTimeout(closeTimer);
+            closeTimer = null;
         }
-
-        const token = localStorage.getItem('leadflow_access_token');
-
-        if (!token) {
-            console.warn('[WebSocket] No authentication token found');
-            setError('No authentication token found');
-            return;
-        }
-
-        connectingRef.current = true;
-        console.log('[WebSocket] Connecting to:', WS_URL);
-
-        try {
-            // Disconnect existing socket if any
-            if (socketRef.current) {
-                socketRef.current.disconnect();
-                socketRef.current = null;
+        openSocket();
+        return () => {
+            subscribers.delete(callbacksRef);
+            stateListeners.delete(setConn);
+            // Troca de página: não fechar logo, o próximo ecrã usa a mesma ligação
+            if (subscribers.size === 0) {
+                closeTimer = setTimeout(() => {
+                    closeTimer = null;
+                    if (subscribers.size === 0) closeSocket();
+                }, 3000);
             }
-
-            const socket = io(WS_URL, {
-                auth: { token },
-                transports: ['websocket', 'polling'],
-                reconnection: true,
-                reconnectionAttempts: 15,
-                reconnectionDelay: 1000,
-                reconnectionDelayMax: 10000,
-                timeout: 30000,
-                forceNew: true
-            });
-
-            socket.on('connect', () => {
-                console.log('[WebSocket] ✅ Connected successfully');
-                setIsConnected(true);
-                setError(null);
-                connectingRef.current = false;
-
-                // Se estava conectado antes e reconectou, chamar callback
-                if (wasConnectedRef.current && reconnectAttemptsRef.current > 0) {
-                    console.log('[WebSocket] Reconnected - triggering refresh');
-                    callbacksRef.current.onReconnect?.();
-                }
-
-                wasConnectedRef.current = true;
-                reconnectAttemptsRef.current = 0;
-            });
-
-            socket.on('disconnect', (reason) => {
-                console.log('[WebSocket] Disconnected:', reason);
-                setIsConnected(false);
-                connectingRef.current = false;
-            });
-
-            socket.on('reconnect_attempt', (attempt) => {
-                console.log('[WebSocket] Reconnection attempt:', attempt);
-                reconnectAttemptsRef.current = attempt;
-            });
-
-            socket.on('reconnect', (attempt) => {
-                console.log('[WebSocket] Reconnected after', attempt, 'attempts');
-            });
-
-            socket.on('connect_error', (err) => {
-                console.error('[WebSocket] Connection error:', err.message, '| URL:', WS_URL);
-                setError(err.message);
-                setIsConnected(false);
-                connectingRef.current = false;
-            });
-
-            socket.on('reconnect_failed', () => {
-                console.error('[WebSocket] All reconnection attempts failed. Clique no ícone WiFi para tentar novamente.');
-                setError('Falha ao reconectar após várias tentativas. Clique no ícone de sinal para reconectar.');
-            });
-
-            // Route all events through refs so callbacks are always current
-            // and the socket does not need to be recreated when they change
-            socket.on('connected', (data: WebSocketEvents['connected']) => {
-                console.log('[WebSocket] Server confirmed connection:', data);
-            });
-
-            socket.on('new_message', (data) => callbacksRef.current.onNewMessage?.(data));
-            socket.on('new_conversation', (data) => callbacksRef.current.onNewConversation?.(data));
-            socket.on('message_status_update', (data) => callbacksRef.current.onMessageStatusUpdate?.(data));
-            socket.on('conversation_update', (data) => callbacksRef.current.onConversationUpdate?.(data));
-            socket.on('unread_count_update', (data) => callbacksRef.current.onUnreadCountUpdate?.(data));
-            socket.on('conversation_read', (data) => callbacksRef.current.onConversationRead?.(data));
-            socket.on('user_typing', (data) => callbacksRef.current.onUserTyping?.(data));
-            socket.on('lead_funnel_update', (data) => callbacksRef.current.onLeadFunnelUpdate?.(data));
-            socket.on('ai_task_created', (data) => callbacksRef.current.onAiTaskCreated?.(data));
-            socket.on('campaign:stats', (data) => callbacksRef.current.onCampaignStats?.(data));
-
-            socketRef.current = socket;
-        } catch (err) {
-            console.error('[WebSocket] Failed to initialize:', err);
-            setError('Failed to initialize WebSocket');
-            connectingRef.current = false;
-        }
-    }, []); // stable — no options dependency, callbacks accessed via ref
-
-    const disconnect = useCallback(() => {
-        console.log('[WebSocket] Disconnecting...');
-        connectingRef.current = false;
-        if (socketRef.current) {
-            socketRef.current.removeAllListeners();
-            socketRef.current.disconnect();
-            socketRef.current = null;
-        }
+        };
     }, []);
 
     const markAsRead = useCallback((conversationId: string) => {
-        if (socketRef.current?.connected) {
-            socketRef.current.emit('mark_as_read', { conversationId });
-        }
+        if (socket?.connected) socket.emit('mark_as_read', { conversationId });
     }, []);
 
     const sendTyping = useCallback((conversationId: string, isTyping: boolean) => {
-        if (socketRef.current?.connected) {
-            socketRef.current.emit('typing', { conversationId, isTyping });
+        if (socket?.connected) socket.emit('typing', { conversationId, isTyping });
+    }, []);
+
+    const reconnect = useCallback(() => {
+        if (socket) {
+            socket.disconnect();
+            socket.connect();
+        } else {
+            openSocket();
         }
     }, []);
 
-    useEffect(() => {
-        connect();
-        return () => disconnect();
-    }, [connect, disconnect]);
-
     return {
-        isConnected,
-        error,
+        isConnected: conn.isConnected,
+        error: conn.error,
         markAsRead,
         sendTyping,
-        reconnect: connect
+        reconnect,
     };
 }

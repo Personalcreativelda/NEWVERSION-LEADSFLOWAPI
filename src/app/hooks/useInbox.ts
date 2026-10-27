@@ -42,7 +42,7 @@ export function useInbox(options: UseInboxOptions = {}) {
     const clearDraft                = useInboxStore((s) => s.clearDraft);
 
     const refreshConversationsRef = useRef<() => void>(() => {});
-    const refreshMessagesRef      = useRef<() => void>(() => {});
+    const refreshMessagesRef      = useRef<(opts?: { silent?: boolean }) => void>(() => {});
     const conversationsRef        = useRef<ConversationWithDetails[]>([]);
 
     // ── Conversations (TanStack Query — cache + IDB persistence) ─────────────
@@ -99,6 +99,9 @@ export function useInbox(options: UseInboxOptions = {}) {
         deleteMessage,
         refreshMessages,
         scrollToBottom,
+        loadOlder:            loadOlderMessages,
+        hasMore:              hasMoreMessages,
+        loadingOlder:         loadingOlderMessages,
     } = useMessages(selectedConversation?.id ?? null);
 
     useEffect(() => {
@@ -189,7 +192,7 @@ export function useInbox(options: UseInboxOptions = {}) {
 
             onReconnect: useCallback(() => {
                 refreshConversationsRef.current();
-                refreshMessagesRef.current();
+                refreshMessagesRef.current({ silent: true });
             }, []),
         });
 
@@ -286,6 +289,9 @@ export function useInbox(options: UseInboxOptions = {}) {
         forwardMessage:           handleForwardMessage,
         refreshMessages,
         scrollToBottom,
+        loadOlderMessages,
+        hasMoreMessages,
+        loadingOlderMessages,
 
         // WebSocket
         wsConnected,

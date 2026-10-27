@@ -20,6 +20,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { conversationsApi } from '../../services/api/inbox';
 import type { ConversationWithDetails } from '../../types/inbox';
+import { isSocketConnected } from '../useWebSocket';
 import { GC } from '../../lib/queryClient';
 
 // ── Query key helpers ─────────────────────────────────────────────────────────
@@ -54,10 +55,10 @@ export function useConversationsQuery(
         // This is the key fix: without this, the 60s staleTime was blocking refetchOnMount/Focus.
         staleTime:   0,
         gcTime:      GC.conversations,
-        // Poll every 5 s when not searching (WebSocket keeps it instant; this is the safety net).
-        refetchInterval:           enablePolling && !searchQuery ? 5_000 : false,
-        // Refetch in background even when tab is hidden (so list is fresh when user switches back)
-        refetchIntervalInBackground: true,
+        // O WebSocket atualiza a lista na hora; isto é só a rede de segurança: rara com a ligação
+        // ativa, mais frequente sem ela. Com o app em segundo plano não pede (ao voltar, o foco atualiza).
+        refetchInterval:           enablePolling && !searchQuery ? () => (isSocketConnected() ? 60_000 : 15_000) : false,
+        refetchIntervalInBackground: false,
         // Always fetch fresh data when the component mounts (first open of inbox)
         refetchOnMount:           true,
         // Refetch immediately when the user comes back to the tab

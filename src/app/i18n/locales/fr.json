@@ -1965,6 +1965,7 @@
  "Interesse": "Intérêt",
  "Intervalo entre mensagens (segundos)": "Intervalle entre les messages (secondes)",
  "Invalid JSON response from server ({0}). Verifique se VITE_API_URL aponta para o backend Node.": "Réponse JSON invalide du serveur ({0}). Vérifiez que VITE_API_URL pointe vers le serveur API.",
+ "Ir para a última mensagem": "Aller au dernier message",
  "Ir para Inbox": "Aller à la boîte de réception",
  "Ir para o login": "Aller à la connexion",
  "Isso irá substituir o conteúdo atual. Continuar?": "Cela remplacera le contenu actuel. Continuer ?",

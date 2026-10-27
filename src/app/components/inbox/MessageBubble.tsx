@@ -166,7 +166,7 @@ function TranscribeButton({ messageId, apiUrl, isOut, onTranscribed }: {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function MessageBubble({
+function MessageBubbleView({
     message,
     isLastInGroup = true,
     onDelete,
@@ -401,6 +401,8 @@ export function MessageBubble({
                             <img
                                 src={imageUrl}
                                 alt="Mídia"
+                                loading="lazy"
+                                decoding="async"
                                 className="rounded-md w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity"
                                 onClick={() => setViewerOpen(true)}
                                 onError={handleImageError}
@@ -542,3 +544,6 @@ export function MessageBubble({
         </div>
     );
 }
+
+// Só redesenha quando a própria mensagem muda (estado, media…), não a cada mensagem nova no chat
+export const MessageBubble = React.memo(MessageBubbleView);

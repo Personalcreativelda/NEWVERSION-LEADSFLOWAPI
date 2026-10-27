@@ -8,11 +8,12 @@ import { useInboxLayout } from '../../../hooks/useInboxLayout';
 import { conversationsApi, contactsApi, groupsApi, teamApi, channelsApi } from '../../../services/api/inbox';
 import {
     Search, Filter, Plus, X, WifiOff, RefreshCw,
-    PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-    Maximize2, Minimize2,
+    PanelLeftClose, PanelLeftOpen, PanelRightOpen,
     Tag, Users, Settings2, Trash2, CheckSquare, Square,
     UserCheck, UserX, CheckCircle2, Clock
 } from 'lucide-react';
+import { useServerStatus } from '../../../lib/serverStatus';
+import { useOnlineStatus } from '../../../hooks/useOnlineStatus';
 import { ChatPanel } from '../../inbox/ChatPanel';
 import { EmptyState } from '../../inbox/EmptyState';
 import { ContactDetailsPanel } from '../../inbox/ContactDetailsPanel';
@@ -56,6 +57,9 @@ export default function ConversasConversations({
         deleteMessage,
         forwardMessage,
         wsConnected,
+        loadOlderMessages,
+        hasMoreMessages,
+        loadingOlderMessages,
     } = useInbox();
 
     const confirm = useConfirm();
@@ -66,7 +70,6 @@ export default function ConversasConversations({
         startResizeDetailsPanel,
         toggleConversationList,
         toggleDetailsPanel,
-        toggleFocusMode,
     } = useInboxLayout();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -248,15 +251,19 @@ export default function ConversasConversations({
         await handleChangeStatus(isResolved ? 'open' : 'resolved');
     };
 
+    // Sem rede ou sem servidor o aviso geral (ServerStatusBanner) já diz tudo: este só aparece
+    // quando o resto funciona e só a ligação em tempo real falhou
+    const { down: serverDown } = useServerStatus();
+    const isOnline = useOnlineStatus();
     const [showWsBanner, setShowWsBanner] = useState(false);
     useEffect(() => {
-        if (wsConnected) {
+        if (wsConnected || serverDown || !isOnline) {
             setShowWsBanner(false);
             return;
         }
         const t = setTimeout(() => setShowWsBanner(true), 6000);
         return () => clearTimeout(t);
-    }, [wsConnected]);
+    }, [wsConnected, serverDown, isOnline]);
 
     const toggleSelectMode = () => {
         setIsSelectMode(prev => !prev);
@@ -1024,36 +1031,19 @@ export default function ConversasConversations({
                         onForwardMessage={forwardMessage}
                         conversations={conversations}
                         /* layout control buttons passed as slot */
+                        onLoadOlder={loadOlderMessages}
+                        hasMore={hasMoreMessages}
+                        loadingOlder={loadingOlderMessages}
+                        /* Só aparece com o painel do contacto fechado: fecha-se no X do próprio painel */
                         layoutControls={
-                            !isMobile ? (
-                                <div className="flex items-center gap-0.5">
-                                    {/* Focus mode */}
-                                    <button
-                                        onClick={toggleFocusMode}
-                                        className={`p-1.5 rounded-md transition-colors ${
-                                            layout.focusMode
-                                                ? 'text-primary bg-primary/10'
-                                                : 'text-muted-foreground hover:bg-muted'
-                                        }`}
-                                        title={layout.focusMode ? 'Sair do modo foco' : 'Modo foco'}
-                                    >
-                                        {layout.focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                                    </button>
-
-                                    {/* Toggle details panel */}
-                                    {!isTablet && (
-                                        <button
-                                            onClick={toggleDetailsPanel}
-                                            className="p-1.5 rounded-md text-muted-foreground hover:bg-muted transition-colors"
-                                            title={layout.detailsPanelCollapsed ? 'Mostrar detalhes' : 'Ocultar detalhes'}
-                                        >
-                                            {layout.detailsPanelCollapsed
-                                                ? <PanelRightOpen size={15} />
-                                                : <PanelRightClose size={15} />
-                                            }
-                                        </button>
-                                    )}
-                                </div>
+                            !isMobile && layout.detailsPanelCollapsed ? (
+                                <button
+                                    onClick={toggleDetailsPanel}
+                                    className="p-1.5 rounded-md text-muted-foreground hover:bg-muted transition-colors"
+                                    title="Mostrar detalhes"
+                                >
+                                    <PanelRightOpen size={15} />
+                                </button>
                             ) : undefined
                         }
                     />
@@ -1106,35 +1096,6 @@ export default function ConversasConversations({
                         />
                     </div>
                 </>
-            )}
-
-            {/* ── Focus mode: re-open panels bar ──────────────────────── */}
-            {layout.focusMode && !isMobile && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card/90 backdrop-blur-md shadow-lg">
-                    <button
-                        onClick={toggleConversationList}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                    >
-                        <PanelLeftOpen size={13} />
-                        Lista
-                    </button>
-                    <div className="w-px h-4 bg-border" />
-                    <button
-                        onClick={toggleFocusMode}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-primary hover:bg-primary/10 transition-colors font-medium"
-                    >
-                        <Minimize2 size={13} />
-                        Sair do modo foco
-                    </button>
-                    <div className="w-px h-4 bg-border" />
-                    <button
-                        onClick={toggleDetailsPanel}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                    >
-                        <PanelRightOpen size={13} />
-                        Detalhes
-                    </button>
-                </div>
             )}
 
             {/* New Conversation Modal */}
