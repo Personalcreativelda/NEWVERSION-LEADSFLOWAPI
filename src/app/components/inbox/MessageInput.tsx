@@ -10,10 +10,12 @@ import {
     Square,
     Trash2,
     Sparkles,
-    AlertCircle
+    AlertCircle,
+    Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { inboxApi } from '../../services/api/inbox';
+import { apiErrorMessage } from '../../lib/apiError';
 import { useConversationUploadQueue } from '../../context/UploadQueueContext';
 import { AttachmentPreviewCard } from './AttachmentPreviewCard';
 import type { MessageWithSender } from '../../types/inbox';
@@ -50,6 +52,10 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     const [recordingTime, setRecordingTime] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [pickerTab, setPickerTab] = useState<'emoji' | 'stickers'>('emoji');
+    const [stickers, setStickers] = useState<string[] | null>(null);
+    const [sendingSticker, setSendingSticker] = useState(false);
+    const stickerInputRef = useRef<HTMLInputElement>(null);
     const [isGeneratingReply, setIsGeneratingReply] = useState(false);
     
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3200';
@@ -234,7 +240,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
             setRecordingTime(0);
         } catch (error) {
             console.error('Failed to send audio:', error);
-            toast.error('Erro ao enviar áudio. Tente novamente.');
+            toast.error(apiErrorMessage(error, 'Erro ao enviar áudio. Tente novamente.'));
         } finally {
             setIsSendingAudio(false);
         }
@@ -253,6 +259,43 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         setContent(prev => prev + emoji);
         setShowEmojiPicker(false);
         textareaRef.current?.focus();
+    };
+
+    // ==================== FIGURINHAS ====================
+    // As recebidas nas conversas ficam à mão para reenviar; "+" transforma uma imagem em figurinha
+    useEffect(() => {
+        if (!showEmojiPicker || pickerTab !== 'stickers' || stickers !== null) return;
+        inboxApi.getRecentStickers().then(setStickers).catch(() => setStickers([]));
+    }, [showEmojiPicker, pickerTab, stickers]);
+
+    const sendSticker = async (url: string) => {
+        if (!conversationId || sendingSticker) return;
+        setSendingSticker(true);
+        try {
+            const message = await inboxApi.sendSticker(conversationId, url);
+            if (message) onAddLocalMessage?.(message as unknown as MessageWithSender);
+            setShowEmojiPicker(false);
+        } catch (error) {
+            toast.error(apiErrorMessage(error, 'Não foi possível enviar a figurinha. Tente de novo.'));
+        } finally {
+            setSendingSticker(false);
+        }
+    };
+
+    const handleStickerFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file) return;
+        setSendingSticker(true);
+        try {
+            const uploaded = await inboxApi.uploadFile(file);
+            setSendingSticker(false);
+            setStickers(prev => [uploaded.url, ...(prev || []).filter(u => u !== uploaded.url)]);
+            await sendSticker(uploaded.url);
+        } catch (error) {
+            setSendingSticker(false);
+            toast.error(apiErrorMessage(error, 'Não foi possível carregar a imagem. Tente de novo.'));
+        }
     };
 
     const handleDraftReply = async () => {
@@ -415,6 +458,13 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                 onChange={handleFileSelect}
                 multiple
             />
+            <input
+                ref={stickerInputRef}
+                type="file"
+                className="hidden"
+                accept="image/*"
+                onChange={handleStickerFile}
+            />
 
             {/* Recording Mode UI */}
             {showRecordingMode && (
@@ -538,18 +588,60 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                                 className="absolute bottom-full left-0 mb-2 p-3 rounded-xl border border-border shadow-xl bg-card z-[100] w-[280px] max-w-[calc(100vw-24px)]"
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                <div className="grid grid-cols-8 gap-1">
-                                    {popularEmojis.map((emoji, index) => (
+                                <div className="mb-2 flex gap-1">
+                                    {([['emoji', 'Emoji'], ['stickers', 'Figurinhas']] as const).map(([id, label]) => (
                                         <button
-                                            key={index}
-                                            onClick={() => insertEmoji(emoji)}
+                                            key={id}
                                             type="button"
-                                            className="p-1.5 hover:bg-muted/50 rounded-lg text-xl transition-colors flex items-center justify-center"
+                                            onClick={() => setPickerTab(id)}
+                                            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${pickerTab === id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                                         >
-                                            {emoji}
+                                            {label}
                                         </button>
                                     ))}
                                 </div>
+                                {pickerTab === 'emoji' ? (
+                                    <div className="grid grid-cols-8 gap-1">
+                                        {popularEmojis.map((emoji, index) => (
+                                            <button
+                                                key={index}
+                                                onClick={() => insertEmoji(emoji)}
+                                                type="button"
+                                                className="p-1.5 hover:bg-muted/50 rounded-lg text-xl transition-colors flex items-center justify-center"
+                                            >
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="grid max-h-64 grid-cols-4 gap-1.5 overflow-y-auto">
+                                        <button
+                                            type="button"
+                                            onClick={() => stickerInputRef.current?.click()}
+                                            disabled={sendingSticker}
+                                            className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-foreground/25 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                                            title="Criar figurinha"
+                                        >
+                                            {sendingSticker ? <Loader2 size={18} className="animate-spin" /> : <Plus size={20} />}
+                                        </button>
+                                        {stickers === null && (
+                                            <div className="col-span-3 flex items-center justify-center text-muted-foreground">
+                                                <Loader2 size={16} className="animate-spin" />
+                                            </div>
+                                        )}
+                                        {stickers?.map((url) => (
+                                            <button
+                                                key={url}
+                                                type="button"
+                                                onClick={() => void sendSticker(url)}
+                                                disabled={sendingSticker}
+                                                className="aspect-square rounded-lg p-1 transition-colors hover:bg-muted/50 disabled:opacity-50"
+                                            >
+                                                <img src={url} alt="" loading="lazy" className="h-full w-full object-contain" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

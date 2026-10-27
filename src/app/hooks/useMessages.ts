@@ -6,6 +6,8 @@ import { conversationsApi, inboxApi } from '../services/api/inbox';
 import type { MessageWithSender } from '../types/inbox';
 import { OUTBOX_FAILED_EVENT, OUTBOX_SENT_EVENT, enqueueOutbox, queuedMessages, type OutboxItem } from '../lib/outbox';
 import { isServerDownError } from '../lib/serverStatus';
+import { apiErrorMessage } from '../lib/apiError';
+import { toast } from 'sonner';
 import {
     getCachedMessages,
     setCachedMessages,
@@ -153,11 +155,11 @@ export function useMessages(conversationId: string | null) {
                 return;
             }
             console.error('[useMessages] Error sending:', err);
-            // Marcar mensagem como falha
+            // Marcar mensagem como falha e dizer porquê (o erro de carregar fica para o carregamento)
             setMessages(prev => prev.map(m =>
                 m.id === tempId ? { ...m, status: 'failed' } : m
             ));
-            setError(err.message || 'Failed to send message');
+            toast.error(apiErrorMessage(err, 'Não foi possível enviar a mensagem. Tente de novo.'));
             throw err;
         } finally {
             setSending(false);

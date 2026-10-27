@@ -3720,7 +3720,8 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
               channelType: 'whatsapp_cloud',
               conversationId: conversation.id,
               userId: channel.user_id,
-              contactPhone: finalPhone,
+              // A resposta vai para o wa_id de quem escreveu (o telefone do lead pode estar sem indicativo)
+              contactPhone: phone || finalPhone,
               contactName: contactName,
               messageContent: messageContent || (mediaType ? `[${mediaType}]` : ''),
               credentials: channel.credentials,
@@ -3738,12 +3739,24 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
         // Processar status de mensagem (delivered, read)
         for (const status of value.statuses || []) {
           console.log('[WhatsApp Cloud Webhook] Status update:', status.status, 'for message:', status.id);
-          // Atualizar status da mensagem no banco se necessário
-          if (status.status === 'delivered' || status.status === 'read') {
-            await query(
-              `UPDATE messages SET status = $1, updated_at = NOW() WHERE external_id = $2`,
-              [status.status, status.id]
+          // Entregue, lida ou recusada depois de aceite (ex.: fora das 24 horas): a bolha no
+          // painel acompanha, e a recusa guarda o motivo da Meta
+          if (status.status === 'delivered' || status.status === 'read' || status.status === 'failed') {
+            const metaError = status.status === 'failed' ? status.errors?.[0] : null;
+            if (metaError) console.warn('[WhatsApp Cloud Webhook] Mensagem recusada pela Meta:', status.id, JSON.stringify(metaError).slice(0, 300));
+            const updated = await query(
+              `UPDATE messages
+               SET status = $1, updated_at = NOW(),
+                   metadata = CASE WHEN $3::jsonb IS NULL THEN metadata ELSE COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('error', $3::jsonb) END
+               WHERE external_id = $2 AND direction = 'out'
+               RETURNING id, conversation_id, user_id`,
+              [status.status, status.id, metaError ? JSON.stringify({ code: metaError.code, message: metaError.error_data?.details || metaError.message || metaError.title }) : null]
             );
+            const row = updated.rows[0];
+            const ws = getWebSocketService();
+            if (row && ws) {
+              ws.emitMessageStatusUpdate(row.user_id, { messageId: row.id, conversationId: row.conversation_id, status: status.status });
+            }
           }
         }
       }

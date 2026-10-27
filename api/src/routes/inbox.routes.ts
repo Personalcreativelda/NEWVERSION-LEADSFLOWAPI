@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { isStorageUrl, publicFileUrl } from '../utils/storage-urls';
-import { convertToM4a, isMetaFriendlyAudio } from '../utils/audio-convert';
+import { convertToM4a, isMetaFriendlyAudio } from '../utils/media-convert';
 
 /**
  * Destino aceite pelo /media-proxy além do armazenamento: hosts públicos (CDNs de
@@ -48,6 +48,7 @@ import { AIService, getAvailableProviders } from '../services/ai.service';
 import { emailService } from '../services/email.service';
 import { encryptCredentials } from '../utils/secret-box';
 import { isInstagramLoginToken, metaMessagesUrl } from '../utils/meta-send';
+import { CloudSendError, cloudMediaKind, cloudRecipient, sendCloudMedia, sendCloudText } from '../services/whatsapp-cloud.service';
 
 const router = Router();
 
@@ -1551,83 +1552,25 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
 
     } else if (messageChannel === 'whatsapp_cloud' && (phone || remoteJid)) {
       // ===== WHATSAPP CLOUD (Graph API) SENDING =====
-      const phoneNumberId = channelCredentials?.phone_number_id;
-      const accessToken = channelCredentials?.access_token;
-
-      if (!phoneNumberId || !accessToken) {
-        console.error('[Inbox] WhatsApp Cloud channel missing credentials:', channelId);
-        return res.status(500).json({ error: 'WhatsApp Cloud channel not properly configured (missing phone_number_id or access_token)' });
-      }
-
-      const recipientPhone = phone?.replace(/\D/g, '') || remoteJid?.replace('@s.whatsapp.net', '');
-      if (!recipientPhone) {
-        return res.status(400).json({ error: 'No phone number available for WhatsApp Cloud' });
-      }
-
+      // O wa_id da conversa primeiro: o telefone do lead pode estar sem indicativo
+      const recipientPhone = cloudRecipient(remoteJid, phone);
       try {
-        console.log('[Inbox] Sending WhatsApp Cloud message via Graph API:', { phoneNumberId, recipientPhone });
-
-        if (media_url && media_type) {
-          // Send media via WhatsApp Cloud API
-          let waMediaType = 'document';
-          if (media_type === 'image' || media_type?.startsWith('image')) waMediaType = 'image';
-          else if (media_type === 'video' || media_type?.startsWith('video')) waMediaType = 'video';
-          else if (media_type === 'audio' || media_type?.startsWith('audio')) waMediaType = 'audio';
-
-          const mediaPayload: any = {
-            messaging_product: 'whatsapp',
-            to: recipientPhone,
-            type: waMediaType,
-            [waMediaType]: {
-              link: media_url,
-              ...(messageContent && waMediaType !== 'audio' ? { caption: messageContent } : {})
-            }
-          };
-
-          const mediaResponse = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${accessToken}`
-            },
-            body: JSON.stringify(mediaPayload)
+        console.log('[Inbox] Sending WhatsApp Cloud message:', { phoneNumberId: channelCredentials?.phone_number_id, recipientPhone, media_type });
+        if (media_url) {
+          const sent = await sendCloudMedia(channelCredentials, recipientPhone, {
+            kind: cloudMediaKind(media_type),
+            url: media_url,
+            caption: messageContent,
           });
-
-          const mediaResult = await mediaResponse.json();
-          if (!mediaResponse.ok) {
-            console.error('[Inbox] WhatsApp Cloud media send error:', mediaResult);
-            return res.status(500).json({ error: 'Failed to send media via WhatsApp Cloud', details: mediaResult?.error?.message });
-          }
-          externalResult = mediaResult;
+          externalResult = sent.result;
         } else {
-          // Send text message via WhatsApp Cloud API
-          const textPayload = {
-            messaging_product: 'whatsapp',
-            to: recipientPhone,
-            type: 'text',
-            text: { body: messageContent }
-          };
-
-          const textResponse = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${accessToken}`
-            },
-            body: JSON.stringify(textPayload)
-          });
-
-          const textResult = await textResponse.json();
-          if (!textResponse.ok) {
-            console.error('[Inbox] WhatsApp Cloud text send error:', textResult);
-            return res.status(500).json({ error: 'Failed to send message via WhatsApp Cloud', details: textResult?.error?.message });
-          }
-          externalResult = textResult;
+          externalResult = await sendCloudText(channelCredentials, recipientPhone, messageContent);
         }
         console.log('[Inbox] WhatsApp Cloud send result:', externalResult);
-      } catch (whatsappCloudError) {
-        console.error('[Inbox] WhatsApp Cloud send error:', whatsappCloudError);
-        return res.status(500).json({ error: 'Failed to send WhatsApp Cloud message' });
+      } catch (whatsappCloudError: any) {
+        console.error('[Inbox] WhatsApp Cloud send error:', whatsappCloudError?.message);
+        const message = whatsappCloudError instanceof CloudSendError ? whatsappCloudError.message : 'Não foi possível enviar pelo WhatsApp. Tente de novo.';
+        return res.status(422).json({ error: message, details: whatsappCloudError?.metaMessage });
       }
 
     } else if (messageChannel === 'instagram' || messageChannel === 'facebook') {
@@ -2380,97 +2323,19 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
 
     } else if (channelType === 'whatsapp_cloud') {
       // ===== WhatsApp Cloud audio (Graph API) =====
-      const phoneNumberId = channelCredentials?.phone_number_id;
-      const accessToken = channelCredentials?.access_token;
-      if (!phoneNumberId || !accessToken) {
-        return res.status(500).json({ error: 'WhatsApp Cloud channel not properly configured' });
-      }
-      const recipientPhone = (phone || remoteJid?.replace('@s.whatsapp.net', ''))?.replace(/\D/g, '');
-      if (!recipientPhone) {
-        return res.status(400).json({ error: 'No phone number available for WhatsApp Cloud audio' });
-      }
-
-      // Determinar mime type do áudio (preferir OGG que é suportado pelo WhatsApp Cloud)
-      let audioMimeType = req.file?.mimetype || 'audio/ogg';
-      // WhatsApp Cloud suporta: audio/aac, audio/mp4, audio/mpeg, audio/amr, audio/ogg
-      // Se recebemos WebM, tentar enviar como OGG (opus codec é compatível)
-      if (audioMimeType.includes('webm')) {
-        audioMimeType = 'audio/ogg';
-      }
-      const audioExtension = audioMimeType.includes('ogg') ? 'ogg' : audioMimeType.includes('mp4') ? 'm4a' : audioMimeType.includes('mpeg') ? 'mp3' : 'ogg';
-
-      // Estratégia: Upload para WhatsApp Media API primeiro, depois enviar com media_id
-      // Isso resolve problemas de URL inacessível e formato de arquivo
-      let audioPayload: any;
-
-      if (req.file?.buffer) {
-        try {
-          // Upload direto para WhatsApp Media API
-          const mediaFormData = new FormData();
-          mediaFormData.append('messaging_product', 'whatsapp');
-          mediaFormData.append('type', audioMimeType);
-          const audioBytes = new Uint8Array(req.file.buffer);
-          mediaFormData.append('file', new Blob([audioBytes], { type: audioMimeType }), `audio.${audioExtension}`);
-
-          console.log('[Inbox Audio] Uploading to WhatsApp Media API...', { mime: audioMimeType, size: req.file.buffer.length });
-          const uploadResponse = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/media`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}` },
-            body: mediaFormData
-          });
-          const uploadResult = await uploadResponse.json();
-          console.log('[Inbox Audio] Media upload result:', uploadResult);
-
-          if (uploadResult.id) {
-            // Enviar usando media_id (mais confiável)
-            audioPayload = {
-              messaging_product: 'whatsapp',
-              to: recipientPhone,
-              type: 'audio',
-              audio: { id: uploadResult.id }
-            };
-            console.log('[Inbox Audio] Using media_id:', uploadResult.id);
-          } else {
-            console.warn('[Inbox Audio] Media upload failed, falling back to link:', uploadResult);
-            // Fallback para link se upload falhar
-            audioPayload = {
-              messaging_product: 'whatsapp',
-              to: recipientPhone,
-              type: 'audio',
-              audio: { link: finalAudioUrl }
-            };
-          }
-        } catch (uploadErr: any) {
-          console.warn('[Inbox Audio] Media upload error, falling back to link:', uploadErr.message);
-          audioPayload = {
-            messaging_product: 'whatsapp',
-            to: recipientPhone,
-            type: 'audio',
-            audio: { link: finalAudioUrl }
-          };
-        }
-      } else {
-        // Sem buffer disponível, usar link direto
-        audioPayload = {
-          messaging_product: 'whatsapp',
-          to: recipientPhone,
-          type: 'audio',
-          audio: { link: finalAudioUrl }
-        };
-      }
-
-      const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        },
-        body: JSON.stringify(audioPayload)
-      });
-      result = await response.json();
-      if (!response.ok) {
-        console.error('[Inbox Audio] WhatsApp Cloud error:', result);
-        return res.status(500).json({ error: 'Failed to send audio via WhatsApp Cloud', details: result?.error?.message });
+      // Sobe para a Meta já em OGG Opus (chega como mensagem de voz); ver whatsapp-cloud.service
+      try {
+        const sent = await sendCloudMedia(channelCredentials, cloudRecipient(remoteJid, phone), {
+          kind: 'audio',
+          ...(req.file?.buffer
+            ? { file: { buffer: req.file.buffer, mime: req.file.mimetype || 'audio/webm', filename: req.file.originalname || 'audio.webm' } }
+            : { url: finalAudioUrl }),
+        });
+        result = sent.result;
+      } catch (cloudErr: any) {
+        console.error('[Inbox Audio] WhatsApp Cloud error:', cloudErr?.message);
+        const message = cloudErr instanceof CloudSendError ? cloudErr.message : 'Não foi possível enviar o áudio pelo WhatsApp. Tente de novo.';
+        return res.status(422).json({ error: message, details: cloudErr?.metaMessage });
       }
       console.log('[Inbox Audio] WhatsApp Cloud result:', result);
 
@@ -2582,7 +2447,30 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
   }
 });
 
-// ✅ Send Sticker
+// Figurinhas recebidas (as mais recentes, sem repetidas) para reenviar pelo painel
+router.get('/stickers/recent', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const { query: dbQuery } = require('../database/connection');
+    const result = await dbQuery(
+      `SELECT media_url FROM (
+         SELECT DISTINCT ON (media_url) media_url, created_at
+         FROM messages
+         WHERE user_id = $1 AND media_type = 'sticker' AND media_url IS NOT NULL AND media_url <> ''
+         ORDER BY media_url, created_at DESC
+       ) s
+       ORDER BY created_at DESC
+       LIMIT 40`,
+      [user.id]
+    );
+    res.json({ stickers: result.rows.map((r: any) => r.media_url) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ✅ Send Sticker — WhatsApp (QR e oficial), Instagram/Messenger (como imagem) e Telegram
 router.post('/conversations/:conversationIdOrJid/send-sticker', async (req, res, next) => {
   try {
     const user = req.user;
@@ -2590,74 +2478,107 @@ router.post('/conversations/:conversationIdOrJid/send-sticker', async (req, res,
 
     const { conversationIdOrJid } = req.params;
     const { sticker_url, sticker_base64 } = req.body;
-
     if (!sticker_url && !sticker_base64) {
       return res.status(400).json({ error: 'Sticker URL or base64 required' });
     }
 
-    console.log('[Inbox Sticker] Processing for:', conversationIdOrJid);
-
-    // Get the instance for this user
-    const savedInstance = await getActiveWhatsAppInstance(user.id);
-    const instanceId = savedInstance || getUserInstanceName(user.id);
-
-    if (!instanceId) {
-      return res.status(400).json({ error: 'No WhatsApp instance configured' });
-    }
-
-    // Detect if it's a JID or UUID
+    const { query: dbQuery } = require('../database/connection');
     const isJid = conversationIdOrJid.includes('@');
-    let remoteJid = isJid ? conversationIdOrJid : null;
-    let phone = '';
-
-    if (isJid) {
-      phone = conversationIdOrJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '');
-    } else {
-      const conversation = await conversationsService.getById(conversationIdOrJid);
-      if (conversation) {
-        remoteJid = conversation.remote_jid;
-        phone = remoteJid?.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '') || '';
-      }
-    }
-
-    if (!remoteJid && !phone) {
+    const convResult = await dbQuery(
+      `SELECT c.id, c.remote_jid, c.channel_id, ch.type as channel_type, ch.credentials as channel_credentials
+       FROM conversations c LEFT JOIN channels ch ON c.channel_id = ch.id
+       WHERE ${isJid ? 'c.remote_jid' : 'c.id::text'} = $1 AND c.user_id = $2 LIMIT 1`,
+      [conversationIdOrJid, user.id]
+    );
+    const conv = convResult.rows[0];
+    const remoteJid: string | null = conv?.remote_jid || (isJid ? conversationIdOrJid : null);
+    if (!remoteJid) {
       return res.status(400).json({ error: 'Invalid conversation or phone number' });
     }
+    const channelType: string = conv?.channel_type || 'whatsapp';
+    let creds: any = conv?.channel_credentials || null;
+    if (creds && typeof creds === 'string') { try { creds = JSON.parse(creds); } catch { /* ignore */ } }
+    const phone = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '');
 
-    // Send via Evolution API
-    const result = await whatsappService.sendSticker({
-      instanceId,
-      number: remoteJid?.includes('@lid') || remoteJid?.includes('@g.us') ? remoteJid! : phone,
-      stickerUrl: sticker_url,
-      stickerBase64: sticker_base64,
-    });
+    // Base64 → ficheiro guardado, para ficar na conversa e os canais o poderem ler
+    let stickerUrl: string = sticker_url || '';
+    if (!stickerUrl && sticker_base64) {
+      const raw = String(sticker_base64).replace(/^data:[^;]+;base64,/, '');
+      stickerUrl = await getStorageService().uploadBuffer(Buffer.from(raw, 'base64'), `sticker_${Date.now()}.webp`, 'image/webp', 'inbox-media', user.id);
+    }
 
-    // Extract external ID from result
-    const externalId = (result as any)?.key?.id || (result as any)?.message?.id || null;
+    let result: any = null;
+    console.log('[Inbox Sticker] Sending:', { conversation: conv?.id, channelType });
 
-    // Save to database
+    if (channelType === 'whatsapp_cloud') {
+      try {
+        const sent = await sendCloudMedia(creds, cloudRecipient(remoteJid, phone), { kind: 'sticker', url: stickerUrl });
+        result = sent.result;
+      } catch (cloudErr: any) {
+        const message = cloudErr instanceof CloudSendError ? cloudErr.message : 'Não foi possível enviar a figurinha. Tente de novo.';
+        return res.status(422).json({ error: message, details: cloudErr?.metaMessage });
+      }
+    } else if (channelType === 'whatsapp') {
+      const instanceId = creds?.instance_id || creds?.instance_name || (await getActiveWhatsAppInstance(user.id)) || getUserInstanceName(user.id);
+      if (!instanceId) return res.status(400).json({ error: 'No WhatsApp instance configured' });
+      result = await whatsappService.sendSticker({
+        instanceId,
+        number: remoteJid.includes('@lid') || remoteJid.includes('@g.us') ? remoteJid : phone,
+        stickerUrl: publicFileUrl(stickerUrl),
+      });
+    } else if (channelType === 'instagram' || channelType === 'facebook') {
+      // Sem figurinhas próprias nestes canais: segue como imagem
+      const accessToken = creds?.page_access_token || creds?.access_token;
+      if (!accessToken) return res.status(500).json({ error: 'Canal sem token configurado. Reconecte o canal.' });
+      const payload = channelType === 'facebook'
+        ? { url: publicFileUrl(stickerUrl), is_reusable: true }
+        : { url: publicFileUrl(stickerUrl) };
+      const response = await fetch(`${metaMessagesUrl(accessToken, creds?.page_id)}?access_token=${accessToken}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient: { id: remoteJid }, message: { attachment: { type: 'image', payload } } }),
+      });
+      result = await response.json();
+      if (!response.ok) {
+        const channelName = channelType === 'instagram' ? 'Instagram' : 'Messenger';
+        return res.status(422).json({ error: `O ${channelName} não aceitou a figurinha: ${result?.error?.message || 'erro desconhecido'}` });
+      }
+    } else if (channelType === 'telegram') {
+      const botToken = creds?.bot_token || creds?.token;
+      if (!botToken) return res.status(500).json({ error: 'Telegram channel not properly configured' });
+      const isWebp = /\.webp(\?|$)/i.test(stickerUrl);
+      const method = isWebp ? 'sendSticker' : 'sendPhoto';
+      const response = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: remoteJid, [isWebp ? 'sticker' : 'photo']: publicFileUrl(stickerUrl) }),
+      });
+      const tg = await response.json();
+      if (!tg.ok) return res.status(422).json({ error: `O Telegram não aceitou a figurinha: ${tg?.description || 'erro desconhecido'}` });
+      result = tg.result;
+    } else {
+      return res.status(400).json({ error: 'Este canal não aceita figurinhas.' });
+    }
+
+    const externalId = result?.key?.id || result?.messages?.[0]?.id || result?.message_id?.toString() || result?.message?.id || null;
     const message = await messagesService.create({
-      conversation_id: isJid ? null : conversationIdOrJid,
+      conversation_id: conv?.id || null,
       direction: 'out',
-      channel: 'whatsapp',
+      channel: channelType,
       content: '🎨 Sticker',
       status: 'sent',
       sent_at: new Date().toISOString(),
       external_id: externalId,
-      media_url: sticker_url || null,
+      media_url: stickerUrl,
       media_type: 'sticker',
-      metadata: { whatsapp_result: result, remote_jid: remoteJid },
+      metadata: { external_result: result, remote_jid: remoteJid, channel_type: channelType },
     }, user.id);
 
-    console.log('[Inbox Sticker] Sent successfully');
-
-    // Disparar webhook para sistemas externos (n8n, Make, Zapier, etc.)
     if (message) {
-      const stickerConvId = isJid ? null : conversationIdOrJid;
       webhookDispatcher.dispatch(user.id, 'message.sent', {
-        channel: { type: 'whatsapp' },
-        conversation: { id: stickerConvId },
-        message: { id: message.id, content: '🎨 Sticker', direction: 'out', media_type: 'sticker', media_url: sticker_url || null },
+        channel: { type: channelType },
+        conversation: { id: conv?.id || null },
+        message: { id: message.id, content: '🎨 Sticker', direction: 'out', media_type: 'sticker', media_url: stickerUrl },
       }).catch(err => console.warn('[Inbox Sticker] Webhook dispatch (message.sent) failed:', err.message));
     }
 

@@ -454,9 +454,16 @@ export const inboxApi = {
     async sendSticker(conversationId: string, stickerUrl: string): Promise<Message> {
         const { data } = await api.post<Message>(
             `/inbox/conversations/${conversationId}/send-sticker`,
-            { sticker_url: stickerUrl }
+            { sticker_url: stickerUrl },
+            { timeout: 60000 }
         );
         return data;
+    },
+
+    /** Figurinhas recebidas nas conversas (as mais recentes primeiro) */
+    async getRecentStickers(): Promise<string[]> {
+        const { data } = await api.get<{ stickers: string[] }>('/inbox/stickers/recent');
+        return data?.stickers || [];
     }
 };
 
