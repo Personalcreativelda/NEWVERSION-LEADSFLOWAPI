@@ -47,5 +47,7 @@
  "Diagnóstico guiado": ["Guided diagnosis", "Diagnóstico guiado", "Diagnostic guidé"],
  "Soluções passo a passo": ["Step-by-step solutions", "Soluciones paso a paso", "Solutions étape par étape"],
  "Escalada inteligente": ["Smart escalation", "Escalado inteligente", "Transfert intelligent"],
- "Recolha de dados para o pedido": ["Data collection for the request", "Recopilación de datos para la solicitud", "Collecte de données pour la demande"]
+ "Recolha de dados para o pedido": ["Data collection for the request", "Recopilación de datos para la solicitud", "Collecte de données pour la demande"],
+ "Aprovada": ["Approved", "Aprobada", "Approuvée"],
+ "Rejeitada": ["Rejected", "Rechazada", "Rejetée"]
 }

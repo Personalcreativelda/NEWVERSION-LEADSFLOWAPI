@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { MessageCircle, Plus, RefreshCw } from 'lucide-react';
 import { AppModal } from '../base/AppModal';
@@ -204,9 +204,13 @@ function AccountTab({ channelId }: { channelId: string }) {
                     <Chip className={state.className}>{state.label}</Chip>
                     {n.in_use && <Chip className="bg-primary/10 text-primary">Neste canal</Chip>}
                   </div>
+                  {/* Cada parte no seu próprio elemento: o tradutor do ecrã troca texto a texto */}
                   <p className="truncate text-sm text-muted-foreground">
-                    {[n.verified_name, n.quality_rating && QUALITY[n.quality_rating] ? `qualidade ${QUALITY[n.quality_rating].toLowerCase()}` : null, n.messaging_limit ? LIMIT[n.messaging_limit] : null]
-                      .filter(Boolean).join(' · ')}
+                    {[
+                      n.verified_name ? <span translate="no">{n.verified_name}</span> : null,
+                      n.quality_rating && QUALITY[n.quality_rating] ? <><span>Qualidade</span> <span>{QUALITY[n.quality_rating].toLowerCase()}</span></> : null,
+                      n.messaging_limit && LIMIT[n.messaging_limit] ? <span>{LIMIT[n.messaging_limit]}</span> : null,
+                    ].filter(Boolean).map((part, i) => <Fragment key={i}>{i > 0 && ' · '}{part}</Fragment>)}
                   </p>
                 </div>
                 {state.next === 'verify' && <Button size="sm" variant="outline" onClick={() => setAction({ number: n, kind: 'verify' })}>Verificar</Button>}
