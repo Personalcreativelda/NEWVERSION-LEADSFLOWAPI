@@ -5,6 +5,7 @@ import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
 import { Globe, Check, AlertCircle, Loader2, Copy, Code, CheckCircle } from 'lucide-react';
 import { OverlayModal } from '../../base/OverlayModal';
+import { LogoBox } from '../../base/LogoBox';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -178,9 +179,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                     style={{ borderColor: 'hsl(var(--border))' }}
                 >
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-violet-500 to-purple-600 flex items-center justify-center">
-                            <Globe className="w-5 h-5 text-white" />
-                        </div>
+                        <LogoBox icon={Globe} tone="text-violet-600 dark:text-violet-400" />
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
                                 {isEditing ? 'Editar Canal Website' : 'Chat do Site'}

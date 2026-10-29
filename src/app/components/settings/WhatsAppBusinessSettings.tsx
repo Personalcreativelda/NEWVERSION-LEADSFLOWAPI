@@ -19,6 +19,7 @@ import {
   type WaProfile,
   type WaTemplate,
 } from '../../services/api/whatsapp-business';
+import { LogoBox } from '../base/LogoBox';
 
 /**
  * Definições → WhatsApp Business: a conta oficial (Cloud API) ligada a um canal
@@ -312,6 +313,7 @@ function NumberSetupModal({ channelId, number, startAt, onClose, onDone }: {
       open
       onOpenChange={(open) => { if (!open && !busy) onClose(); }}
       size="sm"
+      logo={<LogoBox brand="whatsapp" />}
       title={step === 'pin' ? 'Ativar número' : 'Verificar número'}
       description={number.display_phone_number}
       footer={footer}
@@ -563,6 +565,7 @@ function TemplateModal({ template, onClose, onDelete }: { template: WaTemplate; 
       open
       onOpenChange={(open) => { if (!open) onClose(); }}
       size="sm"
+      logo={<LogoBox brand="whatsapp" />}
       title={<span className="font-mono">{template.name}</span>}
       description={`${CATEGORY_LABEL[template.category] || template.category} · ${template.language}`}
       footer={
@@ -625,6 +628,7 @@ function NewTemplateModal({ channelId, onClose, onCreated }: { channelId: string
       open
       onOpenChange={(open) => { if (!open && !saving) onClose(); }}
       size="lg"
+      logo={<LogoBox brand="whatsapp" />}
       title="Novo modelo"
       footer={
         <>

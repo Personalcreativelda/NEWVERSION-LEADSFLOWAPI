@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Mail, Send } from 'lucide-react';
 import { AppButton } from '../base/AppButton';
 import { FormField } from '../base/FormField';
+import { LogoBox } from '../base/LogoBox';
 
 interface EnviarEmailModalProps {
   isOpen: boolean;
@@ -67,12 +68,8 @@ export default function EnviarEmailModal({
     <AppModal
       open={isOpen}
       onOpenChange={(open) => { if (!open && !loading) handleClose(); }}
-      title={
-        <span className="flex items-center gap-2">
-          <Mail className="w-5 h-5 text-primary shrink-0" />
-          Enviar email
-        </span>
-      }
+      logo={<LogoBox icon={Mail} tone="text-cyan-600 dark:text-cyan-400" />}
+      title="Enviar email"
       description={<span className="break-all">Para: {leadNome}{leadEmail ? ` · ${leadEmail}` : ''}</span>}
       bodyClassName="space-y-4"
       footer={

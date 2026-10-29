@@ -4,6 +4,7 @@ import { useConfirm } from '../ui/ConfirmDialog';
 import type { Lead } from '../../types';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
+import { LogoBox } from '../base/LogoBox';
 
 interface MassMessageModalProps {
   isOpen: boolean;
@@ -173,7 +174,8 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
       open={isOpen}
       onOpenChange={(open) => !open && onClose()}
       className="p-0 gap-0"
-      title="Envio em Massa via WhatsApp"
+      logo={<LogoBox brand="whatsapp" />}
+      title="Envio em massa via WhatsApp"
       footer={
         <>
           <AppButton type="button" variant="outline" onClick={onClose} disabled={enviando}>

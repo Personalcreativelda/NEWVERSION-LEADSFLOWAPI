@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Mail, Check, AlertCircle, Loader2, Info, CheckCircle, Eye, EyeOff, ChevronRight, Server } from 'lucide-react';
 import { OverlayModal } from '../../base/OverlayModal';
 import { MailProviderLogo, type MailProvider } from '../../base/MailProviderLogo';
+import { LogoBox } from '../../base/LogoBox';
 
 interface EmailConnectProps {
     isOpen: boolean;
@@ -49,6 +50,15 @@ const EMAIL_PROVIDERS = [
         note: 'Configure manualmente os dados do seu servidor SMTP/IMAP.'
     }
 ];
+
+/** Fornecedor pelo servidor SMTP (canais antigos guardados sem o campo provider) */
+function providerFromHost(host?: string): MailProvider | null {
+    const h = (host || '').toLowerCase();
+    if (h.includes('gmail') || h.includes('google')) return 'gmail';
+    if (h.includes('office365') || h.includes('outlook') || h.includes('hotmail') || h.includes('live.com')) return 'outlook';
+    if (h.includes('yahoo')) return 'yahoo';
+    return null;
+}
 
 export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: EmailConnectProps) {
     const isEditing = !!editingChannel;
@@ -198,9 +208,11 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                     style={{ borderColor: 'hsl(var(--border))' }}
                 >
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-500 flex items-center justify-center">
-                            <Mail className="w-5 h-5 text-white" />
-                        </div>
+                        {(() => {
+                            // Logótipo do fornecedor que se está a configurar; na escolha, o de email
+                            const logo = step === 'provider' ? null : (selectedProvider?.logo ?? providerFromHost(formData.smtp_host));
+                            return logo ? <LogoBox mail={logo} /> : <LogoBox icon={Mail} tone="text-cyan-600 dark:text-cyan-400" />;
+                        })()}
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
                                 {isEditing ? 'Editar Canal Email' : step === 'provider' ? 'Ligar Email' : step === 'config' ? (selectedProvider?.name || 'Configurar Email') : 'Sucesso!'}
@@ -445,7 +457,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                 {!isEditing && (
                                     <button
                                         onClick={() => { setStep('provider'); setError(null); }}
-                                        className="px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
+                                        className="px-4 h-10 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
                                         style={{ borderColor: 'hsl(var(--border))' }}
                                     >
                                         Voltar
@@ -453,7 +465,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                 )}
                                 <button
                                     onClick={handleSubmit}
-                                    disabled={loading || !formData.name.trim() || !formData.email.trim() || !formData.password.trim() || !formData.smtp_host.trim()}
+                                    disabled={loading || !formData.name.trim() || !formData.email.trim() || (!formData.password.trim() && !isEditing) || !formData.smtp_host.trim()}
                                     className="flex-1 px-4 h-10 rounded-lg text-sm font-medium text-white bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {loading ? (
@@ -462,10 +474,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                             {isEditing ? 'A atualizar...' : 'A ligar...'}
                                         </>
                                     ) : (
-                                        <>
-                                            <Check className="w-4 h-4" />
-                                            {isEditing ? 'Atualizar Canal' : 'Ligar Email'}
-                                        </>
+                                        isEditing ? 'Atualizar canal' : 'Ligar email'
                                     )}
                                 </button>
                             </div>

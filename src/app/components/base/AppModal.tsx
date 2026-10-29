@@ -25,6 +25,8 @@ interface AppModalProps {
   onOpenChange: (open: boolean) => void;
   title?: ReactNode;
   description?: ReactNode;
+  /** Logótipo do que se está a configurar (LogoBox), à esquerda do título */
+  logo?: ReactNode;
   size?: AppModalSize;
   footer?: ReactNode;
   children: ReactNode;
@@ -48,6 +50,7 @@ export function AppModal({
   onOpenChange,
   title,
   description,
+  logo,
   size = 'md',
   footer,
   children,
@@ -70,8 +73,20 @@ export function AppModal({
       >
         {(title || description) && (
           <DialogHeader className="shrink-0 px-5 pt-5 pb-4 sm:px-6 border-b border-border">
-            {title && <DialogTitle>{title}</DialogTitle>}
-            {description && <DialogDescription>{description}</DialogDescription>}
+            {logo ? (
+              <div className="flex items-center gap-3 min-w-0 pr-8 text-left">
+                {logo}
+                <div className="min-w-0 space-y-1">
+                  {title && <DialogTitle>{title}</DialogTitle>}
+                  {description && <DialogDescription>{description}</DialogDescription>}
+                </div>
+              </div>
+            ) : (
+              <>
+                {title && <DialogTitle>{title}</DialogTitle>}
+                {description && <DialogDescription>{description}</DialogDescription>}
+              </>
+            )}
           </DialogHeader>
         )}
 

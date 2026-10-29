@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle } from 'lucide-react';
 import { BrandIcon } from '../../base/BrandIcon';
 import { OverlayModal } from '../../base/OverlayModal';
+import { LogoBox } from '../../base/LogoBox';
 
 interface TelegramConnectProps {
     isOpen: boolean;
@@ -143,9 +144,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                     style={{ borderColor: 'hsl(var(--border))' }}
                 >
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                            <BrandIcon brand="telegram" className="w-5 h-5" />
-                        </div>
+                        <LogoBox brand="telegram" />
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
                                 {isEditing ? 'Editar Canal Telegram' : 'Ligar Telegram'}

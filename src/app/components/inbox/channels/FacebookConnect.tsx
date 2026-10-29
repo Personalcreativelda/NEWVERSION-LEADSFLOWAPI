@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, ChevronRight, ArrowLeft } from 'lucide-react';
 import { BrandIcon } from '../../base/BrandIcon';
 import { OverlayModal } from '../../base/OverlayModal';
+import { LogoBox } from '../../base/LogoBox';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -162,9 +163,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                     style={{ borderColor: 'hsl(var(--border))' }}
                 >
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center">
-                            <BrandIcon brand="messenger" className="w-5 h-5" />
-                        </div>
+                        <LogoBox brand="messenger" />
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
                                 {isEditing ? 'Editar Canal Facebook' : 'Ligar Facebook Messenger'}

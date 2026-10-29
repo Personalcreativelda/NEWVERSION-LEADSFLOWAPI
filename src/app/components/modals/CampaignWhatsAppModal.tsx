@@ -18,6 +18,7 @@ import EmojiPicker from 'emoji-picker-react';
 import { channelsApi, groupsApi } from '../../services/api/inbox';
 import { uploadAttachment } from '../../services/uploadService';
 import { NUMBER_OPTS, getLocale } from '../../utils/format';
+import { LogoBox } from '../base/LogoBox';
 
 interface Lead {
   id: string;
@@ -1760,6 +1761,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       onOpenChange={(open) => !open && handleClose()}
       size="2xl"
       className="campaign-modal p-0 gap-0 max-h-[90vh] flex flex-col"
+      logo={<LogoBox brand="whatsapp" />}
       title={
         <div className="min-w-0">
           <span>{editingCampaign ? 'Editar campanha de WhatsApp' : 'Nova campanha de WhatsApp'}</span>

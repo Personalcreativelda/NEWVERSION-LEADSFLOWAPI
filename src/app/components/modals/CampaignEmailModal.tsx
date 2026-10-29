@@ -14,6 +14,7 @@ import { Layout } from 'lucide-react';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
 import { ChoiceList, CheckList } from '../base/ChoiceList';
+import { LogoBox } from '../base/LogoBox';
 
 const STAGE_LABELS: Record<string, string> = {
   novo: 'Novos', contatado: 'Contactados', qualificado: 'Qualificados',
@@ -595,6 +596,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
       onOpenChange={(open) => !open && onClose()}
       size="lg"
       className="p-0 gap-0 max-h-[90vh] flex flex-col"
+      logo={<LogoBox icon={Mail} tone="text-cyan-600 dark:text-cyan-400" />}
       title={editingCampaign ? 'Editar campanha de email' : 'Nova campanha de email'}
       footer={
         <>

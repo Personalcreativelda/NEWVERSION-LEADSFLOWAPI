@@ -10,6 +10,7 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Alert, AlertDescription } from '../../ui/alert';
 import { getApiBaseUrl } from '../../../utils/api-client';
+import { LogoBox } from '../../base/LogoBox';
 
 interface TwilioSMSConnectProps {
     isOpen: boolean;
@@ -149,10 +150,8 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
         <Dialog open={isOpen} onOpenChange={handleClose}>
             <DialogContent className="sm:max-w-2xl p-4 sm:p-6">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl pr-8">
-                        <div className="bg-teal-100 dark:bg-teal-900/30 p-2 rounded-lg">
-                            <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 text-teal-600 dark:text-teal-400" />
-                        </div>
+                    <DialogTitle className="flex items-center gap-3 text-lg sm:text-xl pr-8">
+                        <LogoBox icon={Smartphone} tone="text-teal-600 dark:text-teal-400" />
                         <span className="text-base sm:text-xl">{isEditing ? 'Editar Canal Twilio SMS' : 'Configurar Twilio SMS'}</span>
                     </DialogTitle>
                     <DialogDescription className="text-xs sm:text-sm">

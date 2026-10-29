@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Check, AlertCircle, Loader2, ExternalLink, Info, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
 import { BrandIcon } from '../../base/BrandIcon';
 import { OverlayModal } from '../../base/OverlayModal';
+import { LogoBox } from '../../base/LogoBox';
 
 // URL base da API (pegar do env ou usar padrão)
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
@@ -379,9 +380,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                     style={{ borderColor: 'hsl(var(--border))' }}
                 >
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex items-center justify-center">
-                            <BrandIcon brand="instagram" mono className="w-5 h-5 text-white" />
-                        </div>
+                        <LogoBox brand="instagram" />
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
                                 {isEditing ? 'Editar Canal Instagram' : 'Ligar Instagram'}

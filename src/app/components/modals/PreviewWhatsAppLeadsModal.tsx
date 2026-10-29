@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { toast } from"sonner";
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
+import { LogoBox } from '../base/LogoBox';
 
 interface WhatsAppContact {
  nome: string;
@@ -224,21 +225,9 @@ export default function PreviewWhatsAppLeadsModal({
  onOpenChange={(open) => !open && onClose()}
  size="xl"
  className="p-0 gap-0 max-h-[90vh] flex flex-col"
- title={
- <div className="flex items-center gap-3">
- <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
- <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
- </div>
- <div>
- <h2 className="text-xl font-semibold text-foreground">
- Contactos Importados do WhatsApp
- </h2>
- <p className="text-sm text-muted-foreground font-normal">
- {editedContacts.length} contacto(s) disponível(is) para importação no CRM
- </p>
- </div>
- </div>
- }
+ logo={<LogoBox brand="whatsapp" />}
+ title="Contactos importados do WhatsApp"
+ description={`${editedContacts.length} contacto(s) disponível(is) para importação no CRM`}
  footer={
  <div className="flex items-center justify-between gap-3 w-full">
  <p className="text-sm text-muted-foreground hidden sm:block">

@@ -7,6 +7,7 @@ import { AppModal } from '../../base/AppModal';
 import { BrandIcon } from '../../base/BrandIcon';
 import { isNativeApp, openBrowser } from '../../../../native';
 import { instagramOAuthApi, metaOAuthApi, whatsappSignupApi, type InstagramLoginAccount, type MetaConnectResult, type MetaOAuthPage } from '../../../services/api/inbox';
+import { LogoBox } from '../../base/LogoBox';
 
 export type MetaProduct = 'facebook' | 'instagram';
 
@@ -190,6 +191,7 @@ export function MetaPagesSheet({ sessionId, onClose, onConnected }: {
       open={!!sessionId}
       onOpenChange={(open) => !open && onClose()}
       size="md"
+      logo={<LogoBox brand="meta" />}
       title="Escolha o que quer ligar"
       description="As mensagens destas páginas e contas passam a chegar à caixa de entrada."
       footer={

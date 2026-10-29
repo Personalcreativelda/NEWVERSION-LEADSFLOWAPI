@@ -12,6 +12,7 @@ import type { Channel } from '../../types/inbox';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
 import { ChoiceList, CheckList } from '../base/ChoiceList';
+import { LogoBox } from '../base/LogoBox';
 
 interface Lead {
   id: string;
@@ -223,6 +224,7 @@ export default function CampaignSMSModal({
       onOpenChange={(open) => !open && onClose()}
       size="lg"
       className="campaign-modal p-0 gap-0 max-h-[90vh] flex flex-col"
+      logo={<LogoBox icon={Smartphone} tone="text-teal-600 dark:text-teal-400" />}
       title={editingCampaign ? 'Editar campanha de SMS' : 'Nova campanha de SMS'}
       footer={
         <>
