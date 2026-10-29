@@ -109,7 +109,9 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
 - Seleção/destaque sem contornos azuis grossos: `border` neutro (`border-foreground/25`).
 - Botões com texto não levam ícone à esquerda: o `Button` (ui/button.tsx) tira-o sozinho
   (fica o spinner e ícones depois do texto, ex.: ▾). Em `<button>` feitos à mão, não pôr.
-- Logótipos de canais/integrações: `h-7 w-7` dentro da caixa de 40px.
+- Logótipos de canais/integrações: `h-7 w-7` dentro da caixa de 40px — `LogoBox` (`base/LogoBox.tsx`,
+  marcas do `BrandIcon`, Gmail/Outlook/Yahoo do `MailProviderLogo`). Modal que configura ou envia por
+  um canal mostra esse logótipo no cabeçalho (`AppModal logo={<LogoBox …/>}`), nunca um ícone genérico.
 - Tamanhos únicos: botões com texto 40px (o `Button` ignora `h-*`/`py-*`/`text-*` avulsos;
   botões feitos à mão: `h-10`). Campos: regra global em globals.css ("Campos de texto") dá o
   mesmo fundo, contorno, cantos, altura mínima (40px) e foco a todos os input/select/textarea,
