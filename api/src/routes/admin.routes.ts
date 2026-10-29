@@ -390,6 +390,38 @@ router.post('/notification-settings', requireAuth, requireAdmin, async (req: Aut
 });
 
 // ==========================================
+// POST /admin/notification-settings/test - Email de teste para o email dos avisos
+// ==========================================
+router.post('/notification-settings/test', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { emailService } = await import('../services/email.service');
+    const { adminNotificationEmail } = await import('../services/notifications.service');
+    if (!emailService.configured) {
+      return res.status(422).json({ error: 'O servidor de email (SMTP) não está configurado.' });
+    }
+    let to = req.user!.email;
+    try {
+      const r = await query(
+        `SELECT settings FROM admin_settings WHERE admin_id = $1 AND setting_key = 'notifications'`,
+        [req.user!.id]
+      );
+      const saved = r.rows[0]?.settings?.notificationEmail;
+      if (typeof saved === 'string' && saved.trim()) to = saved.trim();
+    } catch { /* sem definições guardadas: vai para o email da conta */ }
+
+    const mail = adminNotificationEmail('Email de teste', 'Os avisos do administrador vão chegar a este email.');
+    try {
+      await emailService.sendRaw({ to, ...mail });
+    } catch {
+      return res.status(422).json({ error: 'Não foi possível enviar o email. Verifique as definições SMTP do servidor.' });
+    }
+    res.json({ success: true, sentTo: to });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==========================================
 // POST /admin/reset-usage - Resetar contadores de uso de um usuário
 // ==========================================
 router.post('/reset-usage', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {

@@ -33,7 +33,7 @@ export const AdminActivityTab: React.FC<ActivityTabProps> = ({
     <div className="space-y-8">
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-foreground">Online agora</h2>
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Online agora</h3>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground" translate="no">
             <span className={`w-1.5 h-1.5 rounded-full ${activeUsers.length > 0 ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
             {activeUsers.length}
@@ -69,7 +69,7 @@ export const AdminActivityTab: React.FC<ActivityTabProps> = ({
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">Atividade recente</h2>
+        <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Atividade recente</h3>
         <AdminActivityFeed activities={activities} users={users} loading={activitiesLoading} />
       </section>
     </div>

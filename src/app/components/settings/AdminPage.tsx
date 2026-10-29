@@ -2,9 +2,8 @@ import { matchesSearch } from '../../utils/search';
 import { useState, useEffect } from 'react';
 import { apiRequest } from '../../utils/api';
 import { toast } from 'sonner';
-import { Button } from '../ui/button';
 import {
-  Bell, Star, AlertTriangle, Loader2, MessageSquare, Search,
+  Star, AlertTriangle, Loader2, MessageSquare, Search,
   Activity, Megaphone, Settings, Users, UserPlus, RefreshCw,
 } from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
@@ -17,7 +16,8 @@ import { AdminDashboardTab } from './admin/AdminDashboardTab';
 import { AdminDiagnosticsTab } from './admin/AdminDiagnosticsTab';
 
 import { UserDetailsModal } from './admin/UserDetailsModal';
-import { ActivatePlanModal, NotificationSettingsModal, AddUserModal } from './admin/AdminModals';
+import { ActivatePlanModal, AddUserModal } from './admin/AdminModals';
+import { AdminNotificationsTab } from './admin/AdminNotificationsTab';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { getLocale } from '../../utils/format';
 
@@ -61,15 +61,6 @@ export default function AdminPage(_props: AdminPageProps = {}) {
   const [selectedPlan, setSelectedPlan] = useState<string>('business');
   const [expirationDays, setExpirationDays] = useState<number>(30);
   const [plansPricing, setPlansPricing] = useState<PlanPricing[]>([]);
-  const [notificationSettings, setNotificationSettings] = useState({
-    upgradeNotifications: true,
-    newUserNotifications: true,
-    paymentNotifications: true,
-    expirationNotifications: true,
-    suspensionNotifications: true,
-    notificationEmail: '',
-  });
-  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [filterPlan, setFilterPlan] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'activity' | 'marketing' | 'settings' | 'feedback' | 'diagnostics'>('dashboard');
@@ -83,7 +74,6 @@ export default function AdminPage(_props: AdminPageProps = {}) {
   useEffect(() => {
     loadUsers();
     loadPlansPricing();
-    loadNotificationSettings();
     // Read tab requested from sidebar navigation (on initial mount)
     const initialTab = sessionStorage.getItem('adminInitialTab') as typeof activeTab | null;
     if (initialTab) {
@@ -280,32 +270,6 @@ export default function AdminPage(_props: AdminPageProps = {}) {
     }
   };
 
-  const loadNotificationSettings = async () => {
-    try {
-      const response = await apiRequest('/admin/notification-settings', 'GET');
-      if (response.success) {
-        setNotificationSettings(response.settings);
-      }
-    } catch (error: any) {
-      console.log('Using default notification settings');
-    }
-  };
-
-  const saveNotificationSettings = async () => {
-    setLoading(true);
-    try {
-      const response = await apiRequest('/admin/notification-settings', 'POST', notificationSettings);
-      if (response.success) {
-        toast.success('Definições de notificação guardadas com sucesso!');
-        setShowNotificationSettings(false);
-      }
-    } catch (error: any) {
-      toast.error('Erro ao guardar definições de notificação: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSuspendUser = async (userId: string, currentStatus?: string) => {
     const isSuspended = currentStatus === 'suspended';
     const action = isSuspended ? 'reativar' : 'suspender';
@@ -469,7 +433,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
       {/* Marketing tab */}
       {activeTab === 'marketing' && (
         <div>
-          <PageHeader title="Marketing" description="Comunicação com os utilizadores da plataforma" icon={Megaphone} />
+          <PageHeader title="Marketing" icon={Megaphone} />
           <AdminMarketingTab
             totalUsers={users.length}
             freeCount={users.filter(u => u.plan === 'free').length}
@@ -567,23 +531,8 @@ export default function AdminPage(_props: AdminPageProps = {}) {
       {/* Settings tab */}
       {activeTab === 'settings' && (
         <div>
-          <PageHeader title="Definições Admin" description="Notificações e sistema" icon={Settings} />
-          <div className="max-w-2xl">
-            <div className="bg-card rounded-xl p-6 shadow-sm border border-border mb-4">
-              <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                <Bell className="w-5 h-5 text-blue-500" />
-                Notificações
-              </h2>
-              <Button
-                onClick={() => setShowNotificationSettings(true)}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Bell className="w-4 h-4" />
-                Configurar Notificações
-              </Button>
-            </div>
-          </div>
+          <PageHeader title="Definições" icon={Settings} />
+          <AdminNotificationsTab />
         </div>
       )}
 
@@ -613,16 +562,6 @@ export default function AdminPage(_props: AdminPageProps = {}) {
             setSelectedUser(null);
           }}
           onActivate={handleActivatePlan}
-        />
-      )}
-
-      {showNotificationSettings && (
-        <NotificationSettingsModal
-          settings={notificationSettings}
-          setSettings={setSettings => setNotificationSettings(setSettings)}
-          loading={loading}
-          onClose={() => setShowNotificationSettings(false)}
-          onSave={saveNotificationSettings}
         />
       )}
 

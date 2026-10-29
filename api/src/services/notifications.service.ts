@@ -1,4 +1,29 @@
 import { query } from '../database/connection';
+import { emailService } from './email.service';
+
+const escapeHtml = (v: string) =>
+  v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** Email simples para os avisos do administrador (mesmo texto da notificação do sino) */
+export function adminNotificationEmail(title: string, description: string) {
+  const appUrl = (process.env.FRONTEND_URL || 'https://app.leadsflowapi.com').replace(/\/$/, '');
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#f4f4f5;font-family:Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+<table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#ffffff;border-radius:12px;padding:28px">
+<tr><td>
+<p style="margin:0 0 6px;font-size:12px;color:#71717a">LeadsFlow · Admin</p>
+<h1 style="margin:0 0 12px;font-size:20px;color:#18181b">${escapeHtml(title)}</h1>
+<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#3f3f46">${escapeHtml(description)}</p>
+<a href="${appUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px">Abrir o painel</a>
+</td></tr></table>
+<p style="margin:16px 0 0;font-size:11px;color:#a1a1aa">Pode desligar estes avisos em Admin → Definições.</p>
+</td></tr></table></body></html>`;
+  return { subject: `LeadsFlow: ${title}`, html, text: `${title}
+
+${description}
+
+${appUrl}` };
+}
 
 export interface Notification {
   id: string;
@@ -126,7 +151,8 @@ export const notificationsService = {
   },
 
   // ── Admin notification helper ──────────────────────────────────────────────
-  // Sends an in-app notification to every admin whose settings allow this type.
+  // Sends an in-app notification to every admin whose settings allow this type,
+  // and the same notice by email (to notificationEmail, or the admin's own email).
   // settingKey must match a key in admin_settings.settings (e.g. 'newUserNotifications').
   async sendAdminNotification(
     settingKey: 'newUserNotifications' | 'upgradeNotifications' | 'paymentNotifications' | 'expirationNotifications' | 'suspensionNotifications',
@@ -138,13 +164,14 @@ export const notificationsService = {
   ): Promise<void> {
     try {
       // Get all admins
-      const admins = await query(`SELECT id FROM users WHERE role = 'admin'`);
+      const admins = await query(`SELECT id, email FROM users WHERE role = 'admin'`);
       if (!admins.rows.length) return;
 
       for (const admin of admins.rows) {
         try {
           // Read this admin's notification settings
           let enabled = true; // default on if no settings saved yet
+          let notificationEmail = '';
           try {
             const settingsResult = await query(
               `SELECT settings FROM admin_settings WHERE admin_id = $1 AND setting_key = 'notifications'`,
@@ -153,6 +180,7 @@ export const notificationsService = {
             if (settingsResult.rows.length > 0) {
               const s = settingsResult.rows[0].settings;
               enabled = s[settingKey] !== false; // default true if key missing
+              notificationEmail = typeof s.notificationEmail === 'string' ? s.notificationEmail.trim() : '';
             }
           } catch { /* admin_settings table may not exist yet */ }
 
@@ -163,6 +191,13 @@ export const notificationsService = {
              VALUES ($1, $2, $3, $4, $5, $6)`,
             [admin.id, type, title, description, icon, JSON.stringify(metadata)]
           );
+
+          const to = notificationEmail || admin.email;
+          if (to && emailService.configured) {
+            const mail = adminNotificationEmail(title, description);
+            await emailService.sendRaw({ to, ...mail }).catch((err) =>
+              console.warn(`[Notifications] Admin email to ${to} failed:`, err?.message || err));
+          }
         } catch (err) {
           console.warn(`[Notifications] Could not send admin notification to ${admin.id}:`, err);
         }

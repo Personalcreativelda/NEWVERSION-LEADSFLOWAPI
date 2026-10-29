@@ -309,6 +309,11 @@ Equipa LeadsFlow
     }
   }
 
+  /** SMTP configurado? Sem ele os emails só aparecem no registo do servidor. */
+  get configured(): boolean {
+    return this.isConfigured;
+  }
+
   /** Send a raw email — used by the diagnostic alert service. */
   async sendRaw(options: { to: string; subject: string; html: string; text: string }): Promise<void> {
     await this.sendEmail(options);
