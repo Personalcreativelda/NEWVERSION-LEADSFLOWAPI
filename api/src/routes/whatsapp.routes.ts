@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { WhatsAppService } from '../services/whatsapp.service';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, requireAdmin } from '../middleware/auth.middleware';
+import { listWhatsAppContacts } from '../services/whatsapp-contacts.service';
 import { LeadsService } from '../services/leads.service';
 import { ChannelsService } from '../services/channels.service';
 import { ConversationsService } from '../services/conversations.service';
@@ -1078,8 +1079,49 @@ router.post('/validate-leads', async (req, res, next) => {
   }
 });
 
-// Debug endpoint to check environment variables
-router.get('/config', async (_req, res) => {
+/**
+ * Contactos do WhatsApp ligado por código QR, para importar como leads
+ *
+ * POST /api/whatsapp/contacts  (POST: pode demorar e não deve ficar em cache)
+ * Response: { contacts: [{ number, name, avatar, existing }], found, withoutWhatsApp }
+ */
+router.post('/contacts', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Membros de uma equipa usam o WhatsApp do dono do espaço de trabalho
+    let ownerId = user.id;
+    const team = await query(
+      `SELECT w.owner_id FROM team_members tm
+         JOIN workspaces w ON w.id = tm.workspace_id
+        WHERE tm.user_id = $1 AND tm.status = 'active' AND tm.is_active = true AND w.owner_id != $1
+        LIMIT 1`,
+      [user.id]
+    ).catch(() => ({ rows: [] as any[] }));
+    if (team.rows[0]?.owner_id) ownerId = team.rows[0].owner_id;
+
+    const channels = await channelsService.findByType('whatsapp', ownerId);
+    const channel = channels.find((c) => c.status === 'active') || null;
+    const instance = channel?.credentials?.instance_id || channel?.credentials?.instance_name;
+    if (!instance) {
+      return res.status(409).json({ error: 'Ligue o WhatsApp por código QR em Canais para importar os contactos.' });
+    }
+    if (!whatsappService.isReady()) {
+      return res.status(503).json({ error: 'O WhatsApp não está disponível de momento.' });
+    }
+
+    const result = await listWhatsAppContacts(whatsappService, instance, user.id);
+    console.log(`[WhatsApp Contacts] ${instance}: ${result.found} encontrados, ${result.withoutWhatsApp} sem WhatsApp, ${result.contacts.length} para mostrar`);
+    res.json(result);
+  } catch (error: any) {
+    console.error('[WhatsApp Contacts] Error:', error?.message || error);
+    res.status(502).json({ error: 'Não foi possível obter os contactos do WhatsApp. Tente de novo.' });
+  }
+});
+
+// Debug endpoint to check environment variables (só administradores: mostra o início das chaves)
+router.get('/config', requireAdmin, async (_req, res) => {
   const webhookUrl = process.env.WEBHOOK_URL || process.env.API_URL || process.env.SERVICE_URL_API;
   res.json({
     hasEvolutionApiUrl: !!process.env.EVOLUTION_API_URL,

@@ -65,7 +65,7 @@ import FeedbackModal from './modals/FeedbackModal';
 // Chat Flutuante
 
 // Utils and Hooks
-import { leadsApi, userApi } from '../utils/api';
+import { leadsApi, apiRequest } from '../utils/api';
 import { conversationsApi } from '../services/api/inbox';
 import { useLeadsAutoRefresh } from '../hooks/useLeadsAutoRefresh';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -280,6 +280,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
 
   // WhatsApp Import states
   const [modalImportandoWhatsApp, setModalImportandoWhatsApp] = useState(false);
+  const [importingWhatsApp, setImportingWhatsApp] = useState(false);
   const [modalPreviewWhatsApp, setModalPreviewWhatsApp] = useState(false);
   const [whatsappContacts, setWhatsappContacts] = useState<any[]>(() => {
     console.log('[Dashboard] 🏗️ INICIALIZANDO whatsappContacts - deve estar vazio:', []);
@@ -1375,142 +1376,32 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   };
 
   // ✅ FUNÇÃO PRINCIPAL DE IMPORTAÇÃO DO WHATSAPP
+  // Contactos do WhatsApp ligado por código QR: a API pede-os à instância, filtra os válidos
+  // e com WhatsApp, junta as fotos e marca os que já são leads
   async function importarContatosWhatsApp() {
-    console.log("[IMPORT WA] Disparando...");
-
-    // Check plan enforcement first
     const block = getBlockReason();
     if (block) { showPlanBlock(block.code, block.message); return; }
 
-    // ✅ BUSCAR CONFIGURAÇÕES DO BACKEND (específicas por usuário)
-    let userSettings: any = null;
-    try {
-      console.log('[IMPORT WA] 🔍 Buscando configurações do backend...');
-      const response = await userApi.getSettings();
-      console.log('[IMPORT WA] ✅ Resposta bruta do backend:', response);
-
-      // Parse settings if they come as JSON strings in the 'settings' object
-      userSettings = response?.settings || response || {};
-
-      // Parse JSON strings if needed
-      if (userSettings) {
-        Object.keys(userSettings).forEach(key => {
-          if (typeof userSettings[key] === 'string' && (userSettings[key].startsWith('{') || userSettings[key].startsWith('['))) {
-            try {
-              userSettings[key] = JSON.parse(userSettings[key]);
-            } catch (e) {
-              // Not JSON, keep as string
-            }
-          }
-        });
-      }
-
-      console.log('[IMPORT WA] ✅ Configurações parseadas:', userSettings);
-    } catch (error) {
-      console.error('[IMPORT WA] ❌ Erro ao buscar configurações:', error);
-      toast.error('Erro ao carregar definições. Por favor, tente novamente.');
-      return;
-    }
-
-    const webhookUrl = userSettings?.n8n_whatsapp_import_url;
-
-    if (!webhookUrl) {
-      console.error("[IMPORT WA] Webhook não configurado!");
-      toast.error('A importação do WhatsApp não está configurada (Integrações).');
-      return;
-    }
-
-    // ✅ GERAR instância Evolution usando padrão leadflow_{userId}
-    // Cada usuário tem sua própria instância isolada
-    const evolutionInstance = `leadflow_${user.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
-
-    console.log('[IMPORT WA] 📱 Usando instância Evolution (auto-gerada):', evolutionInstance);
-    console.log('[IMPORT WA] 🔗 Usando webhook:', webhookUrl);
-
-    const payload = {
-      instancia: evolutionInstance,
-      leadflow_userId: user.id,
-      userId: user.id,
-      action: "listar-contatos"
-    };
-
-    console.log("[IMPORT WA] URL:", webhookUrl);
-    console.log("[IMPORT WA] Payload:", payload);
-
     setModalImportandoWhatsApp(true);
-
     try {
-      const resposta = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!resposta.ok) {
-        throw new Error(`Erro na requisição: ${resposta.status}`);
-      }
-
-      const dados = await resposta.json();
-      console.log("[IMPORT WA] Resposta N8N:", dados);
-
-      setModalImportandoWhatsApp(false);
-
-      // Verificar se retornou contatos (compatível com response.contatos OU response.data)
-      const contatos = dados.contatos || dados.data || [];
-      
-      if (!Array.isArray(contatos) || contatos.length === 0) {
-        toast.warning('Nenhum contacto encontrado.');
+      const res = await apiRequest('/whatsapp/contacts', 'POST');
+      const contatos: Array<{ number: string; name: string; avatar: string | null; existing: boolean }> = res?.contacts || [];
+      if (contatos.length === 0) {
+        toast.info('Nenhum contacto com WhatsApp encontrado.');
         return;
       }
-
-      toast.success(`${contatos.length} contacto(s) encontrados.`);
-
-      // Filtrar contatos válidos antes de mostrar
-      const contatosFiltrados = contatos.filter(c =>
-        c &&
-        c.NumeroLimpo &&
-        c.NumeroLimpo !== "" &&
-        c.EhValido === true
-      );
-
-      if (contatosFiltrados.length === 0) {
-        toast.warning('Nenhum contacto válido encontrado após filtragem');
-        console.log('[IMPORT WA] Contatos filtrados:', contatosFiltrados);
-        console.log('[IMPORT WA] Total recebidos:', contatos.length);
-        return;
-      }
-
-      // Normalizar contatos para o formato esperado pelo PreviewModal
-      const contatosNormalizados = contatosFiltrados.map(c => {
-        // ✅ Se não tiver nome, usar o número como nome
-        const nome = (c.Nome && c.Nome.trim() !== '') || (c.nome && c.nome.trim() !== '')
-          ? (c.Nome || c.nome)
-          : (c.NumeroLimpo || c.numero || 'Sem nome');
-        
-        return {
-          nome: nome,
-          numero: c.NumeroLimpo || c.numero || c.telefone || '',
-          avatar: c.Avatar || c.avatar || null,
-          // Adicionar campos extras para referência
-          ehValido: c.EhValido,
-          numeroOriginal: c.NumeroOriginal || c.numero
-        };
-      });
-
-      console.log('[IMPORT WA] Contatos normalizados:', contatosNormalizados.length);
-      console.log('[IMPORT WA] Sample:', contatosNormalizados.slice(0, 3));
-
-      // ✅ Mostrar modal de preview para seleção manual
-      setWhatsappContacts(contatosNormalizados);
-      setWhatsappImportKey(Date.now()); // Forçar remontagem do modal
+      setWhatsappContacts(contatos.map((c) => ({
+        nome: c.name || '',
+        numero: `+${c.number}`,
+        avatar: c.avatar,
+        existing: c.existing,
+      })));
+      setWhatsappImportKey(Date.now()); // nova lista → modal novo (seleção por omissão)
       setModalPreviewWhatsApp(true);
-
-      toast.info(` ${contatosFiltrados.length} contacto(s) válido(s) prontos para importação. Selecione os que deseja importar.`, { duration: 4000 });
-
-    } catch (err) {
-      console.error("[IMPORT WA] Erro no fetch:", err);
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível obter os contactos do WhatsApp');
+    } finally {
       setModalImportandoWhatsApp(false);
-      toast.error('Erro ao importar contactos do WhatsApp');
     }
   }
 
@@ -1520,106 +1411,34 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   };
 
   const handleConfirmWhatsAppImport = async (contacts: any[]) => {
+    setImportingWhatsApp(true);
     try {
-      console.log('[WhatsApp Confirm] 💾 Salvando contatos do WhatsApp via importação em massa...');
-      console.log('[WhatsApp Confirm] 📊 Total de contatos a importar:', contacts.length);
-      console.log('[WhatsApp Confirm] 📋 Sample de contatos recebidos:', contacts.slice(0, 3));
-      
-      // ✅ FUNÇÃO PARA NORMALIZAR NÚMERO DE TELEFONE COM CÓDIGO DO PAÍS
-      const normalizePhoneNumber = (phone: string): string => {
-        if (!phone) return '';
-        
-        // Remover espaços e caracteres especiais
-        const cleaned = phone.replace(/[\s\-\(\)]/g, '');
-        
-        // Se já tem + no início, retornar como está
-        if (cleaned.startsWith('+')) {
-          console.log(`[WhatsApp Normalize] ✅ Número já tem +: ${cleaned}`);
-          return cleaned;
-        }
-        
-        // Se começa com 258 (Moçambique sem +), adicionar +
-        if (cleaned.startsWith('258')) {
-          console.log(`[WhatsApp Normalize] ➕ Adicionando + ao 258: ${cleaned} → +${cleaned}`);
-          return `+${cleaned}`;
-        }
-        
-        // Se começa com 55 (Brasil), adicionar +
-        if (cleaned.startsWith('55') && cleaned.length >= 12) {
-          console.log(`[WhatsApp Normalize] ➕ Adicionando + ao Brasil: ${cleaned} → +${cleaned}`);
-          return `+${cleaned}`;
-        }
-        
-        // Se não tem código de país, assumir Moçambique (+258) como padrão
-        // Números moçambicanos têm 9 dígitos após o código do país
-        if (cleaned.length === 9) {
-          console.log(`[WhatsApp Normalize] 🇲🇿 Adicionando código Moçambique: ${cleaned} → +258${cleaned}`);
-          return `+258${cleaned}`;
-        }
-        
-        // Se tem 12-13 dígitos sem +, provavelmente já tem código, só adicionar +
-        if (cleaned.length >= 12) {
-          console.log(`[WhatsApp Normalize] ➕ Número longo sem +, adicionando: ${cleaned} → +${cleaned}`);
-          return `+${cleaned}`;
-        }
-        
-        // Caso padrão: adicionar código Moçambique
-        console.log(`[WhatsApp Normalize] 🇲🇿 Número desconhecido, assumindo Moçambique: ${cleaned} → +258${cleaned}`);
-        return `+258${cleaned}`;
-      };
-      
-      const leadsToImport = contacts.map(contact => {
-        // ✅ Garantir que o nome não seja "Sem nome" vazio
-        const nome = contact.nome && contact.nome !== 'Sem nome' && contact.nome.trim() !== '' 
-          ? contact.nome 
-          : contact.numero || 'Contato WhatsApp';
-        
-        // ✅ NORMALIZAR NÚMERO COM CÓDIGO DO PAÍS
-        const numeroOriginal = contact.numero || contact.telefone || '';
-        const numeroNormalizado = normalizePhoneNumber(numeroOriginal);
-        
-        console.log('[WhatsApp Confirm] Mapeando contato:', { 
-          original: contact.nome, 
-          final: nome, 
-          numeroOriginal: numeroOriginal,
-          numeroNormalizado: numeroNormalizado
-        });
-        
-        return {
-          nome: nome,
-          telefone: numeroNormalizado, // ✅ USAR NÚMERO NORMALIZADO
-          email: contact.email || '', // WhatsApp contacts usually don't have email
-          avatarUrl: contact.avatar || null,
-          origem: 'whatsapp',
-          status: 'Novo',
-          agente_atual: 'comercial',
-          data: new Date().toISOString().split('T')[0],
-        };
-      });
-
-      console.log('[WhatsApp Confirm] 📝 Leads preparados para importação:', leadsToImport.slice(0, 3));
-
-      console.log('[WhatsApp Confirm] 🚀 Enviando para API local (bulk import)...');
+      const leadsToImport = contacts.map((contact) => ({
+        nome: contact.nome?.trim() || contact.numero,
+        telefone: contact.numero,
+        email: '',
+        // Foto do WhatsApp: a API guarda uma cópia (o link do WhatsApp expira)
+        avatarUrl: contact.avatar || null,
+        origem: 'whatsapp',
+        status: 'Novo',
+        agente_atual: 'comercial',
+        data: new Date().toISOString().split('T')[0],
+      }));
       const result = await leadsApi.importBulk(leadsToImport, { source: 'whatsapp' });
-      console.log('[WhatsApp Confirm] ✅ Importação concluída:', result);
 
       setModalPreviewWhatsApp(false);
       setWhatsappContacts([]);
       await carregarLeads();
-      
-      const importedCount = result.imported || contacts.length;
+
+      const importedCount = result.imported ?? contacts.length;
       const duplicatesSkipped = result.duplicatesSkipped || 0;
-      
-      if (duplicatesSkipped > 0) {
-        toast.success(` ${importedCount} contacto(s) importado(s) do WhatsApp! (${duplicatesSkipped} duplicados ignorados)`);
-      } else {
-        toast.success(` ${importedCount} contacto(s) importado(s) do WhatsApp com sucesso!`);
-      }
-      
-      console.log('[WhatsApp Confirm] ✅ Importação otimizada concluída via backend Express');
+      toast.success(duplicatesSkipped > 0
+        ? `${importedCount} contacto(s) importado(s) (${duplicatesSkipped} já existiam)`
+        : `${importedCount} contacto(s) importado(s) do WhatsApp`);
     } catch (error: any) {
-      console.error('[WhatsApp Confirm] ❌ Erro ao salvar contatos do WhatsApp:', error);
-      toast.error(error.message || 'Erro ao guardar contactos. Tente novamente.');
+      toast.error(error.message || 'Não foi possível importar os contactos. Tente de novo.');
+    } finally {
+      setImportingWhatsApp(false);
     }
   };
 
@@ -2338,32 +2157,18 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         isOpen={modalImportandoWhatsApp}
       />
 
-      {(() => {
-        console.log('[Dashboard RENDER] ================================================');
-        console.log('[Dashboard RENDER] 🎨 Renderizando PreviewWhatsAppLeadsModal');
-        console.log('[Dashboard RENDER] 🚪 isOpen:', modalPreviewWhatsApp);
-        console.log('[Dashboard RENDER] 🔑 Key:', whatsappImportKey);
-        console.log('[Dashboard RENDER] 📊 whatsappContacts.length sendo passado:', whatsappContacts.length);
-        console.log('[Dashboard RENDER] 📋 whatsappContacts[0]:', whatsappContacts[0]);
-        console.log('[Dashboard RENDER] 📋 whatsappContacts[1]:', whatsappContacts[1]);
-        console.log('[Dashboard RENDER] 📋 whatsappContacts[2]:', whatsappContacts[2]);
-        console.log('[Dashboard RENDER] ================================================');
-        return null;
-      })()}
       <PreviewWhatsAppLeadsModal
         isOpen={modalPreviewWhatsApp}
         contacts={whatsappContacts}
         onClose={() => {
-          console.log('[Dashboard] 👋 FECHANDO PreviewModal via onClose');
           setModalPreviewWhatsApp(false);
           setWhatsappContacts([]);
         }}
         onImport={handleConfirmWhatsAppImport}
-        userPlan={user?.plan || user?.subscription_plan || 'free'}
+        loading={importingWhatsApp}
         currentLeadsCount={user?.usage?.leads || 0}
         leadsLimit={user?.limits?.leads !== undefined ? user?.limits?.leads : 100}
-        existingLeads={leads}
-        key={whatsappImportKey} // ✅ Key única para forçar remontagem
+        key={whatsappImportKey}
       />
 
       <CampaignEmailModal

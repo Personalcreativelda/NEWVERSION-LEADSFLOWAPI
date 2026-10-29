@@ -605,6 +605,11 @@ router.post('/import-bulk', async (req, res, next) => {
     }
 
     const source = typeof req.body?.source === 'string' ? req.body.source : undefined;
+    // Contactos do WhatsApp: as fotos são links do WhatsApp que expiram — guarda-se uma cópia
+    if (source === 'whatsapp') {
+      const { persistWhatsAppAvatars } = await import('../services/whatsapp-contacts.service');
+      leadsToImport = await persistWhatsAppAvatars(leadsToImport, user.id);
+    }
     const result = await leadsService.importBulk(leadsToImport, user.id, { source });
 
     // Build response with limit info if applied

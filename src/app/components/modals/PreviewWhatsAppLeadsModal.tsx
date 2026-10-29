@@ -1,442 +1,207 @@
-import { X, User, Phone, CheckCircle, MessageSquare, Edit2, Trash2, AlertCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { toast } from"sonner";
+import { useMemo, useState } from 'react';
+import { Check } from 'lucide-react';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
 import { LogoBox } from '../base/LogoBox';
+import { SearchInput } from '../base/SearchInput';
+import { matchesSearch } from '../../utils/search';
+import { cn } from '../ui/utils';
 
-interface WhatsAppContact {
- nome: string;
- numero: string;
- avatar?: string | null;
+export interface WhatsAppContact {
+  nome: string;
+  numero: string;
+  avatar?: string | null;
+  /** O número já é um lead (não se importa outra vez) */
+  existing?: boolean;
 }
 
 interface PreviewWhatsAppLeadsModalProps {
- isOpen: boolean;
- contacts: WhatsAppContact[];
- onClose: () => void;
- onImport: (contacts: WhatsAppContact[]) => void;
- loading?: boolean;
- userPlan?: string;
- currentLeadsCount?: number;
- leadsLimit?: number;
- existingLeads?: Array<{ telefone?: string; email?: string; }>;
- dataSource?: string; // Fonte dos dados: 'n8n_webhook', 'evolution_api_direct', etc
+  isOpen: boolean;
+  contacts: WhatsAppContact[];
+  onClose: () => void;
+  onImport: (contacts: WhatsAppContact[]) => void;
+  loading?: boolean;
+  userPlan?: string;
+  currentLeadsCount?: number;
+  leadsLimit?: number;
+  existingLeads?: Array<{ telefone?: string; email?: string }>;
+  dataSource?: string;
+}
+
+type Filter = 'new' | 'all' | 'photo' | 'named' | 'existing';
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'new', label: 'Novos' },
+  { value: 'all', label: 'Todos' },
+  { value: 'photo', label: 'Com foto' },
+  { value: 'named', label: 'Com nome' },
+  { value: 'existing', label: 'Já são leads' },
+];
+
+const PAGE = 100;
+const hasName = (c: WhatsAppContact) => !!c.nome && c.nome.replace(/\D/g, '') !== c.numero.replace(/\D/g, '');
+
+function Avatar({ contact }: { contact: WhatsAppContact }) {
+  const [broken, setBroken] = useState(false);
+  const initials = hasName(contact)
+    ? contact.nome.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+    : '#';
+  return (
+    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+      {contact.avatar && !broken ? (
+        <img src={contact.avatar} alt="" loading="lazy" className="h-full w-full object-cover" onError={() => setBroken(true)} />
+      ) : (
+        <span translate="no">{initials}</span>
+      )}
+    </span>
+  );
 }
 
 export default function PreviewWhatsAppLeadsModal({
- isOpen,
- contacts,
- onClose,
- onImport,
- loading = false,
- userPlan,
- currentLeadsCount,
- leadsLimit,
- existingLeads,
- dataSource = 'unknown',
+  isOpen,
+  contacts,
+  onClose,
+  onImport,
+  loading = false,
+  currentLeadsCount,
+  leadsLimit,
 }: PreviewWhatsAppLeadsModalProps) {
- // ✅ RESETAR completamente ao receber novos contatos
- const [modalKey] = useState(() => Date.now());
- const [selectedContacts, setSelectedContacts] = useState<Set<number>>(new Set());
- const [editingContact, setEditingContact] = useState<number | null>(null);
- const [editedContacts, setEditedContacts] = useState<WhatsAppContact[]>([]);
- const [duplicatesCount, setDuplicatesCount] = useState(0);
- const [filteredContactsCount, setFilteredContactsCount] = useState(0);
- const [lastProcessedTimestamp, setLastProcessedTimestamp] = useState<number>(0); // ✅ Estado para rastrear processamento
- const [failedAvatars, setFailedAvatars] = useState<Set<number>>(new Set()); // ✅ Rastrear avatares com erro
+  const [filter, setFilter] = useState<Filter>('new');
+  const [search, setSearch] = useState('');
+  const [visible, setVisible] = useState(PAGE);
+  // Por omissão ficam escolhidos todos os que ainda não são leads
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(contacts.filter((c) => !c.existing).map((c) => c.numero)),
+  );
 
- console.log('[PreviewModal] ================================================');
- console.log('[PreviewModal] 🔑 MODAL KEY:', modalKey);
- console.log('[PreviewModal] 🚪 isOpen:', isOpen);
- console.log('[PreviewModal] 📊 contacts.length recebido:', contacts.length);
- console.log('[PreviewModal] 📋 Sample contacts:', contacts.slice(0, 3));
- console.log('[PreviewModal] 📝 editedContacts.length atual:', editedContacts.length);
- console.log('[PreviewModal] ================================================');
+  const counts = useMemo(() => ({
+    new: contacts.filter((c) => !c.existing).length,
+    all: contacts.length,
+    photo: contacts.filter((c) => !!c.avatar).length,
+    named: contacts.filter(hasName).length,
+    existing: contacts.filter((c) => c.existing).length,
+  }), [contacts]);
 
- // Filtrar duplicados e calcular limites
- useEffect(() => {
- // ✅ LIMPAR contatos editados ao abrir modal com novos dados
- console.log('[PreviewWhatsAppModal] 🧹 Limpando dados anteriores do modal...');
- setEditedContacts([]);
- setSelectedContacts(new Set());
- setDuplicatesCount(0);
- setFilteredContactsCount(0);
- setFailedAvatars(new Set()); // ✅ Limpar avatares com erro
- 
- // ✅ Gerar timestamp único para garantir reprocessamento
- const currentTimestamp = Date.now();
- 
- console.log('[PreviewWhatsAppModal] ================================================');
- console.log('[PreviewWhatsAppModal] 🔄 REPROCESSANDO CONTATOS');
- console.log('[PreviewWhatsAppModal] ================================================');
- console.log('[PreviewWhatsAppModal] 📥 Total recebido:', contacts.length);
- console.log('[PreviewWhatsAppModal] 🕐 Timestamp atual:', currentTimestamp);
- console.log('[PreviewWhatsAppModal] ⏱️ Último timestamp:', lastProcessedTimestamp);
- console.log('[PreviewWhatsAppModal] 🔄 É nova importação?', currentTimestamp !== lastProcessedTimestamp);
- console.log('[PreviewWhatsAppModal] 📋 Sample (3 primeiros):', contacts.slice(0, 3));
- console.log('[PreviewWhatsAppModal] ================================================');
- 
- if (contacts.length > 0) {
- // ✅ Atualizar timestamp de processamento
- setLastProcessedTimestamp(currentTimestamp);
- 
- // ✅ Resetar contadores ao processar novos contatos
- console.log('[PreviewWhatsAppModal] 🧹 Limpando contadores anteriores...');
- setDuplicatesCount(0);
- setFilteredContactsCount(0);
- 
- // Filtrar duplicados se existingLeads for fornecido
- let filteredContacts = [...contacts];
- let duplicates = 0;
- 
- if (existingLeads && existingLeads.length > 0) {
- const existingPhones = new Set(
- existingLeads
- .map(lead => lead.telefone?.replace(/\D/g, ''))
- .filter(phone => phone)
- );
- 
- filteredContacts = contacts.filter(contact => {
- const phone = contact.numero.replace(/\D/g, '');
- const isDuplicate = existingPhones.has(phone);
- if (isDuplicate) duplicates++;
- return !isDuplicate;
- });
- 
- setDuplicatesCount(duplicates);
- console.log(`[PreviewWhatsAppModal] ⚠️ ${duplicates} contatos duplicados filtrados`);
- }
- 
- // Aplicar limite do plano se fornecido
- if (leadsLimit && leadsLimit !== -1 && currentLeadsCount !== undefined) {
- const availableSlots = Math.max(0, leadsLimit - currentLeadsCount);
- if (availableSlots < filteredContacts.length) {
- const originalCount = filteredContacts.length;
- filteredContacts = filteredContacts.slice(0, availableSlots);
- const filtered = originalCount - filteredContacts.length;
- setFilteredContactsCount(filtered);
- console.log(`[PreviewWhatsAppModal] ⚠️ ${filtered} contatos filtrados por limite do plano`);
- toast.warning(
- `Seu plano permite ${leadsLimit} leads. Você pode importar no máximo ${availableSlots} contactos.`,
- { duration: 5000 }
- );
- }
- }
- 
- console.log('[PreviewWhatsAppModal] ================================================');
- console.log('[PreviewWhatsAppModal] ✅ PROCESSAMENTO FINALIZADO');
- console.log('[PreviewWhatsAppModal] 📊 Contatos filtrados:', filteredContacts.length);
- console.log('[PreviewWhatsAppModal] ❌ Duplicados removidos:', duplicates);
- console.log('[PreviewWhatsAppModal] 🔢 Filtrados por limite:', filteredContactsCount);
- console.log('[PreviewWhatsAppModal] ✅ Contatos finais:', filteredContacts.length);
- console.log('[PreviewWhatsAppModal] ================================================');
- 
- setEditedContacts(filteredContacts);
- setSelectedContacts(new Set(filteredContacts.map((_, idx) => idx)));
- 
- if (duplicates > 0) {
- toast.info(
- `${duplicates} contacto(s) duplicado(s) foram automaticamente removidos.`,
- { duration: 4000 }
- );
- }
- }
- }, [contacts, existingLeads, leadsLimit, currentLeadsCount]);
+  const shown = useMemo(() => contacts.filter((c) => {
+    if (filter === 'new' && c.existing) return false;
+    if (filter === 'photo' && !c.avatar) return false;
+    if (filter === 'named' && !hasName(c)) return false;
+    if (filter === 'existing' && !c.existing) return false;
+    return !search || matchesSearch(search, c.nome, c.numero);
+  }), [contacts, filter, search]);
 
- const toggleContact = (index: number) => {
- const newSelected = new Set(selectedContacts);
- if (newSelected.has(index)) {
- newSelected.delete(index);
- } else {
- newSelected.add(index);
- }
- setSelectedContacts(newSelected);
- };
+  const selectable = shown.filter((c) => !c.existing);
+  const allShownSelected = selectable.length > 0 && selectable.every((c) => selected.has(c.numero));
 
- const toggleAll = () => {
- if (selectedContacts.size === editedContacts.length) {
- setSelectedContacts(new Set());
- } else {
- setSelectedContacts(new Set(editedContacts.map((_, idx) => idx)));
- }
- };
+  // Limite do plano: só cabem estes leads
+  const slots = leadsLimit !== undefined && leadsLimit !== -1 && currentLeadsCount !== undefined
+    ? Math.max(0, leadsLimit - currentLeadsCount)
+    : Infinity;
+  const toImport = contacts.filter((c) => !c.existing && selected.has(c.numero));
+  const importCount = Math.min(toImport.length, slots);
 
- const handleImport = () => {
- const contactsToImport = editedContacts.filter((_, idx) => selectedContacts.has(idx));
- if (contactsToImport.length === 0) {
- toast.error('Selecione pelo menos um contacto para importar');
- return;
- }
- onImport(contactsToImport);
- };
+  const toggle = (numero: string) => setSelected((prev) => {
+    const next = new Set(prev);
+    if (next.has(numero)) next.delete(numero); else next.add(numero);
+    return next;
+  });
 
- const handleDelete = async (index: number) => {
- const contact = editedContacts[index];
- const confirmed = confirm(`Deseja remover"${contact.nome}" da lista de importação?`);
- if (confirmed) {
- const newContacts = editedContacts.filter((_, idx) => idx !== index);
- setEditedContacts(newContacts);
- 
- // Atualizar seleção
- const newSelected = new Set<number>();
- selectedContacts.forEach(selectedIdx => {
- if (selectedIdx < index) {
- newSelected.add(selectedIdx);
- } else if (selectedIdx > index) {
- newSelected.add(selectedIdx - 1);
- }
- });
- setSelectedContacts(newSelected);
- 
- toast.success('Contacto removido da lista');
- }
- };
+  const toggleAllShown = () => setSelected((prev) => {
+    const next = new Set(prev);
+    selectable.forEach((c) => (allShownSelected ? next.delete(c.numero) : next.add(c.numero)));
+    return next;
+  });
 
- const handleEdit = (index: number) => {
- setEditingContact(index);
- };
+  return (
+    <AppModal
+      open={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      size="lg"
+      className="p-0 gap-0 max-h-[90vh] flex flex-col"
+      logo={<LogoBox brand="whatsapp" />}
+      title="Contactos do WhatsApp"
+      description={`${contacts.length} contactos com WhatsApp`}
+      bodyClassName="px-0 py-0 sm:px-0"
+      footer={
+        <>
+          <AppButton variant="outline" onClick={onClose} disabled={loading}>
+            Cancelar
+          </AppButton>
+          <AppButton onClick={() => onImport(toImport.slice(0, importCount))} disabled={loading || importCount === 0}>
+            {loading ? 'A importar…' : `Importar ${importCount}`}
+          </AppButton>
+        </>
+      }
+    >
+      <div className="sticky top-0 z-10 space-y-3 border-b border-border bg-background px-5 py-3 sm:px-6">
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setVisible(PAGE); }} placeholder="Pesquisar por nome ou número" />
+        <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {FILTERS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => { setFilter(f.value); setVisible(PAGE); }}
+              className={cn(
+                'flex-shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                filter === f.value
+                  ? 'border-foreground/25 bg-muted text-foreground'
+                  : 'border-border text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {f.label} <span className="tabular-nums opacity-70" translate="no">{counts[f.value]}</span>
+            </button>
+          ))}
+        </div>
+        {slots < toImport.length && (
+          <p className="text-xs text-muted-foreground">{`O seu plano permite mais ${slots} leads: serão importados os primeiros ${slots}.`}</p>
+        )}
+      </div>
 
- const handleSaveEdit = (index: number, nome: string, numero: string) => {
- const newContacts = [...editedContacts];
- newContacts[index] = {
- ...newContacts[index],
- nome,
- numero,
- };
- setEditedContacts(newContacts);
- setEditingContact(null);
- toast.success('Contacto atualizado');
- };
+      {shown.length === 0 ? (
+        <p className="px-6 py-12 text-center text-sm text-muted-foreground">Nenhum contacto</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {selectable.length > 0 && (
+            <li>
+              <button type="button" onClick={toggleAllShown} className="flex w-full items-center gap-3 px-5 py-3 text-left text-sm font-medium text-foreground hover:bg-muted/50 sm:px-6">
+                <span className={cn('flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2', allShownSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+                  {allShownSelected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                </span>
+                Selecionar todos <span className="text-muted-foreground tabular-nums" translate="no">({selectable.length})</span>
+              </button>
+            </li>
+          )}
+          {shown.slice(0, visible).map((c) => {
+            const checked = !c.existing && selected.has(c.numero);
+            return (
+              <li key={c.numero}>
+                <button
+                  type="button"
+                  disabled={c.existing}
+                  onClick={() => toggle(c.numero)}
+                  className="flex w-full items-center gap-3 px-5 py-2.5 text-left transition-colors enabled:hover:bg-muted/50 sm:px-6"
+                >
+                  <span className={cn('flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2', checked ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40', c.existing && 'opacity-40')}>
+                    {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                  </span>
+                  <Avatar contact={c} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground" translate="no">{hasName(c) ? c.nome : c.numero}</span>
+                    {hasName(c) && <span className="block truncate text-xs text-muted-foreground" translate="no">{c.numero}</span>}
+                  </span>
+                  {c.existing && <span className="flex-shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Já é lead</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
- const handleSendMessage = (contact: WhatsAppContact) => {
- // Remove caracteres não numéricos do número
- const phoneNumber = contact.numero.replace(/\D/g, '');
- toast.info(`Abrindo WhatsApp para ${contact.nome}...`);
- // Abre WhatsApp com o número (funcionalidade extra - não afeta importação)
- window.open(`https://wa.me/${phoneNumber}`, '_blank');
- };
-
- const allSelected = selectedContacts.size === editedContacts.length && editedContacts.length > 0;
-
- return (
- <AppModal
- open={isOpen}
- onOpenChange={(open) => !open && onClose()}
- size="xl"
- className="p-0 gap-0 max-h-[90vh] flex flex-col"
- logo={<LogoBox brand="whatsapp" />}
- title="Contactos importados do WhatsApp"
- description={`${editedContacts.length} contacto(s) disponível(is) para importação no CRM`}
- footer={
- <div className="flex items-center justify-between gap-3 w-full">
- <p className="text-sm text-muted-foreground hidden sm:block">
- Os contactos selecionados serão importados como leads no CRM
- </p>
- <div className="flex gap-3 ml-auto">
- <AppButton variant="outline" onClick={onClose} disabled={loading}>
- Cancelar
- </AppButton>
- <AppButton
- onClick={handleImport}
- disabled={selectedContacts.size === 0 || loading || editedContacts.length === 0}
- loading={loading}
- >
- {loading ? 'A importar...' : `Importar para CRM (${selectedContacts.size})`}
- </AppButton>
- </div>
- </div>
- }
- >
- {/* Lista de Contatos */}
- <div className="flex-1 overflow-y-auto p-6">
- {/* Alertas informativos */}
- {(duplicatesCount > 0 || filteredContactsCount > 0 || editedContacts.length > 50) && (
- <div className="mb-4 space-y-2">
- {editedContacts.length > 50 && (
- <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg flex items-start gap-2">
- <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
- <div className="text-sm text-orange-900 dark:text-orange-200">
- <strong>Importação Grande Detectada:</strong> Você está tentando importar {editedContacts.length} contactos. Para melhor performance, recomendamos importar em lotes menores de 50 contactos por vez. Se enfrentar problemas, tente selecionar menos contactos.
- </div>
- </div>
- )}
- {duplicatesCount > 0 && (
- <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg flex items-start gap-2">
- <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
- <div className="text-sm text-blue-900 dark:text-blue-200">
- <strong>{duplicatesCount}</strong> contacto(s) duplicado(s) foram automaticamente removidos para evitar importações duplicadas.
- </div>
- </div>
- )}
- {filteredContactsCount > 0 && (
- <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg flex items-start gap-2">
- <CheckCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
- <div className="text-sm text-amber-900 dark:text-amber-200">
- <strong>{filteredContactsCount}</strong> contacto(s) foram filtrados devido ao limite do seu plano <strong>({userPlan?.toUpperCase() || 'FREE'})</strong>. Faça melhorar o plano para importar mais leads.
- </div>
- </div>
- )}
- </div>
- )}
- 
- {/* Botão Selecionar Todos */}
- <div className="mb-4 flex items-center justify-between p-3 bg-muted/50/50 rounded-lg">
- <span className="text-sm font-medium text-foreground/80">
- {selectedContacts.size} de {editedContacts.length} selecionado(s)
- </span>
- <button
- onClick={toggleAll}
- className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
- >
- {allSelected ? 'Desmarcar Todos' : 'Selecionar Todos'}
- </button>
- </div>
-
- {editedContacts.length === 0 ? (
- <div className="text-center py-12">
- <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
- <User className="w-8 h-8 text-foreground/80" />
- </div>
- <p className="text-muted-foreground">Nenhum contacto disponível</p>
- </div>
- ) : (
- <div className="space-y-3">
- {editedContacts.map((contact, index) => (
- <div
- key={index}
- className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${
- selectedContacts.has(index)
- ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
- : 'border-border'
- }`}
- >
- {/* Checkbox */}
- <div
- onClick={() => toggleContact(index)}
- className="cursor-pointer"
- >
- <div
- className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
- selectedContacts.has(index)
- ? 'bg-blue-600 border-blue-600'
- : 'border-border'
- }`}
- >
- {selectedContacts.has(index) && (
- <CheckCircle className="w-4 h-4 text-white" />
- )}
- </div>
- </div>
-
- {/* Avatar */}
- <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0">
- {contact.avatar && !failedAvatars.has(index) ? (
- <img
- src={contact.avatar}
- alt={contact.nome}
- className="w-full h-full object-cover"
- onError={() => {
- // ✅ Usar estado React em vez de manipular DOM diretamente
- setFailedAvatars(prev => new Set([...prev, index]));
- }}
- />
- ) : (
- <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500">
- <span className="text-white font-semibold text-lg">
- {contact.nome.charAt(0).toUpperCase()}
- </span>
- </div>
- )}
- </div>
-
- {/* Info - Editable */}
- {editingContact === index ? (
- <div className="flex-1 min-w-0 space-y-2">
- <input
- type="text"
- defaultValue={contact.nome}
- id={`edit-nome-${index}`}
- className="w-full px-3 py-1.5 bg-card border border-border rounded-lg text-sm"
- placeholder="Nome"
- />
- <input
- type="text"
- defaultValue={contact.numero}
- id={`edit-numero-${index}`}
- className="w-full px-3 py-1.5 bg-card border border-border rounded-lg text-sm"
- placeholder="Número"
- />
- </div>
- ) : (
- <div className="flex-1 min-w-0">
- <p className="font-medium text-foreground truncate">
- {contact.nome}
- </p>
- <div className="flex items-center gap-1 text-sm text-muted-foreground">
- <Phone className="w-3 h-3" />
- <span>{contact.numero}</span>
- </div>
- </div>
- )}
-
- {/* Actions */}
- <div className="flex items-center gap-2">
- {editingContact === index ? (
- <>
- <button
- onClick={() => {
- const nome = (document.getElementById(`edit-nome-${index}`) as HTMLInputElement).value;
- const numero = (document.getElementById(`edit-numero-${index}`) as HTMLInputElement).value;
- handleSaveEdit(index, nome, numero);
- }}
- className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
- title="Guardar"
- >
- <CheckCircle className="w-4 h-4" />
- </button>
- <button
- onClick={() => setEditingContact(null)}
- className="p-2 text-foreground/80 hover:bg-muted/50 rounded-lg transition-colors"
- title="Cancelar"
- >
- <X className="w-4 h-4" />
- </button>
- </>
- ) : (
- <>
- <button
- onClick={() => handleSendMessage(contact)}
- className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
- title="Enviar mensagem no WhatsApp"
- >
- <MessageSquare className="w-4 h-4" />
- </button>
- <button
- onClick={() => handleEdit(index)}
- className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
- title="Editar contacto"
- >
- <Edit2 className="w-4 h-4" />
- </button>
- <button
- onClick={() => handleDelete(index)}
- className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
- title="Remover da lista"
- >
- <Trash2 className="w-4 h-4" />
- </button>
- </>
- )}
- </div>
- </div>
- ))}
- </div>
- )}
- </div>
- </AppModal>
- );
+      {shown.length > visible && (
+        <div className="flex justify-center px-6 py-4">
+          <AppButton variant="outline" onClick={() => setVisible((v) => v + PAGE)}>Ver mais</AppButton>
+        </div>
+      )}
+    </AppModal>
+  );
 }
-
-
-

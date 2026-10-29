@@ -1,43 +1,25 @@
 import { Loader2 } from 'lucide-react';
 import { OverlayModal } from '../base/OverlayModal';
+import { LogoBox } from '../base/LogoBox';
 
 interface ImportandoWhatsAppModalProps {
   isOpen: boolean;
 }
 
+/** Enquanto a API pede os contactos ao WhatsApp e confirma os números */
 export default function ImportandoWhatsAppModal({ isOpen }: ImportandoWhatsAppModalProps) {
   if (!isOpen) return null;
 
   return (
-    <OverlayModal onClose={() => {}} stickyEdges={false} className="p-8 max-w-md">
-        <div className="flex flex-col items-center text-center space-y-6">
-          {/* Ícone Animado */}
-          <div className="relative">
-            <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-              <Loader2 className="w-10 h-10 text-green-600 dark:text-green-400 animate-spin" />
-            </div>
-            {/* Pulso de fundo */}
-            <div className="absolute inset-0 w-20 h-20 bg-green-400 rounded-full animate-ping opacity-20"></div>
-          </div>
-
-          {/* Título */}
-          <div className="space-y-2">
-            <h3 className="text-xl font-semibold text-foreground">
-              A pesquisar contactos no WhatsApp
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Aguarde alguns segundos enquanto sincronizamos seus contactos...
-            </p>
-          </div>
-
-          {/* Barra de progresso animada */}
-          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full animate-pulse w-3/4"></div>
-          </div>
+    <OverlayModal onClose={() => {}} stickyEdges={false} className="p-8 max-w-sm">
+      <div className="flex flex-col items-center text-center gap-4">
+        <LogoBox brand="whatsapp" className="h-14 w-14 rounded-2xl [&>svg]:h-9 [&>svg]:w-9" />
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-foreground">A procurar contactos no WhatsApp</h3>
+          <p className="text-sm text-muted-foreground">Pode demorar alguns segundos</p>
         </div>
-      </OverlayModal>
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    </OverlayModal>
   );
 }
-
-
-
