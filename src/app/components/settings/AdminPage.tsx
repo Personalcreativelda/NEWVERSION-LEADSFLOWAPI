@@ -5,9 +5,9 @@ import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import {
   Bell, Star, AlertTriangle, Loader2, MessageSquare, Search,
-  Activity, Megaphone, Settings, Users, UserPlus,
+  Activity, Megaphone, Settings, Users, UserPlus, RefreshCw,
 } from 'lucide-react';
-import { PageHeader } from '../base/PageHeader';
+import { PageHeader, PageAction } from '../base/PageHeader';
 
 // New Modular Components
 import { AdminUsersTab } from './admin/AdminUsersTab';
@@ -103,6 +103,14 @@ export default function AdminPage(_props: AdminPageProps = {}) {
     if (activeTab === 'activity') {
       loadActivities();
       loadActiveUsers();
+      // Quem está online muda depressa: atualiza sozinho a cada minuto (com a página visível)
+      const timer = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          loadActivities();
+          loadActiveUsers();
+        }
+      }, 60_000);
+      return () => clearInterval(timer);
     }
     if (activeTab === 'feedback') {
       loadFeedback();
@@ -437,12 +445,22 @@ export default function AdminPage(_props: AdminPageProps = {}) {
       {/* Activity tab */}
       {activeTab === 'activity' && (
         <div>
-          <PageHeader title="Atividade" description="Atividades recentes e utilizadores online" icon={Activity} />
+          <PageHeader
+            title="Atividade"
+            icon={Activity}
+            actions={
+              <PageAction
+                icon={RefreshCw}
+                label="Atualizar"
+                disabled={activitiesLoading}
+                onClick={() => { loadActivities(); loadActiveUsers(); }}
+              />
+            }
+          />
           <AdminActivityTab
             activities={activities}
             activeUsers={activeUsers}
             activitiesLoading={activitiesLoading}
-            onRefreshActivities={loadActivities}
             users={users}
           />
         </div>

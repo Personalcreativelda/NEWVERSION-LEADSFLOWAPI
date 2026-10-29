@@ -1,6 +1,6 @@
 import React from 'react';
-import { RefreshCw, Zap } from 'lucide-react';
-import AdminActivityFeed from '../AdminActivityFeed';
+import AdminActivityFeed, { UserAvatar } from '../AdminActivityFeed';
+import { getLocale } from '../../../utils/format';
 
 interface UserInfo {
   id: string;
@@ -13,134 +13,65 @@ interface ActivityTabProps {
   activities: any[];
   activeUsers: any[];
   activitiesLoading: boolean;
-  onRefreshActivities: () => void;
   users?: UserInfo[];
+}
+
+/** "agora", "há 4 minutos" — no idioma do app */
+function minutesAgo(value?: string): string {
+  if (!value) return '';
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60_000));
+  return new Intl.RelativeTimeFormat(getLocale(), { numeric: 'auto' }).format(-minutes, 'minute');
 }
 
 export const AdminActivityTab: React.FC<ActivityTabProps> = ({
   activities,
   activeUsers,
   activitiesLoading,
-  onRefreshActivities,
   users = [],
 }) => {
   return (
     <div className="space-y-8">
-      {/* Active Users - above the activity feed */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-            <h2 className="text-xl font-bold text-foreground">Online Agora</h2>
-          </div>
-          {activeUsers.length > 0 && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-semibold border border-green-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              {activeUsers.length}
-            </span>
-          )}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-foreground">Online agora</h2>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground" translate="no">
+            <span className={`w-1.5 h-1.5 rounded-full ${activeUsers.length > 0 ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
+            {activeUsers.length}
+          </span>
         </div>
 
-        {/* Online users in a table/card grid matching the style */}
         {activeUsers.length === 0 ? (
-          <div className="p-8 rounded-xl border border-dashed border-border flex flex-col items-center justify-center text-center">
-            <p className="text-muted-foreground text-sm">Nenhum utilizador ativo nos últimos 15 min</p>
-          </div>
+          <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+            Ninguém online
+          </p>
         ) : (
-          <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border bg-muted">
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Utilizador
-                    </th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Estado
-                    </th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Última Atividade
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border bg-card">
-                  {activeUsers.map(user => {
-                    const displayName = user.name || user.email?.split('@')[0] || 'Usuário';
-                    const initials = displayName.split(' ').length >= 2
-                      ? (displayName.split(' ')[0][0] + displayName.split(' ')[1][0]).toUpperCase()
-                      : displayName.substring(0, 2).toUpperCase();
-                    return (
-                      <tr key={user.id} className="hover:bg-muted/50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div className="relative flex-shrink-0">
-                              <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center overflow-hidden border border-border">
-                                {user.avatar_url ? (
-                                  <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                  <span className="text-sm font-semibold text-blue-500">{initials}</span>
-                                )}
-                              </div>
-                              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-card" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-foreground">{displayName}</p>
-                              <p className="text-sm text-muted-foreground">{user.email || ''}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                            Online
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="text-sm text-foreground/80 font-medium truncate max-w-[300px]">
-                            {user.recent_activities?.[0]?.description || 'Ativo na plataforma'}
-                          </p>
-                          {user.recent_activities && user.recent_activities.length > 1 && (() => {
-                            const seen = new Set<string>();
-                            seen.add(user.recent_activities[0]?.description || '');
-                            const unique = user.recent_activities.slice(1).filter((act: any) => {
-                              if (seen.has(act.description)) return false;
-                              seen.add(act.description);
-                              return true;
-                            }).slice(0, 2);
-                            if (unique.length === 0) return null;
-                            return (
-                              <div className="flex flex-col gap-0.5 mt-1">
-                                {unique.map((act: any, idx: number) => (
-                                  <p key={idx} className="text-[11px] text-muted-foreground truncate max-w-[300px]">
-                                    • {act.description}
-                                  </p>
-                                ))}
-                              </div>
-                            );
-                          })()}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {activeUsers.map((user) => {
+              const name = user.name || user.email?.split('@')[0] || 'Utilizador';
+              const last = user.recent_activities?.[0];
+              return (
+                <div key={user.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 min-w-0">
+                  <UserAvatar name={name} avatarUrl={user.avatar_url} online />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate" title={user.email} translate="no">{name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      <span>{last?.description || 'Ativo na plataforma'}</span>
+                    </p>
+                  </div>
+                  <span className="flex-shrink-0 text-xs text-muted-foreground">
+                    {minutesAgo(user.last_active_at || last?.created_at)}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Activity Feed - below online users */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <RefreshCw className="w-5 h-5 text-blue-500" />
-            <h2 className="text-xl font-bold text-foreground">Atividades Recentes</h2>
-          </div>
-        </div>
-        <div>
-          <AdminActivityFeed activities={activities} users={users} loading={activitiesLoading} />
-        </div>
-      </div>
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">Atividade recente</h2>
+        <AdminActivityFeed activities={activities} users={users} loading={activitiesLoading} />
+      </section>
     </div>
   );
 };
