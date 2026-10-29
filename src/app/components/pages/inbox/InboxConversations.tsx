@@ -6,21 +6,16 @@ import { useInbox } from '../../../hooks/useInbox';
 import { useInboxFilters } from '../../../hooks/useInboxFilters';
 import { useInboxLayout } from '../../../hooks/useInboxLayout';
 import { conversationsApi, contactsApi, groupsApi, teamApi, channelsApi } from '../../../services/api/inbox';
-import {
-    Search, Filter, Plus, X, WifiOff, RefreshCw,
-    PanelLeftClose, PanelLeftOpen, PanelRightOpen,
-    Tag, Users, Settings2, Trash2, CheckSquare, Square,
-    UserCheck, UserX, CheckCircle2, Clock
-} from 'lucide-react';
+import { WifiOff, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { useServerStatus } from '../../../lib/serverStatus';
 import { useOnlineStatus } from '../../../hooks/useOnlineStatus';
+import { ConversationListHeader, type QuickFilter } from '../../inbox/ConversationListHeader';
 import { ChatPanel } from '../../inbox/ChatPanel';
 import { EmptyState } from '../../inbox/EmptyState';
 import { ContactDetailsPanel } from '../../inbox/ContactDetailsPanel';
 import { NewConversationModal } from '../../inbox/NewConversationModal';
 import { ResizeHandle } from '../../inbox/ResizeHandle';
 import { PageFab } from '../../base/PageHeader';
-import { formatNumber } from '../../../utils/format';
 import type { TeamMember } from '../../../types/inbox';
 
 interface ConversasConversationsProps {
@@ -63,7 +58,11 @@ export default function ConversasConversations({
     } = useInbox();
 
     const confirm = useConfirm();
-    const { filters, clearFilters, hasActiveFilters, getActiveFiltersDescription, setChannelFilter } = useInboxFilters();
+    const { filters, setFilters, setChannelFilter } = useInboxFilters();
+    // Filtros que vêm de fora da lista (menções, não atendidas, etiqueta): um chip que se tira
+    const externalFilter = filters.type === 'mentions' ? 'Menções'
+        : filters.type === 'unattended' ? 'Não atendidas'
+        : filters.tag ? 'Etiqueta' : null;
     const {
         layout,
         startResizeConversationList,
@@ -78,9 +77,6 @@ export default function ConversasConversations({
     const [isEditingLead, setIsEditingLead] = useState(false);
     const [isSelectMode, setIsSelectMode] = useState(false);
     const [selectedConvIds, setSelectedConvIds] = useState<Set<string>>(new Set());
-
-    // ── WhatsApp-style quick filter tabs ──────────────────────
-    type QuickFilter = 'all' | 'unread' | 'tags' | 'groups' | 'mine' | 'unassigned' | 'pending' | 'resolved';
 
     // Team members for assignee dropdown/filters
     const [, setTeamMembers] = useState<TeamMember[]>([]);
@@ -100,28 +96,6 @@ export default function ConversasConversations({
         catch { return ''; }
     }, []);
 
-    // All available filter options
-    const ALL_FILTER_OPTIONS: { id: QuickFilter; label: string; icon?: React.ReactNode }[] = [
-        { id: 'all', label: 'Tudo' },
-        { id: 'unread', label: 'Não lidas' },
-        { id: 'mine', label: 'Minhas', icon: <UserCheck size={11} /> },
-        { id: 'unassigned', label: 'Não atribuídas', icon: <UserX size={11} /> },
-        { id: 'pending', label: 'Pendentes', icon: <Clock size={11} /> },
-        { id: 'resolved', label: 'Resolvidas', icon: <CheckCircle2 size={11} /> },
-        { id: 'tags', label: 'Etiquetas', icon: <Tag size={11} /> },
-        { id: 'groups', label: 'Grupos', icon: <Users size={11} /> },
-    ];
-
-    // Persisted user-selected visible filters (localStorage)
-    const STORAGE_KEY = 'inbox_visible_filters';
-    const [visibleFilterIds, setVisibleFilterIds] = useState<QuickFilter[]>(() => {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) return JSON.parse(saved);
-        } catch {}
-        return ['all', 'unread', 'mine', 'unassigned', 'tags', 'groups']; // default
-    });
-    const [showFilterConfig, setShowFilterConfig] = useState(false);
     const [isSyncingGroups, setIsSyncingGroups] = useState(false);
 
     const syncGroupsFromEvolution = useCallback(async () => {
@@ -137,18 +111,6 @@ export default function ConversasConversations({
             setIsSyncingGroups(false);
         }
     }, [isSyncingGroups, refreshConversations]);
-
-    const toggleFilterVisibility = useCallback((id: QuickFilter) => {
-        setVisibleFilterIds(prev => {
-            const next = prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id];
-            // 'all' is always visible
-            const final = next.includes('all') ? next : ['all' as QuickFilter, ...next];
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(final));
-            return final;
-        });
-    }, []);
-
-    const visibleFilters = ALL_FILTER_OPTIONS.filter(f => visibleFilterIds.includes(f.id));
 
     const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
 
@@ -468,22 +430,11 @@ export default function ConversasConversations({
         });
     }, [conversations, filters, searchQuery, quickFilter]);
 
-    // Count unreads for the tab badge (non-group only)
-    const totalUnread = useMemo(() => {
-        return conversations.reduce((sum, c) => {
-            const jid = c.metadata?.jid || c.remote_jid || '';
-            if (jid.includes('@g.us')) return sum;
-            return sum + (c.unread_count || 0);
-        }, 0);
-    }, [conversations]);
-
-    // Count groups
-    const groupCount = useMemo(() => {
-        return conversations.filter(c => {
-            const jid = c.metadata?.jid || c.remote_jid || '';
-            return jid.includes('@g.us') || (c as any).is_group || c.metadata?.is_group || c.contact?.is_group;
-        }).length;
-    }, [conversations]);
+    // Conversas por ler (não grupos) — o número de conversas, não de mensagens, como no WhatsApp
+    const unreadChats = useMemo(() => conversations.filter((c) => {
+        const jid = c.metadata?.jid || c.remote_jid || '';
+        return !jid.includes('@g.us') && (c.unread_count || 0) > 0;
+    }).length, [conversations]);
 
     const handleOpenSettings = () => {
         if (onNavigate) {
@@ -553,271 +504,30 @@ export default function ConversasConversations({
                             /* ── Expanded list ── */
                             <>
                                 {wsBanner}
-                                {/* Header */}
-                                <div className="p-3 border-b border-border bg-card/95 backdrop-blur-sm flex-shrink-0">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <h1 className="text-sm font-semibold text-foreground truncate">Conversas</h1>
-                                            {unreadCount > 0 && (
-                                                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-primary text-white">
-                                                    {unreadCount}
-                                                </span>
-                                            )}
-                                            {/* Live refresh dot — pulses while a background fetch is in flight */}
-                                            {conversationsRefreshing && (
-                                                <span
-                                                    className="relative flex h-2 w-2 flex-shrink-0"
-                                                    title="A atualizar..."
-                                                >
-                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
-                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-0.5 flex-shrink-0">
-                                            <button
-                                                onClick={() => setShowNewConversationModal(true)}
-                                                className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
-                                                title="Nova conversa"
-                                            >
-                                                <Plus size={14} />
-                                            </button>
-                                            <button
-                                                onClick={toggleSelectMode}
-                                                className={`p-1.5 rounded-lg transition-colors ${isSelectMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:bg-muted'}`}
-                                                title={isSelectMode ? 'Cancelar seleção' : 'Selecionar conversas'}
-                                            >
-                                                <CheckSquare size={14} />
-                                            </button>
-                                            <button
-                                                onClick={toggleConversationList}
-                                                className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
-                                                title="Recolher lista"
-                                            >
-                                                <PanelLeftClose size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Selection toolbar */}
-                                    {isSelectMode && (
-                                        <div className="flex items-center gap-1.5 mb-2 px-1 py-1.5 rounded-lg bg-muted/60 border border-border">
-                                            <button
-                                                onClick={toggleSelectAll}
-                                                className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
-                                                title={selectedConvIds.size === filteredConversations.length ? 'Desmarcar todos' : 'Selecionar todos'}
-                                            >
-                                                {selectedConvIds.size === filteredConversations.length && filteredConversations.length > 0
-                                                    ? <CheckSquare size={14} className="text-primary" />
-                                                    : <Square size={14} />
-                                                }
-                                            </button>
-                                            <span className="text-[11px] text-muted-foreground flex-1">
-                                                {selectedConvIds.size > 0 ? `${selectedConvIds.size} selecionada(s)` : 'Selecionar tudo'}
-                                            </span>
-                                            {selectedConvIds.size > 0 && (
-                                                <button
-                                                    onClick={handleDeleteSelected}
-                                                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors"
-                                                >
-                                                    <Trash2 size={12} />
-                                                    Apagar
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={toggleSelectMode}
-                                                className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
-                                                title="Cancelar"
-                                            >
-                                                <X size={13} />
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {/* Search */}
-                                    <div className="relative">
-                                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" size={13} />
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            placeholder="Pesquisar conversas..."
-                                            className="w-full rounded-lg py-1.5 pl-8 pr-3 text-xs bg-muted/60 text-foreground border border-border/50 focus:border-primary/40 focus:ring-1 focus:ring-primary/10 transition-all outline-none placeholder:text-muted-foreground/60"
-                                            onChange={(e) => handleSearch(e.target.value)}
-                                        />
-                                    </div>
-
-                                    {/* WhatsApp-style quick filter pill tabs */}
-                                    <div className="flex items-center gap-1.5 mt-2.5">
-                                        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 min-w-0">
-                                            {visibleFilters.map(f => {
-                                                const isActive = quickFilter === f.id;
-                                                const badge = f.id === 'unread' && totalUnread > 0
-                                                    ? totalUnread > 99 ? '99+' : String(totalUnread)
-                                                    : f.id === 'groups' && groupCount > 0
-                                                        ? String(groupCount)
-                                                        : null;
-                                                return (
-                                                    <button
-                                                        key={f.id}
-                                                        onClick={() => setQuickFilter(f.id)}
-                                                        className={`flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors ${
-                                                            isActive
-                                                                ? 'bg-primary/15 text-primary dark:bg-primary/25 dark:text-primary'
-                                                                : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
-                                                        }`}
-                                                    >
-                                                        {f.icon}
-                                                        {f.label}
-                                                        {badge && (
-                                                            <span className={`ml-0.5 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
-                                                                isActive ? 'bg-primary text-white' : 'bg-muted-foreground/20 text-muted-foreground'
-                                                            }`}>
-                                                                {badge}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                        {/* Filter/settings button */}
-                                        <button
-                                            onClick={() => setShowFilterConfig(!showFilterConfig)}
-                                            className={`flex items-center justify-center w-6 h-6 rounded-full transition-colors flex-shrink-0 ml-0.5 ${
-                                                showFilterConfig || filters.channel
-                                                    ? 'bg-primary/15 text-primary'
-                                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                                            }`}
-                                            title="Filtros"
-                                        >
-                                            <Filter size={12} />
-                                        </button>
-                                    </div>
-
-                                    {/* Active channel chip (compact, shown in pill row when a channel is active) */}
-                                    {filters.channel && !showFilterConfig && (
-                                        <div className="flex items-center gap-1 mt-1.5">
-                                            <span className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-[11px] font-medium bg-primary/10 text-primary border border-primary/20">
-                                                <span
-                                                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                                    style={{ backgroundColor: (() => { const ch = channels.find(c => c.id === filters.channel); return ch?.type === 'whatsapp' ? '#25D366' : ch?.type === 'instagram' ? '#E4405F' : ch?.type === 'facebook' ? '#1877F2' : ch?.type === 'email' ? '#0891b2' : '#6b7280'; })() }}
-                                                />
-                                                {channels.find(c => c.id === filters.channel)?.name || 'Canal'}
-                                                <button
-                                                    onClick={() => setChannelFilter(undefined)}
-                                                    className="ml-0.5 p-0.5 rounded-full hover:bg-primary/20 transition-colors"
-                                                >
-                                                    <X size={9} />
-                                                </button>
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {/* Sync groups button when Grupos tab is active */}
-                                    {quickFilter === 'groups' && (
-                                        <div className="mt-2">
-                                            <button
-                                                onClick={syncGroupsFromEvolution}
-                                                disabled={isSyncingGroups}
-                                                className="flex items-center gap-1.5 text-[11px] text-primary hover:text-primary/80 transition-colors disabled:opacity-60"
-                                            >
-                                                <RefreshCw size={11} className={isSyncingGroups ? 'animate-spin' : ''} />
-                                                {isSyncingGroups ? 'A sincronizar...' : 'Sincronizar grupos'}
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {/* Filter panel */}
-                                    {showFilterConfig && (
-                                        <div className="mt-2 rounded-lg border border-border bg-card shadow-lg overflow-hidden">
-                                            {/* Header */}
-                                            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/60 bg-muted/30">
-                                                <Filter size={11} className="text-muted-foreground" />
-                                                <span className="text-[11px] font-semibold text-foreground flex-1">Filtros</span>
-                                                <button onClick={() => setShowFilterConfig(false)} className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"><X size={11} /></button>
-                                            </div>
-
-                                            {/* Channel filter section */}
-                                            {channels.length > 0 && (
-                                                <div className="px-3 py-2 border-b border-border/40">
-                                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Canal</p>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        <button
-                                                            onClick={() => setChannelFilter(undefined)}
-                                                            className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                                                                !filters.channel
-                                                                    ? 'bg-primary text-white'
-                                                                    : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
-                                                            }`}
-                                                        >
-                                                            Todos
-                                                        </button>
-                                                        {channels.map(ch => {
-                                                            const dot = ch.type === 'whatsapp' || ch.type === 'whatsapp_cloud' ? '#25D366'
-                                                                : ch.type === 'instagram' ? '#E4405F'
-                                                                : ch.type === 'facebook' ? '#1877F2'
-                                                                : ch.type === 'email' ? '#0891b2'
-                                                                : ch.type === 'telegram' ? '#0088cc'
-                                                                : '#6b7280';
-                                                            return (
-                                                                <button
-                                                                    key={ch.id}
-                                                                    onClick={() => setChannelFilter(filters.channel === ch.id ? undefined : ch.id)}
-                                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                                                                        filters.channel === ch.id
-                                                                            ? 'text-white'
-                                                                            : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
-                                                                    }`}
-                                                                    style={filters.channel === ch.id ? { backgroundColor: dot } : {}}
-                                                                >
-                                                                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: filters.channel === ch.id ? 'rgba(255,255,255,0.7)' : dot }} />
-                                                                    {ch.name}
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Visible tabs section */}
-                                            <div className="px-3 py-2">
-                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Abas visíveis</p>
-                                                {ALL_FILTER_OPTIONS.filter(f => f.id !== 'all').map(f => (
-                                                    <label
-                                                        key={f.id}
-                                                        className="flex items-center gap-2 px-1 py-1 rounded-md hover:bg-muted cursor-pointer transition-colors"
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={visibleFilterIds.includes(f.id)}
-                                                            onChange={() => toggleFilterVisibility(f.id)}
-                                                            className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary/30 accent-primary"
-                                                        />
-                                                        <span className="text-[12px] text-foreground flex items-center gap-1">
-                                                            {f.icon}
-                                                            {f.label}
-                                                        </span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {hasActiveFilters && (
-                                        <div className="flex items-center gap-1.5 mt-2">
-                                            <div className="flex-1 flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] bg-primary/10 text-primary overflow-hidden">
-                                                <Filter size={10} />
-                                                <span className="truncate font-medium">{getActiveFiltersDescription()}</span>
-                                            </div>
-                                            <button
-                                                onClick={clearFilters}
-                                                className="p-1 rounded-md text-muted-foreground hover:bg-muted transition-colors"
-                                                title="Limpar filtros"
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
+                                <ConversationListHeader
+                                    isMobile={false}
+                                    searchQuery={searchQuery}
+                                    onSearch={handleSearch}
+                                    quickFilter={quickFilter}
+                                    onQuickFilter={setQuickFilter}
+                                    unreadChats={unreadChats}
+                                    channels={channels}
+                                    channelFilter={filters.channel}
+                                    onChannelFilter={setChannelFilter}
+                                    externalFilter={externalFilter}
+                                    onClearExternalFilter={() => setFilters({ type: 'all', tag: undefined })}
+                                    onNewConversation={() => setShowNewConversationModal(true)}
+                                    onCollapse={toggleConversationList}
+                                    onSyncGroups={quickFilter === 'groups' ? syncGroupsFromEvolution : undefined}
+                                    syncingGroups={isSyncingGroups}
+                                    isSelectMode={isSelectMode}
+                                    selectedCount={selectedConvIds.size}
+                                    allSelected={selectedConvIds.size === filteredConversations.length && filteredConversations.length > 0}
+                                    onStartSelect={() => { setIsSelectMode(true); setSelectedConvIds(new Set()); }}
+                                    onToggleSelectAll={toggleSelectAll}
+                                    onDeleteSelected={handleDeleteSelected}
+                                    onExitSelect={toggleSelectMode}
+                                />
 
                                 {/* List */}
                                 <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -847,150 +557,30 @@ export default function ConversasConversations({
             {isMobile && !selectedConversation && (
                 <div className="flex flex-col w-full h-full bg-card">
                     {wsBanner}
-                    {/* Mobile Header */}
-                    <div className="p-4 border-b border-border bg-card/95 backdrop-blur-sm flex-shrink-0">
-                        {/* Nova conversa: FAB (padrão de criar da app), só com a lista visível */}
-                        <PageFab label="Nova conversa" onClick={() => setShowNewConversationModal(true)} />
-
-                        {/* Mobile selection toolbar */}
-                        {isSelectMode && (
-                            <div className="flex items-center gap-2 mb-2 px-2 py-2 rounded-lg bg-muted/60 border border-border">
-                                <button
-                                    onClick={toggleSelectAll}
-                                    className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
-                                >
-                                    {selectedConvIds.size === filteredConversations.length && filteredConversations.length > 0
-                                        ? <CheckSquare size={16} className="text-primary" />
-                                        : <Square size={16} />
-                                    }
-                                </button>
-                                <span className="text-xs text-muted-foreground flex-1">
-                                    {selectedConvIds.size > 0 ? `${selectedConvIds.size} selecionada(s)` : 'Selecionar tudo'}
-                                </span>
-                                {selectedConvIds.size > 0 && (
-                                    <button
-                                        onClick={handleDeleteSelected}
-                                        className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors"
-                                    >
-                                        <Trash2 size={14} />
-                                        Apagar
-                                    </button>
-                                )}
-                                <button onClick={toggleSelectMode} className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors">
-                                    <X size={14} />
-                                </button>
-                            </div>
-                        )}
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                placeholder="Pesquisar conversas..."
-                                className="w-full rounded-xl py-2 pl-9 pr-4 text-sm bg-muted/50 text-foreground border border-border/60 focus:border-primary/40 focus:ring-2 focus:ring-primary/10 transition-all outline-none placeholder:text-muted-foreground/60"
-                                onChange={(e) => handleSearch(e.target.value)}
-                            />
-                        </div>
-
-                        {/* Mobile: WhatsApp-style quick filter tabs */}
-                        <div className="flex items-center gap-2 mt-3">
-                            <div
-                                className="flex items-center gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0 pr-6"
-                                // Esbate a margem direita para indicar que há mais chips
-                                style={{ maskImage: 'linear-gradient(to right, black calc(100% - 28px), transparent)', WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 28px), transparent)' }}
-                            >
-                                {visibleFilters.map(f => {
-                                    const isActive = quickFilter === f.id;
-                                    const badge = f.id === 'unread' && totalUnread > 0
-                                        ? formatNumber(totalUnread, { notation: 'compact', maximumFractionDigits: 1 })
-                                        : f.id === 'groups' && groupCount > 0
-                                            ? String(groupCount)
-                                            : null;
-                                    return (
-                                        <button
-                                            key={f.id}
-                                            onClick={() => setQuickFilter(f.id)}
-                                            className={`flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                                                isActive
-                                                    ? 'bg-primary/15 text-primary dark:bg-primary/25 dark:text-primary'
-                                                    : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
-                                            }`}
-                                        >
-                                            {f.icon}
-                                            {f.label}
-                                            {badge && (
-                                                <span className={`ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
-                                                    isActive ? 'bg-primary text-white' : 'bg-muted-foreground/20 text-muted-foreground'
-                                                }`}>
-                                                    {badge}
-                                                </span>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            {/* + button always visible outside the scroll area */}
-                            <button
-                                onClick={() => setShowFilterConfig(!showFilterConfig)}
-                                className="flex items-center justify-center w-7 h-7 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex-shrink-0"
-                                title="Personalizar filtros"
-                            >
-                                <Plus size={14} />
-                            </button>
-                        </div>
-
-                        {quickFilter === 'groups' && (
-                            <div className="mt-2">
-                                <button
-                                    onClick={syncGroupsFromEvolution}
-                                    disabled={isSyncingGroups}
-                                    className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-60"
-                                >
-                                    <RefreshCw size={12} className={isSyncingGroups ? 'animate-spin' : ''} />
-                                    {isSyncingGroups ? 'A sincronizar...' : 'Sincronizar grupos'}
-                                </button>
-                            </div>
-                        )}
-
-                        {showFilterConfig && (
-                            <div className="mt-2 p-2.5 rounded-lg border border-border bg-card shadow-lg">
-                                <div className="flex items-center gap-1.5 mb-2 px-1">
-                                    <Settings2 size={12} className="text-muted-foreground" />
-                                    <span className="text-xs font-medium text-muted-foreground flex-1">Personalizar filtros</span>
-                                    <button onClick={() => setShowFilterConfig(false)} className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"><X size={12} /></button>
-                                </div>
-                                {ALL_FILTER_OPTIONS.filter(f => f.id !== 'all').map(f => (
-                                    <label
-                                        key={f.id}
-                                        className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-muted cursor-pointer transition-colors"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={visibleFilterIds.includes(f.id)}
-                                            onChange={() => toggleFilterVisibility(f.id)}
-                                            className="w-4 h-4 rounded border-border text-primary focus:ring-primary/30 accent-primary"
-                                        />
-                                        <span className="text-sm text-foreground flex items-center gap-1">
-                                            {f.icon}
-                                            {f.label}
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-
-                        {hasActiveFilters && (
-                            <div className="flex items-center gap-2 mt-2">
-                                <div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-primary/10 text-primary">
-                                    <Filter size={12} />
-                                    <span className="truncate font-medium">{getActiveFiltersDescription()}</span>
-                                </div>
-                                <button onClick={clearFilters} className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors">
-                                    <X size={14} />
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                    {/* Nova conversa: FAB (padrão de criar da app), só com a lista visível */}
+                    <PageFab label="Nova conversa" onClick={() => setShowNewConversationModal(true)} />
+                    <ConversationListHeader
+                        isMobile={true}
+                        searchQuery={searchQuery}
+                        onSearch={handleSearch}
+                        quickFilter={quickFilter}
+                        onQuickFilter={setQuickFilter}
+                        unreadChats={unreadChats}
+                        channels={channels}
+                        channelFilter={filters.channel}
+                        onChannelFilter={setChannelFilter}
+                        externalFilter={externalFilter}
+                        onClearExternalFilter={() => setFilters({ type: 'all', tag: undefined })}
+                        onSyncGroups={quickFilter === 'groups' ? syncGroupsFromEvolution : undefined}
+                        syncingGroups={isSyncingGroups}
+                        isSelectMode={isSelectMode}
+                        selectedCount={selectedConvIds.size}
+                        allSelected={selectedConvIds.size === filteredConversations.length && filteredConversations.length > 0}
+                        onStartSelect={() => { setIsSelectMode(true); setSelectedConvIds(new Set()); }}
+                        onToggleSelectAll={toggleSelectAll}
+                        onDeleteSelected={handleDeleteSelected}
+                        onExitSelect={toggleSelectMode}
+                                />
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         <ConversationList
                             conversations={filteredConversations}

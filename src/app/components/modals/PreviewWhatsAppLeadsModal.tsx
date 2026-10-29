@@ -135,7 +135,7 @@ export default function PreviewWhatsAppLeadsModal({
     >
       <div className="sticky top-0 z-10 space-y-3 border-b border-border bg-background px-5 py-3 sm:px-6">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setVisible(PAGE); }} placeholder="Pesquisar por nome ou número" />
-        <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-2 overflow-x-auto scrollbar-none">
           {FILTERS.map((f) => (
             <button
               key={f.value}
