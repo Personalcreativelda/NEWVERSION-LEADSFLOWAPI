@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
 import { toast } from 'sonner';
-import { Mail, Check, AlertCircle, Loader2, Info, CheckCircle, Eye, EyeOff, ChevronRight } from 'lucide-react';
+import { Mail, Check, AlertCircle, Loader2, Info, CheckCircle, Eye, EyeOff, ChevronRight, Server } from 'lucide-react';
 import { OverlayModal } from '../../base/OverlayModal';
+import { MailProviderLogo, type MailProvider } from '../../base/MailProviderLogo';
 
 interface EmailConnectProps {
     isOpen: boolean;
@@ -18,8 +19,7 @@ const EMAIL_PROVIDERS = [
     {
         id: 'gmail',
         name: 'Gmail',
-        icon: '/channel icon/gmail-svgrepo-com.svg',
-        color: 'from-red-500 to-orange-500',
+        logo: 'gmail' as MailProvider | null,
         smtp: { host: 'smtp.gmail.com', port: '587', secure: false },
         imap: { host: 'imap.gmail.com', port: '993', secure: true },
         note: 'Use uma Senha de App (não sua senha normal). Ative em: Google > Segurança > Senhas de App.'
@@ -27,8 +27,7 @@ const EMAIL_PROVIDERS = [
     {
         id: 'outlook',
         name: 'Microsoft / Outlook',
-        icon: '/channel icon/outlook-svgrepo-com.svg',
-        color: 'from-blue-500 to-blue-700',
+        logo: 'outlook' as MailProvider | null,
         smtp: { host: 'smtp.office365.com', port: '587', secure: false },
         imap: { host: 'outlook.office365.com', port: '993', secure: true },
         note: 'Use sua senha normal ou uma Senha de App se tiver 2FA ativo.'
@@ -36,8 +35,7 @@ const EMAIL_PROVIDERS = [
     {
         id: 'yahoo',
         name: 'Yahoo Mail',
-        icon: '/channel icon/yahoo-svgrepo-com.svg',
-        color: 'from-purple-500 to-purple-700',
+        logo: 'yahoo' as MailProvider | null,
         smtp: { host: 'smtp.mail.yahoo.com', port: '587', secure: false },
         imap: { host: 'imap.mail.yahoo.com', port: '993', secure: true },
         note: 'Gere uma Senha de App em: Yahoo > Segurança da Conta > Gerar Senha de App.'
@@ -45,8 +43,7 @@ const EMAIL_PROVIDERS = [
     {
         id: 'custom',
         name: 'Outro Provedor (SMTP)',
-        icon: '⚙️',
-        color: 'from-muted-foreground to-muted-foreground',
+        logo: null as MailProvider | null,
         smtp: { host: '', port: '587', secure: false },
         imap: { host: '', port: '993', secure: true },
         note: 'Configure manualmente os dados do seu servidor SMTP/IMAP.'
@@ -225,36 +222,26 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                 <div className="p-6 max-h-[70vh] overflow-y-auto">
                     {/* Step 1: Provider Selection */}
                     {step === 'provider' && (
-                        <div className="space-y-3">
+                        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
                             {EMAIL_PROVIDERS.map(provider => (
-                                <button
-                                    key={provider.id}
-                                    onClick={() => handleSelectProvider(provider)}
-                                    className="w-full flex items-center gap-4 p-4 rounded-xl border transition-all hover:shadow-md group"
-                                    style={{
-                                        borderColor: 'hsl(var(--border))',
-                                        backgroundColor: 'hsl(var(--background))'
-                                    }}
-                                >
-                                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${provider.color} flex items-center justify-center flex-shrink-0`}>
-                                        {provider.icon.startsWith('/') ? (
-                                            <img src={provider.icon} alt={provider.name} width={36} height={36} className="object-contain" />
-                                        ) : (
-                                            <span className="text-2xl">{provider.icon}</span>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 text-left">
-                                        <h3 className="font-semibold text-sm" style={{ color: 'hsl(var(--foreground))' }}>
-                                            {provider.name}
-                                        </h3>
-                                        <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                            SMTP: {provider.smtp.host || 'Configurar manualmente'}
-                                        </p>
-                                    </div>
-                                    <ChevronRight className="w-5 h-5 opacity-30 group-hover:opacity-70 transition-opacity" style={{ color: 'hsl(var(--foreground))' }} />
-                                </button>
+                                <li key={provider.id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSelectProvider(provider)}
+                                        className="flex w-full min-h-[64px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+                                    >
+                                        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                                            {provider.logo ? <MailProviderLogo provider={provider.logo} /> : <Server className="h-6 w-6" />}
+                                        </span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block text-[15px] font-medium leading-snug text-foreground">{provider.name}</span>
+                                            <span className="block text-[13px] text-muted-foreground truncate">SMTP: {provider.smtp.host || 'Configurar manualmente'}</span>
+                                        </span>
+                                        <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                                    </button>
+                                </li>
                             ))}
-                        </div>
+                        </ul>
                     )}
 
                     {/* Step 2: SMTP/IMAP Configuration */}
