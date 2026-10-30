@@ -1,5 +1,15 @@
 // INBOX: Empty state - modern ManyChat-style
-import { MessageSquare, Settings } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
+import { ChannelLogo } from '../base/ChannelLogo';
+
+const CHANNELS = [
+    { type: 'whatsapp', label: 'WhatsApp' },
+    { type: 'instagram', label: 'Instagram' },
+    { type: 'facebook', label: 'Messenger' },
+    { type: 'telegram', label: 'Telegram' },
+    { type: 'email', provider: 'gmail', label: 'Gmail' },
+    { type: 'website', label: 'Site' },
+];
 
 interface EmptyStateProps {
     onOpenSettings?: () => void;
@@ -24,23 +34,16 @@ export function EmptyState({ onOpenSettings }: EmptyStateProps) {
                 onClick={onOpenSettings}
                 className="flex items-center gap-2 px-5 h-10 rounded-lg text-sm font-medium transition-all duration-150 hover:opacity-90 active:scale-[0.97] bg-primary text-primary-foreground"
             >
-                <Settings size={16} />
-                Configurar Canais
+                Configurar canais
             </button>
 
-            <div className="mt-10 flex items-center gap-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                <div className="flex items-center gap-2">
-                    <img src="/channel icon/whatsapp-whats-app-svgrepo-com.svg" alt="WhatsApp" width={24} height={24} className="object-contain" />
-                    WhatsApp
-                </div>
-                <div className="flex items-center gap-2">
-                    <img src="/channel icon/instagram-1-svgrepo-com.svg" alt="Instagram" width={24} height={24} className="object-contain" />
-                    Instagram
-                </div>
-                <div className="flex items-center gap-2">
-                    <img src="/channel icon/messenger-facebook-svgrepo-com.svg" alt="Facebook" width={24} height={24} className="object-contain" />
-                    Facebook
-                </div>
+            <div className="mt-10 grid grid-cols-3 gap-x-8 gap-y-5">
+                {CHANNELS.map(({ type, provider, label }) => (
+                    <div key={label} className="flex flex-col items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <ChannelLogo type={type} provider={provider} className="h-11 w-11" />
+                        {label}
+                    </div>
+                ))}
             </div>
         </div>
     );

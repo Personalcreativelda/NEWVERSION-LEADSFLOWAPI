@@ -4,18 +4,14 @@ import type { ConversationWithDetails, ConversationTagInfo } from '../../types/i
 import { formatRelativeDay } from '../../utils/format';
 import { usableImageUrl } from '../../utils/media-url';
 import {
-    MessageCircle,
     Users,
     Check,
     CheckCheck,
-    Mail,
-    Globe,
-    Smartphone,
     Tag,
     UserCheck,
     AlertCircle
 } from 'lucide-react';
-import { BrandIcon } from '../base/BrandIcon';
+import { ChannelLogo } from '../base/ChannelLogo';
 
 interface ConversationItemProps {
     conversation: ConversationWithDetails;
@@ -38,60 +34,6 @@ const FUNNEL_STAGE_LABELS: Record<string, string> = {
     novo: 'Novo', new: 'Novo', contatado: 'Contatado', qualificado: 'Qualificado',
     negociacao: 'Negociação', convertido: 'Convertido', perdido: 'Perdido',
 };
-
-const CHANNEL_COLORS: Record<string, string> = {
-    whatsapp: '#25D366',
-    whatsapp_cloud: '#25D366',
-    telegram: '#0088cc',
-    facebook: '#1877F2',
-    instagram: '#E4405F',
-    email: '#0891b2',
-    email_gmail: '#EA4335',
-    email_outlook: '#0078D4',
-    email_yahoo: '#6001D2',
-    website: '#7c3aed',
-    twilio_sms: '#0d9488',
-    sms: '#0d9488',
-    twilio: '#0d9488',
-};
-
-
-// Outlook icon
-const OutlookIcon = ({ size = 10 }: { size?: number }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="white">
-        <rect x="2" y="4" width="13" height="16" rx="1.5" fill="white" fillOpacity="0.3" stroke="white" strokeWidth="1.5"/>
-        <rect x="9" y="7" width="13" height="10" rx="1" fill="white" fillOpacity="0.5" stroke="white" strokeWidth="1.5"/>
-        <circle cx="15.5" cy="12" r="2.5" fill="white"/>
-    </svg>
-);
-
-function ChannelIcon({ type, provider, size = 10 }: { type: string; provider?: string | null; size?: number }) {
-    const cls = 'text-white';
-    if (type === 'email') {
-        if (provider === 'gmail') return <BrandIcon brand="gmail" mono className={cls} style={{ width: size, height: size }} />;
-        if (provider === 'outlook') return <OutlookIcon size={size} />;
-        return <Mail size={size} className={cls} />;
-    }
-    switch (type) {
-        case 'whatsapp':
-        case 'whatsapp_cloud':
-            return <BrandIcon brand="whatsapp" mono className="text-white" style={{ width: size, height: size }} />;
-        case 'instagram':
-            return <BrandIcon brand="instagram" mono className={cls} style={{ width: size, height: size }} />;
-        case 'facebook':
-            return <BrandIcon brand="messenger" mono className={cls} style={{ width: size, height: size }} />;
-        case 'telegram':
-            return <BrandIcon brand="telegram" mono className={cls} style={{ width: size, height: size }} />;
-        case 'website':
-            return <Globe size={size} className={cls} />;
-        case 'sms':
-        case 'twilio_sms':
-        case 'twilio':
-            return <Smartphone size={size} className={cls} />;
-        default:
-            return <MessageCircle size={size} className={cls} />;
-    }
-}
 
 /**
  * Texto da pré-visualização: sem o negrito "**assunto**" dos emails nem regras de CSS que
@@ -137,10 +79,6 @@ function ConversationItemView({ conversation, isSelected, onClick }: Conversatio
         const index = name.charCodeAt(0) % colors.length;
         return colors[index];
     };
-
-    const emailProvider = channel?.type === 'email' ? (channel?.provider || null) : null;
-    const channelColorKey = emailProvider ? `email_${emailProvider}` : (channel?.type || '');
-    const channelColor = CHANNEL_COLORS[channelColorKey] || CHANNEL_COLORS[channel?.type || ''] || '#6b7280';
 
     const messagePreview = lastMessage ? (() => {
         const senderName = isGroup && lastMessage.direction === 'in'
@@ -199,13 +137,12 @@ function ConversationItemView({ conversation, isSelected, onClick }: Conversatio
                     )}
                 </div>
 
-                {/* Channel icon badge (bottom-right) */}
-                <div
-                    className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full border-2 border-card flex items-center justify-center"
-                    style={{ backgroundColor: channelColor }}
-                >
-                    <ChannelIcon type={channel?.type || ''} provider={channel?.provider} size={9} />
-                </div>
+                {/* Logótipo do canal de origem (canto inferior direito) */}
+                <ChannelLogo
+                    type={channel?.type || ''}
+                    provider={channel?.provider}
+                    className="absolute -bottom-1 -right-1 h-[22px] w-[22px] ring-2 ring-card"
+                />
             </div>
 
             {/* Content */}
