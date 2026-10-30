@@ -2773,24 +2773,11 @@ Responda EXATAMENTE neste formato JSON:
 
     // Se houver agendamento detectado
     if (result.has_scheduling && result.scheduled_date) {
-      // Garantir que a tabela existe
-      await dbQuery(`
-        CREATE TABLE IF NOT EXISTS scheduled_conversations (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          user_id UUID REFERENCES users(id),
-          lead_id UUID REFERENCES leads(id),
-          conversation_id UUID REFERENCES conversations(id),
-          scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL,
-          description TEXT,
-          status VARCHAR(50) DEFAULT 'pending',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        )
-      `);
-
+      const description = result.scheduling_description || 'Agendamento automático IA';
       await dbQuery(
-        `INSERT INTO scheduled_conversations (user_id, lead_id, conversation_id, scheduled_at, description)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [user.id, leadId, conversationId, result.scheduled_date, result.scheduling_description || 'Agendamento automático IA']
+        `INSERT INTO scheduled_conversations (user_id, lead_id, conversation_id, title, description, scheduled_at, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [user.id, leadId, conversationId, String(description).slice(0, 255), description, result.scheduled_date, JSON.stringify({ source: 'ai_summary', type: 'follow-up' })]
       );
     }
 

@@ -154,6 +154,38 @@ const runPendingMigrations = async () => {
     console.warn('[DB] Social IDs migration warning:', error.message);
   }
 
+  // Agendamentos (lead, assistente de IA, página Agendamentos): um só formato.
+  // O código tinha três: title/description/scheduled_at, scheduled_date/scheduling_description e sem title.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS scheduled_conversations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        title VARCHAR(255),
+        description TEXT,
+        scheduled_at TIMESTAMP WITH TIME ZONE,
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      ALTER TABLE scheduled_conversations ADD COLUMN IF NOT EXISTS title VARCHAR(255);
+      ALTER TABLE scheduled_conversations ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE scheduled_conversations ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE scheduled_conversations ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending';
+      ALTER TABLE scheduled_conversations ADD COLUMN IF NOT EXISTS conversation_id UUID;
+      ALTER TABLE scheduled_conversations ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';
+      ALTER TABLE scheduled_conversations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+      UPDATE scheduled_conversations
+         SET title = COALESCE(NULLIF(LEFT(description, 255), ''), 'Agendamento')
+       WHERE title IS NULL OR title = '';
+      CREATE INDEX IF NOT EXISTS idx_scheduled_conversations_user_status_at
+        ON scheduled_conversations(user_id, status, scheduled_at);
+    `);
+  } catch (error: any) {
+    console.warn('[DB] Scheduled conversations migration warning:', error.message);
+  }
+
   // Índice para abrir o chat pelas mensagens mais recentes (e carregar as anteriores)
   try {
     await pool.query(`

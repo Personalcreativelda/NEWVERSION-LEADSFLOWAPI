@@ -1007,6 +1007,11 @@ const queuedNoteToLeadNote = (item: Extract<OutboxItem, { kind: 'lead-note' }>):
 });
 
 export const leadsApi = {
+  /** Últimas mensagens trocadas com o lead (todas as conversas dele), por ordem cronológica */
+  getMessages: async (leadId: string, limit = 50): Promise<Message[]> => {
+    return apiCall(`/leads/${leadId}/messages?limit=${limit}`, {}, true);
+  },
+
   getAll: async () => {
     console.log('[LeadsAPI] 🔄 Fetching leads via backend API (direct sync disabled)...');
 
@@ -1277,14 +1282,14 @@ export const scheduledConversationsApi = {
     return apiCall(`/scheduled-conversations/upcoming?limit=${limit}`, {}, true);
   },
 
-  create: async (data: { lead_id: string; title: string; description?: string; scheduled_at: string }): Promise<ScheduledConversation> => {
+  create: async (data: { lead_id?: string | null; title: string; description?: string; scheduled_at: string; metadata?: ScheduledConversation['metadata'] }): Promise<ScheduledConversation> => {
     return apiCall('/scheduled-conversations', {
       method: 'POST',
       body: JSON.stringify(data),
     }, true);
   },
 
-  update: async (id: string, data: { title?: string; description?: string; scheduled_at?: string; status?: string }): Promise<ScheduledConversation> => {
+  update: async (id: string, data: { title?: string; description?: string; scheduled_at?: string; status?: string; metadata?: ScheduledConversation['metadata'] }): Promise<ScheduledConversation> => {
     return apiCall(`/scheduled-conversations/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

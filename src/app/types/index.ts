@@ -40,7 +40,17 @@ export interface LeadNote {
 export interface ScheduledConversation {
   id: string;
   user_id: string;
-  lead_id: string;
+  lead_id: string | null;
+  /** Tipo, prioridade, notas e origem (assistente de IA, resumo, página Agendamentos) */
+  metadata?: {
+    type?: string;
+    priority?: string;
+    notes?: string;
+    source?: string;
+    assistant?: string;
+    completed_at?: string;
+    [key: string]: unknown;
+  };
   title: string;
   description?: string;
   scheduled_at: string;

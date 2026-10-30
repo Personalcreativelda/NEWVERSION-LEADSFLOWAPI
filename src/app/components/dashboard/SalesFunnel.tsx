@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, memo, useContext } from 'react';
 import { formatMoney } from '../../utils/format';
 import { OverlayModal } from '../base/OverlayModal';
 import { AppModal } from '../base/AppModal';
@@ -7,10 +7,11 @@ import type { UIEvent } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Trash2, Edit2, MoreVertical, ChevronDown, GripVertical, Settings, Plus, X, RotateCcw, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, MoveRight, Workflow, type LucideIcon, MoreHorizontal } from 'lucide-react';
+import { Trash2, Edit2, MoreVertical, ChevronDown, GripVertical, Settings, Plus, X, RotateCcw, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, MoveRight, Workflow, CalendarClock, type LucideIcon, MoreHorizontal } from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { haptic } from '../../../native';
 import type { TabKey } from '../modals/LeadDetailModal';
+import { FunnelReminders, LeadRemindersContext, useLeadReminders, reminderLabel, isOverdue } from './FunnelReminders';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -185,6 +186,7 @@ const LeadCard = memo(({ lead, onEdit, onDelete, onResetToInitial, onViewDetails
   const OriginIcon = origin.Icon;
   const name = leadDisplayName(lead);
   const dealValue = (Number(lead.deal_value) || 0) > 0 ? Number(lead.deal_value) : Number(lead.valor) || 0;
+  const reminder = useContext(LeadRemindersContext).get(lead.id);
 
   return (
     <div
@@ -206,6 +208,15 @@ const LeadCard = memo(({ lead, onEdit, onDelete, onResetToInitial, onViewDetails
           <OriginIcon className="h-3 w-3" />
           <span className="truncate">{origin.label}</span>
         </p>
+        {reminder && (
+          <p
+            className={`mt-0.5 flex items-center gap-1 text-xs ${isOverdue(reminder.scheduled_at) ? 'font-medium text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}
+            title={reminder.title}
+          >
+            <CalendarClock className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">{reminderLabel(reminder.scheduled_at)}</span>
+          </p>
+        )}
       </div>
       {dealValue > 0 && (
         <span className="flex-shrink-0 text-xs font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{formatCurrency(dealValue, currency)}</span>
@@ -669,6 +680,7 @@ export default function SalesFunnel({
   customStages,
   onStagesChange,
 }: SalesFunnelProps) {
+  const { reminders, byLead } = useLeadReminders();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
@@ -937,7 +949,7 @@ export default function SalesFunnel({
   const stageIds = useMemo(() => stages.map(s => s.id), [stages]);
 
   return (
-    <>
+    <LeadRemindersContext.Provider value={byLead}>
       <div className="flex flex-col h-full">
         <PageHeader
           title="Funil de Vendas"
@@ -952,6 +964,9 @@ export default function SalesFunnel({
           Valor do funil:{' '}
           <span className="font-semibold text-foreground tabular-nums">{formatCurrency(stats.pipelineValue, currency)}</span>
         </p>
+
+        {/* Agendamentos pendentes dos leads: ao entrar no funil vê-se logo o que está marcado */}
+        <FunnelReminders reminders={reminders} leads={localLeads} onOpen={(l) => onViewLeadDetails?.(l, 'agendamentos')} />
 
         {/* Stage Editor Modal */}
         {showStageEditor && (
@@ -1277,6 +1292,6 @@ export default function SalesFunnel({
           </div>
         </div>
       </div>
-    </>
+    </LeadRemindersContext.Provider>
   );
 }

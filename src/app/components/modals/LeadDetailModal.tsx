@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, StickyNote, Calendar, MessageSquare, DollarSign, Plus, Edit2, Trash2, Check, Clock, Send, Upload } from 'lucide-react';
 import { leadNotesApi, scheduledConversationsApi, inboxApi, leadsApi } from '../../utils/api';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import AvatarUploadModal from './AvatarUploadModal';
+import { SCHEDULES_CHANGED_EVENT } from '../dashboard/FunnelReminders';
 import { AppModal } from '../base/AppModal';
 import type { Lead, LeadNote, ScheduledConversation, Message } from '../../types';
-import { formatMoney, getLocale } from '../../utils/format';
+import { formatMoney, getLocale, formatRelativeDay, formatTime } from '../../utils/format';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -376,6 +377,7 @@ function AgendamentosTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  setFormDate('');
  setShowForm(false);
  toast.success('Agendamento criado');
+ window.dispatchEvent(new Event(SCHEDULES_CHANGED_EVENT));
  } catch (err) {
  console.error('[LeadDetail] Error creating scheduled conversation:', err);
  toast.error('Erro ao criar agendamento');
@@ -388,7 +390,8 @@ function AgendamentosTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  try {
  const updated = await scheduledConversationsApi.update(id, { status: newStatus });
  setConversations((prev) => prev.map((c) => (c.id === id ? updated : c)));
- toast.success(newStatus === 'completed' ? 'Marcado como concluido' : 'Agendamento cancelado');
+ toast.success(newStatus === 'completed' ? 'Marcado como concluído' : 'Agendamento cancelado');
+ window.dispatchEvent(new Event(SCHEDULES_CHANGED_EVENT));
  } catch (err) {
  console.error('[LeadDetail] Error updating scheduled conversation:', err);
  toast.error('Erro ao atualizar agendamento');
@@ -561,93 +564,82 @@ function AgendamentosTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
 // Tab: Historico
 // ---------------------------------------------------------------------------
 
-function HistoricoTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
+/** Texto da mensagem; sem texto, o tipo de anexo (como na lista de conversas) */
+function messagePreview(msg: any): string {
+ const text = (msg.content || '').trim();
+ if (text && !/^\[(Imagem|Vídeo|Áudio|Documento|Sticker|Mensagem)\]$/.test(text)) return text;
+ switch (msg.media_type) {
+ case 'image': return '📷 Imagem';
+ case 'video': return '🎥 Vídeo';
+ case 'audio': return '🎤 Áudio';
+ case 'sticker': return '🏷️ Figurinha';
+ case 'document': return '📄 Documento';
+ default: return text || 'Mensagem';
+ }
+}
+
+function HistoricoTab({ lead }: { lead: Lead; isDark: boolean }) {
  const [messages, setMessages] = useState<Message[]>([]);
  const [loading, setLoading] = useState(true);
-
- const fetchMessages = useCallback(async () => {
- if (!lead.id) return;
- setLoading(true);
- try {
- const data = await inboxApi.getMessages(lead.id);
- setMessages(Array.isArray(data) ? data : []);
- } catch (err) {
- console.error('[LeadDetail] Error fetching messages:', err);
- toast.error('Erro ao carregar historico');
- setMessages([]);
- } finally {
- setLoading(false);
- }
- }, [lead.id]);
+ const endRef = useRef<HTMLDivElement>(null);
 
  useEffect(() => {
- fetchMessages();
- }, [fetchMessages]);
+ if (!lead.id) return;
+ let cancelled = false;
+ setLoading(true);
+ leadsApi.getMessages(lead.id, 50)
+ .then((data) => { if (!cancelled) setMessages(Array.isArray(data) ? data : []); })
+ .catch(() => { if (!cancelled) setMessages([]); })
+ .finally(() => { if (!cancelled) setLoading(false); });
+ return () => { cancelled = true; };
+ }, [lead.id]);
 
- const channelLabel = (channel: string) => {
- switch (channel?.toLowerCase()) {
- case 'whatsapp': return 'WhatsApp';
- case 'email': return 'Email';
- case 'sms': return 'SMS';
- case 'twilio_sms': return 'SMS';
- case 'twilio': return 'SMS';
- case 'instagram': return 'Instagram';
- case 'facebook': return 'Facebook';
- default: return channel || 'Desconhecido';
- }
- };
+ // Abre nas mensagens mais recentes (em baixo), como no chat
+ useEffect(() => {
+ if (!loading) endRef.current?.scrollIntoView({ block: 'end' });
+ }, [loading, messages.length]);
 
  if (loading) {
  return (
  <div className="flex items-center justify-center py-10">
- <Spinner className="w-6 h-6 text-blue-500" />
+ <Spinner className="w-6 h-6 text-muted-foreground" />
  </div>
  );
  }
 
  if (messages.length === 0) {
- return <EmptyState icon={MessageSquare} message="Nenhuma mensagem encontrada" />;
+ return <EmptyState icon={MessageSquare} message="Ainda não há mensagens com este lead" />;
  }
 
+ let lastDay = '';
  return (
- <div className="flex flex-col gap-2">
- {messages.map((msg) => {
+ <div className="flex flex-col gap-1.5">
+ {messages.map((msg: any) => {
  const isOut = msg.direction === 'out';
+ const day = formatRelativeDay(msg.created_at);
+ const showDay = day !== lastDay;
+ lastDay = day;
  return (
- <div key={msg.id} className={`flex ${isOut ? 'justify-end' : 'justify-start'}`}>
- <div
- className={`max-w-[85%] rounded-xl px-3.5 py-2.5 ${isOut
- ? isDark
- ? 'bg-blue-600 text-white rounded-br-sm'
- : 'bg-blue-500 text-white rounded-br-sm'
- : isDark
- ? 'bg-muted text-foreground rounded-bl-sm'
- : 'bg-muted text-foreground rounded-bl-sm'
- }`}
- >
- <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
- <div
- className={`flex items-center gap-2 mt-1.5 text-[11px] ${isOut
- ? 'text-blue-100 justify-end'
- : isDark
- ? 'text-muted-foreground/70'
- : 'text-muted-foreground'
- }`}
- >
- <span>{channelLabel(msg.channel)}</span>
- <span>&#183;</span>
- <span>{formatRelativeDate(msg.created_at)}</span>
- {isOut && (
- <>
- <span>&#183;</span>
- <Send className="w-3 h-3" />
- </>
+ <div key={msg.id}>
+ {showDay && (
+ <div className="my-2 flex justify-center">
+ <span className="rounded-lg bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">{day}</span>
+ </div>
  )}
+ <div className={`flex ${isOut ? 'justify-end' : 'justify-start'}`}>
+ <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${isOut ? 'bg-primary/15 text-foreground rounded-br-md' : 'bg-muted text-foreground rounded-bl-md'}`}>
+ {(() => {
+ const text = messagePreview(msg);
+ // Texto do cliente não se traduz; o rótulo do anexo ("📷 Imagem") sim
+ return <p className="text-sm whitespace-pre-wrap break-words" translate={text === (msg.content || '').trim() ? 'no' : undefined}>{text}</p>;
+ })()}
+ <p className="mt-0.5 text-right text-[11px] text-muted-foreground tabular-nums">{formatTime(msg.created_at)}</p>
  </div>
  </div>
  </div>
  );
  })}
+ <div ref={endRef} />
  </div>
  );
 }
@@ -857,13 +849,13 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  const [notes, schedules, messages] = await Promise.all([
  leadNotesApi.getAll(currentLead.id).catch(() => []),
  scheduledConversationsApi.getAll({ lead_id: currentLead.id }).catch(() => []),
- inboxApi.getMessages(currentLead.id).catch(() => []),
+ Promise.resolve([]),
  ]);
 
  setTabBadges({
  notas: Array.isArray(notes) ? notes.length : 0,
  agendamentos: Array.isArray(schedules) ? schedules.filter((s: any) => s.status === 'pending').length : 0,
- historico: Array.isArray(messages) ? messages.filter((m: any) => m.direction === 'in' && !m.read).length : 0,
+ historico: Array.isArray(messages) ? messages.length : 0,
  valor: 0,
  });
  } catch (error) {

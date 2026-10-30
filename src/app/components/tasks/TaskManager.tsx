@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -32,6 +32,12 @@ import { format, isToday, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from "sonner";
 import { useWebSocket } from '../../hooks/useWebSocket';
+import { useConfirm } from '../ui/ConfirmDialog';
+import { scheduledConversationsApi } from '../../utils/api';
+import type { ScheduledConversation } from '../../types';
+import { SCHEDULES_CHANGED_EVENT } from '../dashboard/FunnelReminders';
+
+const notifySchedulesChanged = () => window.dispatchEvent(new Event(SCHEDULES_CHANGED_EVENT));
 
 interface Task {
   id: string;
@@ -47,6 +53,33 @@ interface Task {
   createdAt: string;
   completedAt?: string;
   notes?: string;
+  /** Quem criou: assistente de IA, resumo da inbox, ficha do lead ou esta página */
+  source?: string;
+}
+
+const LEGACY_KEY = 'leadsflow_tasks';
+const MIGRATED_KEY = 'leadsflow_tasks_migrated';
+
+/** Agendamento guardado no servidor → tarefa desta página */
+function toTask(s: ScheduledConversation, leads: any[]): Task {
+  const meta = s.metadata || {};
+  const lead = s.lead_id ? leads.find((l) => l.id === s.lead_id) : undefined;
+  return {
+    id: s.id,
+    title: s.title,
+    description: s.description || undefined,
+    leadId: s.lead_id || undefined,
+    leadName: s.lead_name || lead?.nome || lead?.name,
+    type: (meta.type as Task['type']) || 'follow-up',
+    priority: (meta.priority as Task['priority']) || 'medium',
+    status: s.status,
+    dueDate: s.scheduled_at,
+    reminderDate: typeof meta.reminder_at === 'string' ? meta.reminder_at : undefined,
+    createdAt: s.created_at,
+    completedAt: meta.completed_at,
+    notes: meta.notes,
+    source: meta.source,
+  };
 }
 
 interface TaskManagerProps {
@@ -89,37 +122,64 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
     notes: '',
   });
 
-  // Load tasks from localStorage
-  useEffect(() => {
-    const savedTasks = localStorage.getItem('leadsflow_tasks');
-    if (savedTasks) {
-      setTasks(JSON.parse(savedTasks));
+  const confirm = useConfirm();
+  const leadsRef = useRef(leads);
+  leadsRef.current = leads;
+
+  // Agendamentos no servidor: os da ficha do lead, do assistente de IA e desta página
+  const loadTasks = useCallback(async () => {
+    try {
+      const list = await scheduledConversationsApi.getAll();
+      setTasks((Array.isArray(list) ? list : []).map((s) => toTask(s, leadsRef.current)));
+    } catch {
+      // Sem servidor: fica o que já está no ecrã
     }
   }, []);
 
-  // Save tasks to localStorage
+  // Tarefas antigas que só existiam neste browser passam uma vez para o servidor
   useEffect(() => {
-    localStorage.setItem('leadsflow_tasks', JSON.stringify(tasks));
-  }, [tasks]);
+    (async () => {
+      let legacy: Task[] = [];
+      try {
+        if (!localStorage.getItem(MIGRATED_KEY)) legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || '[]');
+      } catch { legacy = []; }
+      if (Array.isArray(legacy) && legacy.length > 0) {
+        let failed = 0;
+        // Cada tarefa enviada fica registada: se algo falhar, da próxima vez não se repete
+        let sent: string[] = [];
+        try { sent = JSON.parse(localStorage.getItem(MIGRATED_KEY + '_ids') || '[]'); } catch { sent = []; }
+        for (const t of legacy) {
+          if (sent.includes(t.id)) continue;
+          try {
+            await scheduledConversationsApi.create({
+              lead_id: t.leadId || null,
+              title: t.title || 'Tarefa',
+              description: t.description,
+              scheduled_at: t.dueDate || new Date().toISOString(),
+              metadata: { type: t.type, priority: t.priority, notes: t.notes, source: (t as any).source || 'tasks_page', reminder_at: t.reminderDate },
+            }).then(async (created) => {
+              if (t.status && t.status !== 'pending') await scheduledConversationsApi.update(created.id, { status: t.status });
+            });
+            sent.push(t.id);
+            try { localStorage.setItem(MIGRATED_KEY + '_ids', JSON.stringify(sent)); } catch { /* sem armazenamento */ }
+          } catch { failed++; }
+        }
+        // A cópia antiga fica no browser; só se marca como passada se tudo correu bem
+        if (failed === 0) {
+          try { localStorage.setItem(MIGRATED_KEY, new Date().toISOString()); } catch { /* sem armazenamento */ }
+        }
+      } else {
+        try { localStorage.setItem(MIGRATED_KEY, new Date().toISOString()); } catch { /* sem armazenamento */ }
+      }
+      await loadTasks();
+    })();
+  }, [loadTasks]);
 
-  // Ouvir WebSocket para tarefas criadas automaticamente pelo Assistente de IA
+  // O assistente de IA guarda o agendamento no servidor e avisa por WebSocket
   useWebSocket({
     onAiTaskCreated: ({ task }) => {
-      setTasks(prev => {
-        // Evitar duplicatas
-        if (prev.find(t => t.id === task.id)) return prev;
-        const updated = [task, ...prev];
-        localStorage.setItem('leadsflow_tasks', JSON.stringify(updated));
-        return updated;
-      });
-      toast.success(
-        `Agendamento detectado automaticamente!`,
-        {
-          description: task.title,
-          duration: 6000,
-          action: { label: 'Ver Tarefas', onClick: () => {} },
-        }
-      );
+      void loadTasks();
+      toast.success('Agendamento detectado automaticamente', { description: task?.title, duration: 6000 });
     },
   });
 
@@ -127,7 +187,8 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   const filteredTasks = tasks.filter(task => {
     // Filtro de status
     if (filter === 'today' && !isToday(new Date(task.dueDate))) return false;
-    if (filter === 'overdue' && !isPast(new Date(task.dueDate)) && task.status === 'pending') return false;
+    // Atrasada: hora já passou e continua pendente (também as de hoje)
+    if (filter === 'overdue' && !(isPast(new Date(task.dueDate)) && task.status === 'pending')) return false;
     if (filter === 'upcoming' && (isPast(new Date(task.dueDate)) || isToday(new Date(task.dueDate)))) return false;
     if (filter === 'completed' && task.status !== 'completed') return false;
     if (filter === 'all' && task.status === 'completed') return false;
@@ -145,60 +206,69 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   const stats = {
     total: tasks.filter(t => t.status !== 'completed').length,
     today: tasks.filter(t => isToday(new Date(t.dueDate)) && t.status !== 'completed').length,
-    overdue: tasks.filter(t => isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate)) && t.status === 'pending').length,
+    overdue: tasks.filter(t => isPast(new Date(t.dueDate)) && t.status === 'pending').length,
     completed: tasks.filter(t => t.status === 'completed').length,
     upcoming: tasks.filter(t => !isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate)) && t.status !== 'completed').length,
   };
   const [showFilters, setShowFilters] = useState(false);
   const activeFilterCount = (priorityFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0);
 
-  const handleCreateTask = () => {
+  const handleCreateTask = async () => {
     if (!newTask.title.trim()) {
-      toast.error('Por favor, preencha o título da tarefa');
+      toast.error('Preencha o título da tarefa');
       return;
     }
-
-    const lead = leads.find(l => l.id === newTask.leadId);
-
-    const task: Task = {
-      id: `task-${Date.now()}`,
-      title: newTask.title,
-      description: newTask.description,
-      leadId: newTask.leadId,
-      leadName: lead?.nome,
-      type: newTask.type as any,
-      priority: newTask.priority as any,
-      status: 'pending',
-      dueDate: newTask.dueDate.toISOString(),
-      reminderDate: newTask.reminderDate?.toISOString(),
-      createdAt: new Date().toISOString(),
-      notes: newTask.notes,
-    };
-
-    setTasks([task, ...tasks]);
-    setShowNewTaskModal(false);
-    resetNewTaskForm();
-    toast.success('Tarefa criada com sucesso!');
+    try {
+      const created = await scheduledConversationsApi.create({
+        lead_id: newTask.leadId || null,
+        title: newTask.title.trim(),
+        description: newTask.description || undefined,
+        scheduled_at: newTask.dueDate.toISOString(),
+        metadata: {
+          type: newTask.type,
+          priority: newTask.priority,
+          notes: newTask.notes || undefined,
+          reminder_at: newTask.reminderDate?.toISOString(),
+          source: 'tasks_page',
+        },
+      });
+      setTasks((prev) => [toTask(created, leads), ...prev]);
+      setShowNewTaskModal(false);
+      resetNewTaskForm();
+      toast.success('Tarefa criada');
+      notifySchedulesChanged();
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível criar a tarefa');
+    }
   };
 
-  const handleToggleTask = (taskId: string) => {
-    setTasks(tasks.map(task => {
-      if (task.id === taskId) {
-        const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-        return {
-          ...task,
-          status: newStatus,
-          completedAt: newStatus === 'completed' ? new Date().toISOString() : undefined,
-        };
-      }
-      return task;
-    }));
+  const handleToggleTask = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const status: Task['status'] = task.status === 'completed' ? 'pending' : 'completed';
+    const completedAt = status === 'completed' ? new Date().toISOString() : undefined;
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status, completedAt } : t)));
+    try {
+      await scheduledConversationsApi.update(taskId, { status, metadata: { completed_at: completedAt ?? null } as any });
+      notifySchedulesChanged();
+    } catch (err: any) {
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? task : t)));
+      toast.error(err?.message || 'Não foi possível atualizar a tarefa');
+    }
   };
 
-  const handleDeleteTask = (taskId: string) => {
-    if (confirm('Tem certeza que deseja apagar esta tarefa?')) {
-      setTasks(tasks.filter(t => t.id !== taskId));
+  const handleDeleteTask = async (taskId: string) => {
+    const ok = await confirm('Apagar esta tarefa?', { title: 'Apagar tarefa', variant: 'danger', confirmLabel: 'Apagar' });
+    if (!ok) return;
+    const before = tasks;
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    try {
+      await scheduledConversationsApi.delete(taskId);
       toast.success('Tarefa apagada');
+      notifySchedulesChanged();
+    } catch (err: any) {
+      setTasks(before);
+      toast.error(err?.message || 'Não foi possível apagar a tarefa');
     }
   };
 
@@ -353,7 +423,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
             const typeInfo = getTaskTypeInfo(task.type);
             const priorityInfo = getPriorityInfo(task.priority);
             const Icon = typeInfo.icon;
-            const isOverdue = isPast(new Date(task.dueDate)) && !isToday(new Date(task.dueDate)) && task.status === 'pending';
+            const isOverdue = isPast(new Date(task.dueDate)) && task.status === 'pending';
             const isDueToday = isToday(new Date(task.dueDate));
 
             return (

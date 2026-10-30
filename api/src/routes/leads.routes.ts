@@ -366,6 +366,40 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// Últimas mensagens trocadas com o lead (todas as conversas dele, sem grupos), por ordem cronológica
+router.get('/:id/messages', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const lead = await leadsService.findById(req.params.id, user.id);
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+    const { query } = require('../database/connection');
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+    // Conversas do lead: ligadas a ele ou com o mesmo número (fim do número, sem indicativo)
+    const tail = String(lead.whatsapp || lead.phone || '').replace(/\D/g, '').slice(-9);
+    const result = await query(
+      `SELECT m.id, m.direction, m.channel, m.content, m.media_type, m.media_url, m.status, m.created_at, m.conversation_id
+         FROM messages m
+         JOIN conversations c ON c.id = m.conversation_id
+        WHERE c.user_id = $2
+          AND COALESCE(c.is_group, false) = false
+          AND c.remote_jid NOT LIKE '%@g.us'
+          AND (
+            c.lead_id = $1 OR m.lead_id = $1
+            OR (length($3::text) = 9 AND RIGHT(regexp_replace(split_part(c.remote_jid, '@', 1), '\\D', '', 'g'), 9) = $3::text)
+          )
+        ORDER BY m.created_at DESC
+        LIMIT $4`,
+      [lead.id, lead.user_id, tail, limit]
+    );
+    res.json(result.rows.reverse());
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/:id', async (req, res, next) => {
   try {
     const user = req.user;

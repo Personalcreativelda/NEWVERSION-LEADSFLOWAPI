@@ -69,14 +69,14 @@ router.post('/', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { lead_id, title, description, scheduled_at } = req.body;
+    const { lead_id, title, description, scheduled_at, metadata } = req.body;
 
-    if (!lead_id || !title || !scheduled_at) {
-      return res.status(400).json({ error: 'lead_id, title, and scheduled_at are required' });
+    if (!title || !scheduled_at) {
+      return res.status(400).json({ error: 'title and scheduled_at are required' });
     }
 
     const conversation = await scheduledService.create(
-      { lead_id, title, description, scheduled_at },
+      { lead_id: lead_id || null, title, description, scheduled_at, metadata: metadata && typeof metadata === 'object' ? metadata : undefined },
       user.id
     );
     res.status(201).json(conversation);
@@ -93,7 +93,8 @@ router.put('/:id', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const conversation = await scheduledService.update(req.params.id, req.body, user.id);
+    const { title, description, scheduled_at, status, metadata } = req.body || {};
+    const conversation = await scheduledService.update(req.params.id, { title, description, scheduled_at, status, metadata }, user.id);
     if (!conversation) {
       return res.status(404).json({ error: 'Scheduled conversation not found' });
     }

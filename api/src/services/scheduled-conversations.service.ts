@@ -32,17 +32,21 @@ export class ScheduledConversationsService {
     return result.rows[0] || null;
   }
 
-  async create(data: { lead_id: string; title: string; description?: string; scheduled_at: string }, userId: string) {
+  async create(
+    data: { lead_id?: string | null; title: string; description?: string; scheduled_at: string; conversation_id?: string | null; metadata?: Record<string, unknown> },
+    userId: string,
+  ) {
     const result = await query(
-      `INSERT INTO scheduled_conversations (user_id, lead_id, title, description, scheduled_at)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO scheduled_conversations (user_id, lead_id, title, description, scheduled_at, conversation_id, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [userId, data.lead_id, data.title, data.description || null, data.scheduled_at]
+      [userId, data.lead_id || null, data.title, data.description || null, data.scheduled_at, data.conversation_id || null, JSON.stringify(data.metadata || {})]
     );
-    return result.rows[0];
+    const row = result.rows[0];
+    return row ? this.findById(row.id, userId) : row;
   }
 
-  async update(id: string, data: { title?: string; description?: string; scheduled_at?: string; status?: string }, userId: string) {
+  async update(id: string, data: { title?: string; description?: string; scheduled_at?: string; status?: string; metadata?: Record<string, unknown> }, userId: string) {
     const fields: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
@@ -63,10 +67,17 @@ export class ScheduledConversationsService {
       paramIndex++;
     }
     if (data.status !== undefined) {
-      fields.push(`status = $${paramIndex}`);
+      fields.push(`status = ${paramIndex}`);
       values.push(data.status);
       paramIndex++;
     }
+    if (data.metadata && typeof data.metadata === 'object') {
+      // Junta ao que já existe (não apaga a origem, o assistente, etc.)
+      fields.push(`metadata = COALESCE(metadata, '{}'::jsonb) || ${paramIndex}::jsonb`);
+      values.push(JSON.stringify(data.metadata));
+      paramIndex++;
+    }
+    fields.push('updated_at = NOW()');
 
     if (fields.length === 0) {
       return this.findById(id, userId);

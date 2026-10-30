@@ -2692,23 +2692,21 @@ Contato: ${ctx.contactName || 'Desconhecido'}`,
             try {
                 await query(
                     `INSERT INTO scheduled_conversations
-                     (user_id, conversation_id, lead_id, scheduled_date, scheduling_description, status, metadata)
-                     VALUES ($1, $2, $3, $4, $5, 'pending', $6)
-                     ON CONFLICT DO NOTHING`,
+                     (user_id, conversation_id, lead_id, title, description, scheduled_at, status, metadata)
+                     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)`,
                     [
                         ctx.userId,
                         ctx.conversationId,
                         leadId,
+                        String(task.title).slice(0, 255),
+                        task.description,
                         new Date(dueDate),
-                        task.title,
-                        JSON.stringify({ task, source: 'ai_assistant', assistant: assistant.assistant_name })
+                        JSON.stringify({ type: task.type, priority: task.priority, notes: task.notes, source: 'ai_assistant', assistant: assistant.assistant_name })
                     ]
                 );
                 console.log('[Scheduling] 💾 Agendamento salvo no banco scheduled_conversations');
             } catch (dbErr: any) {
-                if (dbErr.code !== '42P01') { // Ignorar se tabela não existe
-                    console.warn('[Scheduling] Erro ao salvar no banco:', dbErr.message);
-                }
+                console.warn('[Scheduling] Erro ao salvar no banco:', dbErr.message);
             }
 
             // 8. Emitir WebSocket para o frontend criar a tarefa no localStorage (TaskManager)
