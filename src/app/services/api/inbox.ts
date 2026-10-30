@@ -193,6 +193,12 @@ export const whatsappSignupApi = {
 };
 
 export const conversationsApi = {
+    /** HTML de um email (a lista de mensagens não o traz: é pedido quando a mensagem aparece) */
+    async getEmailHtml(messageId: string): Promise<string> {
+        const { data } = await api.get<{ html: string }>(`/inbox/messages/${messageId}/html`);
+        return data?.html || '';
+    },
+
     /**
      * Lista conversas com filtros
      */

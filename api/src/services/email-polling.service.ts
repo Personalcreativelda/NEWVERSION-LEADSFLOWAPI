@@ -7,6 +7,23 @@ import { getWebSocketService } from './websocket.service';
 import { getStorageService } from './storage.service';
 import { assistantProcessor } from './assistant-processor.service';
 
+/** Texto de um email só em HTML: sem <style>/<script>/<head>, sem etiquetas, espaços juntos */
+function htmlToText(html: string): string {
+  return html
+    .replace(/<(style|script|head|title)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<br\s*\/?>|<\/(p|div|tr|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n+/g, '\n\n')
+    .trim();
+}
+
 const conversationsService = new ConversationsService();
 
 interface EmailChannel {
@@ -184,7 +201,7 @@ class EmailPollingService {
             const fromName = parsed.from?.value?.[0]?.name || fromAddress;
             const subject = parsed.subject || '(Sem assunto)';
             // Prefer plain text for the main content field; fall back to stripped HTML
-            const textContent = parsed.text || (typeof parsed.html === 'string' ? parsed.html.replace(/<[^>]*>/g, '') : '') || '';
+            const textContent = (parsed.text || (typeof parsed.html === 'string' ? htmlToText(parsed.html) : '') || '').trim();
             // Preserve original HTML for rich rendering in the frontend (max 100 KB)
             const htmlBody = typeof parsed.html === 'string' ? parsed.html.substring(0, 100_000) : null;
             const emailMessageId = parsed.messageId || `imap_${msg.uid}_${Date.now()}`;

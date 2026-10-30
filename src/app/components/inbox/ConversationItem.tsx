@@ -93,6 +93,20 @@ function ChannelIcon({ type, provider, size = 10 }: { type: string; provider?: s
     }
 }
 
+/**
+ * Texto da pré-visualização: sem o negrito "**assunto**" dos emails nem regras de CSS que
+ * emails antigos trazem no texto ("#outlook a{padding:0}"), numa só linha.
+ */
+function previewText(text: string): string {
+    // Email ("**assunto**\n\ntexto"): mostra o assunto, como no Gmail
+    const subject = text.match(/^\s*\*\*([^*]+)\*\*/);
+    if (subject) return subject[1].trim();
+    return text
+        .replace(/[#.@]?[\w\-:>*[\]=]*\s*\{[^{}]*:[^{}]*\}/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 function ConversationItemView({ conversation, isSelected, onClick }: ConversationItemProps) {
     const contact = conversation.contact;
     const lastMessage = conversation.last_message;
@@ -134,7 +148,7 @@ function ConversationItemView({ conversation, isSelected, onClick }: Conversatio
             : null;
         const content = lastMessage.media_type
             ? (lastMessage.media_type.startsWith('image') ? 'Imagem' : lastMessage.media_type.startsWith('video') ? 'Vídeo' : lastMessage.media_type.startsWith('audio') ? 'Áudio' : 'Ficheiro')
-            : (lastMessage.content || '');
+            : previewText(lastMessage.content || '');
         return senderName ? `~ ${senderName}: ${content}` : content;
     })() : 'Nenhuma mensagem...';
 

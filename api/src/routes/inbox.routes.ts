@@ -985,6 +985,42 @@ router.post('/conversations/create', async (req, res, next) => {
 });
 
 // Get messages for a specific conversation from Evolution API or Database
+/** Tira o HTML dos emails da lista de mensagens (marca html_lazy para o app o pedir à parte) */
+function withoutEmailHtml(metadata: any) {
+  if (!metadata || typeof metadata !== 'object' || !metadata.html_body) return metadata;
+  const { html_body: _html, ...rest } = metadata;
+  return { ...rest, html_lazy: true };
+}
+
+// HTML de um email (pedido pelo app quando a mensagem aparece no ecrã)
+router.get('/messages/:messageId/html', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.messageId)) return res.status(404).json({ error: 'Mensagem não encontrada' });
+    const { query: dbQuery } = require('../database/connection');
+    const r = await dbQuery(
+      `SELECT m.metadata->>'html_body' AS html
+         FROM messages m
+         JOIN conversations c ON c.id = m.conversation_id
+        WHERE m.id = $1 AND (
+          c.user_id = $2
+          OR c.user_id IN (SELECT w.owner_id FROM team_members tm JOIN workspaces w ON w.id = tm.workspace_id
+                           WHERE tm.user_id = $2 AND tm.status = 'active' AND tm.is_active = true)
+          OR c.workspace_id IN (SELECT tm.workspace_id FROM team_members tm
+                                WHERE tm.user_id = $2 AND tm.status = 'active' AND tm.is_active = true))
+        LIMIT 1`,
+      [req.params.messageId, user.id]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Mensagem não encontrada' });
+    // O conteúdo de um email não muda: o app pode guardar
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.json({ html: r.rows[0].html || '' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/conversations/:conversationIdOrJid/messages', async (req, res, next) => {
   try {
     const user = req.user;
@@ -1007,10 +1043,6 @@ router.get('/conversations/:conversationIdOrJid/messages', async (req, res, next
       [user.id]
     );
     if (teamWsRow.rows[0]) effectiveUserId = teamWsRow.rows[0].owner_id;
-
-    // First try to get instance from saved channels, fallback to legacy
-    const savedInstance = await getActiveWhatsAppInstance(effectiveUserId);
-    const instanceId = savedInstance || getUserInstanceName(effectiveUserId);
 
     // Determine the type of ID we received
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversationIdOrJid);
@@ -1121,7 +1153,7 @@ router.get('/conversations/:conversationIdOrJid/messages', async (req, res, next
           read_at: msg.read_at,
           media_url: msg.media_url,
           media_type: msg.media_type,
-          metadata: msg.metadata,
+          metadata: withoutEmailHtml(msg.metadata),
           sender: msg.direction === 'out' ? {
             id: user.id,
             name: 'Você',
@@ -1145,6 +1177,9 @@ router.get('/conversations/:conversationIdOrJid/messages', async (req, res, next
 
     // STEP 2: If no local messages and we have a JID, try Evolution API
     if ((isJid || isPhone) && whatsappService.isReady() && remoteJid) {
+      // Instância só aqui: abrir uma conversa já guardada não precisa dela
+      const savedInstance = await getActiveWhatsAppInstance(effectiveUserId);
+      const instanceId = savedInstance || getUserInstanceName(effectiveUserId);
       try {
         console.log('[Inbox] Fetching messages from Evolution API for:', remoteJid);
 

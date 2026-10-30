@@ -9,6 +9,7 @@ import { isInternalMediaUrl } from '../../utils/media-url';
 import { getLocale } from '../../utils/format';
 import { ImageViewer } from '../base/ImageViewer';
 import { saveRemoteFile } from '../../lib/saveFile';
+import { conversationsApi } from '../../services/api/inbox';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -83,9 +84,77 @@ function MessageContextMenu({ isOut, onDelete, onForward, onReply, onClose, anch
 
 // ── Email HTML body (collapsible, sanitized) ──────────────────────────────────
 
-function EmailHtmlBody({ html }: { html: string }) {
+/** HTML de emails já limpo, por mensagem (limpar um email grande é caro: faz-se uma vez) */
+const emailHtmlCache = new Map<string, string>();
+
+function sanitizeEmailHtml(html: string): string {
+    return DOMPurify.sanitize(html, {
+        FORCE_BODY: true,
+        ADD_ATTR: ['target'],
+        // <style> de um email mudava o CSS da app inteira; formulários não fazem sentido aqui
+        FORBID_TAGS: ['style', 'link', 'meta', 'title', 'base', 'form', 'input', 'button', 'textarea', 'select'],
+    })
+        // Imagens só quando aparecem no ecrã
+        .replace(/<img\b/gi, '<img loading="lazy" decoding="async"');
+}
+
+function rememberEmailHtml(id: string, html: string) {
+    emailHtmlCache.set(id, html);
+    if (emailHtmlCache.size > 150) emailHtmlCache.delete(emailHtmlCache.keys().next().value as string);
+}
+
+/**
+ * Corpo HTML de um email. A lista de mensagens não traz o HTML (html_lazy): é pedido à API
+ * quando a mensagem se aproxima do ecrã; mensagens que chegam pelo WebSocket já o trazem.
+ */
+function EmailHtmlBody({ messageId, rawHtml, fallbackText }: { messageId: string; rawHtml?: string; fallbackText?: string }) {
     const [expanded, setExpanded] = useState(false);
+    const [html, setHtml] = useState<string | null>(() => {
+        const cached = emailHtmlCache.get(messageId);
+        if (cached !== undefined) return cached;
+        if (rawHtml) {
+            const clean = sanitizeEmailHtml(rawHtml);
+            rememberEmailHtml(messageId, clean);
+            return clean;
+        }
+        return null;
+    });
+    const [failed, setFailed] = useState(false);
+    const boxRef = useRef<HTMLDivElement>(null);
     const PREVIEW_HEIGHT = 200;
+
+    useEffect(() => {
+        if (html !== null || failed) return;
+        const el = boxRef.current;
+        if (!el) return;
+        let cancelled = false;
+        const load = () => {
+            conversationsApi.getEmailHtml(messageId)
+                .then((raw) => {
+                    if (cancelled) return;
+                    const clean = sanitizeEmailHtml(raw);
+                    rememberEmailHtml(messageId, clean);
+                    setHtml(clean);
+                })
+                .catch(() => { if (!cancelled) setFailed(true); });
+        };
+        const io = new IntersectionObserver((entries) => {
+            if (entries.some((e) => e.isIntersecting)) {
+                io.disconnect();
+                load();
+            }
+        }, { rootMargin: '400px 0px' });
+        io.observe(el);
+        return () => { cancelled = true; io.disconnect(); };
+    }, [messageId, html, failed]);
+
+    if (failed || (html !== null && !html.trim())) {
+        return <div translate="no" className="whitespace-pre-wrap break-words text-sm">{fallbackText}</div>;
+    }
+
+    if (html === null) {
+        return <div ref={boxRef} className="h-[120px] animate-pulse rounded-lg bg-black/5 dark:bg-white/5" />;
+    }
 
     return (
         <div className="relative" translate="no">
@@ -302,15 +371,14 @@ function MessageBubbleView({
     // ── Email-specific metadata ───────────────────────────────────────────────
     const isEmail = message.channel === 'email';
     const emailMeta = isEmail ? (message.metadata as any) : null;
-    const emailHtml = emailMeta?.html_body
-        ? DOMPurify.sanitize(emailMeta.html_body, { FORCE_BODY: true, ADD_ATTR: ['target'] })
-        : null;
+    // O HTML vem na mensagem (WebSocket) ou é pedido à parte (lista: html_lazy)
+    const hasEmailHtml = !!(emailMeta?.html_body || emailMeta?.html_lazy);
     const emailAttachments: { url: string; name: string; contentType: string; mediaType: string }[] =
         emailMeta?.attachment_urls || [];
     const emailSubject: string | null = emailMeta?.subject || null;
 
     // For email with HTML: don't show raw text (it would be noise)
-    const showTextContent = message.content && (!isMediaPlaceholder || !hasValidMedia) && !(isEmail && emailHtml);
+    const showTextContent = message.content && (!isMediaPlaceholder || !hasValidMedia) && !(isEmail && hasEmailHtml);
 
     const bubbleRounding = 'rounded-2xl';
 
@@ -467,8 +535,8 @@ function MessageBubbleView({
                                 {emailSubject}
                             </div>
                         )}
-                        {emailHtml ? (
-                            <EmailHtmlBody html={emailHtml} />
+                        {hasEmailHtml ? (
+                            <EmailHtmlBody messageId={message.id} rawHtml={emailMeta?.html_body} fallbackText={message.content} />
                         ) : (
                             <div translate={contentTranslate} className="whitespace-pre-wrap break-words text-sm">{message.content}</div>
                         )}

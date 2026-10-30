@@ -6,6 +6,20 @@ import { toast } from 'sonner';
 import api from '../../../lib/api';
 import { getLocale, formatMoney } from '../../utils/format';
 
+/** Espera depois de trocar de conversa antes dos pedidos do painel */
+const PANEL_FETCH_DELAY_MS = 400;
+
+let teamMembersPromise: Promise<any[]> | null = null;
+/** Membros da equipa: um pedido por sessão, partilhado por todas as conversas */
+function loadTeamMembers(): Promise<any[]> {
+  if (!teamMembersPromise) {
+    teamMembersPromise = import('../../services/api/inbox')
+      .then(({ teamApi }) => teamApi.getMembers())
+      .catch((err) => { teamMembersPromise = null; throw err; });
+  }
+  return teamMembersPromise;
+}
+
 interface Conversation {
   id: string;
   lead_id?: string;
@@ -155,14 +169,30 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
   const [savingInternalNote, setSavingInternalNote] = useState(false);
 
   useEffect(() => {
-    import('../../services/api/inbox').then(({ teamApi }) => {
-      teamApi.getMembers().then(setTeamMembers).catch(() => {});
-      if (conversation.id) {
-        setLoadingInternalNotes(true);
-        teamApi.getNotes(conversation.id).then(setInternalNotes).catch(() => {}).finally(() => setLoadingInternalNotes(false));
-      }
-    });
+    loadTeamMembers().then(setTeamMembers).catch(() => {});
+  }, []);
+
+  // Pedidos do painel só depois de ficar na conversa um instante: as mensagens vão primeiro e
+  // conversas por onde se passa depressa não fazem pedidos
+  const [settledId, setSettledId] = useState<string | null>(null);
+  useEffect(() => {
+    const t = setTimeout(() => setSettledId(conversation.id), PANEL_FETCH_DELAY_MS);
+    return () => clearTimeout(t);
   }, [conversation.id]);
+  const ready = settledId === conversation.id;
+
+  useEffect(() => {
+    setInternalNotes([]);
+    if (!ready || !conversation.id) return;
+    let cancelled = false;
+    setLoadingInternalNotes(true);
+    import('../../services/api/inbox').then(({ teamApi }) =>
+      teamApi.getNotes(conversation.id)
+        .then((n) => { if (!cancelled) setInternalNotes(n); })
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setLoadingInternalNotes(false); }));
+    return () => { cancelled = true; };
+  }, [conversation.id, ready]);
 
   // Sync assignee if conversation prop changes
   useEffect(() => {
@@ -231,8 +261,29 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
   const [editValue, setEditValue] = useState('');
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
 
+  const contactRef = useRef(contact);
+  contactRef.current = contact;
+
+  useEffect(() => {
+    const c: any = contactRef.current || {};
+    setLeadDetails(null);
+    setEditName(c.name || '');
+    setEditPhone(c.phone || '');
+    setEditEmail(c.email || '');
+    setEditCompany(c.company || '');
+    setEditPosition('');
+    setEditStatus(c.status || 'novo');
+    setEditNotes('');
+    setEditValue('');
+    setEditAvatarUrl(c.avatar_url || c.avatar || '');
+    setSchedules([]);
+    setNotes([]);
+  }, [leadId]);
+
   // Fetch lead data
   useEffect(() => {
+    if (!ready) return;
+    const contact: any = contactRef.current || {};
     const fetchLeadData = async () => {
       if (!leadId) return;
       
@@ -270,7 +321,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
     };
 
     fetchLeadData();
-  }, [leadId, contact]);
+  }, [leadId, ready]);
 
   // Fetch schedules/tasks
   const fetchSchedules = useCallback(async () => {
@@ -288,8 +339,8 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
   }, [leadId]);
 
   useEffect(() => {
-    fetchSchedules();
-  }, [fetchSchedules]);
+    if (ready) fetchSchedules();
+  }, [fetchSchedules, ready]);
 
   // Fetch quick notes
   const fetchNotes = useCallback(async () => {
@@ -307,8 +358,8 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
   }, [leadId]);
 
   useEffect(() => {
-    fetchNotes();
-  }, [fetchNotes]);
+    if (ready) fetchNotes();
+  }, [fetchNotes, ready]);
 
   // Fetch remarketing flows
   useEffect(() => {
