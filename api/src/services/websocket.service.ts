@@ -122,11 +122,17 @@ export class WebSocketService {
                     const { query } = await import('../database/connection');
                     const { widgetTyping } = await import('./widget-typing.service');
                     const result = await query(
+                        // Só conversas a que este utilizador tem acesso (dono ou membro ativo da equipa)
                         `SELECT ch.type, u.name FROM conversations c
                          JOIN channels ch ON c.channel_id = ch.id
-                         JOIN users u ON c.user_id = u.id
-                         WHERE c.id = $1 AND ch.type = 'website'`,
-                        [data.conversationId]
+                         JOIN users u ON u.id = $2
+                         WHERE c.id = $1 AND ch.type = 'website' AND (
+                           c.user_id = $2
+                           OR c.user_id IN (SELECT w.owner_id FROM team_members tm JOIN workspaces w ON w.id = tm.workspace_id
+                                            WHERE tm.user_id = $2 AND tm.status = 'active' AND tm.is_active = true)
+                           OR c.workspace_id IN (SELECT tm.workspace_id FROM team_members tm
+                                                 WHERE tm.user_id = $2 AND tm.status = 'active' AND tm.is_active = true))`,
+                        [data.conversationId, userId]
                     );
                     if (result.rows.length > 0) {
                         if (data.isTyping) widgetTyping.set(data.conversationId, result.rows[0].name || 'Atendente');

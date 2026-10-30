@@ -21,7 +21,9 @@ import {
     ChevronDown,
     Clock,
     RotateCcw,
+    UserRound,
 } from 'lucide-react';
+import { BrandIcon, brandForChannel } from '../base/BrandIcon';
 
 interface ChatHeaderProps {
     conversation: ConversationWithDetails;
@@ -32,12 +34,14 @@ interface ChatHeaderProps {
     onResolve?: () => void;
     onStatusChange?: (status: 'open' | 'pending' | 'resolved') => void;
     layoutControls?: React.ReactNode;
+    /** Toque na foto/nome: abre os dados do contacto (como no WhatsApp) */
+    onOpenContact?: () => void;
 }
 
 // Channel display config
 const CHANNEL_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
     whatsapp: { label: 'WhatsApp', color: '#25D366', icon: MessageCircle },
-    whatsapp_cloud: { label: 'WA Cloud', color: '#25D366', icon: Cloud },
+    whatsapp_cloud: { label: 'WhatsApp Business', color: '#25D366', icon: Cloud },
     telegram: { label: 'Telegram', color: '#0088cc', icon: Send },
     facebook: { label: 'Facebook', color: '#1877F2', icon: Facebook },
     instagram: { label: 'Instagram', color: '#E4405F', icon: Instagram },
@@ -48,7 +52,7 @@ const CHANNEL_CONFIG: Record<string, { label: string; color: string; icon: React
     twilio: { label: 'SMS', color: '#0d9488', icon: Smartphone },
 };
 
-export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat, onResolve, onStatusChange, layoutControls }: ChatHeaderProps) {
+export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat, onResolve, onStatusChange, layoutControls, onOpenContact }: ChatHeaderProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [showStatusMenu, setShowStatusMenu] = useState(false);
@@ -73,6 +77,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
     const channelType = conversation.channel?.type || 'whatsapp';
     const channelInfo = CHANNEL_CONFIG[channelType];
     const ChannelIcon = channelInfo?.icon || MessageCircle;
+    const brand = brandForChannel(channelType);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -117,40 +122,55 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                 {onBack && (
                     <button
                         onClick={onBack}
-                        className="md:hidden p-1.5 -ml-1 rounded-lg text-muted-foreground hover:bg-muted/50 transition-all"
+                        aria-label="Voltar"
+                        className="md:hidden h-10 w-8 -ml-2 -mr-1 flex items-center justify-center rounded-full text-foreground active:bg-muted/60 transition-colors"
                     >
-                        <ChevronLeft size={20} />
+                        <ChevronLeft size={24} />
                     </button>
                 )}
 
-                {/* Avatar */}
-                <div className="relative flex-shrink-0">
-                    <div
-                        className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden ${
-                            avatarUrl ? '' : `bg-gradient-to-br ${getAvatarColor(contactName)}`
-                        }`}
-                    >
-                        {avatarUrl ? (
-                            <img
-                                src={avatarUrl}
-                                alt={contactName}
-                                className="w-full h-full object-cover"
-                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                            />
-                        ) : (
-                            <span className="font-semibold text-sm text-white">
-                                {contactName.charAt(0).toUpperCase()}
-                            </span>
+                <button
+                    type="button"
+                    onClick={onOpenContact}
+                    disabled={!onOpenContact}
+                    title={onOpenContact ? 'Dados do contacto' : undefined}
+                    className="flex min-w-0 items-center gap-3 rounded-lg text-left transition-opacity enabled:active:opacity-70"
+                >
+                    {/* Avatar */}
+                    <div className="relative flex-shrink-0">
+                        <div
+                            className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden ${
+                                avatarUrl ? '' : `bg-gradient-to-br ${getAvatarColor(contactName)}`
+                            }`}
+                        >
+                            {avatarUrl ? (
+                                <img
+                                    src={avatarUrl}
+                                    alt={contactName}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                />
+                            ) : (
+                                <span className="font-semibold text-sm text-white" translate="no">
+                                    {contactName.charAt(0).toUpperCase()}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Nome (e o canal por baixo, no telemóvel) */}
+                    <div className="min-w-0">
+                        <h2 className="text-[14px] font-semibold truncate text-foreground" translate="no">
+                            {contactName}
+                        </h2>
+                        {channelInfo && (
+                            <p className="sm:hidden flex items-center gap-1 text-xs text-muted-foreground truncate">
+                                {brand ? <BrandIcon brand={brand} className="h-3 w-3" /> : <ChannelIcon size={11} />}
+                                {channelInfo.label}
+                            </p>
                         )}
                     </div>
-                </div>
-
-                {/* Name */}
-                <div className="min-w-0">
-                    <h2 className="text-[14px] font-semibold truncate text-foreground">
-                        {contactName}
-                    </h2>
-                </div>
+                </button>
 
                 {/* Channel Badge (ManyChat-style pill) */}
                 {channelInfo && (
@@ -162,7 +182,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                             backgroundColor: `${channelInfo.color}10`,
                         }}
                     >
-                        <ChannelIcon size={12} />
+                        {brand ? <BrandIcon brand={brand} className="h-3 w-3" /> : <ChannelIcon size={12} />}
                         {channelInfo.label}
                     </span>
                 )}
@@ -294,8 +314,17 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                     
                     {showMenu && (
                         <div 
-                            className="absolute top-full right-0 mt-1 w-48 rounded-lg border border-border shadow-lg bg-card overflow-hidden z-50"
+                            className="absolute top-full right-0 mt-1 w-52 rounded-xl border border-border shadow-lg bg-card overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right"
                         >
+                            {onOpenContact && (
+                                <button
+                                    onClick={() => { setShowMenu(false); onOpenContact(); }}
+                                    className="w-full px-3 py-2.5 flex items-center gap-2.5 text-sm text-foreground hover:bg-muted/50 transition-colors"
+                                >
+                                    <UserRound className="w-3.5 h-3.5" />
+                                    Dados do contacto
+                                </button>
+                            )}
                             <button
                                 onClick={() => { onEditLead?.(); setShowMenu(false); }}
                                 className="w-full px-3 py-2.5 flex items-center gap-2.5 text-sm text-foreground hover:bg-muted/50 transition-colors"

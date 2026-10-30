@@ -72,6 +72,12 @@ interface ChatPanelProps {
     conversations?: ConversationWithDetails[];
     /** Optional layout control buttons rendered inside the chat header */
     layoutControls?: React.ReactNode;
+    /** Abrir os dados do contacto (toque na foto/nome do cabeçalho) */
+    onOpenContact?: () => void;
+    /** Avisar que o agente está a escrever (o widget do site mostra-o ao visitante) */
+    onTyping?: (typing: boolean) => void;
+    /** Telemóvel: o chat entra a deslizar da direita ao abrir */
+    slideIn?: boolean;
     /** Ref to attach to the scroll container for position save/restore */
     scrollContainerRef?: React.RefObject<HTMLElement | null>;
     /** Mensagens anteriores (ao chegar ao topo do chat) */
@@ -94,6 +100,9 @@ export function ChatPanel({
     messagesEndRef: externalMessagesEndRef,
     onSendMessage,
     layoutControls,
+    onOpenContact,
+    onTyping,
+    slideIn = false,
     onSendAudio,
     scrollContainerRef,
     onAddLocalMessage,
@@ -106,7 +115,6 @@ export function ChatPanel({
     hasMore = false,
     loadingOlder = false,
 }: ChatPanelProps) {
-    const [isTyping, setIsTyping] = useState(false);
     const [forwardTarget, setForwardTarget] = useState<MessageWithSender | null>(null);
     const internalEndRef = useRef<HTMLDivElement>(null);
 
@@ -116,9 +124,27 @@ export function ChatPanel({
     const sending         = externalSending ?? false;
     const messagesEndRef  = externalMessagesEndRef || internalEndRef;
 
-    const handleTyping = (typing: boolean) => { setIsTyping(typing); };
+    const handleTyping = (typing: boolean) => { onTyping?.(typing); };
 
     const rows = useMemo(() => buildRows(messages), [messages]);
+
+    // Só as mensagens que chegam (ou se enviam) com a conversa aberta entram animadas — as que
+    // já estavam e as antigas carregadas ao subir aparecem logo
+    const seenIdsRef = useRef<{ convId: string; ids: Set<string>; ready: boolean }>({ convId: '', ids: new Set(), ready: false });
+    if (seenIdsRef.current.convId !== conversation.id) {
+        seenIdsRef.current = { convId: conversation.id, ids: new Set(), ready: false };
+    }
+    const seen = seenIdsRef.current;
+    const newestIds = useMemo(() => new Set(messages.slice(-3).map((m) => m.id)), [messages]);
+    // A mensagem confirmada pela API troca o id temporário pelo real: o client_id liga as duas
+    const shouldAnimate = (m: MessageWithSender) => {
+        const clientId = (m.metadata as any)?.client_id as string | undefined;
+        return seen.ready && newestIds.has(m.id) && !seen.ids.has(m.id) && !(clientId && seen.ids.has(clientId));
+    };
+    useEffect(() => {
+        for (const m of messages) seen.ids.add(m.id);
+        if (messages.length > 0) seen.ready = true;
+    });
 
     // Contentor do scroll: guardado aqui (carregar antigas, botão para o fim) e no ref do pai
     const [scrollEl, setScrollElState] = useState<HTMLDivElement | null>(null);
@@ -175,7 +201,7 @@ export function ChatPanel({
     );
 
     return (
-        <div className="flex flex-col h-full max-h-full relative overflow-hidden bg-background">
+        <div className={`flex flex-col h-full max-h-full relative overflow-hidden bg-background ${slideIn ? 'animate-in fade-in slide-in-from-right-8 duration-200' : ''}`}>
 
             {/* Header */}
             <div className="flex-shrink-0">
@@ -188,6 +214,7 @@ export function ChatPanel({
                     onResolve={onResolve}
                     onStatusChange={onStatusChange}
                     layoutControls={layoutControls}
+                    onOpenContact={onOpenContact}
                 />
             </div>
 
@@ -212,6 +239,7 @@ export function ChatPanel({
                                 isFirstInGroup={row.isFirstInGroup}
                                 isLastInGroup={row.isLastInGroup}
                                 isGrouped={row.isGrouped}
+                                animateIn={shouldAnimate(row.message)}
                                 onDelete={onDeleteMessage}
                                 onForward={setForwardTarget}
                                 onReply={handleReply}
@@ -267,13 +295,6 @@ export function ChatPanel({
                 >
                     <ChevronDown size={20} />
                 </button>
-            )}
-
-            {/* Typing Indicator */}
-            {isTyping && (
-                <div className="px-4 py-2 text-xs italic text-muted-foreground">
-                    A escrever...
-                </div>
             )}
 
             {/* Input Area */}

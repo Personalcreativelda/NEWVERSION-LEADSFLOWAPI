@@ -21,6 +21,8 @@ interface MessageBubbleProps {
     onDelete?: (messageId: string) => void;
     onForward?: (message: MessageWithSender) => void;
     onReply?: (message: MessageWithSender) => void;
+    /** Mensagem que acabou de chegar/ser enviada: entra a subir */
+    animateIn?: boolean;
 }
 
 // ── Context menu ──────────────────────────────────────────────────────────────
@@ -237,6 +239,7 @@ function TranscribeButton({ messageId, apiUrl, isOut, onTranscribed }: {
 
 function MessageBubbleView({
     message,
+    animateIn,
     isLastInGroup = true,
     onDelete,
     onForward,
@@ -388,7 +391,7 @@ function MessageBubbleView({
     return (
         <div
             ref={wrapperRef}
-            className={`flex w-full ${isOut ? 'justify-end' : 'justify-start'} ${isLastInGroup ? 'mb-[6px]' : 'mb-[2px]'}`}
+            className={`flex w-full ${isOut ? 'justify-end' : 'justify-start'} ${isLastInGroup ? 'mb-[6px]' : 'mb-[2px]'} ${animateIn ? 'animate-in fade-in slide-in-from-bottom-2 duration-200' : ''}`}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => { setHovered(false); }}
         >

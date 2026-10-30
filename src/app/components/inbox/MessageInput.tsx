@@ -64,6 +64,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     const fileInputRef = useRef<HTMLInputElement>(null);
     const imageInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const typingSentRef = useRef(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
     const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -97,14 +98,6 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         }
     }, [attachments]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Auto-resize textarea
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
-        }
-    }, [content]);
-
     // Click outside handler for emoji picker
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -125,22 +118,37 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
     }, []);
 
     // Cresce com o texto até 5 linhas, como no WhatsApp (também com emoji ou resposta da IA)
+    // Vazia fica numa linha; medida de novo quando a largura muda (ao abrir, a caixa ainda
+    // estreita partia o "Mensagem" letra a letra e ficava com 120px)
     useEffect(() => {
         const el = textareaRef.current;
         if (!el) return;
-        el.style.height = 'auto';
-        el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+        const fit = () => {
+            el.style.height = 'auto';
+            if (el.value) el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+        };
+        fit();
+        let lastWidth = el.clientWidth;
+        const ro = new ResizeObserver(() => {
+            if (el.clientWidth !== lastWidth) { lastWidth = el.clientWidth; fit(); }
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
     }, [content]);
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setContent(e.target.value);
 
-        // Typing indicator logic
-        onTyping(true);
+        // "A escrever": avisa só quando começa e quando pára (não a cada tecla)
+        if (!typingSentRef.current) {
+            typingSentRef.current = true;
+            onTyping(true);
+        }
         if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
         }
         typingTimeoutRef.current = setTimeout(() => {
+            typingSentRef.current = false;
             onTyping(false);
         }, 2000);
     };
@@ -399,6 +407,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
 
             try {
                 if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                typingSentRef.current = false;
                 onTyping(false);
                 await onSendMessage(
                     captionForUploaded,
@@ -425,6 +434,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
             if (textareaRef.current) textareaRef.current.style.height = 'auto';
             try {
                 if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                typingSentRef.current = false;
                 onTyping(false);
                 await onSendMessage(messageToSend);
             } catch (error) {

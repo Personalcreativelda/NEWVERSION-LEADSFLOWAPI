@@ -1050,36 +1050,22 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               </div>
             </div>
 
-            {/* AI Summary Card */}
-            <div className="rounded-xl border border-purple-500/30 overflow-hidden bg-gradient-to-br from-purple-500/5 to-transparent">
-              <div className="px-3 py-2.5 border-b border-purple-500/20 flex items-center justify-between">
-                <h5 className="text-[10px] font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
-                  <BrainCircuit className="w-3.5 h-3.5" />
-                  Resumo Inteligente IA
-                </h5>
-              </div>
-              <div className="p-3">
-                <button
-                  onClick={handleGenerateSummary}
-                  disabled={generatingSummary}
-                  className="w-full h-10 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white transition-all shadow-sm shadow-purple-500/20 disabled:opacity-70"
-                >
-                  {generatingSummary ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      A analisar Conversa...
-                    </>
-                  ) : (
-                    <>
-                      <BrainCircuit className="w-3.5 h-3.5" />
-                      Gerar Briefing do Lead
-                    </>
-                  )}
-                </button>
-                <p className="text-[10px] text-center mt-2 text-muted-foreground">
-                  Lê as últimas mensagens e extrai o perfil e o próximo passo. O resumo será guardado nas Notas.
-                </p>
-              </div>
+            {/* Resumo IA: lê as últimas mensagens e guarda o resumo nas notas */}
+            <div className="flex items-center gap-3 rounded-xl border border-border/60 px-3 py-2.5">
+              <BrainCircuit className="w-4 h-4 flex-shrink-0 text-violet-500" />
+              <span className="flex-1 text-sm font-medium text-foreground">Resumo IA</span>
+              <button
+                onClick={handleGenerateSummary}
+                disabled={generatingSummary}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+              >
+                {generatingSummary ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    A analisar…
+                  </>
+                ) : 'Gerar resumo'}
+              </button>
             </div>
 
             {/* Quick Notes Card */}
@@ -1087,7 +1073,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40 flex items-center justify-between">
                 <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
                   <StickyNote className="w-3 h-3" />
-                  Notas Rápidas
+                  Notas do lead
                 </h5>
                 {loadingNotes && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
               </div>
@@ -1421,7 +1407,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
                 <StickyNote className="w-3 h-3" />
-                Notas Internas
+                Notas da conversa
               </div>
 
               {/* Add note input */}
@@ -1431,13 +1417,13 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                   value={newInternalNote}
                   onChange={e => setNewInternalNote(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAddInternalNote()}
-                  placeholder="Adicionar nota interna..."
+                  placeholder="Nota para a equipa…"
                   className="flex-1 px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <button
                   onClick={handleAddInternalNote}
                   disabled={savingInternalNote || !newInternalNote.trim()}
-                  className="inline-flex items-center justify-center px-3 h-10 rounded-lg text-sm bg-amber-500 text-white disabled:opacity-50 hover:bg-amber-600 transition-colors"
+                  className="inline-flex items-center justify-center px-3 h-10 rounded-lg text-sm bg-primary text-primary-foreground disabled:opacity-50 hover:bg-primary/90 transition-colors"
                 >
                   {savingInternalNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 </button>
@@ -1451,7 +1437,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
               ) : internalNotes.length > 0 ? (
                 <div className="space-y-1.5 max-h-40 overflow-y-auto">
                   {internalNotes.map(note => (
-                    <div key={note.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-sm">
+                    <div key={note.id} className="rounded-lg bg-muted/50 border border-border px-3 py-2 text-sm">
                       <p className="text-foreground/90 leading-relaxed">{note.content}</p>
                       <p className="text-[10px] text-muted-foreground mt-1">
                         {note.author_name && <span className="font-medium">{note.author_name} · </span>}
@@ -1461,7 +1447,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                   ))}
                 </div>
               ) : (
-                <p className="text-[12px] text-muted-foreground italic text-center py-2">Nenhuma nota interna</p>
+                <p className="text-[12px] text-muted-foreground italic text-center py-2">Sem notas</p>
               )}
             </div>
 
@@ -1470,13 +1456,6 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
 
             {/* Action Buttons */}
             <div className="mt-3 space-y-2">
-              <button
-                onClick={() => setIsEditing(true)}
-                className="w-full py-2 rounded-lg text-xs font-medium transition-all duration-150 active:scale-[0.97] flex items-center justify-center gap-2 hover:opacity-90 bg-primary text-primary-foreground"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-                Editar Contacto
-              </button>
               
               {/* Action Dropdown */}
               <div className="relative">
@@ -1484,8 +1463,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                   onClick={() => setShowActionMenu(!showActionMenu)}
                   className="w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2 border border-border text-foreground hover:bg-muted/50"
                 >
-                  <Calendar className="w-4 h-4" />
-                  Ações Rápidas
+                  Ações rápidas
                   <ChevronDown className={`w-4 h-4 transition-transform ${showActionMenu ? 'rotate-180' : ''}`} />
                 </button>
                 

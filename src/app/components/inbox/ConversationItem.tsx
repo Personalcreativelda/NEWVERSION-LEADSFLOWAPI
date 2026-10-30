@@ -252,8 +252,7 @@ function ConversationItemView({ conversation, isSelected, onClick }: Conversatio
 
                     {hasUnread && (
                         <span
-                            className="flex-shrink-0 min-w-[22px] h-[22px] px-1.5 text-[11px] font-bold rounded-full flex items-center justify-center text-white shadow-sm"
-                            style={{ backgroundColor: channelColor }}
+                            className="flex-shrink-0 min-w-[22px] h-[22px] px-1.5 text-[11px] font-bold rounded-full flex items-center justify-center bg-primary text-primary-foreground"
                         >
                             {conversation.unread_count > 99 ? '99+' : conversation.unread_count}
                         </span>

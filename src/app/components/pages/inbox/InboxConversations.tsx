@@ -1,5 +1,5 @@
 import { matchesSearch } from '../../../utils/search';
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { ConversationList } from '../../inbox/ConversationList';
 import { useInbox } from '../../../hooks/useInbox';
@@ -13,6 +13,7 @@ import { ConversationListHeader, type QuickFilter } from '../../inbox/Conversati
 import { ChatPanel } from '../../inbox/ChatPanel';
 import { EmptyState } from '../../inbox/EmptyState';
 import { ContactDetailsPanel } from '../../inbox/ContactDetailsPanel';
+import { OverlayModal } from '../../base/OverlayModal';
 import { NewConversationModal } from '../../inbox/NewConversationModal';
 import { ResizeHandle } from '../../inbox/ResizeHandle';
 import { PageFab } from '../../base/PageHeader';
@@ -55,6 +56,7 @@ export default function ConversasConversations({
         loadOlderMessages,
         hasMoreMessages,
         loadingOlderMessages,
+        handleTyping,
     } = useInbox();
 
     const confirm = useConfirm();
@@ -122,12 +124,24 @@ export default function ConversasConversations({
         return () => window.removeEventListener('resize', handle);
     }, []);
 
-    // Detect medium breakpoint (tablet)
-    const [isTablet, setIsTablet] = useState(() => window.innerWidth < 1280);
+    // Conversa aberta no telemóvel: o chat ocupa o ecrã inteiro (sem cabeçalho nem barra
+    // inferior do painel, como no WhatsApp) — ver html.inbox-chat-open em globals.css
+    const chatOpenOnMobile = isMobile && !!selectedConversation;
     useEffect(() => {
-        const handle = () => setIsTablet(window.innerWidth < 1280);
-        window.addEventListener('resize', handle, { passive: true });
-        return () => window.removeEventListener('resize', handle);
+        document.documentElement.classList.toggle('inbox-chat-open', chatOpenOnMobile);
+        return () => document.documentElement.classList.remove('inbox-chat-open');
+    }, [chatOpenOnMobile]);
+
+    // Largura real da inbox (sem a barra lateral do painel): decide se o painel do contacto
+    // cabe ao lado do chat
+    const rootRef = useRef<HTMLDivElement>(null);
+    const [rootWidth, setRootWidth] = useState(() => window.innerWidth);
+    useEffect(() => {
+        const el = rootRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(([entry]) => setRootWidth(Math.round(entry.contentRect.width)));
+        ro.observe(el);
+        return () => ro.disconnect();
     }, []);
 
     // Auto-select conversation when conversationIdToOpen is provided
@@ -178,8 +192,31 @@ export default function ConversasConversations({
         }
     };
 
+    // ── Larguras ─────────────────────────────────────────────────────
+    // O chat fica sempre com pelo menos MIN_CHAT: a lista encolhe até 260 e o painel do
+    // contacto só fica fixo ao lado se couber; senão abre por cima, só quando se pede
+    const MIN_CHAT = 440;
+    const COLLAPSED_STUB = 40;
+    const listShown = !isMobile && !layout.focusMode && !layout.conversationListCollapsed;
+    const detailsWidth = layout.detailsPanelWidth;
+    const wantsDetails = !layout.detailsPanelCollapsed && !layout.focusMode && !!selectedConversation;
+    const convListWidth = Math.max(260, Math.min(layout.conversationListWidth, rootWidth - MIN_CHAT - (wantsDetails ? detailsWidth : 0)));
+    const listSpace = listShown ? convListWidth : (!isMobile && !layout.focusMode ? COLLAPSED_STUB : 0);
+    const detailsDocked = !isMobile && rootWidth - listSpace - detailsWidth >= MIN_CHAT;
+
+    // Dados do contacto: no telemóvel numa folha de ecrã inteiro (como no WhatsApp); no
+    // computador, o painel lateral — ou por cima do chat quando não cabe ao lado
+    const [showContactSheet, setShowContactSheet] = useState(false);
+    useEffect(() => { setShowContactSheet(false); }, [selectedConversation?.id]);
+
+    const openContact = () => {
+        if (!detailsDocked) setShowContactSheet(true);
+        else if (layout.detailsPanelCollapsed || layout.focusMode) toggleDetailsPanel();
+    };
+
     const handleEditLead = () => {
         setIsEditingLead(true);
+        if (!detailsDocked) setShowContactSheet(true);
     };
 
     const handleDeleteConversation = async () => {
@@ -451,16 +488,8 @@ export default function ConversasConversations({
         search(value);
     };
 
-    // ── Computed visibility ──────────────────────────────────────────
-    // On mobile: show list OR chat (not both). Details never shown.
-    // On tablet: conversation list + chat. Details hidden unless explicitly opened.
-    // On desktop: all three panels, respecting layout state.
-    const showDetailsPanel = !isMobile && !isTablet && !layout.detailsPanelCollapsed && !layout.focusMode && !!selectedConversation;
-    const convListWidth = layout.conversationListWidth;
-    const detailsWidth = layout.detailsPanelWidth;
-
-    // Collapsed stub width (icon-only strip)
-    const COLLAPSED_STUB = 40;
+    // Telemóvel: lista OU chat. Computador: lista + chat + painel do contacto (se couber)
+    const showDetailsPanel = detailsDocked && !layout.detailsPanelCollapsed && !layout.focusMode && !!selectedConversation;
 
     // Ligação em tempo real em baixo: aviso discreto (as conversas continuam a atualizar por consulta)
     const wsBanner = showWsBanner ? (
@@ -472,7 +501,7 @@ export default function ConversasConversations({
     ) : null;
 
     return (
-        <div className="flex w-full min-w-0 h-full max-h-full overflow-hidden bg-background relative">
+        <div ref={rootRef} className="flex w-full min-w-0 h-full max-h-full overflow-hidden bg-background relative">
 
             {/* ── Conversation List Panel ─────────────────────────────── */}
             {!isMobile && !layout.focusMode && (
@@ -555,7 +584,7 @@ export default function ConversasConversations({
 
             {/* Mobile: Conversation List (full width, hidden when chat open) */}
             {isMobile && !selectedConversation && (
-                <div className="flex flex-col w-full h-full bg-card">
+                <div className="flex flex-col w-full h-full bg-card animate-in fade-in slide-in-from-left-4 duration-200">
                     {wsBanner}
                     {/* Nova conversa: FAB (padrão de criar da app), só com a lista visível */}
                     <PageFab label="Nova conversa" icon={MessageSquarePlus} onClick={() => setShowNewConversationModal(true)} />
@@ -600,6 +629,9 @@ export default function ConversasConversations({
             <div className={`flex-1 min-w-0 flex flex-col relative overflow-hidden bg-background ${isMobile && !selectedConversation ? 'hidden' : 'flex'}`}>
                 {selectedConversation ? (
                     <ChatPanel
+                        slideIn={isMobile}
+                        onOpenContact={openContact}
+                        onTyping={handleTyping}
                         conversation={selectedConversation}
                         onBack={isMobile ? handleBack : undefined}
                         onEditLead={handleEditLead}
@@ -626,9 +658,9 @@ export default function ConversasConversations({
                         loadingOlder={loadingOlderMessages}
                         /* Só aparece com o painel do contacto fechado: fecha-se no X do próprio painel */
                         layoutControls={
-                            !isMobile && layout.detailsPanelCollapsed ? (
+                            !isMobile && (layout.detailsPanelCollapsed || !detailsDocked) ? (
                                 <button
-                                    onClick={toggleDetailsPanel}
+                                    onClick={detailsDocked ? toggleDetailsPanel : openContact}
                                     className="p-1.5 rounded-md text-muted-foreground hover:bg-muted transition-colors"
                                     title="Mostrar detalhes"
                                 >
@@ -666,26 +698,42 @@ export default function ConversasConversations({
             )}
 
             {/* Tablet: Details panel as overlay sheet */}
-            {!isMobile && isTablet && selectedConversation && !layout.detailsPanelCollapsed && !layout.focusMode && (
+            {!isMobile && !detailsDocked && showContactSheet && selectedConversation && (
                 <>
-                    {/* Dim overlay */}
                     <div
-                        className="absolute inset-0 z-20 bg-black/30"
-                        onClick={toggleDetailsPanel}
+                        className="absolute inset-0 z-20 bg-black/30 animate-in fade-in duration-150"
+                        onClick={() => setShowContactSheet(false)}
                     />
                     <div
-                        className="absolute right-0 top-0 bottom-0 z-30 flex flex-col h-full border-l border-border bg-card shadow-2xl transition-transform duration-200"
-                        style={{ width: Math.min(detailsWidth, 340) }}
+                        className="absolute right-0 top-0 bottom-0 z-30 flex flex-col h-full border-l border-border bg-card shadow-2xl animate-in slide-in-from-right-8 fade-in duration-200"
+                        style={{ width: Math.min(detailsWidth, 360) }}
                     >
                         <ContactDetailsPanel
                             conversation={selectedConversation as any}
-                            onClose={toggleDetailsPanel}
+                            onClose={() => setShowContactSheet(false)}
                             isEditingExternal={isEditingLead}
                             onEditingChange={setIsEditingLead}
                             onSendMessage={sendMessage}
                         />
                     </div>
                 </>
+            )}
+
+            {/* Dados do contacto no telemóvel */}
+            {isMobile && showContactSheet && selectedConversation && (
+                <OverlayModal
+                    onClose={() => setShowContactSheet(false)}
+                    stickyEdges={false}
+                    className="h-[92dvh] max-w-lg overflow-hidden"
+                >
+                    <ContactDetailsPanel
+                        conversation={selectedConversation as any}
+                        onClose={() => setShowContactSheet(false)}
+                        isEditingExternal={isEditingLead}
+                        onEditingChange={setIsEditingLead}
+                        onSendMessage={async (text) => { await sendMessage(text); setShowContactSheet(false); }}
+                    />
+                </OverlayModal>
             )}
 
             {/* New Conversation Modal */}
