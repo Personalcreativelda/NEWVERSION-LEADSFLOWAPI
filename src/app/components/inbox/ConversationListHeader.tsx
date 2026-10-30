@@ -1,6 +1,6 @@
 // Topo da lista de conversas ao estilo do WhatsApp: título com ações, pesquisa e filtros
 // em "chips" só com texto. O mesmo componente no computador e no telemóvel.
-import { Search, X, Plus, MoreVertical, ChevronDown, Check, CheckSquare, Square, PanelLeftClose, RefreshCw, MessageCircle } from 'lucide-react';
+import { Search, X, MessageSquarePlus, MoreVertical, ChevronDown, Check, CheckSquare, Square, PanelLeftClose, RefreshCw, MessageCircle } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
@@ -135,12 +135,18 @@ export function ConversationListHeader(props: ConversationListHeaderProps) {
       {!isMobile && (
         <div className="flex h-10 items-center gap-1">
           <h1 className="flex-1 truncate pl-1 text-base font-semibold text-foreground">Conversas</h1>
+          {menu}
           {onNewConversation && (
-            <button type="button" className={iconBtn} onClick={onNewConversation} aria-label="Nova conversa" title="Nova conversa">
-              <Plus className="h-[18px] w-[18px]" />
+            <button
+              type="button"
+              onClick={onNewConversation}
+              aria-label="Nova conversa"
+              title="Nova conversa"
+              className="ml-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-[filter,transform] hover:brightness-110 active:scale-95"
+            >
+              <MessageSquarePlus className="h-[18px] w-[18px]" />
             </button>
           )}
-          {menu}
         </div>
       )}
 

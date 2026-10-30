@@ -17,7 +17,7 @@ import {
 import { toast } from"sonner";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { getLocale } from '../../utils/format';
+import { getLocale, formatMoney } from '../../utils/format';
 import { saveFile } from '../../lib/saveFile';
 import { htmlToPdf } from '../../lib/htmlToPdf';
 
@@ -286,11 +286,11 @@ export default function ReportExporter({ isOpen, onClose, leads, isDark = false 
  <div class="stats-grid">
  <div class="stat-card blue">
  <div class="stat-label">Receita Total</div>
- <div class="stat-value">R$ ${totalRevenue.toLocaleString(getLocale())}</div>
+ <div class="stat-value">${formatMoney(totalRevenue)}</div>
  </div>
  <div class="stat-card green">
  <div class="stat-label">Valor Médio por Lead</div>
- <div class="stat-value">R$ ${avgRevenue.toFixed(2)}</div>
+ <div class="stat-value">${formatMoney(avgRevenue)}</div>
  </div>
  </div>
  </div>

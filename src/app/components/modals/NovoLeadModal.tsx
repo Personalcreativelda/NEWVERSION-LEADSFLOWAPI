@@ -221,7 +221,7 @@ export default function NovoLeadModal({ isOpen, onClose, onSave }: NovoLeadModal
             <Input name="agente_atual" value={formData.agente_atual} onChange={handleChange} placeholder="Ex: Maria Silva" />
           </FormField>
 
-          <FormField label="Valor do Negócio (R$)" hint="Usado para calcular valor médio de conversão">
+          <FormField label="Valor do negócio" hint="Usado para calcular valor médio de conversão">
             <Input
               type="number"
               name="valor"

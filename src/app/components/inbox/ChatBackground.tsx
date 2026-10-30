@@ -1,4 +1,4 @@
-// INBOX: neutral chat thread background (Minimal Kit style — flat surface, no wallpaper pattern)
+// INBOX: fundo das conversas — papel de parede com desenhos (.chat-wallpaper em globals.css)
 import React from 'react';
 
 interface ChatBackgroundProps {
@@ -11,7 +11,7 @@ export function ChatBackground({ children, className = '', scrollRef }: ChatBack
     return (
         <div
             ref={scrollRef}
-            className={`relative bg-[#ECE5DD] dark:bg-[#0B141A] ${className}`}
+            className={`relative chat-wallpaper ${className}`}
         >
             {children}
         </div>

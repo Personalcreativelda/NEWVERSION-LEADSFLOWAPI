@@ -420,6 +420,17 @@
 
 /* ─── Light Mode Sidebar Overrides ─── */
 /* In light mode, sidebar is light gray instead of dark */
+/* ─── Fundo do chat: desenhos só de traço (scripts/make-chat-wallpaper.mjs) ─── */
+.chat-wallpaper {
+  background-color: #efeae2;
+  background-image: url('/assets/chat/wallpaper-light.svg');
+  background-size: 320px 320px;
+}
+.dark .chat-wallpaper {
+  background-color: #0b141a;
+  background-image: url('/assets/chat/wallpaper-dark.svg');
+}
+
 /* ─── Collapsed sidebar scroll: hidden scrollbar + fade masks ─── */
 .scrollbar-none {
   -ms-overflow-style: none;

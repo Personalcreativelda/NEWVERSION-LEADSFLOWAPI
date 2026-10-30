@@ -6,7 +6,7 @@ import { useInbox } from '../../../hooks/useInbox';
 import { useInboxFilters } from '../../../hooks/useInboxFilters';
 import { useInboxLayout } from '../../../hooks/useInboxLayout';
 import { conversationsApi, contactsApi, groupsApi, teamApi, channelsApi } from '../../../services/api/inbox';
-import { WifiOff, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
+import { WifiOff, PanelLeftOpen, PanelRightOpen, MessageSquarePlus } from 'lucide-react';
 import { useServerStatus } from '../../../lib/serverStatus';
 import { useOnlineStatus } from '../../../hooks/useOnlineStatus';
 import { ConversationListHeader, type QuickFilter } from '../../inbox/ConversationListHeader';
@@ -558,7 +558,7 @@ export default function ConversasConversations({
                 <div className="flex flex-col w-full h-full bg-card">
                     {wsBanner}
                     {/* Nova conversa: FAB (padrão de criar da app), só com a lista visível */}
-                    <PageFab label="Nova conversa" onClick={() => setShowNewConversationModal(true)} />
+                    <PageFab label="Nova conversa" icon={MessageSquarePlus} onClick={() => setShowNewConversationModal(true)} />
                     <ConversationListHeader
                         isMobile={true}
                         searchQuery={searchQuery}

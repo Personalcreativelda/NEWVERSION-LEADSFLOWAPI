@@ -14,9 +14,9 @@
 "2296":["WhatsApp isn't available right now.","WhatsApp no está disponible en este momento.","WhatsApp n'est pas disponible pour le moment."],
 "2421":["Search by name or number","Buscar por nombre o número","Rechercher par nom ou numéro"],
 "2452":["This may take a few seconds","Puede tardar unos segundos","Cela peut prendre quelques secondes"],
-"3243":["{0} contact(s) imported ({1} already existed)","{0} contacto(s) importado(s) ({1} ya existían)","{0} contact(s) importé(s) ({1} existaient déjà)"],
-"3244":["{0} contact(s) imported from WhatsApp","{0} contacto(s) importado(s) de WhatsApp","{0} contact(s) importé(s) depuis WhatsApp"],
-"3245":["{0} contacts with WhatsApp","{0} contactos con WhatsApp","{0} contacts avec WhatsApp"],
-"3409":["Import {0}","Importar {0}","Importer {0}"],
-"3444":["Your plan allows {0} more leads: the first {1} will be imported.","Tu plan permite {0} leads más: se importarán los primeros {1}.","Votre forfait permet encore {0} leads : les {1} premiers seront importés."]
+"3242":["{0} contact(s) imported ({1} already existed)","{0} contacto(s) importado(s) ({1} ya existían)","{0} contact(s) importé(s) ({1} existaient déjà)"],
+"3243":["{0} contact(s) imported from WhatsApp","{0} contacto(s) importado(s) de WhatsApp","{0} contact(s) importé(s) depuis WhatsApp"],
+"3244":["{0} contacts with WhatsApp","{0} contactos con WhatsApp","{0} contacts avec WhatsApp"],
+"3408":["Import {0}","Importar {0}","Importer {0}"],
+"3443":["Your plan allows {0} more leads: the first {1} will be imported.","Tu plan permite {0} leads más: se importarán los primeros {1}.","Votre forfait permet encore {0} leads : les {1} premiers seront importés."]
 }

@@ -87,6 +87,28 @@ const CATEGORY_LABELS: Record<string, string> = {
   'custom': 'Personalizado',
 };
 
+/**
+ * Logótipo do assistente, como o ícone de uma app: quadrado arredondado em gradiente
+ * da cor do assistente, com o ícone a branco.
+ */
+function AssistantLogo({ icon, color, size = 'md' }: { icon?: string; color?: string; size?: 'sm' | 'md' }) {
+  const Icon = ICON_MAP[icon || 'bot'] || Bot;
+  const c = color || '#3B82F6';
+  const box = size === 'sm' ? 'h-10 w-10 rounded-xl' : 'h-12 w-12 rounded-2xl';
+  return (
+    <div
+      className={`${box} flex flex-shrink-0 items-center justify-center text-white`}
+      style={{
+        backgroundColor: c,
+        backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${c} 82%, white), color-mix(in srgb, ${c} 70%, black))`,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 14px -6px ${c}`,
+      }}
+    >
+      <Icon className={size === 'sm' ? 'h-5 w-5' : 'h-6 w-6'} strokeWidth={2.2} />
+    </div>
+  );
+}
+
 const CHANNEL_ICONS: Record<string, React.ComponentType<any>> = {
   'whatsapp': brandIcon('whatsapp'),
   'whatsapp_cloud': brandIcon('whatsapp'),
@@ -602,7 +624,6 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
   // Render assistant card
   const renderAssistantCard = (assistant: Assistant, isMarketplace: boolean = true) => {
-    const IconComponent = ICON_MAP[assistant.icon] || Bot;
     const connected = isConnected(assistant.id);
     const userAssistant = getUserAssistantByAssistantId(assistant.id);
     const resolvedChannels = (userAssistant?.channel_ids || [])
@@ -631,12 +652,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         )}
         {/* Header */}
         <div className="flex items-start gap-3 mb-3">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: `${assistant.color}20` }}
-          >
-            <IconComponent className="w-6 h-6" style={{ color: assistant.color }} />
-          </div>
+          <AssistantLogo icon={assistant.icon} color={assistant.color} />
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
               <h3 className="font-semibold text-base text-foreground">{assistant.name}</h3>
@@ -1038,17 +1054,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             <div className="p-4 space-y-4">
               {/* Assistant Info */}
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
-                {(() => {
-                  const IconComponent = ICON_MAP[selectedAssistant.icon] || Bot;
-                  return (
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: `${selectedAssistant.color}20` }}
-                    >
-                      <IconComponent className="w-5 h-5" style={{ color: selectedAssistant.color }} />
-                    </div>
-                  );
-                })()}
+                <AssistantLogo icon={selectedAssistant.icon} color={selectedAssistant.color} size="sm" />
                 <div>
                   <p className="font-medium text-foreground">
                     {selectedAssistant.name}

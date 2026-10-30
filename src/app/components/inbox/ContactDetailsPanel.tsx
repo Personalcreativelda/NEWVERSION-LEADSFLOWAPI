@@ -4,7 +4,7 @@ import { leadsApi, scheduledConversationsApi, leadNotesApi } from '../../utils/a
 import { LeadNote } from '../../types';
 import { toast } from 'sonner';
 import api from '../../../lib/api';
-import { getLocale } from '../../utils/format';
+import { getLocale, formatMoney } from '../../utils/format';
 
 interface Conversation {
   id: string;
@@ -827,7 +827,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             {/* Value */}
             <div>
               <label className="text-xs font-medium mb-1.5 block text-muted-foreground">
-                Valor do Negócio
+                Valor do negócio
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
@@ -933,7 +933,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                 </span>
                 {editValue && parseFloat(editValue) > 0 && (
                   <span className="text-sm font-semibold text-green-500">
-                    R$ {parseFloat(editValue).toLocaleString(getLocale(), { minimumFractionDigits: 2 })}
+                    {formatMoney(parseFloat(editValue))}
                   </span>
                 )}
               </div>

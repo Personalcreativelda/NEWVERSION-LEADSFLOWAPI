@@ -238,7 +238,7 @@ export default function EditarLeadModal({ isOpen, lead, onClose, onSave }: Edita
           </div>
 
           {/* Valor do Negócio */}
-          <FormField label="Valor do Negócio (R$)" hint="Preencha ao converter o lead para calcular valor médio">
+          <FormField label="Valor do negócio" hint="Preencha ao converter o lead para calcular valor médio">
             <Input
               type="number"
               name="valor"
