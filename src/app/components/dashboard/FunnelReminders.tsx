@@ -1,8 +1,10 @@
 // Lembretes do funil: agendamentos pendentes dos leads (ficha do lead, assistente de IA,
 // página Agendamentos), mostrados ao entrar no funil e no cartão de cada lead.
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarClock, ChevronDown, X } from 'lucide-react';
+import { Check, CalendarClock, ChevronDown, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { scheduledConversationsApi } from '../../utils/api';
+import { useConfirm } from '../ui/ConfirmDialog';
 import type { ScheduledConversation } from '../../types';
 import { getLocale } from '../../utils/format';
 import { cn } from '../ui/utils';
@@ -58,7 +60,7 @@ export function useLeadReminders() {
   return { reminders, byLead, reload: load };
 }
 
-const DISMISS_KEY = 'funnel_reminders_hidden';
+const DISMISS_KEY = 'funnel_reminders_hidden_ids';
 const COLLAPSED_COUNT = 3;
 
 type LeadLike = { id: string; nome?: string; name?: string };
@@ -72,18 +74,39 @@ interface FunnelRemindersProps<L extends LeadLike> {
 /** Bloco no topo do funil: atrasados primeiro, depois os próximos 7 dias */
 export function FunnelReminders<L extends LeadLike>({ reminders, leads, onOpen }: FunnelRemindersProps<L>) {
   const [expanded, setExpanded] = useState(false);
-  // Escondido até haver um lembrete novo (guarda-se o conjunto visto)
-  const [hiddenSig, setHiddenSig] = useState(() => {
-    try { return sessionStorage.getItem(DISMISS_KEY) || ''; } catch { return ''; }
+  const confirm = useConfirm();
+  // Escondido até haver um lembrete novo (guardam-se os vistos, também ao reabrir o app)
+  const [hiddenIds, setHiddenIds] = useState<string[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(DISMISS_KEY) || '[]');
+      return Array.isArray(saved) ? saved : [];
+    } catch { return []; }
   });
+  // Concluídos/apagados aqui: saem logo, sem esperar pelo servidor
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+
+  const resolve = async (r: ScheduledConversation, action: 'complete' | 'delete') => {
+    if (action === 'delete') {
+      const ok = await confirm('Apagar este lembrete?', { title: 'Apagar lembrete', variant: 'danger', confirmLabel: 'Apagar' });
+      if (!ok) return;
+    }
+    setRemovedIds((prev) => [...prev, r.id]);
+    try {
+      if (action === 'delete') await scheduledConversationsApi.delete(r.id);
+      else await scheduledConversationsApi.update(r.id, { status: 'completed' });
+      window.dispatchEvent(new Event(SCHEDULES_CHANGED_EVENT));
+    } catch {
+      setRemovedIds((prev) => prev.filter((id) => id !== r.id));
+      toast.error('Não foi possível atualizar o lembrete');
+    }
+  };
 
   const leadById = useMemo(() => new Map(leads.map((l) => [l.id, l])), [leads]);
   const weekAhead = Date.now() + 7 * 864e5;
-  const items = reminders.filter((r) => r.lead_id && leadById.has(r.lead_id) && new Date(r.scheduled_at).getTime() <= weekAhead);
+  const items = reminders.filter((r) => r.lead_id && leadById.has(r.lead_id) && !removedIds.includes(r.id) && new Date(r.scheduled_at).getTime() <= weekAhead);
   const overdue = items.filter((r) => isOverdue(r.scheduled_at)).length;
-  const signature = items.map((r) => r.id).join(',');
 
-  if (items.length === 0 || hiddenSig === signature) return null;
+  if (items.length === 0 || items.every((r) => hiddenIds.includes(r.id))) return null;
 
   const shown = expanded ? items : items.slice(0, COLLAPSED_COUNT);
 
@@ -100,8 +123,9 @@ export function FunnelReminders<L extends LeadLike>({ reminders, leads, onOpen }
         <button
           type="button"
           onClick={() => {
-            setHiddenSig(signature);
-            try { sessionStorage.setItem(DISMISS_KEY, signature); } catch { /* sem armazenamento */ }
+            const ids = items.map((r) => r.id);
+            setHiddenIds(ids);
+            try { localStorage.setItem(DISMISS_KEY, JSON.stringify(ids)); } catch { /* sem armazenamento */ }
           }}
           className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
           aria-label="Esconder lembretes"
@@ -115,20 +139,42 @@ export function FunnelReminders<L extends LeadLike>({ reminders, leads, onOpen }
           const lead = leadById.get(r.lead_id!)!;
           const late = isOverdue(r.scheduled_at);
           return (
-            <li key={r.id}>
+            <li key={r.id} className="flex items-center pr-2 transition-colors hover:bg-muted/50">
               <button
                 type="button"
                 onClick={() => onOpen(lead)}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/50"
+                className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-4 pr-2 text-left"
               >
                 <span className={cn('h-2 w-2 flex-shrink-0 rounded-full', late ? 'bg-red-500' : 'bg-amber-500')} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-foreground" translate="no">{r.title}</span>
-                  <span className="block truncate text-xs text-muted-foreground" translate="no">{r.lead_name || lead.nome || lead.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    <span translate="no">{r.lead_name || lead.nome || lead.name}</span>
+                    {/* No telemóvel a data fica por baixo, para o título caber ao lado dos botões */}
+                    <span className={cn('sm:hidden', late && 'text-red-600 dark:text-red-400')}> · {reminderLabel(r.scheduled_at)}</span>
+                  </span>
                 </span>
-                <span className={cn('flex-shrink-0 text-xs tabular-nums', late ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground')}>
+                <span className={cn('hidden flex-shrink-0 text-xs tabular-nums sm:inline', late ? 'font-medium text-red-600 dark:text-red-400' : 'text-muted-foreground')}>
                   {reminderLabel(r.scheduled_at)}
                 </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => resolve(r, 'complete')}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Concluir lembrete"
+                title="Concluir"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => resolve(r, 'delete')}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-destructive"
+                aria-label="Apagar lembrete"
+                title="Apagar"
+              >
+                <Trash2 className="h-4 w-4" />
               </button>
             </li>
           );

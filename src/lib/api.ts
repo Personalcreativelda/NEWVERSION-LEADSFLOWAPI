@@ -59,10 +59,11 @@ class ApiClient {
       throw new Error(errorBody.message || errorBody.error || 'API Error');
     }
 
-    const data = await response.json();
+    // 204 (ex.: eliminar um fluxo) não traz corpo
+    const data = response.status === 204 ? undefined : await response.json();
     reportServerUp();
     if (isGet) void saveCachedResponse(endpoint, data);
-    return data;
+    return data as T;
   }
 
   private buildQuery(params?: Record<string, string | number | boolean | null | undefined>): string {

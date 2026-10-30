@@ -61,6 +61,21 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+// Tarefas antigas guardadas só no browser: uma única importação por conta
+router.post('/import-legacy', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const tasks = Array.isArray(req.body?.tasks) ? req.body.tasks : [];
+    const imported = await scheduledService.importLegacy(tasks, user.id);
+    res.json({ imported });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Create a scheduled conversation
 router.post('/', async (req, res, next) => {
   try {

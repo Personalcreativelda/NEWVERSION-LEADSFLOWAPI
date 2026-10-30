@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../../lib/api';
 import { toast } from 'sonner';
 import {
@@ -8,7 +8,7 @@ import {
   Layers, Repeat2, Target, Pencil, X, Info,
   Split, Mic, UploadCloud, MoreHorizontal,
 } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { EmptyState } from '../base/EmptyState';
 import { Button } from '../ui/button';
@@ -19,6 +19,7 @@ import { DashboardCard } from '../base/DashboardCard';
 import { StatusBadge } from '../base/StatusBadge';
 import { formatNumber, formatPercent } from '../../utils/format';
 import { brandIcon } from '../base/BrandIcon';
+import { useConfirm } from '../ui/ConfirmDialog';
 
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
@@ -704,6 +705,10 @@ export default function RemarketingPage() {
     });
   }, []);
 
+  // Eliminados nesta sessão: uma atualização já a caminho não os traz de volta
+  const deletedIdsRef = useRef(new Set<string>());
+  const confirm = useConfirm();
+
   // ── Load on mount: try API, fall back to localStorage ────────────────────
   const fetchFlows = useCallback(async (silent = false) => {
     try {
@@ -722,9 +727,14 @@ export default function RemarketingPage() {
         templateId: r.template_id,
       }));
       const local = loadLocal();
-      const merged = mapped.length > 0 ? mapped : local;
+      // O servidor manda: da cópia local só ficam os fluxos que ainda não chegaram lá (id
+      // temporário). Antes, com o servidor vazio, voltavam os fluxos já eliminados.
+      const merged = [
+        ...local.filter(f => f.id.startsWith('flow-')),
+        ...mapped.filter(f => !deletedIdsRef.current.has(f.id)),
+      ];
       setFlows(merged);
-      if (mapped.length > 0) saveLocal(mapped);
+      saveLocal(merged);
       return { mapped, local };
     } catch {
       if (!silent) setFlows(loadLocal());
@@ -824,9 +834,23 @@ export default function RemarketingPage() {
     } catch { /* keep optimistic */ }
   };
 
-  const handleDelete = async (id: string) => {
-    updateFlows(prev => prev.filter(f => f.id !== id));
-    try { await api.remarketing.delete(id); } catch { /* ok */ }
+  const handleDelete = async (flow: RemarketingFlow) => {
+    const ok = await confirm(`Eliminar "${flow.name || 'Sem nome'}"?`, { title: 'Eliminar fluxo', variant: 'danger', confirmLabel: 'Eliminar' });
+    if (!ok) return;
+    deletedIdsRef.current.add(flow.id);
+    updateFlows(prev => prev.filter(f => f.id !== flow.id));
+    // Ainda só existe neste aparelho
+    if (flow.id.startsWith('flow-')) return;
+    try {
+      await api.remarketing.delete(flow.id);
+      toast.success('Fluxo eliminado');
+    } catch (err: any) {
+      // Já não existe no servidor (eliminado noutro aparelho): está feito
+      if (/not found/i.test(err?.message || '')) return;
+      deletedIdsRef.current.delete(flow.id);
+      updateFlows(prev => [flow, ...prev]);
+      toast.error('Não foi possível eliminar o fluxo');
+    }
   };
 
   const handleDuplicate = async (flow: RemarketingFlow) => {
@@ -1090,12 +1114,18 @@ export default function RemarketingPage() {
                               <DropdownMenuItem onClick={() => setAnalysisFlow(flow)}>
                                 <BarChart3 className="w-4 h-4 mr-2" /> Ver análise
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleDelete(flow.id)} className="text-destructive focus:text-destructive">
-                                <Trash2 className="w-4 h-4 mr-2" /> Eliminar
-                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
+                          <AppButton
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            aria-label="Eliminar fluxo"
+                            title="Eliminar fluxo"
+                            onClick={() => handleDelete(flow)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </AppButton>
                         </div>
                         </div>
                       </DashboardCard>

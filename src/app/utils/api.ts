@@ -1300,6 +1300,14 @@ export const scheduledConversationsApi = {
     }, true);
   },
 
+  /** Tarefas antigas que só existiam neste browser: o servidor aceita-as uma única vez por conta */
+  importLegacy: async (tasks: Array<{ lead_id?: string | null; title: string; description?: string; scheduled_at?: string; status?: string; metadata?: ScheduledConversation['metadata'] }>): Promise<{ imported: number }> => {
+    return apiCall('/scheduled-conversations/import-legacy', {
+      method: 'POST',
+      body: JSON.stringify({ tasks }),
+    }, true);
+  },
+
   delete: async (id: string): Promise<void> => {
     return apiCall(`/scheduled-conversations/${id}`, {
       method: 'DELETE',

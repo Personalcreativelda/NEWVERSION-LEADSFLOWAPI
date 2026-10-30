@@ -136,41 +136,28 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
     }
   }, []);
 
-  // Tarefas antigas que só existiam neste browser passam uma vez para o servidor
+  // Tarefas antigas que só existiam neste browser passam para o servidor. Quem decide é o
+  // servidor (uma só vez por conta): feito por aparelho, cada telemóvel ou browser novo voltava
+  // a criar as tarefas já apagadas e duplicava as outras.
   useEffect(() => {
     (async () => {
       let legacy: Task[] = [];
       try {
         if (!localStorage.getItem(MIGRATED_KEY)) legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || '[]');
       } catch { legacy = []; }
-      if (Array.isArray(legacy) && legacy.length > 0) {
-        let failed = 0;
-        // Cada tarefa enviada fica registada: se algo falhar, da próxima vez não se repete
-        let sent: string[] = [];
-        try { sent = JSON.parse(localStorage.getItem(MIGRATED_KEY + '_ids') || '[]'); } catch { sent = []; }
-        for (const t of legacy) {
-          if (sent.includes(t.id)) continue;
-          try {
-            await scheduledConversationsApi.create({
-              lead_id: t.leadId || null,
-              title: t.title || 'Tarefa',
-              description: t.description,
-              scheduled_at: t.dueDate || new Date().toISOString(),
-              metadata: { type: t.type, priority: t.priority, notes: t.notes, source: (t as any).source || 'tasks_page', reminder_at: t.reminderDate },
-            }).then(async (created) => {
-              if (t.status && t.status !== 'pending') await scheduledConversationsApi.update(created.id, { status: t.status });
-            });
-            sent.push(t.id);
-            try { localStorage.setItem(MIGRATED_KEY + '_ids', JSON.stringify(sent)); } catch { /* sem armazenamento */ }
-          } catch { failed++; }
+      try {
+        if (Array.isArray(legacy) && legacy.length > 0) {
+          await scheduledConversationsApi.importLegacy(legacy.map((t) => ({
+            lead_id: t.leadId || null,
+            title: t.title || 'Tarefa',
+            description: t.description,
+            scheduled_at: t.dueDate,
+            status: t.status,
+            metadata: { type: t.type, priority: t.priority, notes: t.notes, source: (t as any).source || 'tasks_page', reminder_at: t.reminderDate },
+          })));
         }
-        // A cópia antiga fica no browser; só se marca como passada se tudo correu bem
-        if (failed === 0) {
-          try { localStorage.setItem(MIGRATED_KEY, new Date().toISOString()); } catch { /* sem armazenamento */ }
-        }
-      } else {
-        try { localStorage.setItem(MIGRATED_KEY, new Date().toISOString()); } catch { /* sem armazenamento */ }
-      }
+        localStorage.setItem(MIGRATED_KEY, new Date().toISOString());
+      } catch { /* sem servidor ou sem armazenamento: tenta da próxima vez */ }
       await loadTasks();
     })();
   }, [loadTasks]);

@@ -8,6 +8,7 @@ import { idbPersister } from './idbPersister';
 
 const OWNER_KEY = 'leadsflow_data_owner';
 const INBOX_UI_KEY = 'leadflow-inbox-ui';
+const REMARKETING_KEY = 'remarketing_flows_local';
 
 export async function clearUserScopedData(): Promise<void> {
   useInboxStore.setState({
@@ -16,7 +17,10 @@ export async function clearUserScopedData(): Promise<void> {
     draftMessages: {},
     searchQuery: '',
   });
-  try { localStorage.removeItem(INBOX_UI_KEY); } catch { /* sem armazenamento */ }
+  try {
+    localStorage.removeItem(INBOX_UI_KEY);
+    localStorage.removeItem(REMARKETING_KEY);
+  } catch { /* sem armazenamento */ }
   queryClient.clear();
   await Promise.all([
     clearMessageCache().catch(() => {}),

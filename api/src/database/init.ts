@@ -181,6 +181,11 @@ const runPendingMigrations = async () => {
        WHERE title IS NULL OR title = '';
       CREATE INDEX IF NOT EXISTS idx_scheduled_conversations_user_status_at
         ON scheduled_conversations(user_id, status, scheduled_at);
+      -- Tarefas antigas do browser entram uma só vez por conta; as contas que já as têm ficam marcadas
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS legacy_tasks_imported_at TIMESTAMP WITH TIME ZONE;
+      UPDATE users SET legacy_tasks_imported_at = NOW()
+       WHERE legacy_tasks_imported_at IS NULL
+         AND id IN (SELECT user_id FROM scheduled_conversations WHERE metadata->>'source' = 'tasks_page');
     `);
   } catch (error: any) {
     console.warn('[DB] Scheduled conversations migration warning:', error.message);
