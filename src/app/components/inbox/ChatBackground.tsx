@@ -11,6 +11,8 @@ export function ChatBackground({ children, className = '', scrollRef }: ChatBack
     return (
         <div
             ref={scrollRef}
+            // Dentro do chat, arrastar é para ler mensagens antigas, nunca para recarregar a página
+            data-no-pull-refresh=""
             className={`relative chat-wallpaper ${className}`}
         >
             {children}

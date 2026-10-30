@@ -12,13 +12,22 @@ interface PullToRefreshProps {
 const THRESHOLD = 72; // px a puxar para recarregar
 const MAX_PULL = 110;
 
-/** Algum elemento entre o alvo e o body já tem scroll para cima? Então o gesto é desse scroll. */
+/**
+ * Algum elemento entre o alvo e o body já tem scroll para cima (ou não aceita o gesto, como o
+ * chat)? Então o gesto é desse scroll. Em column-reverse (chat) o scrollTop é 0 em baixo e
+ * negativo ao subir — com "scrollTop > 0" o chat parecia sempre no topo e arrastar para ver
+ * mensagens antigas recarregava a página.
+ */
 function isInsideScrolledArea(target: EventTarget | null): boolean {
   let el = target as HTMLElement | null;
   while (el && el !== document.body) {
+    if (el.hasAttribute('data-no-pull-refresh')) return true;
     const style = getComputedStyle(el);
-    if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight && el.scrollTop > 0) {
-      return true;
+    if (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight) {
+      const canScrollUp = style.flexDirection === 'column-reverse'
+        ? el.scrollTop + (el.scrollHeight - el.clientHeight) > 1
+        : el.scrollTop > 0;
+      if (canScrollUp) return true;
     }
     el = el.parentElement;
   }
