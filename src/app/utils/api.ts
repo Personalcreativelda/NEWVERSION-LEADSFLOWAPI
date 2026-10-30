@@ -653,8 +653,12 @@ export const authApi = {
       clearSessionExpiry();
       return { success: true };
     } finally {
-      // As cópias offline e a fila são do utilizador que sai: não podem ficar no aparelho
-      await Promise.all([clearOfflineCache(), clearOutbox()]);
+      // As cópias offline, a fila e os dados da inbox são do utilizador que sai: não podem ficar no aparelho
+      await Promise.all([
+        clearOfflineCache(),
+        clearOutbox(),
+        import('../lib/userScope').then((m) => m.forgetDataOwner()).catch(() => {}),
+      ]);
     }
   },
 

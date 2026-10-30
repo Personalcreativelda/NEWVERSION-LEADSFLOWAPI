@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { query } from '../database/connection';
+import { billingPeriodStart } from '../utils/billing-period';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // In-memory cache to avoid a DB round-trip on every mutating request.
@@ -203,23 +204,19 @@ export async function checkMessageLimit(
 
     const plan = (userData.plan || 'free').toLowerCase();
 
-    // Billing period start (same logic as users.service)
-    let periodStart: Date;
-    if (plan !== 'free' && userData.plan_activated_at) {
-      periodStart = new Date(userData.plan_activated_at);
-    } else {
-      const now = new Date();
-      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
+    // Período de faturação atual (o mesmo do perfil: users.service)
+    const periodStart = billingPeriodStart(plan, userData.plan_activated_at);
 
     const countResult = await (type === 'messages'
       ? query(
           "SELECT COUNT(*) AS count FROM messages WHERE user_id = $1 AND direction = 'out' AND campaign_id IS NULL AND created_at >= $2",
           [userId, periodStart]
         )
+      // Envios em massa só do período (antes somava todas as campanhas de sempre)
       : query(
-          "SELECT COALESCE(SUM((stats->>'sent')::int), 0) AS count FROM campaigns WHERE user_id = $1",
-          [userId]
+          `SELECT COALESCE(SUM(CASE WHEN (stats->>'sent') ~ '^[0-9]+$' THEN (stats->>'sent')::bigint ELSE 0 END), 0) AS count
+             FROM campaigns WHERE user_id = $1 AND created_at >= $2`,
+          [userId, periodStart]
         ));
 
     const storedLimits = userData.plan_limits;

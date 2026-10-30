@@ -17,7 +17,7 @@
  * if cache is populated (same as before).
  */
 import type { MessageWithSender } from '../types/inbox';
-import { idbSaveMessages, idbLoadMessages, idbLoadAllMessageKeys, MESSAGE_CACHE_VERSION } from '../lib/idbStore';
+import { idbSaveMessages, idbLoadMessages, idbLoadAllMessageKeys, idbClearMessages, MESSAGE_CACHE_VERSION } from '../lib/idbStore';
 
 interface CacheEntry {
     messages:   MessageWithSender[];
@@ -46,6 +46,8 @@ function touchAccess(id: string) {
 // ── IDB hydration ──────────────────────────────────────────────────────────
 
 let idbInitialised = false;
+/** Muda ao apagar a cache: uma leitura do IDB que estava a decorrer já não a volta a encher */
+let generation = 0;
 let idbInitPromise: Promise<void> | null = null;
 
 /**
@@ -56,6 +58,7 @@ export async function initMessageCacheFromIDB(): Promise<void> {
     if (idbInitialised) return;
     if (idbInitPromise) return idbInitPromise;
 
+    const startedAt = generation;
     idbInitPromise = (async () => {
         try {
             const keys = await idbLoadAllMessageKeys();
@@ -65,7 +68,7 @@ export async function initMessageCacheFromIDB(): Promise<void> {
                     const entry = await idbLoadMessages(convId);
                     if (!entry || entry.v !== MESSAGE_CACHE_VERSION) return;
                     if (now - entry.savedAt > IDB_MAX_AGE_MS) return;
-                    if (!cache.has(convId)) {
+                    if (generation === startedAt && !cache.has(convId)) {
                         cache.set(convId, {
                             messages:  entry.messages as MessageWithSender[],
                             fetchedAt: entry.savedAt,
@@ -173,4 +176,12 @@ export function getScrollPosition(conversationId: string): number | null {
 export function clearScrollPosition(conversationId: string) {
     const entry = cache.get(conversationId);
     if (entry) entry.scrollTop = null;
+}
+
+/** Apaga a cópia das mensagens (memória e aparelho) — ao sair ou ao trocar de conta */
+export async function clearMessageCache(): Promise<void> {
+    generation++;
+    cache.clear();
+    accessOrder.length = 0;
+    await idbClearMessages();
 }

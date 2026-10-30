@@ -1,6 +1,7 @@
 import type { QueryResult } from 'pg';
 import { query } from '../database/connection';
 import { getStorageService } from './storage.service';
+import { billingPeriodStart } from '../utils/billing-period';
 const DEFAULT_USAGE = {
   leads: 0,
   messages: 0,
@@ -102,16 +103,8 @@ const fetchUsageCounts = async (userId: string): Promise<UsageCounts> => {
     const userData = userRow.rows[0];
     const plan = (userData?.plan || 'free').toLowerCase();
 
-    // Billing period start:
-    //  - Paid plans: from plan_activated_at (when they subscribed)
-    //  - Free plan: beginning of current calendar month (resets monthly)
-    let periodStart: Date;
-    if (plan !== 'free' && userData?.plan_activated_at) {
-      periodStart = new Date(userData.plan_activated_at);
-    } else {
-      const now = new Date();
-      periodStart = new Date(now.getFullYear(), now.getMonth(), 1); // 1st of current month
-    }
+    // Período de faturação atual (grátis: dia 1; pago: todos os meses no dia da ativação)
+    const periodStart = billingPeriodStart(plan, userData?.plan_activated_at);
 
     // Each query is isolated — a failure in one does NOT zero out other counts.
     const [leads, messages, massMessages, channels, customAssistants, voiceAgents, activeCampaigns] = await Promise.all([

@@ -185,23 +185,27 @@ export class AssistantProcessorService {
                 return false;
             }
 
-            // 2c. Verificar limite mensal de mensagens do assistente
-            const isFreePlan = activeAssistant.user_plan === 'free';
-            const monthlyLimit = (activeAssistant.is_custom && isFreePlan)
-                ? 100
-                : Number(config.monthly_message_limit) || 200;
-            const startOfMonth = new Date();
-            startOfMonth.setDate(1);
-            startOfMonth.setHours(0, 0, 0, 0);
-            const usageResult = await query(
-                `SELECT COUNT(*) as count FROM assistant_logs
-                 WHERE user_assistant_id = $1 AND status = 'success' AND created_at >= $2`,
-                [activeAssistant.user_assistant_id, startOfMonth]
-            );
-            const usedThisMonth = parseInt(usageResult.rows[0]?.count || '0', 10);
-            if (usedThisMonth >= monthlyLimit) {
-                console.warn(`[AssistantProcessor] Limite mensal atingido para assistente ${activeAssistant.user_assistant_id}: ${usedThisMonth}/${monthlyLimit}`);
-                return false;
+            // 2c. Limite mensal do assistente: só no plano grátis (200 respostas/mês; personalizado 100).
+            // Nos planos pagos manda o limite de mensagens do plano (2b) — antes os 200 aplicavam-se
+            // a todos e o assistente parava em silêncio numa conta Business.
+            const isFreePlan = (activeAssistant.user_plan || 'free') === 'free';
+            if (isFreePlan) {
+                const monthlyLimit = activeAssistant.is_custom
+                    ? 100
+                    : Number(config.monthly_message_limit) || 200;
+                const startOfMonth = new Date();
+                startOfMonth.setDate(1);
+                startOfMonth.setHours(0, 0, 0, 0);
+                const usageResult = await query(
+                    `SELECT COUNT(*) as count FROM assistant_logs
+                     WHERE user_assistant_id = $1 AND status = 'success' AND created_at >= $2`,
+                    [activeAssistant.user_assistant_id, startOfMonth]
+                );
+                const usedThisMonth = parseInt(usageResult.rows[0]?.count || '0', 10);
+                if (usedThisMonth >= monthlyLimit) {
+                    console.warn(`[AssistantProcessor] Limite mensal atingido para assistente ${activeAssistant.user_assistant_id}: ${usedThisMonth}/${monthlyLimit}`);
+                    return false;
+                }
             }
 
             // 2d. Detecção de escalação para humano (regra leve, sem custo de IA)

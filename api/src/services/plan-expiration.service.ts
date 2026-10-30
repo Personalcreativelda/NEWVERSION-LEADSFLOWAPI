@@ -1,4 +1,5 @@
 import { query } from '../database/connection';
+import { notificationsService } from './notifications.service';
 
 /**
  * Plan Expiration Service
@@ -60,23 +61,15 @@ const checkExpiredPlans = async () => {
           console.warn(`[PlanExpiration] Could not create notification for ${user.email}:`, notifErr);
         }
 
-        // Criar notificação para o admin
-        try {
-          const adminResult = await query(`SELECT id FROM users WHERE role = 'admin' LIMIT 1`);
-          if (adminResult.rows.length > 0) {
-            await query(
-              `INSERT INTO notifications (user_id, type, title, description, icon, metadata)
-               VALUES ($1, 'admin_plan_expired', 'Plano Expirou', $2, 'alert-triangle', $3)`,
-              [
-                adminResult.rows[0].id,
-                `O plano ${user.plan} do usuário ${user.email} expirou e foi revertido para free.`,
-                JSON.stringify({ userId: user.id, email: user.email, previousPlan: user.plan }),
-              ]
-            );
-          }
-        } catch (adminNotifErr) {
-          // Silently ignore admin notification errors
-        }
+        // Aviso aos administradores (sino e email, conforme Admin → Definições)
+        void notificationsService.sendAdminNotification(
+          'expirationNotifications',
+          'admin_plan_expired',
+          'Plano expirou',
+          `O plano ${user.plan} de ${user.email} expirou e a conta passou para o plano grátis.`,
+          'alert-triangle',
+          { userId: user.id, email: user.email, previousPlan: user.plan },
+        );
       } catch (updateErr) {
         console.error(`[PlanExpiration] Failed to downgrade ${user.email}:`, updateErr);
       }

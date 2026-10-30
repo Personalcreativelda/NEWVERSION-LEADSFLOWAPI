@@ -22,6 +22,7 @@ import { MetaPixel } from './components/MetaPixel';
 import { GoogleAnalytics } from './components/GoogleAnalytics';
 import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import { authApi, apiRequest, plansApi, isSessionExpired, startSessionExpiryTimer, refreshAccessToken } from './utils/api';
+import { ensureDataOwner } from './lib/userScope';
 import { mockAuth } from './utils/auth-mock';
 import { Toaster } from './components/ui/sonner';
 import { OfflineBanner } from './components/base/OfflineState';
@@ -521,6 +522,9 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       if (!authUser?.id || !authUser?.email) {
         throw new Error('Sessão inválida. Faça login novamente.');
       }
+
+      // Dados da inbox guardados no aparelho são de outra conta? Apagam-se antes de abrir o painel
+      await ensureDataOwner(authUser.id);
 
       let profile: any = null;
       try {
