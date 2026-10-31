@@ -816,7 +816,7 @@ function ValorTab({ lead, isDark, onLeadUpdated }: { lead: Lead; isDark: boolean
 const TABS: { key: TabKey; label: string; short?: string; icon: React.ElementType }[] = [
  { key: 'notas', label: 'Notas', icon: StickyNote },
  { key: 'agendamentos', label: 'Agendamentos', short: 'Agenda', icon: Calendar },
- { key: 'historico', label: 'Historico', icon: MessageSquare },
+ { key: 'historico', label: 'Histórico', icon: MessageSquare },
  { key: 'valor', label: 'Valor', icon: DollarSign },
 ];
 
@@ -941,28 +941,21 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  <button
  key={tab.key}
  onClick={() => setActiveTab(tab.key)}
- className={`flex-1 sm:flex-none min-w-0 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2.5 sm:py-2 text-xs font-medium rounded-t-lg transition-colors relative ${isActive
- ? isDark
- ? 'text-blue-400'
- : 'text-blue-600'
- : isDark
- ? 'text-muted-foreground hover:text-foreground/80'
- : 'text-muted-foreground hover:text-foreground/80'
- }`}
+ className={`relative flex h-11 min-w-0 flex-1 items-center justify-center gap-1 px-1 text-xs font-medium outline-none transition-colors focus-visible:bg-muted/50 sm:flex-none sm:gap-1.5 sm:px-3 sm:text-sm ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
  >
- <Icon className="w-3.5 h-3.5" />
+ <Icon className="hidden h-4 w-4 flex-shrink-0 sm:block" />
  <span className="truncate sm:hidden">{tab.short || tab.label}</span>
  <span className="hidden sm:inline">{tab.label}</span>
 
- {/* Badge de notificação */}
+ {/* Quantos há neste separador */}
  {badgeCount > 0 && (
- <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-lg">
+ <span className={`min-w-[18px] flex-shrink-0 rounded-full px-1 text-center text-[11px] font-semibold leading-[18px] tabular-nums ${isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
  {badgeCount > 9 ? '9+' : badgeCount}
  </span>
  )}
 
  {isActive && (
- <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-blue-600 dark:bg-blue-400" />
+ <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
  )}
  </button>
  );
