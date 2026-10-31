@@ -1,16 +1,37 @@
+// Motor dos fluxos de remarketing.
+//
+// Cada lead inscrito tem uma linha em flow_enrollments com o passo atual e quando corre o próximo:
+// as esperas (dias, semanas) sobrevivem a deploys e reinícios. O motor acorda a cada 15 segundos e
+// trata no máximo um lead por conta em cada volta (no máximo 4 envios por minuto por conta, para
+// proteger o número de WhatsApp de bloqueios). Quem responde, compra ou pede para sair deixa logo
+// de receber mensagens.
 import { query as dbQuery } from '../database/connection';
-import { RemarketingService } from './remarketing.service';
-import { WhatsAppService } from './whatsapp.service';
-import { ChannelsService } from './channels.service';
 import { getWebSocketService } from './websocket.service';
-import { AIService } from './ai.service';
-import { getStorageService } from './storage.service';
-import pino from 'pino';
-import { metaMessagesUrl } from '../utils/meta-send';
+import { notificationsService } from './notifications.service';
+import { LeadNotesService } from './lead-notes.service';
+import { ScheduledConversationsService } from './scheduled-conversations.service';
+import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
+import { SEND_STEP_TYPES } from './flow-validation';
+import {
+  FlowSendError, generateVoice, isVoiceConfigured, resolveTarget, saveOutgoing, sendAudio, sendEmail, sendText,
+  type FlowLead, type WhatsAppTemplateRef,
+} from './flow-send.service';
 
-const logger = pino().child({ module: 'FlowExecutionService' });
+const TICK_MS = 15_000;
+const SWEEP_MS = 60_000;
+/** Enquanto um lead está a ser tratado, nenhuma outra volta lhe toca; se o processo cair, retoma depois disto */
+const LEASE_MINUTES = 10;
+const MAX_SEND_ATTEMPTS = 3;
+const RETRY_BASE_MS = 15 * 60_000;
+const TEST_WAIT_MS = 20_000;
+const MAX_STEPS_PER_RUN = 60;
+const DEFAULT_TIMEZONE = 'Africa/Maputo';
+/** Tag de quem pediu para não receber mais mensagens: nunca volta a entrar num fluxo */
+export const OPT_OUT_TAG = 'nao-contactar';
 
-// Stage value → display label mapping (matches frontend FUNNEL_STAGES)
+const CONVERTED = ['convertido', 'converted', 'ganho', 'won'];
+const LOST = ['perdido', 'lost'];
+
 const STAGE_LABEL: Record<string, string> = {
   novo: 'Novo Lead',
   contatado: 'Contatado',
@@ -20,844 +41,761 @@ const STAGE_LABEL: Record<string, string> = {
   perdido: 'Perdido',
 };
 
-interface ExecutionContext {
-  leadId: string;
-  userId: string;
-  flowId: string;
-  leadName?: string;
-  leadPhone?: string;
-  conversationId?: string;
-  remoteJid?: string;
-  /** The channel type the lead last used — determines which API to call */
-  channelType?: 'whatsapp' | 'whatsapp_cloud' | 'facebook' | 'instagram' | 'telegram' | string;
-  channelId?: string;
-  channelCredentials?: any;
+/** Pedido de saída: a mensagem inteira tem de ser o pedido ("não quero perder a oferta" não conta) */
+const OPT_OUT_RE = /^\s*(parar|pare|sair|stop|cancelar|remover|descadastrar|unsubscribe|n[aã]o quero( mais)?( receber)?( mensage(m|ns))?|n[aã]o (me )?(contact|mand|envi)\w*( mais)?( mensage(m|ns))?)\s*[.!]*\s*$/i;
+
+const WAIT_UNITS_MS: Record<string, number> = {
+  minutos: 60_000,
+  horas: 3_600_000,
+  dias: 86_400_000,
+  semanas: 604_800_000,
+};
+
+export interface FlowSettings {
+  stop_on_reply: boolean;
+  on_reply: { stage?: string; tag?: string; notify?: boolean };
+  window_start: number;
+  window_end: number;
+  weekdays_only: boolean;
+  timezone: string;
+  reentry_days: number;
+  channel: string;
+  business_name: string;
+  daily_limit: number;
 }
 
-export class FlowExecutionService {
-  private remarketingService = new RemarketingService();
-  private whatsappService = new WhatsAppService();
-  private channelsService = new ChannelsService();
-  private aiService = new AIService();
+const numberOr = (value: unknown, fallback: number) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
 
-  /**
-   * Check if there are any active flows triggered by this event
-   * and execute them asynchronously (fire and forget)
-   */
+export function flowSettings(raw: any): FlowSettings {
+  const s = raw && typeof raw === 'object' ? raw : {};
+  return {
+    stop_on_reply: s.stop_on_reply !== false,
+    on_reply: s.on_reply && typeof s.on_reply === 'object' ? s.on_reply : { notify: true },
+    window_start: Math.min(23, Math.max(0, numberOr(s.window_start, 8))),
+    window_end: Math.min(24, Math.max(1, numberOr(s.window_end, 20))),
+    weekdays_only: s.weekdays_only === true,
+    timezone: typeof s.timezone === 'string' && s.timezone ? s.timezone : DEFAULT_TIMEZONE,
+    reentry_days: Math.trunc(Math.max(0, numberOr(s.reentry_days, 30))),
+    channel: typeof s.channel === 'string' && s.channel ? s.channel : 'any',
+    business_name: typeof s.business_name === 'string' ? s.business_name : '',
+    daily_limit: Math.max(1, numberOr(s.daily_limit, 200)),
+  };
+}
+
+/** Milissegundos até o horário de envio abrir (0 = pode enviar agora) */
+export function msUntilSendWindow(settings: FlowSettings, now = new Date()): number {
+  const read = (timeZone: string) => {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short',
+    }).formatToParts(now);
+    const get = (type: string) => parts.find((p) => p.type === type)?.value || '';
+    return { minutes: Number(get('hour')) * 60 + Number(get('minute')), weekday: get('weekday') };
+  };
+  let local: { minutes: number; weekday: string };
+  try { local = read(settings.timezone); } catch { local = read(DEFAULT_TIMEZONE); }
+
+  const start = settings.window_start * 60;
+  const end = settings.window_end * 60;
+  const open = local.minutes >= start && local.minutes < end;
+  const weekend = local.weekday === 'Sat' || local.weekday === 'Sun';
+  if (open && !(settings.weekdays_only && weekend)) return 0;
+
+  // Próxima abertura: hoje (se ainda não abriu) ou amanhã
+  let wait = local.minutes < start ? start - local.minutes : 24 * 60 - local.minutes + start;
+  if (settings.weekdays_only) {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const next = (days.indexOf(local.weekday) + (local.minutes < start ? 0 : 1)) % 7;
+    if (next === 6) wait += 2 * 24 * 60;
+    else if (next === 0) wait += 24 * 60;
+  }
+  return wait * 60_000;
+}
+
+/** Texto final para este lead. Nomes que são só um número ficam em branco (e a pontuação arruma-se) */
+export function renderText(text: string, lead: FlowLead, settings: FlowSettings, ownerName: string): string {
+  const fullName = String(lead.name || '').trim();
+  const usableName = /\d{5,}/.test(fullName) ? '' : fullName;
+  const values: Record<string, string> = {
+    nome: usableName.split(/\s+/)[0] || '',
+    nome_completo: usableName,
+    empresa: String(lead.company || ''),
+    minha_empresa: settings.business_name || ownerName || '',
+    telefone: String(lead.whatsapp || lead.phone || ''),
+  };
+  return String(text || '')
+    .replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_m, key) => values[String(key).toLowerCase()] ?? '')
+    .replace(/[ \t]+([,.!?;:])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+type StepOutcome =
+  | { kind: 'next'; note?: string; sent?: boolean }
+  | { kind: 'goto'; stepId: string; note?: string }
+  | { kind: 'end'; note?: string }
+  | { kind: 'pause'; ms: number; advance: boolean; note?: string };
+
+export class FlowExecutionService {
+  private notesService = new LeadNotesService();
+  private schedulesService = new ScheduledConversationsService();
+  private ticking = false;
+  private sweeping = false;
+  private sendCounts = new Map<string, { count: number; at: number }>();
+  private limitWarnedAt = new Map<string, number>();
+
+  // ── Arranque ──────────────────────────────────────────────────────────────
+
+  start() {
+    if (process.env.DISABLE_FLOW_WORKER === 'true') return;
+    console.log('[FlowExecution] Motor dos fluxos iniciado');
+    setTimeout(() => {
+      setInterval(() => { void this.tick(); }, TICK_MS).unref?.();
+      setInterval(() => { void this.sweep(); }, SWEEP_MS).unref?.();
+      void this.sweep();
+      void this.tick();
+    }, 20_000).unref?.();
+  }
+
+  // ── Entrada de leads ──────────────────────────────────────────────────────
+
+  /** Um evento aconteceu ao lead (mudou de etapa, recebeu uma tag…): inscreve-o nos fluxos que o esperam */
   async triggerFlowsForLead(
     userId: string,
     leadId: string,
     triggerType: 'funnel_stage' | 'tag' | 'inactivity' | 'purchase' | 'lead_score',
-    triggerValue: string
+    triggerValue: string,
   ) {
     try {
-      let flowsResult;
-
-      console.log(`[FlowExecution] ▶ triggerFlowsForLead called:`, { userId, leadId, triggerType, triggerValue });
-
+      let flows: any[] = [];
       if (triggerType === 'funnel_stage') {
-        const stageLabel = STAGE_LABEL[triggerValue] ?? triggerValue;
-        console.log(`[FlowExecution] funnel_stage — triggerValue="${triggerValue}" stageLabel="${stageLabel}"`);
-        flowsResult = await dbQuery(
-          `SELECT id, name, trigger_label, status FROM remarketing_flows
-           WHERE user_id = $1 AND status = 'active'
-           AND trigger_type = $2
-           AND (
-             trigger_label ILIKE $3 || '%'
-             OR trigger_label ILIKE $4 || '%'
-           )`,
-          [userId, triggerType, stageLabel, triggerValue],
+        const label = STAGE_LABEL[triggerValue] ?? triggerValue;
+        const res = await dbQuery(
+          `SELECT * FROM remarketing_flows
+            WHERE user_id = $1 AND status = 'active' AND trigger_type = 'funnel_stage'
+              AND (trigger_label ILIKE $2::text || ' +%' OR trigger_label ILIKE $3::text || ' +%'
+                   OR LOWER(trigger_label) = LOWER($2::text))`,
+          [userId, triggerValue, label],
         );
-        // Debug: also show ALL active funnel_stage flows to diagnose mismatch
-        const allFlows = await dbQuery(
-          `SELECT id, name, trigger_label, status FROM remarketing_flows WHERE user_id = $1 AND trigger_type = 'funnel_stage'`,
-          [userId],
+        flows = res.rows;
+      } else if (triggerType === 'lead_score') {
+        const score = parseInt(triggerValue, 10);
+        if (Number.isNaN(score)) return;
+        const res = await dbQuery(
+          `SELECT * FROM remarketing_flows
+            WHERE user_id = $1 AND status = 'active' AND trigger_type = 'lead_score'
+              AND CAST(NULLIF(regexp_replace(trigger_label, '[^0-9]', '', 'g'), '') AS INTEGER) <= $2`,
+          [userId, score],
         );
-        console.log(`[FlowExecution] All funnel_stage flows for user:`, allFlows.rows);
-        console.log(`[FlowExecution] Matched flows (label="${stageLabel}" OR raw="${triggerValue}"):`, flowsResult.rows);
-
-      } else if (triggerType === 'inactivity' || triggerType === 'lead_score') {
-        // triggerValue = numeric value (days inactive / actual score)
-        // match flows whose numeric threshold ≤ actual value
-        const numVal = parseInt(triggerValue, 10);
-        if (isNaN(numVal)) return;
-        flowsResult = await dbQuery(
-          `SELECT id, name, steps FROM remarketing_flows
-           WHERE user_id = $1 AND status = 'active' AND trigger_type = $2
-           AND CAST(NULLIF(regexp_replace(trigger_label, '[^0-9]', '', 'g'), '') AS INTEGER) <= $3`,
-          [userId, triggerType, numVal],
-        );
-
+        flows = res.rows;
       } else if (triggerType === 'purchase') {
-        // fires for all active purchase flows — no threshold
-        flowsResult = await dbQuery(
-          `SELECT id, name, steps FROM remarketing_flows
-           WHERE user_id = $1 AND status = 'active' AND trigger_type = 'purchase'`,
+        const res = await dbQuery(
+          `SELECT * FROM remarketing_flows WHERE user_id = $1 AND status = 'active' AND trigger_type = 'purchase'`,
           [userId],
         );
-
-      } else {
-        // tag: trigger_label is stored as "Tag: <tagname>"
-        flowsResult = await dbQuery(
-          `SELECT id, name, steps FROM remarketing_flows
-           WHERE user_id = $1 AND status = 'active' AND trigger_type = 'tag'
-           AND (trigger_label = $2 OR trigger_label ILIKE 'tag: ' || $3)`,
-          [userId, `Tag: ${triggerValue}`, triggerValue],
+        flows = res.rows;
+      } else if (triggerType === 'tag') {
+        const res = await dbQuery(
+          `SELECT * FROM remarketing_flows
+            WHERE user_id = $1 AND status = 'active' AND trigger_type = 'tag' AND LOWER(trigger_label) = LOWER($2::text)`,
+          [userId, `Tag: ${triggerValue}`],
         );
+        flows = res.rows;
       }
 
-      if (!flowsResult.rows || flowsResult.rows.length === 0) {
-        console.log(`[FlowExecution] ✗ No active ${triggerType} flows matched triggerValue="${triggerValue}" — nothing to do`);
-        return;
-      }
-      console.log(`[FlowExecution] ✓ Found ${flowsResult.rows.length} matching flow(s): ${flowsResult.rows.map((r: any) => r.name).join(', ')}`);
-
-      // Get lead details for variable replacement
-      const leadResult = await dbQuery(
-        'SELECT id, name, phone, company FROM leads WHERE id = $1 AND user_id = $2',
-        [leadId, userId]
-      );
-
-      if (!leadResult.rows || !leadResult.rows[0]) {
-        logger.warn(`[FlowExecution] Lead not found: ${leadId}`);
-        return;
-      }
-
-      const lead = leadResult.rows[0];
-
-      // Get the lead's most recent conversation together with its channel info
-      let conversationId: string | undefined;
-      let remoteJid: string | undefined;
-      let channelType: string | undefined;
-      let channelId: string | undefined;
-      let channelCredentials: any;
-
-      const convResult = await dbQuery(
-        `SELECT c.id, c.remote_jid, c.channel_id,
-                ch.type  AS channel_type,
-                ch.credentials AS channel_credentials
-         FROM conversations c
-         LEFT JOIN channels ch ON ch.id = c.channel_id
-         WHERE c.lead_id = $1 AND c.user_id = $2
-         ORDER BY c.updated_at DESC LIMIT 1`,
-        [leadId, userId],
-      );
-      if (convResult.rows?.[0]) {
-        const row = convResult.rows[0];
-        conversationId = row.id;
-        remoteJid = row.remote_jid;
-        channelId = row.channel_id;
-        channelType = row.channel_type;
-        channelCredentials = row.channel_credentials;
-        if (channelCredentials && typeof channelCredentials === 'string') {
-          try { channelCredentials = JSON.parse(channelCredentials); } catch (_) { }
-        }
-      } else if (lead.phone) {
-        // No conversation yet — default to WhatsApp with the lead's phone
-        remoteJid = `${lead.phone.replace(/\D/g, '')}@s.whatsapp.net`;
-      }
-
-      logger.info(`[FlowExecution] Executing ${flowsResult.rows.length} flows for lead "${lead.name || leadId}"`);
-
-      // ── Ensure dedup table exists (two separate statements to avoid multi-query issues) ──
-      try {
-        await dbQuery(`
-          CREATE TABLE IF NOT EXISTS flow_enrollments (
-            id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            flow_id     UUID NOT NULL,
-            lead_id     UUID NOT NULL,
-            user_id     UUID NOT NULL,
-            enrolled_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-          )
-        `);
-        await dbQuery(`
-          CREATE INDEX IF NOT EXISTS idx_flow_enrollments
-          ON flow_enrollments(flow_id, lead_id, enrolled_at DESC)
-        `);
-      } catch (_) { /* table / index already exists — safe to ignore */ }
-
-      // ── Increment enrolled_leads and record enrollment (with dedup) ──────────
-      for (const flowRow of flowsResult.rows) {
-        // Dedup check — wrapped in try-catch so a missing table never blocks enrollment
-        let isDuplicate = false;
-        try {
-          const dupeRes = await dbQuery(
-            `SELECT 1 FROM flow_enrollments
-             WHERE flow_id = $1 AND lead_id = $2
-             AND enrolled_at > NOW() - INTERVAL '12 hours' LIMIT 1`,
-            [flowRow.id, leadId],
-          );
-          isDuplicate = (dupeRes.rows?.length ?? 0) > 0;
-        } catch (deupErr) {
-          // Table may not exist yet on first run — proceed with enrollment
-          logger.warn(`[FlowExecution] Dedup check skipped (${(deupErr as any).message})`);
-          isDuplicate = false;
-        }
-
-        if (isDuplicate) {
-          logger.debug(`[FlowExecution] Skipping duplicate enrollment for flow ${flowRow.id} lead ${leadId}`);
-          continue;
-        }
-
-        // Increment counter and record enrollment (awaited to ensure it completes)
-        try {
-          await dbQuery(
-            'UPDATE remarketing_flows SET enrolled_leads = enrolled_leads + 1 WHERE id = $1',
-            [flowRow.id],
-          );
-        } catch (e) {
-          logger.warn(`[FlowExecution] Could not increment enrolled_leads: ${(e as any).message}`);
-        }
-        try {
-          await dbQuery(
-            `INSERT INTO flow_enrollments (flow_id, lead_id, user_id) VALUES ($1, $2, $3)`,
-            [flowRow.id, leadId, userId],
-          );
-        } catch (_) { /* ignore duplicate key on race condition */ }
-      }
-
-      // Execute each flow asynchronously (don't wait for response)
-      for (const flowRow of flowsResult.rows) {
-        setImmediate(() => {
-          this.executeFlow({
-            leadId,
-            userId,
-            flowId: flowRow.id,
-            leadName: lead.name,
-            leadPhone: lead.phone,
-            conversationId,
-            remoteJid,
-            channelType,
-            channelId,
-            channelCredentials,
-          }).catch(err => {
-            logger.error(`[FlowExecution] Flow ${flowRow.id} error: ${(err as any).message}`);
-          });
-        });
-      }
-    } catch (err) {
-      logger.error(`[FlowExecution] Error triggering flows: ${(err as any).message}`);
-    }
-  }
-
-  /**
-   * Execute a single flow for a lead
-   * Processes steps sequentially, respecting delays
-   */
-  private async executeFlow(ctx: ExecutionContext) {
-    try {
-      const flow = await this.remarketingService.findById(ctx.flowId, ctx.userId);
-      if (!flow) {
-        logger.warn(`[FlowExecution] Flow not found: ${ctx.flowId}`);
-        return;
-      }
-
-      const steps = Array.isArray(flow.steps) ? flow.steps : [];
-      logger.info(`[FlowExecution] Starting flow "${flow.name}" (${steps.length} steps) for lead "${ctx.leadName || ctx.leadId}"`);
-
-      let stepIndex = 0;
-      for (const step of steps) {
-        stepIndex++;
-        logger.debug(`[FlowExecution] Step ${stepIndex}/${steps.length}: ${step.label}`);
-        try {
-          await this.executeStep(step, ctx);
-        } catch (err) {
-          logger.warn(`[FlowExecution] Step ${stepIndex} failed: ${(err as any).message}, continuing...`);
-          // Continue to next step even if current fails
-        }
-      }
-
-      // Conversão só quando o lead está mesmo convertido (terminar o fluxo não é converter)
-      await dbQuery(
-        `UPDATE remarketing_flows SET conversions = conversions + 1
-          WHERE id = $1
-            AND EXISTS (SELECT 1 FROM leads WHERE id = $2 AND LOWER(status) IN ('convertido', 'converted', 'ganho', 'won'))`,
-        [ctx.flowId, ctx.leadId]
-      );
-
-      logger.info(`[FlowExecution] ✅ Flow "${flow.name}" completed`);
-    } catch (err) {
-      logger.error(`[FlowExecution] Flow execution error: ${(err as any).message}`);
-    }
-  }
-
-  /**
-   * Execute a single step
-   */
-  private async executeStep(step: any, ctx: ExecutionContext): Promise<void> {
-    const { type, label, config = {} } = step;
-    logger.debug(`[FlowExecution] Executing step: "${label}" (type=${type})`);
-
-    switch (type) {
-      case 'wait':
-        await this.stepWait(config);
-        break;
-
-      case 'whatsapp':
-        await this.stepWhatsapp(config, ctx);
-        break;
-
-      case 'dynamic_audio':
-        await this.stepDynamicAudio(config, ctx);
-        break;
-
-      case 'facebook':
-        await this.stepWhatsapp({ ...config, _forceChannel: 'facebook' }, { ...ctx, channelType: 'facebook' });
-        break;
-
-      case 'instagram':
-        await this.stepWhatsapp({ ...config, _forceChannel: 'instagram' }, { ...ctx, channelType: 'instagram' });
-        break;
-
-      case 'telegram':
-        await this.stepWhatsapp({ ...config, _forceChannel: 'telegram' }, { ...ctx, channelType: 'telegram' });
-        break;
-
-      case 'email':
-        await this.stepEmail(config, ctx);
-        break;
-
-      case 'tag':
-        await this.stepTag(config, ctx);
-        break;
-
-      case 'move_stage':
-        await this.stepMoveStage(config, ctx);
-        break;
-
-      case 'condition':
-        logger.warn(`[FlowExecution] Condition steps not yet implemented`);
-        break;
-
-      case 'ab_test':
-        const isVariantA = Math.random() < 0.5;
-        const chosenMessage = isVariantA ? config.messageA : config.messageB;
-        logger.info(`[FlowExecution] ⚖️ A/B Test evaluated to Variant ${isVariantA ? 'A' : 'B'}`);
-        if (chosenMessage) {
-          // Re-use the omnichannel send logic
-          await this.stepWhatsapp({ message: chosenMessage }, ctx);
+      for (const flow of flows) {
+        if (triggerType === 'funnel_stage') {
+          // "negociacao +3 dias": só corre se ainda lá estiver daqui a 3 dias
+          const days = Number(String(flow.trigger_label).match(/\+(\d+)/)?.[1] || 0);
+          await this.enrollLead(flow, leadId, { delayMs: days * 86_400_000, entryStage: triggerValue });
         } else {
-          logger.warn(`[FlowExecution] A/B Test missing message for Variant ${isVariantA ? 'A' : 'B'}`);
+          await this.enrollLead(flow, leadId);
         }
-        break;
-
-      default:
-        logger.warn(`[FlowExecution] Unknown step type: ${type}`);
-    }
-  }
-
-  /**
-   * Wait for a duration.
-   * Supports new format { duration: '1', unit: 'dias'|'horas'|'semanas' }
-   * and old format string like '7d', '24h'.
-   */
-  private async stepWait(config: any): Promise<void> {
-    let millis: number;
-    if (config.unit) {
-      const n = parseInt(String(config.duration ?? '1'), 10) || 1;
-      const unitMap: Record<string, number> = {
-        minutos: 60_000,
-        horas: 3_600_000,
-        dias: 86_400_000,
-        semanas: 604_800_000,
-      };
-      millis = n * (unitMap[config.unit] ?? 86_400_000);
-    } else {
-      millis = this.parseDuration(config.duration || '24h');
-    }
-    const label = config.unit ? `${config.duration ?? 1} ${config.unit}` : (config.duration || '24h');
-    logger.info(`[FlowExecution] ⏳ Waiting ${label}...`);
-    return new Promise(resolve => setTimeout(resolve, millis));
-  }
-
-  /**
-   * Generates dynamic audio using ElevenLabs and sends via the lead's channel.
-   * Supports: WhatsApp (Evolution PTT), WhatsApp Cloud, Telegram, Facebook, Instagram.
-   * Falls back to text if audio fails or channel doesn't support audio.
-   */
-  private async stepDynamicAudio(config: any, ctx: ExecutionContext): Promise<void> {
-    const text = config.text || 'Olá!';
-    const resolvedText = this.replaceVariables(text, ctx);
-    // Voz sempre vinda das variáveis de ambiente (config.voiceId é ignorado)
-    const voiceId = process.env.ELEVENLABS_DEFAULT_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-
-    if (!apiKey) {
-      logger.error('[FlowExecution] ❌ ELEVENLABS_API_KEY não configurada — fallback para texto');
-      await this.stepWhatsapp({ message: resolvedText }, ctx);
-      return;
-    }
-
-    try {
-      logger.info(`[FlowExecution] 🎙️ Gerando Áudio Mágico para lead ${ctx.leadId} (voice: ${voiceId})`);
-      const audioBuffer = await this.aiService.generateElevenLabsAudio(resolvedText, voiceId, apiKey);
-      // raw base64 sem prefixo data URI (Evolution API espera assim)
-      const rawBase64 = audioBuffer.toString('base64');
-      const dataUri   = `data:audio/mp3;base64,${rawBase64}`;
-
-      const chType = ctx.channelType || 'whatsapp';
-      let credentials = ctx.channelCredentials;
-      let usedChannelId = ctx.channelId;
-
-      // Resolver credenciais se não disponíveis
-      if (!usedChannelId || !credentials) {
-        const allChannels = await this.channelsService.findAll(ctx.userId);
-        const targetCh = allChannels.find((c: any) => {
-          const ct = c.type || c.channel_type || '';
-          return ct === chType && (c.status === 'active' || c.status === 'connected');
-        }) || allChannels.find((c: any) =>
-          (c.type === 'whatsapp' || c.channel_type === 'whatsapp') &&
-          (c.status === 'active' || c.status === 'connected')
-        );
-        if (!targetCh) {
-          logger.warn(`[FlowExecution] Nenhum canal ativo para ${chType}`);
-          return;
-        }
-        usedChannelId = targetCh.id;
-        credentials   = targetCh.credentials;
-        if (credentials && typeof credentials === 'string') {
-          try { credentials = JSON.parse(credentials); } catch (_) { /* ignore */ }
-        }
-      }
-
-      let sent = false;
-
-      // ── Dispatch por canal ───────────────────────────────────────────────────
-      if (chType === 'whatsapp') {
-        const instanceId: string =
-          credentials?.instance_name || credentials?.instanceId || credentials?.instance_id ||
-          (await this._getInstanceName(usedChannelId!));
-        const phone = ctx.leadPhone?.replace(/\D/g, '') || ctx.remoteJid?.replace('@s.whatsapp.net', '') || '';
-        if (!phone) { logger.warn('[FlowExecution] Áudio: sem número de telefone'); return; }
-        await this.whatsappService.sendAudio({ instanceId, number: phone, audioBase64: dataUri });
-        logger.info(`[FlowExecution] ✅ Áudio PTT enviado via Evolution (${instanceId})`);
-        sent = true;
-
-      } else if (chType === 'whatsapp_cloud') {
-        const phoneNumberId = credentials?.phone_number_id;
-        const accessToken   = credentials?.access_token;
-        const phone = ctx.leadPhone?.replace(/\D/g, '') || ctx.remoteJid?.replace('@s.whatsapp.net', '') || '';
-        if (!phoneNumberId || !accessToken || !phone) {
-          logger.warn('[FlowExecution] Áudio Cloud: credenciais insuficientes — fallback texto');
-        } else {
-          try {
-            await this._sendAudioWhatsappCloud(rawBase64, phone, phoneNumberId, accessToken);
-            logger.info(`[FlowExecution] ✅ Áudio enviado via WhatsApp Cloud`);
-            sent = true;
-          } catch (e: any) {
-            logger.warn(`[FlowExecution] Áudio Cloud falhou: ${e.message} — fallback texto`);
-          }
-        }
-
-      } else if (chType === 'telegram') {
-        const botToken = credentials?.bot_token || credentials?.token;
-        const chatId   = ctx.remoteJid || ctx.leadPhone;
-        if (!botToken || !chatId) {
-          logger.warn('[FlowExecution] Áudio Telegram: sem bot_token ou chatId — fallback texto');
-        } else {
-          try {
-            await this._sendAudioTelegram(rawBase64, chatId, botToken, ctx.userId);
-            logger.info(`[FlowExecution] ✅ Áudio enviado via Telegram`);
-            sent = true;
-          } catch (e: any) {
-            logger.warn(`[FlowExecution] Áudio Telegram falhou: ${e.message} — fallback texto`);
-          }
-        }
-
-      } else if (chType === 'facebook' || chType === 'messenger' || chType === 'instagram') {
-        const accessToken = credentials?.page_access_token || credentials?.access_token;
-        const recipientId = ctx.remoteJid;
-        if (!accessToken || !recipientId) {
-          logger.warn(`[FlowExecution] Áudio ${chType}: sem token/recipientId — fallback texto`);
-        } else {
-          try {
-            await this._sendAudioMeta(rawBase64, recipientId, accessToken, ctx.userId);
-            logger.info(`[FlowExecution] ✅ Áudio enviado via ${chType} (Meta)`);
-            sent = true;
-          } catch (e: any) {
-            logger.warn(`[FlowExecution] Áudio Meta falhou: ${e.message} — fallback texto`);
-          }
-        }
-      }
-
-      // Fallback para texto se o canal não suportou áudio
-      if (!sent) {
-        logger.warn(`[FlowExecution] Canal "${chType}" não suportou áudio — enviando texto`);
-        await this.stepWhatsapp({ message: resolvedText }, ctx);
-        return;
-      }
-
-      // ── Salvar no inbox ──────────────────────────────────────────────────────
-      let convId = ctx.conversationId;
-      if (!convId && ctx.remoteJid && usedChannelId) {
-        const look = await dbQuery(
-          `SELECT id FROM conversations WHERE lead_id = $1 AND user_id = $2 AND remote_jid = $3 ORDER BY updated_at DESC LIMIT 1`,
-          [ctx.leadId, ctx.userId, ctx.remoteJid]
-        );
-        convId = look.rows?.[0]?.id;
-      }
-      if (convId) {
-        await dbQuery(
-          `INSERT INTO messages (conversation_id, user_id, direction, channel, content, status) VALUES ($1, $2, 'out', $3, $4, 'sent')`,
-          [convId, ctx.userId, chType, `[Áudio Mágico] ${resolvedText}`]
-        );
       }
     } catch (err: any) {
-      logger.error(`[FlowExecution] Erro no Áudio Mágico: ${err.message}`);
-      // Fallback para texto
-      try { await this.stepWhatsapp({ message: resolvedText }, ctx); } catch (_) { /* ignore */ }
+      console.error('[FlowExecution] Erro ao inscrever lead:', err?.message);
     }
   }
 
-  // ── Helpers de áudio por canal ─────────────────────────────────────────────
+  /** Inscreve o lead se puder entrar. Devolve true quando ficou inscrito. */
+  async enrollLead(
+    flow: any,
+    leadId: string,
+    opts: { delayMs?: number; entryStage?: string; test?: boolean } = {},
+  ): Promise<boolean> {
+    const settings = flowSettings(flow.settings);
+    const steps: any[] = Array.isArray(flow.steps) ? flow.steps : [];
+    if (steps.length === 0) return false;
 
-  /** Upload raw base64 audio to MinIO → return public URL */
-  private async _uploadAudioBuffer(rawBase64: string, userId: string): Promise<string | null> {
+    const leadRes = await dbQuery('SELECT * FROM leads WHERE id = $1 AND user_id = $2', [leadId, flow.user_id]);
+    const lead: FlowLead | undefined = leadRes.rows?.[0];
+    if (!lead) return false;
+
+    if (!opts.test) {
+      if ((lead.tags || []).includes(OPT_OUT_TAG)) return false;
+
+      // Quem já passou por este fluxo há pouco não volta a entrar
+      const recent = await dbQuery(
+        `SELECT 1 FROM flow_enrollments
+          WHERE flow_id = $1 AND lead_id = $2
+            AND (status = 'active' OR enrolled_at > NOW() - make_interval(days => $3::int))
+          LIMIT 1`,
+        [flow.id, leadId, settings.reentry_days],
+      );
+      if (recent.rows?.length) return false;
+
+      const sends = steps.some((s) => SEND_STEP_TYPES.has(s?.type) && s.type !== 'email');
+      if (sends && !(await resolveTarget(lead, settings.channel === 'any' ? null : settings.channel))) return false;
+    }
+
+    const context: Record<string, any> = {};
+    if (opts.entryStage) context.entry_stage = opts.entryStage;
+    if (opts.test) context.test = true;
+
+    const inserted = await dbQuery(
+      `INSERT INTO flow_enrollments (flow_id, lead_id, user_id, status, step_index, next_run_at, context)
+       VALUES ($1, $2, $3, 'active', 0, NOW() + ($4::float8 * INTERVAL '1 millisecond'), $5::jsonb)
+       ON CONFLICT (flow_id, lead_id) WHERE status = 'active' DO NOTHING
+       RETURNING id`,
+      [flow.id, leadId, flow.user_id, Math.max(0, Math.round(opts.delayMs || 0)), JSON.stringify(context)],
+    );
+    if (!inserted.rows?.length) return false;
+
+    if (!opts.test) {
+      await dbQuery('UPDATE remarketing_flows SET enrolled_leads = enrolled_leads + 1 WHERE id = $1', [flow.id]);
+    }
+    return true;
+  }
+
+  /** Corre o fluxo para um lead à escolha: esperas curtas, a qualquer hora, mesmo em rascunho */
+  async startTest(flow: any, leadId: string, userId: string): Promise<boolean> {
+    await dbQuery(
+      `UPDATE flow_enrollments SET status = 'stopped', stop_reason = 'restarted', finished_at = NOW(), next_run_at = NULL
+        WHERE flow_id = $1 AND lead_id = $2 AND user_id = $3 AND status = 'active'`,
+      [flow.id, leadId, userId],
+    );
+    return this.enrollLead(flow, leadId, { test: true });
+  }
+
+  // ── Volta do motor ────────────────────────────────────────────────────────
+
+  private async tick() {
+    if (this.ticking) return;
+    this.ticking = true;
     try {
-      const buffer = Buffer.from(rawBase64, 'base64');
-      const storageService = getStorageService();
-      const url = await storageService.uploadBuffer(buffer, `ai_voice_${Date.now()}.mp3`, 'audio/mpeg', 'ai-voices', userId);
-      return url || null;
-    } catch (e: any) {
-      logger.warn(`[FlowExecution] Upload de áudio falhou: ${e.message}`);
-      return null;
+      const due = await dbQuery(
+        `UPDATE flow_enrollments
+            SET next_run_at = NOW() + make_interval(mins => ${LEASE_MINUTES})
+          WHERE status = 'active' AND next_run_at <= NOW() AND id IN (
+            SELECT DISTINCT ON (e.user_id) e.id
+              FROM flow_enrollments e
+              JOIN remarketing_flows f ON f.id = e.flow_id
+             WHERE e.status = 'active' AND e.next_run_at <= NOW()
+               AND (f.status = 'active' OR e.context->>'test' = 'true')
+             ORDER BY e.user_id, (e.context->>'test' = 'true') DESC NULLS LAST, e.next_run_at
+          )
+          RETURNING *`,
+      );
+      await Promise.allSettled((due.rows || []).map((e: any) => this.processEnrollment(e).catch(async (err) => {
+        console.error(`[FlowExecution] Inscrição ${e.id}:`, err?.message);
+      })));
+    } catch (err: any) {
+      console.error('[FlowExecution] Volta do motor falhou:', err?.message);
+    } finally {
+      this.ticking = false;
     }
   }
 
-  /** WhatsApp Cloud: upload para Media API + enviar como audio */
-  private async _sendAudioWhatsappCloud(rawBase64: string, to: string, phoneNumberId: string, accessToken: string): Promise<void> {
-    const buffer = Buffer.from(rawBase64, 'base64');
-    const formData = new FormData();
-    formData.append('file', new Blob([buffer], { type: 'audio/mpeg' }), 'voice.mp3');
-    formData.append('type', 'audio/mpeg');
-    formData.append('messaging_product', 'whatsapp');
+  private async processEnrollment(e: any) {
+    const flowRes = await dbQuery('SELECT * FROM remarketing_flows WHERE id = $1 AND user_id = $2', [e.flow_id, e.user_id]);
+    const flow = flowRes.rows?.[0];
+    if (!flow) return this.finish(e, 'stopped', 'flow_removed');
 
-    const uploadRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/media`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body: formData,
-    });
-    if (!uploadRes.ok) throw new Error(`WA Cloud media upload: ${await uploadRes.text()}`);
-    const { id: mediaId } = await uploadRes.json() as any;
+    const leadRes = await dbQuery('SELECT * FROM leads WHERE id = $1 AND user_id = $2', [e.lead_id, e.user_id]);
+    const lead: FlowLead | undefined = leadRes.rows?.[0];
+    if (!lead) return this.finish(e, 'stopped', 'lead_removed');
 
-    const sendRes = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'audio', audio: { id: mediaId } }),
-    });
-    if (!sendRes.ok) throw new Error(`WA Cloud send audio: ${await sendRes.text()}`);
-  }
+    const ownerRes = await dbQuery('SELECT name FROM users WHERE id = $1', [e.user_id]);
+    const ownerName: string = ownerRes.rows?.[0]?.name || '';
 
-  /** Telegram: upload para MinIO → sendVoice via URL */
-  private async _sendAudioTelegram(rawBase64: string, chatId: string, botToken: string, userId: string): Promise<void> {
-    const audioUrl = await this._uploadAudioBuffer(rawBase64, userId);
-    if (!audioUrl) throw new Error('Upload de áudio falhou para Telegram');
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, voice: audioUrl }),
-    });
-    if (!res.ok) throw new Error(`Telegram sendVoice: ${await res.text()}`);
-  }
+    const settings = flowSettings(flow.settings);
+    const steps: any[] = Array.isArray(flow.steps) ? flow.steps : [];
+    const context: Record<string, any> = e.context && typeof e.context === 'object' ? { ...e.context } : {};
+    const isTest = context.test === true;
 
-  /** Facebook / Instagram: upload para MinIO → enviar como attachment de áudio */
-  private async _sendAudioMeta(rawBase64: string, recipientId: string, accessToken: string, userId: string): Promise<void> {
-    const audioUrl = await this._uploadAudioBuffer(rawBase64, userId);
-    if (!audioUrl) throw new Error('Upload de áudio falhou para Meta');
-    const res = await fetch(`${metaMessagesUrl(accessToken)}?access_token=${encodeURIComponent(accessToken)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        recipient: { id: recipientId },
-        message: { attachment: { type: 'audio', payload: { url: audioUrl, is_reusable: false } } },
-      }),
-    });
-    if (!res.ok) throw new Error(`Meta audio: ${await res.text()}`);
-  }
+    let stepIndex: number = e.step_index || 0;
+    let attempts: number = e.attempts || 0;
+    const events: any[] = [];
+    const save = async (nextRun: number | null) => dbQuery(
+      `UPDATE flow_enrollments
+          SET step_index = $2, attempts = $3, context = $4::jsonb, log = log || $5::jsonb,
+              next_run_at = NOW() + ($6::float8 * INTERVAL '1 millisecond')
+        WHERE id = $1`,
+      [e.id, stepIndex, attempts, JSON.stringify(context), JSON.stringify(events), nextRun ?? 0],
+    );
 
-  /**
-   * Send a message via the channel the lead originally came from.
-   * Falls back to the best available WhatsApp channel when no conversation exists yet.
-   */
-  private async stepWhatsapp(config: any, ctx: ExecutionContext): Promise<void> {
-    const message = config.message || 'Olá! Esta é uma mensagem automática.';
-    const resolved = this.replaceVariables(message, ctx);
-    const chType = ctx.channelType || 'whatsapp';
+    for (let guard = 0; guard < MAX_STEPS_PER_RUN; guard++) {
+      // Antes de cada passo: o lead ainda deve receber isto?
+      const exit = this.exitReason(flow, lead, context);
+      if (exit) return this.finish(e, 'stopped', exit, events, stepIndex);
 
-    logger.info(`[FlowExecution] 📱 Sending via channel "${chType}" for lead ${ctx.leadId}`);
-
-    try {
-      // ── Resolve conversation ID ───────────────────────────────────────────
-      let convId = ctx.conversationId;
-      let usedChannelId = ctx.channelId;
-      let credentials = ctx.channelCredentials;
-
-      // ── Dispatch per channel type ─────────────────────────────────────────
-      if (chType === 'whatsapp_cloud') {
-        await this._sendWhatsappCloud(resolved, ctx, credentials);
-
-      } else if (chType === 'facebook' || chType === 'instagram' || chType === 'messenger') {
-        await this._sendMetaMessenger(resolved, ctx, credentials, chType);
-
-      } else if (chType === 'telegram') {
-        await this._sendTelegram(resolved, ctx, credentials);
-
-      } else {
-        // Default: Evolution API (whatsapp)
-        if (!ctx.leadPhone && !ctx.remoteJid) {
-          logger.warn(`[FlowExecution] Cannot send: lead has no phone number`);
+      if (settings.stop_on_reply) {
+        const reply = await this.lastReply(e);
+        if (reply !== null) {
+          await this.handleReply({ ...e, settings: flow.settings, flow_name: flow.name, lead_name: lead.name, reply });
           return;
         }
-        // If we don't have a channel yet, find the first connected WhatsApp channel
-        if (!usedChannelId || !credentials) {
-          const allChannels = await this.channelsService.findAll(ctx.userId);
-          const waCh = allChannels.find(
-            (c: any) => (c.type === 'whatsapp' || c.channel_type === 'whatsapp') &&
-              (c.status === 'active' || c.status === 'connected'),
-          );
-          if (!waCh) {
-            logger.warn(`[FlowExecution] No connected WhatsApp channel found for user ${ctx.userId}`);
-            return;
-          }
-          usedChannelId = waCh.id;
-          credentials = waCh.credentials;
-          if (credentials && typeof credentials === 'string') {
-            try { credentials = JSON.parse(credentials); } catch (_) { }
-          }
-        }
-        const instanceId: string =
-          credentials?.instance_name || credentials?.instanceId || credentials?.instance_id ||
-          (await this._getInstanceName(usedChannelId!));
-        const phone = ctx.leadPhone?.replace(/\D/g, '') ?? '';
-        await this.whatsappService.sendMessage({ instanceId, number: phone, text: resolved });
-        logger.info(`[FlowExecution] ✅ Sent via Evolution API (instance: ${instanceId})`);
       }
 
-      // ── Save to inbox ─────────────────────────────────────────────────────
-      if (!convId && ctx.remoteJid && usedChannelId) {
-        const look = await dbQuery(
-          `SELECT id FROM conversations
-           WHERE lead_id = $1 AND user_id = $2 AND remote_jid = $3
-           ORDER BY updated_at DESC LIMIT 1`,
-          [ctx.leadId, ctx.userId, ctx.remoteJid],
-        );
-        if (look.rows?.[0]) {
-          convId = look.rows[0].id;
+      if (stepIndex >= steps.length) return this.finish(e, 'completed', null, events, stepIndex);
+
+      const step = steps[stepIndex];
+      let outcome: StepOutcome;
+      try {
+        outcome = await this.runStep(step, { e, flow, lead, settings, context, ownerName, isTest });
+        attempts = 0;
+      } catch (err: any) {
+        const transient = err instanceof FlowSendError ? err.transient : true;
+        attempts += 1;
+        if (transient && attempts < MAX_SEND_ATTEMPTS) {
+          outcome = { kind: 'pause', ms: RETRY_BASE_MS * attempts, advance: false };
+          console.warn(`[FlowExecution] Passo ${stepIndex + 1} do fluxo ${flow.id}: nova tentativa (${err?.message})`);
         } else {
-          const ins = await dbQuery(
-            `INSERT INTO conversations (user_id, lead_id, remote_jid, channel_id, status)
-             VALUES ($1, $2, $3, $4, 'open') RETURNING id`,
-            [ctx.userId, ctx.leadId, ctx.remoteJid, usedChannelId],
-          );
-          convId = ins.rows?.[0]?.id;
+          // Sem hipótese de chegar a este lead neste passo: segue para o seguinte
+          outcome = { kind: 'next', note: `Não enviado: ${err?.message || 'erro'}` };
+          attempts = 0;
         }
       }
-      if (convId) {
-        await dbQuery(
-          `INSERT INTO messages (conversation_id, user_id, direction, channel, content, status)
-           VALUES ($1, $2, 'out', $3, $4, 'sent') RETURNING id`,
-          [convId, ctx.userId, chType, resolved],
-        );
-        logger.info(`[FlowExecution] ✅ Message saved to inbox (conv: ${convId})`);
+
+      if (outcome.note) {
+        events.push({ at: new Date().toISOString(), step: stepIndex + 1, type: step?.type, note: outcome.note });
       }
-    } catch (err) {
-      logger.error(`[FlowExecution] Send error (${chType}): ${(err as any).message}`);
-      throw err;
+
+      if (outcome.kind === 'pause') {
+        if (outcome.advance) stepIndex += 1;
+        await save(outcome.ms);
+        return;
+      }
+      if (outcome.kind === 'end') return this.finish(e, 'completed', null, events, stepIndex);
+      if (outcome.kind === 'goto') {
+        const target = steps.findIndex((s) => s?.id === outcome.stepId);
+        stepIndex = target >= 0 ? target : stepIndex + 1;
+        continue;
+      }
+
+      stepIndex += 1;
+      if (outcome.sent) {
+        // Depois de uma mensagem há sempre uma pausa curta, como quem está a escrever
+        await save(8_000 + Math.floor(Math.random() * 17_000));
+        return;
+      }
     }
+    // Condições a apontarem umas para as outras sem fim
+    await this.finish(e, 'stopped', 'loop', events, stepIndex);
   }
 
-  /** WhatsApp Business Cloud (Graph API) */
-  private async _sendWhatsappCloud(text: string, ctx: ExecutionContext, creds: any): Promise<void> {
-    const phoneNumberId = creds?.phone_number_id;
-    const accessToken = creds?.access_token;
-    if (!phoneNumberId || !accessToken) {
-      logger.warn(`[FlowExecution] WhatsApp Cloud: missing phone_number_id or access_token`);
-      return;
+  /** Razão para o lead sair já do fluxo, ou null */
+  private exitReason(flow: any, lead: FlowLead, context: Record<string, any>): string | null {
+    if ((lead.tags || []).includes(OPT_OUT_TAG)) return 'opt_out';
+    const status = String(lead.status || '').toLowerCase();
+    const entry = String(context.entry_stage || '').toLowerCase();
+    if (context.test === true) return null;
+    if (entry && status !== entry) return 'stage_changed';
+    if (status !== entry) {
+      if (LOST.includes(status)) return 'lost';
+      if (CONVERTED.includes(status) && flow.trigger_type !== 'purchase') return 'converted';
     }
-    const phone = ctx.leadPhone?.replace(/\D/g, '') ||
-      ctx.remoteJid?.replace('@s.whatsapp.net', '') || '';
-    if (!phone) { logger.warn(`[FlowExecution] WhatsApp Cloud: no phone`); return; }
-
-    const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: phone,
-        type: 'text',
-        text: { body: text },
-      }),
-    });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      throw new Error(`WhatsApp Cloud error ${res.status}: ${e?.error?.message || res.statusText}`);
-    }
-    logger.info(`[FlowExecution] ✅ Sent via WhatsApp Cloud`);
+    return null;
   }
 
-  /** Facebook Messenger / Instagram DM (Graph API) */
-  private async _sendMetaMessenger(
-    text: string, ctx: ExecutionContext, creds: any, channelType: string,
-  ): Promise<void> {
-    const recipientId = ctx.remoteJid; // PSID / IGSID
-    if (!recipientId) { logger.warn(`[FlowExecution] ${channelType}: no recipientId (remoteJid)`); return; }
-
-    const accessToken = creds?.page_access_token || creds?.access_token;
-    if (!accessToken) {
-      logger.warn(`[FlowExecution] ${channelType}: no access token in channel credentials`);
-      return;
-    }
-    const apiUrl = metaMessagesUrl(accessToken, creds?.page_id);
-
-    const res = await fetch(`${apiUrl}?access_token=${accessToken}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
-    });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      throw new Error(`${channelType} Graph API error ${res.status}: ${e?.error?.message || res.statusText}`);
-    }
-    logger.info(`[FlowExecution] ✅ Sent via ${channelType} (Messenger Graph API)`);
-  }
-
-  /** Telegram Bot API */
-  private async _sendTelegram(text: string, ctx: ExecutionContext, creds: any): Promise<void> {
-    const botToken = creds?.bot_token || creds?.token;
-    const chatId = ctx.remoteJid;
-    if (!botToken) { logger.warn(`[FlowExecution] Telegram: no bot_token`); return; }
-    if (!chatId) { logger.warn(`[FlowExecution] Telegram: no chatId (remoteJid)`); return; }
-
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
-    });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      throw new Error(`Telegram error ${res.status}: ${e?.description || res.statusText}`);
-    }
-    logger.info(`[FlowExecution] ✅ Sent via Telegram`);
-  }
-
-  /** Get instance name from channels table when not in credentials */
-  private async _getInstanceName(channelId: string): Promise<string> {
-    const r = await dbQuery(
-      `SELECT credentials->>'instance_name' AS name FROM channels WHERE id = $1`,
-      [channelId],
+  private async finish(e: any, status: 'completed' | 'stopped', reason: string | null, events: any[] = [], stepIndex?: number) {
+    await dbQuery(
+      `UPDATE flow_enrollments
+          SET status = $2, stop_reason = $3, finished_at = NOW(), next_run_at = NULL,
+              log = log || $4::jsonb, step_index = COALESCE($5, step_index)
+        WHERE id = $1`,
+      [e.id, status, reason, JSON.stringify(events), stepIndex ?? null],
     );
-    return r.rows?.[0]?.name || channelId;
   }
 
-  /**
-   * Send email (placeholder for now)
-   */
-  private async stepEmail(config: any, ctx: ExecutionContext): Promise<void> {
-    try {
-      const subject = config.subject || 'Mensagem automática';
-      const body = config.body || '';
-      this.replaceVariables(body, ctx);
+  /** Última resposta do lead desde que entrou no fluxo, ou null */
+  private async lastReply(e: any): Promise<string | null> {
+    const res = await dbQuery(
+      `SELECT m.content FROM messages m
+         JOIN conversations c ON c.id = m.conversation_id
+        WHERE c.lead_id = $1 AND c.user_id = $2 AND m.direction = 'in' AND m.created_at > $3
+        ORDER BY m.created_at DESC
+        LIMIT 1`,
+      [e.lead_id, e.user_id, e.enrolled_at],
+    );
+    return res.rows?.length ? String(res.rows[0].content ?? '') : null;
+  }
 
-      logger.info(`[FlowExecution] 📧 Email: "${subject}"`);
-      logger.warn(`[FlowExecution] Email sending not yet implemented`);
-      // TODO: Implement email sending
-    } catch (err) {
-      logger.error(`[FlowExecution] Email error: ${(err as any).message}`);
-      throw err;
+  // ── Passos ────────────────────────────────────────────────────────────────
+
+  private async runStep(
+    step: any,
+    run: { e: any; flow: any; lead: FlowLead; settings: FlowSettings; context: Record<string, any>; ownerName: string; isTest: boolean },
+  ): Promise<StepOutcome> {
+    const { flow, lead, settings, context, ownerName, isTest } = run;
+    const cfg = step?.config || {};
+    const render = (text: string) => renderText(text, lead, settings, ownerName);
+
+    if (SEND_STEP_TYPES.has(step?.type)) {
+      const blocked = await this.sendGate(run);
+      if (blocked) return blocked;
     }
-  }
 
-  /**
-   * Apply a tag to the lead
-   */
-  private async stepTag(config: any, ctx: ExecutionContext): Promise<void> {
-    const tag = config.tag || '';
-    if (!tag) return;
-
-    try {
-      logger.info(`[FlowExecution] 🏷️  Applying tag "${tag}"`);
-
-      await dbQuery(
-        `UPDATE leads SET tags = array_append(tags, $1)
-         WHERE id = $2 AND user_id = $3 AND NOT $1 = ANY(tags)`,
-        [tag, ctx.leadId, ctx.userId]
-      );
-
-      logger.info(`[FlowExecution] ✅ Tag "${tag}" applied`);
-    } catch (err) {
-      logger.error(`[FlowExecution] Tag error: ${(err as any).message}`);
-      throw err;
-    }
-  }
-
-  /**
-   * Move lead to a different funnel stage
-   */
-  private async stepMoveStage(config: any, ctx: ExecutionContext): Promise<void> {
-    const stage = config.stage || '';
-    if (!stage) return;
-
-    try {
-      logger.info(`[FlowExecution] 📊 Moving to stage "${stage}"`);
-
-      await dbQuery(
-        'UPDATE leads SET status = $1 WHERE id = $2 AND user_id = $3',
-        [stage, ctx.leadId, ctx.userId]
-      );
-
-      logger.info(`[FlowExecution] ✅ Lead moved to "${stage}"`);
-
-      // 🚀 Emit real-time WebSocket event to update Kanban automatically
-      const ws = getWebSocketService();
-      if (ws) {
-        ws.emitLeadFunnelUpdate(ctx.userId, {
-          leadId: ctx.leadId,
-          leadName: ctx.leadName,
-          newStatus: stage,
-        });
+    switch (step?.type) {
+      case 'wait': {
+        if (isTest) return { kind: 'pause', ms: TEST_WAIT_MS, advance: true, note: 'Espera encurtada no teste' };
+        const unit = WAIT_UNITS_MS[cfg.unit] ?? WAIT_UNITS_MS.dias;
+        const n = Number(cfg.duration);
+        if (!(n > 0)) return { kind: 'next', note: 'Espera sem tempo definido' };
+        return { kind: 'pause', ms: n * unit, advance: true };
       }
 
-    } catch (err) {
-      logger.error(`[FlowExecution] Stage move error: ${(err as any).message}`);
-      throw err;
-    }
-  }
+      case 'message':
+      case 'whatsapp':
+      case 'facebook':
+      case 'instagram':
+      case 'telegram': {
+        const text = render(cfg.message);
+        if (!text) return { kind: 'next', note: 'Passo sem mensagem' };
+        const channel = step.type === 'message' ? (settings.channel === 'any' ? null : settings.channel) : step.type;
+        return this.deliverText(flow, lead, channel, text, cfg, render);
+      }
 
-  /**
-   * Parse duration string to milliseconds
-   * Examples: "7d", "24h", "1h", "30m"
-   */
-  private parseDuration(duration: string): number {
-    const match = duration.match(/^(\d+)([dhms])$/);
-    if (!match) return 86400000; // default 1 day
+      case 'ab_test': {
+        if (!context.variant) context.variant = Math.random() < 0.5 ? 'A' : 'B';
+        const text = render(context.variant === 'A' ? cfg.messageA : cfg.messageB);
+        if (!text) return { kind: 'next', note: `Versão ${context.variant} sem mensagem` };
+        return this.deliverText(flow, lead, settings.channel === 'any' ? null : settings.channel, text, cfg, render, `Versão ${context.variant} enviada`);
+      }
 
-    const [, num, unit] = match;
-    const n = parseInt(num, 10);
+      case 'dynamic_audio':
+        return this.deliverAudio(flow, lead, settings, cfg, render);
 
-    switch (unit) {
-      case 'd':
-        return n * 86400000; // days
-      case 'h':
-        return n * 3600000; // hours
-      case 'm':
-        return n * 60000; // minutes
-      case 's':
-        return n * 1000; // seconds
+      case 'email': {
+        const subject = render(cfg.subject);
+        const body = render(cfg.body);
+        if (!subject || !body) return { kind: 'next', note: 'Email sem assunto ou texto' };
+        await sendEmail(lead, subject, body);
+        return { kind: 'next', note: 'Email enviado', sent: true };
+      }
+
+      case 'tag':
+        if (!cfg.tag) return { kind: 'next' };
+        await this.addTag(lead, String(cfg.tag));
+        return { kind: 'next', note: `Tag "${cfg.tag}" aplicada` };
+
+      case 'remove_tag':
+        if (!cfg.tag) return { kind: 'next' };
+        await dbQuery('UPDATE leads SET tags = array_remove(tags, $1::text) WHERE id = $2 AND user_id = $3', [String(cfg.tag), lead.id, lead.user_id]);
+        lead.tags = (lead.tags || []).filter((t: string) => t !== cfg.tag);
+        return { kind: 'next', note: `Tag "${cfg.tag}" removida` };
+
+      case 'move_stage': {
+        if (!cfg.stage) return { kind: 'next' };
+        await this.moveStage(lead, String(cfg.stage));
+        // A mudança foi do próprio fluxo: não conta como "saiu da etapa"
+        if (context.entry_stage) context.entry_stage = String(cfg.stage);
+        return { kind: 'next', note: `Movido para ${STAGE_LABEL[cfg.stage] || cfg.stage}` };
+      }
+
+      case 'create_task': {
+        const title = render(cfg.title);
+        if (!title) return { kind: 'next' };
+        const hours = Number(cfg.due_hours);
+        await this.schedulesService.create({
+          lead_id: lead.id,
+          title,
+          description: cfg.description ? render(cfg.description) : `Criada pelo fluxo "${flow.name}"`,
+          scheduled_at: new Date(Date.now() + (hours > 0 ? hours : 24) * 3_600_000).toISOString(),
+          metadata: { type: cfg.task_type || 'call', priority: cfg.priority || 'high', source: 'remarketing', flow_id: flow.id },
+        }, lead.user_id);
+        return { kind: 'next', note: 'Tarefa criada' };
+      }
+
+      case 'add_note': {
+        const content = render(cfg.text);
+        if (!content) return { kind: 'next' };
+        await this.notesService.create({ lead_id: lead.id, content }, lead.user_id);
+        return { kind: 'next', note: 'Nota adicionada' };
+      }
+
+      case 'notify': {
+        const title = render(cfg.title);
+        if (!title) return { kind: 'next' };
+        await notificationsService.createNotification(
+          lead.user_id, 'flow_notify', title, cfg.text ? render(cfg.text) : `${lead.name || 'Lead'} · ${flow.name}`, 'bell',
+          { leadId: lead.id, flowId: flow.id },
+        );
+        return { kind: 'next', note: 'Aviso enviado à equipa' };
+      }
+
+      case 'score': {
+        const points = Number(cfg.points);
+        if (!points) return { kind: 'next' };
+        await dbQuery(
+          'UPDATE leads SET score = LEAST(100, GREATEST(0, COALESCE(score, 0) + $1::int)) WHERE id = $2 AND user_id = $3',
+          [Math.trunc(points), lead.id, lead.user_id],
+        );
+        return { kind: 'next', note: `Pontuação ${points > 0 ? '+' : ''}${Math.trunc(points)}` };
+      }
+
+      case 'condition': {
+        const matched = await this.evaluateCondition(cfg, run.e, lead);
+        if (matched === null) return { kind: 'next', note: 'Condição por configurar' };
+        const route = String((matched ? cfg.if_true : cfg.if_false) || 'continue');
+        if (route === 'end') return { kind: 'end', note: 'Condição terminou o fluxo' };
+        if (route !== 'continue') return { kind: 'goto', stepId: route };
+        return { kind: 'next' };
+      }
+
       default:
-        return 86400000;
+        return { kind: 'next', note: 'Passo não reconhecido' };
     }
   }
 
-  /**
-   * Replace {{nome}} and {{empresa}} variables
-   */
-  private replaceVariables(text: string, ctx: ExecutionContext): string {
-    const firstName = ctx.leadName?.split(' ')[0] || 'Cliente';
-    const company = ''; // TODO: get from lead details
+  private async evaluateCondition(cfg: any, e: any, lead: FlowLead): Promise<boolean | null> {
+    const status = String(lead.status || '').toLowerCase();
+    const value = String(cfg.value || '').toLowerCase();
+    const tags: string[] = (lead.tags || []).map((t: string) => String(t).toLowerCase());
+    switch (cfg.check) {
+      case 'replied': return (await this.lastReply(e)) !== null;
+      case 'not_replied': return (await this.lastReply(e)) === null;
+      case 'stage': return status === value;
+      case 'not_stage': return status !== value;
+      case 'tag': return tags.includes(value);
+      case 'not_tag': return !tags.includes(value);
+      default: return null;
+    }
+  }
 
-    return text
-      .replace(/\{\{nome\}\}/g, firstName)
-      .replace(/\{\{empresa\}\}/g, company);
+  /** Limites antes de enviar: horário, plano e máximo diário. Devolve a pausa, ou null se pode enviar. */
+  private async sendGate(run: { lead: FlowLead; settings: FlowSettings; isTest: boolean }): Promise<StepOutcome | null> {
+    const { lead, settings, isTest } = run;
+
+    const limit = await checkMessageLimit(lead.user_id, 'messages');
+    if (!limit.allowed) {
+      await this.warnLimit(lead.user_id);
+      return { kind: 'pause', ms: 6 * 3_600_000, advance: false };
+    }
+    if (isTest) return null;
+
+    const wait = msUntilSendWindow(settings);
+    // Espalha os envios pela primeira meia hora, em vez de todos à hora certa
+    if (wait > 0) return { kind: 'pause', ms: wait + Math.floor(Math.random() * 30 * 60_000), advance: false };
+
+    const sent = await this.sendsInLastDay(lead.user_id);
+    if (sent >= settings.daily_limit) return { kind: 'pause', ms: 3_600_000, advance: false };
+    return null;
+  }
+
+  private async sendsInLastDay(userId: string): Promise<number> {
+    const cached = this.sendCounts.get(userId);
+    if (cached && Date.now() - cached.at < 5 * 60_000) return cached.count;
+    const res = await dbQuery(
+      `SELECT COUNT(*)::int AS count FROM messages
+        WHERE user_id = $1 AND direction = 'out' AND created_at > NOW() - INTERVAL '24 hours'
+          AND metadata->>'source' = 'remarketing'`,
+      [userId],
+    );
+    const count = res.rows?.[0]?.count ?? 0;
+    this.sendCounts.set(userId, { count, at: Date.now() });
+    return count;
+  }
+
+  private countSend(userId: string) {
+    const cached = this.sendCounts.get(userId);
+    if (cached) cached.count += 1;
+  }
+
+  /** Avisa uma vez por dia que os fluxos pararam por falta de mensagens no plano */
+  private async warnLimit(userId: string) {
+    const last = this.limitWarnedAt.get(userId) || 0;
+    if (Date.now() - last < 86_400_000) return;
+    this.limitWarnedAt.set(userId, Date.now());
+    await notificationsService.createNotification(
+      userId, 'plan_limit', 'Fluxos em pausa',
+      'Atingiu o limite de mensagens do plano. Os fluxos continuam quando houver mensagens disponíveis.',
+      'alert-triangle',
+    ).catch(() => {});
+  }
+
+  private async deliverText(
+    flow: any, lead: FlowLead, channel: string | null, text: string, cfg: any,
+    render: (t: string) => string, note?: string,
+  ): Promise<StepOutcome> {
+    const target = await resolveTarget(lead, channel);
+    if (!target) return { kind: 'next', note: channel ? `Lead sem conversa em ${channel}` : 'Lead sem canal disponível' };
+
+    const template: WhatsAppTemplateRef | null = cfg.wa_template?.name
+      ? {
+        name: String(cfg.wa_template.name),
+        language: String(cfg.wa_template.language || 'pt_PT'),
+        // {{1}} é o nome do lead; as outras variáveis levam o nome do negócio
+        params: Array.from({ length: Math.max(0, Number(cfg.wa_template.params) || 0) }, (_v, i) => (
+          render(i === 0 ? '{{nome}}' : '{{minha_empresa}}') || '-'
+        )),
+      }
+      : null;
+
+    const sent = await sendText(target, text, template);
+    await saveOutgoing(lead, target, { content: sent.content, externalId: sent.externalId, flowId: flow.id });
+    this.countSend(lead.user_id);
+    return { kind: 'next', note: note || 'Mensagem enviada', sent: true };
+  }
+
+  private async deliverAudio(flow: any, lead: FlowLead, settings: FlowSettings, cfg: any, render: (t: string) => string): Promise<StepOutcome> {
+    const target = await resolveTarget(lead, settings.channel === 'any' ? null : settings.channel);
+    if (!target) return { kind: 'next', note: 'Lead sem canal disponível' };
+
+    const spoken = render(cfg.text || '');
+    try {
+      let url: string | null = cfg.audio_url ? String(cfg.audio_url) : null;
+      if (!url && spoken && isVoiceConfigured()) url = await generateVoice(spoken, lead.user_id);
+      if (!url) throw new FlowSendError('A voz por IA não está configurada');
+      const sent = await sendAudio(target, url, lead.user_id);
+      await saveOutgoing(lead, target, {
+        content: 'Mensagem de voz', externalId: sent.externalId, mediaUrl: sent.url, mediaType: 'audio', flowId: flow.id,
+      });
+      this.countSend(lead.user_id);
+      return { kind: 'next', note: 'Áudio enviado', sent: true };
+    } catch (err: any) {
+      if (err instanceof FlowSendError && err.transient) throw err;
+      // Sem áudio, a mesma mensagem segue em texto (se o canal o permitir)
+      const fallback = render(cfg.fallback_text || '') || spoken;
+      if (!fallback) throw err;
+      const sent = await sendText(target, fallback);
+      await saveOutgoing(lead, target, { content: sent.content, externalId: sent.externalId, flowId: flow.id });
+      this.countSend(lead.user_id);
+      return { kind: 'next', note: `Enviado em texto: ${err?.message || 'áudio indisponível'}`, sent: true };
+    }
+  }
+
+  // ── Ações no painel ───────────────────────────────────────────────────────
+
+  private async addTag(lead: FlowLead, tag: string) {
+    await dbQuery(
+      `UPDATE leads SET tags = CASE
+         WHEN tags IS NULL THEN ARRAY[$1::text]
+         WHEN NOT ($1::text = ANY(tags)) THEN array_append(tags, $1::text)
+         ELSE tags END
+       WHERE id = $2 AND user_id = $3`,
+      [tag, lead.id, lead.user_id],
+    );
+    lead.tags = [...new Set([...(lead.tags || []), tag])];
+    // Outros fluxos podem estar à espera desta tag
+    void this.triggerFlowsForLead(lead.user_id, lead.id, 'tag', tag);
+  }
+
+  private async moveStage(lead: FlowLead, stage: string) {
+    await dbQuery('UPDATE leads SET status = $1 WHERE id = $2 AND user_id = $3', [stage, lead.id, lead.user_id]);
+    lead.status = stage;
+    // O funil atualiza em direto
+    try {
+      getWebSocketService()?.emitLeadFunnelUpdate(lead.user_id, { leadId: lead.id, leadName: lead.name, newStatus: stage });
+    } catch { /* só atualiza o ecrã */ }
+    void this.triggerFlowsForLead(lead.user_id, lead.id, 'funnel_stage', stage);
+    if (CONVERTED.includes(stage.toLowerCase())) void this.triggerFlowsForLead(lead.user_id, lead.id, 'purchase', stage);
+  }
+
+  // ── Respostas e conversões ────────────────────────────────────────────────
+
+  /** A cada minuto: quem respondeu para de receber; quem comprou conta como conversão do fluxo */
+  private async sweep() {
+    if (this.sweeping) return;
+    this.sweeping = true;
+    try {
+      const replies = await dbQuery(
+        `SELECT DISTINCT ON (e.id) e.*, f.settings, f.name AS flow_name, l.name AS lead_name, m.content AS reply
+           FROM messages m
+           JOIN conversations c ON c.id = m.conversation_id
+           JOIN flow_enrollments e ON e.lead_id = c.lead_id AND e.user_id = c.user_id
+                AND e.status = 'active' AND e.replied_at IS NULL AND m.created_at > e.enrolled_at
+           JOIN remarketing_flows f ON f.id = e.flow_id
+           JOIN leads l ON l.id = e.lead_id
+          WHERE m.direction = 'in' AND m.created_at > NOW() - INTERVAL '15 minutes'
+          ORDER BY e.id, m.created_at DESC
+          LIMIT 200`,
+      );
+      for (const row of replies.rows || []) {
+        await this.handleReply(row).catch((err) => console.error('[FlowExecution] Resposta:', err?.message));
+      }
+
+      // Conversão: comprou até 30 dias depois de entrar no fluxo (os fluxos de pós-venda não contam)
+      const converted = await dbQuery(
+        `UPDATE flow_enrollments e
+            SET converted_at = NOW(),
+                status = CASE WHEN e.status = 'active' THEN 'stopped' ELSE e.status END,
+                stop_reason = CASE WHEN e.status = 'active' THEN 'converted' ELSE e.stop_reason END,
+                finished_at = CASE WHEN e.status = 'active' THEN NOW() ELSE e.finished_at END,
+                next_run_at = CASE WHEN e.status = 'active' THEN NULL ELSE e.next_run_at END
+           FROM leads l, remarketing_flows f
+          WHERE l.id = e.lead_id AND f.id = e.flow_id
+            AND e.converted_at IS NULL AND e.enrolled_at > NOW() - INTERVAL '30 days'
+            AND LOWER(l.status) = ANY($1::text[])
+            AND f.trigger_type <> 'purchase'
+            AND LOWER(COALESCE(e.context->>'entry_stage', '')) <> LOWER(l.status)
+            AND COALESCE(e.context->>'test', '') <> 'true'
+          RETURNING e.flow_id`,
+        [CONVERTED],
+      );
+      for (const row of converted.rows || []) {
+        await dbQuery('UPDATE remarketing_flows SET conversions = conversions + 1 WHERE id = $1', [row.flow_id]);
+      }
+    } catch (err: any) {
+      console.error('[FlowExecution] Verificação de respostas falhou:', err?.message);
+    } finally {
+      this.sweeping = false;
+    }
+  }
+
+  private async handleReply(row: any) {
+    const claimed = await dbQuery(
+      `UPDATE flow_enrollments SET replied_at = NOW() WHERE id = $1 AND replied_at IS NULL AND status = 'active' RETURNING id`,
+      [row.id],
+    );
+    if (!claimed.rows?.length) return;
+
+    const settings = flowSettings(row.settings);
+    const leadRes = await dbQuery('SELECT * FROM leads WHERE id = $1 AND user_id = $2', [row.lead_id, row.user_id]);
+    const lead: FlowLead | undefined = leadRes.rows?.[0];
+    if (!lead) return;
+
+    // "SAIR", "parar"…: sai de todos os fluxos e não volta a entrar
+    if (row.reply && OPT_OUT_RE.test(String(row.reply))) {
+      await this.addTag(lead, OPT_OUT_TAG);
+      await dbQuery(
+        `UPDATE flow_enrollments SET status = 'stopped', stop_reason = 'opt_out', finished_at = NOW(), next_run_at = NULL
+          WHERE lead_id = $1 AND user_id = $2 AND status = 'active'`,
+        [row.lead_id, row.user_id],
+      );
+      return;
+    }
+
+    if (!settings.stop_on_reply) return;
+
+    await dbQuery(
+      `UPDATE flow_enrollments SET status = 'stopped', stop_reason = 'replied', finished_at = NOW(), next_run_at = NULL WHERE id = $1`,
+      [row.id],
+    );
+
+    const { stage, tag, notify } = settings.on_reply;
+    const status = String(lead.status || '').toLowerCase();
+    if (stage && !CONVERTED.includes(status) && status !== String(stage).toLowerCase()) await this.moveStage(lead, String(stage));
+    if (tag) await this.addTag(lead, String(tag));
+    if (notify !== false) {
+      await notificationsService.createNotification(
+        row.user_id, 'flow_reply', `${row.lead_name || lead.name || 'Um lead'} respondeu`,
+        `Ao fluxo "${row.flow_name}". O fluxo parou: a conversa é sua.`, 'message-circle',
+        { leadId: row.lead_id, flowId: row.flow_id },
+      ).catch(() => {});
+    }
   }
 }
 

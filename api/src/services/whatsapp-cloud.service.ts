@@ -97,6 +97,29 @@ export async function sendCloudText(creds: CloudCredentials | null | undefined, 
   });
 }
 
+/** Modelo aprovado pela Meta: o único que pode abrir conversa fora das 24 horas */
+export async function sendCloudTemplate(
+  creds: CloudCredentials | null | undefined,
+  to: string,
+  template: { name: string; language: string; params?: string[] },
+): Promise<any> {
+  const { phoneId, token } = requireCreds(creds);
+  if (!to) throw new CloudSendError('Este contacto não tem número de WhatsApp.');
+  const params = template.params || [];
+  return graph(`/${encodeURIComponent(phoneId)}/messages`, token, {
+    json: {
+      messaging_product: 'whatsapp',
+      to,
+      type: 'template',
+      template: {
+        name: template.name,
+        language: { code: template.language },
+        ...(params.length > 0 ? { components: [{ type: 'body', parameters: params.map((text) => ({ type: 'text', text })) }] } : {}),
+      },
+    },
+  });
+}
+
 const MIME_BY_EXT: Record<string, string> = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
   mp4: 'video/mp4', '3gp': 'video/3gpp', webm: 'video/webm', mov: 'video/quicktime',

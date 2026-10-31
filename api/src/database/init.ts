@@ -444,6 +444,65 @@ const runPendingMigrations = async () => {
     console.warn('[DB] remarketing_flows migration warning:', error.message);
   }
 
+  // Motor dos fluxos: o estado de cada lead fica na base de dados (as esperas sobrevivem aos
+  // deploys), com regras por fluxo e a data em que o lead entrou na etapa atual.
+  try {
+    await pool.query(`
+      ALTER TABLE remarketing_flows ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}';
+      ALTER TABLE remarketing_flows DROP CONSTRAINT IF EXISTS remarketing_flows_trigger_type_check;
+      ALTER TABLE remarketing_flows ADD CONSTRAINT remarketing_flows_trigger_type_check
+        CHECK (trigger_type IN ('funnel_stage', 'tag', 'inactivity', 'purchase', 'lead_score', 'conversation_idle'));
+
+      CREATE TABLE IF NOT EXISTS flow_enrollments (
+        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        flow_id     UUID NOT NULL,
+        lead_id     UUID NOT NULL,
+        user_id     UUID NOT NULL,
+        enrolled_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      -- As inscrições antigas não têm passos por correr: ficam como concluídas
+      ALTER TABLE flow_enrollments ADD COLUMN IF NOT EXISTS status       VARCHAR(20) NOT NULL DEFAULT 'completed';
+      ALTER TABLE flow_enrollments ADD COLUMN IF NOT EXISTS step_index   INTEGER     NOT NULL DEFAULT 0;
+      ALTER TABLE flow_enrollments ADD COLUMN IF NOT EXISTS next_run_at  TIMESTAMPTZ;
+      ALTER TABLE flow_enrollments ADD COLUMN IF NOT EXISTS attempts     INTEGER     NOT NULL DEFAULT 0;
+      ALTER TABLE flow_enrollments ADD COLUMN IF NOT EXISTS stop_reason  VARCHAR(50);
+      ALTER TABLE flow_enrollments ADD COLUMN IF NOT EXISTS context      JSONB       NOT NULL DEFAULT '{}';
+      ALTER TABLE flow_enrollments ADD COLUMN IF NOT EXISTS log          JSONB       NOT NULL DEFAULT '[]';
+      ALTER TABLE flow_enrollments ADD COLUMN IF NOT EXISTS replied_at   TIMESTAMPTZ;
+      ALTER TABLE flow_enrollments ADD COLUMN IF NOT EXISTS converted_at TIMESTAMPTZ;
+      ALTER TABLE flow_enrollments ADD COLUMN IF NOT EXISTS finished_at  TIMESTAMPTZ;
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_flow_enrollments_active
+        ON flow_enrollments(flow_id, lead_id) WHERE status = 'active';
+      CREATE INDEX IF NOT EXISTS idx_flow_enrollments_due
+        ON flow_enrollments(next_run_at) WHERE status = 'active';
+      CREATE INDEX IF NOT EXISTS idx_flow_enrollments_lead
+        ON flow_enrollments(lead_id, enrolled_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_flow_enrollments_flow
+        ON flow_enrollments(flow_id, enrolled_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_messages_in_created
+        ON messages(created_at) WHERE direction = 'in';
+
+      -- Os leads que já existem ficam a NULL (o motor usa o updated_at): preenchê-los aqui
+      -- passava o updated_at de todos para agora
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS stage_changed_at TIMESTAMPTZ;
+      ALTER TABLE leads ALTER COLUMN stage_changed_at SET DEFAULT NOW();
+      CREATE OR REPLACE FUNCTION touch_lead_stage_changed_at()
+      RETURNS TRIGGER LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.status IS DISTINCT FROM OLD.status THEN NEW.stage_changed_at = NOW(); END IF;
+        RETURN NEW;
+      END;
+      $$;
+      DROP TRIGGER IF EXISTS trg_leads_stage_changed_at ON leads;
+      CREATE TRIGGER trg_leads_stage_changed_at
+        BEFORE UPDATE ON leads
+        FOR EACH ROW EXECUTE FUNCTION touch_lead_stage_changed_at();
+    `);
+    console.log('[DB] ✅ flow engine tables verified');
+  } catch (error: any) {
+    console.warn('[DB] flow engine migration warning:', error.message);
+  }
+
   // ── Migration 021: Team Inbox ─────────────────────────────────────────────
   try {
     // Colunas de atribuição em conversations

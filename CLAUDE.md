@@ -189,6 +189,20 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
 - **Sessão**: access token JWT 24h, refresh 7 dias (renovação automática em `api.ts`); sem
   rede ao abrir o app usa o utilizador em cache em vez de terminar a sessão.
 
+## Fluxos de remarketing
+
+- Motor em `api/src/services/flow-execution.service.ts`: o estado de cada lead fica em `flow_enrollments`
+  (passo atual, `next_run_at`), as esperas sobrevivem a deploys. Volta a cada 15 s com no máximo um lead por
+  conta (4 envios/min, protege o WhatsApp de bloqueios). `DISABLE_FLOW_WORKER=true` desliga.
+- Quem entra pelo tempo: `inactivity-scheduler.service.ts` (inatividade, parado na etapa, conversa parada).
+  Eventos: `triggerFlowsForLead` (funil, tag, compra, pontuação). O mesmo lead só repete após `reentry_days`.
+- Envio por canal e janela de 24 horas da Meta: `flow-send.service.ts`. Instagram/Messenger só até 24 horas
+  depois da última mensagem do cliente; WhatsApp oficial fora disso só com modelo aprovado.
+- Quem responde sai do fluxo (`on_reply`: mover, tag, avisar); "SAIR"/"parar" aplica a tag `nao-contactar`.
+- Passo novo: `flowTypes.ts` + `flowVisuals.tsx` + `FlowEditor.tsx` + `runStep` no motor + `flow-validation.ts`.
+- Modelos em `src/app/components/remarketing/flowTemplates.ts` (com mensagens, tempos e ações).
+- Nunca enviar texto genérico: passo sem mensagem é saltado e um fluxo incompleto não pode ser ativado.
+
 ## Testar sem a conta do utilizador
 
 Nunca escrever credenciais reais. Sessão de demonstração local no browser (dev server):

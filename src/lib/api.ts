@@ -178,6 +178,9 @@ class ApiClient {
       this.request<any>(`/api/remarketing/${id}/duplicate`, { method: 'POST' }),
     delete: (id: string) =>
       this.request<void>(`/api/remarketing/${id}`, { method: 'DELETE' }),
+    stats: (id: string) => this.request<any>(`/api/remarketing/${id}/stats`),
+    test: (id: string, leadId: string) =>
+      this.request<any>(`/api/remarketing/${id}/test`, { method: 'POST', body: JSON.stringify({ lead_id: leadId }) }),
   };
 
   aiRemarketing = {

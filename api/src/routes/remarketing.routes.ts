@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { RemarketingService } from '../services/remarketing.service';
+import { flowExecutionService } from '../services/flow-execution.service';
+import { flowProblems } from '../services/flow-validation';
 
 const router = Router();
 const svc = new RemarketingService();
@@ -57,14 +59,14 @@ router.post('/', async (req, res, next) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { name, description, status, trigger_type, trigger_label, steps, template_id } = req.body;
+    const { name, description, status, trigger_type, trigger_label, steps, template_id, settings } = req.body;
 
     if (!name || !trigger_type || !trigger_label) {
       return res.status(400).json({ error: 'name, trigger_type and trigger_label are required' });
     }
 
     const flow = await svc.create(
-      { name, description, status, trigger_type, trigger_label, steps: steps ?? [], template_id },
+      { name, description, status, trigger_type, trigger_label, steps: steps ?? [], template_id, settings },
       userId,
     );
     res.status(201).json(flow);
@@ -96,10 +98,55 @@ router.patch('/:id/toggle', async (req, res, next) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+    const flow = await svc.findById(req.params.id, userId);
+    if (!flow) return res.status(404).json({ error: 'Flow not found' });
+
+    // Um fluxo só fica ativo com tudo preenchido: nunca se envia uma mensagem vazia
+    if (flow.status !== 'active') {
+      const problems = flowProblems(flow);
+      if (problems.length > 0) return res.status(422).json({ error: problems[0], problems });
+    }
+
     const updated = await svc.toggleStatus(req.params.id, userId);
     if (!updated) return res.status(404).json({ error: 'Flow not found' });
 
     res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── GET /api/remarketing/:id/stats ───────────────────────────────────────────
+router.get('/:id/stats', async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const flow = await svc.findById(req.params.id, userId);
+    if (!flow) return res.status(404).json({ error: 'Flow not found' });
+    res.json(await svc.stats(req.params.id, userId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── POST /api/remarketing/:id/test ───────────────────────────────────────────
+// Corre o fluxo para um lead escolhido (esperas de segundos, a qualquer hora). Envia mesmo.
+router.post('/:id/test', async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const flow = await svc.findById(req.params.id, userId);
+    if (!flow) return res.status(404).json({ error: 'Flow not found' });
+
+    const problems = flowProblems(flow);
+    if (problems.length > 0) return res.status(422).json({ error: problems[0], problems });
+
+    const leadId = String(req.body?.lead_id || '');
+    if (!/^[0-9a-f-]{36}$/i.test(leadId)) return res.status(400).json({ error: 'lead_id is required' });
+
+    const ok = await flowExecutionService.startTest(flow, leadId, userId);
+    if (!ok) return res.status(404).json({ error: 'Lead not found' });
+    res.status(202).json({ success: true });
   } catch (err) {
     next(err);
   }

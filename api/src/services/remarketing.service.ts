@@ -2,7 +2,7 @@ import { query } from '../database/connection';
 
 export interface FlowStep {
   id: string;
-  type: 'whatsapp' | 'email' | 'wait' | 'tag' | 'move_stage' | 'condition';
+  type: string;
   label: string;
   config?: Record<string, unknown>;
 }
@@ -15,6 +15,7 @@ export interface CreateFlowDto {
   trigger_label: string;
   steps: FlowStep[];
   template_id?: string;
+  settings?: Record<string, unknown>;
 }
 
 export interface UpdateFlowDto {
@@ -24,6 +25,7 @@ export interface UpdateFlowDto {
   trigger_type?: string;
   trigger_label?: string;
   steps?: FlowStep[];
+  settings?: Record<string, unknown>;
   enrolled_leads?: number;
   conversions?: number;
 }
@@ -54,8 +56,8 @@ export class RemarketingService {
     const steps = Array.isArray(data.steps) ? data.steps : [];
     const result = await query(
       `INSERT INTO remarketing_flows
-         (user_id, name, description, status, trigger_type, trigger_label, steps, template_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
+         (user_id, name, description, status, trigger_type, trigger_label, steps, template_id, settings)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9::jsonb)
        RETURNING *`,
       [
         userId,
@@ -66,6 +68,7 @@ export class RemarketingService {
         data.trigger_label,
         JSON.stringify(steps),
         data.template_id ?? null,
+        JSON.stringify(data.settings ?? {}),
       ],
     );
     return result.rows[0];
@@ -95,6 +98,12 @@ export class RemarketingService {
     if (data.steps !== undefined) {
       fields.push(`steps = $${i}::jsonb`);
       values.push(JSON.stringify(data.steps));
+      i++;
+    }
+
+    if (data.settings !== undefined) {
+      fields.push(`settings = $${i}::jsonb`);
+      values.push(JSON.stringify(data.settings));
       i++;
     }
 
@@ -133,8 +142,8 @@ export class RemarketingService {
 
     const result = await query(
       `INSERT INTO remarketing_flows
-         (user_id, name, description, status, trigger_type, trigger_label, steps, template_id)
-       VALUES ($1, $2, $3, 'draft', $4, $5, $6::jsonb, $7)
+         (user_id, name, description, status, trigger_type, trigger_label, steps, template_id, settings)
+       VALUES ($1, $2, $3, 'draft', $4, $5, $6::jsonb, $7, $8::jsonb)
        RETURNING *`,
       [
         userId,
@@ -144,6 +153,7 @@ export class RemarketingService {
         flow.trigger_label,
         JSON.stringify(flow.steps),
         flow.template_id ?? null,
+        JSON.stringify(flow.settings ?? {}),
       ],
     );
     return result.rows[0];
@@ -155,7 +165,37 @@ export class RemarketingService {
       `DELETE FROM remarketing_flows WHERE id = $1 AND user_id = $2 RETURNING id`,
       [id, userId],
     );
-    return (result.rowCount ?? 0) > 0;
+    const deleted = (result.rowCount ?? 0) > 0;
+    // Quem estava a meio do fluxo deixa de receber mensagens
+    if (deleted) await query(`DELETE FROM flow_enrollments WHERE flow_id = $1 AND user_id = $2`, [id, userId]);
+    return deleted;
+  }
+
+  // ── Resultados de um fluxo: quantos em cada estado e os leads mais recentes ───
+  async stats(id: string, userId: string) {
+    const totals = await query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'active')::int AS active,
+         COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+         COUNT(*) FILTER (WHERE status = 'stopped')::int AS stopped,
+         COUNT(*) FILTER (WHERE replied_at IS NOT NULL)::int AS replied,
+         COUNT(*) FILTER (WHERE converted_at IS NOT NULL)::int AS converted,
+         COUNT(*)::int AS total
+       FROM flow_enrollments
+       WHERE flow_id = $1 AND user_id = $2 AND COALESCE(context->>'test', '') <> 'true'`,
+      [id, userId],
+    );
+    const recent = await query(
+      `SELECT e.id, e.status, e.stop_reason, e.step_index, e.next_run_at, e.enrolled_at, e.replied_at,
+              e.log -> -1 AS last_event, COALESCE(e.context->>'test', '') = 'true' AS is_test, l.name AS lead_name
+         FROM flow_enrollments e
+         LEFT JOIN leads l ON l.id = e.lead_id
+        WHERE e.flow_id = $1 AND e.user_id = $2
+        ORDER BY e.enrolled_at DESC
+        LIMIT 20`,
+      [id, userId],
+    );
+    return { ...totals.rows[0], recent: recent.rows };
   }
 
   // ── Analytics summary ────────────────────────────────────────────────────────

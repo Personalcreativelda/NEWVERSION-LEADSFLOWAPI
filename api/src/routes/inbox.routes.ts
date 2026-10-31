@@ -63,7 +63,7 @@ const upload = multer({
     const allowedMimes = [
       'image/jpeg', 'image/png', 'image/gif', 'image/webp',
       'video/mp4', 'video/webm', 'video/quicktime',
-      'audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/webm',
+      'audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/webm', 'audio/mp4', 'audio/x-m4a', 'audio/aac',
       'application/pdf', 'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/vnd.ms-excel',
