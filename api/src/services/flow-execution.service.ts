@@ -13,12 +13,16 @@ import { ScheduledConversationsService } from './scheduled-conversations.service
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 import { SEND_STEP_TYPES } from './flow-validation';
 import {
-  FlowSendError, generateVoice, isVoiceConfigured, resolveTarget, saveOutgoing, sendAudio, sendEmail, sendText,
-  type FlowLead, type WhatsAppTemplateRef,
+  FlowSendError, generateVoice, isVoiceConfigured, isWindowOpen, resolveTarget, saveOutgoing, sendAudio, sendEmail, sendText,
+  targetForConversation, type FlowLead, type FlowTarget, type WhatsAppTemplateRef,
 } from './flow-send.service';
+import {
+  classifyReply, contextualAcknowledgement, conversationContext, hasActiveAssistant, isAiAvailable, personalizeMessage,
+  transcribeReply, type ReplyIntent,
+} from './flow-context.service';
 
 const TICK_MS = 15_000;
-const SWEEP_MS = 60_000;
+const SWEEP_MS = 30_000;
 /** Enquanto um lead está a ser tratado, nenhuma outra volta lhe toca; se o processo cair, retoma depois disto */
 const LEASE_MINUTES = 10;
 const MAX_SEND_ATTEMPTS = 3;
@@ -28,6 +32,17 @@ const MAX_STEPS_PER_RUN = 60;
 const DEFAULT_TIMEZONE = 'Africa/Maputo';
 /** Tag de quem pediu para não receber mais mensagens: nunca volta a entrar num fluxo */
 export const OPT_OUT_TAG = 'nao-contactar';
+/** Disse que não tem interesse: sai dos fluxos e não volta a receber remarketing (só o pós-venda) */
+export const NOT_INTERESTED_TAG = 'sem-interesse';
+
+/** Com assistente no canal é ele quem responde; se ficar calado, segue a resposta automática */
+const ASSISTANT_GRACE_MS = 3 * 60_000;
+/** Ninguém respondeu ao cliente: avisa a equipa outra vez */
+const HANDOFF_REMINDER_MS = 2 * 3_600_000;
+
+const DEFAULT_AUTO_REPLY = 'Obrigado pela resposta, {{nome}}! Já passei à nossa equipa e falamos consigo muito em breve.';
+const NOT_INTERESTED_REPLY = 'Sem problema, {{nome}}. Obrigado por responder, não voltamos a insistir.';
+const LATER_REPLY = 'Combinado, {{nome}}. Voltamos a falar mais tarde. Obrigado por responder!';
 
 const CONVERTED = ['convertido', 'converted', 'ganho', 'won'];
 const LOST = ['perdido', 'lost'];
@@ -53,7 +68,9 @@ const WAIT_UNITS_MS: Record<string, number> = {
 
 export interface FlowSettings {
   stop_on_reply: boolean;
-  on_reply: { stage?: string; tag?: string; notify?: boolean };
+  on_reply: { stage?: string; tag?: string; notify?: boolean; task?: boolean; auto_reply?: string };
+  /** A IA adapta as mensagens ao que já foi conversado (sem IA segue o texto escrito) */
+  personalize: boolean;
   window_start: number;
   window_end: number;
   weekdays_only: boolean;
@@ -74,6 +91,7 @@ export function flowSettings(raw: any): FlowSettings {
   return {
     stop_on_reply: s.stop_on_reply !== false,
     on_reply: s.on_reply && typeof s.on_reply === 'object' ? s.on_reply : { notify: true },
+    personalize: s.personalize === true,
     window_start: Math.min(23, Math.max(0, numberOr(s.window_start, 8))),
     window_end: Math.min(24, Math.max(1, numberOr(s.window_end, 20))),
     weekdays_only: s.weekdays_only === true,
@@ -136,6 +154,7 @@ type StepOutcome =
   | { kind: 'next'; note?: string; sent?: boolean }
   | { kind: 'goto'; stepId: string; note?: string }
   | { kind: 'end'; note?: string }
+  | { kind: 'stop'; reason: string; note?: string }
   | { kind: 'pause'; ms: number; advance: boolean; note?: string };
 
 export class FlowExecutionService {
@@ -235,6 +254,7 @@ export class FlowExecutionService {
 
     if (!opts.test) {
       if ((lead.tags || []).includes(OPT_OUT_TAG)) return false;
+      if ((lead.tags || []).includes(NOT_INTERESTED_TAG) && flow.trigger_type !== 'purchase') return false;
 
       // Quem já passou por este fluxo há pouco não volta a entrar
       const recent = await dbQuery(
@@ -343,9 +363,14 @@ export class FlowExecutionService {
 
       if (settings.stop_on_reply) {
         const reply = await this.lastReply(e);
-        if (reply !== null) {
-          await this.handleReply({ ...e, settings: flow.settings, flow_name: flow.name, lead_name: lead.name, reply });
+        if (reply) {
+          await this.handleReply({ ...e, settings: flow.settings, flow_name: flow.name, lead_name: lead.name, ...reply });
           return;
+        }
+        // A conversa já está com pessoas: o fluxo não se mete no meio
+        if (!isTest) {
+          const human = await this.humanInConversation(e);
+          if (human) return this.finish(e, 'stopped', human, events, stepIndex);
         }
       }
 
@@ -379,6 +404,7 @@ export class FlowExecutionService {
         return;
       }
       if (outcome.kind === 'end') return this.finish(e, 'completed', null, events, stepIndex);
+      if (outcome.kind === 'stop') return this.finish(e, 'stopped', outcome.reason, events, stepIndex);
       if (outcome.kind === 'goto') {
         const target = steps.findIndex((s) => s?.id === outcome.stepId);
         stepIndex = target >= 0 ? target : stepIndex + 1;
@@ -421,16 +447,116 @@ export class FlowExecutionService {
   }
 
   /** Última resposta do lead desde que entrou no fluxo, ou null */
-  private async lastReply(e: any): Promise<string | null> {
+  private async lastReply(e: any): Promise<{ reply: string; reply_media_type: string | null; reply_media_url: string | null; reply_conversation_id: string } | null> {
     const res = await dbQuery(
-      `SELECT m.content FROM messages m
+      `SELECT m.content, m.media_type, m.media_url, m.conversation_id FROM messages m
          JOIN conversations c ON c.id = m.conversation_id
         WHERE c.lead_id = $1 AND c.user_id = $2 AND m.direction = 'in' AND m.created_at > $3
         ORDER BY m.created_at DESC
         LIMIT 1`,
       [e.lead_id, e.user_id, e.enrolled_at],
     );
-    return res.rows?.length ? String(res.rows[0].content ?? '') : null;
+    const row = res.rows?.[0];
+    if (!row) return null;
+    return {
+      reply: String(row.content ?? ''),
+      reply_media_type: row.media_type ?? null,
+      reply_media_url: row.media_url ?? null,
+      reply_conversation_id: row.conversation_id,
+    };
+  }
+
+  /**
+   * A equipa (ou o assistente) está a falar com o lead? Mensagens enviadas perto de um envio do fluxo
+   * não contam: podem ser o eco do próprio envio, que o WhatsApp devolve pelo webhook.
+   */
+  private async humanInConversation(e: any): Promise<string | null> {
+    const res = await dbQuery(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM conversations c WHERE c.lead_id = $1 AND c.user_id = $2 AND c.status = 'pending'
+         ) AS human_mode,
+         EXISTS (
+           SELECT 1 FROM messages m
+             JOIN conversations c ON c.id = m.conversation_id
+            WHERE c.lead_id = $1 AND c.user_id = $2 AND m.direction = 'out' AND m.campaign_id IS NULL
+              AND m.created_at > $3
+              AND COALESCE(m.metadata->>'source', '') NOT LIKE 'remarketing%'
+              AND NOT EXISTS (
+                SELECT 1 FROM messages own
+                 WHERE own.conversation_id = m.conversation_id
+                   AND own.metadata->>'source' LIKE 'remarketing%'
+                   AND ABS(EXTRACT(EPOCH FROM (own.created_at - m.created_at))) < 60
+              )
+         ) AS took_over`,
+      [e.lead_id, e.user_id, e.enrolled_at],
+    );
+    const row = res.rows?.[0];
+    if (row?.human_mode) return 'human_mode';
+    if (row?.took_over) return 'human_took_over';
+    return null;
+  }
+
+  /** Avisa a equipa, sem repetir o mesmo aviso sobre o mesmo lead no mesmo dia */
+  private async notifyOnce(lead: FlowLead, type: string, title: string, text: string, flowId: string) {
+    const seen = await dbQuery(
+      `SELECT 1 FROM notifications
+        WHERE user_id = $1 AND type = $2 AND metadata->>'leadId' = $3 AND created_at > NOW() - INTERVAL '1 day'
+        LIMIT 1`,
+      [lead.user_id, type, lead.id],
+    );
+    if (seen.rows?.length) return;
+    await notificationsService.createNotification(lead.user_id, type, title, text, 'message-circle', { leadId: lead.id, flowId }).catch(() => {});
+  }
+
+  /** O cliente está à espera de resposta e o fluxo não sabe responder: passa à equipa, em vez de insistir */
+  private async handToTeamWaiting(flow: any, lead: FlowLead): Promise<StepOutcome> {
+    await this.notifyOnce(
+      lead, 'flow_waiting', `${lead.name || 'Um lead'} está à espera de resposta`,
+      `O fluxo "${flow.name}" parou: a última mensagem do cliente ficou sem resposta.`, flow.id,
+    );
+    await this.createFollowUpTask(lead, flow, `Responder a ${lead.name || 'este lead'}: está à espera de resposta`, 1);
+    return { kind: 'stop', reason: 'client_waiting', note: 'O cliente estava à espera de resposta: passou à equipa' };
+  }
+
+  private async createFollowUpTask(lead: FlowLead, flow: any, title: string, dueHours: number) {
+    await this.schedulesService.create({
+      lead_id: lead.id,
+      title,
+      description: `Criada pelo fluxo "${flow.name}"`,
+      scheduled_at: new Date(Date.now() + dueHours * 3_600_000).toISOString(),
+      metadata: { type: 'whatsapp', priority: 'high', source: 'remarketing', flow_id: flow.id },
+    }, lead.user_id);
+  }
+
+  /**
+   * Texto final de uma mensagem do fluxo: adaptado à conversa quando se pode. Se o cliente ficou
+   * sem resposta, só segue uma mensagem que o reconheça; sem isso, passa à equipa.
+   */
+  private async composeText(
+    flow: any, lead: FlowLead, settings: FlowSettings, target: FlowTarget, base: string,
+    opts: { spoken?: boolean; canAdapt?: boolean; ownerName?: string } = {},
+  ): Promise<{ text: string } | { outcome: StepOutcome }> {
+    if (!target.conversationId || !settings.stop_on_reply && !settings.personalize) return { text: base };
+
+    const ctx = await conversationContext(target.conversationId);
+    const waiting = settings.stop_on_reply && ctx.unanswered;
+    const canAdapt = opts.canAdapt !== false && settings.personalize && isAiAvailable() && ctx.history.length > 0 && isWindowOpen(target);
+
+    if (canAdapt) {
+      const adapted = await personalizeMessage({
+        base,
+        history: ctx.history,
+        unanswered: waiting,
+        leadName: lead.name,
+        businessName: settings.business_name || opts.ownerName,
+        goal: flow.description || flow.name,
+        spoken: opts.spoken,
+      });
+      if (adapted) return { text: adapted };
+    }
+    if (waiting) return { outcome: await this.handToTeamWaiting(flow, lead) };
+    return { text: base };
   }
 
   // ── Passos ────────────────────────────────────────────────────────────────
@@ -465,18 +591,18 @@ export class FlowExecutionService {
         const text = render(cfg.message);
         if (!text) return { kind: 'next', note: 'Passo sem mensagem' };
         const channel = step.type === 'message' ? (settings.channel === 'any' ? null : settings.channel) : step.type;
-        return this.deliverText(flow, lead, channel, text, cfg, render);
+        return this.deliverText(flow, lead, channel, text, cfg, render, settings, ownerName);
       }
 
       case 'ab_test': {
         if (!context.variant) context.variant = Math.random() < 0.5 ? 'A' : 'B';
         const text = render(context.variant === 'A' ? cfg.messageA : cfg.messageB);
         if (!text) return { kind: 'next', note: `Versão ${context.variant} sem mensagem` };
-        return this.deliverText(flow, lead, settings.channel === 'any' ? null : settings.channel, text, cfg, render, `Versão ${context.variant} enviada`);
+        return this.deliverText(flow, lead, settings.channel === 'any' ? null : settings.channel, text, cfg, render, settings, ownerName, `Versão ${context.variant} enviada`);
       }
 
       case 'dynamic_audio':
-        return this.deliverAudio(flow, lead, settings, cfg, render);
+        return this.deliverAudio(flow, lead, settings, cfg, render, ownerName);
 
       case 'email': {
         const subject = render(cfg.subject);
@@ -627,8 +753,8 @@ export class FlowExecutionService {
   }
 
   private async deliverText(
-    flow: any, lead: FlowLead, channel: string | null, text: string, cfg: any,
-    render: (t: string) => string, note?: string,
+    flow: any, lead: FlowLead, channel: string | null, baseText: string, cfg: any,
+    render: (t: string) => string, settings: FlowSettings, ownerName: string, note?: string,
   ): Promise<StepOutcome> {
     const target = await resolveTarget(lead, channel);
     if (!target) return { kind: 'next', note: channel ? `Lead sem conversa em ${channel}` : 'Lead sem canal disponível' };
@@ -644,17 +770,25 @@ export class FlowExecutionService {
       }
       : null;
 
-    const sent = await sendText(target, text, template);
+    const composed = await this.composeText(flow, lead, settings, target, baseText, { ownerName });
+    if ('outcome' in composed) return composed.outcome;
+
+    const sent = await sendText(target, composed.text, template);
     await saveOutgoing(lead, target, { content: sent.content, externalId: sent.externalId, flowId: flow.id });
     this.countSend(lead.user_id);
-    return { kind: 'next', note: note || 'Mensagem enviada', sent: true };
+    return { kind: 'next', note: note || (composed.text !== baseText ? 'Mensagem adaptada à conversa e enviada' : 'Mensagem enviada'), sent: true };
   }
 
-  private async deliverAudio(flow: any, lead: FlowLead, settings: FlowSettings, cfg: any, render: (t: string) => string): Promise<StepOutcome> {
+  private async deliverAudio(flow: any, lead: FlowLead, settings: FlowSettings, cfg: any, render: (t: string) => string, ownerName: string): Promise<StepOutcome> {
     const target = await resolveTarget(lead, settings.channel === 'any' ? null : settings.channel);
     if (!target) return { kind: 'next', note: 'Lead sem canal disponível' };
 
-    const spoken = render(cfg.text || '');
+    // Áudio gravado não se adapta: só pode seguir se o cliente não estiver à espera de resposta
+    const composed = await this.composeText(flow, lead, settings, target, render(cfg.text || cfg.fallback_text || ''), {
+      spoken: true, canAdapt: !cfg.audio_url, ownerName,
+    });
+    if ('outcome' in composed) return composed.outcome;
+    const spoken = composed.text;
     try {
       let url: string | null = cfg.audio_url ? String(cfg.audio_url) : null;
       if (!url && spoken && isVoiceConfigured()) url = await generateVoice(spoken, lead.user_id);
@@ -668,7 +802,7 @@ export class FlowExecutionService {
     } catch (err: any) {
       if (err instanceof FlowSendError && err.transient) throw err;
       // Sem áudio, a mesma mensagem segue em texto (se o canal o permitir)
-      const fallback = render(cfg.fallback_text || '') || spoken;
+      const fallback = spoken;
       if (!fallback) throw err;
       const sent = await sendText(target, fallback);
       await saveOutgoing(lead, target, { content: sent.content, externalId: sent.externalId, flowId: flow.id });
@@ -706,13 +840,14 @@ export class FlowExecutionService {
 
   // ── Respostas e conversões ────────────────────────────────────────────────
 
-  /** A cada minuto: quem respondeu para de receber; quem comprou conta como conversão do fluxo */
+  /** A cada 30 segundos: trata as respostas dos clientes; quem comprou conta como conversão do fluxo */
   private async sweep() {
     if (this.sweeping) return;
     this.sweeping = true;
     try {
       const replies = await dbQuery(
-        `SELECT DISTINCT ON (e.id) e.*, f.settings, f.name AS flow_name, l.name AS lead_name, m.content AS reply
+        `SELECT DISTINCT ON (e.id) e.*, f.settings, f.name AS flow_name, l.name AS lead_name, m.content AS reply,
+                m.media_type AS reply_media_type, m.media_url AS reply_media_url, m.conversation_id AS reply_conversation_id
            FROM messages m
            JOIN conversations c ON c.id = m.conversation_id
            JOIN flow_enrollments e ON e.lead_id = c.lead_id AND e.user_id = c.user_id
@@ -726,6 +861,8 @@ export class FlowExecutionService {
       for (const row of replies.rows || []) {
         await this.handleReply(row).catch((err) => console.error('[FlowExecution] Resposta:', err?.message));
       }
+
+      await this.runHandoffs();
 
       // Conversão: comprou até 30 dias depois de entrar no fluxo (os fluxos de pós-venda não contam)
       const converted = await dbQuery(
@@ -766,35 +903,198 @@ export class FlowExecutionService {
     const leadRes = await dbQuery('SELECT * FROM leads WHERE id = $1 AND user_id = $2', [row.lead_id, row.user_id]);
     const lead: FlowLead | undefined = leadRes.rows?.[0];
     if (!lead) return;
+    const flow = { id: row.flow_id, name: row.flow_name };
+
+    // Resposta em áudio: percebe-se pelo texto transcrito
+    let text = String(row.reply ?? '');
+    if (row.reply_media_type === 'audio' && row.reply_media_url) {
+      text = (await transcribeReply(row.reply_media_url)) || '';
+    }
 
     // "SAIR", "parar"…: sai de todos os fluxos e não volta a entrar
-    if (row.reply && OPT_OUT_RE.test(String(row.reply))) {
+    if (text && OPT_OUT_RE.test(text)) {
       await this.addTag(lead, OPT_OUT_TAG);
-      await dbQuery(
-        `UPDATE flow_enrollments SET status = 'stopped', stop_reason = 'opt_out', finished_at = NOW(), next_run_at = NULL
-          WHERE lead_id = $1 AND user_id = $2 AND status = 'active'`,
-        [row.lead_id, row.user_id],
-      );
+      await this.stopAllFor(row, 'opt_out');
       return;
     }
 
-    if (!settings.stop_on_reply) return;
+    const conversationId: string | undefined = row.reply_conversation_id;
+    const ctx = conversationId ? await conversationContext(conversationId) : { history: [], unanswered: true };
+    const intent: ReplyIntent = text ? await classifyReply(text, ctx.history) : 'other';
+    const target = conversationId ? await targetForConversation(conversationId, lead) : null;
+    const assistant = await hasActiveAssistant(target?.channelId, row.user_id);
+    const { stage, tag, notify, task, auto_reply: autoReply } = settings.on_reply;
+    const leadLabel = row.lead_name || lead.name || 'Um lead';
 
-    await dbQuery(
-      `UPDATE flow_enrollments SET status = 'stopped', stop_reason = 'replied', finished_at = NOW(), next_run_at = NULL WHERE id = $1`,
-      [row.id],
-    );
+    // Pós-venda e semelhantes: a sequência continua, mas o cliente não fica sem resposta
+    if (!settings.stop_on_reply) {
+      await this.scheduleHandoff(row, assistant, { reply: autoReply ?? DEFAULT_AUTO_REPLY, intent });
+      if (notify !== false) {
+        await this.notifyOnce(lead, 'flow_reply', `${leadLabel} respondeu`, `Ao fluxo "${row.flow_name}".`, row.flow_id);
+      }
+      return;
+    }
 
-    const { stage, tag, notify } = settings.on_reply;
+    if (intent === 'not_interested') {
+      await this.addTag(lead, NOT_INTERESTED_TAG);
+      await this.stopAllFor(row, 'no_interest', 'O cliente disse que não tem interesse');
+      if (!assistant && target) await this.sendQuickReply(lead, target, render(NOT_INTERESTED_REPLY), flow.id);
+      if (notify !== false) {
+        await this.notifyOnce(lead, 'flow_reply', `${leadLabel} não tem interesse`, `Ao fluxo "${row.flow_name}". Não volta a receber remarketing.`, row.flow_id);
+      }
+      return;
+    }
+
+    if (intent === 'later') {
+      await this.addTag(lead, 'mais-tarde');
+      await this.stopAllFor(row, 'later', 'O cliente pediu para falar mais tarde');
+      await this.createFollowUpTask(lead, flow, `Voltar a falar com ${leadLabel}: pediu mais tarde`, 30 * 24);
+      if (!assistant && target) await this.sendQuickReply(lead, target, render(LATER_REPLY), flow.id);
+      return;
+    }
+
+    // Interessado, com dúvida ou por perceber: a conversa passa para a equipa ou para o assistente
+    await this.finishReplied(row, intent);
     const status = String(lead.status || '').toLowerCase();
     if (stage && !CONVERTED.includes(status) && status !== String(stage).toLowerCase()) await this.moveStage(lead, String(stage));
     if (tag) await this.addTag(lead, String(tag));
+    if (!assistant && task !== false) {
+      await this.createFollowUpTask(lead, flow, `Responder a ${leadLabel}: respondeu ao fluxo`, 1);
+    }
     if (notify !== false) {
+      await this.notifyOnce(
+        lead, 'flow_reply', `${leadLabel} respondeu`,
+        assistant ? `Ao fluxo "${row.flow_name}". O assistente está a responder.` : `Ao fluxo "${row.flow_name}". A conversa é sua.`,
+        row.flow_id,
+      );
+    }
+    await this.scheduleHandoff(row, assistant, { reply: autoReply ?? DEFAULT_AUTO_REPLY, intent, personalize: settings.personalize });
+
+    function render(textToRender: string) {
+      return renderText(textToRender, lead as FlowLead, settings, settings.business_name);
+    }
+  }
+
+  private async finishReplied(row: any, intent: ReplyIntent) {
+    await dbQuery(
+      `UPDATE flow_enrollments
+          SET status = 'stopped', stop_reason = 'replied', finished_at = NOW(), next_run_at = NULL, log = log || $2::jsonb
+        WHERE id = $1`,
+      [row.id, JSON.stringify([{ at: new Date().toISOString(), note: `Respondeu (${intent})` }])],
+    );
+  }
+
+  private async stopAllFor(row: any, reason: string, note?: string) {
+    await dbQuery(
+      `UPDATE flow_enrollments
+          SET status = 'stopped', stop_reason = $3, finished_at = NOW(), next_run_at = NULL, log = log || $4::jsonb
+        WHERE lead_id = $1 AND user_id = $2 AND status = 'active'`,
+      [row.lead_id, row.user_id, reason, JSON.stringify(note ? [{ at: new Date().toISOString(), note }] : [])],
+    );
+  }
+
+  /** Marca o que falta fazer se ninguém responder ao cliente (ver runHandoffs) */
+  private async scheduleHandoff(row: any, assistant: boolean, data: { reply: string; intent: ReplyIntent; personalize?: boolean }) {
+    const now = Date.now();
+    const handoff = {
+      conversation_id: row.reply_conversation_id,
+      reply: data.reply,
+      personalize: data.personalize === true,
+      ack_at: new Date(assistant ? now + ASSISTANT_GRACE_MS : now).toISOString(),
+      remind_at: new Date(now + HANDOFF_REMINDER_MS).toISOString(),
+    };
+    await dbQuery(
+      `UPDATE flow_enrollments SET context = context || jsonb_build_object('handoff', $2::jsonb) WHERE id = $1`,
+      [row.id, JSON.stringify(handoff)],
+    );
+  }
+
+  /** Enquanto ninguém responde ao cliente: resposta automática e, passado um tempo, novo aviso */
+  private async runHandoffs() {
+    const res = await dbQuery(
+      `SELECT e.*, f.name AS flow_name, f.settings
+         FROM flow_enrollments e
+         JOIN remarketing_flows f ON f.id = e.flow_id
+        WHERE e.context ? 'handoff' AND e.replied_at > NOW() - INTERVAL '1 day'
+        LIMIT 100`,
+    );
+    for (const row of res.rows || []) {
+      try {
+        await this.advanceHandoff(row);
+      } catch (err: any) {
+        console.error('[FlowExecution] Resposta ao cliente:', err?.message);
+      }
+    }
+  }
+
+  private async advanceHandoff(row: any) {
+    const handoff = row.context.handoff;
+    const clear = () => dbQuery(`UPDATE flow_enrollments SET context = context - 'handoff' WHERE id = $1`, [row.id]);
+
+    // Já alguém respondeu (equipa ou assistente): não há mais nada a fazer
+    const answered = await dbQuery(
+      `SELECT 1 FROM messages
+        WHERE conversation_id = $1 AND direction = 'out' AND created_at > $2
+          AND COALESCE(metadata->>'source', '') NOT LIKE 'remarketing%'
+        LIMIT 1`,
+      [handoff.conversation_id, row.replied_at],
+    );
+    if (answered.rows?.length) return clear();
+
+    const leadRes = await dbQuery('SELECT * FROM leads WHERE id = $1 AND user_id = $2', [row.lead_id, row.user_id]);
+    const lead: FlowLead | undefined = leadRes.rows?.[0];
+    if (!lead) return clear();
+
+    const now = Date.now();
+    if (handoff.ack_at && new Date(handoff.ack_at).getTime() <= now) {
+      await this.acknowledge(row, lead, handoff);
+      await dbQuery(`UPDATE flow_enrollments SET context = jsonb_set(context, '{handoff,ack_at}', 'null'::jsonb) WHERE id = $1`, [row.id]);
+    }
+
+    if (new Date(handoff.remind_at).getTime() <= now) {
       await notificationsService.createNotification(
-        row.user_id, 'flow_reply', `${row.lead_name || lead.name || 'Um lead'} respondeu`,
-        `Ao fluxo "${row.flow_name}". O fluxo parou: a conversa é sua.`, 'message-circle',
-        { leadId: row.lead_id, flowId: row.flow_id },
+        lead.user_id, 'flow_waiting', `${lead.name || 'Um lead'} continua à espera de resposta`,
+        `Respondeu ao fluxo "${row.flow_name}" há 2 horas e ninguém lhe respondeu.`, 'alert-triangle',
+        { leadId: lead.id, flowId: row.flow_id },
       ).catch(() => {});
+      await clear();
+    }
+  }
+
+  /** "Recebemos a sua mensagem": adaptada ao que o cliente disse, quando há IA */
+  private async acknowledge(row: any, lead: FlowLead, handoff: any) {
+    const base = String(handoff.reply ?? '');
+    if (!base.trim()) return;
+    const settings = flowSettings(row.settings);
+    const target = await targetForConversation(handoff.conversation_id, lead);
+    if (!target) return;
+
+    // Vários fluxos podem parar com a mesma resposta: o cliente só recebe uma
+    const recent = await dbQuery(
+      `SELECT 1 FROM messages
+        WHERE conversation_id = $1 AND metadata->>'source' = 'remarketing_ack' AND created_at > NOW() - INTERVAL '1 hour'
+        LIMIT 1`,
+      [handoff.conversation_id],
+    );
+    if (recent.rows?.length) return;
+
+    let text = renderText(base, lead, settings, settings.business_name);
+    if (handoff.personalize && isAiAvailable()) {
+      const ctx = await conversationContext(handoff.conversation_id);
+      const adapted = await contextualAcknowledgement({ history: ctx.history, leadName: lead.name, businessName: settings.business_name });
+      if (adapted) text = adapted;
+    }
+    await this.sendQuickReply(lead, target, text, row.flow_id);
+  }
+
+  private async sendQuickReply(lead: FlowLead, target: FlowTarget, text: string, flowId: string) {
+    const limit = await checkMessageLimit(lead.user_id, 'messages');
+    if (!limit.allowed) return;
+    try {
+      const sent = await sendText(target, text);
+      await saveOutgoing(lead, target, { content: sent.content, externalId: sent.externalId, flowId, source: 'remarketing_ack' });
+    } catch (err: any) {
+      console.warn('[FlowExecution] Resposta automática não enviada:', err?.message);
     }
   }
 }

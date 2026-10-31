@@ -396,8 +396,11 @@ export class AIService {
                 role = 'user';
             } else if (source === 'ai_assistant' || source === 'user') {
                 role = 'assistant';
-            } else if (source === 'phone' || fromMe === false) {
-                // Echo de mensagem enviada pelo device fisico do contato (comum em @lid)
+            } else if (source === 'remarketing' || source === 'remarketing_ack') {
+                role = 'assistant';
+            } else if (source === 'phone' || meta.fromMe === false || meta.fromMe === 'false') {
+                // Echo de mensagem enviada pelo device fisico do contato (comum em @lid).
+                // Só com fromMe explícito: sem o campo (ex.: envios do painel) é da empresa
                 role = 'user';
             } else {
                 // Padrão seguro: se saiu do sistema, tratar como assistant

@@ -198,7 +198,12 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
   Eventos: `triggerFlowsForLead` (funil, tag, compra, pontuação). O mesmo lead só repete após `reentry_days`.
 - Envio por canal e janela de 24 horas da Meta: `flow-send.service.ts`. Instagram/Messenger só até 24 horas
   depois da última mensagem do cliente; WhatsApp oficial fora disso só com modelo aprovado.
-- Quem responde sai do fluxo (`on_reply`: mover, tag, avisar); "SAIR"/"parar" aplica a tag `nao-contactar`.
+- Quem responde nunca fica sem resposta (`handleReply` + `runHandoffs`): a IA percebe a intenção (`flow-context.service.ts`, com
+  palavras-chave como alternativa). Interessado/dúvida: `on_reply` (mover, tag, tarefa, aviso) e responde o assistente do canal;
+  sem assistente (ou se ele ficar calado 3 min) segue a resposta automática, e ao fim de 2 horas sem resposta avisa de novo.
+  "Sem interesse": tag `sem-interesse` e não volta a entrar. "Mais tarde": tarefa a 30 dias. "SAIR"/"parar": tag `nao-contactar`.
+- Contexto: com `personalize` a IA adapta a mensagem à conversa (só factos da conversa; sem IA segue o texto). Cliente com mensagem
+  sem resposta: só segue uma mensagem que a reconheça, senão passa à equipa. Equipa a falar ou conversa `pending`: o fluxo para.
 - Passo novo: `flowTypes.ts` + `flowVisuals.tsx` + `FlowEditor.tsx` + `runStep` no motor + `flow-validation.ts`.
 - Modelos em `src/app/components/remarketing/flowTemplates.ts` (com mensagens, tempos e ações).
 - Nunca enviar texto genérico: passo sem mensagem é saltado e um fluxo incompleto não pode ser ativado.

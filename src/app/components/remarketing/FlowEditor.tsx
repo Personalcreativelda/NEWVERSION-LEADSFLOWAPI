@@ -8,7 +8,7 @@ import { Switch } from '../ui/switch';
 import { inboxApi } from '../../services/api/inbox';
 import { whatsappBusinessApi, type WaTemplate } from '../../services/api/whatsapp-business';
 import {
-  CHANNEL_OPTIONS, CONDITION_OPTIONS, MESSAGE_VARIABLES, STEP_GROUPS, STEP_NAMES, TRIGGER_OPTIONS, stepSummary,
+  CHANNEL_OPTIONS, CONDITION_OPTIONS, DEFAULT_AUTO_REPLY, MESSAGE_VARIABLES, STEP_GROUPS, STEP_NAMES, TRIGGER_OPTIONS, stepSummary,
   type ActionType, type FlowSettings, type FlowStep, type RemarketingFlow, type TriggerType,
 } from './flowTypes';
 import { STEP_COLORS, STEP_ICONS } from './flowVisuals';
@@ -175,6 +175,7 @@ export function FlowEditor({ flow, isNew = false, onSave, onClose, funnelStages 
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const [settings, setSettings] = useState<FlowSettings>({
     stop_on_reply: true,
+    personalize: true,
     on_reply: { notify: true },
     channel: 'any',
     window_start: 8,
@@ -549,8 +550,22 @@ export function FlowEditor({ flow, isNew = false, onSave, onClose, funnelStages 
             </div>
 
             <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-foreground">Adaptar as mensagens à conversa</span>
+              <Switch checked={settings.personalize === true} onCheckedChange={(personalize) => patchSettings({ personalize })} />
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-foreground">Parar quando o lead responder</span>
               <Switch checked={settings.stop_on_reply !== false} onCheckedChange={(stop_on_reply) => patchSettings({ stop_on_reply })} />
+            </div>
+
+            <div className="space-y-1">
+              <label className={fieldLabelCls}>Resposta automática se ninguém estiver disponível</label>
+              <MessageField
+                value={settings.on_reply?.auto_reply ?? DEFAULT_AUTO_REPLY}
+                onChange={(auto_reply) => patchOnReply({ auto_reply })}
+                rows={2}
+              />
             </div>
 
             {settings.stop_on_reply !== false && (
@@ -562,6 +577,10 @@ export function FlowEditor({ flow, isNew = false, onSave, onClose, funnelStages 
                 <div className="space-y-1">
                   <label className={fieldLabelCls}>Quando responder, aplicar a tag</label>
                   <input value={settings.on_reply?.tag ?? ''} onChange={(e) => patchOnReply({ tag: e.target.value || undefined })} className="w-full" />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-foreground">Criar tarefa para responder</span>
+                  <Switch checked={settings.on_reply?.task !== false} onCheckedChange={(task) => patchOnReply({ task })} />
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-foreground">Avisar-me quando responder</span>

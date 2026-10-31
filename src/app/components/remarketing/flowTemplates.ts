@@ -34,7 +34,7 @@ const note = (text: string) => step('add_note', { text });
 const notify = (title: string) => step('notify', { title });
 const score = (points: number) => step('score', { points: String(points) });
 
-export const FLOW_TEMPLATES: FlowTemplate[] = [
+const TEMPLATES: FlowTemplate[] = [
   {
     id: 'speed-to-lead',
     name: 'Primeiro contacto em 5 minutos',
@@ -139,7 +139,7 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
     channels: ['whatsapp'],
     trigger: 'purchase',
     triggerLabel: 'Compra realizada',
-    settings: { channel: 'any', stop_on_reply: false, on_reply: { notify: false }, reentry_days: 90 },
+    settings: { channel: 'any', stop_on_reply: false, on_reply: { notify: true }, reentry_days: 90 },
     steps: [
       tag('cliente'),
       wait(1, 'horas'),
@@ -250,3 +250,9 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
     ],
   },
 ];
+
+// Todos os modelos adaptam as mensagens à conversa (sem IA segue o texto escrito aqui)
+export const FLOW_TEMPLATES: FlowTemplate[] = TEMPLATES.map((template) => ({
+  ...template,
+  settings: { personalize: true, ...template.settings },
+}));

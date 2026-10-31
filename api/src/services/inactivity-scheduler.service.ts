@@ -5,7 +5,7 @@
  * base grande enche a fila aos poucos, em vez de tudo de uma vez.
  */
 import { query as dbQuery } from '../database/connection';
-import { flowExecutionService, flowSettings, OPT_OUT_TAG } from './flow-execution.service';
+import { flowExecutionService, flowSettings, NOT_INTERESTED_TAG, OPT_OUT_TAG } from './flow-execution.service';
 
 const SWEEP_MS = 5 * 60 * 1000;
 const HOURLY_EVERY = 12; // inatividade e etapas: de 12 em 12 voltas (1 hora)
@@ -28,7 +28,7 @@ const NOT_ENROLLED = (flowParam: string, daysParam: string) => `
      WHERE e.flow_id = ${flowParam} AND e.lead_id = l.id
        AND (e.status = 'active' OR e.enrolled_at > NOW() - make_interval(days => ${daysParam}::int))
   )
-  AND NOT ('${OPT_OUT_TAG}' = ANY(COALESCE(l.tags, ARRAY[]::text[])))`;
+  AND NOT (COALESCE(l.tags, ARRAY[]::text[]) && ARRAY['${OPT_OUT_TAG}', '${NOT_INTERESTED_TAG}']::text[])`;
 
 const firstNumber = (label: string) => {
   const n = parseInt(String(label).match(/(\d+)/)?.[1] || '', 10);

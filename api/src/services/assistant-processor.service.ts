@@ -1,5 +1,6 @@
 // Processador de mensagens dos assistentes de IA
 // Intercepta mensagens recebidas e responde automaticamente usando IA
+import { flowNoteForAssistant } from './flow-context.service';
 import { query } from '../database/connection';
 import { AIService, getAvailableProviders, type AIMessage, type AIProvider, type ProviderConfig } from './ai.service';
 import { AssistantsService } from './assistants.service';
@@ -652,6 +653,7 @@ export class AssistantProcessorService {
         // System prompt: 100% controlado pelas instruções do usuário.
         // Saudações, tom, comportamento inicial e final — tudo definido no prompt.
         let systemPrompt = instructions;
+        const followUpNote = await flowNoteForAssistant(ctx.conversationId);
         if (!systemPrompt) {
             systemPrompt = `Você é ${assistant.assistant_name}, um assistente virtual inteligente. Responda de forma educada, profissional e útil.`;
         }
@@ -664,6 +666,8 @@ export class AssistantProcessorService {
         }
 
         // O idioma do cliente vence o das instruções (os modelos dizem "responda em português")
+        if (followUpNote) systemPrompt += followUpNote;
+
         systemPrompt += '\n\nIDIOMA: responda sempre no idioma em que o cliente escreveu a última mensagem ' +
             '(ex.: se escrever em inglês, responda em inglês), mesmo que as instruções acima indiquem outro idioma. ' +
             'Mantenha respostas concisas e diretas.';

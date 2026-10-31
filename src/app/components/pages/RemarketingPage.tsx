@@ -46,7 +46,13 @@ const stepsFromTemplate = (template: FlowTemplate): FlowStep[] =>
 /** Rascunhos criados com os modelos antigos (só nomes, sem mensagens) recebem o conteúdo do modelo */
 function hydrateLegacyDraft(flow: RemarketingFlow): RemarketingFlow {
   if (flow.status !== 'draft' || !flow.templateId || flow.steps.length === 0) return flow;
-  if (flow.steps.some((step) => step.config && Object.keys(step.config).length > 0)) return flow;
+  if (flow.steps.some((step) => step.config && Object.keys(step.config).length > 0)) {
+    // Rascunhos de modelos anteriores a esta opção também passam a adaptar-se à conversa
+    if (flow.settings?.personalize !== undefined || !FLOW_TEMPLATES.some((t) => t.id === flow.templateId)) return flow;
+    const settings = { ...flow.settings, personalize: true };
+    void api.remarketing.update(flow.id, { settings }).catch(() => { /* tenta na próxima atualização */ });
+    return { ...flow, settings };
+  }
   const template = FLOW_TEMPLATES.find((t) => t.id === flow.templateId);
   if (!template) return flow;
   const upgraded: RemarketingFlow = {
@@ -94,6 +100,11 @@ const STOP_REASONS: Record<string, string> = {
   opt_out: 'Pediu para sair',
   lost: 'Perdido',
   stage_changed: 'Mudou de etapa',
+  no_interest: 'Sem interesse',
+  later: 'Pediu mais tarde',
+  client_waiting: 'À espera de resposta',
+  human_took_over: 'A equipa assumiu',
+  human_mode: 'Com a equipa',
   restarted: 'Reiniciado',
   lead_removed: 'Lead apagado',
   flow_removed: 'Fluxo apagado',

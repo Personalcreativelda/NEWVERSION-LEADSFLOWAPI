@@ -17,7 +17,9 @@ export interface FlowSettings {
   /** Parar a sequência quando o lead responde */
   stop_on_reply?: boolean;
   /** O que acontece quando o lead responde */
-  on_reply?: { stage?: string; tag?: string; notify?: boolean };
+  on_reply?: { stage?: string; tag?: string; notify?: boolean; task?: boolean; auto_reply?: string };
+  /** A IA adapta as mensagens ao que já foi conversado */
+  personalize?: boolean;
   /** Horário de envio (hora local do fuso abaixo) */
   window_start?: number;
   window_end?: number;
@@ -129,6 +131,8 @@ export const CONDITION_OPTIONS = [
   { value: 'tag', label: 'Tem a tag' },
   { value: 'not_tag', label: 'Não tem a tag' },
 ];
+
+export const DEFAULT_AUTO_REPLY = 'Obrigado pela resposta, {{nome}}! Já passei à nossa equipa e falamos consigo muito em breve.';
 
 export const CHANNEL_OPTIONS = [
   { value: 'any', label: 'Canal da última conversa' },

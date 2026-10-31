@@ -114,6 +114,30 @@ export async function resolveTarget(lead: FlowLead, channel?: string | null): Pr
   };
 }
 
+/** A conversa onde o cliente acabou de escrever: é por ela que se responde */
+export async function targetForConversation(conversationId: string, lead: FlowLead): Promise<FlowTarget | null> {
+  const res = await dbQuery(
+    `SELECT c.id, c.remote_jid, c.channel_id, ch.type AS channel_type, ch.credentials AS channel_credentials,
+            (SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id = c.id AND m.direction = 'in') AS last_inbound_at
+       FROM conversations c
+       JOIN channels ch ON ch.id = c.channel_id
+      WHERE c.id = $1 AND c.user_id = $2 AND ch.status IN ('active', 'connected')
+      LIMIT 1`,
+    [conversationId, lead.user_id],
+  );
+  const row = res.rows?.[0];
+  if (!row?.remote_jid || !MESSAGING_TYPES.includes(row.channel_type)) return null;
+  return {
+    conversationId: row.id,
+    remoteJid: row.remote_jid,
+    phone: leadDigits(lead),
+    channelId: row.channel_id,
+    channelType: row.channel_type,
+    credentials: parseCredentials(row.channel_credentials),
+    lastInboundAt: row.last_inbound_at ? new Date(row.last_inbound_at) : null,
+  };
+}
+
 /** A janela de 24 horas da Meta está aberta (ou o canal não tem essa regra)? */
 export function isWindowOpen(target: FlowTarget, now = Date.now()): boolean {
   if (!META_WINDOW_TYPES.has(target.channelType)) return true;
@@ -344,7 +368,7 @@ export async function sendEmail(lead: FlowLead, subject: string, body: string): 
 export async function saveOutgoing(
   lead: FlowLead,
   target: FlowTarget,
-  data: { content: string; externalId?: string | null; mediaUrl?: string; mediaType?: string; flowId: string },
+  data: { content: string; externalId?: string | null; mediaUrl?: string; mediaType?: string; flowId: string; source?: string },
 ): Promise<void> {
   let conversationId = target.conversationId;
   if (!conversationId) {
@@ -375,7 +399,7 @@ export async function saveOutgoing(
     external_id: data.externalId || null,
     media_url: data.mediaUrl || null,
     media_type: data.mediaType || null,
-    metadata: { source: 'remarketing', flow_id: data.flowId, remote_jid: target.remoteJid, channel_type: target.channelType },
+    metadata: { source: data.source || 'remarketing', flow_id: data.flowId, remote_jid: target.remoteJid, channel_type: target.channelType },
   }, lead.user_id);
 
   await dbQuery('UPDATE leads SET last_contact_at = NOW() WHERE id = $1', [lead.id]);
