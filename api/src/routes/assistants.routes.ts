@@ -86,13 +86,19 @@ router.get('/elevenlabs-voices', authMiddleware, async (_req, res) => {
         }
 
         const data: any = await response.json();
-        const voices = (data.voices || []).map((v: any) => ({
-            voice_id: v.voice_id,
-            name: v.name,
-            category: v.category,
-            labels: v.labels,
-            preview_url: v.preview_url,
-        }));
+        const speaksPortuguese = (v: any) =>
+            /portug|^pt/i.test(String(v.labels?.language || ''))
+            || (v.verified_languages || []).some((l: any) => /^pt/i.test(String(l.language || '')));
+        const voices = (data.voices || [])
+            .map((v: any) => ({
+                voice_id: v.voice_id,
+                name: v.name,
+                category: v.category,
+                labels: v.labels,
+                preview_url: v.preview_url,
+                portuguese: speaksPortuguese(v),
+            }))
+            .sort((a: any, b: any) => Number(b.portuguese) - Number(a.portuguese));
 
         res.json({ voices });
     } catch (error: any) {

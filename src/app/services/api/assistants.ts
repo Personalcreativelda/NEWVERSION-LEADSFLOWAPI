@@ -114,7 +114,21 @@ export interface KnowledgeFile {
 
 export const MAX_KNOWLEDGE_FILES = 20; // limite de documentos por assistente
 
+export interface AssistantVoice {
+    voice_id: string;
+    name: string;
+    preview_url?: string;
+    portuguese?: boolean;
+    labels?: Record<string, string>;
+}
+
 export const assistantsApi = {
+    /** Vozes disponíveis para as respostas em áudio (as em português primeiro) */
+    async getVoices(): Promise<AssistantVoice[]> {
+        const { data } = await api.get<{ voices: AssistantVoice[] }>('/assistants/elevenlabs-voices');
+        return data.voices || [];
+    },
+
     /**
      * Lista assistentes disponíveis no marketplace
      */

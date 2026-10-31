@@ -235,11 +235,11 @@
 "3249":["Verify Token:","Verify Token:","Verify Token :"],
 "3258":["Viewer","Lector","Lecteur"],
 "3291":["voice calls phone","voz llamadas teléfono","voix appels téléphone"],
-"3306":["Webhook URL","URL del webhook","URL du webhook"],
-"3307":["Webhook URL:","URL del webhook:","URL du webhook :"],
-"3308":["Webhooks","Webhooks","Webhooks"],
-"3309":["webhooks automations events n8n api","webhooks automatizaciones eventos n8n api","webhooks automatisations événements n8n api"],
-"3311":["Website","Sitio web","Site web"],
-"3312":["WhatsApp","WhatsApp","WhatsApp"],
-"3314":["WhatsApp Business","WhatsApp Business","WhatsApp Business"]
+"3307":["Webhook URL","URL del webhook","URL du webhook"],
+"3308":["Webhook URL:","URL del webhook:","URL du webhook :"],
+"3309":["Webhooks","Webhooks","Webhooks"],
+"3310":["webhooks automations events n8n api","webhooks automatizaciones eventos n8n api","webhooks automatisations événements n8n api"],
+"3312":["Website","Sitio web","Site web"],
+"3313":["WhatsApp","WhatsApp","WhatsApp"],
+"3315":["WhatsApp Business","WhatsApp Business","WhatsApp Business"]
 }

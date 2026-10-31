@@ -16,7 +16,7 @@ import { PageHeader, PageAction } from '../base/PageHeader';
 import { EmptyState } from '../base/EmptyState';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
-import { assistantsApi, MAX_KNOWLEDGE_FILES, type Assistant, type UserAssistant, type CreateAssistantInput, type KnowledgeFile } from '../../services/api/assistants';
+import { assistantsApi, MAX_KNOWLEDGE_FILES, type AssistantVoice, type Assistant, type UserAssistant, type CreateAssistantInput, type KnowledgeFile } from '../../services/api/assistants';
 import { channelsApi } from '../../services/api/inbox';
 import type { Channel } from '../../types/inbox';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
@@ -166,6 +166,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const [selectedUserAssistant, setSelectedUserAssistant] = useState<UserAssistant | null>(null);
   const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([]);
   const [configValues, setConfigValues] = useState<Record<string, any>>({});
+  const [voices, setVoices] = useState<AssistantVoice[]>([]);
+  // Só carrega as vozes quando as respostas em áudio estão ligadas
+  useEffect(() => {
+    if (!configValues.audio_enabled || voices.length > 0) return;
+    assistantsApi.getVoices().then(setVoices).catch(() => {});
+  }, [configValues.audio_enabled, voices.length]);
   const [actionLoading, setActionLoading] = useState(false);
   const [knowledgeFiles, setKnowledgeFiles] = useState<KnowledgeFile[]>([]); // base de conhecimento (RAG)
   const [clientFiles, setClientFiles] = useState<KnowledgeFile[]>([]); // arquivos para enviar ao cliente
@@ -1458,6 +1464,34 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     />
                   </button>
                 </div>
+
+                {configValues.audio_enabled && (
+                  <div className="mt-4 space-y-2">
+                    <label className="block text-sm font-medium text-foreground">Voz</label>
+                    <select
+                      value={configValues.voice_id || ''}
+                      onChange={(e) => setConfigValues({ ...configValues, voice_id: e.target.value })}
+                      className="w-full px-3"
+                      translate="no"
+                    >
+                      <option value="">Voz padrão</option>
+                      {voices.map((voice) => (
+                        <option key={voice.voice_id} value={voice.voice_id}>
+                          {voice.portuguese ? `${voice.name} · PT` : voice.name}
+                        </option>
+                      ))}
+                    </select>
+                    {voices.find((voice) => voice.voice_id === configValues.voice_id)?.preview_url && (
+                      <audio
+                        key={configValues.voice_id}
+                        controls
+                        preload="none"
+                        src={voices.find((voice) => voice.voice_id === configValues.voice_id)?.preview_url}
+                        className="h-10 w-full"
+                      />
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* 🖼️ Multimodalidade — Imagens e Documentos */}

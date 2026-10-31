@@ -3294,6 +3294,7 @@
   "voz chamadas telefone ligacoes",
   "Voz gerada",
   "Voz Mágica",
+  "Voz padrão",
   "Wavoip Painel → Dispositivos → SIP",
   "wavoip-api nao disponivel. Verifique se o arquivo wavoip-api.js esta na pasta public/.",
   "Webhook ativado",
@@ -3339,6 +3340,7 @@
  "patterns": [
   "· expira {0}",
   "{0} · já ligado",
+  "{0} · PT",
   "{0} (Cópia)",
   "{0} +{1} dias",
   "{0} adicionado ao fluxo \"{1}\"",

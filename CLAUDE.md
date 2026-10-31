@@ -208,6 +208,14 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
 - Modelos em `src/app/components/remarketing/flowTemplates.ts` (com mensagens, tempos e ações).
 - Nunca enviar texto genérico: passo sem mensagem é saltado e um fluxo incompleto não pode ser ativado.
 
+## Voz dos assistentes
+
+- Resposta a áudio: `[CONVERSA POR VOZ]` no prompt (curta, como numa chamada) → `toSpokenScript` (texto escrito passa a fala, números por
+  extenso) → `generateElevenLabsAudio` (`ai.service.ts`). Modelo em `ELEVENLABS_TTS_MODEL` (por omissão `eleven_v4`, cai para `eleven_multilingual_v2` se recusado).
+- Nada de SSML: os modelos v3/v4 não o processam. Só marcas da lista `ALLOWED_AUDIO_TAGS`; as outras são removidas para não serem lidas em voz alta.
+- A voz é escolhida por assistente (`config.voice_id`); sem escolha usa `ELEVENLABS_DEFAULT_VOICE_ID`. Uma voz em inglês a falar português soa estrangeira.
+- Links, emails ou mais de 600 caracteres seguem também por escrito. Se o áudio falhar, segue sempre o texto (`ctx.audioFellBack`).
+
 ## Testar sem a conta do utilizador
 
 Nunca escrever credenciais reais. Sessão de demonstração local no browser (dev server):

@@ -44,10 +44,10 @@
 "3131":["Plan upgrade","Mejora de plan","Passage à un forfait supérieur"],
 "3178":["users ·","usuarios ·","utilisateurs ·"],
 "3233":["Checks","Verificaciones","Vérifications"],
-"3329":["WhatsApp via QR","WhatsApp por QR","WhatsApp par QR"],
-"3471":["Test email sent to {0}","Email de prueba enviado a {0}","E-mail de test envoyé à {0}"],
-"3473":["Email sent to {0} of {1} users","Email enviado a {0} de {1} usuarios","E-mail envoyé à {0} sur {1} utilisateurs"],
-"3478":["Send this email to {0} user(s)?","¿Enviar este email a {0} usuario(s)?","Envoyer cet e-mail à {0} utilisateur(s) ?"],
-"3481":["Send to {0}","Enviar a {0}","Envoyer à {0}"],
-"3568":["Report sent to {0}","Informe enviado a {0}","Rapport envoyé à {0}"]
+"3330":["WhatsApp via QR","WhatsApp por QR","WhatsApp par QR"],
+"3473":["Test email sent to {0}","Email de prueba enviado a {0}","E-mail de test envoyé à {0}"],
+"3475":["Email sent to {0} of {1} users","Email enviado a {0} de {1} usuarios","E-mail envoyé à {0} sur {1} utilisateurs"],
+"3480":["Send this email to {0} user(s)?","¿Enviar este email a {0} usuario(s)?","Envoyer cet e-mail à {0} utilisateur(s) ?"],
+"3483":["Send to {0}","Enviar a {0}","Envoyer à {0}"],
+"3570":["Report sent to {0}","Informe enviado a {0}","Rapport envoyé à {0}"]
 }

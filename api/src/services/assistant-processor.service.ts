@@ -2,7 +2,7 @@
 // Intercepta mensagens recebidas e responde automaticamente usando IA
 import { flowNoteForAssistant } from './flow-context.service';
 import { query } from '../database/connection';
-import { AIService, getAvailableProviders, type AIMessage, type AIProvider, type ProviderConfig } from './ai.service';
+import { AIService, getAvailableProviders, needsWrittenCopy, type AIMessage, type AIProvider, type ProviderConfig } from './ai.service';
 import { AssistantsService } from './assistants.service';
 import { WhatsAppService } from './whatsapp.service';
 import { getWebSocketService } from './websocket.service';
@@ -109,6 +109,7 @@ export interface IncomingMessageContext {
     mediaUrl?: string;        // URL da mídia (se armazenada no MinIO)
     incomingMessageId?: string;    // ID da última mensagem recebida
     incomingMessageIds?: string[]; // IDs de TODAS as mensagens enfileiradas (para blue ticks em lote)
+    audioFellBack?: boolean;       // O áudio não chegou a sair e seguiu o texto
 }
 
 export class AssistantProcessorService {
@@ -441,20 +442,13 @@ export class AssistantProcessorService {
                 } else {
                     try {
                         console.log(`[AssistantProcessor] 🎙️ Gerando Áudio Mágico (ElevenLabs) para a resposta...`);
-                        // Voz sempre vinda das variáveis de ambiente (UI não expõe mais esse campo)
-                        const voiceId = process.env.ELEVENLABS_DEFAULT_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
-                        console.log(`[AssistantProcessor] 🎤 VoiceId: ${voiceId} (env: ${!!process.env.ELEVENLABS_DEFAULT_VOICE_ID})`);
-                        // Corrigir a fala: formatar datas/horas/telefones com SSML antes do TTS
-                        let speechText = aiResponse.content;
-                        try {
-                            speechText = await aiService.formatTextForSpeech(aiResponse.content, availableProviders, model);
-                        } catch (ssmlErr: any) {
-                            console.warn('[AssistantProcessor] Falha SSML (usando texto original):', ssmlErr.message);
-                        }
-                        // Empacotar em <speak> para o ElevenLabs interpretar as tags SSML inline
-                        const ssmlSpeech = speechText.includes('<') ? `<speak>${speechText}</speak>` : speechText;
+                        // A voz do assistente; sem escolha, a da plataforma
+                        const voiceId = (typeof config.voice_id === 'string' && config.voice_id) || process.env.ELEVENLABS_DEFAULT_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
+                        console.log(`[AssistantProcessor] 🎤 VoiceId: ${voiceId}`);
+                        // O texto escrito passa a fala: como alguém diria, não como se lê
+                        const speechText = await aiService.toSpokenScript(aiResponse.content, availableProviders, model);
                         const audioBuffer = await aiService.generateElevenLabsAudio(
-                            ssmlSpeech,
+                            speechText,
                             voiceId,
                             elevenLabsApiKey
                         );
@@ -474,7 +468,17 @@ export class AssistantProcessorService {
 
             // 7. Salvar mensagem no banco — website já salva por chunk em humanizedSend(); outros canais salvam aqui.
             if (ctx.channelType !== 'website') {
-                await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId, audioBase64 ? 'audio' : 'text');
+                await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId, audioBase64 && !ctx.audioFellBack ? 'audio' : 'text');
+            }
+
+            // Links, emails ou muita informação não se ouvem bem: seguem também por escrito
+            if (audioBase64 && !ctx.audioFellBack && needsWrittenCopy(aiResponse.content)) {
+                try {
+                    const copyId = await this.sendReply(ctx, aiResponse.content);
+                    if (ctx.channelType !== 'website') await this.saveOutgoingMessage(ctx, aiResponse.content, copyId);
+                } catch (copyErr: any) {
+                    console.warn('[AssistantProcessor] Cópia por escrito não enviada:', copyErr.message);
+                }
             }
 
             // 7b. Concluir a escalação pedida pela IA (após a resposta já ter sido entregue)
@@ -667,6 +671,13 @@ export class AssistantProcessorService {
 
         // O idioma do cliente vence o das instruções (os modelos dizem "responda em português")
         if (followUpNote) systemPrompt += followUpNote;
+
+        // O cliente falou e vai ouvir a resposta: é uma conversa, não uma mensagem escrita
+        if (ctx.mediaType === 'audio' && (config.audio_enabled === true || config.audio_enabled === 'true')) {
+            systemPrompt += '\n\n---\n[CONVERSA POR VOZ]\nO cliente está a falar por áudio e vai ouvir a sua resposta. Responda como numa chamada: ' +
+                'de 1 a 3 frases, comece por reagir ao que ele acabou de dizer, trate de uma ideia de cada vez e faça no máximo uma pergunta. ' +
+                'Sem listas, títulos, emojis nem markdown. Se houver muita informação, diga o essencial e pergunte se quer os detalhes.\n---';
+        }
 
         systemPrompt += '\n\nIDIOMA: responda sempre no idioma em que o cliente escreveu a última mensagem ' +
             '(ex.: se escrever em inglês, responda em inglês), mesmo que as instruções acima indiquem outro idioma. ' +
@@ -1038,7 +1049,9 @@ export class AssistantProcessorService {
         if (typeof creds === 'string') { try { creds = JSON.parse(creds); } catch { creds = {}; } }
 
         // Modo áudio exclusivo: cliente mandou áudio E temos áudio gerado → só envia PTT, sem texto
-        const audioOnlyMode = !!audioBase64 && ctx.mediaType === 'audio';
+        // (no Instagram e no chat do site este envio é só de texto: sem isto o cliente não recebia nada)
+        const audioOnlyMode = !!audioBase64 && ctx.mediaType === 'audio' && !isInstagram && !isWebsite;
+        if (audioBase64 && !audioOnlyMode) ctx.audioFellBack = true;
 
         // 1. Dividir em partes naturais (usado só se não for modo áudio exclusivo)
         const chunks = (!audioOnlyMode && (text.includes('\n\n') || text.length > 280))
@@ -1088,6 +1101,7 @@ export class AssistantProcessorService {
                     console.log(`[AssistantProcessor] ✅ Áudio PTT enviado para ${target} (modo áudio exclusivo)`);
                 } catch (e: any) {
                     console.warn('[AssistantProcessor] ⚠️ Áudio PTT falhou, enviando texto como fallback:', e.message);
+                    ctx.audioFellBack = true;
                     // Fallback: enviar texto se o PTT falhar
                     for (const chunk of this.splitResponse(text)) {
                         if (!chunk.trim()) continue;
@@ -1124,7 +1138,11 @@ export class AssistantProcessorService {
             if (audioOnlyMode && audioBase64) {
                 await this.sendTelegramRecordVoiceAction(botToken, chatId);
                 await this.sleep(2000);
-                await this.sendTelegramAudio(botToken, chatId, audioBase64, ctx.userId).catch(() => {});
+                await this.sendTelegramAudio(botToken, chatId, audioBase64, ctx.userId).catch(async (e: any) => {
+                    console.warn('[AssistantProcessor] Áudio no Telegram falhou, enviando texto:', e?.message);
+                    ctx.audioFellBack = true;
+                    await this.sendTelegramMessage(botToken, chatId, text).catch(() => {});
+                });
             } else {
                 for (const chunk of chunks) {
                     if (!chunk.trim()) continue;
@@ -1140,7 +1158,11 @@ export class AssistantProcessorService {
             const tok = creds.access_token;
             if (audioOnlyMode && audioBase64) {
                 await this.sleep(800);
-                await this.sendWhatsAppCloudAudio(pid, tok, ctx.contactPhone!, audioBase64).catch(() => {});
+                await this.sendWhatsAppCloudAudio(pid, tok, ctx.contactPhone!, audioBase64).catch(async (e: any) => {
+                    console.warn('[AssistantProcessor] Áudio no WhatsApp oficial falhou, enviando texto:', e?.message);
+                    ctx.audioFellBack = true;
+                    await this.sendWhatsAppCloudMessage(pid, tok, ctx.contactPhone!, text).catch(() => {});
+                });
             } else {
                 for (let i = 0; i < chunks.length; i++) {
                     if (!chunks[i].trim()) continue;
@@ -1154,7 +1176,11 @@ export class AssistantProcessorService {
             const rid = ctx.contactPhone!;
             if (audioOnlyMode && audioBase64) {
                 await this.sleep(800);
-                await this.sendFacebookAudio(tok, rid, audioBase64, ctx.userId).catch(() => {});
+                await this.sendFacebookAudio(tok, rid, audioBase64, ctx.userId).catch(async (e: any) => {
+                    console.warn('[AssistantProcessor] Áudio no Messenger falhou, enviando texto:', e?.message);
+                    ctx.audioFellBack = true;
+                    await this.sendFacebookMessage(tok, rid, text).catch(() => {});
+                });
             } else {
                 for (let i = 0; i < chunks.length; i++) {
                     if (!chunks[i].trim()) continue;

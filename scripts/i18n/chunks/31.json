@@ -1,4 +1,5 @@
-{"223":["Add leads","Añadir leads","Ajouter des leads"],
+{
+"223":["Add leads","Añadir leads","Ajouter des leads"],
 "403":["Activate the flow before adding leads","Active el flujo antes de añadir leads","Activez le flux avant d'ajouter des leads"],
 "844":["dd 'de' MMMM, HH:mm","dd 'de' MMMM, HH:mm","dd 'de' MMMM, HH:mm"],
 "1010":["Edit task","Editar tarea","Modifier la tâche"],
@@ -11,12 +12,13 @@
 "3056":["All stages","Todas las etapas","Toutes les étapes"],
 "3190":["Open value","Valor abierto","Valeur en cours"],
 "3199":["Closed sales","Ventas cerradas","Ventes conclues"],
-"3346":["{0} converted","{0} convertido(s)","{0} converti(s)"],
-"3347":["{0} converted · average {1}","{0} convertido(s) · media {1}","{0} converti(s) · moyenne {1}"],
-"3352":["{0} on average in the funnel","{0} de media en el embudo","{0} en moyenne dans l'entonnoir"],
-"3365":["{0} already in the flow","{0} ya en el flujo","{0} déjà dans le flux"],
-"3367":["{0} lead(s) added to the flow","{0} lead(s) añadido(s) al flujo","{0} lead(s) ajouté(s) au flux"],
-"3368":["{0} lead(s) with a value","{0} lead(s) con valor","{0} lead(s) avec valeur"],
-"3384":["{0} asked not to receive","{0} pidió no recibir","{0} a demandé à ne pas recevoir"],
-"3387":["{0} without a channel","{0} sin canal","{0} sans canal"],
-"3573":["Select all ({0})","Seleccionar todos ({0})","Tout sélectionner ({0})"]}
+"3348":["{0} converted","{0} convertido(s)","{0} converti(s)"],
+"3349":["{0} converted · average {1}","{0} convertido(s) · media {1}","{0} converti(s) · moyenne {1}"],
+"3354":["{0} on average in the funnel","{0} de media en el embudo","{0} en moyenne dans l'entonnoir"],
+"3367":["{0} already in the flow","{0} ya en el flujo","{0} déjà dans le flux"],
+"3369":["{0} lead(s) added to the flow","{0} lead(s) añadido(s) al flujo","{0} lead(s) ajouté(s) au flux"],
+"3370":["{0} lead(s) with a value","{0} lead(s) con valor","{0} lead(s) avec valeur"],
+"3386":["{0} asked not to receive","{0} pidió no recibir","{0} a demandé à ne pas recevoir"],
+"3389":["{0} without a channel","{0} sin canal","{0} sans canal"],
+"3575":["Select all ({0})","Seleccionar todos ({0})","Tout sélectionner ({0})"]
+}
