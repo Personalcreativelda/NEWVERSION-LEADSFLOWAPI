@@ -117,6 +117,11 @@ let turn = 0;
 async function runSweep(): Promise<void> {
   const includeDaily = turn % HOURLY_EVERY === 0;
   turn += 1;
+  await runFlowSweep(includeDaily);
+}
+
+/** Procura leads: as conversas paradas sempre; com `includeDaily`, também inatividade e etapas */
+export async function runFlowSweep(includeDaily: boolean): Promise<void> {
   try {
     const flows = await dbQuery(
       `SELECT * FROM remarketing_flows
