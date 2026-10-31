@@ -3,7 +3,7 @@ import { api } from '../../../lib/api';
 import { toast } from 'sonner';
 import {
   GitBranch, Zap, ChevronRight, Play, Pause, Copy, Trash2, BarChart3, ArrowRight,
-  Layers, Repeat2, Pencil, UploadCloud, MoreHorizontal, FlaskConical, Loader2,
+  Layers, Repeat2, Pencil, UploadCloud, MoreHorizontal, FlaskConical, Loader2, UserPlus, Check,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { PageHeader, PageAction } from '../base/PageHeader';
@@ -130,6 +130,10 @@ export default function RemarketingPage() {
   const [testSearch, setTestSearch] = useState('');
   const [testLeadId, setTestLeadId] = useState<string | null>(null);
   const [testSending, setTestSending] = useState(false);
+  const [enrollFlow, setEnrollFlow] = useState<RemarketingFlow | null>(null);
+  const [enrollIds, setEnrollIds] = useState<Set<string>>(new Set());
+  const [enrollStage, setEnrollStage] = useState('');
+  const [enrollSending, setEnrollSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editingFlow, setEditingFlow] = useState<RemarketingFlow | null>(null);
   const [analysisFlow, setAnalysisFlow] = useState<RemarketingFlow | null>(null);
@@ -324,14 +328,65 @@ export default function RemarketingPage() {
     api.remarketing.stats(flow.id).then(setAnalysisStats).catch(() => {});
   };
 
+  const loadPickerLeads = () => {
+    if (testLeads) return;
+    api.leads.list({ limit: 1000 })
+      .then((data: any) => setTestLeads(Array.isArray(data) ? data : (data?.leads ?? [])))
+      .catch(() => setTestLeads([]));
+  };
+
   const openTest = (flow: RemarketingFlow) => {
     setTestFlow(flow);
     setTestLeadId(null);
     setTestSearch('');
-    if (testLeads) return;
-    api.leads.list({ limit: 500 })
-      .then((data: any) => setTestLeads(Array.isArray(data) ? data : (data?.leads ?? [])))
-      .catch(() => setTestLeads([]));
+    loadPickerLeads();
+  };
+
+  const openEnroll = (flow: RemarketingFlow) => {
+    if (flow.status !== 'active') {
+      toast.error('Ative o fluxo antes de adicionar leads');
+      return;
+    }
+    setEnrollFlow(flow);
+    setEnrollIds(new Set());
+    setEnrollStage('');
+    setTestSearch('');
+    loadPickerLeads();
+  };
+
+  const enrollCandidates = (testLeads ?? []).filter((lead) =>
+    (!enrollStage || String(lead.status || '').toLowerCase() === enrollStage)
+    && matchesSearch(testSearch, lead.name, lead.nome, lead.phone, lead.whatsapp, lead.email));
+
+  const toggleEnrollLead = (id: string) => setEnrollIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
+
+  const runEnroll = async () => {
+    if (!enrollFlow || enrollIds.size === 0) return;
+    setEnrollSending(true);
+    try {
+      const r = await api.remarketing.enroll(enrollFlow.id, [...enrollIds]);
+      const skipped = r.already + r.opted_out + r.no_channel + r.not_found;
+      if (r.enrolled > 0) toast.success(`${r.enrolled} lead(s) adicionado(s) ao fluxo`);
+      if (skipped > 0) {
+        const reasons = [
+          r.already > 0 && `${r.already} já no fluxo`,
+          r.opted_out > 0 && `${r.opted_out} pediu para não receber`,
+          r.no_channel > 0 && `${r.no_channel} sem canal`,
+        ].filter(Boolean).join(' · ');
+        toast.info(`Ficaram de fora: ${reasons || skipped}`);
+      }
+      setEnrollFlow(null);
+      fetchFlows(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível adicionar os leads');
+    } finally {
+      setEnrollSending(false);
+    }
   };
 
   const runTest = async () => {
@@ -629,6 +684,9 @@ export default function RemarketingPage() {
                               <DropdownMenuItem onClick={() => handleDuplicate(flow)}>
                                 <Copy className="w-4 h-4 mr-2" /> Duplicar
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEnroll(flow)}>
+                                <UserPlus className="w-4 h-4 mr-2" /> Adicionar leads
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => openTest(flow)}>
                                 <FlaskConical className="w-4 h-4 mr-2" /> Testar com um lead
                               </DropdownMenuItem>
@@ -823,6 +881,73 @@ export default function RemarketingPage() {
             )}
           </div>
         )}
+      </AppModal>
+
+      {/* Adicionar leads à mão */}
+      <AppModal
+        open={!!enrollFlow}
+        onOpenChange={(o) => !o && setEnrollFlow(null)}
+        size="md"
+        title="Adicionar leads"
+        description={enrollFlow?.name}
+        footer={(
+          <>
+            <AppButton variant="outline" onClick={() => setEnrollFlow(null)}>Cancelar</AppButton>
+            <AppButton onClick={runEnroll} disabled={enrollIds.size === 0} loading={enrollSending}>
+              {enrollIds.size > 0 ? `Adicionar ${enrollIds.size}` : 'Adicionar'}
+            </AppButton>
+          </>
+        )}
+      >
+        <div className="space-y-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input value={testSearch} onChange={(e) => setTestSearch(e.target.value)} placeholder="Pesquisar lead" className="w-full px-3" />
+            <select value={enrollStage} onChange={(e) => setEnrollStage(e.target.value)} className="w-full px-3">
+              <option value="">Todas as etapas</option>
+              {funnelStages.map((stage) => <option key={stage.value} value={stage.value}>{stage.label}</option>)}
+            </select>
+          </div>
+          {testLeads === null ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  const ids = enrollCandidates.map((lead) => lead.id);
+                  const all = ids.length > 0 && ids.every((id) => enrollIds.has(id));
+                  setEnrollIds(all ? new Set() : new Set(ids));
+                }}
+                className="text-sm font-medium text-primary hover:opacity-80"
+              >
+                {enrollCandidates.length > 0 && enrollCandidates.every((lead) => enrollIds.has(lead.id))
+                  ? 'Limpar seleção'
+                  : `Selecionar todos (${enrollCandidates.length})`}
+              </button>
+              <ul className="divide-y divide-border rounded-lg border border-border">
+                {enrollCandidates.slice(0, 100).map((lead) => {
+                  const checked = enrollIds.has(lead.id);
+                  return (
+                    <li key={lead.id}>
+                      <button
+                        type="button"
+                        aria-pressed={checked}
+                        onClick={() => toggleEnrollLead(lead.id)}
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+                      >
+                        <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border ${checked ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}>
+                          {checked && <Check className="h-3.5 w-3.5" />}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-foreground" translate="no">{lead.name || lead.nome || '—'}</span>
+                        <span className="flex-shrink-0 text-xs text-muted-foreground" translate="no">{lead.whatsapp || lead.phone || ''}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </div>
       </AppModal>
 
       {/* Testar com um lead */}

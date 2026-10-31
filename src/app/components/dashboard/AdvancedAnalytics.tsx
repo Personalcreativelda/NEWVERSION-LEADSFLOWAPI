@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { Users, Target, DollarSign, Clock, Zap, Lightbulb } from 'lucide-react';
+import { Users, Target, DollarSign, Clock, Zap, Lightbulb, Wallet } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import { formatMoney, formatPercent, getLocale } from '../../utils/format';
 
@@ -223,6 +223,14 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
     const lostRate = total > 0 ? ((lost / total) * 100).toFixed(1) : '0';
     const qualificationRate = total > 0 ? ((qualified / total) * 100).toFixed(1) : '0';
 
+    // Dinheiro: o que já entrou e o que está em jogo (sem os fechados nem os perdidos)
+    const leadValue = (l: Lead) => Number(l.valor) || 0;
+    const wonLeads = leads.filter(l => (l.status || '').toLowerCase() === 'convertido');
+    const openLeads = leads.filter(l => !['convertido', 'perdido'].includes((l.status || '').toLowerCase()));
+    const salesValue = wonLeads.reduce((sum, l) => sum + leadValue(l), 0);
+    const openValue = openLeads.reduce((sum, l) => sum + leadValue(l), 0);
+    const openWithValue = openLeads.filter(l => leadValue(l) > 0).length;
+
     // ✅ CALCULAR VALOR MÉDIO REAL - Usar campo 'valor' dos leads convertidos
     const convertedLeads = leads.filter(l =>
       (l.status || '').toLowerCase() === 'convertido' && (l.valor || 0) > 0
@@ -392,6 +400,10 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
       previousWeekLeads,
       absoluteGrowth,
       growthRate,
+      salesValue,
+      salesCount: wonLeads.length,
+      openValue,
+      openWithValue,
       // ✅ NOVO: Status dinâmicos com contagem
       dynamicStatuses: sortedStatuses.map(([status, count], index) => ({
         status,
@@ -407,7 +419,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
 
   return (
     <div className="space-y-6">
-      {/* KPIs: grelha de 2 colunas, só o ícone pequeno; as métricas sem dados viram uma nota no fim */}
+      {/* KPIs: sempre os mesmos 4; o valor médio e o tempo no funil são notas destes cartões */}
       {(() => {
         const formatDays = (d: number) =>
           d < 1 ? `${Math.round(d * 24)} h` : d < 30 ? `${d} dias` : `${Math.round(d / 30)} meses`;
@@ -416,7 +428,14 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
           return `${n > 0 ? '+' : ''}${formatPercent(n)}`;
         };
         const kpis: { label: string; value: string; note?: string; noteTone?: 'up' | 'down' | 'neutral'; icon: any; color: string }[] = [
-          { label: 'Taxa de conversão', value: formatPercent(metrics.conversionRate), icon: Target, color: 'text-green-600' },
+          {
+            label: 'Taxa de conversão',
+            value: formatPercent(metrics.conversionRate),
+            note: metrics.avgTimeInFunnel > 0 ? `${formatDays(metrics.avgTimeInFunnel)} em média no funil` : undefined,
+            noteTone: 'neutral',
+            icon: Target,
+            color: 'text-green-600',
+          },
           {
             // Novos leads da semana (nunca negativo); a comparação só aparece a verde quando
             // sobe — quando desce mostra só quantos houve na semana anterior, sem vermelho
@@ -430,27 +449,26 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
             color: 'text-green-600',
           },
         ];
-        if (metrics.avgValue > 0) {
-          kpis.push({
-            label: 'Valor médio',
-            value: formatMoney(metrics.avgValue),
-            note: `${signed(metrics.avgValueChange)} vs mês anterior`,
-            noteTone: parseFloat(metrics.avgValueChange) >= 0 ? 'up' : 'down',
+        kpis.push(
+          {
+            label: 'Vendas fechadas',
+            value: formatMoney(metrics.salesValue),
+            note: metrics.avgValue > 0
+              ? `${metrics.salesCount} convertido(s) · média ${formatMoney(metrics.avgValue)}`
+              : `${metrics.salesCount} convertido(s)`,
+            noteTone: 'neutral',
             icon: DollarSign,
+            color: 'text-green-600',
+          },
+          {
+            label: 'Valor em aberto',
+            value: formatMoney(metrics.openValue),
+            note: `${metrics.openWithValue} lead(s) com valor`,
+            noteTone: 'neutral',
+            icon: Wallet,
             color: 'text-blue-600',
-          });
-        }
-        if (metrics.avgTimeInFunnel > 0) {
-          const change = parseFloat(metrics.avgTimeChange);
-          kpis.push({
-            label: 'Tempo médio no funil',
-            value: formatDays(metrics.avgTimeInFunnel),
-            note: change !== 0 ? `${signed(change)} vs mês anterior` : undefined,
-            noteTone: change <= 0 ? 'up' : 'down',
-            icon: Clock,
-            color: 'text-primary',
-          });
-        }
+          },
+        );
         return (
           <div className="space-y-3">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -460,7 +478,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                     <k.icon className={`w-4 h-4 flex-shrink-0 ${k.color}`} />
                     <p className="text-xs sm:text-sm text-muted-foreground truncate">{k.label}</p>
                   </div>
-                  <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${k.color}`}>{k.value}</p>
+                  <p className={`mt-1.5 truncate text-xl font-semibold tabular-nums sm:text-2xl ${k.color}`} title={k.value}>{k.value}</p>
                   {k.note && (
                     <p className={`mt-0.5 text-xs ${k.noteTone === 'down' ? 'text-red-600' : k.noteTone === 'neutral' ? 'text-muted-foreground' : 'text-green-600'}`}>{k.note}</p>
                   )}

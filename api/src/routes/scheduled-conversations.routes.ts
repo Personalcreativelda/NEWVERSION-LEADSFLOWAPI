@@ -108,14 +108,15 @@ router.put('/:id', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { title, description, scheduled_at, status, metadata } = req.body || {};
-    const conversation = await scheduledService.update(req.params.id, { title, description, scheduled_at, status, metadata }, user.id);
+    const { lead_id, title, description, scheduled_at, status, metadata } = req.body || {};
+    const conversation = await scheduledService.update(req.params.id, { lead_id, title, description, scheduled_at, status, metadata }, user.id);
     if (!conversation) {
       return res.status(404).json({ error: 'Scheduled conversation not found' });
     }
 
     res.json(conversation);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.status === 404) return res.status(404).json({ error: error.message });
     next(error);
   }
 });

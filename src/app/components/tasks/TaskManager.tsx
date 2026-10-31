@@ -12,6 +12,7 @@ import {
   Plus,
   Calendar as CalendarIcon,
   CheckCircle2,
+  Pencil,
   Circle,
   Trash2,
   Bell,
@@ -105,6 +106,8 @@ const PRIORITY_LEVELS = [
 export default function TaskManager({ leads, isDark = false }: TaskManagerProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
+  /** Tarefa a ser editada no mesmo formulário (null = nova) */
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'today' | 'overdue' | 'upcoming' | 'completed'>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -199,9 +202,50 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   const [showFilters, setShowFilters] = useState(false);
   const activeFilterCount = (priorityFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0);
 
+  const openEditTask = (task: Task) => {
+    setEditingTaskId(task.id);
+    setNewTask({
+      title: task.title,
+      description: task.description || '',
+      leadId: task.leadId || '',
+      type: task.type,
+      priority: task.priority,
+      dueDate: new Date(task.dueDate),
+      reminderDate: task.reminderDate ? new Date(task.reminderDate) : undefined,
+      notes: task.notes || '',
+    });
+    setShowNewTaskModal(true);
+  };
+
+  const closeTaskModal = (open = false) => {
+    setShowNewTaskModal(open);
+    if (!open) {
+      setEditingTaskId(null);
+      resetNewTaskForm();
+    }
+  };
+
   const handleCreateTask = async () => {
     if (!newTask.title.trim()) {
       toast.error('Preencha o título da tarefa');
+      return;
+    }
+    if (editingTaskId) {
+      try {
+        const updated = await scheduledConversationsApi.update(editingTaskId, {
+          lead_id: newTask.leadId || null,
+          title: newTask.title.trim(),
+          description: newTask.description || '',
+          scheduled_at: newTask.dueDate.toISOString(),
+          metadata: { type: newTask.type, priority: newTask.priority, notes: newTask.notes || undefined },
+        });
+        setTasks((prev) => prev.map((t) => (t.id === editingTaskId ? toTask(updated, leads) : t)));
+        closeTaskModal();
+        toast.success('Tarefa atualizada');
+        notifySchedulesChanged();
+      } catch (err: any) {
+        toast.error(err?.message || 'Não foi possível atualizar a tarefa');
+      }
       return;
     }
     try {
@@ -219,8 +263,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
         },
       });
       setTasks((prev) => [toTask(created, leads), ...prev]);
-      setShowNewTaskModal(false);
-      resetNewTaskForm();
+      closeTaskModal();
       toast.success('Tarefa criada');
       notifySchedulesChanged();
     } catch (err: any) {
@@ -464,7 +507,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
 
                           <Badge variant="outline" className={`gap-1 ${isOverdue ? 'border-red-500 text-red-600' : isDueToday ? 'border-orange-500 text-orange-600' : ''}`}>
                             <CalendarIcon className="w-3 h-3" />
-                            {format(new Date(task.dueDate), "dd 'de' MMMM", { locale: ptBR })}
+                            {format(new Date(task.dueDate), "dd 'de' MMMM, HH:mm", { locale: ptBR })}
                           </Badge>
 
                           {isOverdue && (
@@ -477,6 +520,16 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                       </div>
 
                       <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label="Editar tarefa"
+                          title="Editar"
+                          onClick={() => openEditTask(task)}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -496,12 +549,12 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
       </div>
 
       {/* Modal de Nova Tarefa */}
-      <Dialog open={showNewTaskModal} onOpenChange={setShowNewTaskModal}>
+      <Dialog open={showNewTaskModal} onOpenChange={closeTaskModal}>
         <DialogContent className="max-w-2xl bg-card border border-border shadow-2xl p-6">
           <DialogHeader>
-            <DialogTitle className="text-foreground dark:text-foreground">Nova tarefa</DialogTitle>
+            <DialogTitle className="text-foreground dark:text-foreground">{editingTaskId ? 'Editar tarefa' : 'Nova tarefa'}</DialogTitle>
             <DialogDescription className="sr-only">
-              Nova tarefa
+              {editingTaskId ? 'Editar tarefa' : 'Nova tarefa'}
             </DialogDescription>
           </DialogHeader>
 
@@ -594,16 +647,16 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
               <DateTimePicker
                 value={toDateTimeValue(newTask.dueDate)}
                 onChange={(value) => setNewTask({ ...newTask, dueDate: new Date(value) })}
-                disablePast
+                disablePast={!editingTaskId}
               />
             </div>
 
             <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end pt-4">
-              <Button variant="outline" onClick={() => setShowNewTaskModal(false)}>
+              <Button variant="outline" onClick={() => closeTaskModal()}>
                 Cancelar
               </Button>
               <Button onClick={handleCreateTask}>
-                Criar tarefa
+                {editingTaskId ? 'Guardar' : 'Criar tarefa'}
               </Button>
             </div>
           </div>

@@ -17,6 +17,14 @@ const mapPostgrestCodeToStatus = (code?: string): number => {
   }
 };
 
+/** Códigos da base de dados (5 caracteres). Outros erros com "code" (rede, ficheiros…) seguem o caminho normal. */
+const SQLSTATE = /^[0-9A-Z]{5}$/;
+const SQL_MESSAGES: Record<string, string> = {
+  '23503': 'Este registo está ligado a outros dados.',
+  '23505': 'Já existe um registo com estes dados.',
+  '23502': 'Falta preencher um campo obrigatório.',
+};
+
 export const errorMiddleware = async (
   error: unknown,
   req: Request,
@@ -40,6 +48,15 @@ export const errorMiddleware = async (
     return res.status(503).json({
       error: 'Base de dados temporariamente indisponível',
       code: 'SERVER_UNAVAILABLE',
+    });
+  }
+
+  // O texto da base de dados fica só nos registos: não diz nada a quem usa o painel e expõe a estrutura
+  if (isPostgresError(error) && SQLSTATE.test(error.code || '')) {
+    const code = error.code as string;
+    const isDataError = code.startsWith('22') || code.startsWith('23');
+    return res.status(isDataError ? mapPostgrestCodeToStatus(code) : 500).json({
+      error: SQL_MESSAGES[code] || 'Não foi possível concluir o pedido. Tente de novo.',
     });
   }
 

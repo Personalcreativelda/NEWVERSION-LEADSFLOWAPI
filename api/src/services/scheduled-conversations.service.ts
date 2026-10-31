@@ -46,11 +46,21 @@ export class ScheduledConversationsService {
     return row ? this.findById(row.id, userId) : row;
   }
 
-  async update(id: string, data: { title?: string; description?: string; scheduled_at?: string; status?: string; metadata?: Record<string, unknown> }, userId: string) {
+  async update(id: string, data: { lead_id?: string | null; title?: string; description?: string; scheduled_at?: string; status?: string; metadata?: Record<string, unknown> }, userId: string) {
     const fields: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
 
+    if (data.lead_id !== undefined) {
+      // Só leads desta conta (o agendamento devolve o nome e o contacto do lead)
+      if (data.lead_id) {
+        const lead = await query('SELECT 1 FROM leads WHERE id = $1 AND user_id = $2', [data.lead_id, userId]);
+        if (lead.rows.length === 0) throw Object.assign(new Error('Lead não encontrado'), { status: 404 });
+      }
+      fields.push(`lead_id = $${paramIndex}`);
+      values.push(data.lead_id || null);
+      paramIndex++;
+    }
     if (data.title !== undefined) {
       fields.push(`title = $${paramIndex}`);
       values.push(data.title);
@@ -67,28 +77,25 @@ export class ScheduledConversationsService {
       paramIndex++;
     }
     if (data.status !== undefined) {
-      fields.push(`status = ${paramIndex}`);
+      fields.push(`status = $${paramIndex}`);
       values.push(data.status);
       paramIndex++;
     }
     if (data.metadata && typeof data.metadata === 'object') {
       // Junta ao que já existe (não apaga a origem, o assistente, etc.)
-      fields.push(`metadata = COALESCE(metadata, '{}'::jsonb) || ${paramIndex}::jsonb`);
+      fields.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${paramIndex}::jsonb`);
       values.push(JSON.stringify(data.metadata));
       paramIndex++;
     }
     fields.push('updated_at = NOW()');
 
-    if (fields.length === 0) {
-      return this.findById(id, userId);
-    }
-
     values.push(id, userId);
     const result = await query(
-      `UPDATE scheduled_conversations SET ${fields.join(', ')} WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1} RETURNING *`,
+      `UPDATE scheduled_conversations SET ${fields.join(', ')} WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1} RETURNING id`,
       values
     );
-    return result.rows[0];
+    // Com o nome do lead, para o ecrã atualizar sem recarregar
+    return result.rows[0] ? this.findById(id, userId) : null;
   }
 
   async delete(id: string, userId: string) {

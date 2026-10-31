@@ -129,6 +129,28 @@ router.get('/:id/stats', async (req, res, next) => {
   }
 });
 
+// ── POST /api/remarketing/:id/enroll ─────────────────────────────────────────
+// Adicionar leads ao fluxo à mão
+router.post('/:id/enroll', async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const flow = await svc.findById(req.params.id, userId);
+    if (!flow) return res.status(404).json({ error: 'Flow not found' });
+    if (flow.status !== 'active') return res.status(409).json({ error: 'Ative o fluxo antes de adicionar leads' });
+
+    const leadIds = Array.isArray(req.body?.lead_ids)
+      ? [...new Set(req.body.lead_ids.map(String))].filter((id: any) => /^[0-9a-f-]{36}$/i.test(id)) as string[]
+      : [];
+    if (leadIds.length === 0) return res.status(400).json({ error: 'lead_ids is required' });
+    if (leadIds.length > 1000) return res.status(400).json({ error: 'No máximo 1000 leads de cada vez' });
+
+    res.json(await flowExecutionService.enrollManually(flow, leadIds, userId));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── POST /api/remarketing/:id/test ───────────────────────────────────────────
 // Corre o fluxo para um lead escolhido (esperas de segundos, a qualquer hora). Envia mesmo.
 router.post('/:id/test', async (req, res, next) => {

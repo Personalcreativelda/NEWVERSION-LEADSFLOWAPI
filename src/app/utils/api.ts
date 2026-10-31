@@ -1293,7 +1293,7 @@ export const scheduledConversationsApi = {
     }, true);
   },
 
-  update: async (id: string, data: { title?: string; description?: string; scheduled_at?: string; status?: string; metadata?: ScheduledConversation['metadata'] }): Promise<ScheduledConversation> => {
+  update: async (id: string, data: { lead_id?: string | null; title?: string; description?: string; scheduled_at?: string; status?: string; metadata?: ScheduledConversation['metadata'] }): Promise<ScheduledConversation> => {
     return apiCall(`/scheduled-conversations/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

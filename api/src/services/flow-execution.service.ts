@@ -242,7 +242,7 @@ export class FlowExecutionService {
   async enrollLead(
     flow: any,
     leadId: string,
-    opts: { delayMs?: number; entryStage?: string; test?: boolean } = {},
+    opts: { delayMs?: number; entryStage?: string; test?: boolean; manual?: boolean } = {},
   ): Promise<boolean> {
     const settings = flowSettings(flow.settings);
     const steps: any[] = Array.isArray(flow.steps) ? flow.steps : [];
@@ -256,15 +256,17 @@ export class FlowExecutionService {
       if ((lead.tags || []).includes(OPT_OUT_TAG)) return false;
       if ((lead.tags || []).includes(NOT_INTERESTED_TAG) && flow.trigger_type !== 'purchase') return false;
 
-      // Quem já passou por este fluxo há pouco não volta a entrar
-      const recent = await dbQuery(
-        `SELECT 1 FROM flow_enrollments
-          WHERE flow_id = $1 AND lead_id = $2
-            AND (status = 'active' OR enrolled_at > NOW() - make_interval(days => $3::int))
-          LIMIT 1`,
-        [flow.id, leadId, settings.reentry_days],
-      );
-      if (recent.rows?.length) return false;
+      // Quem já passou por este fluxo há pouco não volta a entrar (quem adiciona à mão decide)
+      if (!opts.manual) {
+        const recent = await dbQuery(
+          `SELECT 1 FROM flow_enrollments
+            WHERE flow_id = $1 AND lead_id = $2
+              AND (status = 'active' OR enrolled_at > NOW() - make_interval(days => $3::int))
+            LIMIT 1`,
+          [flow.id, leadId, settings.reentry_days],
+        );
+        if (recent.rows?.length) return false;
+      }
 
       const sends = steps.some((s) => SEND_STEP_TYPES.has(s?.type) && s.type !== 'email');
       if (sends && !(await resolveTarget(lead, settings.channel === 'any' ? null : settings.channel))) return false;
@@ -273,6 +275,7 @@ export class FlowExecutionService {
     const context: Record<string, any> = {};
     if (opts.entryStage) context.entry_stage = opts.entryStage;
     if (opts.test) context.test = true;
+    if (opts.manual) context.manual = true;
 
     const inserted = await dbQuery(
       `INSERT INTO flow_enrollments (flow_id, lead_id, user_id, status, step_index, next_run_at, context)
@@ -287,6 +290,33 @@ export class FlowExecutionService {
       await dbQuery('UPDATE remarketing_flows SET enrolled_leads = enrolled_leads + 1 WHERE id = $1', [flow.id]);
     }
     return true;
+  }
+
+  /**
+   * Adicionados à mão: entram logo, mesmo que já tenham passado pelo fluxo e seja qual for a etapa.
+   * Quem pediu para sair ou disse que não tem interesse fica sempre de fora.
+   */
+  async enrollManually(flow: any, leadIds: string[], userId: string) {
+    const counts = { enrolled: 0, already: 0, opted_out: 0, no_channel: 0, not_found: 0 };
+    const res = await dbQuery('SELECT id, status, tags FROM leads WHERE user_id = $1 AND id = ANY($2::uuid[])', [userId, leadIds]);
+    const rows: any[] = res.rows || [];
+    counts.not_found = leadIds.length - rows.length;
+
+    const activeRes = await dbQuery(
+      `SELECT lead_id FROM flow_enrollments WHERE flow_id = $1 AND status = 'active' AND lead_id = ANY($2::uuid[])`,
+      [flow.id, leadIds],
+    );
+    const active = new Set((activeRes.rows || []).map((r: any) => r.lead_id));
+
+    for (const lead of rows) {
+      const tags: string[] = lead.tags || [];
+      if (active.has(lead.id)) counts.already += 1;
+      else if (tags.includes(OPT_OUT_TAG) || (tags.includes(NOT_INTERESTED_TAG) && flow.trigger_type !== 'purchase')) counts.opted_out += 1;
+      // A etapa de entrada é a atual: sai se mudar, mas um perdido adicionado à mão não sai logo
+      else if (await this.enrollLead(flow, lead.id, { manual: true, entryStage: lead.status || undefined })) counts.enrolled += 1;
+      else counts.no_channel += 1;
+    }
+    return counts;
   }
 
   /** Corre o fluxo para um lead à escolha: esperas curtas, a qualquer hora, mesmo em rascunho */
