@@ -7,8 +7,7 @@ import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
-import { Calendar } from '../ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { DateTimePicker, toDateTimeValue } from '../base/DateTimePicker';
 import {
   Plus,
   Calendar as CalendarIcon,
@@ -590,25 +589,13 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
 
             <div>
               <label className="text-sm mb-2 block text-muted-foreground">
-                Data limite
+                Data e hora
               </label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start !bg-card !text-foreground !border-border font-normal text-left">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(newTask.dueDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 !bg-card border border-border shadow-lg z-[9999]">
-                  <Calendar
-                    mode="single"
-                    selected={newTask.dueDate}
-                    onSelect={date => date && setNewTask({ ...newTask, dueDate: date })}
-                    locale={ptBR}
-                    className="rounded-md border-0"
-                  />
-                </PopoverContent>
-              </Popover>
+              <DateTimePicker
+                value={toDateTimeValue(newTask.dueDate)}
+                onChange={(value) => setNewTask({ ...newTask, dueDate: new Date(value) })}
+                disablePast
+              />
             </div>
 
             <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end pt-4">

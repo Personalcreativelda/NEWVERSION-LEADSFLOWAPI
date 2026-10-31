@@ -1,3 +1,4 @@
+import { DateTimePicker } from '../base/DateTimePicker';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { X, Mail, Phone, Building2, Calendar, User, Loader2, AlertCircle, Edit2, Save, Camera, Check, StickyNote, ChevronDown, Clock, ListTodo, Plus, Trash2, Send, Zap, Target, Copy, Pencil, BrainCircuit, UserCheck } from 'lucide-react';
 import { leadsApi, scheduledConversationsApi, leadNotesApi } from '../../utils/api';
@@ -1501,12 +1502,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                     placeholder="Título da tarefa"
                     className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-blue-500/30 transition-all duration-150"
                   />
-                  <input
-                    type="datetime-local"
-                    value={taskDate}
-                    onChange={(e) => setTaskDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-blue-500/30 transition-all duration-150"
-                  />
+                  <DateTimePicker value={taskDate} onChange={setTaskDate} disablePast className="bg-muted" />
                   <div className="flex gap-2">
                     <button
                       onClick={() => setActiveAction(null)}
@@ -1540,12 +1536,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                     placeholder="Título do agendamento"
                     className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-purple-500/30 transition-all duration-150"
                   />
-                  <input
-                    type="datetime-local"
-                    value={scheduleDate}
-                    onChange={(e) => setScheduleDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-purple-500/30 transition-all duration-150"
-                  />
+                  <DateTimePicker value={scheduleDate} onChange={setScheduleDate} disablePast className="bg-muted" />
                   <div className="flex gap-2">
                     <button
                       onClick={() => setActiveAction(null)}

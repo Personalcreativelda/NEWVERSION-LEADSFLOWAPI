@@ -1,3 +1,4 @@
+import { DateTimePicker } from '../base/DateTimePicker';
 import { useState, useEffect } from 'react';
 import {
   Smartphone, Users, Send, Clock, AlertCircle, Loader2
@@ -363,10 +364,11 @@ export default function CampaignSMSModal({
                   value: 'scheduled',
                   label: 'Agendar',
                   children: (
-                    <div className="grid grid-cols-2 gap-3">
-                      <Input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} />
-                      <Input type="time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)} />
-                    </div>
+                    <DateTimePicker
+                      value={scheduleDate ? `${scheduleDate}T${scheduleTime || '09:00'}` : ''}
+                      onChange={(v) => { const [d, t] = v.split('T'); setScheduleDate(d); setScheduleTime(t); }}
+                      disablePast
+                    />
                   ),
                 },
               ]}

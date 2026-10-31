@@ -1,3 +1,4 @@
+import { DateTimePicker } from '../base/DateTimePicker';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, StickyNote, Calendar, MessageSquare, DollarSign, Plus, Edit2, Trash2, Check, Clock, Send, Upload } from 'lucide-react';
 import { leadNotesApi, scheduledConversationsApi, inboxApi, leadsApi } from '../../utils/api';
@@ -455,12 +456,7 @@ function AgendamentosTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  rows={2}
  className={`${inputClasses} resize-none`}
  />
- <input
- type="datetime-local"
- value={formDate}
- onChange={(e) => setFormDate(e.target.value)}
- className={inputClasses}
- />
+ <DateTimePicker value={formDate} onChange={setFormDate} disablePast />
  <div className="flex gap-2 pt-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end">
  <Button
  variant="ghost"

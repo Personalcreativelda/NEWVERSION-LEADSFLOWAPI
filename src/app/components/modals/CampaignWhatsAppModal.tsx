@@ -1,4 +1,5 @@
 // Campaign WhatsApp Modal - Versão Completa com Drag & Drop e Preview
+import { DateTimePicker } from '../base/DateTimePicker';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   MessageCircle, Send, Clock, Settings, RefreshCw,
@@ -1750,10 +1751,6 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
 
   if (!isOpen) return null;
 
-  // Obter data mínima (hoje)
-  const today = new Date();
-  const minDate = today.toISOString().split('T')[0];
-  const minTime = scheduleDate === minDate ? today.toTimeString().slice(0, 5) : '00:00';
 
   return (
     <AppModal
@@ -2454,16 +2451,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                       value: 'scheduled',
                       label: 'Agendar',
                       children: (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="min-w-0">
-                            <Label className="text-sm text-muted-foreground mb-1.5 block">Data</Label>
-                            <Input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} min={minDate} />
-                          </div>
-                          <div className="min-w-0">
-                            <Label className="text-sm text-muted-foreground mb-1.5 block">Hora</Label>
-                            <Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} min={scheduleDate === minDate ? minTime : undefined} />
-                          </div>
-                        </div>
+                        <DateTimePicker
+                          value={scheduleDate ? `${scheduleDate}T${scheduleTime || '09:00'}` : ''}
+                          onChange={(v) => { const [d, t] = v.split('T'); setScheduleDate(d); setScheduleTime(t); }}
+                          disablePast
+                        />
                       ),
                     },
                   ]}
