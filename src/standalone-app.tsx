@@ -1,4 +1,3 @@
-import { lazy, Suspense } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
@@ -19,24 +18,32 @@ import './app/styles/globals.css';
 // once they are used; this just prevents a total cache bust on every reload.
 const MAX_CACHE_AGE = 24 * 60 * 60_000;
 
+type PublicPageComponent = () => React.JSX.Element;
+
 // Páginas públicas: abrem sem sessão e fora do App (que redirecionaria para o login)
-const PUBLIC_ROUTES: Record<string, React.LazyExoticComponent<() => React.JSX.Element>> = {
-  '/privacidade': lazy(() => import('./app/components/public/PrivacyPage')),
-  '/privacy': lazy(() => import('./app/components/public/PrivacyPage')),
-  '/termos': lazy(() => import('./app/components/public/TermsPage')),
-  '/terms': lazy(() => import('./app/components/public/TermsPage')),
-  '/docs': lazy(() => import('./app/components/public/ApiDocsPage')),
-  '/docs/api': lazy(() => import('./app/components/public/ApiDocsPage')),
+const PUBLIC_ROUTES: Record<string, () => Promise<{ default: PublicPageComponent }>> = {
+  '/privacidade': () => import('./app/components/public/PrivacyPage'),
+  '/privacy': () => import('./app/components/public/PrivacyPage'),
+  '/termos': () => import('./app/components/public/TermsPage'),
+  '/terms': () => import('./app/components/public/TermsPage'),
+  '/docs': () => import('./app/components/public/ApiDocsPage'),
+  '/docs/api': () => import('./app/components/public/ApiDocsPage'),
 };
 
-export default function StandaloneApp() {
-  const PublicPage = PUBLIC_ROUTES[window.location.pathname.replace(/\/$/, '')];
+/**
+ * Carrega a página pública antes do primeiro render. Com React.lazy o React apagava o HTML já
+ * desenhado no build (prerender) e mostrava a página vazia até o código chegar.
+ */
+export async function loadPublicPage(pathname: string): Promise<PublicPageComponent | null> {
+  const loader = PUBLIC_ROUTES[pathname.replace(/\/$/, '')];
+  return loader ? (await loader()).default : null;
+}
+
+export default function StandaloneApp({ publicPage: PublicPage }: { publicPage?: PublicPageComponent | null }) {
   if (PublicPage) {
     return (
       <ThemeModeProvider>
-        <Suspense fallback={null}>
-          <PublicPage />
-        </Suspense>
+        <PublicPage />
       </ThemeModeProvider>
     );
   }
