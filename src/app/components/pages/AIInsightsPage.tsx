@@ -11,6 +11,7 @@ import { api } from '../../../lib/api';
 import { formatMoney, formatNumber, formatRelativeDay } from '../../utils/format';
 import { formatLeadStatus } from '../dashboard/leadDisplay';
 import { cn } from '../ui/utils';
+import { AIReactivationModal } from '../remarketing/AIReactivationModal';
 
 export type Bucket = 'waiting_reply' | 'ready_to_close' | 'cooling' | 'never_contacted';
 
@@ -36,6 +37,8 @@ export interface SalesQueue {
   counts: Record<Bucket, number>;
   stale: number;
   value_at_stake: number;
+  /** Fluxo ativo que já está a reativar os parados */
+  reactivation_flow?: { id: string; name: string } | null;
 }
 
 interface Suggestion { label: string; text: string }
@@ -79,6 +82,7 @@ export default function AIInsightsPage({ onOpenConversation, onOpenLead, onNavig
   const [visible, setVisible] = useState(PAGE);
   const [composers, setComposers] = useState<Record<string, Composer>>({});
   const [sent, setSent] = useState<Record<string, true>>({});
+  const [reactivating, setReactivating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -276,18 +280,36 @@ export default function AIInsightsPage({ onOpenConversation, onOpenLead, onNavig
                   <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                     <Workflow className="h-5 w-5" />
                   </span>
-                  <p className="min-w-0 text-sm text-foreground">
-                    {queue.stale === 1 ? '1 lead parado' : `${formatNumber(queue.stale)} leads parados`} há mais de 30 dias
-                  </p>
+                  <div className="min-w-0">
+                    <p className="text-sm text-foreground">
+                      {queue.stale === 1 ? '1 lead parado' : `${formatNumber(queue.stale)} leads parados`} há mais de 30 dias
+                    </p>
+                    {queue.reactivation_flow && (
+                      <p className="truncate text-xs text-muted-foreground">
+                        A ser reativados por <span translate="no">{queue.reactivation_flow.name}</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
-                {onNavigate && (
-                  <Button variant="outline" onClick={() => onNavigate('remarketing')}>Reativar com um fluxo</Button>
+                {queue.reactivation_flow ? (
+                  onNavigate && <Button variant="outline" onClick={() => onNavigate('remarketing')}>Ver fluxo</Button>
+                ) : (
+                  <Button onClick={() => setReactivating(true)}>Criar fluxo com IA</Button>
                 )}
               </div>
             )}
           </>
         )}
       </main>
+
+      <AIReactivationModal
+        open={reactivating}
+        onOpenChange={setReactivating}
+        onCreated={(active) => {
+          if (!active && onNavigate) onNavigate('remarketing');
+          else load();
+        }}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authMiddleware, type AuthenticatedRequest } from '../middleware/auth.middleware';
 import { query } from '../database/connection';
 import { FlowExecutionService } from '../services/flow-execution.service';
-import { salesOpportunities, sendToLead, suggestMessages } from '../services/sales-engine.service';
+import { reactivationDraft, salesOpportunities, sendToLead, suggestMessages } from '../services/sales-engine.service';
 import { FlowSendError } from '../services/flow-send.service';
 
 const flowExecutionService = new FlowExecutionService();
@@ -527,6 +527,15 @@ router.get('/lead/:leadId/score', async (req: AuthenticatedRequest, res, next) =
 router.get('/opportunities', async (req: AuthenticatedRequest, res, next) => {
   try {
     res.json(await salesOpportunities(req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Rascunho de um fluxo de reativação para os leads parados (não grava nada)
+router.post('/reactivation-flow', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    res.json(await reactivationDraft(req.user!.id));
   } catch (err) {
     next(err);
   }

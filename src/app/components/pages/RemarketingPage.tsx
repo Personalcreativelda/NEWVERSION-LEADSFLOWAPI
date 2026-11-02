@@ -3,7 +3,7 @@ import { api } from '../../../lib/api';
 import { toast } from 'sonner';
 import {
   GitBranch, Zap, ChevronRight, Play, Pause, Copy, Trash2, BarChart3, ArrowRight,
-  Layers, Repeat2, Pencil, UploadCloud, MoreHorizontal, FlaskConical, Loader2, UserPlus, Check,
+  Layers, Repeat2, Pencil, UploadCloud, MoreHorizontal, FlaskConical, Loader2, UserPlus, Check, Sparkles,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { PageHeader, PageAction } from '../base/PageHeader';
@@ -18,6 +18,7 @@ import { ChannelLogo } from '../base/ChannelLogo';
 import { LogoBox } from '../base/LogoBox';
 import type { Brand } from '../base/BrandIcon';
 import { FlowEditor } from '../remarketing/FlowEditor';
+import { AIReactivationModal } from '../remarketing/AIReactivationModal';
 import { FLOW_TEMPLATES, type FlowTemplate, type TemplateChannel } from '../remarketing/flowTemplates';
 import { STEP_COLORS, STEP_ICONS } from '../remarketing/flowVisuals';
 import {
@@ -120,6 +121,7 @@ function enrollmentState(row: any): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function RemarketingPage() {
+  const [aiFlowOpen, setAiFlowOpen] = useState(false);
   const [flows, setFlows] = useState<RemarketingFlow[]>([]);
   const [activeTab, setActiveTab] = useState<'flows' | 'templates'>('flows');
   const [selectedTemplate, setSelectedTemplate] = useState<FlowTemplate | null>(null);
@@ -549,7 +551,12 @@ export default function RemarketingPage() {
             title="Remarketing"
             description="Fluxos automáticos para reativar leads"
             icon={Repeat2}
-            actions={<PageAction icon={UploadCloud} label={syncing ? 'A sincronizar…' : 'Sincronizar'} onClick={syncToDB} disabled={syncing} />}
+            actions={(
+              <>
+                <PageAction icon={Sparkles} label="Criar com IA" onClick={() => setAiFlowOpen(true)} />
+                <PageAction icon={UploadCloud} label={syncing ? 'A sincronizar…' : 'Sincronizar'} onClick={syncToDB} disabled={syncing} />
+              </>
+            )}
             create={{ label: 'Novo fluxo', onClick: handleCreateBlank }}
           />
 
@@ -582,8 +589,13 @@ export default function RemarketingPage() {
                 <EmptyState
                   icon={GitBranch}
                   title="Ainda sem fluxos"
-                  description="Comece por um modelo ou crie um fluxo do zero."
-                  action={<PageAction variant="primary" icon={Layers} label="Ver modelos" onClick={() => setActiveTab('templates')} />}
+                  description="A IA cria um a partir das suas conversas, ou comece por um modelo."
+                  action={(
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <PageAction variant="primary" icon={Sparkles} label="Criar com IA" onClick={() => setAiFlowOpen(true)} />
+                      <AppButton variant="outline" onClick={() => setActiveTab('templates')}>Ver modelos</AppButton>
+                    </div>
+                  )}
                 />
               ) : (
                 <>
@@ -999,6 +1011,12 @@ export default function RemarketingPage() {
           funnelStages={funnelStages}
         />
       )}
+
+      <AIReactivationModal
+        open={aiFlowOpen}
+        onOpenChange={setAiFlowOpen}
+        onCreated={() => { setActiveTab('flows'); fetchFlows(true); }}
+      />
     </>
   );
 }
