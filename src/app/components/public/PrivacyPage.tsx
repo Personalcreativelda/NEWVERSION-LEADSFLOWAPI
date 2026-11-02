@@ -79,6 +79,7 @@ export default function PrivacyPage({ path }: { path?: string } = {}) {
           <li><strong>Plataformas de mensagens</strong> que liga à sua conta (Meta — WhatsApp, Facebook e Instagram —, Telegram, fornecedores de email e de SMS), para entregar as mensagens.</li>
           <li><strong>Pagamentos</strong>: Stripe e PayPal processam os pagamentos das subscrições.</li>
           <li><strong>Inteligência artificial</strong>: quando usa assistentes virtuais, agentes de voz ou análises com IA, o conteúdo necessário (por exemplo, a mensagem a que se vai responder) é enviado a fornecedores de modelos de IA para gerar a resposta.</li>
+          <li><strong>Meta, para medir anúncios</strong>: só se ativar a ligação em Integrações → Meta. Enviamos à sua própria conta da Meta os eventos do funil dos seus clientes (lead, lead qualificado, compra e o valor), com o telefone, o email e o nome cifrados (SHA-256) ou o identificador do clique no anúncio. Está desligado por omissão.</li>
           <li><strong>Integrações que configurar</strong> (por exemplo, webhooks, folhas de cálculo ou píxeis de conversão), que recebem os dados que escolher enviar.</li>
           <li><strong>Autoridades</strong>, quando a lei o exigir.</li>
         </ul>
@@ -125,7 +126,8 @@ export default function PrivacyPage({ path }: { path?: string } = {}) {
         </p>
         <ul>
           <li>Usamos esses dados apenas para lhe prestar o serviço: mostrar e responder às conversas, enviar as mensagens e campanhas que pedir e executar as automações que configurar.</li>
-          <li>Não os vendemos, não os usamos para publicidade e não os partilhamos com terceiros, exceto os fornecedores necessários ao serviço descritos acima.</li>
+          <li>Não os vendemos, não os usamos para publicidade de terceiros e não os partilhamos com terceiros, exceto os fornecedores necessários ao serviço descritos acima.</li>
+          <li>Só se a empresa ativar a medição de anúncios, os eventos do funil dos clientes que vieram de anúncios seguem para a conta de anúncios da Meta dessa empresa, para medir esses anúncios.</li>
           <li>Não os usamos para treinar modelos de inteligência artificial.</li>
           <li>Apagamo-los quando remove o canal, quando pede a eliminação da conta ou quando a Meta nos pede.</li>
         </ul>

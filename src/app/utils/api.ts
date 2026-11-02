@@ -978,6 +978,7 @@ const mapLeadFromApi = (lead: any): Lead => {
     updatedAt: lead.updated_at,
     convertedAt: lead.converted_at,
     lead_score: lead.lead_score ?? lead.engagement_score ?? null,
+    adReferral: lead.ad_referral || null,
   };
 };
 

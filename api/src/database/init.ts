@@ -552,6 +552,28 @@ const runPendingMigrations = async () => {
         sent_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_campaign_sends_user ON campaign_sends(user_id, sent_at);
+
+      -- Conversões para a Meta: de que anúncio veio o lead (o último clique) e os eventos do
+      -- funil enviados pela API de Conversões (um por lead e evento)
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS ad_referral JSONB;
+      CREATE TABLE IF NOT EXISTS meta_events (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        lead_id     UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+        event_name  VARCHAR(40) NOT NULL,
+        stage       VARCHAR(60),
+        value       NUMERIC(12, 2),
+        via_ad      BOOLEAN NOT NULL DEFAULT FALSE,
+        status      VARCHAR(20) NOT NULL DEFAULT 'pending',
+        attempts    INTEGER NOT NULL DEFAULT 0,
+        error       TEXT,
+        sent_at     TIMESTAMPTZ,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (lead_id, event_name)
+      );
+      CREATE INDEX IF NOT EXISTS idx_meta_events_user ON meta_events(user_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_meta_events_retry ON meta_events(updated_at) WHERE status = 'failed';
     `);
     console.log('[DB] ✅ campaign engine tables verified');
   } catch (error: any) {

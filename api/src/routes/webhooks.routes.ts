@@ -23,6 +23,7 @@ import { secretFingerprint } from '../utils/secret-box';
 import { acceptMetaWebhook } from '../utils/meta-signature';
 import { fetchMessengerProfile, isInstagramLoginToken } from '../utils/meta-send';
 import { findOrCreateLead } from '../services/leads-dedup.service';
+import { recordAdReferral, referralFromCloud, referralFromEvolution, referralFromMessaging } from '../services/meta-conversions.service';
 
 const router = Router();
 const conversationsService = new ConversationsService();
@@ -1464,6 +1465,11 @@ router.post('/evolution/messages', async (req, res) => {
       }
     }
 
+    // Mensagem vinda de um anúncio "Enviar mensagem": guarda de que anúncio (para a Meta e o painel)
+    if (!isFromMe && !isGroupMessage) {
+      await recordAdReferral(leadId, referralFromEvolution(messageData)).catch(() => {});
+    }
+
     // Buscar ou criar conversa
     // Para grupos: usar o JID do grupo como remote_jid, e incluir sender info no metadata
     const isGroup = isGroupMessage && remoteJidValue?.includes('@g.us');
@@ -2568,6 +2574,9 @@ router.post('/facebook', async (req, res) => {
           }
         }
 
+        // Conversa iniciada por um anúncio: guarda de que anúncio
+        await recordAdReferral(leadId, referralFromMessaging(messagingEvent, 'facebook')).catch(() => {});
+
         // Buscar ou criar conversa
         const conversation = await conversationsService.findOrCreate(
           channel.user_id,
@@ -3121,6 +3130,9 @@ router.post('/instagram', async (req, res) => {
           }
         }
 
+        // Conversa iniciada por um anúncio: guarda de que anúncio
+        await recordAdReferral(leadId, referralFromMessaging(messagingEvent, 'instagram')).catch(() => {});
+
         // Buscar ou criar conversa
         const conversation = await conversationsService.findOrCreate(
           channel.user_id,
@@ -3609,6 +3621,9 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
               );
             }
           }
+
+          // Mensagem vinda de um anúncio "Enviar mensagem": o código do clique vai depois nos eventos da Meta
+          await recordAdReferral(leadId, referralFromCloud(message, channel.credentials?.waba_id)).catch(() => {});
 
           // Buscar ou criar conversa
           const remoteJid = `${senderId}@s.whatsapp.net`;

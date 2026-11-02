@@ -8,6 +8,8 @@ import { Label } from '../ui/label';
 import { toast } from "sonner";
 import { userApi } from '../../utils/api';
 import { brandIcon } from '../base/BrandIcon';
+import { MetaConversionsSettings } from './MetaConversionsSettings';
+import { api } from '../../../lib/api';
 
 interface IntegrationsPageProps {
   user: any;
@@ -115,6 +117,10 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   // Verificar se o usuário tem plano Business ou Enterprise
   const userPlan = user?.plan || user?.subscription_plan || 'free';
   const hasHttpAccess = true; // Habilitado para todos os planos
+  useEffect(() => {
+    api.metaConversions.config().then((c) => setIsMetaPixelConfigured(!!c.enabled)).catch(() => {});
+  }, []);
+
   const hasTrackingAccess = userPlan === 'business' || userPlan === 'enterprise'; // Meta Pixel e Google Analytics apenas Business+
 
   // Debug log
@@ -309,26 +315,6 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       toast.error('Erro ao remover configuração');
     }
   };
-  const handleSaveMetaPixel = async () => {
-    if (!metaPixelId) {
-      toast.error('Por favor, insira o ID do Meta Pixel');
-      return;
-    }
-
-    try {
-      // ✅ SALVAR NO BACKEND
-      await userApi.saveSettings({ meta_pixel_id: metaPixelId });
-
-      // Sync com localStorage
-      localStorage.setItem('meta_pixel_id', metaPixelId);
-      setIsMetaPixelConfigured(true);
-      toast.success('Meta Pixel configurado com sucesso!');
-    } catch (error) {
-      console.error('[Meta Pixel Save] Error:', error);
-      toast.error('Erro ao guardar Meta Pixel');
-    }
-  };
-
   const handleSaveGoogleAnalytics = async () => {
     if (!googleAnalyticsId) {
       toast.error('Por favor, insira o ID do Google Analytics');
@@ -388,8 +374,8 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
     },
     {
       id: 'meta-pixel' as IntegrationType,
-      name: 'Meta Pixel (Facebook)',
-      description: 'Rastreie eventos de conversão de leads no Meta Ads',
+      name: 'Meta (anúncios)',
+      description: 'Envie os leads e as vendas do funil para os anúncios da Meta',
       icon: brandIcon('meta'),
       color: 'text-indigo-600 dark:text-indigo-400',
       borderColor: 'border-indigo-200 dark:border-indigo-800',
@@ -599,36 +585,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
                   {/* Meta Pixel Content */}
                   {integration.id === 'meta-pixel' && (
-                    <div className="space-y-6">
-
-                      <div className="space-y-2">
-                        <Label htmlFor="meta-pixel-id" className="text-sm flex items-center gap-2 text-foreground">
-                          <BarChart3 className="w-4 h-4 text-muted-foreground" />
-                          Meta Pixel ID
-                        </Label>
-                        <Input
-                          id="meta-pixel-id"
-                          type="text"
-                          value={metaPixelId}
-                          onChange={(e) => setMetaPixelId(e.target.value)}
-                          placeholder="123456789012345"
-                          className={`${integrationInputClass} font-mono`}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          No Gestor de Eventos da Meta
-                        </p>
-                      </div>
-
-
-                      <div className="flex justify-end">
-                        <Button
-                          onClick={handleSaveMetaPixel}
-                          className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                        >
-                          Guardar
-                        </Button>
-                      </div>
-                    </div>
+                    <MetaConversionsSettings initialDatasetId={metaPixelId} onConfigured={setIsMetaPixelConfigured} />
                   )}
 
                   {/* Google Analytics Content */}

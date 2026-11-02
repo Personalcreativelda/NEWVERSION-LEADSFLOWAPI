@@ -6,8 +6,10 @@
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+// O funil já não vai para o pixel da Meta a partir do browser: aqui quem "comprava" era quem
+// usa o painel, não o cliente. Os eventos saem do servidor (API de Conversões, Integrações → Meta).
 function getMetaPixelId(): string {
-  return (typeof window !== 'undefined' ? localStorage.getItem('meta_pixel_id') || '' : '');
+  return '';
 }
 
 function getGoogleAnalyticsId(): string {

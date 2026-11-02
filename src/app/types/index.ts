@@ -26,6 +26,8 @@ export interface Lead {
   convertedAt?: string;
   empresa?: string;
   lead_score?: number | null;
+  /** Último anúncio de onde veio (WhatsApp, Messenger, Instagram) */
+  adReferral?: { channel?: string; ad_id?: string; headline?: string; at?: string } | null;
 }
 
 export interface LeadNote {

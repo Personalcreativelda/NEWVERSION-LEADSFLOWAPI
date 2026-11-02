@@ -7,7 +7,10 @@ import type { UIEvent } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Trash2, Edit2, MoreVertical, ChevronDown, GripVertical, Settings, Plus, X, RotateCcw, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, MoveRight, Workflow, CalendarClock, type LucideIcon, MoreHorizontal } from 'lucide-react';
+import { toast } from 'sonner';
+import { api } from '../../../lib/api';
+import { saveFile } from '../../lib/saveFile';
+import { Trash2, Edit2, MoreVertical, ChevronDown, Share2, GripVertical, Settings, Plus, X, RotateCcw, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, MoveRight, Workflow, CalendarClock, type LucideIcon, MoreHorizontal } from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { haptic } from '../../../native';
 import type { TabKey } from '../modals/LeadDetailModal';
@@ -271,6 +274,7 @@ const FunnelColumn = memo(({
   onDelete,
   onRemoveStage,
   onEditStage, // Added prop
+  onExportStage,
   onResetToInitial,
   onCall,
   onEmail,
@@ -402,6 +406,14 @@ const FunnelColumn = memo(({
                   >
                     <ChevronDown className="h-3.5 w-3.5 mr-2" />
                     Recolher coluna
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => { e.stopPropagation(); onExportStage?.(stage); }}
+                    className="cursor-pointer flex items-center"
+                    style={{ color: 'hsl(var(--foreground))' }}
+                  >
+                    <Share2 className="h-3.5 w-3.5 mr-2" />
+                    Exportar para a Meta
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={(e) => {
@@ -849,6 +861,22 @@ export default function SalesFunnel({
     return { total, inProgress, converted, conversionRate, pipelineValue };
   }, [localLeads, leadsByStatus]);
 
+  // Lista de clientes desta etapa no formato da Meta (públicos personalizados e semelhantes)
+  const handleExportStage = useCallback(async (stage: { id: string; label: string }) => {
+    try {
+      const result = await api.metaConversions.audience([stage.id]);
+      if (!result.count) {
+        toast.info('Nenhum lead com telefone ou email nesta etapa');
+        return;
+      }
+      const slug = String(stage.label || stage.id).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const saved = await saveFile(`publico-meta-${slug || 'funil'}.csv`, result.csv, 'text/csv');
+      if (saved) toast.success(result.count === 1 ? '1 contacto exportado' : `${result.count} contactos exportados`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível exportar');
+    }
+  }, []);
+
   const handleRemoveStage = useCallback((stageId: string) => {
     // Prevent removing the last stage if desired, or just allow it
     if (stages.length <= 1) {
@@ -1256,6 +1284,7 @@ export default function SalesFunnel({
                           onDelete={onDeleteLead}
                           onRemoveStage={handleRemoveStage}
                           onEditStage={setEditingStage}
+                          onExportStage={handleExportStage}
                           onResetToInitial={onResetLeadToInitial}
                           onCall={onCallLead}
                           onEmail={onEmailLead}

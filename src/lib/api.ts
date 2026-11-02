@@ -199,6 +199,16 @@ class ApiClient {
       this.request<any>('/api/ai-remarketing/send-message', { method: 'POST', body: JSON.stringify(data) }),
   };
 
+  metaConversions = {
+    config: () => this.request<any>('/api/meta-conversions/config'),
+    save: (data: Record<string, any>) =>
+      this.request<any>('/api/meta-conversions/config', { method: 'PUT', body: JSON.stringify(data) }),
+    test: () => this.request<any>('/api/meta-conversions/test', { method: 'POST' }),
+    events: () => this.request<any>('/api/meta-conversions/events'),
+    audience: (stages: string[]) =>
+      this.request<{ csv: string; count: number }>(`/api/meta-conversions/audience${this.buildQuery({ stages: stages.join(',') })}`),
+  };
+
   messages = {
     list: (params?: Record<string, string | number | boolean | null | undefined>) =>
       this.request(`/api/messages${this.buildQuery(params)}`),

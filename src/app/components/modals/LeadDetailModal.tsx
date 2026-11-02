@@ -926,6 +926,14 @@ export default function LeadDetailModal({ isOpen, onClose, lead, isDark = false,
  {statusCfg.label}
  </span>
  </div>
+ {/* Veio de um anúncio da Meta (o clique conta para as conversões) */}
+ {displayLead.adReferral && (
+ <p className="mt-0.5 truncate text-xs font-normal text-muted-foreground">
+ Veio do anúncio{(displayLead.adReferral.headline || displayLead.adReferral.ad_id) && (
+ <span translate="no"> {displayLead.adReferral.headline || displayLead.adReferral.ad_id}</span>
+ )}
+ </p>
+ )}
  </div>
  </div>
  }

@@ -504,10 +504,9 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       if (response.success && response.webhookSettings?.metaPixelId) {
         console.log('[Meta Pixel] Dynamic pixel ID from settings:', response.webhookSettings.metaPixelId);
       }
-      // Load pixel + GA IDs from user settings (saved by IntegrationsPage)
-      const storedPixelId = localStorage.getItem('meta_pixel_id');
+      // O pixel do utilizador já não carrega no painel (os eventos do funil vão pelo servidor);
+      // fica só o pixel do próprio LeadsFlow (VITE_META_PIXEL_ID)
       const storedGaId = localStorage.getItem('google_analytics_id');
-      if (storedPixelId) setMetaPixelId(storedPixelId);
       if (storedGaId) setGoogleAnalyticsId(storedGaId);
     } catch (error) {
       console.log('[Meta Pixel] Using default configuration (webhook settings unavailable)');
