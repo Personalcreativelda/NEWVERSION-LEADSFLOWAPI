@@ -196,16 +196,37 @@ export function buildEvent(cfg: MetaConfig, lead: LeadRow, event: MetaEventName,
 
 // ── Envio ────────────────────────────────────────────────────────────────────
 
+/** Mensagem clara para os erros mais comuns da Meta (os outros seguem como a Meta os escreve) */
+export function metaErrorMessage(error: any, datasetId: string): string {
+  const code = Number(error?.code);
+  const sub = Number(error?.error_subcode);
+  if (code === 190) return 'Token inválido ou expirado. Gere um token novo no Gestor de Eventos.';
+  if (code === 100 && sub === 33) {
+    return `O token não tem acesso ao conjunto de dados ${datasetId}. Use o ID do conjunto de dados onde gerou o token.`;
+  }
+  if (code === 10 || code === 200 || code === 803) {
+    return `O token não tem permissão para o conjunto de dados ${datasetId}. Gere o token nas Configurações desse conjunto de dados.`;
+  }
+  return error?.error_user_msg || error?.message || 'A Meta recusou o pedido';
+}
+
+// Os erros da Meta seguem como 400 com a mensagem: um 502 passava pela Cloudflare como
+// "servidor em baixo" e o painel escondia o motivo
 async function graph(cfg: MetaConfig, path: string, body?: any) {
-  const res = await fetch(`${GRAPH}/${path}`, {
-    method: body ? 'POST' : 'GET',
-    headers: { Authorization: `Bearer ${cfg.access_token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${GRAPH}/${path}`, {
+      method: body ? 'POST' : 'GET',
+      headers: { Authorization: `Bearer ${cfg.access_token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    throw new MetaConversionsError('Não foi possível contactar a Meta. Tente de novo dentro de momentos.', 400);
+  }
   const data: any = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = data?.error?.error_user_msg || data?.error?.message || `Erro ${res.status} da Meta`;
-    throw new MetaConversionsError(msg, res.status === 401 || res.status === 403 ? 400 : 502);
+    throw new MetaConversionsError(metaErrorMessage(data?.error, cfg.dataset_id), 400);
   }
   return data;
 }
@@ -221,14 +242,15 @@ export async function sendEvents(cfg: MetaConfig, events: any[]) {
 export async function testConnection(userId: string) {
   const cfg = await getMetaConfig(userId);
   if (!cfg.dataset_id || !cfg.access_token) throw new MetaConversionsError('Indique o ID do conjunto de dados e o token de acesso');
-  const dataset = await graph(cfg, `${cfg.dataset_id}?fields=id,name`);
-  let testEvent = false;
+  // Com código de teste, o próprio evento é a prova (os tokens da API de Conversões nem sempre
+  // podem ler os dados do conjunto); sem ele, confirma-se o token lendo o conjunto de dados
   if (cfg.test_event_code) {
     const sample = buildEvent(cfg, { id: `teste-${Date.now()}`, name: 'Teste LeadsFlow', email: 'teste@leadsflow.test' }, 'Lead');
     await sendEvents(cfg, [sample]);
-    testEvent = true;
+    return { dataset: { id: cfg.dataset_id, name: '' }, test_event: true };
   }
-  return { dataset: { id: String(dataset.id || cfg.dataset_id), name: String(dataset.name || '') }, test_event: testEvent };
+  const dataset = await graph(cfg, `${cfg.dataset_id}?fields=id,name`);
+  return { dataset: { id: String(dataset.id || cfg.dataset_id), name: String(dataset.name || '') }, test_event: false };
 }
 
 /** Eventos por enviar de uma conta: leads que chegaram a uma etapa com evento depois de ativar */
