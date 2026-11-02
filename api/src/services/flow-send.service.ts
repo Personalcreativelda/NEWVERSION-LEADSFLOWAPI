@@ -368,7 +368,7 @@ export async function sendEmail(lead: FlowLead, subject: string, body: string): 
 export async function saveOutgoing(
   lead: FlowLead,
   target: FlowTarget,
-  data: { content: string; externalId?: string | null; mediaUrl?: string; mediaType?: string; flowId: string; source?: string },
+  data: { content: string; externalId?: string | null; mediaUrl?: string; mediaType?: string; flowId?: string; source?: string },
 ): Promise<void> {
   let conversationId = target.conversationId;
   if (!conversationId) {
@@ -399,7 +399,7 @@ export async function saveOutgoing(
     external_id: data.externalId || null,
     media_url: data.mediaUrl || null,
     media_type: data.mediaType || null,
-    metadata: { source: data.source || 'remarketing', flow_id: data.flowId, remote_jid: target.remoteJid, channel_type: target.channelType },
+    metadata: { source: data.source || 'remarketing', flow_id: data.flowId ?? null, remote_jid: target.remoteJid, channel_type: target.channelType },
   }, lead.user_id);
 
   await dbQuery('UPDATE leads SET last_contact_at = NOW() WHERE id = $1', [lead.id]);

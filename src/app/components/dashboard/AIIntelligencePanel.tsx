@@ -1,66 +1,39 @@
 import { useState, useEffect, useCallback } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { LoadingState } from '../base/LoadingState';
 import { EmptyState } from '../base/EmptyState';
 import { ErrorState } from '../base/ErrorState';
 import { AppButton } from '../base/AppButton';
-
-interface AILead {
-  id: string;
-  name: string;
-  status: string;
-  engagement_score: number;
-  conversion_probability: number;
-  risk_level: string;
-  next_best_action: string;
-  recommended_channel: string;
-  last_contact_at?: string;
-}
-
-interface AIStats {
-  hot_count?: number;
-  high_risk_count?: number;
-  avg_engagement?: number;
-  avg_conversion?: number;
-}
+import { ChannelLogo } from '../base/ChannelLogo';
+import { formatNumber, formatRelativeDay } from '../../utils/format';
+import { cn } from '../ui/utils';
+import { BUCKETS, bucketDot, displayName, type SalesQueue } from '../pages/AIInsightsPage';
 
 interface AIIntelligencePanelProps {
   onNavigateToRemarketing?: () => void;
 }
 
 export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntelligencePanelProps) {
-  const [hotLeads, setHotLeads] = useState<AILead[]>([]);
-  const [atRiskLeads, setAtRiskLeads] = useState<AILead[]>([]);
-  const [stats, setStats] = useState<AIStats>({});
+  const [queue, setQueue] = useState<SalesQueue | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
 
-  const load = useCallback(async (showRefreshing = false) => {
-    if (showRefreshing) setRefreshing(true);
-    else setLoading(true);
+  const load = useCallback(async () => {
+    setLoading(true);
     setError(false);
     try {
-      const data = await api.aiRemarketing.insights();
-      setHotLeads((data.hotLeads || []).slice(0, 3));
-      setAtRiskLeads((data.atRiskLeads || []).slice(0, 3));
-      setStats(data.stats || {});
+      setQueue(await api.aiRemarketing.opportunities());
     } catch {
       setError(true);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const daysSince = (date?: string) => {
-    if (!date) return null;
-    return Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
-  };
-
-  if (loading) {
+  if (loading && !queue) {
     return (
       <section className="h-full rounded-2xl border border-border bg-card p-4 sm:p-5">
         <h3 className="mb-2 text-[15px] font-semibold text-foreground">Assistente de vendas IA</h3>
@@ -69,78 +42,53 @@ export default function AIIntelligencePanel({ onNavigateToRemarketing }: AIIntel
     );
   }
 
-  const hasData = hotLeads.length > 0 || atRiskLeads.length > 0;
+  const top = (queue?.items || []).slice(0, 4);
 
-  // Mesmo estilo dos outros cartões do Início (ex.: "Leads por origem"): título simples,
-  // linhas neutras como na lista de leads e um selo à direita
-  const Row = ({ lead, sub, chip, chipClass }: { lead: AILead; sub: string; chip: string; chipClass: string }) => (
-    <li className="flex items-center gap-3 py-2.5">
-      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-foreground">
-        {(lead.name || 'L').charAt(0).toUpperCase()}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-medium text-foreground">{lead.name}</span>
-        <span className="block truncate text-xs text-muted-foreground">{sub}</span>
-      </span>
-      <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${chipClass}`}>{chip}</span>
-    </li>
-  );
-
+  // Mesmo estilo dos outros cartões do Início: título simples e linhas neutras
   return (
     <section className="h-full rounded-2xl border border-border bg-card p-4 sm:p-5 flex flex-col">
       <h3 className="mb-2 text-[15px] font-semibold text-foreground">Assistente de vendas IA</h3>
-      {error ? (
+      {error || !queue ? (
         <ErrorState
-          title="Não foi possível carregar a análise"
-          action={<AppButton size="sm" onClick={() => load(true)}>Tentar novamente</AppButton>}
+          title="Não foi possível carregar"
+          action={<AppButton size="sm" onClick={load}>Tentar novamente</AppButton>}
         />
-      ) : !hasData ? (
-        <EmptyState
-          title="Ainda sem análise"
-          description="Abra o Assistente de vendas IA no menu."
-          imgSrc="/assets/icons/empty/ic_content.svg"
-        />
+      ) : top.length === 0 ? (
+        <EmptyState icon={CheckCircle2} title="Está tudo em dia" />
       ) : (
         <div className="space-y-3">
-          {hotLeads.length > 0 && (
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mais prováveis de comprar</p>
-              <ul className="divide-y divide-border">
-                {hotLeads.map((lead) => (
-                  <Row
-                    key={lead.id}
-                    lead={lead}
-                    sub={`${lead.conversion_probability}% de probabilidade`}
-                    chip="Quente"
-                    chipClass="bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                  />
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {atRiskLeads.length > 0 && (
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Em risco</p>
-              <ul className="divide-y divide-border">
-                {atRiskLeads.map((lead) => {
-                  const days = daysSince(lead.last_contact_at);
-                  return (
-                    <Row
-                      key={lead.id}
-                      lead={lead}
-                      sub={days !== null ? (days === 0 ? 'Contactado hoje' : `${days} dias sem contacto`) : 'Sem contacto'}
-                      chip={lead.risk_level === 'high' ? 'Risco alto' : 'Risco médio'}
-                      chipClass={lead.risk_level === 'high' ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'}
-                    />
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {BUCKETS.filter((b) => queue.counts[b.key] > 0).map((b) => (
+              <span key={b.key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className={cn('h-2 w-2 rounded-full', b.dot)} />
+                {b.label} <span className="font-semibold tabular-nums text-foreground">{formatNumber(queue.counts[b.key])}</span>
+              </span>
+            ))}
+          </div>
+          <ul className="divide-y divide-border">
+            {top.map((o) => (
+              <li key={o.lead_id} className="flex items-center gap-3 py-2.5">
+                <span className="relative flex-shrink-0">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-sm font-semibold text-foreground" translate="no">
+                    {displayName(o.name).charAt(0).toUpperCase()}
+                  </span>
+                  {o.channel && <ChannelLogo type={o.channel} className="absolute -bottom-1 -right-1 h-4 w-4 ring-2 ring-card" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-[15px] font-medium text-foreground" translate="no">{displayName(o.name)}</span>
+                    <span className="flex-shrink-0 text-xs text-muted-foreground tabular-nums">{formatRelativeDay(o.since, 'time')}</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={cn('h-1.5 w-1.5 flex-shrink-0 rounded-full', bucketDot(o.bucket))} />
+                    <span className="truncate">{o.reason}</span>
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
           <AppButton variant="outline" className="w-full" onClick={onNavigateToRemarketing}>
-            Ver análise completa
+            Ver todos
           </AppButton>
         </div>
       )}

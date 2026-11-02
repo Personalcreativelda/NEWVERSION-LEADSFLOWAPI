@@ -1815,7 +1815,15 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             )}
 
             {currentPage === 'ai-insights' && (
-              <AIInsightsPage />
+              <AIInsightsPage
+                onOpenConversation={(leadId, conversationId) => {
+                  if (!conversationId) { handleChat(leadId); return; }
+                  setConversationIdToOpen(conversationId);
+                  setCurrentPage('inbox');
+                }}
+                onOpenLead={handleViewLead}
+                onNavigate={handleNavigate}
+              />
             )}
 
             {(currentPage === 'inbox' || currentPage === 'inbox-settings' || currentPage === 'ai-assistants' || currentPage === 'voice-agents' || currentPage === 'automations') && (

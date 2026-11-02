@@ -189,11 +189,12 @@ class ApiClient {
 
   aiRemarketing = {
     insights: () => this.request<any>('/api/ai-remarketing/insights'),
+    opportunities: () => this.request<any>('/api/ai-remarketing/opportunities'),
     analyze: () => this.request<any>('/api/ai-remarketing/analyze', { method: 'POST' }),
     leadScore: (leadId: string) => this.request<any>(`/api/ai-remarketing/lead/${leadId}/score`),
-    generateMessage: (data: { leadId: string; tone?: string; goal?: string; channel?: string }) =>
+    generateMessage: (data: { leadId: string; bucket?: string }) =>
       this.request<any>('/api/ai-remarketing/generate-message', { method: 'POST', body: JSON.stringify(data) }),
-    sendMessage: (data: { leadId: string; content: string; channel?: string }) =>
+    sendMessage: (data: { leadId: string; content: string }) =>
       this.request<any>('/api/ai-remarketing/send-message', { method: 'POST', body: JSON.stringify(data) }),
   };
 

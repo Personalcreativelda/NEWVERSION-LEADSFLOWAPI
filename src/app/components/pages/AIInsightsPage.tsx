@@ -1,899 +1,423 @@
-import { useState, useEffect, useCallback } from 'react';
-import {
-  Brain, Flame, TrendingUp, 
-  Sparkles, CheckCircle2, Mail,
-  Zap, AlertCircle, ArrowRight, Lightbulb, Copy, 
-  ChevronDown, ChevronUp, Edit3} from 'lucide-react';
-import { PageHeader, PageAction } from '../base/PageHeader';
-import { Button } from '../ui/button';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Copy, RefreshCw, Workflow } from 'lucide-react';
 import { toast } from 'sonner';
-import { api } from '../../../lib/api';
-import { formatNumber, formatPercent } from '../../utils/format';
-import { formatLeadStatus } from '../dashboard/leadDisplay';
+import { PageHeader, PageAction } from '../base/PageHeader';
+import { EmptyState } from '../base/EmptyState';
+import { ChannelLogo } from '../base/ChannelLogo';
+import { ChoiceList } from '../base/ChoiceList';
+import { Button } from '../ui/button';
 import { SkeletonStatCardsRow, SkeletonInsightRow, UpdatingBadge } from '../ui/skeletons';
-import { BrandIcon } from '../base/BrandIcon';
+import { api } from '../../../lib/api';
+import { formatMoney, formatNumber, formatRelativeDay } from '../../utils/format';
+import { formatLeadStatus } from '../dashboard/leadDisplay';
+import { cn } from '../ui/utils';
 
-interface AIInsightsStats {
-  hot_count: number;
-  high_risk_count: number;
-  avg_engagement: number;
-  avg_conversion: number;
-}
+export type Bucket = 'waiting_reply' | 'ready_to_close' | 'cooling' | 'never_contacted';
 
-interface LeadInsight {
-  id: string;
+export interface Opportunity {
+  lead_id: string;
   name: string;
   status: string;
-  engagement_score: number;
-  conversion_probability: number;
-  risk_level?: 'high' | 'medium' | 'low';
-  next_best_action?: string;
-  recommended_channel?: string;
-  last_contact_at?: string;
+  deal_value: number;
+  bucket: Bucket;
+  priority: number;
+  reason: string;
+  since: string;
+  action: string;
+  channel: string | null;
+  conversation_id: string | null;
+  last_client_message: string | null;
+  in_flow: boolean;
+  window_closed: boolean;
 }
 
-interface Insights {
-  stats: AIInsightsStats;
-  hotLeads: LeadInsight[];
-  atRiskLeads: LeadInsight[];
-  recommendedActions: LeadInsight[];
+export interface SalesQueue {
+  items: Opportunity[];
+  counts: Record<Bucket, number>;
+  stale: number;
+  value_at_stake: number;
 }
 
-interface MessageState {
-  leadId: string;
-  suggestions: string[];
-  selectedIndex: number;
-  isExpanded: boolean;
-  editedContent?: string;
+interface Suggestion { label: string; text: string }
+
+interface Composer {
+  loading: boolean;
+  suggestions: Suggestion[];
+  selected: string;
+  draft: string;
+  sending: boolean;
 }
 
-interface SendingState {
-  leadId: string;
-  isSending: boolean;
-  sentAt?: Date;
-}
+export const BUCKETS: { key: Bucket; label: string; dot: string }[] = [
+  { key: 'waiting_reply', label: 'Aguardam resposta', dot: 'bg-red-500' },
+  { key: 'ready_to_close', label: 'Prontos a fechar', dot: 'bg-emerald-500' },
+  { key: 'cooling', label: 'A arrefecer', dot: 'bg-amber-500' },
+  { key: 'never_contacted', label: 'Por contactar', dot: 'bg-sky-500' },
+];
+export const bucketDot = (b: Bucket) => BUCKETS.find((x) => x.key === b)?.dot || 'bg-muted-foreground';
 
+const PAGE = 20;
 
 // Nomes guardados todos em maiúsculas (ex.: "JOAO SILVA") passam a "Joao Silva"
-function displayName(name?: string) {
+export function displayName(name?: string) {
   const n = (name || '').trim();
   if (!n || n !== n.toUpperCase() || !/\p{L}/u.test(n)) return n || 'Lead';
   return n.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_, sp, c) => sp + c.toUpperCase());
 }
 
-export default function AIInsightsPage() {
-  const [insights, setInsights] = useState<Insights | null>(null);
+interface AIInsightsPageProps {
+  /** Abre a conversa do lead na inbox (cria-a se ainda não existir) */
+  onOpenConversation?: (leadId: string, conversationId: string | null) => void;
+  onOpenLead?: (leadId: string) => void;
+  onNavigate?: (page: string) => void;
+}
+
+export default function AIInsightsPage({ onOpenConversation, onOpenLead, onNavigate }: AIInsightsPageProps) {
+  const [queue, setQueue] = useState<SalesQueue | null>(null);
   const [loading, setLoading] = useState(true);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Record<string, MessageState>>({});
-  const [sendingStates, setSendingStates] = useState<Record<string, SendingState>>({});
-  const [editingMessage, setEditingMessage] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Bucket | null>(null);
+  const [visible, setVisible] = useState(PAGE);
+  const [composers, setComposers] = useState<Record<string, Composer>>({});
+  const [sent, setSent] = useState<Record<string, true>>({});
 
-  // ── Ícone, label e badge do canal ─────────────────────────────────────────
-  const getChannelInfo = (channel?: string) => {
-    const ch = (channel || '').toLowerCase().trim();
-    if (ch === 'facebook' || ch === 'messenger' || ch.includes('facebook')) return { icon: <BrandIcon brand="messenger" mono className="w-3.5 h-3.5" />, label: 'Messenger', color: 'bg-[#0866FF]' };
-    if (ch === 'instagram' || ch.includes('instagram'))  return { icon: <BrandIcon brand="instagram" mono className="w-3.5 h-3.5" />, label: 'Instagram', color: 'bg-[#E1306C]' };
-    if (ch === 'telegram' || ch.includes('telegram'))    return { icon: <BrandIcon brand="telegram" mono className="w-3.5 h-3.5" />, label: 'Telegram', color: 'bg-[#26A5E4]' };
-    if (ch === 'email' || ch.includes('email'))          return { icon: <Mail className="w-3.5 h-3.5" />, label: 'Email', color: 'bg-gray-600' };
-    if (ch === 'whatsapp_cloud')                         return { icon: <BrandIcon brand="whatsapp" mono className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-[#25D366]' };
-    if (ch === 'whatsapp' || ch.includes('whatsapp') || ch.includes('wapp')) return { icon: <BrandIcon brand="whatsapp" mono className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-[#25D366]' };
-    return { icon: <BrandIcon brand="whatsapp" mono className="w-3.5 h-3.5" />, label: 'WhatsApp', color: 'bg-[#25D366]' };
-  };
-
-  const ChannelBadge = ({ channel }: { channel?: string }) => {
-    const { icon, label, color } = getChannelInfo(channel);
-    return (
-      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white ${color} flex-shrink-0`}>
-        {icon}
-        {label}
-      </span>
-    );
-  };
-
-  const loadInsights = useCallback(async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await api.aiRemarketing.insights();
-      if (data) {
-        setInsights(data);
-      }
-    } catch (err) {
-      console.error('Error loading insights:', err);
+      const data = await api.aiRemarketing.opportunities();
+      if (data?.items) setQueue(data);
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível carregar as prioridades');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadInsights();
-  }, [loadInsights]);
+  useEffect(() => { load(); }, [load]);
 
-  const handleAnalyzeLeads = async () => {
-    try {
-      setAnalyzing(true);
-      const res = await api.aiRemarketing.analyze();
-      if (res) {
-        await loadInsights();
-        toast.success('Leads analisados com sucesso!');
-      }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Erro ao analisar leads');
-    } finally {
-      setAnalyzing(false);
-    }
-  };
+  const items = useMemo(
+    () => (queue?.items || []).filter((o) => !filter || o.bucket === filter),
+    [queue, filter],
+  );
 
-  const handleGenerateMessage = async (lead: LeadInsight) => {
-    try {
-      setGeneratingFor(lead.id);
-      // Uma chamada retorna 3 sugestões diferentes
-      const res = await api.aiRemarketing.generateMessage({
-        leadId: lead.id,
-        tone: 'friendly',
-        goal: 'follow-up',
-        channel: lead.recommended_channel || 'whatsapp'
-      });
+  const patch = (leadId: string, change: Partial<Composer>) =>
+    setComposers((prev) => ({ ...prev, [leadId]: { ...prev[leadId], ...change } }));
 
-      const suggestions: string[] = res?.suggestions || [];
-
-      if (suggestions.length > 0) {
-        setMessages(prev => ({
-          ...prev,
-          [lead.id]: {
-            leadId: lead.id,
-            suggestions,
-            selectedIndex: 0,
-            isExpanded: true
-          }
-        }));
-        toast.success(`${suggestions.length} mensagens geradas! Escolha uma ou edite.`);
-      } else {
-        toast.error('Erro ao gerar mensagens, tente novamente.');
-      }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Erro ao gerar mensagens');
-    } finally {
-      setGeneratingFor(null);
-    }
-  };
-
-  const handleCopyMessage = async (leadId: string) => {
-    const message = messages[leadId];
-    if (message) {
-      const contentToCopy = message.editedContent || message.suggestions[message.selectedIndex];
-      await navigator.clipboard.writeText(contentToCopy);
-      toast.success('✓ Copiado para área de transferência');
-    }
-  };
-
-  const handleSendMessage = async (lead: LeadInsight) => {
-    const message = messages[lead.id];
-    if (!message?.suggestions?.length) {
-      toast.error('Nenhuma mensagem para enviar');
-      return;
-    }
-
-    const contentToSend = message.editedContent || message.suggestions[message.selectedIndex];
-
-    try {
-      setSendingStates(prev => ({
-        ...prev,
-        [lead.id]: { leadId: lead.id, isSending: true }
-      }));
-
-      // Enviar mensagem de verdade via API — backend detecta o canal automaticamente
-      const res = await api.aiRemarketing.sendMessage({
-        leadId: lead.id,
-        content: contentToSend,
-      });
-      
-      if (res?.success) {
-        setSendingStates(prev => ({
-          ...prev,
-          [lead.id]: { leadId: lead.id, isSending: false, sentAt: new Date() }
-        }));
-
-        const chInfo = getChannelInfo(res.channel);
-        toast.success(`✓ Mensagem enviada para ${lead.name} via ${chInfo.label}!`);
-        
-        // Limpar estado após 3 segundos
-        setTimeout(() => {
-          setSendingStates(prev => {
-            const newState = { ...prev };
-            delete newState[lead.id];
-            return newState;
-          });
-          // Limpar mensagens após envio bem-sucedido
-          setMessages(prev => {
-            const newState = { ...prev };
-            delete newState[lead.id];
-            return newState;
-          });
-        }, 3000);
-      } else {
-        toast.error('Erro ao enviar mensagem');
-      }
-    } catch (err: any) {
-      // Mostrar mensagem específica para WhatsApp desconectado
-      const errData = err?.response?.data;
-      if (errData?.error === 'WhatsApp desconectado' || errData?.error === 'Erro no servidor WhatsApp') {
-        toast.error(` ${errData.detail || errData.error}`, { duration: 6000 });
-      } else {
-        toast.error(errData?.detail || errData?.error || 'Erro ao enviar mensagem. Tente novamente.');
-      }
-      setSendingStates(prev => ({
-        ...prev,
-        [lead.id]: { leadId: lead.id, isSending: false }
-      }));
-    }
-  };
-
-  const toggleMessageExpand = (leadId: string) => {
-    setMessages(prev => ({
+  const generate = async (o: Opportunity) => {
+    setComposers((prev) => ({
       ...prev,
-      [leadId]: {
-        ...prev[leadId],
-        isExpanded: !prev[leadId]?.isExpanded
-      }
+      [o.lead_id]: { suggestions: prev[o.lead_id]?.suggestions || [], selected: '0', draft: '', sending: false, loading: true },
     }));
-  };
-
-  const handleSelectSuggestion = (leadId: string, index: number) => {
-    setMessages(prev => ({
-      ...prev,
-      [leadId]: {
-        ...prev[leadId],
-        selectedIndex: index,
-        editedContent: undefined
-      }
-    }));
-  };
-
-  const handleEditMessage = (leadId: string) => {
-    setEditingMessage(editingMessage === leadId ? null : leadId);
-  };
-
-  const handleSaveEdit = (leadId: string, newContent: string) => {
-    if (newContent.trim()) {
-      setMessages(prev => ({
-        ...prev,
-        [leadId]: {
-          ...prev[leadId],
-          editedContent: newContent
-        }
-      }));
-      setEditingMessage(null);
-      toast.success('Mensagem atualizada!');
+    try {
+      const res = await api.aiRemarketing.generateMessage({ leadId: o.lead_id, bucket: o.bucket });
+      const suggestions: Suggestion[] = res?.suggestions || [];
+      if (suggestions.length === 0) throw new Error('Sem sugestões');
+      patch(o.lead_id, { loading: false, suggestions, selected: '0', draft: suggestions[0].text });
+    } catch (err: any) {
+      setComposers((prev) => {
+        const next = { ...prev };
+        if (!next[o.lead_id]?.suggestions.length) delete next[o.lead_id];
+        else next[o.lead_id] = { ...next[o.lead_id], loading: false };
+        return next;
+      });
+      toast.error(err?.message || 'Não foi possível gerar a mensagem');
     }
   };
+
+  const choose = (leadId: string, index: string) => {
+    const c = composers[leadId];
+    if (!c) return;
+    patch(leadId, { selected: index, draft: c.suggestions[Number(index)]?.text || '' });
+  };
+
+  const send = async (o: Opportunity) => {
+    const c = composers[o.lead_id];
+    const content = c?.draft.trim();
+    if (!content) return;
+    patch(o.lead_id, { sending: true });
+    try {
+      await api.aiRemarketing.sendMessage({ leadId: o.lead_id, content });
+      setSent((prev) => ({ ...prev, [o.lead_id]: true }));
+      setComposers((prev) => {
+        const next = { ...prev };
+        delete next[o.lead_id];
+        return next;
+      });
+      toast.success(`Mensagem enviada a ${displayName(o.name)}`);
+    } catch (err: any) {
+      patch(o.lead_id, { sending: false });
+      toast.error(err?.message || 'Não foi possível enviar');
+    }
+  };
+
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Mensagem copiada');
+    } catch {
+      toast.error('Não foi possível copiar');
+    }
+  };
+
+  const refresh = () => {
+    setSent({});
+    setComposers({});
+    load();
+  };
+
+  const total = queue ? Object.values(queue.counts).reduce((a, b) => a + b, 0) : 0;
 
   return (
     <div className="w-full">
       <PageHeader
         title="Assistente de vendas IA"
-        description="Prioridades e próximas ações para os seus leads"
-        icon={Brain}
+        description="Quem precisa de si agora e o que lhe dizer"
         actions={
           <PageAction
-            icon={Sparkles}
-            label={analyzing ? 'A analisar…' : 'Reanalisar'}
-            onClick={handleAnalyzeLeads}
-            disabled={analyzing}
-            className={analyzing ? '[&>svg]:animate-spin' : undefined}
+            icon={RefreshCw}
+            label="Atualizar"
+            onClick={refresh}
+            disabled={loading}
+            className={loading ? '[&>svg]:animate-spin' : undefined}
           />
         }
       />
 
-      <main className="space-y-6">
-        {loading && !insights ? (
-          <div className="space-y-6">
+      <main className="space-y-5">
+        {loading && !queue ? (
+          <div className="space-y-5">
             <SkeletonStatCardsRow count={4} />
             <div className="space-y-3">
-              <div className="h-5 skeleton-shimmer rounded-md w-32" />
               {Array.from({ length: 4 }).map((_, i) => <SkeletonInsightRow key={i} />)}
             </div>
-            <div className="space-y-3">
-              <div className="h-5 skeleton-shimmer rounded-md w-28" />
-              {Array.from({ length: 3 }).map((_, i) => <SkeletonInsightRow key={i} />)}
-            </div>
           </div>
-        ) : insights ? (
+        ) : !queue ? (
+          <EmptyState
+            icon={RefreshCw}
+            title="Não foi possível carregar"
+            action={<Button onClick={load}>Tentar de novo</Button>}
+          />
+        ) : (
           <>
-            {loading && (
-              <div className="flex justify-end"><UpdatingBadge /></div>
-            )}
-            {/* AI Decision Summary */}
-            <div className="bg-gradient-to-r from-purple-600/10 to-indigo-600/10 border border-purple-200/30 dark:border-purple-800/30 rounded-xl p-5 space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                  <Lightbulb className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-sm font-bold text-foreground mb-1">Decisões da IA</h2>
-                  <p className="text-sm leading-relaxed text-foreground/80">
-                    {insights.stats.hot_count > 0 &&
-                      (insights.stats.hot_count === 1
-                        ? '1 lead com alto potencial, pronto a converter. '
-                        : `${formatNumber(insights.stats.hot_count)} leads com alto potencial, prontos a converter. `)}
-                    {insights.stats.high_risk_count > 0 &&
-                      (insights.stats.high_risk_count === 1
-                        ? '1 em risco precisa de atenção imediata. '
-                        : `${formatNumber(insights.stats.high_risk_count)} em risco precisam de atenção imediata. `)}
-                    {insights.stats.avg_conversion > 0 && (
-                      <>Conversão prevista: <span className="font-bold text-emerald-600">{formatPercent(insights.stats.avg_conversion)}</span></>
+            {/* Situações: tocar filtra a lista */}
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+              {BUCKETS.map((b) => {
+                const active = filter === b.key;
+                return (
+                  <button
+                    key={b.key}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => { setFilter(active ? null : b.key); setVisible(PAGE); }}
+                    className={cn(
+                      'min-w-0 rounded-xl border bg-card p-3 text-left transition-colors sm:p-4',
+                      active ? 'border-foreground/25 bg-muted/60' : 'border-border hover:bg-muted/40',
                     )}
+                  >
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <span className={cn('h-2 w-2 flex-shrink-0 rounded-full', b.dot)} />
+                      <span className="truncate">{b.label}</span>
+                    </span>
+                    <span className="mt-1 block text-2xl font-semibold tabular-nums text-foreground">
+                      {formatNumber(queue.counts[b.key] ?? 0)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {(queue.value_at_stake > 0 || loading) && (
+              <div className="flex items-center justify-between gap-3">
+                {queue.value_at_stake > 0 ? (
+                  <p className="min-w-0 text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground tabular-nums">{formatMoney(queue.value_at_stake)}</span> em negócios à espera de si
                   </p>
-                </div>
+                ) : <span />}
+                {loading && <UpdatingBadge />}
               </div>
-            </div>
+            )}
 
-            {/* Key Metrics */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: 'Leads quentes', value: formatNumber(insights.stats.hot_count ?? 0), icon: Flame, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-                { label: 'Em risco', value: formatNumber(insights.stats.high_risk_count ?? 0), icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
-                { label: 'Envolvimento médio', value: formatPercent(insights.stats.avg_engagement ?? 0), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-              ].map(s => (
-                <div key={s.label} className="min-w-0 bg-card border border-border rounded-lg p-3">
-                  <s.icon className={`w-4 h-4 ${s.color}`} />
-                  <p className="mt-1.5 text-xl font-bold tabular-nums text-foreground">{s.value}</p>
-                  <p className="text-[11px] font-medium leading-tight text-muted-foreground break-words">{s.label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Priority Leads with Message Preview */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-amber-500" />
-                <h3 className="text-base font-bold text-foreground">Ações prioritárias</h3>
-                <span className="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-1 rounded-full font-semibold">
-                  {(insights.hotLeads?.length || 0) + (insights.atRiskLeads?.length || 0)} leads a aguardar
-                </span>
+            {total === 0 ? (
+              <EmptyState
+                icon={CheckCircle2}
+                title="Está tudo em dia"
+                description="Nenhum cliente à espera de resposta"
+              />
+            ) : items.length === 0 ? (
+              <EmptyState icon={CheckCircle2} title="Nada nesta situação" />
+            ) : (
+              <div className="space-y-3">
+                {items.slice(0, visible).map((o) => (
+                  <OpportunityCard
+                    key={o.lead_id}
+                    o={o}
+                    composer={composers[o.lead_id]}
+                    sent={!!sent[o.lead_id]}
+                    onGenerate={() => generate(o)}
+                    onChoose={(i) => choose(o.lead_id, i)}
+                    onDraft={(draft) => patch(o.lead_id, { draft })}
+                    onCancel={() => setComposers((prev) => { const n = { ...prev }; delete n[o.lead_id]; return n; })}
+                    onSend={() => send(o)}
+                    onCopy={copy}
+                    onOpenConversation={onOpenConversation ? () => onOpenConversation(o.lead_id, o.conversation_id) : undefined}
+                    onOpenLead={onOpenLead ? () => onOpenLead(o.lead_id) : undefined}
+                  />
+                ))}
+                {items.length > visible && (
+                  <Button variant="outline" className="w-full" onClick={() => setVisible((v) => v + PAGE)}>
+                    Ver mais ({formatNumber(items.length - visible)})
+                  </Button>
+                )}
               </div>
+            )}
 
-              {/* Hot Leads - Priority 1 */}
-              {insights.hotLeads?.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                    Prioridade 1 · Prontos a converter
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {insights.hotLeads.map((lead: any) => (
-                      <div key={lead.id} className="bg-gradient-to-br from-emerald-50/50 to-emerald-50/20 dark:from-emerald-950/20 dark:to-emerald-950/5 border-2 border-emerald-200/50 dark:border-emerald-800/30 rounded-lg p-4 space-y-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="font-bold text-foreground truncate">{displayName(lead.name)}</span>
-                              <ChannelBadge channel={lead.recommended_channel} />
-                              <span className="text-xs font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                {formatPercent(lead.conversion_probability)} de probabilidade
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground">{formatLeadStatus(lead.status)}</p>
-                          </div>
-                          <div className="flex-shrink-0 text-right">
-                            <p className="text-[11px] text-muted-foreground">Pontuação</p>
-                            <p className="font-bold tabular-nums text-emerald-600">{lead.engagement_score}</p>
-                          </div>
-                        </div>
-
-                        {/* AI Recommendation */}
-                        {lead.next_best_action && (
-                          <div className="bg-white/50 dark:bg-black/20 rounded border border-emerald-200/30 dark:border-emerald-800/30 p-2.5">
-                            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 mb-1">Por que é prioritário:</p>
-                            <p className="text-xs text-foreground/80">{lead.next_best_action}</p>
-                          </div>
-                        )}
-
-                        {/* Message Preview */}
-                        {messages[lead.id] ? (
-                          <div className="bg-white/30 dark:bg-black/30 rounded-lg border border-emerald-200/50 dark:border-emerald-800/50 p-3 space-y-2">
-                            {/* Suggestion Selector */}
-                            <div className="space-y-2">
-                              <p className="text-xs font-bold text-foreground">3 mensagens sugeridas</p>
-                              <div className="space-y-1.5">
-                                {messages[lead.id]?.suggestions.map((suggestion, idx) => (
-                                  <button
-                                    key={idx}
-                                    onClick={() => handleSelectSuggestion(lead.id, idx)}
-                                    className={`w-full text-left p-2 rounded border text-xs transition-all ${
-                                      messages[lead.id]?.selectedIndex === idx
-                                        ? 'bg-emerald-100 dark:bg-emerald-950/40 border-emerald-400 dark:border-emerald-600'
-                                        : 'bg-white/20 dark:bg-black/20 border-emerald-200/30 dark:border-emerald-800/30 hover:bg-white/30'
-                                    }`}
-                                  >
-                                    <div className="flex items-start gap-2">
-                                      <span className={`text-xs font-bold flex-shrink-0 ${
-                                        messages[lead.id]?.selectedIndex === idx 
-                                          ? 'text-emerald-600 dark:text-emerald-400' 
-                                          : 'text-muted-foreground'
-                                      }`}>
-                                        {idx + 1}.
-                                      </span>
-                                      <span className="line-clamp-2 text-foreground/80">{suggestion}</span>
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Edit Mode */}
-                            {editingMessage === lead.id ? (
-                              <div className="space-y-2 bg-white/20 dark:bg-black/40 p-2.5 rounded border border-emerald-200/50 dark:border-emerald-800/50">
-                                <p className="text-xs font-bold text-foreground">Editar Mensagem</p>
-                                <textarea
-                                  defaultValue={messages[lead.id]?.editedContent || messages[lead.id]?.suggestions[messages[lead.id]?.selectedIndex]}
-                                  onChange={(e) => {
-                                    const newContent = e.target.value;
-                                    if (newContent) {
-                                      setMessages(prev => ({
-                                        ...prev,
-                                        [lead.id]: {
-                                          ...prev[lead.id],
-                                          editedContent: newContent
-                                        }
-                                      }));
-                                    }
-                                  }}
-                                  className="w-full h-24 p-2 bg-white/50 dark:bg-black/40 text-foreground text-xs rounded border border-emerald-200/30 dark:border-emerald-800/30 resize-none focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-                                  placeholder="Edite a mensagem conforme necessário..."
-                                />
-                                <div className="flex gap-2">
-                                  <Button
-                                    size="sm"
-                                    className="flex-1 h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                                    onClick={() => {
-                                      const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-                                      handleSaveEdit(lead.id, textarea?.value || '');
-                                    }}
-                                  >
-                                    Guardar
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="flex-1 h-7 text-xs"
-                                    onClick={() => {
-                                      setEditingMessage(null);
-                                      setMessages(prev => ({
-                                        ...prev,
-                                        [lead.id]: {
-                                          ...prev[lead.id],
-                                          editedContent: undefined
-                                        }
-                                      }));
-                                    }}
-                                  >
-                                    Cancelar
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-xs font-bold text-foreground">Mensagem Selecionada</p>
-                                  <button
-                                    onClick={() => toggleMessageExpand(lead.id)}
-                                    className="text-emerald-600 hover:text-emerald-700 transition-colors"
-                                  >
-                                    {messages[lead.id]?.isExpanded ? (
-                                      <ChevronUp className="w-4 h-4" />
-                                    ) : (
-                                      <ChevronDown className="w-4 h-4" />
-                                    )}
-                                  </button>
-                                </div>
-
-                                {messages[lead.id]?.isExpanded ? (
-                                  <div>
-                                    <p className="text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap break-words bg-white/20 dark:bg-black/20 p-2 rounded">
-                                      {messages[lead.id]?.editedContent || messages[lead.id]?.suggestions[messages[lead.id]?.selectedIndex]}
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <p className="text-xs text-foreground/80 line-clamp-3 bg-white/20 dark:bg-black/20 p-2 rounded">
-                                    {messages[lead.id]?.editedContent || messages[lead.id]?.suggestions[messages[lead.id]?.selectedIndex]}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Message Action Buttons */}
-                            {editingMessage !== lead.id && (
-                              <div className="flex gap-2 pt-2">
-                                <Button
-                                  size="sm"
-                                  className={`flex-1 h-7 text-xs gap-1.5 text-white font-semibold ${getChannelInfo(lead.recommended_channel).color} hover:opacity-90`}
-                                  onClick={() => handleSendMessage(lead)}
-                                  disabled={sendingStates[lead.id]?.isSending}
-                                >
-                                  {sendingStates[lead.id]?.isSending ? (
-                                    <>
-                                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                      A enviar...
-                                    </>
-                                  ) : sendingStates[lead.id]?.sentAt ? (
-                                    <>
-                                      <CheckCircle2 className="w-3.5 h-3.5" />
-                                      Enviado
-                                    </>
-                                  ) : (
-                                    <>
-                                      {getChannelInfo(lead.recommended_channel).icon}
-                                      Enviar via {getChannelInfo(lead.recommended_channel).label}
-                                    </>
-                                  )}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs gap-1 px-2"
-                                  onClick={() => handleCopyMessage(lead.id)}
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs gap-1 px-2"
-                                  onClick={() => handleEditMessage(lead.id)}
-                                >
-                                  <Edit3 className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <Button
-                            size="sm"
-                            className="w-full gap-1.5 h-8 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={() => handleGenerateMessage(lead)}
-                            disabled={generatingFor === lead.id}
-                          >
-                            {generatingFor === lead.id
-                              ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              : <Sparkles className="w-3.5 h-3.5" />
-                            }
-                            {generatingFor === lead.id ? 'A gerar...' : 'Gerar mensagem'}
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* At-Risk Leads - Priority 2 */}
-              {insights.atRiskLeads?.length > 0 && (
-                <div className="space-y-2 mt-4">
-                  <p className="text-sm font-semibold text-red-700 dark:text-red-400">
-                    Prioridade 2 · Risco de perda
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {insights.atRiskLeads.map((lead: any) => {
-                      const days = lead.last_contact_at
-                        ? Math.floor((Date.now() - new Date(lead.last_contact_at).getTime()) / 86400000)
-                        : null;
-                      return (
-                        <div key={lead.id} className="bg-gradient-to-br from-red-50/50 to-red-50/20 dark:from-red-950/20 dark:to-red-950/5 border-2 border-red-200/50 dark:border-red-800/30 rounded-lg p-4 space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <span className="font-bold text-foreground truncate">{displayName(lead.name)}</span>
-                                <ChannelBadge channel={lead.recommended_channel} />
-                                <span className="text-xs font-bold bg-red-500/20 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                  {lead.risk_level === 'high' ? 'Crítico' : 'Médio'}
-                                </span>
-                              </div>
-                              <p className="text-xs text-muted-foreground">{formatLeadStatus(lead.status)}</p>
-                            </div>
-                            <div className="flex-shrink-0 text-right">
-                              <p className="text-[11px] text-muted-foreground">Pontuação</p>
-                              <p className="font-bold tabular-nums text-red-600">{lead.engagement_score}</p>
-                            </div>
-                          </div>
-
-                          {/* Risk Details */}
-                          {days !== null && (
-                            <div className="text-xs text-red-600 dark:text-red-400 font-semibold bg-red-50/50 dark:bg-red-950/30 p-2 rounded border border-red-200/30 dark:border-red-800/30">
-                               {days === 0 ? 'Sem contacto hoje' : `Sem resposta há ${days} dia${days !== 1 ? 's' : ''}`}
-                            </div>
-                          )}
-
-                          {/* AI Recommendation */}
-                          {lead.next_best_action && (
-                            <div className="bg-white/50 dark:bg-black/20 rounded border border-red-200/30 dark:border-red-800/30 p-2.5">
-                              <p className="text-xs font-semibold text-red-700 dark:text-red-300 mb-1">Ação recomendada:</p>
-                              <p className="text-xs text-foreground/80">{lead.next_best_action}</p>
-                            </div>
-                          )}
-
-                          {/* Message Preview */}
-                          {messages[lead.id] ? (
-                            <div className="bg-white/30 dark:bg-black/30 rounded-lg border border-red-200/50 dark:border-red-800/50 p-3 space-y-2">
-                              {/* Suggestion Selector */}
-                              <div className="space-y-2">
-                                <p className="text-xs font-bold text-foreground">3 mensagens sugeridas</p>
-                                <div className="space-y-1.5">
-                                  {messages[lead.id]?.suggestions.map((suggestion, idx) => (
-                                    <button
-                                      key={idx}
-                                      onClick={() => handleSelectSuggestion(lead.id, idx)}
-                                      className={`w-full text-left p-2 rounded border text-xs transition-all ${
-                                        messages[lead.id]?.selectedIndex === idx
-                                          ? 'bg-red-100 dark:bg-red-950/40 border-red-400 dark:border-red-600'
-                                          : 'bg-white/20 dark:bg-black/20 border-red-200/30 dark:border-red-800/30 hover:bg-white/30'
-                                      }`}
-                                    >
-                                      <div className="flex items-start gap-2">
-                                        <span className={`text-xs font-bold flex-shrink-0 ${
-                                          messages[lead.id]?.selectedIndex === idx 
-                                            ? 'text-red-600 dark:text-red-400' 
-                                            : 'text-muted-foreground'
-                                        }`}>
-                                          {idx + 1}.
-                                        </span>
-                                        <span className="line-clamp-2 text-foreground/80">{suggestion}</span>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Edit Mode */}
-                              {editingMessage === lead.id ? (
-                                <div className="space-y-2 bg-white/20 dark:bg-black/40 p-2.5 rounded border border-red-200/50 dark:border-red-800/50">
-                                  <p className="text-xs font-bold text-foreground">Editar Mensagem</p>
-                                  <textarea
-                                    defaultValue={messages[lead.id]?.editedContent || messages[lead.id]?.suggestions[messages[lead.id]?.selectedIndex]}
-                                    onChange={(e) => {
-                                      const newContent = e.target.value;
-                                      if (newContent) {
-                                        setMessages(prev => ({
-                                          ...prev,
-                                          [lead.id]: {
-                                            ...prev[lead.id],
-                                            editedContent: newContent
-                                          }
-                                        }));
-                                      }
-                                    }}
-                                    className="w-full h-24 p-2 bg-white/50 dark:bg-black/40 text-foreground text-xs rounded border border-red-200/30 dark:border-red-800/30 resize-none focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400"
-                                    placeholder="Edite a mensagem conforme necessário..."
-                                  />
-                                  <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      className="flex-1 h-7 text-xs bg-red-600 hover:bg-red-700 text-white"
-                                      onClick={() => {
-                                        const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-                                        handleSaveEdit(lead.id, textarea?.value || '');
-                                      }}
-                                    >
-                                      Guardar
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="flex-1 h-7 text-xs"
-                                      onClick={() => {
-                                        setEditingMessage(null);
-                                        setMessages(prev => ({
-                                          ...prev,
-                                          [lead.id]: {
-                                            ...prev[lead.id],
-                                            editedContent: undefined
-                                          }
-                                        }));
-                                      }}
-                                    >
-                                      Cancelar
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <p className="text-xs font-bold text-foreground">Mensagem Selecionada</p>
-                                    <button
-                                      onClick={() => toggleMessageExpand(lead.id)}
-                                      className="text-red-600 hover:text-red-700 transition-colors"
-                                    >
-                                      {messages[lead.id]?.isExpanded ? (
-                                        <ChevronUp className="w-4 h-4" />
-                                      ) : (
-                                        <ChevronDown className="w-4 h-4" />
-                                      )}
-                                    </button>
-                                  </div>
-
-                                  {messages[lead.id]?.isExpanded ? (
-                                    <div>
-                                      <p className="text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap break-words bg-white/20 dark:bg-black/20 p-2 rounded">
-                                        {messages[lead.id]?.editedContent || messages[lead.id]?.suggestions[messages[lead.id]?.selectedIndex]}
-                                      </p>
-                                    </div>
-                                  ) : (
-                                    <p className="text-xs text-foreground/80 line-clamp-3 bg-white/20 dark:bg-black/20 p-2 rounded">
-                                      {messages[lead.id]?.editedContent || messages[lead.id]?.suggestions[messages[lead.id]?.selectedIndex]}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Message Action Buttons */}
-                              {editingMessage !== lead.id && (
-                                <div className="flex gap-2 pt-2">
-                                  <Button
-                                    size="sm"
-                                    className={`flex-1 h-7 text-xs gap-1.5 text-white font-semibold ${getChannelInfo(lead.recommended_channel).color} hover:opacity-90`}
-                                    onClick={() => handleSendMessage(lead)}
-                                    disabled={sendingStates[lead.id]?.isSending}
-                                  >
-                                    {sendingStates[lead.id]?.isSending ? (
-                                      <>
-                                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        A enviar...
-                                      </>
-                                    ) : sendingStates[lead.id]?.sentAt ? (
-                                      <>
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                        Enviado
-                                      </>
-                                    ) : (
-                                      <>
-                                        {getChannelInfo(lead.recommended_channel).icon}
-                                        Enviar via {getChannelInfo(lead.recommended_channel).label}
-                                      </>
-                                    )}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs gap-1 px-2"
-                                    onClick={() => handleCopyMessage(lead.id)}
-                                  >
-                                    <Copy className="w-3 h-3" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs gap-1 px-2"
-                                    onClick={() => handleEditMessage(lead.id)}
-                                  >
-                                    <Edit3 className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <Button
-                              size="sm"
-                              className="w-full gap-1.5 h-8 text-xs font-bold bg-red-600 hover:bg-red-700 text-white"
-                              onClick={() => handleGenerateMessage(lead)}
-                              disabled={generatingFor === lead.id}
-                            >
-                              {generatingFor === lead.id
-                                ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                : <Zap className="w-3.5 h-3.5" />
-                              }
-                              {generatingFor === lead.id ? 'A gerar...' : 'Gerar mensagem urgente'}
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Recommended Actions Section */}
-            {insights.recommendedActions?.length > 0 && (
-              <div className="space-y-3 mt-6">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-primary" />
-                  <h3 className="text-base font-bold text-foreground">Próximas ações automáticas</h3>
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-semibold">
-                    {insights.recommendedActions.length} sugestões
+            {queue.stale > 0 && (
+              <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                    <Workflow className="h-5 w-5" />
                   </span>
+                  <p className="min-w-0 text-sm text-foreground">
+                    {queue.stale === 1 ? '1 lead parado' : `${formatNumber(queue.stale)} leads parados`} há mais de 30 dias
+                  </p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {insights.recommendedActions.map((lead: any) => (
-                    <div key={lead.id} className="bg-card border border-border rounded-lg p-3 space-y-3 hover:border-primary/50 transition-colors">
-                      <div className="flex items-start gap-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-                          <span className="text-[10px] font-bold text-primary">
-                            {(lead.name || 'L').charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                            <p className="text-xs font-bold text-foreground truncate">{displayName(lead.name)}</p>
-                            <ChannelBadge channel={lead.recommended_channel} />
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">{formatPercent(lead.conversion_probability)} de probabilidade</p>
-                        </div>
-                      </div>
-
-                      {lead.next_best_action && (
-                        <p className="text-xs text-foreground/80 bg-muted/30 p-2 rounded border border-border">
-                          {lead.next_best_action}
-                        </p>
-                      )}
-
-                      {messages[lead.id] ? (
-                        <div className="space-y-2 bg-muted/20 p-2 rounded-lg border border-border">
-                          <p className="text-xs font-semibold text-foreground">Prévia da Mensagem</p>
-                          <p className="text-xs text-foreground/80 line-clamp-3">
-                            {messages[lead.id]?.editedContent || messages[lead.id]?.suggestions[messages[lead.id]?.selectedIndex]}
-                          </p>
-                          <Button
-                            size="sm"
-                            className={`w-full gap-1.5 h-7 text-xs font-semibold text-white ${getChannelInfo(lead.recommended_channel).color} hover:opacity-90`}
-                            onClick={() => handleSendMessage(lead)}
-                            disabled={sendingStates[lead.id]?.isSending}
-                          >
-                            {sendingStates[lead.id]?.isSending ? (
-                              <>
-                                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                A enviar...
-                              </>
-                            ) : sendingStates[lead.id]?.sentAt ? (
-                              <>
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                Enviado
-                              </>
-                            ) : (
-                              <>
-                                {getChannelInfo(lead.recommended_channel).icon}
-                                Enviar via {getChannelInfo(lead.recommended_channel).label}
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          size="sm"
-                          className="w-full gap-1.5 h-7 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground"
-                          onClick={() => handleGenerateMessage(lead)}
-                          disabled={generatingFor === lead.id}
-                        >
-                          {generatingFor === lead.id
-                            ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            : <ArrowRight className="w-3 h-3" />
-                          }
-                          {generatingFor === lead.id ? 'A gerar...' : 'Gerar Ação'}
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                {onNavigate && (
+                  <Button variant="outline" onClick={() => onNavigate('remarketing')}>Reativar com um fluxo</Button>
+                )}
               </div>
             )}
           </>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 animate-pulse">
-              <Brain className="w-8 h-8 text-primary" />
-            </div>
-            <h3 className="text-lg font-bold text-foreground mb-2">Pronto para Análise</h3>
-            <p className="text-sm text-muted-foreground mb-6 max-w-xs">
-              A IA identificará leads quentes, alertará sobre riscos e sugerirá ações automáticas.
-            </p>
-            <Button onClick={handleAnalyzeLeads} disabled={analyzing} className="gap-2 px-6">
-              {analyzing
-                ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                : <Zap className="w-4 h-4" />
-              }
-              {analyzing ? 'A analisar...' : 'Iniciar Análise Inteligente'}
-            </Button>
-          </div>
         )}
       </main>
     </div>
+  );
+}
+
+function OpportunityCard({
+  o, composer, sent, onGenerate, onChoose, onDraft, onCancel, onSend, onCopy, onOpenConversation, onOpenLead,
+}: {
+  o: Opportunity;
+  composer?: Composer;
+  sent: boolean;
+  onGenerate: () => void;
+  onChoose: (index: string) => void;
+  onDraft: (text: string) => void;
+  onCancel: () => void;
+  onSend: () => void;
+  onCopy: (text: string) => void;
+  onOpenConversation?: () => void;
+  onOpenLead?: () => void;
+}) {
+  const ready = composer && !composer.loading && composer.suggestions.length > 0;
+
+  return (
+    <article className={cn('rounded-xl border border-border bg-card p-4 transition-opacity', sent && 'opacity-70')}>
+      <div className="flex items-start gap-3">
+        <div className="relative flex-shrink-0">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-sm font-semibold text-foreground" translate="no">
+            {displayName(o.name).charAt(0).toUpperCase()}
+          </span>
+          {o.channel && (
+            <ChannelLogo type={o.channel} className="absolute -bottom-1 -right-1 h-5 w-5 ring-2 ring-card" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <button
+              type="button"
+              onClick={onOpenLead}
+              disabled={!onOpenLead}
+              className="min-w-0 truncate text-left text-[15px] font-semibold text-foreground hover:underline disabled:no-underline"
+              translate="no"
+            >
+              {displayName(o.name)}
+            </button>
+            {o.deal_value > 0 && (
+              <span className="flex-shrink-0 text-sm font-semibold tabular-nums text-foreground">{formatMoney(o.deal_value)}</span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {formatLeadStatus(o.status)}
+            {o.in_flow && ' · Num fluxo'}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-start gap-2 text-sm">
+        <span className={cn('mt-1.5 h-2 w-2 flex-shrink-0 rounded-full', bucketDot(o.bucket))} />
+        <span className="min-w-0 flex-1 text-foreground">{o.reason}</span>
+        <span className="flex-shrink-0 text-xs text-muted-foreground tabular-nums">{formatRelativeDay(o.since, 'time')}</span>
+      </div>
+
+      {o.last_client_message && (
+        <p className="mt-2 rounded-lg bg-muted/60 px-3 py-2 text-sm text-foreground/80" translate="no">
+          <span className="line-clamp-2">“{o.last_client_message}”</span>
+        </p>
+      )}
+
+      {sent ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+            <CheckCircle2 className="h-4 w-4" /> Mensagem enviada
+          </span>
+          {onOpenConversation && <Button variant="outline" size="sm" onClick={onOpenConversation}>Abrir conversa</Button>}
+        </div>
+      ) : ready ? (
+        <div className="mt-4 space-y-3">
+          <ChoiceList
+            value={composer.selected}
+            onChange={onChoose}
+            options={composer.suggestions.map((s, i) => ({
+              value: String(i),
+              label: (
+                <span className="block min-w-0">
+                  <span className="block text-xs font-medium text-muted-foreground">{s.label}</span>
+                  {composer.selected !== String(i) && <span className="line-clamp-2 text-sm" translate="no">{s.text}</span>}
+                </span>
+              ),
+              children: (
+                <textarea
+                  value={composer.draft}
+                  onChange={(e) => onDraft(e.target.value)}
+                  rows={Math.min(6, Math.max(3, Math.ceil(composer.draft.length / 48)))}
+                  className="w-full resize-none text-sm"
+                  aria-label="Mensagem"
+                  translate="no"
+                />
+              ),
+            }))}
+          />
+          {o.window_closed && (
+            <p className="text-xs text-muted-foreground">
+              Passaram mais de 24 horas desde a última mensagem do cliente: neste canal só pode responder quando ele voltar a escrever.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={onGenerate}>Gerar outras</Button>
+            <Button variant="ghost" size="icon" onClick={() => onCopy(composer.draft)} aria-label="Copiar" title="Copiar">
+              <Copy className="h-4 w-4" />
+            </Button>
+            <div className="ml-auto flex gap-2">
+              <Button variant="outline" size="sm" onClick={onCancel}>Cancelar</Button>
+              <Button
+                size="sm"
+                onClick={onSend}
+                disabled={composer.sending || !composer.draft.trim() || o.window_closed}
+              >
+                {composer.sending ? 'A enviar…' : 'Enviar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">
+          <Button size="sm" onClick={onGenerate} disabled={composer?.loading}>
+            {composer?.loading ? 'A escrever…' : o.action}
+          </Button>
+          {onOpenConversation && (
+            <Button variant="outline" size="sm" onClick={onOpenConversation}>Abrir conversa</Button>
+          )}
+        </div>
+      )}
+    </article>
   );
 }
