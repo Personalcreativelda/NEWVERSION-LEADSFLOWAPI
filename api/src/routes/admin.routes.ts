@@ -432,20 +432,36 @@ router.post('/reset-usage', requireAuth, requireAdmin, async (req: Authenticated
       return res.status(400).json({ error: 'userId is required' });
     }
 
+    // Repor o consumo marca as mensagens (deixam de contar para o plano) em vez de as apagar:
+    // o histórico das conversas fica intacto
+    const resetIndividual = () => query(
+      `UPDATE messages SET metadata = COALESCE(metadata, '{}'::jsonb) || '{"usage_reset": true}'::jsonb
+        WHERE user_id = $1 AND direction = 'out' AND campaign_id IS NULL AND NOT COALESCE(metadata ? 'campaign_id', false)
+          AND NOT COALESCE(metadata ? 'usage_reset', false)`,
+      [userId]
+    );
+    const resetMass = async () => {
+      await query('DELETE FROM campaign_sends WHERE user_id = $1', [userId]);
+      await query(
+        `UPDATE messages SET metadata = COALESCE(metadata, '{}'::jsonb) || '{"usage_reset": true}'::jsonb
+          WHERE user_id = $1 AND direction = 'out' AND (campaign_id IS NOT NULL OR COALESCE(metadata ? 'campaign_id', false))
+            AND NOT COALESCE(metadata ? 'usage_reset', false)`,
+        [userId]
+      );
+    };
+
     switch (resetType) {
       case 'messages':
-        // Deletar mensagens individuais (não de campanha)
-        await query("DELETE FROM messages WHERE user_id = $1 AND campaign_id IS NULL AND direction = 'outgoing'", [userId]);
+        await resetIndividual();
         console.log(`[Admin] Reset individual messages for user ${userId}`);
         break;
       case 'massMessages':
-        // Resetar stats das campanhas
-        await query("UPDATE campaigns SET stats = '{\"sent\": 0, \"delivered\": 0, \"read\": 0, \"replied\": 0, \"failed\": 0}' WHERE user_id = $1", [userId]);
-        console.log(`[Admin] Reset mass messages stats for user ${userId}`);
+        await resetMass();
+        console.log(`[Admin] Reset mass messages for user ${userId}`);
         break;
       case 'all':
-        await query("DELETE FROM messages WHERE user_id = $1 AND campaign_id IS NULL AND direction = 'outgoing'", [userId]);
-        await query("UPDATE campaigns SET stats = '{\"sent\": 0, \"delivered\": 0, \"read\": 0, \"replied\": 0, \"failed\": 0}' WHERE user_id = $1", [userId]);
+        await resetIndividual();
+        await resetMass();
         console.log(`[Admin] Reset all usage counters for user ${userId}`);
         break;
       default:

@@ -86,7 +86,9 @@ export class CampaignCleanupService {
          FROM campaigns
          WHERE status = 'active'
          AND started_at < $1
-         AND completed_at IS NULL`,
+         AND completed_at IS NULL
+         -- As do motor de WhatsApp duram horas ou dias de propósito (ritmo lento, limite diário)
+         AND NOT EXISTS (SELECT 1 FROM campaign_recipients r WHERE r.campaign_id = campaigns.id)`,
         [twoHoursAgo]
       );
 

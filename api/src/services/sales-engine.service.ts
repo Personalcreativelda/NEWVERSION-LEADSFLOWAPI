@@ -303,7 +303,7 @@ export function parseSuggestions(raw: string): Suggestion[] {
   }
 }
 
-async function providersFor(userId: string): Promise<ProviderConfig[]> {
+export async function providersFor(userId: string): Promise<ProviderConfig[]> {
   const platform = getAvailableProviders();
   if (platform.length > 0) return platform;
   // Contas antigas com chave própria

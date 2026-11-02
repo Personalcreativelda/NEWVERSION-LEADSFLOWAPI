@@ -12,6 +12,7 @@ import { campaignScheduler } from './services/campaign-scheduler.service';
 import { campaignCleanupService } from './services/campaign-cleanup.service';
 import { inactivityScheduler } from './services/inactivity-scheduler.service';
 import { flowExecutionService } from './services/flow-execution.service';
+import { campaignEngine } from './services/campaign-engine.service';
 // INBOX: Importar WebSocket service e Email Polling
 import { initializeWebSocket } from './services/websocket.service';
 import { emailPollingService } from './services/email-polling.service';
@@ -588,6 +589,7 @@ initDatabase().then(() => {
   // ✅ Iniciar verificação de inatividade de leads (flows de remarketing)
   inactivityScheduler.start();
   flowExecutionService.start();
+  campaignEngine.start();
 
   // INBOX: Criar HTTP server e inicializar WebSocket
   const server = http.createServer(app);

@@ -436,11 +436,15 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
           body: JSON.stringify({})
         });
 
+        const sendResult = await response.json().catch(() => ({}));
         if (!response.ok) {
-          throw new Error('Erro ao processar envio no servidor');
+          throw new Error(sendResult.error || 'Erro ao processar envio no servidor');
         }
 
         toast.success(`Campanha "${campaignName}" iniciada com sucesso!`);
+        if (sendResult.plan && (sendResult.recipientCount ?? 0) > sendResult.plan.remaining) {
+          toast.warning(`O seu plano permite enviar mais ${sendResult.plan.remaining} mensagens neste período. A campanha pausa quando chegar ao limite.`);
+        }
       } else {
         toast.success(`Campanha "${campaignName}" agendada com sucesso!`);
       }

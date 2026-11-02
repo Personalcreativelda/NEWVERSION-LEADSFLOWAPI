@@ -181,6 +181,45 @@ export async function checkLeadLimit(userId: string): Promise<MessageLimitResult
 // ─────────────────────────────────────────────────────────────────────────────
 
 
+/**
+ * Mensagens individuais enviadas no período ($1 = utilizador, $2 = início do período). As de
+ * campanhas apagadas ficam com campaign_id a NULL mas guardam-no no metadata: continuam em massa.
+ * As marcadas com usage_reset (o administrador repôs o consumo) já não contam.
+ */
+export const INDIVIDUAL_MESSAGES_USED_SQL = `
+  SELECT COUNT(*) AS count FROM messages
+   WHERE user_id = $1 AND direction = 'out' AND created_at >= $2
+     AND campaign_id IS NULL AND NOT COALESCE(metadata ? 'campaign_id', false)
+     AND NOT COALESCE(metadata ? 'usage_reset', false)`;
+
+/**
+ * Mensagens em massa enviadas no período, contadas por envio (não pela data da campanha):
+ * o registo campaign_sends do motor não se apaga com a campanha; as do envio antigo vêm das mensagens.
+ */
+export const MASS_MESSAGES_USED_SQL = `
+  SELECT (SELECT COUNT(*) FROM campaign_sends WHERE user_id = $1 AND sent_at >= $2)
+       + (SELECT COUNT(*) FROM messages
+           WHERE user_id = $1 AND direction = 'out' AND created_at >= $2
+             AND (campaign_id IS NOT NULL OR COALESCE(metadata ? 'campaign_id', false))
+             AND COALESCE(status, '') <> 'failed'
+             AND NOT COALESCE(metadata ? 'engine', false)
+             AND NOT COALESCE(metadata ? 'usage_reset', false)) AS count`;
+
+/** Regista uma mensagem em massa enviada (WhatsApp, SMS ou email): conta no plano mesmo que a campanha seja apagada */
+export async function recordMassSend(userId: string, campaignId: string | null, channelId?: string | null) {
+  await query(
+    'INSERT INTO campaign_sends (user_id, campaign_id, channel_id) VALUES ($1, $2, $3)',
+    [userId, campaignId, channelId ?? null]
+  );
+}
+
+/** Saldo para devolver ao painel ao iniciar uma campanha (null = sem limite) */
+export function planBalance(limit: MessageLimitResult) {
+  return limit.limit === -1
+    ? null
+    : { limit: limit.limit, used: limit.current, remaining: Math.max(0, limit.limit - limit.current) };
+}
+
 export interface MessageLimitResult {
   allowed: boolean;
   current: number;
@@ -207,17 +246,10 @@ export async function checkMessageLimit(
     // Período de faturação atual (o mesmo do perfil: users.service)
     const periodStart = billingPeriodStart(plan, userData.plan_activated_at);
 
-    const countResult = await (type === 'messages'
-      ? query(
-          "SELECT COUNT(*) AS count FROM messages WHERE user_id = $1 AND direction = 'out' AND campaign_id IS NULL AND created_at >= $2",
-          [userId, periodStart]
-        )
-      // Envios em massa só do período (antes somava todas as campanhas de sempre)
-      : query(
-          `SELECT COALESCE(SUM(CASE WHEN (stats->>'sent') ~ '^[0-9]+$' THEN (stats->>'sent')::bigint ELSE 0 END), 0) AS count
-             FROM campaigns WHERE user_id = $1 AND created_at >= $2`,
-          [userId, periodStart]
-        ));
+    const countResult = await query(
+      type === 'messages' ? INDIVIDUAL_MESSAGES_USED_SQL : MASS_MESSAGES_USED_SQL,
+      [userId, periodStart]
+    );
 
     const storedLimits = userData.plan_limits;
     const limit: number =

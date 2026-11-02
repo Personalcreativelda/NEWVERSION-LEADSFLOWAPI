@@ -4,6 +4,7 @@ import { query } from '../database/connection';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
 import { emailService } from '../services/email.service';
 import { getStorageService } from '../services/storage.service';
+import { checkMessageLimit, planBalance, recordMassSend } from '../middleware/plan-enforcement.middleware';
 
 const router = Router();
 const upload = multer({
@@ -444,16 +445,20 @@ router.post('/:id/send', requireAuth, async (req, res) => {
         // 2. Identify recipients
         let recipients: { email: string; name: string }[] = [];
 
+        // Ordem fixa: retomar uma campanha pausada continua do mesmo sítio
         if (campaign.recipient_mode === 'all') {
             const leadsResult = await query(
-                'SELECT email, nome as name FROM leads WHERE user_id = $1 AND email IS NOT NULL AND email != \'\'',
+                `SELECT email, name FROM leads WHERE user_id = $1 AND email IS NOT NULL AND email != '' ORDER BY created_at, id`,
                 [userId]
             );
             recipients = leadsResult.rows;
         } else if (campaign.recipient_mode === 'segments') {
+            const statuses = typeof campaign.selected_statuses === 'string'
+                ? JSON.parse(campaign.selected_statuses || '[]')
+                : campaign.selected_statuses || [];
             const leadsResult = await query(
-                'SELECT email, nome as name FROM leads WHERE user_id = $1 AND status = ANY($2) AND email IS NOT NULL AND email != \'\'',
-                [userId, campaign.selected_statuses]
+                `SELECT email, name FROM leads WHERE user_id = $1 AND status = ANY($2) AND email IS NOT NULL AND email != '' ORDER BY created_at, id`,
+                [userId, statuses]
             );
             recipients = leadsResult.rows;
         } else if (campaign.recipient_mode === 'custom') {
@@ -468,6 +473,24 @@ router.post('/:id/send', requireAuth, async (req, res) => {
         if (recipients.length === 0) {
             return res.status(400).json({ success: false, error: 'No recipients found for this campaign' });
         }
+        if (campaign.status === 'active') {
+            return res.status(400).json({ success: false, error: 'A campanha já está a enviar' });
+        }
+
+        // Retomar depois de pausada: salta quem já foi tratado
+        const resumeFrom = campaign.status === 'paused'
+            ? Math.min(recipients.length, (campaign.sent_count || 0) + (campaign.failed_count || 0))
+            : 0;
+        const pending = recipients.slice(resumeFrom);
+        if (pending.length === 0) {
+            return res.status(400).json({ success: false, error: 'Já não há ninguém por enviar nesta campanha' });
+        }
+
+        // Limite de mensagens em massa do plano (o mesmo das campanhas de WhatsApp)
+        const limit = await checkMessageLimit(userId!, 'massMessages');
+        if (!limit.allowed) {
+            return res.status(403).json({ success: false, error: limit.message, code: limit.code });
+        }
 
         // 3. Update status to active
         await query(
@@ -479,12 +502,16 @@ router.post('/:id/send', requireAuth, async (req, res) => {
         console.log(`[Campaign ${id}] SMTP resolved: host=${smtp_settings.host} port=${smtp_settings.port} user=${smtp_settings.user} fromEmail=${smtp_settings.fromEmail}`);
         (async () => {
             try {
-                console.log(`[Campaign ${id}] Starting background send loop for ${recipients.length} recipients`);
-                let sent = 0;
-                let failed = 0;
-                const failureLogs: any[] = [];
+                console.log(`[Campaign ${id}] Starting background send loop for ${pending.length} recipients`);
+                let sent = resumeFrom > 0 ? campaign.sent_count || 0 : 0;
+                let failed = resumeFrom > 0 ? campaign.failed_count || 0 : 0;
+                let paused = false;
+                const failureLogs: any[] = resumeFrom > 0 ? (campaign.metadata?.failures || []) : [];
 
-                for (const recipient of recipients) {
+                for (const recipient of pending) {
+                    // O plano acabou a meio: pausa (retomar continua daqui)
+                    const check = await checkMessageLimit(userId!, 'massMessages');
+                    if (!check.allowed) { paused = true; break; }
                     try {
                         console.log(`[Campaign ${id}] Sending to ${recipient.email}...`);
                         // Substituir variáveis básicas
@@ -501,6 +528,7 @@ router.post('/:id/send', requireAuth, async (req, res) => {
                             campaign.attachments
                         );
                         sent++;
+                        await recordMassSend(userId!, id, null).catch(() => {});
                     } catch (err: any) {
                         console.error(`[Campaign Send] Failed to send to ${recipient.email}: ${err.message}`, err.code || '', err.responseCode || '');
                         failed++;
@@ -525,17 +553,19 @@ router.post('/:id/send', requireAuth, async (req, res) => {
 
                 // Update stats when finished - use 'completed' for CampaignsPage compatibility
                 await query(
-                    `UPDATE email_campaigns SET 
-              status = 'completed', 
-              sent_count = $1, 
-              failed_count = $2, 
+                    `UPDATE email_campaigns SET
+              status = $4,
+              sent_count = $1,
+              failed_count = $2,
               delivered_count = $1,
-              sent_at = NOW(), 
-              updated_at = NOW() 
+              sent_at = NOW(),
+              metadata = COALESCE(metadata, '{}'::jsonb) || $5::jsonb,
+              updated_at = NOW()
             WHERE id = $3`,
-                    [sent, failed, id]
+                    [sent, failed, id, paused ? 'paused' : 'completed',
+                        JSON.stringify(paused ? { pausedReason: 'MASS_MESSAGE_LIMIT_EXCEEDED' } : {})]
                 );
-                console.log(`[Campaign Send] ✅ Campaign ${id} completed. Sent: ${sent}, Failed: ${failed}`);
+                console.log(`[Campaign Send] Campaign ${id} ${paused ? 'paused (plan limit)' : 'completed'}. Sent: ${sent}, Failed: ${failed}`);
             } catch (fatalError: any) {
                 console.error(`[Campaign ${id}] ❌ FATAL ERROR IN SEND LOOP:`, fatalError);
                 await query(
@@ -549,7 +579,8 @@ router.post('/:id/send', requireAuth, async (req, res) => {
         res.json({
             success: true,
             message: 'Campaign sending started in background',
-            recipientCount: recipients.length
+            recipientCount: pending.length,
+            plan: planBalance(limit),
         });
 
     } catch (error: any) {

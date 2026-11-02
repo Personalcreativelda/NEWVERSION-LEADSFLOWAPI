@@ -2,6 +2,7 @@ import type { QueryResult } from 'pg';
 import { query } from '../database/connection';
 import { getStorageService } from './storage.service';
 import { billingPeriodStart } from '../utils/billing-period';
+import { INDIVIDUAL_MESSAGES_USED_SQL, MASS_MESSAGES_USED_SQL } from '../middleware/plan-enforcement.middleware';
 const DEFAULT_USAGE = {
   leads: 0,
   messages: 0,
@@ -109,19 +110,9 @@ const fetchUsageCounts = async (userId: string): Promise<UsageCounts> => {
     // Each query is isolated — a failure in one does NOT zero out other counts.
     const [leads, messages, massMessages, channels, customAssistants, voiceAgents, activeCampaigns] = await Promise.all([
       safeCount('SELECT COUNT(*) FROM leads WHERE user_id = $1', [userId]),
-      // Mensagens individuais: enviadas (out), não são de campanha, dentro do período (inclui IA)
-      safeCount(
-        "SELECT COUNT(*) FROM messages WHERE user_id = $1 AND direction = 'out' AND campaign_id IS NULL AND created_at >= $2",
-        [userId, periodStart]
-      ),
-      // Mensagens em massa: soma de envios das campanhas criadas dentro do período
-      // Use CASE guard to avoid cast errors when stats->>'sent' is not a valid integer
-      safeCount(
-        `SELECT COALESCE(SUM(
-           CASE WHEN (stats->>'sent') ~ '^[0-9]+$' THEN (stats->>'sent')::bigint ELSE 0 END
-         ), 0) as count FROM campaigns WHERE user_id = $1 AND created_at >= $2`,
-        [userId, periodStart]
-      ),
+      // Mensagens individuais e em massa: a mesma contagem que o limite do plano aplica
+      safeCount(INDIVIDUAL_MESSAGES_USED_SQL, [userId, periodStart]),
+      safeCount(MASS_MESSAGES_USED_SQL, [userId, periodStart]),
       safeCount('SELECT COUNT(*) FROM channels WHERE user_id = $1', [userId]),
       safeCount('SELECT COUNT(*) FROM user_assistants ua JOIN assistants a ON ua.assistant_id = a.id WHERE ua.user_id = $1 AND a.is_custom = true', [userId]),
       safeCount('SELECT COUNT(*) FROM voice_agents WHERE user_id = $1', [userId]),

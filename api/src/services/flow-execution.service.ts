@@ -57,7 +57,7 @@ const STAGE_LABEL: Record<string, string> = {
 };
 
 /** Pedido de saída: a mensagem inteira tem de ser o pedido ("não quero perder a oferta" não conta) */
-const OPT_OUT_RE = /^\s*(parar|pare|sair|stop|cancelar|remover|descadastrar|unsubscribe|n[aã]o quero( mais)?( receber)?( mensage(m|ns))?|n[aã]o (me )?(contact|mand|envi)\w*( mais)?( mensage(m|ns))?)\s*[.!]*\s*$/i;
+export const OPT_OUT_RE = /^\s*(parar|pare|sair|stop|cancelar|remover|descadastrar|unsubscribe|n[aã]o quero( mais)?( receber)?( mensage(m|ns))?|n[aã]o (me )?(contact|mand|envi)\w*( mais)?( mensage(m|ns))?)\s*[.!]*\s*$/i;
 
 const WAIT_UNITS_MS: Record<string, number> = {
   minutos: 60_000,

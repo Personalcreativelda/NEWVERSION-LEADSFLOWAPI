@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import {
   Plus, X, Megaphone,
-  Pause, BarChart3, FileText, Edit2,
+  Pause, Play, BarChart3, FileText, Edit2,
   Send, Trash2, Copy, MoreVertical,
   FileDown, Bell, Calendar, 
   Mail, MessageSquare, PlayCircle, Clock,
@@ -57,6 +57,10 @@ interface Campaign {
   read?: number;
   failed?: number;
   replies?: number;
+  skipped?: number;
+  pending?: number;
+  excluded?: number;
+  metadata?: any;
   scheduledDate?: string;
   completedDate?: string;
   updatedDate?: string;
@@ -81,6 +85,86 @@ function normalizeCampaignStatus(raw: unknown): Campaign['status'] {
   if (s === 'completed' || s === 'sent' || s === 'finished' || s === 'done') return 'completed';
   if (s === 'failed' || s === 'error' || s === 'cancelled' || s === 'canceled' || s === 'stopped') return 'failed';
   return 'draft';
+}
+
+const parseMaybe = (v: any) => {
+  if (!v) return {};
+  if (typeof v !== 'string') return v;
+  try { return JSON.parse(v) || {}; } catch { return {}; }
+};
+
+// Progresso de uma campanha de WhatsApp a partir do que o servidor guarda (nada estimado)
+function whatsAppProgress(raw: any) {
+  const settings = parseMaybe(raw.settings);
+  const stats = parseMaybe(raw.stats);
+  const status = normalizeCampaignStatus(raw.status);
+  const total = Number(stats.total ?? settings.recipientCount ?? 0) || 0;
+  const sent = Number(stats.sent || 0);
+  const failed = Number(stats.failed || 0);
+  const skipped = Number(stats.skipped || 0);
+  const pending = stats.pending != null ? Number(stats.pending) : Math.max(0, total - sent - failed - skipped);
+  const delivered = Number(stats.delivered || 0);
+  return {
+    status,
+    totalRecipients: total,
+    sent,
+    failed,
+    skipped,
+    pending,
+    excluded: Number(stats.excluded || 0),
+    delivered,
+    read: Number(stats.read || 0),
+    replies: Number(stats.replied || 0),
+    progress: status === 'completed' ? 100 : total > 0 ? Math.min(100, Math.round(((total - pending) / total) * 100)) : 0,
+    deliveryRate: sent > 0 ? Math.min(100, Math.floor((delivered / sent) * 100)) : 0,
+    metadata: parseMaybe(raw.metadata),
+  };
+}
+
+// O plano não chega para todos: a campanha começa e pausa quando o limite acabar
+function warnPlanLimit(result: { totalLeads?: number; plan?: { remaining: number } | null }) {
+  if (result?.plan && (result.totalLeads ?? 0) > result.plan.remaining) {
+    toast.warning(`O seu plano permite enviar mais ${result.plan.remaining} mensagens neste período. A campanha pausa quando chegar ao limite.`);
+  }
+}
+
+const PAUSE_REASONS: Record<string, string> = {
+  TOO_MANY_ERRORS: 'Várias mensagens falharam seguidas. Confirme que o WhatsApp está ligado e retome.',
+  LOW_DELIVERY: 'Muitas mensagens não estão a ser entregues: o número pode estar restrito. Espere algumas horas antes de retomar.',
+  HIGH_OPT_OUT: 'Muitos contactos pediram para não receber mais mensagens. Reveja a mensagem antes de retomar.',
+  MASS_MESSAGE_LIMIT_EXCEEDED: 'Atingiu o limite de mensagens em massa do plano.',
+  CHANNEL_MISSING: 'O canal de WhatsApp da campanha já não existe.',
+  ENGINE_UPDATED: 'Retome para continuar a enviar.',
+};
+
+// Estado que o cartão mostra: a enviar, à espera do horário/limite diário, ou pausada e porquê
+function sendingState(c: Campaign): { label: string; tone: 'success' | 'warning' | 'info'; detail?: string; resumeAt?: string } {
+  const meta = c.metadata || {};
+  if (c.status === 'paused') return { label: 'Pausada', tone: 'warning', detail: PAUSE_REASONS[meta.pausedReason] };
+  if (meta.waiting === 'window') return { label: 'Fora do horário de envio', tone: 'info', resumeAt: meta.resume_at };
+  if (meta.waiting === 'daily_limit') {
+    return {
+      label: 'Limite diário atingido', tone: 'info', resumeAt: meta.resume_at,
+      detail: meta.warmup ? 'Número novo: o limite sobe todos os dias.' : undefined,
+    };
+  }
+  return { label: 'A enviar', tone: 'success' };
+}
+
+// Tempo que falta, com o ritmo e o limite diário da campanha
+function remainingTime(c: Campaign): string {
+  const pending = c.pending ?? 0;
+  if (pending <= 0) return '—';
+  const st = parseMaybe(c.settings);
+  if (st.channelType === 'whatsapp_cloud') return pending < 30 ? '< 1 min' : `~${Math.ceil((pending * 2) / 60)} min`;
+  const min = Math.max(12, Number(st.minDelaySeconds) || 15);
+  const max = Math.max(min + 5, Number(st.maxDelaySeconds) || 45);
+  const rawLimit = Number(st.dailyLimit ?? 150);
+  const perDay = rawLimit <= 0 ? 300 : Math.min(300, rawLimit);
+  if (pending > perDay) return `~${Math.ceil(pending / perDay)} dias`;
+  const minutes = Math.ceil((pending * (min + max)) / 2 / 60);
+  if (minutes < 60) return `~${Math.max(1, minutes)} min`;
+  return `~${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
 // Rótulos dos estados, também usados na pesquisa ("agendada", "concluída"…)
@@ -118,17 +202,14 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
 
   // Listener WebSocket para stats em tempo real (sem polling extra)
-  const handleCampaignStats = useCallback((data: { campaignId: string; stats: any; progress: { sent: number; failed: number; total: number } }) => {
+  const handleCampaignStats = useCallback((data: { campaignId: string; stats: any; progress: { sent: number; failed: number; total: number; done?: number } }) => {
     setCampaigns(prev => prev.map(c => {
       if (c.id !== data.campaignId) return c;
+      if (data.stats) return { ...c, ...whatsAppProgress({ status: c.status, settings: c.settings, stats: data.stats, metadata: c.metadata }) };
       const { sent, failed, total } = data.progress;
       const totalRecipients = total || c.totalRecipients || 1;
-      return {
-        ...c,
-        sent,
-        totalRecipients,
-        progress: Math.min(100, Math.round(((sent + failed) / totalRecipients) * 100)),
-      };
+      const done = data.progress.done ?? sent + failed;
+      return { ...c, sent, failed, totalRecipients, progress: Math.min(100, Math.round((done / totalRecipients) * 100)) };
     }));
   }, []);
 
@@ -190,21 +271,12 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
             id: campaign.id,
             name: campaign.name,
             type: campaign.type || 'whatsapp',
-            status: normalizeCampaignStatus(campaign.status),
-            totalRecipients: settings.recipientCount || 0,
-            sent: stats.sent || 0,
-            delivered: stats.delivered || 0,
-            read: stats.read || 0,
-            replies: stats.replied || 0,
-            failed: stats.failed || 0,
+            ...whatsAppProgress({ ...campaign, settings, stats, metadata }),
             scheduledDate: campaign.scheduled_at,
             completedDate: campaign.completed_at,
             createdAt: campaign.created_at,
-            progress: campaign.status === 'completed' ? 100 : (campaign.status === 'active' ? Math.floor(((stats.sent || 0) / (settings.recipientCount || 1)) * 100) : 0),
-            deliveryRate: stats.delivered && stats.sent ? Math.floor((stats.delivered / stats.sent) * 100) : 0,
             template: campaign.template,
             settings: campaign.settings,
-            metadata: metadata,
             media_urls: campaign.media_urls || [],
           };
         });
@@ -367,331 +439,118 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
     reloadCampaigns();
   }, []); // Executar apenas uma vez ao montar
 
-  // ✅ SISTEMA HÍBRIDO DE ATUALIZAÇÃO DE PROGRESSO (Simulação Local + API Real)
+  // Progresso das campanhas em curso: quem envia é o servidor, aqui só se lê
+  const trackedKey = campaigns
+    .filter(c => (c.status === 'active' || c.status === 'sending') && (c.type === 'whatsapp' || c.type === 'email'))
+    .map(c => `${c.type}:${c.id}`)
+    .join(',');
+
   useEffect(() => {
-    const activeCampaignsToUpdate = campaigns.filter(c =>
-      c.status === 'active' && (c.progress === undefined || c.progress <= 100)
-    );
+    if (!trackedKey) return;
+    const base = (import.meta as any).env.VITE_API_URL;
+    const items = trackedKey.split(',').map(k => { const [type, id] = k.split(':'); return { type, id }; });
 
-    if (activeCampaignsToUpdate.length === 0) return;
-
-    debugLog('[CampaignsPage] 📊 Iniciando tracking de', activeCampaignsToUpdate.length, 'campanhas ativas');
-
-    // ✅ Determinar intervalo baseado no tamanho das campanhas
-    const hasSmallCampaigns = activeCampaignsToUpdate.some(c => c.totalRecipients <= 5);
-    const updateInterval = hasSmallCampaigns ? 2000 : 5000; // 2s para pequenas, 5s para grandes
-
-    debugLog('[CampaignsPage] ⏱️ Intervalo de atualização:', updateInterval, 'ms');
-
-    // Função para consultar progresso real da API
-    const checkRealProgress = async (campaign: Campaign) => {
-      try {
-        const token = localStorage.getItem('leadflow_access_token');
-        const endpoint = campaign.type === 'email' ? 'email-campaigns' : 'campaigns';
-
-        // Tentar endpoint interno primeiro
-        const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/${endpoint}/${campaign.id}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const camp = campaign.type === 'email' ? data.campaign : data; // API de email retorna {campaign: ...}
-
-          if (camp) {
-            return {
-              sent: campaign.type === 'email' ? camp.sent_count : (camp.stats?.sent || 0),
-              delivered: campaign.type === 'email' ? camp.delivered_count : (camp.stats?.delivered || 0),
-              read: campaign.type === 'email' ? camp.opened_count : (camp.stats?.read || 0),
-              failed: campaign.type === 'email' ? camp.failed_count : (camp.stats?.failed || 0),
-              total: campaign.type === 'email' ? 0 : (camp.stats?.total || 0),
-              status: camp.status
-            };
-          }
+    const refresh = async () => {
+      const token = localStorage.getItem('leadflow_access_token');
+      const fresh = await Promise.all(items.map(async ({ type, id }) => {
+        try {
+          const res = await fetch(`${base}/api/${type === 'email' ? 'email-campaigns' : 'campaigns'}/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) return null;
+          const data = await res.json();
+          return { type, id, raw: type === 'email' ? data.campaign : data };
+        } catch {
+          return null;
         }
+      }));
 
-        // Fallback para n8n se configurado (apenas para whatsapp geralmente)
-        const progressUrl = localStorage.getItem('n8n_progress_url');
-        if (progressUrl && campaign.type === 'whatsapp') {
-          const n8nRes = await fetch(`${progressUrl}?campaignId=${campaign.id}`);
-          if (n8nRes.ok) return await n8nRes.json();
+      setCampaigns(prev => prev.map(c => {
+        const f = fresh.find(x => x?.id === c.id);
+        if (!f?.raw) return c;
+        if (f.type === 'whatsapp') return { ...c, ...whatsAppProgress(f.raw) };
+
+        // Email: o envio termina no servidor e o painel marca a campanha como concluída
+        const sent = f.raw.sent_count || 0;
+        const failed = f.raw.failed_count || 0;
+        const delivered = f.raw.delivered_count || 0;
+        const total = c.totalRecipients || 1;
+        const finished = sent + failed >= total || f.raw.status === 'completed' || f.raw.status === 'failed';
+        if (finished && c.status !== 'completed') {
+          fetch(`${base}/api/email-campaigns/${c.id}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ status: 'completed', stats: { sent, delivered, read: f.raw.opened_count || 0, replied: 0, failed } }),
+          }).catch(() => {});
         }
-
-        return null;
-      } catch (error) {
-        debugWarn('[CampaignsPage] ⚠️ Erro ao consultar API:', error);
-        return null;
-      }
+        return {
+          ...c,
+          status: finished ? 'completed' as const : c.status,
+          sent,
+          failed,
+          delivered,
+          read: f.raw.opened_count || 0,
+          progress: finished ? 100 : Math.min(100, Math.floor((sent / total) * 100)),
+          deliveryRate: sent > 0 ? Math.floor((delivered / sent) * 100) : 0,
+        };
+      }));
     };
 
-    // ✅ EXECUTAR PRIMEIRA ATUALIZAÇÃO IMEDIATAMENTE
-    const updateCampaigns = async () => {
-      // Primeiro, tentar obter dados reais da API
-      const realProgressData: { [key: string]: any } = {};
+    refresh();
+    const interval = setInterval(refresh, 10000);
+    return () => clearInterval(interval);
+  }, [trackedKey]);
 
-      for (const campaign of activeCampaignsToUpdate) {
-        const realData = await checkRealProgress(campaign);
-        if (realData) {
-          realProgressData[campaign.id] = realData;
-        }
-      }
+  const setCampaignStatus = (id: string, status: Campaign['status'], metadata?: any) =>
+    setCampaigns(prev => prev.map(c => (c.id === id ? { ...c, status, ...(metadata ? { metadata } : {}) } : c)));
 
-      setCampaigns(prev => {
-        let hasChanges = false;
+  const campaignRequest = async (path: string, init: RequestInit) => {
+    const token = localStorage.getItem('leadflow_access_token');
+    const res = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/${path}`, {
+      ...init,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || data.message || 'Não foi possível concluir o pedido');
+    return data;
+  };
 
-        const updated = prev.map(campaign => {
-          // Se já estiver completa e no estado 'completed', pular
-          if (campaign.status === 'completed') {
-            return campaign;
-          }
-
-          // Se estiver em progresso ou se estiver 'ativa' mas com 100% (precisa concluir)
-          if (campaign.status !== 'active' && campaign.status !== 'sending') {
-            return campaign;
-          }
-
-          // ✅ USAR DADOS REAIS DA API SE DISPONÍVEIS
-          const realData = realProgressData[campaign.id];
-
-          if (realData) {
-            debugLog('[CampaignsPage] ✅ Usando dados REAIS para', campaign.name);
-
-            const sent = realData.sent || 0;
-            const delivered = realData.delivered || 0;
-            const read = realData.read || 0;
-            const failed = realData.failed || 0;
-            const pending = realData.pending || 0;
-
-            // Use the actual total from DB stats if available (may differ from recipientCount setting)
-            const totalRecipients = realData.total || campaign.totalRecipients || 1;
-
-            const progress = Math.min(
-              Math.floor((sent / totalRecipients) * 100),
-              100
-            );
-
-            const deliveryRate = sent > 0 ? Math.floor((delivered / sent) * 100) : 0;
-            const readRate = delivered > 0 ? Math.floor((read / delivered) * 100) : 0;
-
-            // Se completou, marcar como concluída
-            if (progress >= 100 || (sent + failed) >= totalRecipients || realData.status === 'completed' || realData.status === 'failed') {
-              debugLog('[CampaignsPage] ✅ Campanha CONCLUÍDA (dados reais):', campaign.name);
-              const needsCompletionUpdate =
-                (campaign.status as string) !== 'completed' ||
-                campaign.progress !== 100 ||
-                (campaign.sent ?? 0) !== sent ||
-                (campaign.delivered ?? 0) !== delivered ||
-                (campaign.read ?? 0) !== read ||
-                (campaign.deliveryRate ?? 0) !== deliveryRate;
-
-              if (!needsCompletionUpdate) {
-                return campaign;
-              }
-
-              // ✅ ATUALIZAR STATUS NO BACKEND
-              (async () => {
-                try {
-                  const endpoint = campaign.type === 'email' ? 'email-campaigns' : 'campaigns';
-                  await fetch(`${(import.meta as any).env.VITE_API_URL}/api/${endpoint}/${campaign.id}/status`, {
-                    method: 'PATCH',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${localStorage.getItem('leadflow_access_token')}`
-                    },
-                    body: JSON.stringify({
-                      status: 'completed',
-                      stats: {
-                        sent,
-                        delivered,
-                        read,
-                        replied: 0,
-                        failed
-                      }
-                    })
-                  });
-                  debugLog('[CampaignsPage] ✅ Status atualizado no backend para campanha:', campaign.id);
-                } catch (error) {
-                  console.error('[CampaignsPage] ❌ Erro ao atualizar status no backend:', error);
-                }
-              })();
-
-              hasChanges = true;
-              return {
-                ...campaign,
-                status: 'completed' as const,
-                progress: 100,
-                sent,
-                delivered,
-                read,
-                deliveryRate,
-                completedDate: new Date().toISOString(),
-              };
-            }
-
-            if (
-              campaign.progress === progress &&
-              (campaign.sent ?? 0) === sent &&
-              (campaign.delivered ?? 0) === delivered &&
-              (campaign.read ?? 0) === read &&
-              (campaign.deliveryRate ?? 0) === deliveryRate
-            ) {
-              return campaign;
-            }
-
-            hasChanges = true;
-            return {
-              ...campaign,
-              progress,
-              sent,
-              delivered,
-              read,
-              deliveryRate,
-            };
-          }
-
-          // ✅ FALLBACK: SIMULAÇÃO LOCAL MELHORADA (quando API não está disponível)
-          debugLog('[CampaignsPage] 🔄 Usando SIMULAÇÃO local para', campaign.name);
-
-          const createdAt = new Date(campaign.createdAt || Date.now()).getTime();
-          const now = Date.now();
-          const elapsedSeconds = (now - createdAt) / 1000; // segundos decorridos
-
-          // ✅ LÓGICA MELHORADA: Para campanhas pequenas (≤5 destinatários), concluir rapidamente
-          let newProgress: number;
-          let sent: number;
-
-          if (campaign.totalRecipients <= 5) {
-            // Para campanhas pequenas: 100% após 10 segundos
-            if (elapsedSeconds >= 10) {
-              newProgress = 100;
-              sent = campaign.totalRecipients;
-            } else {
-              // Progresso linear nos primeiros 10 segundos
-              newProgress = Math.min(Math.floor((elapsedSeconds / 10) * 100), 99);
-              sent = Math.floor((newProgress / 100) * campaign.totalRecipients);
-            }
-          } else {
-            // Para campanhas grandes: usar tempo estimado
-            const estimatedMinutes = campaign.estimatedTime || 1;
-            const elapsedMinutes = elapsedSeconds / 60;
-            newProgress = Math.min(Math.floor((elapsedMinutes / estimatedMinutes) * 100), 100);
-            sent = Math.floor((newProgress / 100) * campaign.totalRecipients);
-          }
-
-          const delivered = Math.floor(sent * 0.95); // 95% de taxa de entrega simulada
-          const read = Math.floor(sent * 0.30); // 30% de taxa de leitura simulada
-          const deliveryRate = sent > 0 ? Math.floor((delivered / sent) * 100) : 0;
-
-          // ✅ Se chegou a 100%, marcar como concluída
-          if (newProgress >= 100 || sent >= campaign.totalRecipients) {
-            debugLog('[CampaignsPage] ✅ Campanha CONCLUÍDA (simulação):', campaign.name);
-            const completedAlready =
-              (campaign.status as string) === 'completed' &&
-              campaign.progress === 100 &&
-              (campaign.sent ?? 0) === campaign.totalRecipients &&
-              (campaign.delivered ?? 0) === Math.floor(campaign.totalRecipients * 0.95) &&
-              (campaign.read ?? 0) === Math.floor(campaign.totalRecipients * 0.30) &&
-              (campaign.deliveryRate ?? 0) === 95;
-
-            if (completedAlready) {
-              return campaign;
-            }
-
-            // ✅ ATUALIZAR STATUS NO BACKEND
-            (async () => {
-              try {
-                debugLog('[CampaignsPage] 📡 Atualizando status no backend para campanha (simulação):', campaign.id);
-                await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/${campaign.id}/status`, {
-                  method: 'PATCH',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                  },
-                  body: JSON.stringify({
-                    status: 'completed',
-                    stats: {
-                      sent: campaign.totalRecipients,
-                      delivered: Math.floor(campaign.totalRecipients * 0.95),
-                      read: Math.floor(campaign.totalRecipients * 0.30),
-                      replied: 0,
-                      failed: Math.floor(campaign.totalRecipients * 0.05)
-                    }
-                  })
-                });
-                debugLog('[CampaignsPage] ✅ Status atualizado no backend para campanha (simulação):', campaign.id);
-              } catch (error) {
-                console.error('[CampaignsPage] ❌ Erro ao atualizar status no backend:', error);
-              }
-            })();
-
-            hasChanges = true;
-            return {
-              ...campaign,
-              status: 'completed' as const,
-              progress: 100,
-              sent: campaign.totalRecipients,
-              delivered: Math.floor(campaign.totalRecipients * 0.95),
-              read: Math.floor(campaign.totalRecipients * 0.30),
-              deliveryRate: 95,
-              completedDate: new Date().toISOString(),
-            };
-          }
-
-          if (
-            campaign.progress === newProgress &&
-            (campaign.sent ?? 0) === sent &&
-            (campaign.delivered ?? 0) === delivered &&
-            (campaign.read ?? 0) === read &&
-            (campaign.deliveryRate ?? 0) === deliveryRate
-          ) {
-            return campaign;
-          }
-
-          hasChanges = true;
-          return {
-            ...campaign,
-            progress: newProgress,
-            sent,
-            delivered,
-            read,
-            deliveryRate,
-          };
-        });
-
-        if (!hasChanges) {
-          return prev;
-        }
-
-        // Salvar no localStorage somente quando houver mudanças reais
-        localStorage.setItem('campaigns_list', JSON.stringify(updated));
-
-        return updated;
-      });
-    };
-
-    // ✅ Executar imediatamente
-    updateCampaigns();
-
-    // ✅ Continuar atualizando em intervalo
-    const interval = setInterval(updateCampaigns, updateInterval);
-
-    return () => {
-      clearInterval(interval);
-      debugLog('[CampaignsPage] 🛑 Tracking interrompido');
-    };
-  }, [campaigns]);
-
-  const handlePauseCampaign = (id: string) => {
-    const updated = campaigns.map(c =>
-      c.id === id ? { ...c, status: 'paused' as const } : c
-    );
-    setCampaigns(updated);
-    localStorage.setItem('campaigns_list', JSON.stringify(updated));
+  const handleResumeCampaign = async (campaign: Campaign) => {
     setDropdownOpen(null);
+    try {
+      let result: any;
+      if (campaign.type === 'whatsapp') {
+        result = await campaignRequest(`${campaign.id}/execute`, { method: 'POST' });
+      } else {
+        const res = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/${campaign.type === 'email' ? 'email-campaigns' : 'sms-campaigns'}/${campaign.id}/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('leadflow_access_token')}` },
+          body: JSON.stringify({}),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Não foi possível concluir o pedido');
+        result = { totalLeads: data.recipientCount, plan: data.plan };
+      }
+      setCampaignStatus(campaign.id, 'active', { ...(campaign.metadata || {}), pausedReason: undefined });
+      toast.success('Campanha retomada');
+      warnPlanLimit(result);
+      await reloadCampaigns();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handlePauseCampaign = async (campaign: Campaign) => {
+    setDropdownOpen(null);
+    setCampaignStatus(campaign.id, 'paused', { ...(campaign.metadata || {}), pausedReason: 'USER', waiting: undefined });
+    if (campaign.type !== 'whatsapp') return;
+    try {
+      await campaignRequest(`${campaign.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'paused' }) });
+      toast.success('Campanha pausada');
+    } catch (error: any) {
+      setCampaignStatus(campaign.id, campaign.status, campaign.metadata);
+      toast.error(error.message);
+    }
   };
 
   const handleCancelCampaign = async (campaign: Campaign) => {
@@ -809,6 +668,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
           console.log('[CampaignsPage] Campanha iniciada:', result);
 
           toast.success(`Campanha "${name}" iniciada! A enviar para ${result.totalLeads} contactos...`);
+          warnPlanLimit(result);
         } else if (type === 'sms') {
           // Para campanhas SMS, acionar endpoint de send dedicado
           const smsResponse = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/sms-campaigns/${id}/send`, {
@@ -827,6 +687,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
           const smsResult = await smsResponse.json();
           toast.success(`Campanha SMS "${name}" iniciada! A enviar para ${smsResult.recipientCount} contactos...`);
+          warnPlanLimit({ totalLeads: smsResult.recipientCount, plan: smsResult.plan });
         } else {
           // Para outros tipos (email), apenas atualizar status
           const response = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/${id}`, {
@@ -941,11 +802,14 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
         variant: 'warning',
       });
       if (!confirmed) return;
-
-      // Aqui você implementaria a lógica para reenviar apenas para quem falhou
-      // Por enquanto, vamos simular
-      toast.success('Campanha reenviada para destinatários com falha!');
       setDropdownOpen(null);
+      try {
+        const res = await campaignRequest(`${campaign.id}/retry-failed`, { method: 'POST' });
+        toast.success(res.retried === 1 ? '1 contacto voltou à fila' : `${res.retried} contactos voltaram à fila`);
+        await reloadCampaigns();
+      } catch (error: any) {
+        toast.error(error.message);
+      }
     })();
   };
 
@@ -1056,13 +920,15 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                     <span>Duplicar</span>
                   </button>
                   <div className="border-t border-border my-1"></div>
+                  {campaign.type === 'whatsapp' && (campaign.failed ?? 0) > 0 && (
                   <button
                     onClick={() => handleResendFailed(campaign)}
                     className="w-full text-left px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-3 transition-colors"
                   >
                     <Send className="w-4 h-4" />
-                    <span>Reenviar Falhados</span>
+                    <span>Reenviar falhados</span>
                   </button>
+                  )}
                   <div className="border-t border-border my-1"></div>
                   <button
                     onClick={() => handleExportData(campaign)}
@@ -1402,16 +1268,21 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                   </h3>
                   {activeCampaigns.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {activeCampaigns.map((campaign) => (
+                      {activeCampaigns.map((campaign) => {
+                        const state = sendingState(campaign);
+                        return (
                         <DashboardCard key={campaign.id} disableContentPadding className="hover:shadow-md transition-shadow duration-200">
                         <div className="p-6">
                           <div className="flex items-start justify-between mb-4">
                             <div>
                               <h4 className="font-semibold text-foreground dark:text-foreground mb-1">{campaign.name}</h4>
-                              <StatusBadge
-                                label={campaign.status === 'paused' ? 'Pausada' : 'A enviar agora...'}
-                                tone={campaign.status === 'paused' ? 'warning' : 'success'}
-                              />
+                              <StatusBadge label={state.label} tone={state.tone} />
+                              {state.resumeAt && (
+                                <p className="mt-1.5 text-xs text-muted-foreground">
+                                  Continua <span translate="no">{new Date(state.resumeAt).toLocaleString(getLocale(), { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                </p>
+                              )}
+                              {state.detail && <p className="mt-1.5 text-xs text-muted-foreground">{state.detail}</p>}
                             </div>
                             <DropdownMenu campaign={campaign} />
                           </div>
@@ -1427,37 +1298,52 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                                 style={{ width: `${campaign.progress}%` }}
                               />
                             </div>
+                            {((campaign.excluded ?? 0) + (campaign.skipped ?? 0)) > 0 && (
+                              <p className="mt-1.5 text-xs text-muted-foreground">
+                                {((campaign.excluded ?? 0) + (campaign.skipped ?? 0)).toLocaleString(getLocale(), NUMBER_OPTS)} ficaram de fora
+                              </p>
+                            )}
                           </div>
 
                           <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                             <div>
                               <span className="text-muted-foreground">Entregues</span>
-                              <p className="font-semibold text-foreground">{campaign.delivered?.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
+                              <p className="font-semibold text-foreground">
+                                {campaign.delivered?.toLocaleString(getLocale(), NUMBER_OPTS)}
+                                {(campaign.sent ?? 0) > 0 && <span className="ml-1 text-xs font-normal text-muted-foreground">{campaign.deliveryRate}%</span>}
+                              </p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Visualizadas</span>
                               <p className="font-semibold text-foreground">{campaign.read?.toLocaleString(getLocale(), NUMBER_OPTS)}</p>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Tempo restante</span>
-                              <p className="font-semibold text-foreground">{formatMinutes(campaign.estimatedTime || 0)}</p>
+                              <span className="text-muted-foreground">Respostas</span>
+                              <p className="font-semibold text-foreground">
+                                {(campaign.replies ?? 0).toLocaleString(getLocale(), NUMBER_OPTS)}
+                                {(campaign.sent ?? 0) > 0 && <span className="ml-1 text-xs font-normal text-muted-foreground">{Math.round(((campaign.replies ?? 0) / (campaign.sent ?? 1)) * 100)}%</span>}
+                              </p>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Taxa de entrega</span>
-                              <p className="font-semibold text-foreground">{campaign.deliveryRate}%</p>
+                              <span className="text-muted-foreground">Tempo restante</span>
+                              <p className="font-semibold text-foreground">{campaign.type === 'whatsapp' ? remainingTime(campaign) : formatMinutes(campaign.estimatedTime || 0)}</p>
                             </div>
                           </div>
 
                           {/* Action Buttons */}
                           <div className="flex gap-2 pt-4 border-t border-border">
-                            <AppButton
-                              variant="outline"
-                              onClick={() => handlePauseCampaign(campaign.id)}
-                              className="flex-1"
-                            >
-                              <Pause className="w-4 h-4" />
-                              <span>Pausar</span>
-                            </AppButton>
+                            {campaign.status === 'paused' ? (
+                              <AppButton variant="outline" onClick={() => handleResumeCampaign(campaign)} className="flex-1">
+                                <Play className="w-4 h-4" />
+                                <span>Retomar</span>
+                              </AppButton>
+                            ) : campaign.type === 'whatsapp' ? (
+                              // SMS e email enviam de seguida no servidor: só pausam quando o plano acaba
+                              <AppButton variant="outline" onClick={() => handlePauseCampaign(campaign)} className="flex-1">
+                                <Pause className="w-4 h-4" />
+                                <span>Pausar</span>
+                              </AppButton>
+                            ) : null}
                             <AppButton
                               variant="outline"
                               onClick={() => handleCancelCampaign(campaign)}
@@ -1469,7 +1355,8 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
                           </div>
                         </div>
                         </DashboardCard>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : null}
                 </section>

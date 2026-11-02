@@ -503,6 +503,61 @@ const runPendingMigrations = async () => {
     console.warn('[DB] flow engine migration warning:', error.message);
   }
 
+  // Motor das campanhas de WhatsApp: cada destinatário fica na base de dados (sobrevive aos
+  // deploys, retomar não repete ninguém) e o ritmo de envio fica na campanha.
+  try {
+    await pool.query(`
+      ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}';
+      ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS next_send_at TIMESTAMPTZ;
+      ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS consecutive_errors INTEGER NOT NULL DEFAULT 0;
+
+      CREATE TABLE IF NOT EXISTS campaign_recipients (
+        id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        campaign_id     UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        channel_id      UUID,
+        lead_id         UUID,
+        phone           VARCHAR(80) NOT NULL,
+        name            TEXT,
+        position        INTEGER NOT NULL DEFAULT 0,
+        status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+        skip_reason     VARCHAR(40),
+        error           TEXT,
+        conversation_id UUID,
+        external_id     TEXT,
+        sent_at         TIMESTAMPTZ,
+        replied_at      TIMESTAMPTZ,
+        opted_out_at    TIMESTAMPTZ,
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      -- Qual das variações da mensagem recebeu (0 = a mensagem principal)
+      ALTER TABLE campaign_recipients ADD COLUMN IF NOT EXISTS variant SMALLINT;
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_campaign_recipients_phone ON campaign_recipients(campaign_id, phone);
+      CREATE INDEX IF NOT EXISTS idx_campaign_recipients_queue
+        ON campaign_recipients(campaign_id, position) WHERE status = 'pending';
+      CREATE INDEX IF NOT EXISTS idx_campaign_recipients_user_phone ON campaign_recipients(user_id, phone, sent_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_campaign_recipients_lead ON campaign_recipients(lead_id, sent_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_campaign_recipients_channel_sent
+        ON campaign_recipients(channel_id, sent_at) WHERE status = 'sent';
+      CREATE INDEX IF NOT EXISTS idx_campaign_recipients_awaiting
+        ON campaign_recipients(sent_at) WHERE status = 'sent' AND replied_at IS NULL;
+
+      -- Consumo do plano: um registo por mensagem de campanha enviada. Não depende da campanha
+      -- (apagar ou cancelar a campanha não devolve mensagens ao plano)
+      CREATE TABLE IF NOT EXISTS campaign_sends (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        campaign_id UUID,
+        channel_id  UUID,
+        sent_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_campaign_sends_user ON campaign_sends(user_id, sent_at);
+    `);
+    console.log('[DB] ✅ campaign engine tables verified');
+  } catch (error: any) {
+    console.warn('[DB] campaign engine migration warning:', error.message);
+  }
+
   // ── Migration 021: Team Inbox ─────────────────────────────────────────────
   try {
     // Colunas de atribuição em conversations

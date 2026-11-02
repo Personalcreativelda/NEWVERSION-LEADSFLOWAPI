@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../database/connection';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
 import twilio from 'twilio';
+import { checkMessageLimit, planBalance, recordMassSend } from '../middleware/plan-enforcement.middleware';
 
 const router = Router();
 
@@ -241,17 +242,20 @@ router.post('/:id/send', requireAuth, async (req: AuthenticatedRequest, res) => 
       ? JSON.parse(campaign.selected_statuses)
       : campaign.selected_statuses || [];
 
+    // Ordem fixa: retomar uma campanha pausada continua do mesmo sítio
     if (campaign.recipient_mode === 'all') {
       const rows = await query(
-        `SELECT telefone as phone, nome as name FROM leads
-         WHERE user_id = $1 AND telefone IS NOT NULL AND telefone != ''`,
+        `SELECT COALESCE(NULLIF(phone, ''), whatsapp) AS phone, name FROM leads
+         WHERE user_id = $1 AND COALESCE(NULLIF(phone, ''), NULLIF(whatsapp, '')) IS NOT NULL
+         ORDER BY created_at, id`,
         [userId]
       );
       recipients = rows.rows;
     } else if (campaign.recipient_mode === 'segments') {
       const rows = await query(
-        `SELECT telefone as phone, nome as name FROM leads
-         WHERE user_id = $1 AND status = ANY($2) AND telefone IS NOT NULL AND telefone != ''`,
+        `SELECT COALESCE(NULLIF(phone, ''), whatsapp) AS phone, name FROM leads
+         WHERE user_id = $1 AND status = ANY($2) AND COALESCE(NULLIF(phone, ''), NULLIF(whatsapp, '')) IS NOT NULL
+         ORDER BY created_at, id`,
         [userId, statuses]
       );
       recipients = rows.rows;
@@ -265,6 +269,24 @@ router.post('/:id/send', requireAuth, async (req: AuthenticatedRequest, res) => 
     if (recipients.length === 0) {
       return res.status(400).json({ success: false, error: 'No recipients with phone numbers found' });
     }
+    if (campaign.status === 'active') {
+      return res.status(400).json({ success: false, error: 'A campanha já está a enviar' });
+    }
+
+    // Retomar depois de pausada: salta quem já foi tratado
+    const resumeFrom = campaign.status === 'paused'
+      ? Math.min(recipients.length, (campaign.sent_count || 0) + (campaign.failed_count || 0))
+      : 0;
+    const pending = recipients.slice(resumeFrom);
+    if (pending.length === 0) {
+      return res.status(400).json({ success: false, error: 'Já não há ninguém por enviar nesta campanha' });
+    }
+
+    // Limite de mensagens em massa do plano (o mesmo das campanhas de WhatsApp)
+    const limit = await checkMessageLimit(userId!, 'massMessages');
+    if (!limit.allowed) {
+      return res.status(403).json({ success: false, error: limit.message, code: limit.code });
+    }
 
     // 4. Mark as active and respond immediately
     await query(
@@ -274,17 +296,22 @@ router.post('/:id/send', requireAuth, async (req: AuthenticatedRequest, res) => 
 
     res.json({
       success: true,
-      message: `Sending SMS to ${recipients.length} recipients`,
-      recipientCount: recipients.length
+      message: `Sending SMS to ${pending.length} recipients`,
+      recipientCount: pending.length,
+      plan: planBalance(limit),
     });
 
     // 5. Send in background (fire-and-forget after response)
     setImmediate(async () => {
       const twilioClient = twilio(creds.accountSid, creds.authToken);
-      let sentCount = 0;
-      let failedCount = 0;
+      let sentCount = resumeFrom > 0 ? campaign.sent_count || 0 : 0;
+      let failedCount = resumeFrom > 0 ? campaign.failed_count || 0 : 0;
+      let paused = false;
 
-      for (const recipient of recipients) {
+      for (const recipient of pending) {
+        // O plano acabou a meio: pausa (retomar continua daqui)
+        const check = await checkMessageLimit(userId!, 'massMessages');
+        if (!check.allowed) { paused = true; break; }
         try {
           const body = campaign.message
             .replace(/\{\{nome\}\}/gi, recipient.name || '')
@@ -296,6 +323,7 @@ router.post('/:id/send', requireAuth, async (req: AuthenticatedRequest, res) => 
             to: recipient.phone,
           });
           sentCount++;
+          await recordMassSend(userId!, id, channel.id).catch(() => {});
         } catch (err) {
           console.error(`[SMSCampaigns] Failed to send to ${recipient.phone}:`, err);
           failedCount++;
@@ -306,13 +334,13 @@ router.post('/:id/send', requireAuth, async (req: AuthenticatedRequest, res) => 
 
       await query(
         `UPDATE sms_campaigns SET
-          status = 'completed',
+          status = $4,
           sent_count = $1,
           failed_count = $2,
           sent_at = NOW(),
           updated_at = NOW()
          WHERE id = $3`,
-        [sentCount, failedCount, id]
+        [sentCount, failedCount, id, paused ? 'paused' : 'completed']
       );
       console.log(`[SMSCampaigns] Campaign ${id} completed: ${sentCount} sent, ${failedCount} failed`);
     });

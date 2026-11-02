@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   MessageCircle, Send, Clock, Settings, RefreshCw,
   Paperclip, Image as ImageIcon, ChevronDown, ChevronUp,
-  Smile, Bold, Italic, Link2, Check, Eye, Save, Trash2, Video, Smartphone
+  Smile, Bold, Italic, Link2, Check, Eye, Save, Trash2, Video, Smartphone, X
 } from 'lucide-react';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
@@ -151,6 +151,13 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const [randomDelay, setRandomDelay] = useState(false);
   const [minDelay, setMinDelay] = useState('15');
   const [maxDelay, setMaxDelay] = useState('45');
+  // Horário de envio (no fuso do utilizador) e dias sem repetir campanha ao mesmo contacto
+  const [windowStart, setWindowStart] = useState(8);
+  const [windowEnd, setWindowEnd] = useState(20);
+  const [frequencyDays, setFrequencyDays] = useState(7);
+  // Versões da mensagem: cada contacto recebe uma (o mesmo texto para todos é sinal de envio em massa)
+  const [variations, setVariations] = useState<string[]>([]);
+  const [generatingVariations, setGeneratingVariations] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showVariableDropdown, setShowVariableDropdown] = useState(false);
@@ -210,6 +217,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         setScheduleDate(settings.scheduleDate || '');
         setScheduleTime(settings.scheduleTime || '');
         setSendSpeed(settings.sendSpeed || 'slow');
+        setWindowStart(Number.isFinite(settings.windowStart) ? settings.windowStart : 8);
+        setWindowEnd(Number.isFinite(settings.windowEnd) ? settings.windowEnd : 20);
+        setFrequencyDays(Number.isFinite(settings.frequencyDays) ? settings.frequencyDays : 7);
+        setVariations(Array.isArray(settings.variations) ? settings.variations : []);
         setUseTemplate(settings.useTemplate || false);
         setTemplateName(settings.templateName || '');
         setTemplateLanguage(settings.templateLanguage || 'pt_BR');
@@ -896,9 +907,30 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
+  const generateVariations = async () => {
+    if (!message.trim()) return;
+    setGeneratingVariations(true);
+    try {
+      const res = await fetch(`${(import.meta as any).env.VITE_API_URL}/api/campaigns/variations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('leadflow_access_token')}` },
+        body: JSON.stringify({ message, count: 4 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Não foi possível gerar variações agora');
+      setVariations(data.variations || []);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setGeneratingVariations(false);
+    }
+  };
+
   const getEstimatedTime = () => {
-    // Slow: 15-45s (média 30s = ~2 msgs/min) | Normal: 10-25s (~3.5/min) | Fast: 6-15s (~5.5/min)
-    const messagesPerMinute = sendSpeed === 'slow' ? 2 : sendSpeed === 'normal' ? 3.5 : 5.5;
+    // Seguro: 15-45s (~2/min, 100/dia) | Normal: 12-25s (~3/min, 200/dia) | Rápido: 12-18s (~4/min, 300/dia)
+    const messagesPerMinute = sendSpeed === 'slow' ? 2 : sendSpeed === 'normal' ? 3 : 4;
+    const perDay = sendSpeed === 'slow' ? 100 : sendSpeed === 'normal' ? 200 : 300;
+    if (!isCloudChannel && recipientCount > perDay) return `~${Math.ceil(recipientCount / perDay)} dias`;
     const totalMinutes = Math.ceil(recipientCount / messagesPerMinute);
 
     if (totalMinutes < 1) return '< 1 minuto';
@@ -912,6 +944,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const resetForm = () => {
     setCampaignName('');
     setMessage('');
+    setVariations([]);
     setAttachments([]);
     setRecipientMode('all');
     setSelectedStatuses(['novo']);
@@ -1198,17 +1231,17 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           batchPauseMaxSeconds = 240;
           dailyLimit = 100;
         } else if (sendSpeed === 'normal') {
-          // ~3.5 msgs/min — conta com alguma actividade
-          minDelaySeconds = 10;
+          // ~3 msgs/min — conta com alguma actividade
+          minDelaySeconds = 12;
           maxDelaySeconds = 25;
           batchSize = 20;
           batchPauseMinSeconds = 90;
           batchPauseMaxSeconds = 180;
           dailyLimit = 200;
         } else {
-          // fast — ~5.5 msgs/min — conta estabelecida, risco moderado
-          minDelaySeconds = 6;
-          maxDelaySeconds = 15;
+          // fast — ~4 msgs/min — conta estabelecida, risco moderado
+          minDelaySeconds = 12;
+          maxDelaySeconds = 18;
           batchSize = 25;
           batchPauseMinSeconds = 60;
           batchPauseMaxSeconds = 120;
@@ -1345,6 +1378,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             batchPauseMinSeconds,
             batchPauseMaxSeconds,
             dailyLimit,
+            windowStart,
+            windowEnd: Math.max(windowEnd, windowStart + 1),
+            frequencyDays,
+            variations: variations.map((v) => v.trim()).filter(Boolean),
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             channelId: selectedChannel,
             channelType: selectedChannelData?.type || 'whatsapp',
             // API Oficial (Cloud API) — template messages
@@ -1459,6 +1497,11 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             batchPauseMinSeconds,
             batchPauseMaxSeconds,
             dailyLimit,
+            windowStart,
+            windowEnd: Math.max(windowEnd, windowStart + 1),
+            frequencyDays,
+            variations: variations.map((v) => v.trim()).filter(Boolean),
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             channelId: selectedChannel,
             channelType: selectedChannelData?.type || 'whatsapp',
             // API Oficial (Cloud API) — template messages
@@ -1513,6 +1556,10 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           if (executeResponse.ok) {
             console.log('[Campaign WhatsApp] ✅ Execução iniciada pelo backend');
             toast.success('Disparo iniciado com sucesso!');
+            const started = await executeResponse.json().catch(() => ({}));
+            if (started?.plan && (started.totalLeads ?? 0) > started.plan.remaining) {
+              toast.warning(`O seu plano permite enviar mais ${started.plan.remaining} mensagens neste período. A campanha pausa quando chegar ao limite.`);
+            }
             // Notificar UI agora que a campanha está 'active' no banco
             const isEditing = !!editingCampaign;
             if (isEditing && onCampaignUpdated) {
@@ -2055,6 +2102,39 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
  </span>
                   )}
                 </div>
+
+                {/* Variações: cada contacto recebe uma, por ordem */}
+                {!(isCloudChannel && useTemplate) && (
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-sm font-medium text-foreground">Variações</Label>
+                      <AppButton type="button" variant="outline" size="sm" onClick={generateVariations} disabled={generatingVariations || !message.trim()}>
+                        {generatingVariations ? 'A gerar…' : variations.length > 0 ? 'Gerar outras' : 'Gerar com IA'}
+                      </AppButton>
+                    </div>
+                    {variations.map((variation, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <Textarea
+                          value={variation}
+                          onChange={(e) => setVariations((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                          rows={3}
+                          maxLength={4096}
+                          aria-label={`Variação ${i + 1}`}
+                          className="min-h-[72px] flex-1 text-sm"
+                          translate="no"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setVariations((prev) => prev.filter((_, j) => j !== i))}
+                          aria-label="Remover variação"
+                          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-border"></div>
@@ -2495,8 +2575,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                       <div className="space-y-1">
                         {[
                           { value: 'slow', label: 'Seguro (~2/min)', desc: 'Recomendado — menos risco de ban' },
-                          { value: 'normal', label: 'Normal (~3.5/min)', desc: 'Conta com actividade regular' },
-                          { value: 'fast', label: 'Rápido (~5.5/min)', desc: 'Risco moderado de ban' },
+                          { value: 'normal', label: 'Normal (~3/min)', desc: 'Conta com actividade regular' },
+                          { value: 'fast', label: 'Rápido (~4/min)', desc: 'Risco moderado de ban' },
                         ].map(({ value, label, desc }) => (
                           <label key={value} className="flex items-start gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer transition-colors">
                             <input
@@ -2540,13 +2620,37 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                           Intervalo entre mensagens (segundos)
                         </Label>
                         <div className="flex items-center gap-2">
-                          <Input type="number" value={minDelay} onChange={(e) => setMinDelay(e.target.value)} min="6" max="300" className="w-16 h-8 text-sm" />
+                          <Input type="number" value={minDelay} onChange={(e) => setMinDelay(e.target.value)} min="12" max="300" className="w-16 h-8 text-sm" />
                           <span className="text-xs text-muted-foreground">a</span>
-                          <Input type="number" value={maxDelay} onChange={(e) => setMaxDelay(e.target.value)} min="6" max="300" className="w-16 h-8 text-sm" />
+                          <Input type="number" value={maxDelay} onChange={(e) => setMaxDelay(e.target.value)} min="12" max="300" className="w-16 h-8 text-sm" />
                         </div>
-                        <p className="text-[10px] text-orange-500 mt-1">Mínimo recomendado: 15s. Valores abaixo de 6s aumentam risco de ban.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Mínimo: 12 s</p>
                       </div>
                     )}
+
+                    <div>
+                      <Label className="text-xs text-foreground/80 mb-1 block">Horário de envio</Label>
+                      <div className="flex items-center gap-2">
+                        <select value={windowStart} onChange={(e) => setWindowStart(Number(e.target.value))} aria-label="Início" className="w-24 text-sm">
+                          {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+                        </select>
+                        <span className="text-xs text-muted-foreground">a</span>
+                        <select value={windowEnd} onChange={(e) => setWindowEnd(Number(e.target.value))} aria-label="Fim" className="w-24 text-sm">
+                          {Array.from({ length: 24 }, (_, i) => i + 1).filter((h) => h > windowStart).map((h) => <option key={h} value={h}>{String(h % 24).padStart(2, '0')}:00</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs text-foreground/80 mb-1 block">Quem recebeu outra campanha há menos de</Label>
+                      <select value={frequencyDays} onChange={(e) => setFrequencyDays(Number(e.target.value))} className="w-full text-sm">
+                        <option value={0}>Enviar na mesma</option>
+                        <option value={3}>3 dias fica de fora</option>
+                        <option value={7}>7 dias fica de fora</option>
+                        <option value={14}>14 dias fica de fora</option>
+                        <option value={30}>30 dias fica de fora</option>
+                      </select>
+                    </div>
 
                     <div className="flex items-center gap-2 text-xs text-foreground/80 pt-2 border-t border-border">
                       <Clock className="w-3 h-3" />
