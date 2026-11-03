@@ -246,8 +246,14 @@ export async function testConnection(userId: string) {
   // podem ler os dados do conjunto); sem ele, confirma-se o token lendo o conjunto de dados
   if (cfg.test_event_code) {
     const sample = buildEvent(cfg, { id: `teste-${Date.now()}`, name: 'Teste LeadsFlow', email: 'teste@leadsflow.test' }, 'Lead');
-    await sendEvents(cfg, [sample]);
-    return { dataset: { id: cfg.dataset_id, name: '' }, test_event: true };
+    // A resposta da Meta diz quantos eventos aceitou: é a confirmação, sem depender do Gestor de Eventos
+    const result = await sendEvents(cfg, [sample]);
+    return {
+      dataset: { id: cfg.dataset_id, name: '' },
+      test_event: true,
+      test_event_code: cfg.test_event_code,
+      events_received: Number(result?.events_received ?? 0),
+    };
   }
   const dataset = await graph(cfg, `${cfg.dataset_id}?fields=id,name`);
   return { dataset: { id: String(dataset.id || cfg.dataset_id), name: String(dataset.name || '') }, test_event: false };

@@ -116,7 +116,9 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
     setTesting(true);
     try {
       const r = await api.metaConversions.test();
-      toast.success(r.test_event ? 'Ligação confirmada: veja o evento de teste no Gestor de Eventos' : 'Ligação confirmada');
+      if (!r.test_event) toast.success('Ligação confirmada');
+      else if (r.events_received > 0) toast.success(`A Meta recebeu o evento de teste (${r.test_event_code})`);
+      else toast.error('A Meta não aceitou o evento de teste');
     } catch (err: any) {
       toast.error(err?.message || 'Não foi possível ligar à Meta');
     } finally {
