@@ -442,7 +442,9 @@ router.get('/conversations', async (req, res, next) => {
       const pOwnUser  = paramIndex++; params.push(user.id);
       const pTeamWs   = paramIndex++; params.push(teamWorkspaceId);
       const pTeamOwner = paramIndex++; params.push(teamWorkspaceOwnerId);
-      const pAssignee = paramIndex++; params.push(user.id);
+      // Só os agentes filtram pelo responsável: um parâmetro a mais que a SQL não usa faz o
+      // PostgreSQL recusar a consulta e a inbox ficava vazia (admins/gestores de outra equipa)
+      const pAssignee = isExternalAgent ? (params.push(user.id), paramIndex++) : 0;
       const teamBranch = isExternalAgent
         ? `(c.assignee_id = $${pAssignee} AND (c.workspace_id = $${pTeamWs} OR (c.workspace_id IS NULL AND c.user_id = $${pTeamOwner})))`
         : `(c.workspace_id = $${pTeamWs} OR (c.workspace_id IS NULL AND c.user_id = $${pTeamOwner}))`;
@@ -457,7 +459,7 @@ router.get('/conversations', async (req, res, next) => {
       // Pure team member — no own workspace
       const pTeamWs    = paramIndex++; params.push(teamWorkspaceId);
       const pTeamOwner = paramIndex++; params.push(teamWorkspaceOwnerId);
-      const pAssignee  = paramIndex++; params.push(user.id);
+      const pAssignee  = isExternalAgent ? (params.push(user.id), paramIndex++) : 0;
       workspaceWhere = isExternalAgent
         ? `(c.assignee_id = $${pAssignee} AND (c.workspace_id = $${pTeamWs} OR (c.workspace_id IS NULL AND c.user_id = $${pTeamOwner})))`
         : `(c.workspace_id = $${pTeamWs} OR (c.workspace_id IS NULL AND c.user_id = $${pTeamOwner}))`;
