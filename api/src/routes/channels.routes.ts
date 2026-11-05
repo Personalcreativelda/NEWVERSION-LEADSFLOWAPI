@@ -81,6 +81,23 @@ router.get('/', async (req, res, next) => {
 });
 
 // GET /api/channels/:id - Busca canal por ID
+/** Que canais esta conta pode ligar: o WhatsApp por código QR só para quem já o usa ou foi autorizado */
+router.get('/options', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const { query } = require('../database/connection');
+    const r = await query(
+      `SELECT COALESCE((SELECT allow_whatsapp_qr FROM users WHERE id = $1), false)
+              OR EXISTS (SELECT 1 FROM channels WHERE user_id = $1 AND type = 'whatsapp') AS whatsapp_qr`,
+      [user.id]
+    );
+    res.json({ whatsapp_qr: r.rows[0]?.whatsapp_qr === true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/:id', async (req, res, next) => {
     try {
         const user = req.user;

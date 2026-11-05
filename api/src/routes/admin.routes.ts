@@ -627,14 +627,37 @@ router.get('/users/:userId/details', requireAuth, requireAdmin, async (req: Auth
       [userId]
     );
 
+    let allowWhatsappQr = false;
+    try {
+      const qr = await query('SELECT allow_whatsapp_qr FROM users WHERE id = $1', [userId]);
+      allowWhatsappQr = qr.rows[0]?.allow_whatsapp_qr === true;
+    } catch { /* coluna ainda não criada */ }
+
     res.json({
       success: true,
-      user: { ...userResult.rows[0], ...extraUserData, messages_count: messagesCount },
+      user: { ...userResult.rows[0], ...extraUserData, messages_count: messagesCount, allow_whatsapp_qr: allowWhatsappQr },
       channels: channelsResult.rows,
       recentActivities: activitiesResult.rows,
     });
   } catch (error) {
     console.error('[Admin] Error fetching user details:', error);
+    next(error);
+  }
+});
+
+// ==========================================
+// POST /admin/users/:userId/whatsapp-qr - Permitir (ou não) o WhatsApp por código QR nesta conta
+// ==========================================
+router.post('/users/:userId/whatsapp-qr', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const enabled = req.body?.enabled === true;
+    const result = await query(
+      'UPDATE users SET allow_whatsapp_qr = $2 WHERE id = $1 RETURNING id, allow_whatsapp_qr',
+      [req.params.userId, enabled]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Utilizador não encontrado' });
+    res.json({ success: true, allow_whatsapp_qr: result.rows[0].allow_whatsapp_qr });
+  } catch (error) {
     next(error);
   }
 });

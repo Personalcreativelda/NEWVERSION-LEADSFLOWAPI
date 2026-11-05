@@ -107,9 +107,14 @@ const AVAILABLE_CHANNELS = [
 export function ChannelsList() {
     const [channels, setChannels] = useState<Channel[]>([]);
     // O WhatsApp por código QR deixa de ser oferecido a contas novas; quem já o tem ligado
-    // continua a vê-lo (para ligar outro número ou voltar a ligar)
+    // continua a vê-lo (para ligar outro número ou voltar a ligar), e a administração pode
+    // permiti-lo numa conta (Administração → utilizador)
+    const [qrAllowed, setQrAllowed] = useState(false);
+    useEffect(() => {
+        channelsApi.getOptions().then((o) => setQrAllowed(!!o?.whatsapp_qr)).catch(() => {});
+    }, []);
     const pickableChannels = AVAILABLE_CHANNELS.filter(
-        (c) => c.id !== 'whatsapp' || channels.some((ch) => ch.type === 'whatsapp'),
+        (c) => c.id !== 'whatsapp' || qrAllowed || channels.some((ch) => ch.type === 'whatsapp'),
     );
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);

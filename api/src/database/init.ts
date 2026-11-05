@@ -556,6 +556,9 @@ const runPendingMigrations = async () => {
       -- Conversões para a Meta: de que anúncio veio o lead (o último clique) e os eventos do
       -- funil enviados pela API de Conversões (um por lead e evento)
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS ad_referral JSONB;
+      -- WhatsApp por código QR: escondido nas contas novas (revisão da Meta); a administração
+      -- pode permiti-lo conta a conta
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_whatsapp_qr BOOLEAN NOT NULL DEFAULT FALSE;
       CREATE TABLE IF NOT EXISTS meta_events (
         id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

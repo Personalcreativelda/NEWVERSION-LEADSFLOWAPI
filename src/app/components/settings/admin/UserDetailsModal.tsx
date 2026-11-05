@@ -9,6 +9,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getLocale } from '../../../utils/format';
 import { OverlayModal } from '../../base/OverlayModal';
+import { Switch } from '../../ui/switch';
 
 interface Channel {
   id: string;
@@ -41,6 +42,7 @@ interface UserDetails {
   messages_count: number;
   campaigns_count: number;
   plan_limits?: { leads?: number; messages?: number; massMessages?: number } | null;
+  allow_whatsapp_qr?: boolean;
 }
 
 interface UserDetailsModalProps {
@@ -92,6 +94,24 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
       toast.error('Erro ao carregar dados do utilizador');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // WhatsApp por código QR: escondido nas contas novas, a administração pode permiti-lo aqui
+  const [savingQr, setSavingQr] = useState(false);
+  const toggleWhatsappQr = async (enabled: boolean) => {
+    if (!userDetails) return;
+    setSavingQr(true);
+    setUserDetails({ ...userDetails, allow_whatsapp_qr: enabled });
+    try {
+      const res = await apiRequest(`/admin/users/${userId}/whatsapp-qr`, 'POST', { enabled });
+      if (!res?.success) throw new Error();
+      toast.success(enabled ? 'WhatsApp por código QR disponível nesta conta' : 'WhatsApp por código QR escondido nesta conta');
+    } catch {
+      setUserDetails({ ...userDetails, allow_whatsapp_qr: !enabled });
+      toast.error('Não foi possível guardar');
+    } finally {
+      setSavingQr(false);
     }
   };
 
@@ -249,6 +269,17 @@ export const UserDetailsModal: React.FC<UserDetailsModalProps> = ({ userId, onCl
                     </div>
                   );
                 })}
+              </div>
+
+              {/* WhatsApp por código QR */}
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-border/50 bg-muted/20 px-4 py-3">
+                <label htmlFor="admin-whatsapp-qr" className="text-sm font-medium text-foreground">WhatsApp por código QR</label>
+                <Switch
+                  id="admin-whatsapp-qr"
+                  checked={!!userDetails.allow_whatsapp_qr}
+                  disabled={savingQr}
+                  onCheckedChange={toggleWhatsappQr}
+                />
               </div>
 
               {/* Channels */}
