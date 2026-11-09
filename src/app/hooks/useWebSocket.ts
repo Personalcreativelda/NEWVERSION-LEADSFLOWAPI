@@ -30,6 +30,8 @@ interface UseWebSocketOptions {
     onUserTyping?: (data: WebSocketEvents['user_typing']) => void;
     onLeadFunnelUpdate?: (data: { leadId: string; leadName: string; previousStatus: string; newStatus: string; conversationId: string; triggeredBy: string; assistantName: string; timestamp: string }) => void;
     onAiTaskCreated?: (data: { task: any; timestamp: string }) => void;
+    /** O assistente preencheu o valor do negócio de um lead */
+    onLeadValueUpdate?: (data: { leadId: string; leadName: string; dealValue: number; label: string; assistantName: string; timestamp: string }) => void;
     onNewConversation?: (data: { conversationId: string; conversation?: any; timestamp: string }) => void;
     onReconnect?: () => void; // Callback when reconnected
     onCampaignStats?: (data: { campaignId: string; stats: any; progress: { sent: number; failed: number; total: number } }) => void;
@@ -47,6 +49,7 @@ const EVENTS: Record<string, keyof UseWebSocketOptions> = {
     user_typing: 'onUserTyping',
     lead_funnel_update: 'onLeadFunnelUpdate',
     ai_task_created: 'onAiTaskCreated',
+    lead_value_update: 'onLeadValueUpdate',
     'campaign:stats': 'onCampaignStats',
 };
 

@@ -640,6 +640,12 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         duration: 5000,
       });
     },
+    // Valor do negócio preenchido pelo assistente: o funil e os totais mudam logo
+    onLeadValueUpdate: (data) => {
+      setLeads(prev => prev.map(lead =>
+        String(lead.id) === String(data.leadId) ? { ...lead, deal_value: data.dealValue } : lead
+      ));
+    },
   });
 
   // Check if user can perform action based on limits

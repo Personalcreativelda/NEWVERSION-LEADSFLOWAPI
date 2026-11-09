@@ -1416,7 +1416,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">Movimentação automática do funil</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Avança os leads no funil
+                        Avança os leads no funil e preenche o valor do negócio
                       </p>
                     </div>
                     <button

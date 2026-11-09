@@ -1,6 +1,7 @@
 // Processador de mensagens dos assistentes de IA
 // Intercepta mensagens recebidas e responde automaticamente usando IA
 import { flowNoteForAssistant } from './flow-context.service';
+import { canSetDealValue, formatDealValue, mentionsPrice, parseDealValue } from './deal-value.service';
 import { query } from '../database/connection';
 import { AIService, getAvailableProviders, needsWrittenCopy, type AIMessage, type AIProvider, type ProviderConfig } from './ai.service';
 import { AssistantsService } from './assistants.service';
@@ -526,6 +527,11 @@ export class AssistantProcessorService {
             const funnelTrackingEnabled = config.funnel_tracking_enabled !== false;
             if (funnelTrackingEnabled) {
                 void this.detectAndUpdateFunnelStage(ctx, aiResponse.content, activeAssistant, availableProviders, model);
+            }
+
+            // 10b. Preencher o valor do negócio a partir da conversa (mesma opção do funil)
+            if (funnelTrackingEnabled && config.deal_value_enabled !== false) {
+                void this.detectAndUpdateDealValue(ctx, aiResponse.content, activeAssistant, availableProviders, model);
             }
 
             // 11. Detectar agendamentos/reuniões e criar tarefa automaticamente (assíncrono)
@@ -2592,6 +2598,103 @@ Responda APENAS com uma das palavras: contatado, qualificado, negociacao, conver
         } catch (err: any) {
             console.warn('[FunnelAI] Falha na classificação IA de funil:', err.message);
             return null;
+        }
+    }
+
+    /**
+     * Valor do negócio (pipeline): quando a conversa fala de preços, a IA calcula o total que o
+     * cliente está a negociar e preenche leads.deal_value. Não passa por cima de valores escritos
+     * por pessoas (ver canSetDealValue).
+     */
+    private async detectAndUpdateDealValue(
+        ctx: IncomingMessageContext,
+        aiReply: string,
+        assistant: any,
+        providers: ProviderConfig[],
+        model?: string
+    ): Promise<void> {
+        try {
+            if (providers.length === 0) return;
+            if (!mentionsPrice(`${ctx.messageContent} ${aiReply}`)) return;
+
+            const leadRow = (await query(
+                `SELECT l.id, l.name, l.status, l.deal_value, l.custom_fields
+                   FROM conversations c JOIN leads l ON l.id = c.lead_id
+                  WHERE c.id = $1 AND c.user_id = $2 LIMIT 1`,
+                [ctx.conversationId, ctx.userId]
+            )).rows[0];
+            if (!leadRow || leadRow.status === 'perdido') return;
+            const customFields = leadRow.custom_fields && typeof leadRow.custom_fields === 'object' ? leadRow.custom_fields : {};
+            // Valor escrito por uma pessoa: nem vale a pena perguntar à IA
+            const nowValue = Number(leadRow.deal_value) || 0;
+            if (nowValue > 0 && Math.abs(nowValue - (Number(customFields.deal_value_ai) || 0)) > 0.005) return;
+
+            // Últimas mensagens da conversa (o preço e a quantidade costumam estar espalhados)
+            const history = (await query(
+                `SELECT direction, content FROM messages
+                  WHERE conversation_id = $1 AND COALESCE(metadata->>'is_system', 'false') <> 'true' AND content IS NOT NULL AND content <> ''
+                  ORDER BY created_at DESC LIMIT 16`,
+                [ctx.conversationId]
+            )).rows.reverse();
+            const lines = history.map((m: any) => `${m.direction === 'in' ? 'Cliente' : 'Empresa'}: ${String(m.content).slice(0, 400)}`);
+            const last = `Empresa: ${aiReply.slice(0, 400)}`;
+            if (lines[lines.length - 1] !== last) lines.push(last);
+
+            const current = Number(leadRow.deal_value) || 0;
+            const messages: AIMessage[] = [
+                {
+                    role: 'system',
+                    content: `Analise esta conversa de vendas e calcule o VALOR DO NEGÓCIO: o total que o cliente vai pagar pelo que está a negociar (quantidade × preço, com descontos ou portes combinados).
+Responda APENAS com JSON: {"value": número ou null, "currency": "moeda como aparece na conversa (ex.: MT, MZN, Kz, R$, €)" ou null, "confidence": "alta" | "media" | "baixa", "basis": "frase curta a explicar o cálculo"}
+Regras:
+- null se o cliente ainda não escolheu o que quer, ou se só se falou de preços em geral (tabela, catálogo).
+- Use só preços que aparecem na conversa. Nunca invente.
+- Se o cliente mudou de ideia, use a escolha mais recente.
+- "value" é um número simples, sem separadores de milhares (ex.: 1250.5).
+Valor registado neste momento: ${current > 0 ? current : 'nenhum'}`,
+                },
+                { role: 'user', content: lines.join('\n').slice(-6000) },
+            ];
+            const response = await aiService.generateResponseWithFallback(messages, providers, model);
+            const guess = parseDealValue(response.content);
+            if (!canSetDealValue(leadRow.deal_value, customFields, guess)) return;
+            const value = guess!.value as number;
+
+            await query(
+                `UPDATE leads
+                    SET deal_value = $1,
+                        custom_fields = COALESCE(custom_fields, '{}'::jsonb) || $2::jsonb,
+                        updated_at = NOW()
+                  WHERE id = $3 AND user_id = $4`,
+                [value, JSON.stringify({ deal_value_ai: value, deal_value_currency: guess!.currency || undefined, deal_value_basis: guess!.basis || undefined }), leadRow.id, ctx.userId]
+            );
+            console.log(`[DealValue] ✅ Lead "${leadRow.name}": ${current} → ${value} (${guess!.basis || ''})`);
+
+            const label = formatDealValue(value, guess!.currency);
+            try {
+                getWebSocketService()?.emitToUser(ctx.userId, 'lead_value_update', {
+                    leadId: leadRow.id,
+                    leadName: leadRow.name,
+                    dealValue: value,
+                    label,
+                    assistantName: assistant.assistant_name,
+                    timestamp: new Date().toISOString(),
+                });
+            } catch { /* sem tempo real */ }
+
+            await query(
+                `INSERT INTO messages (user_id, conversation_id, direction, channel, content, status, metadata)
+                 VALUES ($1, $2, 'out', $3, $4, 'sent', $5)`,
+                [
+                    ctx.userId,
+                    ctx.conversationId,
+                    ctx.channelType,
+                    `🤖 Assistente atualizou o valor do negócio para ${label}.`,
+                    JSON.stringify({ source: 'funnel_automation', is_system: true, deal_value: value, previous_deal_value: current }),
+                ]
+            ).catch(() => {});
+        } catch (err: any) {
+            console.warn('[DealValue] Não foi possível calcular o valor do negócio:', err.message);
         }
     }
 

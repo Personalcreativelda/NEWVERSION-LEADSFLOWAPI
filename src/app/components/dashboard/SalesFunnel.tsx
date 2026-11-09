@@ -282,6 +282,7 @@ const FunnelColumn = memo(({
   onViewDetails,
   visibleCount,
   onLoadMore,
+  onShowLess,
   currency,
   stages = [],
   onMoveToStage,
@@ -472,19 +473,32 @@ const FunnelColumn = memo(({
                 </p>
               )}
 
-              {hasMore && (
-                <div className="mt-3 flex justify-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="px-4 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onLoadMore(stage.id, leads.length);
-                    }}
-                  >
-                    Carregar mais leads
-                  </Button>
+              {(hasMore || visibleCount > DEFAULT_VISIBLE_PER_STAGE) && (
+                <div className="mt-2 flex justify-center gap-1">
+                  {visibleCount > DEFAULT_VISIBLE_PER_STAGE && (
+                    <button
+                      type="button"
+                      className="h-9 rounded-lg px-3 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onShowLess?.(stage.id);
+                      }}
+                    >
+                      Ver menos
+                    </button>
+                  )}
+                  {hasMore && (
+                    <button
+                      type="button"
+                      className="h-9 rounded-lg px-3 text-xs font-medium text-primary hover:bg-primary/10"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onLoadMore(stage.id, leads.length);
+                      }}
+                    >
+                      Ver mais {Math.min(LOAD_MORE_STEP, leads.length - visibleCount)}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -552,8 +566,9 @@ const FunnelColumn = memo(({
 
 FunnelColumn.displayName = 'FunnelColumn';
 
-const DEFAULT_VISIBLE_PER_STAGE = 50;
-const LOAD_MORE_STEP = 40;
+// 10 leads por coluna (com 50 a coluna ficava enorme e era preciso descer muito); "Ver mais" mostra mais 10
+const DEFAULT_VISIBLE_PER_STAGE = 10;
+const LOAD_MORE_STEP = 10;
 
 // Etapa do lead (o id da etapa onde aparece agrupado)
 function stageOfLead(lead: Lead, leadsByStatus: Record<string, Lead[]>) {
@@ -567,7 +582,10 @@ const MobileFunnel = ({ stages, leadsByStatus, currency, onOpen, onRequestMove }
   useEffect(() => {
     if (!stages.some((st: FunnelStage) => st.id === selected)) setSelected(firstWithLeads);
   }, [stages, selected, firstWithLeads]);
-  const list: Lead[] = leadsByStatus[selected] || [];
+  const fullList: Lead[] = leadsByStatus[selected] || [];
+  const [shown, setShown] = useState(DEFAULT_VISIBLE_PER_STAGE);
+  useEffect(() => { setShown(DEFAULT_VISIBLE_PER_STAGE); }, [selected]);
+  const list = fullList.slice(0, shown);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressed = useRef(false);
 
@@ -646,6 +664,17 @@ const MobileFunnel = ({ stages, leadsByStatus, currency, onOpen, onRequestMove }
             );
           })}
         </ul>
+      )}
+      {fullList.length > shown && (
+        <div className="mt-2 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShown((n) => n + LOAD_MORE_STEP)}
+            className="h-10 rounded-lg px-4 text-sm font-medium text-primary hover:bg-primary/10"
+          >
+            Ver mais {Math.min(LOAD_MORE_STEP, fullList.length - shown)}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -785,6 +814,10 @@ export default function SalesFunnel({
       ...prev,
       [stageId]: !(prev[stageId] ?? true)
     }));
+  }, []);
+
+  const handleShowLess = useCallback((stageId: string) => {
+    setVisibleCounts(prev => ({ ...prev, [stageId]: DEFAULT_VISIBLE_PER_STAGE }));
   }, []);
 
   const handleLoadMore = useCallback((stageId: string, total: number) => {
@@ -1292,6 +1325,7 @@ export default function SalesFunnel({
                           onViewDetails={onViewLeadDetails}
                           visibleCount={visibleCounts[stage.id] ?? DEFAULT_VISIBLE_PER_STAGE}
                           onLoadMore={handleLoadMore}
+                          onShowLess={handleShowLess}
                           currency={currency}
                           stages={stages}
                           onMoveToStage={moveLeadToStage}
