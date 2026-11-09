@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { getMarketingEmail } from '../templates/email.template';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import { query } from '../database/connection';
 import { plansService } from '../services/plans.service';
@@ -613,7 +614,7 @@ router.post('/users/:userId/whatsapp-qr', requireAuth, requireAdmin, async (req:
 router.post('/users/:userId/send-email', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { userId } = req.params;
-    const { subject, message, is_html } = req.body;
+    const { subject, message, is_html, button_label, button_url } = req.body;
 
     if (!subject || !message) {
       return res.status(400).json({ error: 'subject and message are required' });
@@ -647,8 +648,9 @@ router.post('/users/:userId/send-email', requireAuth, requireAdmin, async (req: 
       from: smtpFrom,
       to: email,
       subject,
-      text: is_html ? undefined : message,
-      html: is_html ? message : `<p>${message.replace(/\n/g, '<br>')}</p>`,
+      text: is_html ? String(message).replace(/<[^>]+>/g, ' ').replace(/[ \t]+/g, ' ').trim() : message,
+      // Mesmo desenho dos emails do LeadsFlow (logótipo, botão azul, rodapé)
+      html: getMarketingEmail({ subject, message, isHtml: !!is_html, buttonLabel: button_label, buttonUrl: button_url }),
     });
 
     console.log(`[Admin] Email sent to ${email} (${name}) — subject: ${subject}`);
@@ -722,7 +724,7 @@ router.post('/users/:userId/send-whatsapp', requireAuth, requireAdmin, async (re
 // ==========================================
 router.post('/broadcast/email', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { subject, message, is_html, target } = req.body;
+    const { subject, message, is_html, target, button_label, button_url } = req.body;
     // target: 'all' | 'free' | 'business' | 'enterprise' | string[] (user ids)
 
     if (!subject || !message) {
@@ -780,8 +782,9 @@ router.post('/broadcast/email', requireAuth, requireAdmin, async (req: Authentic
           from: smtpFrom,
           to: user.email,
           subject,
-          text: is_html ? undefined : personalizedMessage,
-          html: is_html ? personalizedMessage : `<p>${personalizedMessage.replace(/\n/g, '<br>')}</p>`,
+          text: is_html ? personalizedMessage.replace(/<[^>]+>/g, ' ').replace(/[ \t]+/g, ' ').trim() : personalizedMessage,
+          // Mesmo desenho dos emails do LeadsFlow (logótipo, botão azul, rodapé)
+          html: getMarketingEmail({ subject, message: personalizedMessage, isHtml: !!is_html, buttonLabel: button_label, buttonUrl: button_url }),
         });
         sent++;
       } catch (err: any) {

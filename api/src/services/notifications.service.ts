@@ -1,28 +1,15 @@
 import { query } from '../database/connection';
 import { emailService } from './email.service';
+import { getAdminNotificationEmail } from '../templates/email.template';
 
-const escapeHtml = (v: string) =>
-  v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-/** Email simples para os avisos do administrador (mesmo texto da notificação do sino) */
+/** Email para os avisos do administrador (mesmo texto da notificação do sino) */
 export function adminNotificationEmail(title: string, description: string) {
   const appUrl = (process.env.FRONTEND_URL || 'https://app.leadsflowapi.com').replace(/\/$/, '');
-  const html = `<!DOCTYPE html><html><body style="margin:0;padding:24px;background:#f4f4f5;font-family:Arial,sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-<table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#ffffff;border-radius:12px;padding:28px">
-<tr><td>
-<p style="margin:0 0 6px;font-size:12px;color:#71717a">LeadsFlow · Admin</p>
-<h1 style="margin:0 0 12px;font-size:20px;color:#18181b">${escapeHtml(title)}</h1>
-<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#3f3f46">${escapeHtml(description)}</p>
-<a href="${appUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px">Abrir o painel</a>
-</td></tr></table>
-<p style="margin:16px 0 0;font-size:11px;color:#a1a1aa">Pode desligar estes avisos em Admin → Definições.</p>
-</td></tr></table></body></html>`;
-  return { subject: `LeadsFlow: ${title}`, html, text: `${title}
-
-${description}
-
-${appUrl}` };
+  return {
+    subject: `LeadsFlow: ${title}`,
+    html: getAdminNotificationEmail(title, description),
+    text: `${title}\n\n${description}\n\n${appUrl}`,
+  };
 }
 
 export interface Notification {

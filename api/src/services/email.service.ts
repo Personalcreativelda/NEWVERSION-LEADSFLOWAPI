@@ -81,82 +81,53 @@ class EmailService {
   }
 
   async sendEmailConfirmation(email: string, token: string, appUrl: string): Promise<void> {
-    const subject = 'Confirme seu email - LeadsFlow API';
+    const subject = `${token} é o seu código do LeadsFlow`;
+    const text = `Confirme o seu email
 
-    const text = `
-Olá!
-
-Obrigado por se cadastrar no LeadsFlow API.
-
-Para confirmar seu email, use o código abaixo:
+Obrigado por criar a sua conta no LeadsFlow. Escreva este código na página de confirmação:
 
 ${token}
 
-Este código expira em 24 horas.
+O código é válido durante 24 horas. Se não criou uma conta, ignore este email.
 
-Se você não se cadastrou, ignore este email.
-
-Atenciosamente,
-Equipe LeadsFlow API
-    `.trim();
-
+Equipa LeadsFlow`;
     const html = getEmailConfirmationEmail(token, appUrl);
-
     await this.sendEmail({ to: email, subject, text, html });
   }
 
   async sendPasswordReset(email: string, token: string, appUrl: string): Promise<void> {
-    const resetUrl = `${appUrl}#type=recovery&token=${token}`;
-    const subject = 'Redefinir senha - LeadsFlow API';
+    // Abre a página do código já preenchida (o App guarda o código antes de limpar o endereço)
+    const resetUrl = `${String(appUrl || '').replace(/\/$/, '')}/reset-password#type=recovery&token=${token}`;
+    const subject = 'Redefinir a palavra-passe do LeadsFlow';
+    const text = `Redefinir a palavra-passe
 
-    const text = `
-Olá!
+Recebemos um pedido para redefinir a palavra-passe da sua conta LeadsFlow.
 
-Você solicitou a redefinição de senha para sua conta no LeadsFlow API.
+Código: ${token}
 
-Para redefinir sua senha, use o código abaixo:
+Ou abra: ${resetUrl}
 
-${token}
+O código é válido durante 1 hora. Se não pediu esta alteração, ignore este email.
 
-Ou clique no link:
-${resetUrl}
-
-Este código expira em 1 hora.
-
-Se você não solicitou a redefinição de senha, ignore este email e sua senha permanecerá inalterada.
-
-Atenciosamente,
-Equipe LeadsFlow API
-    `.trim();
-
+Equipa LeadsFlow`;
     const html = getPasswordResetEmail(token, resetUrl);
-
     await this.sendEmail({ to: email, subject, text, html });
   }
 
   async sendWelcomeEmail(email: string, name: string): Promise<void> {
-    const subject = 'Bem-vindo ao LeadsFlow API!';
+    const subject = 'Bem-vindo ao LeadsFlow';
+    const app = (process.env.FRONTEND_URL || process.env.APP_URL || 'https://app.leadsflowapi.com').replace(/\/$/, '');
+    const text = `Bem-vindo ao LeadsFlow${name && name !== 'User' ? `, ${name.split(/\s+/)[0]}` : ''}!
 
-    const text = `
-Olá ${name}!
+A sua conta está pronta. Para começar:
+1. Ligue os seus canais (WhatsApp, Instagram, Facebook, email)
+2. Importe os seus contactos
+3. Ative um assistente de IA
 
-Bem-vindo ao LeadsFlow API!
+${app}/dashboard
 
-Estamos felizes em tê-lo conosco. Você agora tem acesso a todas as funcionalidades da nossa plataforma CRM.
-
-Para começar:
-1. Acesse o dashboard
-2. Importe seus leads
-3. Configure suas integrações
-
-Se precisar de ajuda, nossa documentação está disponível em nosso site.
-
-Atenciosamente,
-Equipe LeadsFlow API
-    `.trim();
-
+Equipa LeadsFlow`;
     const html = getWelcomeEmail(name);
-
     await this.sendEmail({ to: email, subject, text, html });
   }
 

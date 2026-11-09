@@ -5,6 +5,7 @@ import { authApi } from '../../utils/api';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
 import { useThemeMode } from '../../context/ThemeModeContext';
+import { EmailCodeStep } from './AuthShared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -75,11 +76,6 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
   const [showPassword, setShowPassword] = useState(false);
   const [verificationModalOpen, setVerificationModalOpen] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [verificationStatus, setVerificationStatus] = useState<'idle' | 'loading' | 'success'>('idle');
-  const [verificationFeedback, setVerificationFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [resendStatus, setResendStatus] = useState<'idle' | 'loading'>('idle');
-  const [resendFeedback, setResendFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [pendingCredentials, setPendingCredentials] = useState<{ email: string; password: string } | null>(null);
 
   // Rate limiting
@@ -358,7 +354,6 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
         setLockUntil(null);
         setVerificationModalOpen(false);
         setPendingCredentials(null);
-        setVerificationFeedback(null);
         onSuccess();
       }
     } catch (err: any) {
@@ -373,11 +368,6 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           normalizedMessage.includes('email not confirmed')) {
         setPendingCredentials({ email: trimmedEmail, password });
         setVerificationEmail(trimmedEmail);
-        setVerificationCode('');
-        setVerificationStatus('idle');
-        setVerificationFeedback({ type: 'error', text: 'Confirme seu email com o código recebido para continuar.' });
-        setResendFeedback(null);
-        setResendStatus('idle');
         setVerificationModalOpen(true);
         setError(null);
         return;
@@ -461,60 +451,6 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
     }
   };
 
-  const handleVerificationSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (verificationStatus === 'loading') {
-      return;
-    }
-
-    const trimmedCode = verificationCode.trim();
-
-    if (!trimmedCode) {
-      setVerificationFeedback({ type: 'error', text: 'Digite o código recebido no email.' });
-      return;
-    }
-
-    try {
-      setVerificationStatus('loading');
-      setVerificationFeedback(null);
-
-      await authApi.verifyEmail(verificationEmail, trimmedCode);
-
-      setVerificationStatus('success');
-      setVerificationFeedback({ type: 'success', text: 'Email confirmado com sucesso! Autenticando...' });
-
-      if (pendingCredentials) {
-        try {
-          const response = await authApi.signin(pendingCredentials.email, pendingCredentials.password);
-          if (response.success) {
-            setVerificationModalOpen(false);
-            setPendingCredentials(null);
-            setVerificationCode('');
-            setResendFeedback(null);
-            setResendStatus('idle');
-            setVerificationFeedback(null);
-            onSuccess();
-            return;
-          }
-        } catch (loginErr: any) {
-          console.error('Login after verification failed:', loginErr);
-          const message = loginErr?.message || 'Erro ao fazer login após confirmar o email. Faça login novamente.';
-          setError({ message, type: 'general' });
-        }
-      }
-
-      setVerificationStatus('idle');
-      setVerificationModalOpen(false);
-      setPendingCredentials(null);
-      setResendStatus('idle');
-    } catch (verifyErr: any) {
-      console.error('Email verification failed:', verifyErr);
-      setVerificationStatus('idle');
-      setVerificationFeedback({ type: 'error', text: verifyErr?.message || 'Código inválido ou expirado.' });
-    }
-  };
-
   const handle2FASubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = twoFACode.trim();
@@ -532,24 +468,6 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
     } catch (err: any) {
       setTwoFAError(err.message || 'Código inválido. Tente novamente.');
       setTwoFAStatus('idle');
-    }
-  };
-
-  const handleVerificationResend = async () => {
-    if (!verificationEmail || resendStatus === 'loading') {
-      return;
-    }
-
-    try {
-      setResendStatus('loading');
-      setResendFeedback(null);
-      await authApi.resendConfirmation(verificationEmail);
-      setResendStatus('idle');
-      setResendFeedback({ type: 'success', text: 'Email reenviado. Verifique sua caixa de entrada ou spam.' });
-    } catch (resendErr: any) {
-      console.error('Resend confirmation failed:', resendErr);
-      setResendStatus('idle');
-      setResendFeedback({ type: 'error', text: resendErr?.message || 'Não foi possível reenviar o email.' });
     }
   };
 
@@ -571,6 +489,18 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
   };
 
   const FONT = 'var(--font-sans)';
+
+  // Conta por confirmar: a mesma página, com o código de 6 dígitos (e entra logo a seguir)
+  if (verificationModalOpen && verificationEmail) {
+    return (
+      <EmailCodeStep
+        email={verificationEmail}
+        password={pendingCredentials?.password}
+        onVerified={() => { setVerificationModalOpen(false); setPendingCredentials(null); onSuccess(); }}
+        onBack={() => { setVerificationModalOpen(false); setPendingCredentials(null); }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-[100dvh] relative flex items-center justify-center py-6 sm:py-16 px-4 overflow-hidden"
@@ -751,64 +681,6 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           )}
         </div>
       </div>
-
-      {/* ── VERIFICATION MODAL ─────────────────────────────────────── */}
-      {verificationModalOpen && (
-        <AppModal
-          open={verificationModalOpen}
-          onOpenChange={(open) => { if (!open) { setVerificationModalOpen(false); setVerificationCode(''); setVerificationFeedback(null); setResendFeedback(null); setResendStatus('idle'); setVerificationStatus('idle'); } }}
-          size="md"
-          className="p-8 space-y-0"
-          title={
-            <div className="text-center space-y-2 w-full" style={{ fontFamily: FONT }}>
-              <div className="w-12 h-12 mx-auto rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(103,93,255,0.08)', border: '1px solid rgba(103,93,255,0.15)' }}>
-                <Mail className="w-6 h-6" style={{ color: '#675DFF' }} />
-              </div>
-              <span className="block" style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Confirmar email</span>
-              <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>
-                Código enviado para <span style={{ fontWeight: 500, color: '#1A2C44' }}>{verificationEmail}</span>
-              </p>
-            </div>
-          }
-        >
-          <div className="space-y-6 pt-6" style={{ fontFamily: FONT }}>
-            <form onSubmit={handleVerificationSubmit} className="space-y-4">
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px' }}>Código de verificação</label>
-                <Input ref={verificationInputRef} id="verification-code" inputMode="numeric" placeholder="000000"
-                  value={verificationCode} onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))} maxLength={6}
-                  style={{ width: '100%', height: '48px', background: '#FFFFFF', border: '1px solid #D4DEE9', borderRadius: '6px', fontSize: '22px', letterSpacing: '0.4em', textAlign: 'center', color: '#273951', caretColor: '#675DFF' }}
-                  className="placeholder:text-[#BFC8D6] focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)] transition-all"
-                />
-              </div>
-              {verificationFeedback && (
-                <p style={{ fontSize: '13px', color: verificationFeedback.type === 'error' ? '#E61947' : '#059669' }}>{verificationFeedback.text}</p>
-              )}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <AppButton type="submit" loading={verificationStatus === 'loading'}
-                  style={{ flex: 1, background: '#675DFF', borderRadius: '6px', height: '44px', fontSize: '14px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
-                  className="transition-all hover:brightness-110 disabled:opacity-60">
-                  {verificationStatus === 'loading' ? 'Confirmando...' : 'Confirmar código'}
-                </AppButton>
-                <AppButton type="button" onClick={handleVerificationResend} loading={resendStatus === 'loading'}
-                  style={{ flex: 1, background: 'rgba(239,239,239,0.3)', border: '1px solid #D4DEE9', borderRadius: '6px', height: '44px', fontSize: '14px', color: '#414552', fontWeight: 300 }}
-                  className="transition-all hover:border-[#A497FC] disabled:opacity-60">
-                  {resendStatus === 'loading' ? 'Reenviando...' : 'Reenviar email'}
-                </AppButton>
-              </div>
-              {resendFeedback && (
-                <p style={{ fontSize: '13px', color: resendFeedback.type === 'error' ? '#E61947' : '#059669' }}>{resendFeedback.text}</p>
-              )}
-            </form>
-            <button type="button" style={{ fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}
-              className="transition-colors hover:text-[#533AFD]"
-              onClick={() => { setVerificationModalOpen(false); setVerificationCode(''); setVerificationFeedback(null); setResendFeedback(null); setResendStatus('idle'); setVerificationStatus('idle'); }}>
-              Cancelar e voltar
-            </button>
-          </div>
-        </AppModal>
-      )}
 
       {/* ── 2FA MODAL ──────────────────────────────────────────────── */}
       {show2FAModal && (

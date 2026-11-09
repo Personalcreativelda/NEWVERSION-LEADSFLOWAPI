@@ -736,6 +736,9 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       console.log('[Reset] Redirecting to reset-password flow');
       sessionStorage.setItem('password_reset_mode', 'true');
       sessionStorage.removeItem('password_reset_requested');
+      // Código que veio no link do email: a página preenche-o sozinha
+      const linkToken = (hashParams.get('token') || searchParams.get('token') || '').replace(/\D/g, '');
+      if (linkToken.length === 6) sessionStorage.setItem('password_reset_token', linkToken);
       window.history.replaceState(null, '', window.location.pathname);
       setCurrentPage('reset-password');
       setLoading(false);
@@ -992,6 +995,7 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
       {currentPage === 'forgot-password' && (
         <ForgotPasswordPage
           onBackToLogin={() => setCurrentPage('login')}
+          onHaveCode={() => setCurrentPage('reset-password')}
         />
       )}
 

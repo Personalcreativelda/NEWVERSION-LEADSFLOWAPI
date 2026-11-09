@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle, Eye, EyeOff, MailCheck, Zap, Star } from 'luc
 import { authApi } from '../../utils/api';
 import { metaEvents } from '../MetaPixel';
 import { AppButton } from '../base/AppButton';
+import { EmailCodeStep } from './AuthShared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
@@ -129,6 +130,18 @@ export default function SignupPage({ onSuccess, onSwitchToLogin }: SignupPagePro
     }
   };
 
+
+  if (status === 'confirmation' && pendingEmail) {
+    return (
+      <EmailCodeStep
+        email={pendingEmail}
+        password={password}
+        onVerified={onSuccess}
+        onBack={() => { setStatus('idle'); setPendingEmail(''); setError(''); }}
+        backLabel="Usar outro email"
+      />
+    );
+  }
 
   if (status !== 'idle') {
     const isConfirmation = status === 'confirmation';

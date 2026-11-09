@@ -1,10 +1,10 @@
 {
-"355":["Delete this reminder?","¿Eliminar este recordatorio?","Supprimer ce rappel ?"],
-"359":["Delete reminder","Eliminar recordatorio","Supprimer le rappel"],
-"661":["Complete reminder","Completar recordatorio","Terminer le rappel"],
-"1056":["Delete flow","Eliminar flujo","Supprimer le flux"],
-"1596":["Flow deleted","Flujo eliminado","Flux supprimé"],
-"2137":["Could not update the reminder","No se pudo actualizar el recordatorio","Impossible de mettre à jour le rappel"],
-"2156":["Could not delete the flow","No se pudo eliminar el flujo","Impossible de supprimer le flux"],
-"3622":["Delete \"{0}\"?","¿Eliminar \"{0}\"?","Supprimer « {0} » ?"]
+"358":["Delete this reminder?","¿Eliminar este recordatorio?","Supprimer ce rappel ?"],
+"362":["Delete reminder","Eliminar recordatorio","Supprimer le rappel"],
+"664":["Complete reminder","Completar recordatorio","Terminer le rappel"],
+"1051":["Delete flow","Eliminar flujo","Supprimer le flux"],
+"1589":["Flow deleted","Flujo eliminado","Flux supprimé"],
+"2130":["Could not update the reminder","No se pudo actualizar el recordatorio","Impossible de mettre à jour le rappel"],
+"2149":["Could not delete the flow","No se pudo eliminar el flujo","Impossible de supprimer le flux"],
+"3620":["Delete \"{0}\"?","¿Eliminar \"{0}\"?","Supprimer « {0} » ?"]
 }
