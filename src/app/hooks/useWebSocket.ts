@@ -22,6 +22,8 @@ const TOKEN_KEY = 'leadflow_access_token';
 interface UseWebSocketOptions {
     onNewMessage?: (data: WebSocketEvents['new_message']) => void;
     onMessageStatusUpdate?: (data: WebSocketEvents['message_status_update']) => void;
+    /** Reação, edição ou mensagem apagada (WhatsApp) */
+    onMessageUpdated?: (data: { conversationId: string; message: any }) => void;
     onConversationUpdate?: (data: WebSocketEvents['conversation_update']) => void;
     onUnreadCountUpdate?: (data: WebSocketEvents['unread_count_update']) => void;
     onConversationRead?: (data: WebSocketEvents['conversation_read']) => void;
@@ -38,6 +40,7 @@ const EVENTS: Record<string, keyof UseWebSocketOptions> = {
     new_message: 'onNewMessage',
     new_conversation: 'onNewConversation',
     message_status_update: 'onMessageStatusUpdate',
+    message_updated: 'onMessageUpdated',
     conversation_update: 'onConversationUpdate',
     unread_count_update: 'onUnreadCountUpdate',
     conversation_read: 'onConversationRead',

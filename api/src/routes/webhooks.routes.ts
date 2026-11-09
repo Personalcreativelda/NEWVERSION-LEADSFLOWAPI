@@ -24,6 +24,8 @@ import { acceptMetaWebhook } from '../utils/meta-signature';
 import { fetchMessengerProfile, isInstagramLoginToken } from '../utils/meta-send';
 import { findOrCreateLead } from '../services/leads-dedup.service';
 import { recordAdReferral, referralFromCloud, referralFromEvolution, referralFromMessaging } from '../services/meta-conversions.service';
+import { describeWhatsAppMessage, unwrapWhatsAppMessage, whatsAppEvent, whatsAppMessageType, whatsAppThumbnail, type WhatsAppEvent } from '../utils/whatsapp-message';
+import { applyWhatsAppEvent } from '../services/whatsapp-events.service';
 
 const router = Router();
 const conversationsService = new ConversationsService();
@@ -782,8 +784,9 @@ router.post('/evolution/messages', async (req, res) => {
     console.log('[Evolution Webhook] É válido (5-15 dígitos)?', testValid);
     console.log('═'.repeat(100) + '\n');
 
-    // Extrair conteúdo da mensagem - suporta múltiplos formatos
-    const msg = messageData.message || messageData;
+    // Extrair conteúdo da mensagem - suporta múltiplos formatos (sem envelopes: temporárias,
+    // ver uma vez, enviadas de outro aparelho…)
+    const msg = unwrapWhatsAppMessage(messageData.message || messageData);
 
     // Desempacotar mensagens com caption wrapper do WhatsApp
     // Quando um documento/imagem/vídeo é enviado com legenda, o WhatsApp encapsula em *WithCaptionMessage
@@ -800,12 +803,24 @@ router.post('/evolution/messages', async (req, res) => {
       msg.videoMessage = msg.videoWithCaptionMessage.message.videoMessage;
     }
 
+    // Reação, edição ou mensagem apagada: muda a mensagem que já existe (antes virava um balão "[Mídia]")
+    const waType = whatsAppMessageType(msg);
+    const waEvent = whatsAppEvent(msg);
+    if (waEvent) {
+      if (waEvent.kind !== 'ignore') {
+        await applyWhatsAppEvent(channel.user_id, waEvent, isFromMe).catch((err: any) =>
+          console.warn('[Evolution Webhook] Não foi possível aplicar', waEvent.kind, err?.message));
+      }
+      return res.json({ success: true, message: `WhatsApp ${waEvent.kind === 'ignore' ? waEvent.type : waEvent.kind}` });
+    }
+
     const messageContent = msg?.conversation ||
       msg?.extendedTextMessage?.text ||
       msg?.imageMessage?.caption ||
       msg?.videoMessage?.caption ||
       msg?.documentMessage?.caption ||
       msg?.documentWithCaptionMessage?.message?.documentMessage?.caption ||
+      describeWhatsAppMessage(msg) ||
       msg?.text ||
       msg?.body ||
       msg?.content ||
@@ -856,7 +871,16 @@ router.post('/evolution/messages', async (req, res) => {
       mediaMimetype = msg.stickerMessage.mimetype || 'image/webp';
       mediaBase64 = msg.stickerMessage.base64 || null;
       mediaUrl = msg.stickerMessage.url || null;
+    } else if (msg?.ptvMessage) {
+      // Vídeo redondo (nota de vídeo)
+      mediaType = 'video';
+      mediaMimetype = msg.ptvMessage.mimetype || 'video/mp4';
+      mediaBase64 = msg.ptvMessage.base64 || null;
+      mediaUrl = msg.ptvMessage.url || null;
     }
+    // GIF (vídeo em ciclo) e a miniatura que o WhatsApp manda: o painel mostra a imagem do vídeo
+    const waGif = msg?.videoMessage?.gifPlayback === true;
+    const waThumbnail = whatsAppThumbnail(msg?.videoMessage || msg?.ptvMessage);
 
     // Evolution API v2 pode colocar base64 em diversos locais dependendo da versão
     // Tentar todos os locais possíveis se não encontramos base64 ainda
@@ -1546,6 +1570,10 @@ router.post('/evolution/messages', async (req, res) => {
           sender_name: isGroup ? groupSenderName : undefined,
           sender_jid: isGroup ? groupSenderJid : undefined,
           is_group_message: isGroup || undefined,
+          wa_type: waType || undefined,
+          gif: waGif || undefined,
+          video_note: msg?.ptvMessage ? true : undefined,
+          thumbnail: waThumbnail || undefined,
           rawPayload: JSON.stringify(req.body).substring(0, 500)
         })
       ]
@@ -3402,6 +3430,7 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
 
           let mediaId: string | null = null;
           let mediaMimetype: string | null = null;
+          let cloudEvent: WhatsAppEvent | null = null;
 
           switch (messageType) {
             case 'text':
@@ -3437,11 +3466,36 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
               mediaMimetype = message.sticker?.mime_type || 'image/webp';
               messageContent = '[Sticker]';
               break;
-            case 'location':
-              messageContent = `[Localização: ${message.location?.latitude}, ${message.location?.longitude}]`;
+            case 'location': {
+              const loc = message.location || {};
+              const where = [loc.name, loc.address].filter(Boolean).join(' · ');
+              messageContent = `📍 ${where || 'Localização'}\nhttps://maps.google.com/?q=${loc.latitude},${loc.longitude}`;
               break;
-            case 'contacts':
-              messageContent = '[Contato]';
+            }
+            case 'contacts': {
+              const names = (message.contacts || []).map((c: any) => c?.name?.formatted_name).filter(Boolean);
+              const phone = message.contacts?.[0]?.phones?.[0]?.phone;
+              messageContent = `👤 ${names.join(', ') || 'Contacto'}${phone ? `\n${phone}` : ''}`;
+              break;
+            }
+            case 'interactive':
+              messageContent = message.interactive?.button_reply?.title || message.interactive?.list_reply?.title
+                || message.interactive?.nfm_reply?.body || '';
+              break;
+            case 'button':
+              messageContent = message.button?.text || message.button?.payload || '';
+              break;
+            case 'order':
+              messageContent = `🛒 Encomenda${message.order?.product_items?.length ? ` (${message.order.product_items.length} artigos)` : ''}`;
+              break;
+            case 'reaction':
+              // Reação a uma mensagem: muda essa mensagem, não cria um balão novo
+              cloudEvent = { kind: 'reaction', targetId: String(message.reaction?.message_id || ''), emoji: String(message.reaction?.emoji || '') };
+              break;
+            case 'unsupported':
+            case 'system':
+            case 'request_welcome':
+              cloudEvent = { kind: 'ignore', type: messageType };
               break;
             default:
               messageContent = `[${messageType}]`;
@@ -3479,6 +3533,14 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
             try { channel.credentials = JSON.parse(channel.credentials); } catch (e) { /* ignore */ }
           }
           console.log('[WhatsApp Cloud Webhook] Canal encontrado:', channel.id, 'User:', channel.user_id, 'Status:', channel.status, 'HasCredentials:', !!channel.credentials?.access_token);
+
+          if (cloudEvent) {
+            if (cloudEvent.kind !== 'ignore' && cloudEvent.targetId) {
+              await applyWhatsAppEvent(channel.user_id, cloudEvent, false).catch((err: any) =>
+                console.warn('[WhatsApp Cloud Webhook] Não foi possível aplicar a reação:', err?.message));
+            }
+            continue;
+          }
 
           // Baixar mídia via Graph API se tiver mediaId
           if (mediaId && mediaType) {

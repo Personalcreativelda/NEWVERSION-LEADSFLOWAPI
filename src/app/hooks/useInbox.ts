@@ -20,7 +20,7 @@ import { useCallback, useEffect, useRef, useMemo } from 'react';
 import { useConversationsQuery } from './queries/useConversationsQuery';
 import { useMessages } from './useMessages';
 import { useWebSocket } from './useWebSocket';
-import { patchCachedMessage, patchCachedMessageStatus } from './useMessageCache';
+import { patchCachedMessage, patchCachedMessageStatus, replaceCachedMessage } from './useMessageCache';
 import { useInboxStore } from '../stores/inboxStore';
 import { conversationsApi } from '../services/api/inbox';
 import type { ConversationWithDetails, MessageWithSender } from '../types/inbox';
@@ -96,6 +96,7 @@ export function useInbox(options: UseInboxOptions = {}) {
         updateLocalMessageProgress,
         failLocalMessage,
         updateMessageStatus,
+        replaceMessage,
         deleteMessage,
         refreshMessages,
         scrollToBottom,
@@ -165,6 +166,15 @@ export function useInbox(options: UseInboxOptions = {}) {
                     }
                 },
                 [selectedConversation?.id, updateMessageStatus],
+            ),
+
+            onMessageUpdated: useCallback(
+                (data: { conversationId: string; message: any }) => {
+                    if (!data?.message?.id) return;
+                    if (data.conversationId === selectedConversation?.id) replaceMessage(data.message);
+                    else replaceCachedMessage(data.conversationId, data.message);
+                },
+                [selectedConversation?.id, replaceMessage],
             ),
 
             onConversationUpdate: useCallback(

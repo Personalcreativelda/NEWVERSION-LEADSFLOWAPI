@@ -147,6 +147,16 @@ export function patchCachedMessage(conversationId: string, message: MessageWithS
     idbSaveMessages(conversationId, entry.messages).catch(() => {});
 }
 
+/** Troca uma mensagem já guardada (reação, edição, apagada); se não estiver lá, não faz nada */
+export function replaceCachedMessage(conversationId: string, message: MessageWithSender) {
+    const entry = cache.get(conversationId);
+    if (!entry) return;
+    const idx = entry.messages.findIndex((m) => m.id === message.id);
+    if (idx === -1) return;
+    entry.messages[idx] = { ...entry.messages[idx], ...message };
+    idbSaveMessages(conversationId, entry.messages).catch(() => {});
+}
+
 /** Update a message's status in cache. */
 export function patchCachedMessageStatus(
     conversationId: string,

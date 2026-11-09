@@ -380,8 +380,21 @@ function MessageBubbleView({
         emailMeta?.attachment_urls || [];
     const emailSubject: string | null = emailMeta?.subject || null;
 
+    // WhatsApp: reações (uma por lado), mensagem apagada ou editada, GIF e miniatura do vídeo
+    const waMeta = (message.metadata || {}) as any;
+    const reactions: Array<{ emoji: string; from: string }> = Array.isArray(waMeta.reactions) ? waMeta.reactions.filter((r: any) => r?.emoji) : [];
+    const isDeleted = waMeta.deleted === true;
+    const isEdited = waMeta.edited === true;
+    const isGif = waMeta.gif === true;
+    const isVideoNote = waMeta.video_note === true;
+    const videoPoster: string | undefined = typeof waMeta.thumbnail === 'string' ? waMeta.thumbnail : undefined;
+    // Sem miniatura, "#t=0.1" faz o browser (e o app) mostrar o primeiro fotograma em vez de um ecrã cinzento
+    const videoSrc = (url?: string | null) => (url && !videoPoster && !url.includes('#') ? `${url}#t=0.1` : url || undefined);
+    // "[Mídia]" sem ficheiro: o ficheiro não chegou, ou é um tipo de mensagem que o painel não mostra
+    const mediaMissing = isMediaPlaceholder && !hasValidMedia && !isUploading && !waMeta.media_expired;
+
     // For email with HTML: don't show raw text (it would be noise)
-    const showTextContent = message.content && (!isMediaPlaceholder || !hasValidMedia) && !(isEmail && hasEmailHtml);
+    const showTextContent = message.content && !isMediaPlaceholder && !(isEmail && hasEmailHtml) && !isDeleted;
 
     const bubbleRounding = 'rounded-2xl';
 
@@ -391,7 +404,7 @@ function MessageBubbleView({
     return (
         <div
             ref={wrapperRef}
-            className={`flex w-full ${isOut ? 'justify-end' : 'justify-start'} ${isLastInGroup ? 'mb-[6px]' : 'mb-[2px]'} ${animateIn ? 'animate-in fade-in slide-in-from-bottom-2 duration-200' : ''}`}
+            className={`flex w-full ${isOut ? 'justify-end' : 'justify-start'} ${reactions.length > 0 && !isDeleted ? 'mb-5' : isLastInGroup ? 'mb-[6px]' : 'mb-[2px]'} ${animateIn ? 'animate-in fade-in slide-in-from-bottom-2 duration-200' : ''}`}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => { setHovered(false); }}
         >
@@ -435,7 +448,7 @@ function MessageBubbleView({
                         <div className="relative rounded-md overflow-hidden">
                             {displayUrl && message.media_type !== 'audio' && message.media_type !== 'document' ? (
                                 message.media_type === 'video' ? (
-                                    <video src={displayUrl} className="w-full max-h-64 object-cover" muted preload="metadata" />
+                                    <video src={videoSrc(displayUrl)} className="w-full max-h-64 object-cover" muted playsInline preload="metadata" />
                                 ) : (
                                     <img src={displayUrl} alt="A enviar..." className="w-full max-h-64 object-cover" />
                                 )
@@ -466,7 +479,7 @@ function MessageBubbleView({
                 )}
 
                 {/* Media Content */}
-                {hasValidMedia && !isUploading && !(message.metadata as any)?.media_expired && (
+                {hasValidMedia && !isUploading && !(message.metadata as any)?.media_expired && !isDeleted && (
                     <div className="mb-2">
                         {(effectiveMediaType === 'image' || effectiveMediaType === 'sticker') && !imageError ? (
                             <img
@@ -490,8 +503,28 @@ function MessageBubbleView({
                             <audio controls src={message.media_url} className="w-full max-w-[280px] h-10" preload="metadata">
                                 <a href={message.media_url} target="_blank" rel="noopener noreferrer">Ouvir áudio</a>
                             </audio>
+                        ) : effectiveMediaType === 'video' && isGif ? (
+                            <div className="relative">
+                                <video
+                                    src={message.media_url}
+                                    poster={videoPoster}
+                                    className="rounded-md w-full max-h-64 object-cover"
+                                    autoPlay
+                                    loop
+                                    muted
+                                    playsInline
+                                />
+                                <span className="absolute left-2 top-2 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">GIF</span>
+                            </div>
                         ) : effectiveMediaType === 'video' ? (
-                            <video controls src={message.media_url} className="rounded-md w-full max-h-64" preload="metadata" />
+                            <video
+                                controls
+                                playsInline
+                                src={videoSrc(message.media_url)}
+                                poster={videoPoster}
+                                className={isVideoNote ? 'mx-auto aspect-square w-48 rounded-full object-cover' : 'rounded-md w-full max-h-64 bg-black'}
+                                preload="metadata"
+                            />
                         ) : (
                             <button type="button" onClick={() => void saveRemoteFile(message.media_url!, fileName)}
                                 className={`flex w-full items-center gap-2 p-2.5 rounded-xl text-left ${isOut ? 'bg-primary/15 text-foreground' : 'bg-muted text-foreground'}`}>
@@ -569,9 +602,16 @@ function MessageBubbleView({
                 )}
 
                 {/* Text Content (non-email) */}
-                {showTextContent && (
+                {isDeleted ? (
+                    <div className="flex items-center gap-1.5 italic opacity-60">
+                        <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" strokeWidth={2} /><path strokeLinecap="round" strokeWidth={2} d="M5.6 5.6l12.8 12.8" /></svg>
+                        <span>Mensagem apagada</span>
+                    </div>
+                ) : showTextContent ? (
                     <div translate={contentTranslate} className="whitespace-pre-wrap break-words">{message.content}</div>
-                )}
+                ) : mediaMissing ? (
+                    <div className="italic opacity-60">{message.media_type ? 'Ficheiro indisponível' : 'Mensagem não suportada · veja no telemóvel'}</div>
+                ) : null}
 
                 {/* Metadata row */}
                 <div className="flex justify-end items-center gap-1 mt-1 text-[11px] text-muted-foreground">
@@ -583,9 +623,18 @@ function MessageBubbleView({
                             <span>IA</span>
                         </span>
                     )}
+                    {isEdited && !isDeleted && <span>editada</span>}
                     <span>{formatTime(message.created_at)}</span>
                     {isOut && <StatusIcon status={message.status} />}
                 </div>
+
+                {/* Reações (como no WhatsApp: em baixo, a sair do balão) */}
+                {reactions.length > 0 && !isDeleted && (
+                    <div className={`absolute -bottom-3.5 ${isOut ? 'right-2' : 'left-2'} flex items-center gap-0.5 rounded-full border border-black/5 bg-white px-1.5 py-0.5 text-[13px] leading-none shadow-sm dark:border-white/10 dark:bg-[#233138]`}>
+                        {reactions.map((r, i) => <span key={i} translate="no">{r.emoji}</span>)}
+                        {reactions.length > 1 && <span className="ml-0.5 text-[11px] text-muted-foreground">{reactions.length}</span>}
+                    </div>
+                )}
             </div>
 
             {/* Hover chevron for incoming messages (right side of bubble) */}

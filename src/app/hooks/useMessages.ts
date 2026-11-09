@@ -14,6 +14,7 @@ import {
     isCacheFresh,
     patchCachedMessage,
     patchCachedMessageStatus,
+    replaceCachedMessage,
 } from './useMessageCache';
 import { isSocketConnected } from './useWebSocket';
 
@@ -345,6 +346,12 @@ export function useMessages(conversationId: string | null) {
         if (message.direction === 'out') setTimeout(() => scrollToBottom(), 100);
     }, []);
 
+    /** Reação, edição ou mensagem apagada que chegou em tempo real */
+    const replaceMessage = useCallback((message: MessageWithSender) => {
+        if (conversationId) replaceCachedMessage(conversationId, message);
+        setMessages(prev => prev.map(msg => (msg.id === message.id ? { ...msg, ...message } : msg)));
+    }, [conversationId]);
+
     const updateMessageStatus = useCallback((messageId: string, status: MessageWithSender['status']) => {
         if (conversationId) patchCachedMessageStatus(conversationId, messageId, status);
         setMessages(prev =>
@@ -480,6 +487,7 @@ export function useMessages(conversationId: string | null) {
         updateLocalMessageProgress,
         failLocalMessage,
         updateMessageStatus,
+        replaceMessage,
         deleteMessage,
         refreshMessages: fetchMessages,
         loadOlder,
