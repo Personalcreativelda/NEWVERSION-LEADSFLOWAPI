@@ -25,6 +25,8 @@ interface PreviewWhatsAppLeadsModalProps {
   currentLeadsCount?: number;
   leadsLimit?: number;
   existingLeads?: Array<{ telefone?: string; email?: string }>;
+  /** Contactos em que o WhatsApp esconde o número (código de privacidade): não dá para importar */
+  hiddenNumbers?: number;
   dataSource?: string;
 }
 
@@ -65,6 +67,7 @@ export default function PreviewWhatsAppLeadsModal({
   loading = false,
   currentLeadsCount,
   leadsLimit,
+  hiddenNumbers = 0,
 }: PreviewWhatsAppLeadsModalProps) {
   const [filter, setFilter] = useState<Filter>('new');
   const [search, setSearch] = useState('');
@@ -120,7 +123,9 @@ export default function PreviewWhatsAppLeadsModal({
       className="p-0 gap-0 max-h-[90vh] flex flex-col"
       logo={<LogoBox brand="whatsapp" />}
       title="Contactos do WhatsApp"
-      description={`${contacts.length} contactos com WhatsApp`}
+      description={hiddenNumbers > 0
+        ? `${contacts.length} contactos com WhatsApp · ${hiddenNumbers} sem número visível`
+        : `${contacts.length} contactos com WhatsApp`}
       bodyClassName="px-0 py-0 sm:px-0"
       footer={
         <>

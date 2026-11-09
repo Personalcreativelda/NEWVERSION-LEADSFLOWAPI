@@ -32,6 +32,6 @@
 "2869":["Resume","Reanudar","Reprendre"],
 "2870":["Resume to keep sending.","Reanude para seguir enviando.","Reprenez pour continuer l'envoi."],
 "3297":["Several messages failed in a row. Make sure WhatsApp is connected and resume.","Varios mensajes fallaron seguidos. Confirme que WhatsApp está conectado y reanude.","Plusieurs messages ont échoué d'affilée. Vérifiez que WhatsApp est connecté et reprenez."],
-"3463":["{0} contacts are back in the queue","{0} contactos volvieron a la cola","{0} contacts sont de retour dans la file"],
-"3524":["~{0} days","~{0} días","~{0} jours"]
+"3464":["{0} contacts are back in the queue","{0} contactos volvieron a la cola","{0} contacts sont de retour dans la file"],
+"3525":["~{0} days","~{0} días","~{0} jours"]
 }

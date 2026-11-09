@@ -3464,6 +3464,7 @@
   "{0} contacto(s) importado(s) ({1} já existiam)",
   "{0} contacto(s) importado(s) do WhatsApp",
   "{0} contactos com WhatsApp",
+  "{0} contactos com WhatsApp · {1} sem número visível",
   "{0} contactos exportados",
   "{0} contactos voltaram à fila",
   "{0} convertido(s)",

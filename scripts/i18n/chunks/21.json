@@ -19,9 +19,9 @@
 "2642":["Fill in the task title","Rellena el título de la tarea","Indiquez le titre de la tâche"],
 "3078":["Task created","Tarea creada","Tâche créée"],
 "3456":["{0} overdue","{0} atrasado(s)","{0} en retard"],
-"3503":["{0} pending","{0} pendiente(s)","{0} en attente"],
-"3541":["Tomorrow {0}","Mañana {0}","Demain {0}"],
-"3637":["Today {0}","Hoy {0}","Aujourd'hui {0}"],
-"3682":["Yesterday {0}","Ayer {0}","Hier {0}"],
-"3724":["See all ({0})","Ver todos ({0})","Tout voir ({0})"]
+"3504":["{0} pending","{0} pendiente(s)","{0} en attente"],
+"3542":["Tomorrow {0}","Mañana {0}","Demain {0}"],
+"3638":["Today {0}","Hoy {0}","Aujourd'hui {0}"],
+"3683":["Yesterday {0}","Ayer {0}","Hier {0}"],
+"3725":["See all ({0})","Ver todos ({0})","Tout voir ({0})"]
 }

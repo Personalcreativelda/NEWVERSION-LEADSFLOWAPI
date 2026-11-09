@@ -51,6 +51,7 @@
  "{0} contacto(s) importado(s) do WhatsApp com sucesso!": "¡{0} contacto(s) importado(s) de WhatsApp con éxito!",
  "{0} contacto(s) importado(s) do WhatsApp! ({1} duplicados ignorados)": "¡{0} contacto(s) importado(s) de WhatsApp! ({1} duplicados ignorados)",
  "{0} contactos com WhatsApp": "{0} contactos con WhatsApp",
+ "{0} contactos com WhatsApp · {1} sem número visível": "{0} contactos con WhatsApp · {1} sin número visible",
  "{0} contactos exportados": "{0} contactos exportados",
  "{0} contactos voltaram à fila": "{0} contactos volvieron a la cola",
  "{0} convertido(s)": "{0} convertido(s)",

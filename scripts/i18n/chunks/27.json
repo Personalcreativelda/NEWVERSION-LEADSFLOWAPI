@@ -151,13 +151,13 @@
 "3362":["Version B","Versión B","Version B"],
 "3401":["Generated voice","Voz generada","Voix générée"],
 "3427":["WhatsApp Business: reopen conversation","WhatsApp Business: reabrir conversación","WhatsApp Business : rouvrir la conversation"],
-"3481":["{0} for {1} days","{0} hace {1} días","{0} depuis {1} jours"],
-"3578":["Conversa parada +{0} horas","Conversa parada +{0} horas","Conversa parada +{0} horas"],
-"3579":["Conversation stopped for {0} hours","Conversación detenida hace {0} horas","Conversation arrêtée depuis {0} heures"],
-"3600":["Entered {0}","Entró en {0}","Entré dans {0}"],
-"3646":["Go to step {0}: {1}","Ir al paso {0}: {1}","Aller à l'étape {0} : {1}"],
-"3689":["Score ≥ {0}","Puntuación ≥ {0}","Score ≥ {0}"],
-"3700":["No messages for {0} days","Sin mensajes hace {0} días","Sans message depuis {0} jours"],
-"3714":["Test · {0}","Prueba · {0}","Test · {0}"],
-"3732":["voz.{0}","voz.{0}","voz.{0}"]
+"3482":["{0} for {1} days","{0} hace {1} días","{0} depuis {1} jours"],
+"3579":["Conversa parada +{0} horas","Conversa parada +{0} horas","Conversa parada +{0} horas"],
+"3580":["Conversation stopped for {0} hours","Conversación detenida hace {0} horas","Conversation arrêtée depuis {0} heures"],
+"3601":["Entered {0}","Entró en {0}","Entré dans {0}"],
+"3647":["Go to step {0}: {1}","Ir al paso {0}: {1}","Aller à l'étape {0} : {1}"],
+"3690":["Score ≥ {0}","Puntuación ≥ {0}","Score ≥ {0}"],
+"3701":["No messages for {0} days","Sin mensajes hace {0} días","Sans message depuis {0} jours"],
+"3715":["Test · {0}","Prueba · {0}","Test · {0}"],
+"3733":["voz.{0}","voz.{0}","voz.{0}"]
 }

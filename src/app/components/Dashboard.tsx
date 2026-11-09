@@ -282,6 +282,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   const [modalImportandoWhatsApp, setModalImportandoWhatsApp] = useState(false);
   const [importingWhatsApp, setImportingWhatsApp] = useState(false);
   const [modalPreviewWhatsApp, setModalPreviewWhatsApp] = useState(false);
+  const [whatsappHiddenNumbers, setWhatsappHiddenNumbers] = useState(0);
   const [whatsappContacts, setWhatsappContacts] = useState<any[]>(() => {
     console.log('[Dashboard] 🏗️ INICIALIZANDO whatsappContacts - deve estar vazio:', []);
     return [];
@@ -1386,6 +1387,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     try {
       const res = await apiRequest('/whatsapp/contacts', 'POST');
       const contatos: Array<{ number: string; name: string; avatar: string | null; existing: boolean }> = res?.contacts || [];
+      setWhatsappHiddenNumbers(Number(res?.hiddenNumbers) || 0);
       if (contatos.length === 0) {
         toast.info('Nenhum contacto com WhatsApp encontrado.');
         return;
@@ -2168,6 +2170,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       <PreviewWhatsAppLeadsModal
         isOpen={modalPreviewWhatsApp}
         contacts={whatsappContacts}
+        hiddenNumbers={whatsappHiddenNumbers}
         onClose={() => {
           setModalPreviewWhatsApp(false);
           setWhatsappContacts([]);

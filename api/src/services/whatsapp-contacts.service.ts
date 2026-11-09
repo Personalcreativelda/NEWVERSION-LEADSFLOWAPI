@@ -34,40 +34,124 @@ function pickAvatar(c: any): string | null {
   return typeof v === 'string' && /^https:\/\//.test(v) ? v : null;
 }
 
+/** Número de telefone de um JID (só @s.whatsapp.net; o @lid não é um número) */
+function phoneOfJid(jid: unknown): string {
+  const j = String(jid ?? '');
+  if (!j.endsWith('@s.whatsapp.net')) return '';
+  const n = digitsOf(j.split('@')[0].split(':')[0]);
+  return n.length >= 8 && n.length <= 15 && !/^0/.test(n) ? n : '';
+}
+
+/** O WhatsApp esconde cada vez mais números atrás de um código (@lid): o número pode vir noutros campos */
+function phoneOfContact(c: any): string {
+  for (const v of [c?.remoteJid, c?.jid, c?.id, c?.remoteJidAlt, c?.jidAlt, c?.phoneNumber, c?.pn, c?.senderPn]) {
+    const n = phoneOfJid(v);
+    if (n) return n;
+  }
+  for (const v of [c?.phoneNumber, c?.number, c?.phone]) {
+    const n = digitsOf(v);
+    if (n.length >= 8 && n.length <= 15 && !/^0/.test(n) && !String(v).includes('@lid')) return n;
+  }
+  return '';
+}
+
+const lidOf = (c: any): string => {
+  for (const v of [c?.remoteJid, c?.jid, c?.id, c?.lid]) {
+    const j = String(v ?? '');
+    if (j.endsWith('@lid')) return j;
+  }
+  return '';
+};
+
+/** Código @lid → número, a partir das conversas (a última mensagem traz o número verdadeiro) */
+async function lidMapFromChats(whatsapp: WhatsAppService, instance: string): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const chats: any[] = await whatsapp.fetchChats(instance);
+    for (const chat of Array.isArray(chats) ? chats : []) {
+      const lid = [chat?.remoteJid, chat?.id, chat?.lastMessage?.key?.remoteJid].map(String).find((j) => j.endsWith('@lid'));
+      if (!lid) continue;
+      const k = chat?.lastMessage?.key || {};
+      const number = [chat?.remoteJidAlt, k.remoteJidAlt, k.senderPn, k.participantAlt, chat?.phoneNumber].map(phoneOfJid).find(Boolean)
+        || digitsOf(chat?.phoneNumber);
+      if (number && number.length >= 8) map.set(lid, number);
+    }
+  } catch {
+    // Sem conversas: ficam os outros caminhos
+  }
+  return map;
+}
+
 export async function listWhatsAppContacts(
   whatsapp: WhatsAppService,
-  instance: string,
+  instances: string | string[],
   userId: string,
-): Promise<{ contacts: WhatsAppImportContact[]; found: number; withoutWhatsApp: number }> {
-  const raw: any = await whatsapp.fetchContacts(instance);
-  const list: any[] = Array.isArray(raw) ? raw : raw?.contacts ?? raw?.data ?? raw?.response ?? [];
+): Promise<{ contacts: WhatsAppImportContact[]; found: number; withoutWhatsApp: number; hiddenNumbers: number }> {
+  const list = Array.isArray(instances) ? instances : [instances];
 
-  // 1. Contactos individuais com número válido (sem grupos, listas, estados nem @lid), sem repetidos
+  // Códigos @lid que já se conhecem pelos leads (o webhook guarda-os ao receber mensagens)
+  const knownLids = new Map<string, string>();
+  try {
+    const r = await query(
+      `SELECT whatsapp_lid, COALESCE(NULLIF(whatsapp, ''), phone) AS phone FROM leads
+        WHERE user_id = $1 AND whatsapp_lid IS NOT NULL AND COALESCE(NULLIF(whatsapp, ''), phone) IS NOT NULL`,
+      [userId],
+    );
+    for (const row of r.rows) {
+      const lid = String(row.whatsapp_lid);
+      const n = digitsOf(row.phone);
+      if (n.length >= 8) knownLids.set(lid.endsWith('@lid') ? lid : `${lid}@lid`, n);
+    }
+  } catch { /* coluna antiga */ }
+
+  // 1. Contactos individuais de todos os números ligados, com número válido, sem repetidos
   const byNumber = new Map<string, { number: string; name: string; avatar: string | null }>();
-  for (const c of list) {
-    const jid = String(c?.remoteJid || c?.jid || c?.id || '');
-    if (!jid.endsWith('@s.whatsapp.net')) continue;
-    const number = digitsOf(jid.split('@')[0].split(':')[0]);
-    if (number.length < 8 || number.length > 15 || /^0/.test(number)) continue;
-    const name = pickName(c, number);
-    const avatar = pickAvatar(c);
-    const prev = byNumber.get(number);
-    if (!prev) byNumber.set(number, { number, name, avatar });
-    else byNumber.set(number, { number, name: prev.name || name, avatar: prev.avatar || avatar });
+  const hidden = new Set<string>();
+  const instanceOf = new Map<string, string>();
+  for (const instance of list) {
+    const raw: any = await whatsapp.fetchContacts(instance);
+    const contacts: any[] = Array.isArray(raw) ? raw : raw?.contacts ?? raw?.data ?? raw?.response ?? [];
+    const needChats = contacts.some((c) => lidOf(c) && !phoneOfContact(c) && !knownLids.has(lidOf(c)));
+    const fromChats = needChats ? await lidMapFromChats(whatsapp, instance) : new Map<string, string>();
+
+    for (const c of contacts) {
+      const anyJid = String(c?.remoteJid || c?.jid || c?.id || '');
+      // Grupos, listas de difusão e estados ficam de fora
+      if (anyJid.endsWith('@g.us') || anyJid.endsWith('@broadcast') || anyJid.endsWith('@newsletter')) continue;
+      const lid = lidOf(c);
+      const number = phoneOfContact(c) || (lid ? knownLids.get(lid) || fromChats.get(lid) || '' : '');
+      if (!number) {
+        if (lid) hidden.add(lid);
+        continue;
+      }
+      if (lid) hidden.delete(lid);
+      const name = pickName(c, number);
+      const avatar = pickAvatar(c);
+      const prev = byNumber.get(number);
+      if (!prev) {
+        byNumber.set(number, { number, name, avatar });
+        instanceOf.set(number, instance);
+      } else {
+        byNumber.set(number, { number, name: prev.name || name, avatar: prev.avatar || avatar });
+      }
+    }
   }
   const found = byNumber.size;
   const numbers = [...byNumber.keys()];
 
-  // 2. Confirmar na Evolution que cada número tem WhatsApp (por lotes, com tempo máximo)
+  // 2. Confirmar que cada número tem WhatsApp (por lotes, no número de onde veio, com tempo máximo)
   const hasWhatsApp = new Map<string, boolean>();
   const started = Date.now();
-  const batches: string[][] = [];
-  for (let i = 0; i < numbers.length; i += CHECK_BATCH) batches.push(numbers.slice(i, i + CHECK_BATCH));
+  const batches: Array<{ instance: string; numbers: string[] }> = [];
+  for (const instance of list) {
+    const mine = numbers.filter((n) => instanceOf.get(n) === instance);
+    for (let i = 0; i < mine.length; i += CHECK_BATCH) batches.push({ instance, numbers: mine.slice(i, i + CHECK_BATCH) });
+  }
   for (let i = 0; i < batches.length; i += CHECK_PARALLEL) {
     if (Date.now() - started > CHECK_BUDGET_MS) break;
     await Promise.all(batches.slice(i, i + CHECK_PARALLEL).map(async (batch) => {
       try {
-        const res = await whatsapp.checkWhatsAppNumbers(instance, batch);
+        const res = await whatsapp.checkWhatsAppNumbers(batch.instance, batch.numbers);
         for (const r of res.results || []) {
           const n = digitsOf(r.jid ? String(r.jid).split('@')[0] : r.number);
           if (n) hasWhatsApp.set(n, r.exists === true);
@@ -101,7 +185,7 @@ export async function listWhatsAppContacts(
     // Com nome primeiro (por ordem alfabética), depois só com número
     .sort((a, b) => (a.name ? 0 : 1) - (b.name ? 0 : 1) || (a.name || a.number).localeCompare(b.name || b.number));
 
-  return { contacts, found, withoutWhatsApp };
+  return { contacts, found, withoutWhatsApp, hiddenNumbers: hidden.size };
 }
 
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024;

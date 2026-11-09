@@ -1101,18 +1101,21 @@ router.post('/contacts', async (req, res, next) => {
     ).catch(() => ({ rows: [] as any[] }));
     if (team.rows[0]?.owner_id) ownerId = team.rows[0].owner_id;
 
+    // Todos os números ligados por código QR (antes só o primeiro: os contactos dos outros faltavam)
     const channels = await channelsService.findByType('whatsapp', ownerId);
-    const channel = channels.find((c) => c.status === 'active') || null;
-    const instance = channel?.credentials?.instance_id || channel?.credentials?.instance_name;
-    if (!instance) {
+    const instances = [...new Set(channels
+      .filter((c: any) => c.status === 'active' || c.status === 'connected')
+      .map((c: any) => c.credentials?.instance_id || c.credentials?.instance_name)
+      .filter(Boolean) as string[])];
+    if (instances.length === 0) {
       return res.status(409).json({ error: 'Ligue o WhatsApp por código QR em Canais para importar os contactos.' });
     }
     if (!whatsappService.isReady()) {
       return res.status(503).json({ error: 'O WhatsApp não está disponível de momento.' });
     }
 
-    const result = await listWhatsAppContacts(whatsappService, instance, user.id);
-    console.log(`[WhatsApp Contacts] ${instance}: ${result.found} encontrados, ${result.withoutWhatsApp} sem WhatsApp, ${result.contacts.length} para mostrar`);
+    const result = await listWhatsAppContacts(whatsappService, instances, user.id);
+    console.log(`[WhatsApp Contacts] ${instances.join(', ')}: ${result.found} encontrados, ${result.hiddenNumbers} sem número visível, ${result.withoutWhatsApp} sem WhatsApp, ${result.contacts.length} para mostrar`);
     res.json(result);
   } catch (error: any) {
     console.error('[WhatsApp Contacts] Error:', error?.message || error);

@@ -12,13 +12,13 @@
 "3157":["All stages","Todas las etapas","Toutes les étapes"],
 "3295":["Open value","Valor abierto","Valeur en cours"],
 "3307":["Closed sales","Ventas cerradas","Ventes conclues"],
-"3464":["{0} converted","{0} convertido(s)","{0} converti(s)"],
-"3465":["{0} converted · average {1}","{0} convertido(s) · media {1}","{0} converti(s) · moyenne {1}"],
-"3469":["{0} on average in the funnel","{0} de media en el embudo","{0} en moyenne dans l'entonnoir"],
-"3482":["{0} already in the flow","{0} ya en el flujo","{0} déjà dans le flux"],
-"3484":["{0} lead(s) added to the flow","{0} lead(s) añadido(s) al flujo","{0} lead(s) ajouté(s) au flux"],
-"3485":["{0} lead(s) with a value","{0} lead(s) con valor","{0} lead(s) avec valeur"],
-"3502":["{0} asked not to receive","{0} pidió no recibir","{0} a demandé à ne pas recevoir"],
-"3505":["{0} without a channel","{0} sin canal","{0} sans canal"],
-"3699":["Select all ({0})","Seleccionar todos ({0})","Tout sélectionner ({0})"]
+"3465":["{0} converted","{0} convertido(s)","{0} converti(s)"],
+"3466":["{0} converted · average {1}","{0} convertido(s) · media {1}","{0} converti(s) · moyenne {1}"],
+"3470":["{0} on average in the funnel","{0} de media en el embudo","{0} en moyenne dans l'entonnoir"],
+"3483":["{0} already in the flow","{0} ya en el flujo","{0} déjà dans le flux"],
+"3485":["{0} lead(s) added to the flow","{0} lead(s) añadido(s) al flujo","{0} lead(s) ajouté(s) au flux"],
+"3486":["{0} lead(s) with a value","{0} lead(s) con valor","{0} lead(s) avec valeur"],
+"3503":["{0} asked not to receive","{0} pidió no recibir","{0} a demandé à ne pas recevoir"],
+"3506":["{0} without a channel","{0} sin canal","{0} sans canal"],
+"3700":["Select all ({0})","Seleccionar todos ({0})","Tout sélectionner ({0})"]
 }

@@ -68,8 +68,8 @@
 "3444":["Windows","Windows","Windows"],
 "3449":["· last {0}","· último {0}","· dernière {0}"],
 "3450":["· used {0}","· usado {0}","· utilisé {0}"],
-"3470":["{0} different IP addresses in 30 days","{0} direcciones IP distintas en 30 días","{0} adresses IP différentes en 30 jours"],
-"3508":["{0} failed sign-in attempts in the last 24 hours","{0} intentos de acceso fallidos en las últimas 24 horas","{0} tentatives de connexion échouées ces dernières 24 heures"],
-"3595":["Email sent to {0}","Correo enviado a {0}","E-mail envoyé à {0}"],
-"3599":["Sign-in from a new country: {0}","Acceso desde un país nuevo: {0}","Connexion depuis un nouveau pays : {0}"]
+"3471":["{0} different IP addresses in 30 days","{0} direcciones IP distintas en 30 días","{0} adresses IP différentes en 30 jours"],
+"3509":["{0} failed sign-in attempts in the last 24 hours","{0} intentos de acceso fallidos en las últimas 24 horas","{0} tentatives de connexion échouées ces dernières 24 heures"],
+"3596":["Email sent to {0}","Correo enviado a {0}","E-mail envoyé à {0}"],
+"3600":["Sign-in from a new country: {0}","Acceso desde un país nuevo: {0}","Connexion depuis un nouveau pays : {0}"]
 }
