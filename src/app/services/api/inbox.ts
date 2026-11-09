@@ -316,6 +316,18 @@ export const conversationsApi = {
         return data;
     },
 
+    /** Editar uma mensagem enviada (WhatsApp por QR, até 15 minutos) */
+    async editMessage(messageId: string, content: string): Promise<Message> {
+        const { data } = await api.put<Message>(`/inbox/messages/${messageId}`, { content });
+        return data;
+    },
+
+    /** Apagar para todos uma mensagem enviada (WhatsApp por QR) */
+    async revokeMessage(messageId: string): Promise<Message> {
+        const { data } = await api.post<Message>(`/inbox/messages/${messageId}/revoke`);
+        return data;
+    },
+
     /** Fixar (ou desafixar) uma conversa no topo */
     async pinConversation(conversationId: string, pinned: boolean): Promise<{ id: string; pinned_at: string | null }> {
         const { data } = await api.post(`/inbox/conversations/${conversationId}/pin`, { pinned });

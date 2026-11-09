@@ -2,6 +2,11 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import { quoteOf } from './quote';
+import { AppModal } from '../base/AppModal';
+import { Button } from '../ui/button';
+import { useConfirm } from '../ui/ConfirmDialog';
+import { toast } from 'sonner';
+import { apiErrorMessage } from '../../lib/apiError';
 import { ChatHeader } from './ChatHeader';
 import { ChatBackground } from './ChatBackground';
 import { MessageBubble } from './MessageBubble';
@@ -67,6 +72,9 @@ interface ChatPanelProps {
     onReactMessage?: (message: MessageWithSender, emoji: string) => void;
     /** Fixar/desafixar a conversa */
     onTogglePin?: () => void;
+    /** Editar / apagar para todos as minhas mensagens (WhatsApp por QR) */
+    onEditMessage?: (message: MessageWithSender, content: string) => Promise<void>;
+    onRevokeMessage?: (message: MessageWithSender) => Promise<void>;
     onSendAudio?: (audioBlob: Blob) => Promise<void>;
     onAddLocalMessage?: (message: MessageWithSender) => void;
     onUpdateLocalMessageProgress?: (tempId: string, progress: number) => void;
@@ -121,6 +129,8 @@ export function ChatPanel({
     loadingOlder = false,
     onReactMessage,
     onTogglePin,
+    onEditMessage,
+    onRevokeMessage,
 }: ChatPanelProps) {
     const [forwardTarget, setForwardTarget] = useState<MessageWithSender | null>(null);
     // Mensagem a que se está a responder (barra por cima da caixa de texto)
@@ -128,6 +138,42 @@ export function ChatPanel({
     const inputAreaRef = useRef<HTMLDivElement>(null);
     const contactName = conversation.contact?.name || conversation.metadata?.contact_name || conversation.contact?.phone || 'Contacto';
     const canReact = conversation.channel?.type === 'whatsapp' || conversation.channel?.type === 'whatsapp_cloud';
+    // Editar e apagar para todos: só o WhatsApp por código QR o permite
+    const canChangeSent = conversation.channel?.type === 'whatsapp';
+    const confirm = useConfirm();
+    const [editing, setEditing] = useState<MessageWithSender | null>(null);
+    const [editText, setEditText] = useState('');
+    const [savingEdit, setSavingEdit] = useState(false);
+
+    const startEdit = useCallback((msg: MessageWithSender) => {
+        setEditing(msg);
+        setEditText(msg.content || '');
+    }, []);
+
+    const saveEdit = async () => {
+        if (!editing || !onEditMessage) return;
+        const text = editText.trim();
+        if (!text) return;
+        setSavingEdit(true);
+        try {
+            await onEditMessage(editing, text);
+            setEditing(null);
+        } catch (err) {
+            toast.error(apiErrorMessage(err, 'Não foi possível editar a mensagem.'));
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
+    const handleRevoke = useCallback(async (msg: MessageWithSender) => {
+        if (!onRevokeMessage) return;
+        const ok = await confirm('A mensagem é apagada também no WhatsApp do contacto.', {
+            title: 'Apagar para todos?',
+            confirmLabel: 'Apagar',
+            variant: 'danger',
+        });
+        if (ok) await onRevokeMessage(msg);
+    }, [confirm, onRevokeMessage]);
     const internalEndRef = useRef<HTMLDivElement>(null);
 
     const messages        = externalMessages || [];
@@ -279,6 +325,8 @@ export function ChatPanel({
                                 onForward={setForwardTarget}
                                 onReply={handleReply}
                                 onReact={canReact ? onReactMessage : undefined}
+                                onEdit={canChangeSent && onEditMessage ? startEdit : undefined}
+                                onRevoke={canChangeSent && onRevokeMessage ? handleRevoke : undefined}
                                 onJumpTo={jumpToMessage}
                                 contactName={contactName}
                             />
@@ -366,6 +414,32 @@ export function ChatPanel({
                     onFailLocalMessage={onFailLocalMessage}
                 />
             </div>
+
+            {/* Editar mensagem enviada */}
+            <AppModal
+                open={!!editing}
+                onOpenChange={(open) => { if (!open && !savingEdit) setEditing(null); }}
+                title="Editar mensagem"
+                size="sm"
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => setEditing(null)} disabled={savingEdit}>Cancelar</Button>
+                        <Button onClick={() => void saveEdit()} disabled={savingEdit || !editText.trim() || editText.trim() === (editing?.content || '').trim()}>
+                            {savingEdit ? 'A guardar…' : 'Guardar'}
+                        </Button>
+                    </>
+                }
+            >
+                <textarea
+                    translate="no"
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    rows={4}
+                    maxLength={4096}
+                    className="w-full resize-none"
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void saveEdit(); } }}
+                />
+            </AppModal>
 
             {/* Forward Modal */}
             {forwardTarget && (

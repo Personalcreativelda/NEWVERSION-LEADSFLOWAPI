@@ -289,6 +289,27 @@ export function useInbox(options: UseInboxOptions = {}) {
         [replaceMessage],
     );
 
+    // ── Editar / apagar para todos (as minhas mensagens no WhatsApp) ──────────
+    const editMessage = useCallback(
+        async (message: MessageWithSender, content: string) => {
+            const updated = await conversationsApi.editMessage(message.id, content);
+            if ((updated as any)?.id) replaceMessage(updated as MessageWithSender);
+        },
+        [replaceMessage],
+    );
+
+    const revokeMessage = useCallback(
+        async (message: MessageWithSender) => {
+            try {
+                const updated = await conversationsApi.revokeMessage(message.id);
+                if ((updated as any)?.id) replaceMessage(updated as MessageWithSender);
+            } catch (err) {
+                toast.error(apiErrorMessage(err, 'Não foi possível apagar a mensagem.'));
+            }
+        },
+        [replaceMessage],
+    );
+
     // ── Fixar a conversa no topo ─────────────────────────────────────────────
     const togglePinConversation = useCallback(
         async (conversation: ConversationWithDetails) => {
@@ -311,6 +332,8 @@ export function useInbox(options: UseInboxOptions = {}) {
         conversations,
         togglePinConversation,
         reactToMessage,
+        editMessage,
+        revokeMessage,
         selectedConversation,
         selectConversation,
         conversationsLoading,

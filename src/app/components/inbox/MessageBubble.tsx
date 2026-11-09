@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from 're
 import { createPortal } from 'react-dom';
 import type { MessageWithSender } from '../../types/inbox';
 import { UploadProgressIndicator } from './UploadProgressIndicator';
-import { ChevronDown, Forward, Trash2, Reply, Copy, Paperclip, ChevronDown as CollapseIcon } from 'lucide-react';
+import { ChevronDown, Forward, Trash2, Reply, Copy, Pencil, Ban, Paperclip, ChevronDown as CollapseIcon } from 'lucide-react';
 import { QUICK_REACTIONS, quotedIn } from './quote';
 import { toast } from 'sonner';
 import DOMPurify from 'dompurify';
@@ -27,6 +27,9 @@ interface MessageBubbleProps {
     onReact?: (message: MessageWithSender, emoji: string) => void;
     /** Toque na citação: ir até à mensagem original */
     onJumpTo?: (messageId: string) => void;
+    /** Editar / apagar para todos (as minhas mensagens, WhatsApp por QR) */
+    onEdit?: (message: MessageWithSender) => void;
+    onRevoke?: (message: MessageWithSender) => void;
     /** Nome do contacto (nas citações das mensagens dele) */
     contactName?: string;
     /** Mensagem que acabou de chegar/ser enviada: entra a subir */
@@ -41,13 +44,15 @@ interface ContextMenuProps {
     onForward:  () => void;
     onReply:    () => void;
     onCopy?:    () => void;
+    onEdit?:    () => void;
+    onRevoke?:  () => void;
     onReact?:   (emoji: string) => void;
     myReaction?: string;
     onClose:    () => void;
     anchorRef:  React.RefObject<HTMLElement>;
 }
 
-function MessageContextMenu({ isOut, onDelete, onForward, onReply, onCopy, onReact, myReaction, onClose, anchorRef }: ContextMenuProps) {
+function MessageContextMenu({ isOut, onDelete, onForward, onReply, onCopy, onEdit, onRevoke, onReact, myReaction, onClose, anchorRef }: ContextMenuProps) {
     const menuRef = useRef<HTMLDivElement>(null);
     const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
@@ -95,8 +100,11 @@ function MessageContextMenu({ isOut, onDelete, onForward, onReply, onCopy, onRea
     const items = [
         { icon: <Reply className="w-4 h-4" />,   label: 'Responder',     action: () => { onReply();   onClose(); }, danger: false },
         ...(onCopy ? [{ icon: <Copy className="w-4 h-4" />, label: 'Copiar', action: () => { onCopy(); onClose(); }, danger: false }] : []),
+        ...(onEdit ? [{ icon: <Pencil className="w-4 h-4" />, label: 'Editar', action: () => { onEdit(); onClose(); }, danger: false }] : []),
         { icon: <Forward className="w-4 h-4" />, label: 'Reencaminhar',  action: () => { onForward(); onClose(); }, danger: false },
-        { icon: <Trash2 className="w-4 h-4" />,  label: 'Eliminar',      action: () => { onDelete();  onClose(); }, danger: true  },
+        ...(onRevoke ? [{ icon: <Ban className="w-4 h-4" />, label: 'Apagar para todos', action: () => { onRevoke(); onClose(); }, danger: true }] : []),
+        // Sem "apagar para todos" basta "Eliminar"; com ele, distingue-se como no WhatsApp
+        { icon: <Trash2 className="w-4 h-4" />,  label: onRevoke ? 'Apagar para mim' : 'Eliminar', action: () => { onDelete();  onClose(); }, danger: true  },
     ];
 
     return createPortal(
@@ -308,6 +316,8 @@ function MessageBubbleView({
     onReact,
     onJumpTo,
     contactName,
+    onEdit,
+    onRevoke,
 }: MessageBubbleProps) {
     const isOut = message.direction === 'out';
     const [imageError, setImageError]       = useState(false);
@@ -477,6 +487,11 @@ function MessageBubbleView({
     const handleCopy = copyText ? () => {
         navigator.clipboard?.writeText(copyText).then(() => toast.success('Mensagem copiada')).catch(() => toast.error('Não foi possível copiar'));
     } : undefined;
+    // As minhas mensagens no WhatsApp: editar (texto, 15 min) e apagar para todos (48 h), como no WhatsApp
+    const sentAgo = Date.now() - new Date(message.created_at).getTime();
+    const mine = isOut && !isDeleted && !!message.external_id;
+    const canEdit = mine && !!onEdit && !message.media_type && !!message.content && !isMediaPlaceholder && sentAgo < 15 * 60_000;
+    const canRevoke = mine && !!onRevoke && sentAgo < 48 * 3600_000;
     const openMenu = () => { if (canShowMenu) setMenuOpen(true); };
     const menu = menuOpen && (
         <MessageContextMenu
@@ -485,6 +500,8 @@ function MessageBubbleView({
             onForward={() => onForward?.(message)}
             onReply={() => onReply?.(message)}
             onCopy={handleCopy}
+            onEdit={canEdit ? () => onEdit!(message) : undefined}
+            onRevoke={canRevoke ? () => onRevoke!(message) : undefined}
             onReact={onReact && !isDeleted ? (emoji) => onReact(message, emoji) : undefined}
             myReaction={myReaction}
             onClose={() => setMenuOpen(false)}

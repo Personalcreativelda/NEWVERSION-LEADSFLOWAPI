@@ -239,6 +239,23 @@ export class WhatsAppService {
     });
   }
 
+  /** Editar uma mensagem enviada por nós (o WhatsApp só deixa nos primeiros 15 minutos) */
+  async editMessage(instanceId: string, key: { remoteJid: string; id: string }, text: string) {
+    const number = key.remoteJid.endsWith('@s.whatsapp.net') ? key.remoteJid.split('@')[0] : key.remoteJid;
+    return this.request(`/chat/updateMessage/${instanceId}`, {
+      method: 'POST',
+      body: JSON.stringify({ number, text, key: { remoteJid: key.remoteJid, fromMe: true, id: key.id } }),
+    });
+  }
+
+  /** Apagar para todos uma mensagem enviada por nós */
+  async deleteForEveryone(instanceId: string, key: { remoteJid: string; id: string }) {
+    return this.request(`/chat/deleteMessageForEveryone/${instanceId}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ id: key.id, remoteJid: key.remoteJid, fromMe: true }),
+    });
+  }
+
   async getStatus(instanceId: string) {
     return this.request(`/instance/connectionState/${instanceId}`);
   }

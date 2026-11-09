@@ -2970,6 +2970,79 @@ router.post('/messages/:messageId/react', async (req, res, next) => {
   }
 });
 
+
+/** Limites do WhatsApp para mexer numa mensagem já enviada */
+const EDIT_WINDOW_MS = 15 * 60_000;
+const REVOKE_WINDOW_MS = 48 * 3600_000;
+
+/** Mensagem enviada por nós num WhatsApp por código QR (só aí se pode editar ou apagar para todos) */
+async function ownSentWhatsAppMessage(userId: string, messageId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(messageId)) return { error: 404 as const };
+  const { query: dbQuery } = require('../database/connection');
+  const r = await dbQuery(
+    `SELECT m.id, m.user_id, m.external_id, m.direction, m.content, m.media_type, m.created_at, m.metadata,
+            c.remote_jid, ch.type AS channel_type, ch.credentials
+       FROM messages m
+       JOIN conversations c ON c.id = m.conversation_id
+       LEFT JOIN channels ch ON ch.id = c.channel_id
+      WHERE m.id = $1 AND m.user_id = ANY($2::uuid[])
+      LIMIT 1`,
+    [messageId, await inboxOwners(userId)]
+  );
+  const row = r.rows[0];
+  if (!row) return { error: 404 as const };
+  if (row.direction !== 'out' || !row.external_id) return { error: 400 as const, message: 'Só pode alterar mensagens que enviou' };
+  if (row.channel_type !== 'whatsapp') return { error: 400 as const, message: 'Este canal não permite alterar mensagens enviadas' };
+  if (row.metadata?.deleted) return { error: 400 as const, message: 'Esta mensagem já foi apagada' };
+  const instance = row.credentials?.instance_id || row.credentials?.instance_name;
+  if (!instance || !row.remote_jid) return { error: 400 as const, message: 'O WhatsApp desta conversa não está ligado' };
+  return { row, instance };
+}
+
+// Editar uma mensagem enviada (como no WhatsApp: até 15 minutos depois)
+router.put('/messages/:messageId', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const text = String(req.body?.content ?? '').trim();
+    if (!text) return res.status(400).json({ error: 'Escreva a mensagem' });
+    if (text.length > 4096) return res.status(400).json({ error: 'Mensagem demasiado longa' });
+    const found = await ownSentWhatsAppMessage(user.id, req.params.messageId);
+    if ('error' in found) return res.status(found.error).json({ error: found.message || 'Mensagem não encontrada' });
+    const { row, instance } = found;
+    if (row.media_type) return res.status(400).json({ error: 'Só pode editar mensagens de texto' });
+    if (Date.now() - new Date(row.created_at).getTime() > EDIT_WINDOW_MS) {
+      return res.status(400).json({ error: 'Só pode editar nos primeiros 15 minutos' });
+    }
+    if (text === String(row.content || '').trim()) return res.json(row);
+
+    await whatsappService.editMessage(instance, { remoteJid: row.remote_jid, id: row.external_id }, text);
+    const updated = await applyWhatsAppEvent(row.user_id, { kind: 'edit', targetId: row.external_id, text }, true);
+    res.json(updated || { success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Apagar para todos uma mensagem enviada (o cliente também deixa de a ver)
+router.post('/messages/:messageId/revoke', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const found = await ownSentWhatsAppMessage(user.id, req.params.messageId);
+    if ('error' in found) return res.status(found.error).json({ error: found.message || 'Mensagem não encontrada' });
+    const { row, instance } = found;
+    if (Date.now() - new Date(row.created_at).getTime() > REVOKE_WINDOW_MS) {
+      return res.status(400).json({ error: 'Já passou o tempo para apagar para todos' });
+    }
+
+    await whatsappService.deleteForEveryone(instance, { remoteJid: row.remote_jid, id: row.external_id });
+    const updated = await applyWhatsAppEvent(row.user_id, { kind: 'revoke', targetId: row.external_id }, true);
+    res.json(updated || { success: true });
+  } catch (error) {
+    next(error);
+  }
+});
 // Fixar (ou desafixar) uma conversa no topo da inbox
 router.post('/conversations/:conversationId/pin', async (req, res, next) => {
   try {

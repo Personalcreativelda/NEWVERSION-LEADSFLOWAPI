@@ -59,6 +59,8 @@ export default function ConversasConversations({
         handleTyping,
         togglePinConversation,
         reactToMessage,
+        editMessage,
+        revokeMessage,
     } = useInbox();
 
     const confirm = useConfirm();
@@ -648,6 +650,8 @@ export default function ConversasConversations({
                         onDeleteConversation={handleDeleteConversation}
                         onTogglePin={() => void togglePinConversation(selectedConversation)}
                         onReactMessage={reactToMessage}
+                        onEditMessage={editMessage}
+                        onRevokeMessage={revokeMessage}
                         onResolve={handleResolveConversation}
                         onStatusChange={handleChangeStatus}
                         messages={messages}
