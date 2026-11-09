@@ -266,32 +266,10 @@ router.post('/login/2fa', async (req, res, next) => {
   }
 });
 
-router.post('/oauth/callback', async (req, res, next) => {
-  try {
-    const { email, name, avatar_url, provider } = req.body;
-
-    if (!email || !provider) {
-      return res.status(400).json({ error: 'Email and provider are required' });
-    }
-
-    console.log('[Auth OAuth] Processing OAuth callback:', { email, provider, name });
-
-    const data = await loginWithOAuth({ email, name, avatar_url, provider });
-    
-    // 📝 Log activity
-    void activityService.logActivity({
-      userId: data.user.id,
-      type: 'login',
-      description: `Login via OAuth: ${email}`,
-      metadata: { provider, ip: req.ip }
-    });
-
-    return res.json(data);
-  } catch (error) {
-    console.error('[Auth OAuth] Error processing OAuth callback:', error);
-    return next(error);
-  }
-});
+// POST /auth/oauth/callback foi removida: dava uma sessão a quem enviasse um email no corpo do
+// pedido, sem verificar nada (qualquer conta podia ser aberta). O login com a Google é só pelo
+// /auth/google/callback, que troca o código com a Google.
+router.post('/oauth/callback', (_req, res) => res.status(410).json({ error: 'Rota removida' }));
 
 router.post('/setup-demo', async (_req, res, next) => {
   try {
