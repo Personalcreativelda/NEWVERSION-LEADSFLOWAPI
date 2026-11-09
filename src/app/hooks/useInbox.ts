@@ -24,6 +24,8 @@ import { patchCachedMessage, patchCachedMessageStatus, replaceCachedMessage } fr
 import { useInboxStore } from '../stores/inboxStore';
 import { conversationsApi } from '../services/api/inbox';
 import type { ConversationWithDetails, MessageWithSender } from '../types/inbox';
+import { toast } from 'sonner';
+import { apiErrorMessage } from '../lib/apiError';
 
 interface UseInboxOptions {
     onlyWithHistory?: boolean;
@@ -231,12 +233,12 @@ export function useInbox(options: UseInboxOptions = {}) {
 
     // ── Send message ──────────────────────────────────────────────────────────
     const handleSendMessage = useCallback(
-        async (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string) => {
+        async (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string, replyTo?: MessageWithSender | null) => {
             if (!selectedConversation) return;
             // Clear draft on send
             clearDraft(selectedConversation.id);
             try {
-                await sendMessage(content, mediaUrl, mediaType, replaceTempId);
+                await sendMessage(content, mediaUrl, mediaType, replaceTempId, replyTo);
                 window.dispatchEvent(new CustomEvent('leadflow:usage-changed'));
             } catch (error: any) {
                 if (error?.response?.status === 429 || error?.response?.data?.upgrade || error?.message?.includes('Limite')) {
@@ -269,9 +271,46 @@ export function useInbox(options: UseInboxOptions = {}) {
         [],
     );
 
+    // ── Reagir a uma mensagem (aparece logo; volta atrás se falhar) ──────────
+    const reactToMessage = useCallback(
+        async (message: MessageWithSender, emoji: string) => {
+            const meta = (message.metadata || {}) as any;
+            const others = (Array.isArray(meta.reactions) ? meta.reactions : []).filter((r: any) => r?.from !== 'me');
+            const reactions = emoji ? [...others, { emoji, from: 'me', at: new Date().toISOString() }] : others;
+            replaceMessage({ ...message, metadata: { ...meta, reactions } });
+            try {
+                const updated = await conversationsApi.reactToMessage(message.id, emoji);
+                if ((updated as any)?.id) replaceMessage(updated as MessageWithSender);
+            } catch (err) {
+                replaceMessage(message);
+                toast.error(apiErrorMessage(err, 'Não foi possível reagir. Tente de novo.'));
+            }
+        },
+        [replaceMessage],
+    );
+
+    // ── Fixar a conversa no topo ─────────────────────────────────────────────
+    const togglePinConversation = useCallback(
+        async (conversation: ConversationWithDetails) => {
+            const before = conversation.pinned_at ?? null;
+            const pinned = !before;
+            updateConversation(conversation.id, { pinned_at: pinned ? new Date().toISOString() : null });
+            try {
+                const r = await conversationsApi.pinConversation(conversation.id, pinned);
+                updateConversation(conversation.id, { pinned_at: r.pinned_at });
+            } catch (err) {
+                updateConversation(conversation.id, { pinned_at: before });
+                toast.error(apiErrorMessage(err, 'Não foi possível fixar a conversa.'));
+            }
+        },
+        [updateConversation],
+    );
+
     return {
         // Conversations
         conversations,
+        togglePinConversation,
+        reactToMessage,
         selectedConversation,
         selectConversation,
         conversationsLoading,

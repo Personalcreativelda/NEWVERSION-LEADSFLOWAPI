@@ -1,5 +1,12 @@
+/** Mensagem citada numa resposta (formato do Evolution) */
+export interface WhatsAppQuoted {
+  key: { id: string; remoteJid?: string; fromMe?: boolean };
+  message: { conversation: string };
+}
+
 export class WhatsAppService {
   private readonly baseUrl: string;
+
   private readonly apiKey: string;
   private readonly isConfigured: boolean;
 
@@ -111,7 +118,7 @@ export class WhatsAppService {
     }
   }
 
-  async sendMessage(data: { instanceId: string; number: string; text: string; delay?: number }) {
+  async sendMessage(data: { instanceId: string; number: string; text: string; delay?: number; quoted?: WhatsAppQuoted }) {
     // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
     const cleanNumber = data.number.includes('@') ? data.number : data.number.replace(/\D/g, '');
 
@@ -125,6 +132,8 @@ export class WhatsAppService {
     // delay > 0: Evolution API shows "typing..." indicator for that many ms before sending
     const payload: Record<string, any> = { number: cleanNumber, text: data.text };
     if (data.delay && data.delay > 0) payload.delay = data.delay;
+    // Resposta a uma mensagem: o cliente vê a mensagem citada
+    if (data.quoted) payload.quoted = data.quoted;
 
     const body = JSON.stringify(payload);
     console.log(`[WhatsAppService] sendMessage → instance=${data.instanceId} number=${cleanNumber} textLen=${data.text.length}${data.delay ? ` delay=${data.delay}ms` : ''}`);
@@ -141,6 +150,7 @@ export class WhatsAppService {
     mediaUrl: string;
     mediaType: string;
     caption?: string;
+    quoted?: WhatsAppQuoted;
   }) {
     const { instanceId, mediaUrl, mediaType, caption } = data;
     // Normalize phone number: remove non-digit chars unless it's a full JID (contains @)
@@ -158,6 +168,7 @@ export class WhatsAppService {
     if (caption) {
       body.caption = caption;
     }
+    if (data.quoted) body.quoted = data.quoted;
     
     // For documents, add filename
     if (mediaType === 'document') {
@@ -217,6 +228,14 @@ export class WhatsAppService {
     return this.request(`/message/sendMedia/${instanceId}`, {
       method: 'POST',
       body: JSON.stringify(body),
+    });
+  }
+
+  /** Reação (emoji) a uma mensagem; emoji vazio tira a reação */
+  async sendReaction(instanceId: string, key: { remoteJid: string; fromMe: boolean; id: string }, reaction: string) {
+    return this.request(`/message/sendReaction/${instanceId}`, {
+      method: 'POST',
+      body: JSON.stringify({ key, reaction }),
     });
   }
 

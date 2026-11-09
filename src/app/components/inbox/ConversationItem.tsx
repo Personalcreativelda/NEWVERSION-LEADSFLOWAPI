@@ -9,7 +9,8 @@ import {
     CheckCheck,
     Tag,
     UserCheck,
-    AlertCircle
+    AlertCircle,
+    Pin
 } from 'lucide-react';
 import { ChannelLogo } from '../base/ChannelLogo';
 
@@ -187,6 +188,9 @@ function ConversationItemView({ conversation, isSelected, onClick }: Conversatio
                         {messagePreview}
                     </p>
 
+                    {conversation.pinned_at && (
+                        <Pin size={14} className="flex-shrink-0 rotate-45 text-muted-foreground" aria-label="Fixada" />
+                    )}
                     {hasUnread && (
                         <span
                             className="flex-shrink-0 min-w-[22px] h-[22px] px-1.5 text-[11px] font-bold rounded-full flex items-center justify-center bg-primary text-primary-foreground"

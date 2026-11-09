@@ -89,11 +89,24 @@ export function cloudMediaKind(mediaType?: string | null): CloudMediaKind {
   return 'document';
 }
 
-export async function sendCloudText(creds: CloudCredentials | null | undefined, to: string, body: string): Promise<any> {
+export async function sendCloudText(creds: CloudCredentials | null | undefined, to: string, body: string, replyTo?: string | null): Promise<any> {
   const { phoneId, token } = requireCreds(creds);
   if (!to) throw new CloudSendError('Este contacto não tem número de WhatsApp.');
   return graph(`/${encodeURIComponent(phoneId)}/messages`, token, {
-    json: { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { body, preview_url: true } },
+    json: {
+      messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { body, preview_url: true },
+      // Resposta a uma mensagem: o cliente vê a mensagem citada
+      ...(replyTo ? { context: { message_id: replyTo } } : {}),
+    },
+  });
+}
+
+/** Reação (emoji) a uma mensagem; emoji vazio tira a reação */
+export async function sendCloudReaction(creds: CloudCredentials | null | undefined, to: string, messageId: string, emoji: string): Promise<any> {
+  const { phoneId, token } = requireCreds(creds);
+  if (!to) throw new CloudSendError('Este contacto não tem número de WhatsApp.');
+  return graph(`/${encodeURIComponent(phoneId)}/messages`, token, {
+    json: { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'reaction', reaction: { message_id: messageId, emoji } },
   });
 }
 

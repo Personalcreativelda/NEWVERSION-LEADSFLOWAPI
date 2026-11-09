@@ -1,6 +1,7 @@
 // INBOX: Painel de Chat modernizado
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
+import { quoteOf } from './quote';
 import { ChatHeader } from './ChatHeader';
 import { ChatBackground } from './ChatBackground';
 import { MessageBubble } from './MessageBubble';
@@ -61,7 +62,11 @@ interface ChatPanelProps {
     messagesError?: string | null;
     sending?: boolean;
     messagesEndRef?: React.RefObject<HTMLDivElement>;
-    onSendMessage?: (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string) => Promise<void>;
+    onSendMessage?: (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string, replyTo?: MessageWithSender | null) => Promise<void>;
+    /** Reagir a uma mensagem (WhatsApp) */
+    onReactMessage?: (message: MessageWithSender, emoji: string) => void;
+    /** Fixar/desafixar a conversa */
+    onTogglePin?: () => void;
     onSendAudio?: (audioBlob: Blob) => Promise<void>;
     onAddLocalMessage?: (message: MessageWithSender) => void;
     onUpdateLocalMessageProgress?: (tempId: string, progress: number) => void;
@@ -114,8 +119,15 @@ export function ChatPanel({
     onLoadOlder,
     hasMore = false,
     loadingOlder = false,
+    onReactMessage,
+    onTogglePin,
 }: ChatPanelProps) {
     const [forwardTarget, setForwardTarget] = useState<MessageWithSender | null>(null);
+    // Mensagem a que se está a responder (barra por cima da caixa de texto)
+    const [replyTo, setReplyTo] = useState<MessageWithSender | null>(null);
+    const inputAreaRef = useRef<HTMLDivElement>(null);
+    const contactName = conversation.contact?.name || conversation.metadata?.contact_name || conversation.contact?.phone || 'Contacto';
+    const canReact = conversation.channel?.type === 'whatsapp' || conversation.channel?.type === 'whatsapp_cloud';
     const internalEndRef = useRef<HTMLDivElement>(null);
 
     const messages        = externalMessages || [];
@@ -183,9 +195,31 @@ export function ChatPanel({
         if (scrollEl) scrollEl.scrollTop = 0;
     }, [conversation.id, scrollEl]);
 
-    const handleReply = useCallback((_msg: MessageWithSender) => {
-        // Future: integrate reply quote into MessageInput
+    // Outra conversa: a resposta em curso não passa para lá
+    useEffect(() => { setReplyTo(null); }, [conversation.id]);
+
+    const handleReply = useCallback((msg: MessageWithSender) => {
+        setReplyTo(msg);
+        // Como no WhatsApp: o cursor vai para a caixa de texto
+        setTimeout(() => inputAreaRef.current?.querySelector('textarea')?.focus(), 30);
     }, []);
+
+    const handleSend = useCallback(
+        async (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string) => {
+            const reply = replyTo;
+            setReplyTo(null);
+            await onSendMessage?.(content, mediaUrl, mediaType, replaceTempId, reply);
+        },
+        [replyTo, onSendMessage],
+    );
+
+    // Toque na citação: vai até à mensagem original e destaca-a
+    const jumpToMessage = useCallback((id: string) => {
+        const el = scrollEl?.querySelector<HTMLElement>(`[data-msg-id="${id}"]`);
+        if (!el) return;
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        el.animate?.([{ backgroundColor: 'hsl(var(--primary) / 0.18)' }, { backgroundColor: 'transparent' }], { duration: 1400, easing: 'ease-out' });
+    }, [scrollEl]);
 
     const handleSearchInChat = useCallback((_query: string) => {
         // TODO: implement in-chat message search highlight
@@ -215,6 +249,7 @@ export function ChatPanel({
                     onStatusChange={onStatusChange}
                     layoutControls={layoutControls}
                     onOpenContact={onOpenContact}
+                    onTogglePin={onTogglePin}
                 />
             </div>
 
@@ -243,6 +278,9 @@ export function ChatPanel({
                                 onDelete={onDeleteMessage}
                                 onForward={setForwardTarget}
                                 onReply={handleReply}
+                                onReact={canReact ? onReactMessage : undefined}
+                                onJumpTo={jumpToMessage}
+                                contactName={contactName}
                             />
                         ),
                     )}
@@ -298,9 +336,27 @@ export function ChatPanel({
             )}
 
             {/* Input Area */}
-            <div className="flex-shrink-0 px-2 py-2 sm:p-3 border-t transition-colors bg-card border-border">
+            <div ref={inputAreaRef} className="flex-shrink-0 px-2 py-2 sm:p-3 border-t transition-colors bg-card border-border">
+                {replyTo && (
+                    <div className="mb-2 flex items-center gap-2 rounded-lg bg-muted/60 py-1.5 pl-2 pr-1">
+                        <div className={`min-w-0 flex-1 border-l-[3px] pl-2 ${replyTo.direction === 'out' ? 'border-primary' : 'border-sky-500'}`}>
+                            <div className={`truncate text-xs font-semibold ${replyTo.direction === 'out' ? 'text-primary' : 'text-sky-600 dark:text-sky-400'}`}>
+                                {replyTo.direction === 'out' ? 'Você' : <span translate="no">{contactName}</span>}
+                            </div>
+                            <div translate="no" className="truncate text-[13px] text-muted-foreground">{quoteOf(replyTo).content}</div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setReplyTo(null)}
+                            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+                            title="Cancelar resposta"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                )}
                 <MessageInput
-                    onSendMessage={onSendMessage || (async () => {})}
+                    onSendMessage={handleSend}
                     onSendAudio={onSendAudio}
                     onTyping={handleTyping}
                     isSending={sending}

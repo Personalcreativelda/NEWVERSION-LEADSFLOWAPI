@@ -125,6 +125,44 @@ export function describeWhatsAppMessage(msg: any): string {
   return '';
 }
 
+const MEDIA_LABEL: Record<string, string> = {
+  image: '📷 Foto', video: '🎥 Vídeo', audio: '🎤 Áudio', document: '📄 Documento', sticker: 'Sticker',
+};
+const PLACEHOLDERS = new Set(['[Mídia]', '[Imagem]', '[Vídeo]', '[Áudio]', '[Documento]', '[Sticker]', '[image]', '[video]', '[audio]', '[document]', '[sticker]']);
+
+/** Mensagem citada numa resposta: o que o balão mostra por cima do texto */
+export interface QuotedMessage {
+  id?: string;           // id da mensagem no LeadsFlow (para saltar até ela)
+  external_id?: string;  // id no WhatsApp
+  content: string;       // texto curto
+  direction: 'in' | 'out';
+  media_type?: string | null;
+}
+
+export function quotedFromRow(row: any): QuotedMessage {
+  const raw = String(row?.content ?? '').trim();
+  const media = row?.media_type || null;
+  const text = !raw || PLACEHOLDERS.has(raw) ? (MEDIA_LABEL[media] || 'Mensagem') : raw;
+  return {
+    id: row?.id, external_id: row?.external_id || undefined,
+    content: text.length > 220 ? text.slice(0, 217) + '…' : text,
+    direction: row?.direction === 'out' ? 'out' : 'in',
+    media_type: media,
+  };
+}
+
+/** Citação de uma mensagem do WhatsApp (contextInfo): stanzaId e o texto citado */
+export function whatsAppQuoteInfo(msg: any): { stanzaId: string; text: string; fromMe: boolean | null } | null {
+  if (!msg || typeof msg !== 'object') return null;
+  const ctx = [msg.contextInfo, ...Object.values(msg).map((m: any) => m?.contextInfo)].find((c: any) => c?.stanzaId);
+  if (!ctx) return null;
+  const q = unwrapWhatsAppMessage(ctx.quotedMessage || {});
+  const text = textOf(q) || describeWhatsAppMessage(q)
+    || (q.imageMessage ? MEDIA_LABEL.image : q.videoMessage ? MEDIA_LABEL.video : q.audioMessage ? MEDIA_LABEL.audio
+      : q.documentMessage ? MEDIA_LABEL.document : q.stickerMessage ? MEDIA_LABEL.sticker : '');
+  return { stanzaId: String(ctx.stanzaId), text, fromMe: null };
+}
+
 /** Miniatura que o WhatsApp manda com vídeos e imagens (para a pré-visualização) */
 export function whatsAppThumbnail(media: any): string | null {
   const raw = media?.jpegThumbnail;

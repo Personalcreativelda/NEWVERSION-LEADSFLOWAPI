@@ -1,8 +1,10 @@
 // INBOX: Componente de mensagem individual com menu de contexto WhatsApp-style
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { MessageWithSender } from '../../types/inbox';
 import { UploadProgressIndicator } from './UploadProgressIndicator';
-import { ChevronDown, Forward, Trash2, Reply, Paperclip, ChevronDown as CollapseIcon } from 'lucide-react';
+import { ChevronDown, Forward, Trash2, Reply, Copy, Paperclip, ChevronDown as CollapseIcon } from 'lucide-react';
+import { QUICK_REACTIONS, quotedIn } from './quote';
 import { toast } from 'sonner';
 import DOMPurify from 'dompurify';
 import { isInternalMediaUrl } from '../../utils/media-url';
@@ -21,6 +23,12 @@ interface MessageBubbleProps {
     onDelete?: (messageId: string) => void;
     onForward?: (message: MessageWithSender) => void;
     onReply?: (message: MessageWithSender) => void;
+    /** Reagir com um emoji (só WhatsApp); emoji vazio tira a reação */
+    onReact?: (message: MessageWithSender, emoji: string) => void;
+    /** Toque na citação: ir até à mensagem original */
+    onJumpTo?: (messageId: string) => void;
+    /** Nome do contacto (nas citações das mensagens dele) */
+    contactName?: string;
     /** Mensagem que acabou de chegar/ser enviada: entra a subir */
     animateIn?: boolean;
 }
@@ -28,59 +36,112 @@ interface MessageBubbleProps {
 // ── Context menu ──────────────────────────────────────────────────────────────
 
 interface ContextMenuProps {
-    isOut:     boolean;
-    onDelete:  () => void;
-    onForward: () => void;
-    onReply:   () => void;
-    onClose:   () => void;
-    anchorRef: React.RefObject<HTMLElement>;
+    isOut:      boolean;
+    onDelete:   () => void;
+    onForward:  () => void;
+    onReply:    () => void;
+    onCopy?:    () => void;
+    onReact?:   (emoji: string) => void;
+    myReaction?: string;
+    onClose:    () => void;
+    anchorRef:  React.RefObject<HTMLElement>;
 }
 
-function MessageContextMenu({ isOut, onDelete, onForward, onReply, onClose, anchorRef }: ContextMenuProps) {
+function MessageContextMenu({ isOut, onDelete, onForward, onReply, onCopy, onReact, myReaction, onClose, anchorRef }: ContextMenuProps) {
     const menuRef = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+    // Junto ao balão, sem sair do ecrã (por baixo; se não couber, por cima)
+    useLayoutEffect(() => {
+        const anchor = anchorRef.current;
+        const menu = menuRef.current;
+        if (!anchor || !menu) return;
+        const a = anchor.getBoundingClientRect();
+        const w = menu.offsetWidth;
+        const h = menu.offsetHeight;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const left = Math.min(Math.max(8, isOut ? a.right - w : a.left), vw - w - 8);
+        let top = a.bottom + 6;
+        if (top + h > vh - 8) top = a.top - h - 6;
+        if (top < 8) top = Math.max(8, vh - h - 8);
+        setPos({ top, left });
+    }, [anchorRef, isOut]);
 
     useEffect(() => {
-        const handle = (e: MouseEvent) => {
+        const handle = (e: Event) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
                 anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
                 onClose();
             }
         };
         const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        // Ao fazer scroll no chat o menu deixava de estar junto à mensagem
+        const handleScroll = (e: Event) => { if (!menuRef.current?.contains(e.target as Node)) onClose(); };
         document.addEventListener('mousedown', handle);
+        document.addEventListener('touchstart', handle, { passive: true });
         document.addEventListener('keydown', handleKey);
+        window.addEventListener('scroll', handleScroll, true);
+        window.addEventListener('resize', onClose);
         return () => {
             document.removeEventListener('mousedown', handle);
+            document.removeEventListener('touchstart', handle);
             document.removeEventListener('keydown', handleKey);
+            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('resize', onClose);
         };
     }, [onClose, anchorRef]);
 
     const items = [
         { icon: <Reply className="w-4 h-4" />,   label: 'Responder',     action: () => { onReply();   onClose(); }, danger: false },
+        ...(onCopy ? [{ icon: <Copy className="w-4 h-4" />, label: 'Copiar', action: () => { onCopy(); onClose(); }, danger: false }] : []),
         { icon: <Forward className="w-4 h-4" />, label: 'Reencaminhar',  action: () => { onForward(); onClose(); }, danger: false },
         { icon: <Trash2 className="w-4 h-4" />,  label: 'Eliminar',      action: () => { onDelete();  onClose(); }, danger: true  },
     ];
 
-    return (
+    return createPortal(
         <div
             ref={menuRef}
-            className={`absolute z-50 top-6 ${isOut ? 'right-0' : 'left-0'} min-w-[180px] bg-card rounded-xl shadow-xl border border-border overflow-hidden py-1`}
+            role="menu"
+            style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999 }}
+            className="fixed z-[60] w-[248px] bg-card rounded-xl shadow-xl border border-border overflow-hidden animate-in fade-in zoom-in-95 duration-100"
         >
-            {items.map((item) => (
-                <button
-                    key={item.label}
-                    onClick={item.action}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13.5px] font-medium text-left transition-colors
-                        ${item.danger
-                            ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
-                            : 'text-foreground hover:bg-muted'
-                        }`}
-                >
-                    {item.icon}
-                    {item.label}
-                </button>
-            ))}
-        </div>
+            {onReact && (
+                <div className="flex items-center justify-between gap-0.5 border-b border-border px-1.5 py-1.5">
+                    {QUICK_REACTIONS.map((emoji) => (
+                        <button
+                            key={emoji}
+                            type="button"
+                            translate="no"
+                            onClick={() => { onReact(myReaction === emoji ? '' : emoji); onClose(); }}
+                            className={`flex h-9 w-9 items-center justify-center rounded-full text-[22px] leading-none transition-transform hover:scale-110 ${myReaction === emoji ? 'bg-muted' : 'hover:bg-muted/60'}`}
+                            title={myReaction === emoji ? 'Tirar reação' : undefined}
+                        >
+                            {emoji}
+                        </button>
+                    ))}
+                </div>
+            )}
+            <div className="py-1">
+                {items.map((item) => (
+                    <button
+                        key={item.label}
+                        type="button"
+                        role="menuitem"
+                        onClick={item.action}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13.5px] font-medium text-left transition-colors
+                            ${item.danger
+                                ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                : 'text-foreground hover:bg-muted'
+                            }`}
+                    >
+                        {item.icon}
+                        {item.label}
+                    </button>
+                ))}
+            </div>
+        </div>,
+        document.body,
     );
 }
 
@@ -244,6 +305,9 @@ function MessageBubbleView({
     onDelete,
     onForward,
     onReply,
+    onReact,
+    onJumpTo,
+    contactName,
 }: MessageBubbleProps) {
     const isOut = message.direction === 'out';
     const [imageError, setImageError]       = useState(false);
@@ -258,6 +322,11 @@ function MessageBubbleView({
     );
     const chevronRef = useRef<HTMLButtonElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const bubbleRef  = useRef<HTMLDivElement>(null);
+    // Toque longo (telemóvel) ou botão direito (computador) abrem o menu, como no WhatsApp
+    const pressTimer = useRef<number | null>(null);
+    const clearPress = () => { if (pressTimer.current) { window.clearTimeout(pressTimer.current); pressTimer.current = null; } };
+    useEffect(() => clearPress, []);
 
     const formatTime = (dateString: string | number) => {
         if (!dateString && dateString !== 0) return '';
@@ -401,17 +470,46 @@ function MessageBubbleView({
     // Don't show menu for temp/uploading messages
     const canShowMenu = !message.id.startsWith('temp_') && !isUploading;
 
+    // Resposta: a mensagem citada; reação minha (para a tirar com o mesmo emoji)
+    const quoted = quotedIn(message);
+    const myReaction = reactions.find((r) => r.from === 'me')?.emoji;
+    const copyText = !isDeleted && message.content && !isMediaPlaceholder ? message.content : '';
+    const handleCopy = copyText ? () => {
+        navigator.clipboard?.writeText(copyText).then(() => toast.success('Mensagem copiada')).catch(() => toast.error('Não foi possível copiar'));
+    } : undefined;
+    const openMenu = () => { if (canShowMenu) setMenuOpen(true); };
+    const menu = menuOpen && (
+        <MessageContextMenu
+            isOut={isOut}
+            onDelete={() => onDelete?.(message.id)}
+            onForward={() => onForward?.(message)}
+            onReply={() => onReply?.(message)}
+            onCopy={handleCopy}
+            onReact={onReact && !isDeleted ? (emoji) => onReact(message, emoji) : undefined}
+            myReaction={myReaction}
+            onClose={() => setMenuOpen(false)}
+            anchorRef={bubbleRef as any}
+        />
+    );
+
     return (
         <div
             ref={wrapperRef}
             className={`flex w-full ${isOut ? 'justify-end' : 'justify-start'} ${reactions.length > 0 && !isDeleted ? 'mb-5' : isLastInGroup ? 'mb-[6px]' : 'mb-[2px]'} ${animateIn ? 'animate-in fade-in slide-in-from-bottom-2 duration-200' : ''}`}
+            data-msg-id={message.id}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => { setHovered(false); }}
         >
             {/* Bubble */}
             <div
+                ref={bubbleRef}
+                onContextMenu={(e) => { if (!canShowMenu || (e.target as HTMLElement).closest('a,video,audio')) return; e.preventDefault(); openMenu(); }}
+                onTouchStart={() => { clearPress(); pressTimer.current = window.setTimeout(() => { navigator.vibrate?.(10); openMenu(); }, 450); }}
+                onTouchMove={clearPress}
+                onTouchEnd={clearPress}
+                onTouchCancel={clearPress}
                 style={{ maxWidth: isEmail ? '85%' : '65%', minWidth: 80, padding: '6px 10px 8px', fontSize: '14.2px', lineHeight: '1.35' }}
-                className={`relative ${bubbleRounding} shadow-sm ${
+                className={`relative ${bubbleRounding} shadow-sm [@media(pointer:coarse)]:select-none [-webkit-touch-callout:none] ${
                     isOut
                         ? 'bg-[#D9FDD3] dark:bg-[#005C4B] text-[#111B21] dark:text-[#E9EDEF]'
                         : 'bg-white dark:bg-[#202C33] text-[#111B21] dark:text-[#E9EDEF] border border-black/[0.05] dark:border-white/[0.06]'
@@ -428,18 +526,24 @@ function MessageBubbleView({
                             >
                                 <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
                             </button>
-                            {menuOpen && isOut && (
-                                <MessageContextMenu
-                                    isOut={true}
-                                    onDelete={() => onDelete?.(message.id)}
-                                    onForward={() => onForward?.(message)}
-                                    onReply={() => onReply?.(message)}
-                                    onClose={() => setMenuOpen(false)}
-                                    anchorRef={chevronRef as any}
-                                />
-                            )}
                         </div>
                     </div>
+                )}
+
+                {/* Resposta: a mensagem citada (toque para ir até ela) */}
+                {quoted && !isDeleted && (
+                    <button
+                        type="button"
+                        onClick={() => quoted.id && onJumpTo?.(quoted.id)}
+                        className={`mb-1.5 block w-full min-w-0 rounded-lg border-l-[3px] px-2 py-1 text-left ${
+                            isOut ? 'bg-black/[0.05] dark:bg-black/20' : 'bg-black/[0.04] dark:bg-white/[0.06]'
+                        } ${quoted.direction === 'out' ? 'border-primary' : 'border-sky-500'}`}
+                    >
+                        <span className={`block truncate text-[12.5px] font-semibold ${quoted.direction === 'out' ? 'text-primary' : 'text-sky-600 dark:text-sky-400'}`}>
+                            {quoted.direction === 'out' ? 'Você' : <span translate="no">{contactName || 'Contacto'}</span>}
+                        </span>
+                        <span translate="no" className="line-clamp-2 break-words text-[13px] opacity-75">{quoted.content}</span>
+                    </button>
                 )}
 
                 {/* Upload-in-progress preview */}
@@ -648,19 +752,10 @@ function MessageBubbleView({
                         >
                             <ChevronDown className="w-4 h-4 text-muted-foreground" />
                         </button>
-                        {menuOpen && !isOut && (
-                            <MessageContextMenu
-                                isOut={false}
-                                onDelete={() => onDelete?.(message.id)}
-                                onForward={() => onForward?.(message)}
-                                onReply={() => onReply?.(message)}
-                                onClose={() => setMenuOpen(false)}
-                                anchorRef={chevronRef as any}
-                            />
-                        )}
                     </div>
                 </div>
             )}
+            {menu}
         </div>
     );
 }

@@ -2,9 +2,22 @@
 // balões novos) e o painel atualiza-a em tempo real.
 import { query } from '../database/connection';
 import { getWebSocketService } from './websocket.service';
-import type { WhatsAppEvent } from '../utils/whatsapp-message';
+import { quotedFromRow, type QuotedMessage, type WhatsAppEvent } from '../utils/whatsapp-message';
 
 export interface MessageReaction { emoji: string; from: 'me' | 'contact'; at: string }
+
+/** Mensagem citada numa resposta que chegou: a nossa cópia dela (ou o texto que veio com a citação) */
+export async function quotedForIncoming(userId: string, externalId: string | null | undefined, fallbackText?: string): Promise<QuotedMessage | undefined> {
+  if (!externalId) return undefined;
+  try {
+    const r = await query(
+      'SELECT id, external_id, direction, content, media_type FROM messages WHERE user_id = $1 AND external_id = $2 ORDER BY created_at DESC LIMIT 1',
+      [userId, externalId],
+    );
+    if (r.rows[0]) return quotedFromRow(r.rows[0]);
+  } catch { /* sem citação */ }
+  return fallbackText ? { external_id: externalId, content: fallbackText.slice(0, 220), direction: 'in' } : undefined;
+}
 
 export async function applyWhatsAppEvent(userId: string, event: WhatsAppEvent, fromMe: boolean) {
   if (event.kind === 'ignore') return null;

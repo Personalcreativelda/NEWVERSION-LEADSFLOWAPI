@@ -48,7 +48,9 @@ import { AIService, getAvailableProviders } from '../services/ai.service';
 import { emailService } from '../services/email.service';
 import { encryptCredentials } from '../utils/secret-box';
 import { isInstagramLoginToken, metaMessagesUrl } from '../utils/meta-send';
-import { CloudSendError, cloudMediaKind, cloudRecipient, sendCloudMedia, sendCloudText } from '../services/whatsapp-cloud.service';
+import { CloudSendError, cloudMediaKind, cloudRecipient, sendCloudMedia, sendCloudReaction, sendCloudText } from '../services/whatsapp-cloud.service';
+import { applyWhatsAppEvent } from '../services/whatsapp-events.service';
+import { quotedFromRow } from '../utils/whatsapp-message';
 
 const router = Router();
 
@@ -577,7 +579,7 @@ router.get('/conversations', async (req, res, next) => {
       paramIndex++;
     }
 
-    sql += ` ORDER BY c.last_message_at DESC NULLS LAST`;
+    sql += ` ORDER BY c.pinned_at DESC NULLS LAST, c.last_message_at DESC NULLS LAST`;
     sql += ` LIMIT $${paramIndex}`;
     params.push(limit);
     paramIndex++;
@@ -656,6 +658,7 @@ router.get('/conversations', async (req, res, next) => {
         assigned_team: conv.assigned_team || null,
         assigned_at: conv.assigned_at || null,
         priority: conv.priority || 'normal',
+        pinned_at: conv.pinned_at || null,
         last_message_at: conv.last_message_at || conv.updated_at,
         unread_count: conv.unread_count || 0,
         is_group: conv.is_group || false,
@@ -704,8 +707,11 @@ router.get('/conversations', async (req, res, next) => {
       };
     });
 
-    // Sort by last_message_at descending
+    // Fixadas primeiro (a mais recente no topo), depois pela última mensagem
     conversations.sort((a: any, b: any) => {
+      const pinA = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
+      const pinB = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+      if (pinA !== pinB) return pinB - pinA;
       const dateA = new Date(a.last_message_at || 0).getTime();
       const dateB = new Date(b.last_message_at || 0).getTime();
       return dateB - dateA;
@@ -1305,6 +1311,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
     }
 
     const { content, channel, media_url, media_type } = req.body;
+    const replyToId = typeof req.body.reply_to === 'string' && /^[0-9a-f-]{36}$/i.test(req.body.reply_to) ? req.body.reply_to : null;
     const messageContent = content?.trim() || '';
 
     // Content is required only if no media is attached
@@ -1551,6 +1558,20 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
 
     console.log('[Inbox Send] Channel type detected:', messageChannel, 'channelId:', channelId);
 
+    // Resposta a uma mensagem: a citação vai para o WhatsApp e fica no balão
+    let quotedRow: any = null;
+    if (replyToId) {
+      const qr = await dbQuery(
+        `SELECT id, external_id, direction, content, media_type FROM messages WHERE id = $1 AND user_id = ANY($2::uuid[]) LIMIT 1`,
+        [replyToId, [user.id, channelOwnerId]]
+      ).catch(() => ({ rows: [] as any[] }));
+      quotedRow = qr.rows[0] || null;
+    }
+    const quotedMeta = quotedRow ? quotedFromRow(quotedRow) : null;
+    const evolutionQuoted = quotedRow?.external_id && remoteJid
+      ? { key: { id: quotedRow.external_id, remoteJid, fromMe: quotedRow.direction === 'out' }, message: { conversation: quotedMeta!.content } }
+      : undefined;
+
     // Send via the appropriate channel
     let externalResult: any = null;
 
@@ -1571,12 +1592,14 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
             mediaUrl: media_url,
             mediaType: media_type,
             caption: messageContent || undefined,
+            quoted: evolutionQuoted,
           });
         } else {
           externalResult = await whatsappService.sendMessage({
             instanceId,
             number: numberToSend!,
             text: messageContent,
+            quoted: evolutionQuoted,
           });
         }
       } catch (whatsappError: any) {
@@ -1614,7 +1637,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
           });
           externalResult = sent.result;
         } else {
-          externalResult = await sendCloudText(channelCredentials, recipientPhone, messageContent);
+          externalResult = await sendCloudText(channelCredentials, recipientPhone, messageContent, quotedRow?.external_id || null);
         }
         console.log('[Inbox] WhatsApp Cloud send result:', externalResult);
       } catch (whatsappCloudError: any) {
@@ -2065,6 +2088,7 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
           channel_type: messageChannel,
           sent_by: user.id !== channelOwnerId ? user.id : undefined,
           client_id: clientId || undefined,
+          quoted: quotedMeta || undefined,
         },
       }, channelOwnerId);
       console.log('[Inbox] Message saved to database:', message.id, 'conversation:', conversationId);
@@ -2893,4 +2917,90 @@ RESPONDA EXATAMENTE NESTE FORMATO JSON (NÃO use markdown nem crases de código,
   }
 });
 
+
+/** Contas cujas conversas este utilizador pode mexer: a dele e a do dono da equipa */
+async function inboxOwners(userId: string): Promise<string[]> {
+  const { query: dbQuery } = require('../database/connection');
+  const team = await dbQuery(
+    `SELECT w.owner_id FROM team_members tm JOIN workspaces w ON w.id = tm.workspace_id
+      WHERE tm.user_id = $1 AND tm.status = 'active' AND tm.is_active = true AND w.owner_id != $1 LIMIT 1`,
+    [userId]
+  ).catch(() => ({ rows: [] as any[] }));
+  return [userId, ...(team.rows[0]?.owner_id ? [team.rows[0].owner_id] : [])];
+}
+
+// Reagir a uma mensagem com um emoji (como no WhatsApp); emoji vazio tira a reação
+router.post('/messages/:messageId/react', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.messageId)) return res.status(404).json({ error: 'Mensagem não encontrada' });
+    const emoji = String(req.body?.emoji ?? '').trim().slice(0, 16);
+    const { query: dbQuery } = require('../database/connection');
+    const r = await dbQuery(
+      `SELECT m.id, m.user_id, m.external_id, m.direction, c.remote_jid, c.metadata AS conv_metadata,
+              ch.type AS channel_type, ch.credentials
+         FROM messages m
+         JOIN conversations c ON c.id = m.conversation_id
+         LEFT JOIN channels ch ON ch.id = c.channel_id
+        WHERE m.id = $1 AND m.user_id = ANY($2::uuid[])
+        LIMIT 1`,
+      [req.params.messageId, await inboxOwners(user.id)]
+    );
+    const row = r.rows[0];
+    if (!row) return res.status(404).json({ error: 'Mensagem não encontrada' });
+    if (!row.external_id) return res.status(400).json({ error: 'Esta mensagem não pode receber reações' });
+
+    if (row.channel_type === 'whatsapp') {
+      const instance = row.credentials?.instance_id || row.credentials?.instance_name;
+      if (!instance || !row.remote_jid) return res.status(400).json({ error: 'O WhatsApp desta conversa não está ligado' });
+      await whatsappService.sendReaction(instance, { remoteJid: row.remote_jid, fromMe: row.direction === 'out', id: row.external_id }, emoji);
+    } else if (row.channel_type === 'whatsapp_cloud') {
+      const to = cloudRecipient(row.remote_jid, row.conv_metadata?.phone);
+      await sendCloudReaction(row.credentials, to, row.external_id, emoji);
+    } else {
+      return res.status(400).json({ error: 'Este canal não permite reações' });
+    }
+
+    const updated = await applyWhatsAppEvent(row.user_id, { kind: 'reaction', targetId: row.external_id, emoji }, true);
+    res.json(updated || { success: true });
+  } catch (error: any) {
+    if (error instanceof CloudSendError) return res.status(422).json({ error: error.message });
+    next(error);
+  }
+});
+
+// Fixar (ou desafixar) uma conversa no topo da inbox
+router.post('/conversations/:conversationId/pin', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.conversationId)) return res.status(404).json({ error: 'Conversa não encontrada' });
+    const pinned = req.body?.pinned === true;
+    const owners = await inboxOwners(user.id);
+    const { query: dbQuery } = require('../database/connection');
+    if (pinned) {
+      // Como no WhatsApp: no máximo 3 conversas fixadas
+      const count = await dbQuery(
+        `SELECT COUNT(*)::int AS n FROM conversations WHERE user_id = ANY($1::uuid[]) AND pinned_at IS NOT NULL AND id <> $2`,
+        [owners, req.params.conversationId]
+      );
+      if (Number(count.rows[0]?.n || 0) >= 3) return res.status(400).json({ error: 'Só pode fixar até 3 conversas' });
+    }
+    const r = await dbQuery(
+      `UPDATE conversations SET pinned_at = CASE WHEN $3 THEN NOW() ELSE NULL END
+        WHERE id = $1 AND user_id = ANY($2::uuid[]) RETURNING id, user_id, pinned_at`,
+      [req.params.conversationId, owners, pinned]
+    );
+    const row = r.rows[0];
+    if (!row) return res.status(404).json({ error: 'Conversa não encontrada' });
+    getWebSocketService()?.emitConversationUpdate(row.user_id, {
+      conversationId: row.id,
+      updates: { pinned_at: row.pinned_at },
+    });
+    res.json({ id: row.id, pinned_at: row.pinned_at });
+  } catch (error) {
+    next(error);
+  }
+});
 export default router;

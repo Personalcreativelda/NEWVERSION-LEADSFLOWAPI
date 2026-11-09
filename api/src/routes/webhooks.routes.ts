@@ -24,8 +24,8 @@ import { acceptMetaWebhook } from '../utils/meta-signature';
 import { fetchMessengerProfile, isInstagramLoginToken } from '../utils/meta-send';
 import { findOrCreateLead } from '../services/leads-dedup.service';
 import { recordAdReferral, referralFromCloud, referralFromEvolution, referralFromMessaging } from '../services/meta-conversions.service';
-import { describeWhatsAppMessage, unwrapWhatsAppMessage, whatsAppEvent, whatsAppMessageType, whatsAppThumbnail, type WhatsAppEvent } from '../utils/whatsapp-message';
-import { applyWhatsAppEvent } from '../services/whatsapp-events.service';
+import { describeWhatsAppMessage, unwrapWhatsAppMessage, whatsAppEvent, whatsAppMessageType, whatsAppQuoteInfo, whatsAppThumbnail, type WhatsAppEvent } from '../utils/whatsapp-message';
+import { applyWhatsAppEvent, quotedForIncoming } from '../services/whatsapp-events.service';
 
 const router = Router();
 const conversationsService = new ConversationsService();
@@ -1540,6 +1540,10 @@ router.post('/evolution/messages', async (req, res) => {
     const messageDirection = isFromMe ? 'out' : 'in';
     const messageStatus = isFromMe ? 'sent' : 'delivered';
 
+    // Resposta a uma mensagem (citação): mostra a mensagem citada por cima do balão
+    const quoteInfo = whatsAppQuoteInfo(msg) || whatsAppQuoteInfo({ contextInfo: messageData.contextInfo });
+    const waQuoted = quoteInfo ? await quotedForIncoming(channel.user_id, quoteInfo.stanzaId, quoteInfo.text) : undefined;
+
     // Salvar mensagem
     const messageResult = await query(
       `INSERT INTO messages (
@@ -1574,6 +1578,7 @@ router.post('/evolution/messages', async (req, res) => {
           gif: waGif || undefined,
           video_note: msg?.ptvMessage ? true : undefined,
           thumbnail: waThumbnail || undefined,
+          quoted: waQuoted || undefined,
           rawPayload: JSON.stringify(req.body).substring(0, 500)
         })
       ]
@@ -3700,6 +3705,9 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
             }
           );
 
+          // Resposta a uma mensagem (citação)
+          const cloudQuoted = await quotedForIncoming(channel.user_id, message.context?.id);
+
           // Salvar mensagem
           const messageResult = await query(
             `INSERT INTO messages (
@@ -3722,7 +3730,8 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
                 from: senderId,
                 timestamp: timestamp,
                 message_type: messageType,
-                media_id: mediaId || undefined
+                media_id: mediaId || undefined,
+                quoted: cloudQuoted || undefined,
               })
             ]
           );

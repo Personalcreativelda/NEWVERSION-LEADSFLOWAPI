@@ -8,6 +8,7 @@ import { OUTBOX_FAILED_EVENT, OUTBOX_SENT_EVENT, enqueueOutbox, queuedMessages, 
 import { isServerDownError } from '../lib/serverStatus';
 import { apiErrorMessage } from '../lib/apiError';
 import { toast } from 'sonner';
+import { quoteOf } from '../components/inbox/quote';
 import {
     getCachedMessages,
     setCachedMessages,
@@ -164,22 +165,26 @@ export function useMessages(conversationId: string | null) {
     }, [conversationId, hasMore]);
 
     // Envio otimista - mostra mensagem imediatamente
-    const sendMessage = useCallback(async (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string) => {
+    const sendMessage = useCallback(async (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string, replyTo?: MessageWithSender | null) => {
         // Permite envio de mídia sem texto
         if (!conversationId || (!content.trim() && !mediaUrl)) return;
 
         const tempId = replaceTempId ?? generateTempId();
+        // Resposta: só a mensagens já gravadas (as temporárias ainda não têm id)
+        const reply = replyTo && !replyTo.id.startsWith('temp_') ? replyTo : null;
         
         if (!replaceTempId) {
             // Criar e injectar mensagem otimista nova
             const optimisticMessage = outgoingBubble(tempId, conversationId, content, mediaUrl, mediaType);
+            if (reply) optimisticMessage.metadata = { quoted: quoteOf(reply) };
             setMessages(prev => [...prev, optimisticMessage]);
             setTimeout(() => scrollToBottom(), 50);
         } else {
             // Bubble já existe — actualizar para 'pending' com a URL real
             setMessages(prev => prev.map(m =>
                 m.id === replaceTempId
-                    ? { ...m, status: 'pending', uploadProgress: undefined, media_url: mediaUrl, localPreviewUrl: undefined }
+                    ? { ...m, status: 'pending', uploadProgress: undefined, media_url: mediaUrl, localPreviewUrl: undefined,
+                        ...(reply ? { metadata: { ...(m.metadata || {}), quoted: quoteOf(reply) } } : {}) }
                     : m
             ));
         }
@@ -193,6 +198,7 @@ export function useMessages(conversationId: string | null) {
                 media_url: mediaUrl,
                 media_type: mediaType,
                 client_id: tempId,
+                ...(reply ? { reply_to: reply.id } : {}),
             });
 
             // Substituir mensagem temporária pela real + dedup
@@ -214,7 +220,7 @@ export function useMessages(conversationId: string | null) {
             // Sem servidor: a mensagem fica na fila e a bolha continua "a enviar" (relógio).
             // Media só entra se já estiver carregada (URL real, não um ficheiro local).
             if (isServerDownError(err) && (!mediaUrl || /^https?:\/\//.test(mediaUrl))) {
-                await enqueueOutbox({ kind: 'message', id: tempId, conversationId, content: content.trim(), mediaUrl, mediaType });
+                await enqueueOutbox({ kind: 'message', id: tempId, conversationId, content: content.trim(), mediaUrl, mediaType, replyTo: reply?.id });
                 return;
             }
             console.error('[useMessages] Error sending:', err);

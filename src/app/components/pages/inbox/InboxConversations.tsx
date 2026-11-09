@@ -57,6 +57,8 @@ export default function ConversasConversations({
         hasMoreMessages,
         loadingOlderMessages,
         handleTyping,
+        togglePinConversation,
+        reactToMessage,
     } = useInbox();
 
     const confirm = useConfirm();
@@ -464,7 +466,15 @@ export default function ConversasConversations({
             }
             
             return true;
-        });
+        })
+        // Fixadas no topo (a mais recente primeiro); o resto mantém a ordem
+        .map((conv, i) => ({ conv, i }))
+        .sort((a, b) => {
+            const pa = a.conv.pinned_at ? new Date(a.conv.pinned_at).getTime() : 0;
+            const pb = b.conv.pinned_at ? new Date(b.conv.pinned_at).getTime() : 0;
+            return pa !== pb ? pb - pa : a.i - b.i;
+        })
+        .map(({ conv }) => conv);
     }, [conversations, filters, searchQuery, quickFilter]);
 
     // Conversas por ler (não grupos) — o número de conversas, não de mensagens, como no WhatsApp
@@ -636,6 +646,8 @@ export default function ConversasConversations({
                         onBack={isMobile ? handleBack : undefined}
                         onEditLead={handleEditLead}
                         onDeleteConversation={handleDeleteConversation}
+                        onTogglePin={() => void togglePinConversation(selectedConversation)}
+                        onReactMessage={reactToMessage}
                         onResolve={handleResolveConversation}
                         onStatusChange={handleChangeStatus}
                         messages={messages}

@@ -1,11 +1,11 @@
 {
-"155":["Generating…","Generando…","Génération…"],
-"1625":["Generate with AI","Generar con IA","Générer avec l'IA"],
-"2094":["Many messages are not being delivered: the number may be restricted. Wait a few hours before resuming.","Muchos mensajes no se están entregando: el número puede estar restringido. Espere unas horas antes de reanudar.","Beaucoup de messages ne sont pas distribués : le numéro est peut-être restreint. Attendez quelques heures avant de reprendre."],
-"2096":["Many contacts asked not to receive more messages. Review the message before resuming.","Muchos contactos pidieron no recibir más mensajes. Revise el mensaje antes de reanudar.","Beaucoup de contacts ont demandé à ne plus recevoir de messages. Revoyez le message avant de reprendre."],
-"2155":["Could not generate variations right now","No se pudieron generar variaciones ahora","Impossible de générer des variantes pour le moment"],
-"2358":["New number: the limit goes up every day.","Número nuevo: el límite sube cada día.","Nouveau numéro : la limite augmente chaque jour."],
-"2818":["Remove variation","Quitar variación","Supprimer la variante"],
-"3296":["Variations","Variaciones","Variantes"],
-"3723":["Variation {0}","Variación {0}","Variante {0}"]
+"156":["Generating…","Generando…","Génération…"],
+"1632":["Generate with AI","Generar con IA","Générer avec l'IA"],
+"2101":["Many messages are not being delivered: the number may be restricted. Wait a few hours before resuming.","Muchos mensajes no se están entregando: el número puede estar restringido. Espere unas horas antes de reanudar.","Beaucoup de messages ne sont pas distribués : le numéro est peut-être restreint. Attendez quelques heures avant de reprendre."],
+"2103":["Many contacts asked not to receive more messages. Review the message before resuming.","Muchos contactos pidieron no recibir más mensajes. Revise el mensaje antes de reanudar.","Beaucoup de contacts ont demandé à ne plus recevoir de messages. Revoyez le message avant de reprendre."],
+"2163":["Could not generate variations right now","No se pudieron generar variaciones ahora","Impossible de générer des variantes pour le moment"],
+"2367":["New number: the limit goes up every day.","Número nuevo: el límite sube cada día.","Nouveau numéro : la limite augmente chaque jour."],
+"2828":["Remove variation","Quitar variación","Supprimer la variante"],
+"3309":["Variations","Variaciones","Variantes"],
+"3737":["Variation {0}","Variación {0}","Variante {0}"]
 }

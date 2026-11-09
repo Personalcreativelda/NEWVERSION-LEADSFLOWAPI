@@ -251,6 +251,8 @@ export const conversationsApi = {
         client_id?: string;
         /** Reenvio da fila offline (a API verifica se a mensagem já tinha sido gravada) */
         queued?: boolean;
+        /** Resposta a esta mensagem (o cliente vê-a citada) */
+        reply_to?: string;
     }): Promise<Message> {
         const { data } = await api.post<Message>(
             `/inbox/conversations/${conversationId}/send`,
@@ -308,6 +310,18 @@ export const conversationsApi = {
         return data;
     },
 
+    /** Reagir a uma mensagem com um emoji (vazio tira a reação) */
+    async reactToMessage(messageId: string, emoji: string): Promise<Message> {
+        const { data } = await api.post<Message>(`/inbox/messages/${messageId}/react`, { emoji });
+        return data;
+    },
+
+    /** Fixar (ou desafixar) uma conversa no topo */
+    async pinConversation(conversationId: string, pinned: boolean): Promise<{ id: string; pinned_at: string | null }> {
+        const { data } = await api.post(`/inbox/conversations/${conversationId}/pin`, { pinned });
+        return data;
+    },
+
     /**
      * Reencaminha uma mensagem para outra conversa
      */
@@ -331,6 +345,7 @@ registerOutboxSender('message', (item) =>
         media_type: item.mediaType,
         client_id: item.id,
         queued: true,
+        reply_to: item.replyTo,
     }));
 
 // ============================================

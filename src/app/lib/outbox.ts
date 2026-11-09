@@ -19,7 +19,7 @@ interface OutboxBase {
 }
 
 export type OutboxItem =
-  | (OutboxBase & { kind: 'message'; conversationId: string; content: string; mediaUrl?: string; mediaType?: string })
+  | (OutboxBase & { kind: 'message'; conversationId: string; content: string; mediaUrl?: string; mediaType?: string; replyTo?: string })
   | (OutboxBase & { kind: 'lead-update'; leadId: string; payload: Record<string, unknown> })
   | (OutboxBase & { kind: 'lead-note'; leadId: string; content: string });
 

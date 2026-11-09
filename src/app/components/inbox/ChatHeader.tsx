@@ -22,6 +22,8 @@ import {
     Clock,
     RotateCcw,
     UserRound,
+    Pin,
+    PinOff,
 } from 'lucide-react';
 import { BrandIcon, brandForChannel } from '../base/BrandIcon';
 
@@ -36,6 +38,8 @@ interface ChatHeaderProps {
     layoutControls?: React.ReactNode;
     /** Toque na foto/nome: abre os dados do contacto (como no WhatsApp) */
     onOpenContact?: () => void;
+    /** Fixar/desafixar a conversa no topo da lista */
+    onTogglePin?: () => void;
 }
 
 // Channel display config
@@ -52,7 +56,7 @@ const CHANNEL_CONFIG: Record<string, { label: string; color: string; icon: React
     twilio: { label: 'SMS', color: '#0d9488', icon: Smartphone },
 };
 
-export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat, onResolve, onStatusChange, layoutControls, onOpenContact }: ChatHeaderProps) {
+export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat, onResolve, onStatusChange, layoutControls, onOpenContact, onTogglePin }: ChatHeaderProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [showStatusMenu, setShowStatusMenu] = useState(false);
@@ -323,6 +327,15 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                                 >
                                     <UserRound className="w-3.5 h-3.5" />
                                     Dados do contacto
+                                </button>
+                            )}
+                            {onTogglePin && (
+                                <button
+                                    onClick={() => { setShowMenu(false); onTogglePin(); }}
+                                    className="w-full px-3 py-2.5 flex items-center gap-2.5 text-sm text-foreground hover:bg-muted/50 transition-colors"
+                                >
+                                    {conversation.pinned_at ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                                    {conversation.pinned_at ? 'Desafixar conversa' : 'Fixar conversa'}
                                 </button>
                             )}
                             <button

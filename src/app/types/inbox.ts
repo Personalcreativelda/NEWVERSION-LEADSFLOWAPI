@@ -73,6 +73,8 @@ export interface Conversation {
     assigned_team?: string | null;
     assigned_at?: string | null;
     priority?: 'low' | 'normal' | 'high' | 'urgent';
+    /** Fixada no topo da inbox (como no WhatsApp) */
+    pinned_at?: string | null;
     last_message_at: string;
     unread_count: number;
     metadata: {
@@ -175,6 +177,8 @@ export interface Message {
     external_id?: string;
     metadata: {
         quoted_message_id?: string;
+        /** Resposta a outra mensagem: o resumo dela */
+        quoted?: { id?: string; content: string; direction: 'in' | 'out'; media_type?: string | null };
         reactions?: Array<{ emoji: string; from: string }>;
         forwarded?: boolean;
     };
