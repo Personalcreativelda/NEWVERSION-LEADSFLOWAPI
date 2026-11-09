@@ -18,6 +18,9 @@ import { googleOAuthService } from '../services/google-oauth.service';
 import { activityService } from '../services/activity.service';
 import { notificationsService } from '../services/notifications.service';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
+import { clientIp, recordSecurityEvent } from '../services/security-events.service';
+import jwt from 'jsonwebtoken';
+import { config } from '../config/env';
 import { AIAssistantsService } from '../services/ai-assistants.service';
 import { DEFAULT_ONBOARDING_TEMPLATE } from './ai-assistants.routes';
 import { query as dbQuery } from '../database/connection';
@@ -129,12 +132,14 @@ router.get('/google/callback', async (req, res, next) => {
 
     console.log('[Auth Google] Redirecting to frontend:', nativeRedirect || frontendUrl);
 
+    recordSecurityEvent(req, { type: 'login_google', userId: authResult.user.id, email: userData.email });
+
     // 📝 Log activity
     void activityService.logActivity({
       userId: authResult.user.id,
       type: 'login',
       description: `Login via Google: ${userData.email}`,
-      metadata: { provider: 'google', ip: req.ip }
+      metadata: { provider: 'google', ip: clientIp(req) }
     });
 
     return res.redirect(redirectUrl);
@@ -173,8 +178,9 @@ router.post('/google/token', async (req, res, next) => {
       userId: authResult.user.id,
       type: 'login',
       description: `Login via Google (Token): ${userData.email}`,
-      metadata: { provider: 'google', source: 'token_endpoint', ip: req.ip }
+      metadata: { provider: 'google', source: 'token_endpoint', ip: clientIp(req) }
     });
+    recordSecurityEvent(req, { type: 'login_google', userId: authResult.user.id, email: userData.email });
 
     return res.json(authResult);
   } catch (error) {
@@ -214,22 +220,25 @@ router.post('/login', async (req, res, next) => {
 
     // If 2FA is required, return temp token without logging activity
     if ('requires_2fa' in data && data.requires_2fa) {
+      recordSecurityEvent(req, { type: 'login_success', email, detail: 'Palavra-passe certa, falta a verificação em dois passos' });
       return res.json(data);
     }
 
     recordAuthEvent({ type: 'login_success', detail: email });
+    recordSecurityEvent(req, { type: 'login_success', userId: (data as any).user?.id, email });
 
     // 📝 Log activity
     void activityService.logActivity({
       userId: (data as any).user.id,
       type: 'login',
       description: `Login via Email: ${email}`,
-      metadata: { ip: req.ip }
+      metadata: { ip: clientIp(req) }
     });
 
     return res.json(data);
   } catch (error: any) {
     recordAuthEvent({ type: 'login_failure', detail: req.body?.email ?? 'unknown', code: error?.message });
+    if (req.body?.email) recordSecurityEvent(req, { type: 'login_failure', email: String(req.body.email), detail: error?.message });
     return next(error);
   }
 });
@@ -260,8 +269,17 @@ router.post('/login/2fa', async (req, res, next) => {
       return res.status(400).json({ error: 'Token e código são obrigatórios' });
     }
     const data = await verify2FALogin(temp_token, code);
+    recordSecurityEvent(req, { type: 'two_factor_success', userId: (data as any)?.user?.id, email: (data as any)?.user?.email });
     return res.json(data);
-  } catch (error) {
+  } catch (error: any) {
+    // O utilizador vem no token temporário
+    let userId: string | null = null;
+    try {
+      // Assinatura verificada (mesmo expirado): um token forjado não pode sujar o registo de outra conta
+      const payload: any = jwt.verify(String(req.body?.temp_token || ''), config.jwtSecret, { ignoreExpiration: true });
+      if (payload?.purpose === 'two_factor_login') userId = payload.user_id || null;
+    } catch { /* token inválido */ }
+    recordSecurityEvent(req, { type: 'two_factor_failure', userId, detail: error?.message });
     return next(error);
   }
 });
@@ -375,6 +393,7 @@ router.post('/password/reset', async (req, res, next) => {
     }
 
     await requestPasswordReset(email, redirectTo);
+    recordSecurityEvent(req, { type: 'password_reset_request', email });
     return res.status(204).send();
   } catch (error) {
     return next(error);
@@ -390,6 +409,7 @@ router.post('/password/complete', async (req, res, next) => {
     }
 
     await resetPasswordWithToken(email, token, password);
+    recordSecurityEvent(req, { type: 'password_reset_done', email });
     return res.status(204).send();
   } catch (error) {
     return next(error);
@@ -409,6 +429,7 @@ router.post('/password/update', requireAuth, async (req: AuthenticatedRequest, r
     }
 
     await updatePassword(user.id, password);
+    recordSecurityEvent(req, { type: 'password_changed', userId: user.id });
     return res.status(204).send();
   } catch (error) {
     return next(error);

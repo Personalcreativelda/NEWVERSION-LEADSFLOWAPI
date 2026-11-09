@@ -3,6 +3,7 @@ import { AuthService } from '../services/auth.service';
 import { activityService } from '../services/activity.service';
 import { query } from '../database/connection';
 import { isPublicApiRoute, scopeAllows, takeRateLimit, validateApiToken } from '../services/api-token.service';
+import { clientCountry, clientIp } from '../services/security-events.service';
 
 const authService = new AuthService();
 
@@ -162,7 +163,8 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
           path: req.path,
           method: req.method,
           feature,
-          ip: req.ip,
+          ip: clientIp(req),
+          country: clientCountry(req),
           userAgent: req.headers['user-agent']
         }
       });

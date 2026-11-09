@@ -25,7 +25,7 @@ interface AdminMarketingTabProps {
 }
 
 type Target = 'all' | 'free' | 'business' | 'enterprise' | 'specific';
-type TemplateKey = 'welcome' | 'upgrade' | 'renewal' | 'promo';
+export type TemplateKey = 'welcome' | 'upgrade' | 'renewal' | 'promo';
 
 interface BroadcastResult {
   sent: number;
@@ -155,7 +155,7 @@ const HTML_TEMPLATES: Record<TemplateKey, { subject: string; message: string }> 
   },
 };
 
-const TEXT_TEMPLATES: Record<TemplateKey, { subject: string; message: string }> = {
+export const TEXT_TEMPLATES: Record<TemplateKey, { subject: string; message: string }> = {
   welcome: {
     subject: 'Bem-vindo à LeadsFlow API! 🚀',
     message: `Olá {{name}},\n\nSeja bem-vindo à LeadsFlow API! Estamos felizes em ter você conosco.\n\nCom a nossa plataforma você pode:\n• Gerir leads de forma inteligente\n• Enviar campanhas de WhatsApp\n• Automatizar seu atendimento com IA\n\nQualquer dúvida, estamos aqui para ajudar!\n\nAtenciosamente,\nEquipe LeadsFlow API`,
@@ -174,7 +174,7 @@ const TEXT_TEMPLATES: Record<TemplateKey, { subject: string; message: string }> 
   },
 };
 
-const TEMPLATE_OPTIONS: { key: TemplateKey; label: string }[] = [
+export const TEMPLATE_OPTIONS: { key: TemplateKey; label: string }[] = [
   { key: 'welcome', label: 'Boas-vindas' },
   { key: 'upgrade', label: 'Upgrade de plano' },
   { key: 'renewal', label: 'Renovação' },

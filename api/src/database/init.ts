@@ -559,6 +559,23 @@ const runPendingMigrations = async () => {
       -- WhatsApp por código QR: escondido nas contas novas (revisão da Meta); a administração
       -- pode permiti-lo conta a conta
       ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_whatsapp_qr BOOLEAN NOT NULL DEFAULT FALSE;
+
+      -- Segurança: logins (com e sem sucesso), verificação em dois passos e palavras-passe, com o
+      -- IP e o país reais (vindos da Cloudflare). Falhas com um email que não existe ficam sem user_id.
+      CREATE TABLE IF NOT EXISTS security_events (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+        email       VARCHAR(255),
+        type        VARCHAR(40) NOT NULL,
+        ip          VARCHAR(64),
+        country     VARCHAR(8),
+        user_agent  TEXT,
+        detail      TEXT,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_security_events_email ON security_events(LOWER(email), created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_security_events_ip ON security_events(ip, created_at DESC);
       CREATE TABLE IF NOT EXISTS meta_events (
         id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

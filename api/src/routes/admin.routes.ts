@@ -8,6 +8,9 @@ import { activityService } from '../services/activity.service';
 import { notificationsService } from '../services/notifications.service';
 import nodemailer from 'nodemailer';
 import bcrypt from 'bcryptjs';
+import { adminUserDetails } from '../services/admin-user-details.service';
+import { WhatsAppService } from '../services/whatsapp.service';
+import { CloudSendError, sendCloudText } from '../services/whatsapp-cloud.service';
 
 const router = Router();
 
@@ -578,67 +581,9 @@ router.get('/user-activities', requireAuth, requireAdmin, async (req: Authentica
 // ==========================================
 router.get('/users/:userId/details', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { userId } = req.params;
-
-    // Build user query only with columns guaranteed to exist
-    const userResult = await query(
-      `SELECT u.id, u.email, u.name, u.avatar_url, u.role, u.is_active, u.plan,
-              u.plan_limits, u.created_at,
-              (SELECT COUNT(*) FROM leads WHERE user_id = u.id) as leads_count,
-              (SELECT COUNT(*) FROM campaigns WHERE user_id = u.id) as campaigns_count
-       FROM users u WHERE u.id = $1`,
-      [userId]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Fetch optional columns separately to avoid crashing if they don't exist
-    let extraUserData: any = {};
-    try {
-      const extra = await query(
-        `SELECT plan_expires_at, plan_activated_at, subscription_status, stripe_customer_id, last_active_at
-         FROM users WHERE id = $1`,
-        [userId]
-      );
-      if (extra.rows[0]) extraUserData = extra.rows[0];
-    } catch { /* columns may not exist in older DBs */ }
-
-    // Optional messages count
-    let messagesCount = 0;
-    try {
-      const mc = await query(
-        `SELECT COUNT(*) as cnt FROM messages WHERE user_id = $1 AND direction = 'outgoing'`,
-        [userId]
-      );
-      messagesCount = parseInt(mc.rows[0]?.cnt) || 0;
-    } catch { /* messages table may not have direction column */ }
-
-    const channelsResult = await query(
-      `SELECT id, name, type, status, credentials, created_at
-       FROM channels WHERE user_id = $1 ORDER BY created_at DESC`,
-      [userId]
-    );
-
-    const activitiesResult = await query(
-      `SELECT type, description, metadata, created_at
-       FROM activities WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10`,
-      [userId]
-    );
-
-    let allowWhatsappQr = false;
-    try {
-      const qr = await query('SELECT allow_whatsapp_qr FROM users WHERE id = $1', [userId]);
-      allowWhatsappQr = qr.rows[0]?.allow_whatsapp_qr === true;
-    } catch { /* coluna ainda não criada */ }
-
-    res.json({
-      success: true,
-      user: { ...userResult.rows[0], ...extraUserData, messages_count: messagesCount, allow_whatsapp_qr: allowWhatsappQr },
-      channels: channelsResult.rows,
-      recentActivities: activitiesResult.rows,
-    });
+    const details = await adminUserDetails(req.params.userId, req.user!.id);
+    if (!details) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true, ...details });
   } catch (error) {
     console.error('[Admin] Error fetching user details:', error);
     next(error);
@@ -707,6 +652,12 @@ router.post('/users/:userId/send-email', requireAuth, requireAdmin, async (req: 
     });
 
     console.log(`[Admin] Email sent to ${email} (${name}) — subject: ${subject}`);
+    void activityService.logActivity({
+      userId,
+      type: 'admin_message',
+      description: `Email da administração: ${subject}`,
+      metadata: { channel: 'email', admin_id: req.user!.id },
+    });
     res.json({ success: true, message: `Email enviado para ${email}` });
   } catch (error: any) {
     console.error('[Admin] Error sending email:', error);
@@ -720,51 +671,47 @@ router.post('/users/:userId/send-email', requireAuth, requireAdmin, async (req: 
 router.post('/users/:userId/send-whatsapp', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { userId } = req.params;
-    const { phone, message, channel_id } = req.body;
-
-    if (!phone || !message) {
-      return res.status(400).json({ error: 'phone and message are required' });
+    const { phone, message, channel_id } = req.body || {};
+    const number = String(phone || '').replace(/\D/g, '');
+    if (number.length < 8 || !String(message || '').trim()) {
+      return res.status(400).json({ error: 'Indique o número e a mensagem' });
     }
 
-    // Find one connected channel — prefer explicitly provided, else first active
-    let instanceName: string | null = null;
-    if (channel_id) {
-      const ch = await query('SELECT name FROM channels WHERE id = $1 AND user_id = $2', [channel_id, userId]);
-      if (ch.rows.length > 0) instanceName = ch.rows[0].name;
-    }
-    if (!instanceName) {
-      const ch = await query(
-        `SELECT name FROM channels WHERE user_id = $1 AND status = 'connected' ORDER BY created_at DESC LIMIT 1`,
-        [userId]
-      );
-      if (ch.rows.length > 0) instanceName = ch.rows[0].name;
+    const target = await query('SELECT id, name, email FROM users WHERE id = $1', [userId]);
+    if (target.rows.length === 0) return res.status(404).json({ error: 'Utilizador não encontrado' });
+
+    // Sai sempre de um número da administração (nunca do número do próprio utilizador)
+    const chRes = await query(
+      `SELECT id, name, type, credentials FROM channels
+        WHERE user_id = $1 AND type IN ('whatsapp', 'whatsapp_cloud') AND status IN ('active', 'connected')
+          AND ($2::uuid IS NULL OR id = $2::uuid)
+        ORDER BY type = 'whatsapp_cloud' DESC, created_at DESC LIMIT 1`,
+      [req.user!.id, channel_id || null]
+    );
+    const channel = chRes.rows[0];
+    if (!channel) return res.status(400).json({ error: 'Ligue um WhatsApp na sua conta de administrador para enviar' });
+
+    const firstName = String(target.rows[0].name || '').trim().split(/\s+/)[0] || '';
+    const text = String(message).replace(/\{\{?\s*(nome|name)\s*\}?\}/gi, firstName).trim();
+
+    if (channel.type === 'whatsapp_cloud') {
+      await sendCloudText(channel.credentials, number, text);
+    } else {
+      const instance = channel.credentials?.instance_id || channel.credentials?.instance_name;
+      if (!instance) return res.status(400).json({ error: 'O WhatsApp da administração não está configurado' });
+      await new WhatsAppService().sendMessage({ instanceId: instance, number, text });
     }
 
-    if (!instanceName) {
-      return res.status(400).json({ error: 'No connected WhatsApp channel found for this user' });
-    }
-
-    const evolutionUrl = process.env.EVOLUTION_API_URL?.replace(/\/$/, '');
-    const apiKey = process.env.EVOLUTION_API_KEY;
-    if (!evolutionUrl || !apiKey) {
-      return res.status(503).json({ error: 'Evolution API not configured' });
-    }
-
-    const cleanPhone = phone.replace(/\D/g, '');
-    const response = await fetch(`${evolutionUrl}/message/sendText/${instanceName}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: apiKey },
-      body: JSON.stringify({ number: cleanPhone, text: message }),
+    // Fica no histórico da conta (o que a administração enviou e de onde)
+    void activityService.logActivity({
+      userId,
+      type: 'admin_message',
+      description: `Mensagem da administração por WhatsApp (${channel.name})`,
+      metadata: { channel: 'whatsapp', to: number, admin_id: req.user!.id },
     });
-
-    if (!response.ok) {
-      const err = await response.text();
-      return res.status(502).json({ error: `Evolution API error: ${err}` });
-    }
-
-    console.log(`[Admin] WhatsApp sent to ${cleanPhone} via instance ${instanceName}`);
-    res.json({ success: true, message: `WhatsApp enviado para ${cleanPhone}` });
+    res.json({ success: true, message: 'Mensagem enviada' });
   } catch (error: any) {
+    if (error instanceof CloudSendError) return res.status(400).json({ error: error.message });
     console.error('[Admin] Error sending WhatsApp:', error);
     next(error);
   }
