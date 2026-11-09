@@ -23,6 +23,8 @@ import {
   AlertCircle,
   CheckSquare,
   SlidersHorizontal,
+  List,
+  LayoutGrid,
 } from 'lucide-react';
 import { PageHeader } from '../base/PageHeader';
 import { AppModal } from '../base/AppModal';
@@ -111,6 +113,14 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   const [filter, setFilter] = useState<'all' | 'today' | 'overdue' | 'upcoming' | 'completed'>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  // Lista ou mosaico (cartões em grelha); fica guardado neste aparelho
+  const [view, setView] = useState<'list' | 'tiles'>(() => {
+    try { return localStorage.getItem('leadsflow_tasks_view') === 'tiles' ? 'tiles' : 'list'; } catch { return 'list'; }
+  });
+  const changeView = (v: 'list' | 'tiles') => {
+    setView(v);
+    try { localStorage.setItem('leadsflow_tasks_view', v); } catch { /* sem armazenamento */ }
+  };
 
   // Formulário de nova tarefa
   const [newTask, setNewTask] = useState({
@@ -357,6 +367,21 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
             </button>
           ))}
         </div>
+        <div className="mb-1 flex flex-shrink-0 items-center rounded-lg bg-muted p-0.5" role="group" aria-label="Vista">
+          {([['list', List, 'Lista'], ['tiles', LayoutGrid, 'Mosaico']] as const).map(([v, VIcon, label]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => changeView(v)}
+              aria-pressed={view === v}
+              aria-label={label}
+              title={label}
+              className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${view === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <VIcon className="h-4 w-4" />
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={() => setShowFilters(true)}
@@ -429,8 +454,8 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
         </div>
       </AppModal>
 
-      {/* Lista de Tarefas */}
-      <div className="space-y-3">
+      {/* Lista de Tarefas (ou mosaico) */}
+      <div className={filteredTasks.length > 0 && view === 'tiles' ? 'grid grid-cols-1 gap-3 min-[520px]:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4' : 'space-y-3'}>
         {filteredTasks.length === 0 ? (
           tasks.length === 0 ? (
             <EmptyState
@@ -454,6 +479,78 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
             const Icon = typeInfo.icon;
             const isOverdue = isPast(new Date(task.dueDate)) && task.status === 'pending';
             const isDueToday = isToday(new Date(task.dueDate));
+            const done = task.status === 'completed';
+
+            if (view === 'tiles') {
+              return (
+                <Card
+                  key={task.id}
+                  className={`flex min-w-0 flex-col gap-3 p-4 transition-colors bg-card border-border hover:bg-muted/40 ${done ? 'opacity-60' : ''}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={done}
+                      onCheckedChange={() => handleToggleTask(task.id)}
+                      aria-label={done ? 'Marcar por fazer' : 'Concluir'}
+                    />
+                    <span className={`flex h-7 w-7 items-center justify-center rounded-lg bg-muted ${typeInfo.color}`}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{typeInfo.label}</span>
+                    <button
+                      type="button"
+                      onClick={() => openEditTask(task)}
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label="Editar tarefa"
+                      title="Editar"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-500/10"
+                      aria-label="Apagar tarefa"
+                      title="Apagar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <button type="button" onClick={() => openEditTask(task)} className="flex min-w-0 flex-1 flex-col items-start justify-start text-left">
+                    <h3 className={`line-clamp-2 font-medium text-foreground ${done ? 'line-through' : ''}`}>{task.title}</h3>
+                    {task.description && (
+                      <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">{task.description}</p>
+                    )}
+                  </button>
+
+                  <div className="space-y-2 border-t border-border pt-3 text-xs">
+                    <div className={`flex items-center gap-1.5 font-medium ${isOverdue ? 'text-red-600 dark:text-red-400' : isDueToday ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'}`}>
+                      {isOverdue ? <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" /> : <CalendarIcon className="h-3.5 w-3.5 flex-shrink-0" />}
+                      <span className="truncate">{format(new Date(task.dueDate), "dd MMM, HH:mm", { locale: ptBR })}</span>
+                      {isOverdue && <><span aria-hidden>·</span><span className="flex-shrink-0">Atrasada</span></>}
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                      {task.leadName && (
+                        <span className="flex min-w-0 items-center gap-1">
+                          <User className="h-3.5 w-3.5 flex-shrink-0" />
+                          <span translate="no" className="truncate">{task.leadName}</span>
+                        </span>
+                      )}
+                      <span className="ml-auto flex flex-shrink-0 items-center gap-1.5">
+                        {(task as any).source === 'ai_assistant' && (
+                          <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-violet-600 dark:text-violet-400">IA</span>
+                        )}
+                        <span className="flex items-center gap-1" title="Prioridade">
+                          <span className={`h-2 w-2 rounded-full ${priorityInfo.dot}`} />
+                          {priorityInfo.label}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              );
+            }
 
             return (
               <Card
@@ -495,7 +592,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                           )}
 
                           {(task as any).source === 'ai_assistant' && (
-                            <Badge className="gap-1 bg-violet-100 text-violet-700 border-violet-200">
+                            <Badge className="gap-1 bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30">
                               IA
  </Badge>
                           )}
