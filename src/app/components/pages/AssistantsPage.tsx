@@ -287,6 +287,23 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     );
   };
 
+  // Um assistente por canal: que outro assistente já usa este canal?
+  const channelOwner = (channelId: string, exceptUserAssistantId?: string) =>
+    userAssistants.find((ua) => ua.id !== exceptUserAssistantId && (ua.channel_ids || []).includes(channelId));
+
+  /** Os canais escolhidos que estão noutro assistente passam para este: pede confirmação */
+  const confirmChannelMoves = async (channelIds: string[], exceptUserAssistantId?: string) => {
+    const moves = channelIds
+      .map((id) => ({ channel: channels.find((c) => c.id === id), owner: channelOwner(id, exceptUserAssistantId) }))
+      .filter((m) => m.channel && m.owner);
+    if (moves.length === 0) return true;
+    const lines = moves.map((m) => `${assistantChannelName(m.channel!)}: sai de ${m.owner!.assistant?.name || 'outro assistente'}`).join('\n');
+    return confirm(`Cada canal tem um só assistente, para não responderem os dois ao mesmo cliente.\n${lines}`, {
+      title: 'Mudar de assistente?',
+      confirmLabel: 'Mudar',
+    });
+  };
+
   // Handle connect
   const handleConnect = async () => {
     if (!selectedAssistant) return;
@@ -296,6 +313,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       toast.error('Selecione pelo menos UM canal para ligar o assistente');
       return;
     }
+    if (!(await confirmChannelMoves(selectedChannelIds))) return;
 
     try {
       setActionLoading(true);
@@ -365,6 +383,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         return;
       }
     }
+    if (!(await confirmChannelMoves(selectedChannelIds, selectedUserAssistant.id || undefined))) return;
 
     // Basic validation: require AI api key if provider is configured
     if (configValues.ai_provider && !configValues.ai_api_key?.trim()) {
@@ -1307,7 +1326,10 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                             {isSelected && <Check className="w-3 h-3 text-white" />}
                           </div>
                           {renderChannelIcon(channel.type)}
-                          <span className="flex-1 text-sm font-medium">{assistantChannelName(channel)}</span>
+                          <span className="flex-1 min-w-0 truncate text-sm font-medium">{assistantChannelName(channel)}</span>
+                          {channelOwner(channel.id) && (
+                            <span className="flex-shrink-0 truncate text-xs text-muted-foreground">{channelOwner(channel.id)!.assistant?.name}</span>
+                          )}
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                             {channel.type}
                           </span>
@@ -1443,7 +1465,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                           {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
                         {renderChannelIcon(channel.type, 'w-3.5 h-3.5')}
-                        <span className="text-sm">{assistantChannelName(channel)}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm">{assistantChannelName(channel)}</span>
+                        {channelOwner(channel.id, selectedUserAssistant.id || undefined) && (
+                          <span className="max-w-[45%] flex-shrink-0 truncate text-xs text-muted-foreground">
+                            {channelOwner(channel.id, selectedUserAssistant.id || undefined)!.assistant?.name}
+                          </span>
+                        )}
                       </button>
                     );
                   })}

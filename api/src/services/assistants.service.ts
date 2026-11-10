@@ -673,6 +673,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
         }
 
         const userAssistant = result.rows[0];
+        await this.releaseChannels(userId, userAssistant.id, channelIdsArray);
 
         // Enviar webhook para n8n para criar/configurar o workflow (silenciosamente)
         const action = existing.rows[0] ? 'configure' : 'connect';
@@ -685,6 +686,35 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
             channel_ids: channelIdsArray,
             assistant
         };
+    }
+
+    /**
+     * Um assistente por canal (como no WhatsApp Business): os canais dados a este assistente
+     * saem dos outros assistentes da mesma conta. Sem isto, dois assistentes no mesmo canal
+     * respondiam alternadamente e os follow-ups saíam em dobro.
+     */
+    async releaseChannels(userId: string, keepUserAssistantId: string, channelIds: string[]): Promise<Array<{ id: string; removed: string[] }>> {
+        const wanted = new Set((channelIds || []).filter(Boolean).map(String));
+        if (wanted.size === 0) return [];
+        const others = await query(
+            `SELECT id, channel_ids, channel_id FROM user_assistants WHERE user_id = $1 AND id <> $2`,
+            [userId, keepUserAssistantId]
+        );
+        const moved: Array<{ id: string; removed: string[] }> = [];
+        for (const row of others.rows) {
+            const current: string[] = (Array.isArray(row.channel_ids) ? row.channel_ids : []).map(String);
+            const removed = current.filter((c) => wanted.has(c));
+            const primaryTaken = row.channel_id && wanted.has(String(row.channel_id));
+            if (removed.length === 0 && !primaryTaken) continue;
+            const remaining = current.filter((c) => !wanted.has(c));
+            await query(
+                `UPDATE user_assistants SET channel_ids = $1, channel_id = $2, updated_at = NOW() WHERE id = $3 AND user_id = $4`,
+                [remaining, remaining[0] || null, row.id, userId]
+            );
+            moved.push({ id: row.id, removed: removed.length ? removed : [String(row.channel_id)] });
+        }
+        if (moved.length) console.log(`[Assistants] Canais passados para ${keepUserAssistantId}: saíram de ${moved.length} assistente(s)`);
+        return moved;
     }
 
     /**
@@ -732,6 +762,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
         );
 
         if (!result.rows[0]) return null;
+        await this.releaseChannels(userId, userAssistantId, channelIds);
 
         const userAssistant = await this.findUserAssistantById(userAssistantId, userId);
 
@@ -783,6 +814,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
         if (!result.rows[0]) {
             return null;
         }
+        if (channelIds !== undefined) await this.releaseChannels(userId, userAssistantId, channelIds);
 
         const userAssistant = await this.findUserAssistantById(userAssistantId, userId);
 

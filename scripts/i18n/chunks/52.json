@@ -1,0 +1,6 @@
+{
+  "2129": ["Move", "Cambiar", "Déplacer"],
+  "2130": ["Move to this assistant?", "¿Cambiar de asistente?", "Changer d'assistant ?"],
+  "2529": ["another assistant", "otro asistente", "un autre assistant"],
+  "3648": ["Each channel has only one assistant, so two don't reply to the same customer. {0}", "Cada canal tiene un solo asistente, para que no respondan dos al mismo cliente. {0}", "Chaque canal n'a qu'un seul assistant, pour que deux ne répondent pas au même client. {0}"]
+}

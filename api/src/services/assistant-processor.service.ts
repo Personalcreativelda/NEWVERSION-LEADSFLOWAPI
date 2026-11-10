@@ -611,6 +611,8 @@ export class AssistantProcessorService {
                  WHERE ua.user_id = $1
                    AND ua.is_active = true
                    AND ($2 = ANY(ua.channel_ids) OR ua.channel_id = $2)
+                 -- Dados antigos com dois assistentes no mesmo canal: responde sempre o mesmo
+                 ORDER BY ua.updated_at DESC NULLS LAST, ua.created_at DESC
                  LIMIT 1`,
                 [userId, channelId]
             );
