@@ -1,6 +1,6 @@
 {
-"172":["Importing 1 document from Google Drive","Importando 1 documento de Google Drive","Importation d'1 document depuis Google Drive"],
-"417":["Invalid assistant","Asistente no válido","Assistant invalide"],
+"171":["Importing 1 document from Google Drive","Importando 1 documento de Google Drive","Importation d'1 document depuis Google Drive"],
+"416":["Invalid assistant","Asistente no válido","Assistant invalide"],
 "1677":["Google Drive","Google Drive","Google Drive"],
 "1678":["Google Drive is not connected","Google Drive no está conectado","Google Drive n'est pas connecté"],
 "1748":["Ignores requests to change the rules or reveal the instructions","Ignora pedidos para cambiar las reglas o revelar las instrucciones","Ignore les demandes de changer les règles ou de révéler les instructions"],
@@ -12,7 +12,7 @@
 "2449":["Google Drive isn't available yet.","Google Drive aún no está disponible.","Google Drive n'est pas encore disponible."],
 "2520":["The documents are already up to date","Los documentos ya están actualizados","Les documents sont déjà à jour"],
 "2745":["Protection against manipulation","Protección contra manipulación","Protection contre la manipulation"],
-"3060":["no text","sin texto","sans texte"],
+"3059":["no text","sin texto","sans texte"],
 "3568":["{0} document(s) updated","{0} documento(s) actualizado(s)","{0} document(s) mis à jour"],
 "3636":["Importing {0} documents from Google Drive","Importando {0} documentos de Google Drive","Importation de {0} documents depuis Google Drive"],
 "3764":["{0}-document limit: {1} were left out.","Límite de {0} documentos: {1} quedaron fuera.","Limite de {0} documents : {1} n'ont pas été ajoutés."]

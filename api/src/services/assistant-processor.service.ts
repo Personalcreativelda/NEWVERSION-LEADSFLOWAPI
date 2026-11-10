@@ -116,6 +116,30 @@ export interface IncomingMessageContext {
     incomingMessageId?: string;    // ID da última mensagem recebida
     incomingMessageIds?: string[]; // IDs de TODAS as mensagens enfileiradas (para blue ticks em lote)
     audioFellBack?: boolean;       // O áudio não chegou a sair e seguiu o texto
+    /** Ficheiros para clientes mostrados à IA nesta resposta (o [[ENVIAR:n]] aponta para eles) */
+    clientFiles?: any[];
+}
+
+// A IA pede para enviar um ficheiro da lista [FICHEIROS PARA O CLIENTE]: [[ENVIAR:2]]
+const SEND_FILE_RE = /\[\[\s*ENVIAR\s*:\s*(\d+)\s*\]\]/i;
+const SEND_FILE_RE_GLOBAL = /\[\[\s*ENVIAR\s*:\s*\d+\s*\]\]/gi;
+
+export const isImageFile = (f: { mime_type?: string | null; file_name?: string | null }) =>
+    /^image\//i.test(String(f.mime_type || '')) || /\.(jpe?g|png|webp|gif)$/i.test(String(f.file_name || ''));
+
+/** Bloco com os ficheiros que o assistente pode enviar (imagens com o que se vê nelas) */
+export function clientFilesBlock(files: any[]): string {
+    if (files.length === 0) return '';
+    const lines = files.map((f, i) => {
+        const kind = isImageFile(f) ? 'imagem' : 'ficheiro';
+        const about = String(f.text_content || '').replace(/\s+/g, ' ').trim().slice(0, isImageFile(f) ? 400 : 200);
+        return `${i + 1}. ${f.file_name} (${kind})${about ? `: ${about}` : ''}`;
+    });
+    return `\n\n[FICHEIROS PARA O CLIENTE]\n${lines.join('\n')}\n` +
+        'Quando o cliente pedir um destes ficheiros, ou quando a resposta à pergunta dele estiver num deles ' +
+        '(por exemplo uma imagem com os preços ou o produto que ele perguntou), responda normalmente em texto e ' +
+        'acabe a mensagem com [[ENVIAR:n]], com o número da lista. Só um ficheiro por resposta e só se ajudar ' +
+        'mesmo; não o volte a enviar se já o enviou nesta conversa. O marcador é retirado antes de chegar ao cliente.';
 }
 
 export class AssistantProcessorService {
@@ -499,6 +523,14 @@ export class AssistantProcessorService {
                 }
             }
 
+            // 5b'. Ficheiro pedido pela IA ([[ENVIAR:n]]): sai depois do texto
+            let fileToSend: any = null;
+            const sendMatch = aiResponse.content.match(SEND_FILE_RE);
+            if (sendMatch) {
+                fileToSend = (ctx.clientFiles || [])[Number(sendMatch[1]) - 1] || null;
+                aiResponse.content = aiResponse.content.replace(SEND_FILE_RE_GLOBAL, '').trim();
+            }
+
             // 5c. Proteção: a resposta não pode revelar as instruções, blocos internos nem segredos
             let guardrailBlocked: string | undefined;
             if (config.guardrails_enabled !== false) {
@@ -549,11 +581,24 @@ export class AssistantProcessorService {
 
             // 6. Enviar resposta com comportamento humano (lido + digitando + chunks)
             const reactionsEnabled = config.reactions_enabled === true || config.reactions_enabled === 'true';
-            const externalMsgId = await this.humanizedSend(ctx, aiResponse.content, audioBase64, reactionsEnabled);
+            if (aiResponse.content) {
+                const externalMsgId = await this.humanizedSend(ctx, aiResponse.content, audioBase64, reactionsEnabled);
 
-            // 7. Salvar mensagem no banco — website já salva por chunk em humanizedSend(); outros canais salvam aqui.
-            if (ctx.channelType !== 'website') {
-                await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId, audioBase64 && !ctx.audioFellBack ? 'audio' : 'text');
+                // 7. Salvar mensagem no banco — website já salva por chunk em humanizedSend(); outros canais salvam aqui.
+                if (ctx.channelType !== 'website') {
+                    await this.saveOutgoingMessage(ctx, aiResponse.content, externalMsgId, audioBase64 && !ctx.audioFellBack ? 'audio' : 'text');
+                }
+            }
+
+            // 7a. A imagem ou o ficheiro com a resposta (a IA já explicou no texto)
+            if (fileToSend && !guardrailBlocked) {
+                try {
+                    if (aiResponse.content) await this.sleep(1200);
+                    const ok = await this.sendKnowledgeFile(ctx, fileToSend, { intro: !aiResponse.content });
+                    if (ok) console.log(`[AssistantProcessor] 📎 ${fileToSend.file_name} enviado a pedido da IA`);
+                } catch (fileErr: any) {
+                    console.warn('[AssistantProcessor] Ficheiro pedido pela IA não enviado:', fileErr.message);
+                }
             }
 
             // Links, emails ou muita informação não se ouvem bem: seguem também por escrito
@@ -893,6 +938,21 @@ export class AssistantProcessorService {
             } catch (agendaErr: any) {
                 console.warn('[AssistantProcessor] Agenda indisponível:', agendaErr.message);
             }
+        }
+
+        // Ficheiros e imagens que o assistente pode enviar quando a resposta está neles
+        ctx.clientFiles = [];
+        if (config.file_sending_enabled !== false) {
+            try {
+                ctx.clientFiles = (await query(
+                    `SELECT id, file_name, mime_type, storage_url, LEFT(COALESCE(text_content, ''), 600) AS text_content
+                       FROM assistant_knowledge_files
+                      WHERE user_assistant_id = $1 AND kind = 'client' AND status = 'ready' AND storage_url IS NOT NULL
+                      ORDER BY created_at ASC LIMIT 20`,
+                    [assistant.user_assistant_id]
+                )).rows;
+                messages[0].content += clientFilesBlock(ctx.clientFiles || []);
+            } catch { ctx.clientFiles = []; }
         }
 
         // Equipa no mesmo canal: os colegas, o que fazem e a nota de quem passou a conversa
@@ -2178,7 +2238,9 @@ export class AssistantProcessorService {
      * Fluxo: mensagem de texto introdutória + o documento.
      * Retorna true se o documento foi entregue (ou o link enviado como fallback).
      */
-    private async sendKnowledgeFile(ctx: IncomingMessageContext, kbFile: any): Promise<boolean> {
+    private async sendKnowledgeFile(ctx: IncomingMessageContext, kbFile: any, opts: { intro?: boolean } = {}): Promise<boolean> {
+        const withIntro = opts.intro !== false;
+        const isImage = isImageFile(kbFile);
         const fileName: string = kbFile.file_name || 'documento';
         const fileUrl: string | null = kbFile.storage_url || null;
         const isHttp = !!fileUrl && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://'));
@@ -2190,8 +2252,8 @@ export class AssistantProcessorService {
         const displayName = this._displayFileName(fileName);
         const introText = `📎 Aqui está o que você pediu: ${displayName}`;
 
-        // 1. Texto introdutório (email recebe tudo num único email com anexo)
-        if (ctx.channelType !== 'email') {
+        // 1. Texto introdutório (email recebe tudo num único email com anexo; sem ele quando a IA já respondeu)
+        if (ctx.channelType !== 'email' && withIntro) {
             try {
                 await this.sendReply(ctx, introText);
             } catch (introErr: any) {
@@ -2215,6 +2277,13 @@ export class AssistantProcessorService {
                     const isLidJid = ctx.remoteJid?.endsWith('@lid');
                     const isGroupJid = ctx.remoteJid?.endsWith('@g.us');
                     const target = (isLidJid || isGroupJid) && ctx.remoteJid ? ctx.remoteJid : ctx.contactPhone;
+                    if (isImage) {
+                        const imgRes = await whatsappService.sendMedia({ instanceId, number: target, mediaUrl: fileUrl, mediaType: 'image' }) as any;
+                        sentExternalId = imgRes?.key?.id || imgRes?.id || null;
+                        sent = true;
+                        console.log(`[AssistantProcessor] 🖼️ Imagem "${fileName}" enviada via WhatsApp`);
+                        break;
+                    }
                     const docRes = await whatsappService.sendDocument({
                         instanceId,
                         number: target,
@@ -2231,7 +2300,7 @@ export class AssistantProcessorService {
                     const pid = creds.phone_number_id;
                     const tok = creds.access_token;
                     if (!pid || !tok || !ctx.contactPhone || !fileUrl) break;
-                    sentExternalId = await this.sendWhatsAppCloudDocument(pid, tok, ctx.contactPhone, fileUrl, fileName);
+                    sentExternalId = await this.sendWhatsAppCloudDocument(pid, tok, ctx.contactPhone, fileUrl, fileName, isImage);
                     sent = true;
                     console.log(`[AssistantProcessor] 📎 Documento "${fileName}" enviado via WhatsApp Cloud`);
                     break;
@@ -2240,7 +2309,7 @@ export class AssistantProcessorService {
                     const botToken = creds.bot_token;
                     const chatId = ctx.contactPhone;
                     if (!botToken || !chatId || !fileUrl) break;
-                    await this.sendTelegramDocument(botToken, chatId, fileUrl, fileName);
+                    await this.sendTelegramDocument(botToken, chatId, fileUrl, fileName, isImage);
                     sent = true;
                     console.log(`[AssistantProcessor] 📎 Documento "${fileName}" enviado via Telegram`);
                     break;
@@ -2249,7 +2318,7 @@ export class AssistantProcessorService {
                     const tok = creds.page_access_token || creds.access_token;
                     const rid = ctx.contactPhone;
                     if (!tok || !rid || !isHttp || !fileUrl) break;
-                    await this.sendFacebookDocument(tok, rid, fileUrl);
+                    await this.sendFacebookDocument(tok, rid, fileUrl, isImage);
                     sent = true;
                     console.log(`[AssistantProcessor] 📎 Documento "${fileName}" enviado via Facebook Messenger`);
                     break;
@@ -2291,9 +2360,9 @@ export class AssistantProcessorService {
             // mensagem (mesma conversa ou sessão seguinte), saiba que JÁ enviou este arquivo.
             await this.saveOutgoingMessage(
                 ctx,
-                `📎 Enviei o arquivo: ${displayName}`,
+                isImage ? `🖼️ Enviei a imagem: ${displayName}` : `📎 Enviei o arquivo: ${displayName}`,
                 sentExternalId,
-                'document',
+                isImage ? 'image' : 'document',
                 fileUrl,
                 { file_name: fileName, storage_url: fileUrl }
             );
@@ -2318,12 +2387,13 @@ export class AssistantProcessorService {
         accessToken: string,
         to: string,
         fileUrl: string,
-        fileName: string
+        fileName: string,
+        isImage = false
     ): Promise<string | null> {
         let documentPayload: any;
 
         if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
-            documentPayload = { link: fileUrl, filename: fileName };
+            documentPayload = isImage ? { link: fileUrl } : { link: fileUrl, filename: fileName };
         } else {
             // data URI → upload para a Media API da Meta
             const commaIdx = fileUrl.indexOf(',');
@@ -2343,13 +2413,13 @@ export class AssistantProcessorService {
             });
             if (!uploadRes.ok) throw new Error(`WhatsApp Cloud media upload error: ${await uploadRes.text()}`);
             const { id: mediaId } = await uploadRes.json() as any;
-            documentPayload = { id: mediaId, filename: fileName };
+            documentPayload = isImage ? { id: mediaId } : { id: mediaId, filename: fileName };
         }
 
         const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-            body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'document', document: documentPayload }),
+            body: JSON.stringify({ messaging_product: 'whatsapp', to, type: isImage ? 'image' : 'document', [isImage ? 'image' : 'document']: documentPayload }),
         });
         if (!response.ok) throw new Error(`WhatsApp Cloud API error: ${await response.text()}`);
         const data = await response.json() as any;
@@ -2357,12 +2427,12 @@ export class AssistantProcessorService {
     }
 
     /** Envia documento via Telegram (URL pública ou upload multipart) */
-    private async sendTelegramDocument(botToken: string, chatId: string, fileUrl: string, fileName: string): Promise<void> {
+    private async sendTelegramDocument(botToken: string, chatId: string, fileUrl: string, fileName: string, isImage = false): Promise<void> {
         if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
-            const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+            const response = await fetch(`https://api.telegram.org/bot${botToken}/${isImage ? 'sendPhoto' : 'sendDocument'}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: chatId, document: fileUrl }),
+                body: JSON.stringify(isImage ? { chat_id: chatId, photo: fileUrl } : { chat_id: chatId, document: fileUrl }),
             });
             if (!response.ok) throw new Error(`Telegram sendDocument error: ${await response.text()}`);
             return;
@@ -2386,13 +2456,13 @@ export class AssistantProcessorService {
     }
 
     /** Envia documento via Facebook Messenger (exige URL pública) */
-    private async sendFacebookDocument(accessToken: string, recipientId: string, fileUrl: string): Promise<void> {
+    private async sendFacebookDocument(accessToken: string, recipientId: string, fileUrl: string, isImage = false): Promise<void> {
         const response = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(accessToken)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 recipient: { id: recipientId },
-                message: { attachment: { type: 'file', payload: { url: fileUrl, is_reusable: true } } },
+                message: { attachment: { type: isImage ? 'image' : 'file', payload: { url: fileUrl, is_reusable: true } } },
             }),
         });
         if (!response.ok) throw new Error(`Facebook Messenger document error: ${await response.text()}`);

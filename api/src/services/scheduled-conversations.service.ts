@@ -1,4 +1,5 @@
 import { query } from '../database/connection';
+import { queueTaskSync, removeTaskFromCalendar } from './task-calendar-sync.service';
 
 export class ScheduledConversationsService {
   async findAll(userId: string, filters?: { lead_id?: string; status?: string }) {
@@ -43,6 +44,7 @@ export class ScheduledConversationsService {
       [userId, data.lead_id || null, data.title, data.description || null, data.scheduled_at, data.conversation_id || null, JSON.stringify(data.metadata || {})]
     );
     const row = result.rows[0];
+    if (row) void queueTaskSync(userId, row.id); // Google Calendar (se ligado)
     return row ? this.findById(row.id, userId) : row;
   }
 
@@ -95,6 +97,7 @@ export class ScheduledConversationsService {
       values
     );
     // Com o nome do lead, para o ecrã atualizar sem recarregar
+    if (result.rows[0]) void queueTaskSync(userId, id); // Google Calendar (se ligado)
     return result.rows[0] ? this.findById(id, userId) : null;
   }
 
@@ -103,6 +106,7 @@ export class ScheduledConversationsService {
       'DELETE FROM scheduled_conversations WHERE id = $1 AND user_id = $2 RETURNING *',
       [id, userId]
     );
+    if (result.rows[0]) void removeTaskFromCalendar(userId, result.rows[0]);
     // Quem já apaga no servidor não pode ver as tarefas voltar pela cópia antiga de outro aparelho
     await query(
       'UPDATE users SET legacy_tasks_imported_at = NOW() WHERE id = $1 AND legacy_tasks_imported_at IS NULL',

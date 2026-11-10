@@ -597,9 +597,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     }
 
     const ext = (file.name.split('.').pop() || '').toLowerCase();
-    const allowed = ['pdf', 'xlsx', 'xls', 'csv', 'txt', 'docx', 'doc'];
+    // Imagens só nos ficheiros para clientes (o assistente envia-as quando a resposta está nelas)
+    const allowed = ['pdf', 'xlsx', 'xls', 'csv', 'txt', 'docx', 'doc', ...(kind === 'client' ? ['jpg', 'jpeg', 'png', 'webp'] : [])];
     if (!allowed.includes(ext)) {
-      toast.error('Formato não suportado. Envie PDF, Excel (XLSX), CSV, TXT ou DOCX.');
+      toast.error(kind === 'client'
+        ? 'Formato não suportado. Envie PDF, Excel (XLSX), CSV, TXT, DOCX ou imagem (JPG, PNG).'
+        : 'Formato não suportado. Envie PDF, Excel (XLSX), CSV, TXT ou DOCX.');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -2215,10 +2218,10 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       ) : (
                         <Upload className="w-4 h-4" />
                       )}
-                      <span>{uploadingKind === 'client' ? 'A enviar...' : 'Adicionar ficheiro (PDF, Excel, CSV — máx 5MB)'}</span>
+                      <span>{uploadingKind === 'client' ? 'A enviar...' : 'Adicionar ficheiro ou imagem (PDF, Excel, JPG, PNG — máx 5MB)'}</span>
                       <input
                         type="file"
-                        accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc"
+                        accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc,.jpg,.jpeg,.png,.webp"
                         className="hidden"
                         onChange={(e) => handleUploadKnowledge(e, 'client')}
                         disabled={uploadingKind !== null}
@@ -2237,7 +2240,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       {clientFiles.map(kf => (
                         <li key={kf.id} className="rounded-lg border border-border bg-background">
                           <div className="flex items-center gap-2 px-3 py-2">
-                            <FileText className={`w-4 h-4 flex-shrink-0 ${kf.status === 'failed' ? 'text-red-400' : 'text-blue-500'}`} />
+                            {/^image\//.test(kf.mime_type || '') || /\.(jpe?g|png|webp)$/i.test(kf.file_name || '')
+                              ? <Image className="w-4 h-4 flex-shrink-0 text-blue-500" />
+                              : <FileText className={`w-4 h-4 flex-shrink-0 ${kf.status === 'failed' ? 'text-red-400' : 'text-blue-500'}`} />}
                             <div className="flex-1 min-w-0">
                               <p className="text-sm text-foreground truncate">{kf.file_name}</p>
                               <p className="text-[10px] text-muted-foreground">{formatFileSize(kf.size_bytes)}</p>

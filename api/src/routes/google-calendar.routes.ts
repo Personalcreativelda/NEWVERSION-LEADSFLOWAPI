@@ -13,6 +13,7 @@ import {
   disconnectCalendar, exchangeCalendarCode, isCalendarConfigured, listEvents, readCalendarState,
 } from '../services/google-calendar.service';
 import { drivePageCsp } from '../services/google-drive.service';
+import { backfillTasksToCalendar } from '../services/task-calendar-sync.service';
 
 const router = Router();
 
@@ -67,6 +68,8 @@ router.get('/callback', async (req, res) => {
   if (req.query.error || !req.query.code) return res.redirect(calendarReturnUrl(state.platform, { calendar: 'cancelled' }));
   try {
     await exchangeCalendarCode(state.userId, String(req.query.code));
+    // As tarefas que já existiam entram também no calendário
+    void backfillTasksToCalendar(state.userId);
     res.redirect(calendarReturnUrl(state.platform, { calendar: 'connected' }));
   } catch (err: any) {
     console.error('[GoogleCalendar] Falha a ligar:', err.message);

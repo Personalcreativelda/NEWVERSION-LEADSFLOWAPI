@@ -1,8 +1,8 @@
 {
-"3523":["WhatsApp Business Account ID","WhatsApp Business Account ID","WhatsApp Business Account ID"],
-"3541":["Widget JS","Widget JS","Widget JS"],
-"3544":["X-Webhook-Secret","X-Webhook-Secret","X-Webhook-Secret"],
-"3545":["Yahoo Mail","Yahoo Mail","Yahoo Mail"],
+"3522":["WhatsApp Business Account ID","WhatsApp Business Account ID","WhatsApp Business Account ID"],
+"3540":["Widget JS","Widget JS","Widget JS"],
+"3543":["X-Webhook-Secret","X-Webhook-Secret","X-Webhook-Secret"],
+"3544":["Yahoo Mail","Yahoo Mail","Yahoo Mail"],
 "3573":["{0} closed a deal{1}","{0} cerró negocio{1}","{0} a conclu une affaire{1}"],
 "3612":["{0}?redirect={1}","{0}?redirect={1}","{0}?redirect={1}"],
 "3619":["<div class=\"header\"> <h1>Leads Report - LeadsFlow</h1> <p>Generated on {0}</p> <p>Period: {1}</p> </div>","<div class=\"header\"> <h1>Informe de leads - LeadsFlow</h1> <p>Generado el {0}</p> <p>Período: {1}</p> </div>","<div class=\"header\"> <h1>Rapport de leads - LeadsFlow</h1> <p>Généré le {0}</p> <p>Période : {1}</p> </div>"],

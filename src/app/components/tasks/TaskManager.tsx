@@ -60,6 +60,30 @@ interface Task {
   notes?: string;
   /** Quem criou: assistente de IA, resumo da inbox, ficha do lead ou esta página */
   source?: string;
+  /** Evento correspondente no Google Calendar (as tarefas vão para lá sozinhas) */
+  calendarEventId?: string;
+  /** Evento que só existe no Google Calendar: aparece na lista mas edita-se lá */
+  external?: 'google';
+  allDay?: boolean;
+}
+
+/** Evento do Google Calendar → item da lista (só leitura) */
+function googleToTask(ev: GoogleCalendarEvent): Task {
+  const start = ev.allDay ? `${ev.start}T00:00:00` : ev.start;
+  const end = new Date(ev.allDay ? `${ev.end}T00:00:00` : ev.end);
+  return {
+    id: `google:${ev.id}`,
+    title: ev.summary,
+    description: ev.location || undefined,
+    type: 'meeting',
+    priority: 'medium',
+    // Já acabou → vai para "Concluídas"; nunca fica "Atrasada"
+    status: end.getTime() < Date.now() ? 'completed' : 'pending',
+    dueDate: new Date(start).toISOString(),
+    createdAt: new Date(start).toISOString(),
+    external: 'google',
+    allDay: ev.allDay,
+  };
 }
 
 const LEGACY_KEY = 'leadsflow_tasks';
@@ -84,6 +108,7 @@ function toTask(s: ScheduledConversation, leads: any[]): Task {
     completedAt: meta.completed_at,
     notes: meta.notes,
     source: meta.source,
+    calendarEventId: typeof meta.calendar_event_id === 'string' ? meta.calendar_event_id : undefined,
   };
 }
 
@@ -197,9 +222,8 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   const refreshCalendar = useCallback(() => { googleCalendarApi.status().then(setCalendar).catch(() => setCalendar(null)); }, []);
   useEffect(() => { refreshCalendar(); }, [refreshCalendar]);
 
-  // Próximos 30 dias do calendário ligado (só leitura; os assistentes marcam lá)
+  // Próximos 30 dias do calendário ligado: entram na lista junto com as tarefas
   const [calendarEvents, setCalendarEvents] = useState<GoogleCalendarEvent[] | null>(null);
-  const [showAllEvents, setShowAllEvents] = useState(false);
   useEffect(() => {
     if (!calendar?.connected) { setCalendarEvents(null); return; }
     let alive = true;
@@ -254,12 +278,18 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
     try { await googleCalendarApi.disconnect(); refreshCalendar(); } catch { toast.error('Não foi possível desligar.'); }
   };
 
+  // Tarefas + eventos que só existem no Google (os das tarefas já estão na lista)
+  const linkedEvents = new Set(tasks.map((t) => t.calendarEventId).filter(Boolean));
+  const googleItems = (calendarEvents || []).filter((ev) => !linkedEvents.has(ev.id)).map(googleToTask);
+  const allItems = googleItems.length ? [...tasks, ...googleItems].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()) : tasks;
+  const overdueOf = (t: Task) => !t.external && isPast(new Date(t.dueDate)) && t.status === 'pending';
+
   // Filtrar tarefas
-  const filteredTasks = tasks.filter(task => {
+  const filteredTasks = allItems.filter(task => {
     // Filtro de status
     if (filter === 'today' && !isToday(new Date(task.dueDate))) return false;
     // Atrasada: hora já passou e continua pendente (também as de hoje)
-    if (filter === 'overdue' && !(isPast(new Date(task.dueDate)) && task.status === 'pending')) return false;
+    if (filter === 'overdue' && !overdueOf(task)) return false;
     if (filter === 'upcoming' && (isPast(new Date(task.dueDate)) || isToday(new Date(task.dueDate)))) return false;
     if (filter === 'completed' && task.status === 'pending') return false;
     if (filter !== 'completed' && task.status === 'cancelled') return false;
@@ -276,11 +306,11 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
 
   // Estatísticas
   const stats = {
-    total: tasks.filter(t => t.status === 'pending').length,
-    today: tasks.filter(t => isToday(new Date(t.dueDate)) && t.status === 'pending').length,
-    overdue: tasks.filter(t => isPast(new Date(t.dueDate)) && t.status === 'pending').length,
-    completed: tasks.filter(t => t.status !== 'pending').length,
-    upcoming: tasks.filter(t => !isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate)) && t.status === 'pending').length,
+    total: allItems.filter(t => t.status === 'pending').length,
+    today: allItems.filter(t => isToday(new Date(t.dueDate)) && t.status === 'pending').length,
+    overdue: allItems.filter(overdueOf).length,
+    completed: allItems.filter(t => t.status !== 'pending').length,
+    upcoming: allItems.filter(t => !isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate)) && t.status === 'pending').length,
   };
   const [showFilters, setShowFilters] = useState(false);
   const activeFilterCount = (priorityFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0);
@@ -373,7 +403,10 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
     const ok = await confirm('Apagar esta tarefa?', { title: 'Apagar tarefa', variant: 'danger', confirmLabel: 'Apagar' });
     if (!ok) return;
     const before = tasks;
+    // O evento sai do Google com a tarefa: não pode voltar a aparecer como evento solto
+    const eventId = tasks.find((t) => t.id === taskId)?.calendarEventId;
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    if (eventId) setCalendarEvents((prev) => prev && prev.filter((ev) => ev.id !== eventId));
     try {
       await scheduledConversationsApi.delete(taskId);
       toast.success('Tarefa apagada');
@@ -426,33 +459,6 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
               <button type="button" onClick={() => void disconnectCalendar()} className="h-10 rounded-lg px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
                 Desligar
               </button>
-              <div className="w-full border-t border-border pt-2">
-                {calendarEvents === null ? (
-                  <p className="py-2 text-sm text-muted-foreground">A carregar eventos…</p>
-                ) : calendarEvents.length === 0 ? (
-                  <p className="py-2 text-sm text-muted-foreground">Sem eventos nos próximos 30 dias</p>
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {(showAllEvents ? calendarEvents : calendarEvents.slice(0, 5)).map((ev) => {
-                      const start = new Date(ev.allDay ? `${ev.start}T00:00:00` : ev.start);
-                      const day = isToday(start) ? 'Hoje' : format(start, "EEE, d MMM", { locale: ptBR });
-                      return (
-                        <li key={ev.id} className="flex items-baseline gap-3 py-2">
-                          <span className="w-32 flex-shrink-0 text-xs text-muted-foreground">
-                            {day} · {ev.allDay ? 'Dia todo' : format(start, 'HH:mm')}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-sm text-foreground" translate="no">{ev.summary}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                {calendarEvents && calendarEvents.length > 5 && (
-                  <button type="button" onClick={() => setShowAllEvents((v) => !v)} className="h-10 text-sm font-medium text-primary hover:underline">
-                    {showAllEvents ? 'Mostrar menos' : `Ver todos (${calendarEvents.length})`}
-                  </button>
-                )}
-              </div>
             </>
           ) : (
             <>
@@ -587,7 +593,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
       {/* Lista de Tarefas (ou mosaico) */}
       <div className={filteredTasks.length > 0 && view === 'tiles' ? 'grid grid-cols-1 gap-3 min-[520px]:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4' : 'space-y-3'}>
         {filteredTasks.length === 0 ? (
-          tasks.length === 0 ? (
+          allItems.length === 0 ? (
             <EmptyState
               icon={CheckSquare}
               title="Ainda não tem tarefas"
@@ -607,9 +613,35 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
             const typeInfo = getTaskTypeInfo(task.type);
             const priorityInfo = getPriorityInfo(task.priority);
             const Icon = typeInfo.icon;
-            const isOverdue = isPast(new Date(task.dueDate)) && task.status === 'pending';
+            const isOverdue = overdueOf(task);
             const isDueToday = isToday(new Date(task.dueDate));
             const done = task.status === 'completed';
+            const when = task.allDay
+              ? `${format(new Date(task.dueDate), view === 'tiles' ? 'dd MMM' : "dd 'de' MMMM", { locale: ptBR })} · Dia todo`
+              : format(new Date(task.dueDate), view === 'tiles' ? 'dd MMM, HH:mm' : "dd 'de' MMMM, HH:mm", { locale: ptBR });
+
+            // Evento só do Google Calendar: mostra-se aqui, edita-se no calendário
+            if (task.external === 'google') {
+              return (
+                <Card
+                  key={task.id}
+                  className={`flex min-w-0 items-start gap-3 p-4 bg-card border-border ${done ? 'opacity-60' : ''} ${view === 'tiles' ? 'flex-col' : ''}`}
+                >
+                  <BrandIcon brand="googlecalendar" className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate font-medium text-foreground" translate="no">{task.title}</h3>
+                    {task.description && <p className="truncate text-sm text-muted-foreground" translate="no">{task.description}</p>}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className={`gap-1 ${isDueToday && !done ? 'border-orange-500 text-orange-600' : ''}`}>
+                        <CalendarIcon className="w-3 h-3" />
+                        {when}
+                      </Badge>
+                      <Badge variant="outline" className="text-muted-foreground">Google Calendar</Badge>
+                    </div>
+                  </div>
+                </Card>
+              );
+            }
 
             if (view === 'tiles') {
               return (
@@ -657,7 +689,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                   <div className="space-y-2 border-t border-border pt-3 text-xs">
                     <div className={`flex items-center gap-1.5 font-medium ${isOverdue ? 'text-red-600 dark:text-red-400' : isDueToday ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'}`}>
                       {isOverdue ? <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" /> : <CalendarIcon className="h-3.5 w-3.5 flex-shrink-0" />}
-                      <span className="truncate">{format(new Date(task.dueDate), "dd MMM, HH:mm", { locale: ptBR })}</span>
+                      <span className="truncate">{when}</span>
                       {isOverdue && <><span aria-hidden>·</span><span className="flex-shrink-0">Atrasada</span></>}
                       {task.status === 'cancelled' && <><span aria-hidden>·</span><span className="flex-shrink-0">Desmarcada</span></>}
                     </div>
@@ -735,7 +767,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
 
                           <Badge variant="outline" className={`gap-1 ${isOverdue ? 'border-red-500 text-red-600' : isDueToday ? 'border-orange-500 text-orange-600' : ''}`}>
                             <CalendarIcon className="w-3 h-3" />
-                            {format(new Date(task.dueDate), "dd 'de' MMMM, HH:mm", { locale: ptBR })}
+                            {when}
                           </Badge>
 
                           {task.status === 'cancelled' && (

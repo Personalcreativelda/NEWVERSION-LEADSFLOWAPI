@@ -1,0 +1,6 @@
+{
+  "246": ["Add file or image (PDF, Excel, JPG, PNG — max 5MB)", "Añadir archivo o imagen (PDF, Excel, JPG, PNG — máx. 5MB)", "Ajouter un fichier ou une image (PDF, Excel, JPG, PNG — max 5 Mo)"],
+  "885": ["dd MMM", "dd MMM", "dd MMM"],
+  "1625": ["Unsupported format. Send PDF, Excel (XLSX), CSV, TXT, DOCX or an image (JPG, PNG).", "Formato no compatible. Envíe PDF, Excel (XLSX), CSV, TXT, DOCX o una imagen (JPG, PNG).", "Format non pris en charge. Envoyez un PDF, Excel (XLSX), CSV, TXT, DOCX ou une image (JPG, PNG)."],
+  "3548": ["{0} · All day", "{0} · Todo el día", "{0} · Toute la journée"]
+}

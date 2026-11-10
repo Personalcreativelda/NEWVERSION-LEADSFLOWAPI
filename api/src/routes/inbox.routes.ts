@@ -2835,11 +2835,15 @@ Responda EXATAMENTE neste formato JSON:
     // Se houver agendamento detectado
     if (result.has_scheduling && result.scheduled_date) {
       const description = result.scheduling_description || 'Agendamento automático IA';
-      await dbQuery(
+      const created = await dbQuery(
         `INSERT INTO scheduled_conversations (user_id, lead_id, conversation_id, title, description, scheduled_at, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
         [user.id, leadId, conversationId, String(description).slice(0, 255), description, result.scheduled_date, JSON.stringify({ source: 'ai_summary', type: 'follow-up' })]
       );
+      if (created.rows[0]) {
+        const { queueTaskSync } = await import('../services/task-calendar-sync.service');
+        void queueTaskSync(user.id, created.rows[0].id);
+      }
     }
 
     res.json({ success: true, summary: summaryText, scheduling: result.has_scheduling ? result : null });

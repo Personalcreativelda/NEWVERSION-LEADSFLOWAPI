@@ -2,11 +2,11 @@
 "78":["1, 2 and 4 days","1, 2 y 4 días","1, 2 et 4 jours"],
 "84":["2, 5 and 10 days","2, 5 y 10 días","2, 5 et 10 jours"],
 "101":["4 h, 1 day, 3 days","4 h, 1 día, 3 días","4 h, 1 jour, 3 jours"],
-"737":["Check the calendar","Consultar la agenda","Consulter l'agenda"],
-"946":["Disconnect Google Calendar?","¿Desconectar Google Calendar?","Déconnecter Google Calendar ?"],
-"947":["Cancelled","Cancelada","Annulé"],
+"736":["Check the calendar","Consultar la agenda","Consulter l'agenda"],
+"947":["Disconnect Google Calendar?","¿Desconectar Google Calendar?","Déconnecter Google Calendar ?"],
+"948":["Cancelled","Cancelada","Annulé"],
 "1022":["Length of each appointment","Duración de cada cita","Durée de chaque rendez-vous"],
-"1615":["Automatic follow-ups","Seguimientos automáticos","Relances automatiques"],
+"1614":["Automatic follow-ups","Seguimientos automáticos","Relances automatiques"],
 "1674":["Google Calendar","Google Calendar","Google Calendar"],
 "1675":["Google Calendar connected","Google Calendar conectado","Google Calendar connecté"],
 "2154":["Couldn't open Google Calendar.","No se pudo abrir Google Calendar.","Impossible d'ouvrir Google Calendar."],
@@ -21,7 +21,7 @@
 "2519":["The assistants will stop seeing Google Calendar and booking there.","Los asistentes dejarán de ver Google Calendar y de agendar allí.","Les assistants ne verront plus Google Calendar et n'y réserveront plus."],
 "2792":["Fast","Rápido","Rapide"],
 "2951":["Follow-up pace","Ritmo de los seguimientos","Rythme des relances"],
-"3127":["Only offers free times and books, reschedules and cancels in Tasks","Solo propone horarios libres y agenda, reprograma y cancela en Tareas","Ne propose que des créneaux libres et réserve, déplace et annule dans les Tâches"],
-"3141":["Gentle","Suave","Doux"],
-"3490":["Writes again to people who stop replying","Vuelve a escribir a quien deja de responder","Écrit à nouveau à ceux qui ne répondent plus"]
+"3126":["Only offers free times and books, reschedules and cancels in Tasks","Solo propone horarios libres y agenda, reprograma y cancela en Tareas","Ne propose que des créneaux libres et réserve, déplace et annule dans les Tâches"],
+"3140":["Gentle","Suave","Doux"],
+"3489":["Writes again to people who stop replying","Vuelve a escribir a quien deja de responder","Écrit à nouveau à ceux qui ne répondent plus"]
 }

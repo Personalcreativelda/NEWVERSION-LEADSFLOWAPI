@@ -1,8 +1,4 @@
 {
-  "131": ["Loading events…", "Cargando eventos…", "Chargement des événements…"],
-  "959": ["All day", "Todo el día", "Toute la journée"],
-  "1059": ["EEE, d MMM", "EEE, d MMM", "EEE, d MMM"],
-  "1676": ["Google Calendar not connected", "Google Calendar no conectado", "Google Agenda non connecté"],
-  "1934": ["Connect Google Calendar again.", "Vuelva a conectar Google Calendar.", "Reconnectez Google Agenda."],
-  "3026": ["No events in the next 30 days", "Sin eventos en los próximos 30 días", "Aucun événement dans les 30 prochains jours"]
+"1676":["Google Calendar not connected","Google Calendar no conectado","Google Agenda non connecté"],
+"1934":["Connect Google Calendar again.","Vuelva a conectar Google Calendar.","Reconnectez Google Agenda."]
 }

@@ -1056,7 +1056,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
             // Tier 2: pedido genérico de arquivo ("me manda o pdf", "envia o documento")
             const fileNouns = ['pdf', 'arquivo', 'ficheiro', 'documento', 'planilha', 'catalogo',
                 'tabela', 'lista', 'material', 'conteudo', 'menu', 'cardapio', 'manual', 'guia',
-                'doc', 'docx', 'xlsx', 'xls', 'csv'];
+                'doc', 'docx', 'xlsx', 'xls', 'csv', 'imagem', 'foto', 'fotografia', 'image', 'photo', 'jpg', 'png'];
             if (!fileNouns.some(n => msgNorm.includes(n))) return null;
 
             if (files.length === 1) return files[0];

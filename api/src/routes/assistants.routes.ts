@@ -3,7 +3,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { AssistantsService } from '../services/assistants.service';
-import { AIService } from '../services/ai.service';
+import { AIService, getAvailableProviders } from '../services/ai.service';
 import { getStorageService } from '../services/storage.service';
 
 const router = Router();
@@ -13,7 +13,13 @@ const assistantsService = new AssistantsService();
 const KB_MAX_BYTES = 5 * 1024 * 1024; // 5MB
 const kbUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: KB_MAX_BYTES } });
 
+/** Imagem (JPG, PNG, WEBP): o assistente envia-a ao cliente quando a resposta está nela */
+function isImageUpload(file: Express.Multer.File): boolean {
+    return /\.(jpe?g|png|webp)$/i.test(file.originalname || '') || /^image\/(jpeg|png|webp)$/i.test(file.mimetype || '');
+}
+
 function isKnowledgeFileAllowed(file: Express.Multer.File): boolean {
+    if (isImageUpload(file)) return true;
     const name = (file.originalname || '').toLowerCase();
     const allowedExt = /\.(pdf|xlsx|xls|csv|txt|docx|doc)$/.test(name);
     const mime = (file.mimetype || '').toLowerCase();
@@ -447,7 +453,7 @@ router.post('/:id/knowledge', kbUpload.single('file'), async (req, res, next) =>
             return res.status(400).json({ error: 'O arquivo excede o limite de 5MB' });
         }
         if (!isKnowledgeFileAllowed(file)) {
-            return res.status(400).json({ error: 'Formato não suportado. Envie PDF, Excel (XLSX), CSV, TXT ou DOCX.' });
+            return res.status(400).json({ error: 'Formato não suportado. Envie PDF, Excel (XLSX), CSV, TXT, DOCX ou imagem (JPG, PNG).' });
         }
 
         // Categoria do documento: 'rag' (base de conhecimento) ou 'client' (arquivo para enviar ao cliente)
@@ -470,13 +476,28 @@ router.post('/:id/knowledge', kbUpload.single('file'), async (req, res, next) =>
             txt:  'text/plain',
             docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             doc:  'application/msword',
+            jpg:  'image/jpeg',
+            jpeg: 'image/jpeg',
+            png:  'image/png',
+            webp: 'image/webp',
         };
         const mimeForExtraction = extMime[ext] || file.mimetype || 'application/octet-stream';
 
         const aiService = new AIService();
         const base64 = file.buffer.toString('base64');
         const dataUri = `data:${mimeForExtraction};base64,${base64}`;
-        const textContent = await aiService.extractDocumentText(dataUri, mimeForExtraction, process.env.GEMINI_API_KEY, 20000, process.env.OPENAI_API_KEY);
+        // Imagem: a IA lê o texto e descreve o que se vê (é assim que o assistente sabe quando a enviar)
+        let textContent: string;
+        if (isImageUpload(file)) {
+            try {
+                textContent = (await aiService.analyzeImageWithVision(dataUri, '', getAvailableProviders())).slice(0, 20000);
+            } catch (visionErr: any) {
+                console.warn('[Assistants] Não foi possível ler a imagem:', visionErr.message);
+                textContent = '';
+            }
+        } else {
+            textContent = await aiService.extractDocumentText(dataUri, mimeForExtraction, process.env.GEMINI_API_KEY, 20000, process.env.OPENAI_API_KEY);
+        }
 
         // Guardar o arquivo original (para o assistente poder enviá-lo quando o cliente pedir)
         let storageUrl: string | null = null;
@@ -495,7 +516,7 @@ router.post('/:id/knowledge', kbUpload.single('file'), async (req, res, next) =>
 
         const kbFile = await assistantsService.addKnowledgeFile(req.params.id, user.id, {
             fileName: file.originalname,
-            mimeType: file.mimetype,
+            mimeType: isImageUpload(file) ? mimeForExtraction : file.mimetype,
             sizeBytes: file.size,
             textContent,
             storageUrl,
