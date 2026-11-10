@@ -2,7 +2,7 @@
 // Usar sempre estes em vez de ícones genéricos para canais, origens e integrações.
 import {
   siWhatsapp, siFacebook, siMessenger, siInstagram, siTelegram, siGoogle, siGooglesheets,
-  siMeta, siGoogleanalytics, siN8n, siTiktok, siX, siYoutube, siGmail,
+  siMeta, siGoogleanalytics, siN8n, siTiktok, siX, siYoutube, siGmail, siGoogledrive,
   type SimpleIcon,
 } from 'simple-icons';
 
@@ -21,6 +21,7 @@ const BRANDS = {
   x: siX,
   youtube: siYoutube,
   gmail: siGmail,
+  googledrive: siGoogledrive,
 } satisfies Record<string, SimpleIcon>;
 
 export type Brand = keyof typeof BRANDS;

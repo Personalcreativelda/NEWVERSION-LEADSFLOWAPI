@@ -1,0 +1,19 @@
+{
+  "167": ["Importing 1 document from Google Drive", "Importando 1 documento de Google Drive", "Importation d'1 document depuis Google Drive"],
+  "412": ["Invalid assistant", "Asistente no válido", "Assistant invalide"],
+  "1653": ["Google Drive", "Google Drive", "Google Drive"],
+  "1654": ["Google Drive is not connected", "Google Drive no está conectado", "Google Drive n'est pas connecté"],
+  "1723": ["Ignores requests to change the rules or reveal the instructions", "Ignora pedidos para cambiar las reglas o revelar las instrucciones", "Ignore les demandes de changer les règles ou de révéler les instructions"],
+  "1881": ["Read the Google Drive documents again", "Leer de nuevo los documentos de Google Drive", "Relire les documents de Google Drive"],
+  "1907": ["Connect Google Drive again.", "Conecta Google Drive de nuevo.", "Reconnectez Google Drive."],
+  "2127": ["Couldn't open Google Drive.", "No se pudo abrir Google Drive.", "Impossible d'ouvrir Google Drive."],
+  "2188": ["Couldn't connect Google Drive. Try again.", "No se pudo conectar Google Drive. Inténtalo de nuevo.", "Impossible de connecter Google Drive. Réessayez."],
+  "2205": ["Couldn't sync.", "No se pudo sincronizar.", "Impossible de synchroniser."],
+  "2412": ["Google Drive isn't available yet.", "Google Drive aún no está disponible.", "Google Drive n'est pas encore disponible."],
+  "2479": ["The documents are already up to date", "Los documentos ya están actualizados", "Les documents sont déjà à jour"],
+  "2704": ["Protection against manipulation", "Protección contra manipulación", "Protection contre la manipulation"],
+  "3014": ["no text", "sin texto", "sans texte"],
+  "3512": ["{0} document(s) updated", "{0} documento(s) actualizado(s)", "{0} document(s) mis à jour"],
+  "3579": ["Importing {0} documents from Google Drive", "Importando {0} documentos de Google Drive", "Importation de {0} documents depuis Google Drive"],
+  "3704": ["{0}-document limit: {1} were left out.", "Límite de {0} documentos: {1} quedaron fuera.", "Limite de {0} documents : {1} n'ont pas été ajoutés."]
+}

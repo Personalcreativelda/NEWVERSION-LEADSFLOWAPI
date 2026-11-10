@@ -8,7 +8,7 @@ import {
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, Send, Mail, Hash, Globe,
   Smartphone, History, Lock, AlertTriangle, Mic,
-  Image, FileText, Upload, BookOpen, FileSpreadsheet, ChevronDown, ChevronUp
+  Image, FileText, Upload, BookOpen, FileSpreadsheet, ChevronDown, ChevronUp, ShieldCheck
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -16,7 +16,9 @@ import { PageHeader, PageAction } from '../base/PageHeader';
 import { EmptyState } from '../base/EmptyState';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
-import { assistantsApi, MAX_KNOWLEDGE_FILES, type AssistantVoice, type Assistant, type UserAssistant, type CreateAssistantInput, type KnowledgeFile } from '../../services/api/assistants';
+import { assistantsApi, googleDriveApi, MAX_KNOWLEDGE_FILES, type AssistantVoice, type Assistant, type UserAssistant, type CreateAssistantInput, type KnowledgeFile } from '../../services/api/assistants';
+import { BrandIcon } from '../base/BrandIcon';
+import { isNativeApp, openBrowser } from '../../../native';
 import { channelsApi } from '../../services/api/inbox';
 import type { Channel } from '../../types/inbox';
 import { usePlanLimits } from '../../hooks/usePlanLimits';
@@ -382,9 +384,97 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     knowledge_base_enabled: cfg.knowledge_base_enabled !== false,
     file_sending_enabled: cfg.file_sending_enabled !== false,
     escalation_enabled: cfg.escalation_enabled !== false,
+    guardrails_enabled: cfg.guardrails_enabled !== false,
   });
 
   // ========== Base de Conhecimento / Arquivos para clientes ==========
+
+  // ── Google Drive ──
+  const [drive, setDrive] = useState<{ configured: boolean; connected: boolean; email: string | null } | null>(null);
+  const [driveBusy, setDriveBusy] = useState<'connect' | 'sync' | null>(null);
+  useEffect(() => {
+    googleDriveApi.status().then(setDrive).catch(() => setDrive(null));
+  }, []);
+
+  const handleDriveReturn = useCallback((params: Record<string, string>) => {
+    setDriveBusy(null);
+    if (params.drive === 'importing') {
+      const n = Number(params.count || 0);
+      toast.success(n === 1 ? 'A importar 1 documento do Google Drive' : `A importar ${n} documentos do Google Drive`);
+      if (Number(params.skipped || 0) > 0) toast.warning(`Limite de ${MAX_KNOWLEDGE_FILES} documentos: ${params.skipped} ficaram de fora.`);
+      googleDriveApi.status().then(setDrive).catch(() => {});
+      if (params.assistant) void loadKnowledgeFiles(params.assistant);
+    } else if (params.drive === 'error') {
+      toast.error('Não foi possível ligar o Google Drive. Tente de novo.');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // App: a aba do Google fecha e o native.ts avisa; web: a janela do Google avisa antes de fechar
+    const onApp = (e: Event) => handleDriveReturn((e as CustomEvent).detail || {});
+    const apiOrigin = (() => { try { return new URL(import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com').origin; } catch { return ''; } })();
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== apiOrigin || e.data?.type !== 'leadsflow-drive') return;
+      handleDriveReturn(e.data);
+    };
+    window.addEventListener('leadsflow-drive', onApp);
+    window.addEventListener('message', onMessage);
+    return () => { window.removeEventListener('leadsflow-drive', onApp); window.removeEventListener('message', onMessage); };
+  }, [handleDriveReturn]);
+
+  const handleAddFromDrive = async () => {
+    if (!selectedUserAssistant) return;
+    const native = isNativeApp();
+    // A janela abre já (antes do pedido) para o browser não a bloquear
+    const popup = native ? null : window.open('', 'leadsflow-drive', 'width=960,height=720');
+    try {
+      setDriveBusy('connect');
+      const url = await googleDriveApi.start(selectedUserAssistant.id, native ? 'app' : 'web');
+      if (native) { await openBrowser(url); return; }
+      if (popup) {
+        popup.location.href = url;
+        // Se a janela fechar sem aviso (o Google às vezes corta a ligação), atualiza na mesma
+        const id = selectedUserAssistant.id;
+        const timer = window.setInterval(() => {
+          if (popup.closed) { window.clearInterval(timer); setDriveBusy(null); void loadKnowledgeFiles(id); }
+        }, 800);
+      } else {
+        window.location.href = url;
+      }
+    } catch (err: any) {
+      popup?.close();
+      setDriveBusy(null);
+      toast.error(err?.response?.data?.error || 'Não foi possível abrir o Google Drive.');
+    }
+  };
+
+  const handleSyncDrive = async () => {
+    if (!selectedUserAssistant) return;
+    try {
+      setDriveBusy('sync');
+      const r = await assistantsApi.syncDriveFiles(selectedUserAssistant.id);
+      toast.success(r.updated > 0 ? `${r.updated} documento(s) atualizado(s)` : 'Os documentos já estão atualizados');
+      await loadKnowledgeFiles(selectedUserAssistant.id);
+    } catch (err: any) {
+      if (err?.response?.data?.code === 'DRIVE_NOT_CONNECTED') {
+        toast.error('Ligue de novo o Google Drive.');
+        setDrive((d) => d ? { ...d, connected: false } : d);
+      } else {
+        toast.error(err?.response?.data?.error || 'Não foi possível sincronizar.');
+      }
+    } finally {
+      setDriveBusy(null);
+    }
+  };
+
+  // Documentos a importar: atualiza a lista até ficarem prontos
+  useEffect(() => {
+    if (!selectedUserAssistant || !knowledgeFiles.some((f) => f.status === 'processing')) return;
+    const t = window.setTimeout(() => void loadKnowledgeFiles(selectedUserAssistant.id), 3000);
+    return () => window.clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [knowledgeFiles, selectedUserAssistant?.id]);
 
   const loadKnowledgeFiles = async (userAssistantId: string) => {
     try {
@@ -1271,6 +1361,35 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
               </div>
 
+              {/* Proteção contra manipulação (prompt injection) */}
+              <div className="p-4 rounded-lg border bg-muted/30 border-border">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-blue-500" />
+                      <h4 className="text-sm font-semibold text-foreground">Proteção contra manipulação</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Ignora pedidos para mudar as regras ou revelar as instruções
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!!configValues.guardrails_enabled}
+                    aria-label="Proteção contra manipulação"
+                    onClick={() => setConfigValues({ ...configValues, guardrails_enabled: !configValues.guardrails_enabled })}
+                    className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                    style={{ width: 44, height: 24, background: configValues.guardrails_enabled ? '#2563eb' : '#6b7280' }}
+                  >
+                    <span
+                      className="inline-block rounded-full bg-white shadow transition-transform"
+                      style={{ width: 18, height: 18, transform: configValues.guardrails_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                    />
+                  </button>
+                </div>
+              </div>
+
               {/* Escalar para humano */}
               <div className="p-4 rounded-lg border bg-muted/30 border-border">
                 <div className="flex items-center gap-2 mb-3">
@@ -1636,6 +1755,37 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     </label>
                   )}
 
+                  {drive?.configured && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {knowledgeFiles.length < MAX_KNOWLEDGE_FILES && (
+                        <button
+                          type="button"
+                          onClick={() => void handleAddFromDrive()}
+                          disabled={driveBusy !== null}
+                          className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-60"
+                        >
+                          {driveBusy === 'connect' ? <Loader2 className="h-4 w-4 animate-spin" /> : <BrandIcon brand="googledrive" className="h-4 w-4" />}
+                          Google Drive
+                        </button>
+                      )}
+                      {knowledgeFiles.some((f) => f.source === 'google_drive') && (
+                        <button
+                          type="button"
+                          onClick={() => void handleSyncDrive()}
+                          disabled={driveBusy !== null}
+                          className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60"
+                          title="Ler de novo os documentos do Google Drive"
+                        >
+                          Sincronizar
+                          {driveBusy === 'sync' && <Loader2 className="h-4 w-4 animate-spin" />}
+                        </button>
+                      )}
+                      {drive.connected && drive.email && (
+                        <span className="min-w-0 truncate text-xs text-muted-foreground" translate="no">{drive.email}</span>
+                      )}
+                    </div>
+                  )}
+
                   {knowledgeLoading ? (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Loader2 className="w-3.5 h-3.5 animate-spin" /> A carregar documentos...
@@ -1647,11 +1797,19 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                       {knowledgeFiles.map(kf => (
                         <li key={kf.id} className="rounded-lg border border-border bg-background">
                           <div className="flex items-center gap-2 px-3 py-2">
-                            <FileSpreadsheet className={`w-4 h-4 flex-shrink-0 ${kf.status === 'failed' ? 'text-red-400' : 'text-emerald-500'}`} />
+                            {kf.status === 'processing' ? (
+                              <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin text-muted-foreground" />
+                            ) : kf.source === 'google_drive' ? (
+                              <BrandIcon brand="googledrive" className={`w-4 h-4 flex-shrink-0 ${kf.status === 'failed' ? 'opacity-50' : ''}`} />
+                            ) : (
+                              <FileSpreadsheet className={`w-4 h-4 flex-shrink-0 ${kf.status === 'failed' ? 'text-red-400' : 'text-emerald-500'}`} />
+                            )}
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-foreground truncate">{kf.file_name}</p>
+                              <p className="text-sm text-foreground truncate" translate="no">{kf.file_name}</p>
                               <p className="text-[10px] text-muted-foreground">
-                                {formatFileSize(kf.size_bytes)} · {kf.char_count > 0 ? `${kf.char_count} caracteres` : kf.status === 'failed' ? 'sem texto extraído' : '—'}
+                                {kf.status === 'processing'
+                                  ? 'A importar…'
+                                  : <>{formatFileSize(kf.size_bytes)} · {kf.char_count > 0 ? `${kf.char_count} caracteres` : kf.status === 'failed' ? (kf.source === 'google_drive' ? (kf.error_message || 'sem texto') : 'sem texto extraído') : '—'}</>}
                               </p>
                             </div>
                             <button

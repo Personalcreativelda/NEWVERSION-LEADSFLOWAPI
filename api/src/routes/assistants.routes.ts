@@ -490,6 +490,24 @@ router.post('/:id/knowledge', kbUpload.single('file'), async (req, res, next) =>
     }
 });
 
+// POST /api/assistants/:id/knowledge/drive-sync - Volta a ler os documentos do Google Drive
+router.post('/:id/knowledge/drive-sync', async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+        const userAssistant = await assistantsService.findUserAssistantById(req.params.id, user.id);
+        if (!userAssistant) return res.status(404).json({ error: 'Assistente não encontrado' });
+        const { syncDriveFiles } = await import('../services/google-drive.service');
+        const result = await syncDriveFiles(user.id, req.params.id, { force: req.body?.force === true });
+        res.json(result);
+    } catch (error: any) {
+        if (error?.code === 'DRIVE_NOT_CONNECTED' || error?.code === 'invalid_grant') {
+            return res.status(409).json({ error: 'Ligue de novo o Google Drive.', code: 'DRIVE_NOT_CONNECTED' });
+        }
+        next(error);
+    }
+});
+
 // GET /api/assistants/:id/knowledge - Lista documentos da base de conhecimento
 router.get('/:id/knowledge', async (req, res, next) => {
     try {

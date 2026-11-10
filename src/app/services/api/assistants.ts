@@ -98,6 +98,9 @@ export interface CreateAssistantInput {
 
 export interface KnowledgeFile {
     id: string;
+    /** 'google_drive' = lido do Google Drive (volta a ser lido quando muda lá) */
+    source?: 'upload' | 'google_drive';
+    synced_at?: string | null;
     user_assistant_id: string;
     user_id: string;
     file_name: string;
@@ -286,8 +289,30 @@ export const assistantsApi = {
     /**
      * Busca o texto completo extraído de um documento (para preview no dashboard)
      */
+    /** Volta a ler os documentos do Google Drive deste assistente */
+    async syncDriveFiles(userAssistantId: string): Promise<{ updated: number; unchanged: number; failed: number; removed: number }> {
+        const { data } = await api.post(`/assistants/${userAssistantId}/knowledge/drive-sync`, {});
+        return data;
+    },
+
     async getKnowledgeFileText(userAssistantId: string, fileId: string): Promise<string> {
         const { data } = await api.get<{ text: string }>(`/assistants/${userAssistantId}/knowledge/${fileId}/text`);
         return data.text;
     }
+};
+
+// ── Google Drive (base de conhecimento dos assistentes) ──
+export const googleDriveApi = {
+    async status(): Promise<{ configured: boolean; connected: boolean; email: string | null }> {
+        const { data } = await api.get('/oauth/google-drive/status');
+        return data;
+    },
+    /** Endereço do login do Google (abre o seletor de ficheiros no fim) */
+    async start(assistantId: string, platform: 'web' | 'app'): Promise<string> {
+        const { data } = await api.post<{ url: string }>('/oauth/google-drive/start', { assistant_id: assistantId, platform });
+        return data.url;
+    },
+    async disconnect(): Promise<void> {
+        await api.delete('/oauth/google-drive');
+    },
 };

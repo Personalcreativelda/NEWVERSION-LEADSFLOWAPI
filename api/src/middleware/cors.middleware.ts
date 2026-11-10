@@ -59,6 +59,9 @@ const noOriginRequiredPaths = [
   '/api/oauth/meta/callback', // o Facebook redireciona o browser para aqui (sem Origin)
   '/api/oauth/whatsapp/connect', // página do Embedded Signup aberta no browser (sem Origin)
   '/api/oauth/instagram/callback', // o Instagram redireciona o browser para aqui (sem Origin)
+  '/api/oauth/google-drive/callback', // o Google redireciona o browser para aqui (sem Origin)
+  '/api/oauth/google-drive/import', // o seletor do Google navega para aqui (sem Origin)
+  '/api/oauth/google-drive/done', // página final no browser (sem Origin)
   '/api/inbox/media-proxy',
   '/api/diagnostics', // direct browser navigation with ?secret= or Bearer token
   '/api/version/mobile/release', // script release:mobile (protegido por MOBILE_RELEASE_KEY)

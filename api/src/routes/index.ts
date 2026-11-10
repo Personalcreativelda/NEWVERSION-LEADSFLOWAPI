@@ -29,6 +29,7 @@ import userWebhooksRoutes from './user-webhooks.routes';
 import versionRoutes from './version.routes';
 import filesRoutes from './files.routes';
 import metaOAuthRoutes from './meta-oauth.routes';
+import googleDriveRoutes from './google-drive.routes';
 import whatsappSignupRoutes from './whatsapp-signup.routes';
 import instagramOAuthRoutes from './instagram-oauth.routes';
 // Lead Tracking: Importar rotas de rastreamento de leads
@@ -64,6 +65,7 @@ router.use('/files', filesRoutes);          // ficheiros guardados (sem expor o 
 router.use('/oauth/meta', metaOAuthRoutes); // ligar Facebook/Instagram pelo login da Meta (auth dentro das rotas)
 router.use('/oauth/whatsapp', whatsappSignupRoutes); // WhatsApp oficial pelo Embedded Signup (auth dentro das rotas)
 router.use('/oauth/instagram', instagramOAuthRoutes); // Instagram com o login do próprio Instagram (auth dentro das rotas)
+router.use('/oauth/google-drive', googleDriveRoutes); // Google Drive na base de conhecimento dos assistentes (auth dentro das rotas)
 
 // ── Routes with plan enforcement ────────────────────────────────────────────
 router.use('/leads', withPlan, leadsRoutes);

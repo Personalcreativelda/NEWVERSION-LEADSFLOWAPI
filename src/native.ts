@@ -71,6 +71,14 @@ function handleMetaDeepLink(url: string) {
   window.dispatchEvent(new Event('meta-oauth-return'));
 }
 
+// Regresso do Google Drive (escolher documentos para um assistente): fecha a aba e avisa a página
+function handleDriveDeepLink(url: string) {
+  Browser.close().catch(() => {});
+  const queryIndex = url.indexOf('?');
+  const params = Object.fromEntries(new URLSearchParams(queryIndex >= 0 ? url.slice(queryIndex + 1) : ''));
+  window.dispatchEvent(new CustomEvent('leadsflow-drive', { detail: params }));
+}
+
 function handleOAuthDeepLink(url: string) {
   oauthCompleting = true;
   Browser.close().catch(() => {});
@@ -242,6 +250,7 @@ export async function initNative() {
 
   App.addListener('appUrlOpen', ({ url }) => {
     if (url.startsWith(`${NATIVE_OAUTH_REDIRECT}/meta`)) handleMetaDeepLink(url);
+    else if (url.startsWith(`${NATIVE_OAUTH_REDIRECT}/drive`)) handleDriveDeepLink(url);
     else if (url.startsWith(NATIVE_OAUTH_REDIRECT)) handleOAuthDeepLink(url);
   });
 

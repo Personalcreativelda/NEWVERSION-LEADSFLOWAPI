@@ -578,6 +578,10 @@ initDatabase().then(() => {
   const refreshIg = () => refreshExpiringInstagramTokens().catch((err) => console.error('[InstagramOAuth] Renovação:', err?.message));
   setTimeout(refreshIg, 60_000);
   setInterval(refreshIg, 24 * 60 * 60 * 1000);
+  // Documentos do Google Drive nos assistentes: voltam a ser lidos quando mudam (de 6 em 6 horas)
+  const syncDrive = () => import('./services/google-drive.service').then((m) => m.syncAllDriveFiles()).catch((err) => console.error('[GoogleDrive] Sincronização:', err?.message));
+  setTimeout(syncDrive, 5 * 60_000);
+  setInterval(syncDrive, 6 * 60 * 60 * 1000);
 
   // ✅ Iniciar scheduler de campanhas agendadas
   campaignScheduler.start();

@@ -265,6 +265,11 @@ export class AssistantsService {
             "ALTER TABLE user_assistants ADD COLUMN IF NOT EXISTS channel_ids UUID[] DEFAULT '{}'",
             'ALTER TABLE assistant_knowledge_files ADD COLUMN IF NOT EXISTS storage_url TEXT',
             "ALTER TABLE assistant_knowledge_files ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'rag'",
+            // Ficheiros do Google Drive (voltam a ser lidos quando mudam no Drive)
+            "ALTER TABLE assistant_knowledge_files ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'upload'",
+            'ALTER TABLE assistant_knowledge_files ADD COLUMN IF NOT EXISTS external_id TEXT',
+            'ALTER TABLE assistant_knowledge_files ADD COLUMN IF NOT EXISTS external_modified_at TIMESTAMPTZ',
+            'ALTER TABLE assistant_knowledge_files ADD COLUMN IF NOT EXISTS synced_at TIMESTAMPTZ',
             // Memória: flags de configuração no config do user_assistant
             // (memory_enabled e memory_window ficam no JSONB config, não precisam de coluna nova)
         ];
@@ -1043,6 +1048,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
         const safeKind = kind === 'client' ? 'client' : kind === 'rag' ? 'rag' : null;
         const result = await query(
             `SELECT id, user_assistant_id, user_id, file_name, kind, mime_type, size_bytes, status, char_count, error_message,
+                    source, synced_at,
                     CASE WHEN status = 'ready' THEN LEFT(text_content, 220)
                          ELSE COALESCE(error_message, '')
                     END AS preview,
