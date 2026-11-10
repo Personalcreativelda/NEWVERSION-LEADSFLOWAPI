@@ -380,6 +380,8 @@ export class AIService {
                AND TRIM(content) NOT IN ('[Mídia]', '[image]', '[audio]', '[video]', '[document]', '[sticker]')
                AND content NOT LIKE '[O usuário enviou%'
                AND content NOT LIKE '[The user sent%'
+               -- Notas internas (funil, marcações, passagens na equipa) não são conversa
+               AND COALESCE(metadata->>'is_system', 'false') <> 'true'
              ORDER BY created_at DESC LIMIT $2`,
             [conversationId, limit]
         );

@@ -190,10 +190,11 @@ export const assistantsApi = {
     /**
      * Conecta um assistente com múltiplos canais
      */
-    async connect(assistantId: string, channelIds?: string[]): Promise<UserAssistant> {
+    async connect(assistantId: string, channelIds?: string[], replaceChannelIds: string[] = []): Promise<UserAssistant> {
         const { data } = await api.post<UserAssistant>('/assistants/connect', {
             assistantId,
-            channelIds
+            channelIds,
+            replaceChannelIds
         });
         return data;
     },
@@ -218,10 +219,11 @@ export const assistantsApi = {
     /**
      * Atualiza configuração do assistente
      */
-    async configure(userAssistantId: string, config: Record<string, any>, channelIds?: string[]): Promise<UserAssistant> {
+    async configure(userAssistantId: string, config: Record<string, any>, channelIds?: string[], replaceChannelIds: string[] = []): Promise<UserAssistant> {
         const { data } = await api.put<UserAssistant>(`/assistants/${userAssistantId}/configure`, {
             config,
-            channelIds
+            channelIds,
+            replaceChannelIds
         });
         return data;
     },

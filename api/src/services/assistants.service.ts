@@ -97,6 +97,12 @@ export interface CreateAssistantInput {
     memory_window?: number;  // número de mensagens por sessão (5-50)
 }
 
+/** Só os canais que o assistente vai mesmo usar podem sair dos outros */
+function onlyChosen(replace: unknown, channelIds: string[]): string[] {
+    const keep = new Set((channelIds || []).map(String));
+    return Array.isArray(replace) ? replace.map(String).filter((id) => keep.has(id)) : [];
+}
+
 export class AssistantsService {
     /**
      * Lista todos os assistentes disponíveis no marketplace (globais + custom do user)
@@ -626,7 +632,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
      * Conecta um assistente ao usuário com múltiplos canais
      * Se já existe, ATUALIZA os canais (UPSERT)
      */
-    async connectAssistant(assistantId: string, userId: string, channelIds?: string[]): Promise<UserAssistant> {
+    async connectAssistant(assistantId: string, userId: string, channelIds?: string[], replaceChannelIds: string[] = []): Promise<UserAssistant> {
         // Garantir que as colunas novas existem
         await this.ensureColumns();
 
@@ -673,7 +679,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
         }
 
         const userAssistant = result.rows[0];
-        await this.releaseChannels(userId, userAssistant.id, channelIdsArray);
+        await this.releaseChannels(userId, userAssistant.id, onlyChosen(replaceChannelIds, channelIdsArray));
 
         // Enviar webhook para n8n para criar/configurar o workflow (silenciosamente)
         const action = existing.rows[0] ? 'configure' : 'connect';
@@ -689,9 +695,8 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
     }
 
     /**
-     * Um assistente por canal (como no WhatsApp Business): os canais dados a este assistente
-     * saem dos outros assistentes da mesma conta. Sem isto, dois assistentes no mesmo canal
-     * respondiam alternadamente e os follow-ups saíam em dobro.
+     * "Substituir": os canais indicados saem dos outros assistentes da conta. Sem esta escolha,
+     * os assistentes do mesmo canal trabalham em equipa (assistant-team.service).
      */
     async releaseChannels(userId: string, keepUserAssistantId: string, channelIds: string[]): Promise<Array<{ id: string; removed: string[] }>> {
         const wanted = new Set((channelIds || []).filter(Boolean).map(String));
@@ -750,7 +755,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
     /**
      * Atualiza os canais conectados de um assistente
      */
-    async updateChannels(userAssistantId: string, userId: string, channelIds: string[]): Promise<UserAssistant | null> {
+    async updateChannels(userAssistantId: string, userId: string, channelIds: string[], replaceChannelIds: string[] = []): Promise<UserAssistant | null> {
         const primaryChannelId = channelIds.length > 0 ? channelIds[0] : null;
 
         const result = await query(
@@ -762,7 +767,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
         );
 
         if (!result.rows[0]) return null;
-        await this.releaseChannels(userId, userAssistantId, channelIds);
+        await this.releaseChannels(userId, userAssistantId, onlyChosen(replaceChannelIds, channelIds));
 
         const userAssistant = await this.findUserAssistantById(userAssistantId, userId);
 
@@ -787,7 +792,8 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
         userAssistantId: string,
         userId: string,
         config: any,
-        channelIds?: string[]
+        channelIds?: string[],
+        replaceChannelIds: string[] = []
     ): Promise<UserAssistant | null> {
         const fields: string[] = ['config = $1', 'is_configured = true', 'updated_at = NOW()'];
         const values: any[] = [JSON.stringify(config)];
@@ -814,7 +820,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
         if (!result.rows[0]) {
             return null;
         }
-        if (channelIds !== undefined) await this.releaseChannels(userId, userAssistantId, channelIds);
+        if (channelIds !== undefined) await this.releaseChannels(userId, userAssistantId, onlyChosen(replaceChannelIds, channelIds));
 
         const userAssistant = await this.findUserAssistantById(userAssistantId, userId);
 

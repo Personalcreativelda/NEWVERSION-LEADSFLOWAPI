@@ -1,6 +1,8 @@
 import { matchesSearch } from '../../utils/search';
 import { OverlayModal } from '../base/OverlayModal';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { AppModal } from '../base/AppModal';
+import { ChoiceList } from '../base/ChoiceList';
 import {
   Bot, Search, Plus, Settings, Power, PowerOff, Trash2,
   Briefcase, Headphones, Calendar, Users, ShoppingCart,
@@ -287,20 +289,29 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     );
   };
 
-  // Um assistente por canal: que outro assistente já usa este canal?
+  // Que outro assistente já usa este canal?
   const channelOwner = (channelId: string, exceptUserAssistantId?: string) =>
     userAssistants.find((ua) => ua.id !== exceptUserAssistantId && (ua.channel_ids || []).includes(channelId));
 
-  /** Os canais escolhidos que estão noutro assistente passam para este: pede confirmação */
-  const confirmChannelMoves = async (channelIds: string[], exceptUserAssistantId?: string) => {
-    const moves = channelIds
-      .map((id) => ({ channel: channels.find((c) => c.id === id), owner: channelOwner(id, exceptUserAssistantId) }))
-      .filter((m) => m.channel && m.owner);
-    if (moves.length === 0) return true;
-    const lines = moves.map((m) => `${assistantChannelName(m.channel!)}: sai de ${m.owner!.assistant?.name || 'outro assistente'}`).join('\n');
-    return confirm(`Cada canal tem um só assistente, para não responderem os dois ao mesmo cliente.\n${lines}`, {
-      title: 'Mudar de assistente?',
-      confirmLabel: 'Mudar',
+  // Canal que já tem assistente: trabalham em equipa (passam a conversa entre si) ou este substitui o outro
+  const [sharing, setSharing] = useState<{ rows: { channel: Channel; owner: UserAssistant }[]; mode: 'team' | 'replace' } | null>(null);
+  const sharingResolve = useRef<(value: string[] | null) => void>(() => {});
+  const finishSharing = (value: string[] | null) => {
+    setSharing(null);
+    sharingResolve.current(value);
+  };
+
+  /** Canais a tirar dos outros assistentes ([] = em equipa; null = cancelado). Só pergunta pelos canais novos. */
+  const askChannelSharing = (channelIds: string[], current?: UserAssistant | null): Promise<string[] | null> => {
+    const already = new Set(current?.id ? current.channel_ids || [] : []);
+    const rows = channelIds
+      .filter((id) => !already.has(id))
+      .map((id) => ({ channel: channels.find((c) => c.id === id)!, owner: channelOwner(id, current?.id || undefined)! }))
+      .filter((r) => r.channel && r.owner);
+    if (rows.length === 0) return Promise.resolve([]);
+    return new Promise((resolve) => {
+      sharingResolve.current = resolve;
+      setSharing({ rows, mode: 'team' });
     });
   };
 
@@ -313,11 +324,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       toast.error('Selecione pelo menos UM canal para ligar o assistente');
       return;
     }
-    if (!(await confirmChannelMoves(selectedChannelIds))) return;
+    const replaceChannelIds = await askChannelSharing(selectedChannelIds);
+    if (replaceChannelIds === null) return;
 
     try {
       setActionLoading(true);
-      await assistantsApi.connect(selectedAssistant.id, selectedChannelIds);
+      await assistantsApi.connect(selectedAssistant.id, selectedChannelIds, replaceChannelIds);
       toast.success(`${selectedAssistant.name} ligado com sucesso!`);
       setConnectModalOpen(false);
       setSelectedAssistant(null);
@@ -383,7 +395,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         return;
       }
     }
-    if (!(await confirmChannelMoves(selectedChannelIds, selectedUserAssistant.id || undefined))) return;
+    const replaceChannelIds = await askChannelSharing(selectedChannelIds, selectedUserAssistant);
+    if (replaceChannelIds === null) return;
 
     // Basic validation: require AI api key if provider is configured
     if (configValues.ai_provider && !configValues.ai_api_key?.trim()) {
@@ -410,13 +423,14 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       }
       let targetId = selectedUserAssistant.id;
       if (isPreview) {
-        const connected = await assistantsApi.connect(selectedUserAssistant.assistant_id, selectedChannelIds);
+        const connected = await assistantsApi.connect(selectedUserAssistant.assistant_id, selectedChannelIds, replaceChannelIds);
         targetId = connected.id;
       }
       await assistantsApi.configure(
         targetId,
         valuesToSave,
-        selectedChannelIds.length > 0 ? selectedChannelIds : undefined
+        selectedChannelIds.length > 0 ? selectedChannelIds : undefined,
+        replaceChannelIds
       );
       toast.success(isPreview ? `${previewAssistant?.name || 'Assistente'} ligado com sucesso!` : 'Configuração guardada com sucesso!');
       closeSettings();
@@ -1477,6 +1491,23 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
               </div>
 
+              {/* Equipa: o que este assistente faz quando partilha o canal com outros */}
+              {selectedChannelIds.some((id) => channelOwner(id, selectedUserAssistant.id || undefined)) && (
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-foreground">
+                    Função na equipa
+                  </label>
+                  <textarea
+                    value={configValues.team_role || ''}
+                    onChange={(e) => setConfigValues({ ...configValues, team_role: e.target.value })}
+                    rows={2}
+                    maxLength={240}
+                    className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
+                    placeholder={(selectedUserAssistant.assistant as Assistant | undefined)?.short_description || 'Ex.: Marcações e reagendamentos'}
+                  />
+                </div>
+              )}
+
               {/* Greeting */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-foreground">
@@ -2485,6 +2516,52 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             </div>
         </OverlayModal>
       )}
+
+      {/* Canal que já tem assistente: equipa ou substituir */}
+      <AppModal
+        open={!!sharing}
+        onOpenChange={(open) => { if (!open) finishSharing(null); }}
+        title="Canal com outro assistente"
+        size="sm"
+        footer={(
+          <>
+            <Button variant="outline" onClick={() => finishSharing(null)}>Cancelar</Button>
+            <Button onClick={() => finishSharing(sharing?.mode === 'replace' ? sharing.rows.map((r) => r.channel.id) : [])}>
+              Continuar
+            </Button>
+          </>
+        )}
+      >
+        {sharing && (
+          <div className="space-y-3">
+            <div className="divide-y divide-border rounded-xl border border-border">
+              {sharing.rows.map((r) => (
+                <div key={r.channel.id} className="flex items-center gap-3 px-4 py-2.5">
+                  {renderChannelIcon(r.channel.type, 'w-4 h-4')}
+                  <span className="min-w-0 flex-1 truncate text-sm">{assistantChannelName(r.channel)}</span>
+                  <span className="max-w-[45%] flex-shrink-0 truncate text-xs text-muted-foreground">{r.owner.assistant?.name}</span>
+                </div>
+              ))}
+            </div>
+            <ChoiceList
+              value={sharing.mode}
+              onChange={(mode) => setSharing({ ...sharing, mode })}
+              options={[
+                {
+                  value: 'team',
+                  label: 'Trabalhar em equipa',
+                  children: <p className="text-sm text-muted-foreground">Cada conversa fica com um deles, que a passa ao outro quando o pedido é da área dele.</p>,
+                },
+                {
+                  value: 'replace',
+                  label: 'Substituir',
+                  children: <p className="text-sm text-muted-foreground">O outro assistente deixa de responder neste canal.</p>,
+                },
+              ]}
+            />
+          </div>
+        )}
+      </AppModal>
     </div>
   );
 }

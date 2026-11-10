@@ -82,12 +82,13 @@ async function candidates(): Promise<FollowupCandidate[]> {
             (SELECT MAX(m2.created_at) FROM messages m2 WHERE m2.conversation_id = c.id AND m2.direction = 'in') AS last_in_at
        FROM conversations c
        JOIN leads l ON l.id = c.lead_id
-       -- Um só assistente por conversa: o mesmo que responde no canal (nunca follow-ups em dobro)
+       -- Um só assistente por conversa: o responsável (equipa no canal) ou o que responde no canal
        JOIN LATERAL (
          SELECT u2.* FROM user_assistants u2
           WHERE u2.user_id = c.user_id AND u2.is_active = true
             AND (c.channel_id = ANY(u2.channel_ids) OR u2.channel_id = c.channel_id)
-          ORDER BY u2.updated_at DESC NULLS LAST, u2.created_at DESC
+          ORDER BY (u2.id::text = c.metadata->'ai_team'->>'owner') DESC NULLS LAST,
+                   u2.updated_at DESC NULLS LAST, u2.created_at DESC
           LIMIT 1
        ) ua ON true
        JOIN assistants a ON a.id = ua.assistant_id

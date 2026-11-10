@@ -5,6 +5,7 @@ import { canSetDealValue, formatDealValue, mentionsPrice, parseDealValue } from 
 import { GUARDRAIL_RULES, INJECTION_NOTE, checkReply, detectInjection, fenceCustomerMessage, safeRefusal } from './guardrails.service';
 import { agendaBlock, agendaOptions, applyDecision, decisionPrompt, hasSchedulingIntent, parseDecision, pendingForConversation } from './appointments.service';
 import { query } from '../database/connection';
+import { MAX_HANDOFFS, getTeamState, logHandoff, parseHandoff, pickResponsible, saveTeamState, stripHandoff, teamBlock, teamForChannel, type TeamMember, type TeamState } from './assistant-team.service';
 import { AIService, getAvailableProviders, needsWrittenCopy, type AIMessage, type AIProvider, type ProviderConfig } from './ai.service';
 import { AssistantsService } from './assistants.service';
 import { WhatsAppService } from './whatsapp.service';
@@ -156,21 +157,33 @@ export class AssistantProcessorService {
                 }
             }
 
-            // 1. Verificar se há assistente ativo para este canal
-            const activeAssistant = await this.findActiveAssistantForChannel(ctx.channelId, ctx.userId);
-            if (!activeAssistant) {
+            // 1. Assistentes ativos neste canal. Com vários (equipa), responde o responsável da
+            // conversa; numa conversa nova a escolha é feita depois de ler a mensagem (passo 4e)
+            const team: TeamMember[] = await teamForChannel(ctx.userId, ctx.channelId);
+            if (team.length === 0) {
                 return false;
             }
+            let teamState: TeamState = team.length > 1 ? await getTeamState(ctx.conversationId) : {};
+            const currentOwner = teamState.owner ? team.find((m) => m.user_assistant_id === teamState.owner) : undefined;
+            let activeAssistant: TeamMember = currentOwner || team[0];
+            const needsRouting = team.length > 1 && !currentOwner;
 
             console.log(`[AssistantProcessor] Assistente "${activeAssistant.assistant_name}" ativo para canal ${ctx.channelId}`);
 
             // 2. Detectar provedores disponíveis (com fallback automático)
-            const config = activeAssistant.config || {};
-            const configuredProvider = config.ai_provider as AIProvider | undefined;
-            const model = config.ai_model as string | undefined;
+            let config = activeAssistant.config || {};
+            let model = config.ai_model as string | undefined;
 
             // Constrói lista ordenada: provedor preferido do assistente → env AI_PROVIDER → restantes
-            const availableProviders: ProviderConfig[] = getAvailableProviders(configuredProvider);
+            let availableProviders: ProviderConfig[] = getAvailableProviders(config.ai_provider as AIProvider | undefined);
+            /** Outro assistente da equipa passa a responder: as definições passam a ser as dele */
+            const useAssistant = (member: TeamMember) => {
+                activeAssistant = member;
+                config = member.config || {};
+                model = config.ai_model as string | undefined;
+                const own = getAvailableProviders(config.ai_provider as AIProvider | undefined);
+                if (own.length > 0) availableProviders = own;
+            };
 
             if (availableProviders.length === 0) {
                 console.warn(
@@ -362,6 +375,19 @@ export class AssistantProcessorService {
                 }
             }
 
+            // 4e. Equipa no canal e conversa nova: escolhe quem atende pela função de cada um
+            if (needsRouting) {
+                const recent = (await aiService.getConversationHistory(ctx.conversationId, 7))
+                    .slice(0, -1)
+                    .map((m) => `${m.role === 'user' ? 'Cliente' : 'Empresa'}: ${String(m.content).slice(0, 200)}`)
+                    .join('\n');
+                const pick = await pickResponsible(team, {}, ctx.messageContent, recent, availableProviders);
+                useAssistant(pick.member);
+                teamState = { owner: pick.member.user_assistant_id, since: new Date().toISOString(), handoffs: teamState.handoffs || 0 };
+                await saveTeamState(ctx.conversationId, teamState).catch(() => {});
+                console.log(`[Equipa] Conversa ${ctx.conversationId} → ${pick.member.assistant_name}`);
+            }
+
             // 4d. Detecção de pedido de arquivo — o assistente envia documentos da base de conhecimento
             // (regra leve, sem custo de IA; roda APÓS o processamento de mídia para pegar áudio transcrito/legenda)
             const fileSendingEnabled = config.file_sending_enabled !== false; // padrão: ativo
@@ -401,19 +427,60 @@ export class AssistantProcessorService {
                 }
             }
 
-            // 4. Construir mensagens para IA
-            const messages = await this.buildAIMessages(ctx, activeAssistant);
-
-            // 5. Chamar IA (com fallback automático entre provedores)
-            const startTime = Date.now();
-            const aiResponse = await aiService.generateResponseWithFallback(messages, availableProviders, model);
+            // 4-5. Construir mensagens e chamar a IA (com fallback automático entre provedores).
+            // Em equipa, o assistente pode passar a conversa a um colega ([[PASSAR:n]]): o colega
+            // responde logo a seguir, à mesma mensagem — no máximo MAX_HANDOFFS passagens.
+            let handoffs = 0;
+            let previousOwner: string | undefined;
+            let lockHandoff = false;
+            let startTime = Date.now();
+            let aiResponse: Awaited<ReturnType<typeof aiService.generateResponseWithFallback>>;
+            for (;;) {
+                const teamCtx = team.length > 1
+                    ? { team, state: teamState, allowHandoff: !lockHandoff && handoffs < MAX_HANDOFFS }
+                    : undefined;
+                const messages = await this.buildAIMessages(ctx, activeAssistant, teamCtx);
+                startTime = Date.now();
+                aiResponse = await aiService.generateResponseWithFallback(messages, availableProviders, model);
+                if (!aiResponse.content) {
+                    console.warn('[AssistantProcessor] Resposta vazia da IA');
+                    return false;
+                }
+                if (!teamCtx) break;
+                const handoff = parseHandoff(aiResponse.content, team, activeAssistant);
+                if (handoff && teamCtx.allowHandoff && handoff.to.user_assistant_id !== previousOwner) {
+                    handoffs++;
+                    previousOwner = activeAssistant.user_assistant_id;
+                    await logHandoff(ctx, activeAssistant, handoff.to, handoff.note);
+                    teamState = {
+                        owner: handoff.to.user_assistant_id,
+                        since: new Date().toISOString(),
+                        from: activeAssistant.assistant_name,
+                        note: handoff.note,
+                        handoffs: (teamState.handoffs || 0) + 1,
+                    };
+                    await saveTeamState(ctx.conversationId, teamState).catch(() => {});
+                    console.log(`[Equipa] ${activeAssistant.assistant_name} passou a conversa a ${handoff.to.assistant_name}`);
+                    useAssistant(handoff.to);
+                    continue;
+                }
+                const clean = stripHandoff(aiResponse.content);
+                if (!clean) {
+                    // Quis passar mas não pode (voltava atrás ou já passou demasiadas vezes): responde ele
+                    if (lockHandoff) return false;
+                    lockHandoff = true;
+                    continue;
+                }
+                aiResponse.content = clean;
+                // A nota de passagem só serve para a primeira resposta do colega
+                if (teamState.note) {
+                    teamState = { owner: teamState.owner, since: teamState.since, handoffs: teamState.handoffs };
+                    await saveTeamState(ctx.conversationId, teamState).catch(() => {});
+                }
+                break;
+            }
             const responseTime = Date.now() - startTime;
             const provider = aiResponse.provider;
-
-            if (!aiResponse.content) {
-                console.warn('[AssistantProcessor] Resposta vazia da IA');
-                return false;
-            }
 
             console.log(`[AssistantProcessor] Resposta gerada em ${responseTime}ms (${aiResponse.tokensUsed} tokens)`);
 
@@ -668,7 +735,11 @@ export class AssistantProcessorService {
      * Constrói array de mensagens para enviar à IA,
      * incorporando memória de curto e longo prazo
      */
-    private async buildAIMessages(ctx: IncomingMessageContext, assistant: any): Promise<AIMessage[]> {
+    private async buildAIMessages(
+        ctx: IncomingMessageContext,
+        assistant: any,
+        teamCtx?: { team: TeamMember[]; state: TeamState; allowHandoff: boolean }
+    ): Promise<AIMessage[]> {
         const config = assistant.config || {};
         const defaultConfig = assistant.default_config || {};
         const instructions = config.instructions || defaultConfig.instructions || '';
@@ -822,6 +893,11 @@ export class AssistantProcessorService {
             } catch (agendaErr: any) {
                 console.warn('[AssistantProcessor] Agenda indisponível:', agendaErr.message);
             }
+        }
+
+        // Equipa no mesmo canal: os colegas, o que fazem e a nota de quem passou a conversa
+        if (teamCtx) {
+            messages[0].content += teamBlock(teamCtx.team, assistant, teamCtx.allowHandoff, teamCtx.state);
         }
 
         // Proteção contra manipulação (ativa por omissão)

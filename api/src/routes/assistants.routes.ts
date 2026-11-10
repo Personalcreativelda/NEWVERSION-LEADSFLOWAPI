@@ -260,7 +260,7 @@ router.post('/connect', async (req, res, next) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const { assistantId, channelIds } = req.body;
+        const { assistantId, channelIds, replaceChannelIds } = req.body;
 
         if (!assistantId) {
             return res.status(400).json({ error: 'assistantId é obrigatório' });
@@ -277,7 +277,8 @@ router.post('/connect', async (req, res, next) => {
         const userAssistant = await assistantsService.connectAssistant(
             assistantId,
             user.id,
-            channelIds
+            channelIds,
+            Array.isArray(replaceChannelIds) ? replaceChannelIds : []
         );
         res.status(201).json(userAssistant);
     } catch (error: any) {
@@ -315,12 +316,12 @@ router.put('/:id/channels', async (req, res, next) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const { channelIds } = req.body;
+        const { channelIds, replaceChannelIds } = req.body;
         if (!Array.isArray(channelIds)) {
             return res.status(400).json({ error: 'channelIds deve ser um array' });
         }
 
-        const userAssistant = await assistantsService.updateChannels(req.params.id, user.id, channelIds);
+        const userAssistant = await assistantsService.updateChannels(req.params.id, user.id, channelIds, Array.isArray(replaceChannelIds) ? replaceChannelIds : []);
         if (!userAssistant) {
             return res.status(404).json({ error: 'Assistente não encontrado' });
         }
@@ -339,7 +340,7 @@ router.put('/:id/configure', async (req, res, next) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const { config, channelIds } = req.body;
+        const { config, channelIds, replaceChannelIds } = req.body;
 
         if (!config) {
             return res.status(400).json({ error: 'config é obrigatório' });
@@ -349,7 +350,8 @@ router.put('/:id/configure', async (req, res, next) => {
             req.params.id,
             user.id,
             config,
-            channelIds
+            channelIds,
+            Array.isArray(replaceChannelIds) ? replaceChannelIds : []
         );
 
         if (!userAssistant) {
