@@ -21,6 +21,9 @@ function sendPage(res: any, html: string, nonce: string) {
   // O seletor do Google abre janelas e a página de fim fala com a janela que a abriu
   res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
   res.setHeader('Cache-Control', 'no-store');
+  // O helmet põe "no-referrer"; o seletor do Google precisa da origem para validar a chave
+  // (restrita a api.leadsflowapi.com) — sem ela dá "The API developer key is invalid".
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.type('html').send(html);
 }
 

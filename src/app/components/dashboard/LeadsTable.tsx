@@ -189,40 +189,24 @@ export default function LeadsTable({
     return matchesSearch(busca, lead.nome, lead.telefone, lead.email, lead.interesse, lead.origem, lead.status, (lead as any).empresa);
   });
 
-  const handleBuscaChange = (valor: string) => setBusca(valor);
+  // Pesquisa nova limpa a seleção: nunca apagar leads que deixaram de estar à vista
+  const handleBuscaChange = (valor: string) => { setBusca(valor); setSelectedIds([]); };
 
-  // "Todos selecionados" no sentido do conjunto filtrado inteiro — quando
-  // verdadeiro, a ação em massa oferece "Apagar Todos" em vez de "Deletar
-  // Selecionados" (mesmo espírito do atalho que já existia).
-  const allFilteredSelected = selectedIds.length > 0 && selectedIds.length === leadsFiltrados.length;
+  // Apaga sempre só os selecionados. Com pesquisa ativa, "todos" são os que aparecem — nunca a conta inteira.
+  const allSelected = selectedIds.length > 0 && selectedIds.length === leads.length;
+  const deleteLabel = allSelected ? `Apagar todos (${selectedIds.length})` : `Apagar selecionados (${selectedIds.length})`;
 
   const handleDeleteSelected = async () => {
-    if (selectedIds.length === 0) return;
-    const confirmed = await confirm(`Tem certeza que deseja apagar ${selectedIds.length} lead(s) selecionado(s)?`, {
-      title: 'Eliminar leads selecionados',
-      confirmLabel: 'Eliminar',
-      variant: 'danger',
-    });
+    if (selectedIds.length === 0 || !onDeleteMultiple) return;
+    const confirmed = await confirm(
+      allSelected
+        ? `Apagar todos os ${selectedIds.length} leads? Esta ação não pode ser desfeita.`
+        : `Apagar ${selectedIds.length} lead(s) selecionado(s)? Esta ação não pode ser desfeita.`,
+      { title: allSelected ? 'Apagar todos os leads' : 'Apagar leads selecionados', confirmLabel: 'Apagar', variant: 'danger' },
+    );
     if (!confirmed) return;
-    if (onDeleteMultiple) {
-      onDeleteMultiple(selectedIds);
-      setSelectedIds([]);
-    }
-  };
-
-  const handleDeleteAll = async () => {
-    if (leads.length === 0) return;
-    const confirmed = await confirm(`Tem certeza que deseja apagar TODOS os ${leads.length} contactos? Esta ação não pode ser desfeita.`, {
-      title: 'Apagar todos os contactos',
-      confirmLabel: 'Apagar Todos',
-      variant: 'danger',
-    });
-    if (!confirmed) return;
-    if (onDeleteMultiple) {
-      const allIds = leads.map((l) => l.id).filter(Boolean);
-      onDeleteMultiple(allIds);
-      setSelectedIds([]);
-    }
+    onDeleteMultiple(selectedIds);
+    setSelectedIds([]);
   };
 
   const isExpired = planExpired === true;
@@ -413,8 +397,9 @@ export default function LeadsTable({
               <AppButton
                 size="icon"
                 variant="destructive"
-                onClick={allFilteredSelected ? handleDeleteAll : handleDeleteSelected}
-                title={allFilteredSelected ? `Apagar Todos (${leads.length})` : `Apagar Selecionados (${selectedIds.length})`}
+                onClick={handleDeleteSelected}
+                title={deleteLabel}
+                aria-label={deleteLabel}
               >
                 <Trash2 />
               </AppButton>
@@ -441,11 +426,11 @@ export default function LeadsTable({
           <div className="flex flex-wrap gap-2">
             {selectedIds.length > 0 && onDeleteMultiple && (
               <>
-                <AppButton variant="destructive" onClick={allFilteredSelected ? handleDeleteAll : handleDeleteSelected}>
-                  {allFilteredSelected ? `Apagar Todos (${leads.length})` : `Apagar Selecionados (${selectedIds.length})`}
+                <AppButton variant="destructive" onClick={handleDeleteSelected}>
+                  {deleteLabel}
                 </AppButton>
                 <AppButton variant="outline" onClick={() => setSelectedIds([])}>
-                  Limpar Seleção
+                  Limpar seleção
                 </AppButton>
               </>
             )}

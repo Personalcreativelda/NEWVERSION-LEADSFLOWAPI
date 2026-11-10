@@ -676,6 +676,35 @@ router.post('/import-bulk', async (req, res, next) => {
   }
 });
 
+router.post('/delete-many', async (req, res, next) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const ids = req.body?.ids;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Nenhum lead indicado' });
+    }
+    if (ids.length > 10000) {
+      return res.status(400).json({ error: 'Demasiados leads de uma vez' });
+    }
+
+    const deleted = await leadsService.deleteMany(ids, user.id);
+
+    void activityService.logActivity({
+      userId: user.id,
+      type: 'lead_deleted',
+      description: `Removeu ${deleted.length} lead(s) selecionado(s)`,
+      metadata: { count: deleted.length }
+    });
+
+    res.json({ success: true, deleted: deleted.length, ids: deleted });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/remove-duplicates', async (req, res, next) => {
   try {
     const user = req.user;

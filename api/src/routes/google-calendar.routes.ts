@@ -1,6 +1,7 @@
 // Google Calendar nas Tarefas e lembretes (ver services/google-calendar.service.ts).
 //   GET    /status     configurado? ligado? com que email?
 //   POST   /start      endereço do login do Google
+//   GET    /events     próximos eventos (?days=1..90, por omissão 30)
 //   GET    /callback   (público) o Google volta aqui
 //   GET    /done       (público) fim na web: avisa as Tarefas e fecha a janela
 //   DELETE /           desligar
@@ -9,7 +10,7 @@ import { Router } from 'express';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth.middleware';
 import {
   buildCalendarAuthorizeUrl, calendarConnection, calendarDonePage, calendarReturnUrl, createCalendarState,
-  disconnectCalendar, exchangeCalendarCode, isCalendarConfigured, readCalendarState,
+  disconnectCalendar, exchangeCalendarCode, isCalendarConfigured, listEvents, readCalendarState,
 } from '../services/google-calendar.service';
 import { drivePageCsp } from '../services/google-drive.service';
 
@@ -28,6 +29,22 @@ router.get('/status', requireAuth, async (req: AuthenticatedRequest, res, next) 
     const conn = configured ? await calendarConnection(req.user!.id) : null;
     res.json({ configured, connected: !!conn, email: conn?.email || null });
   } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/events', requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const days = Math.min(90, Math.max(1, Number(req.query.days) || 30));
+    const from = new Date();
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(from.getTime() + days * 86_400_000);
+    const events = await listEvents(req.user!.id, from, to);
+    if (events === null) return res.status(404).json({ error: 'Google Calendar não ligado' });
+    res.json({ events });
+  } catch (err: any) {
+    // Acesso retirado na conta Google: pedir para ligar de novo em vez de um erro genérico
+    if (err?.status === 401 || err?.status === 403) return res.status(409).json({ error: 'Ligue o Google Calendar de novo.', reconnect: true });
     next(err);
   }
 });

@@ -38,7 +38,7 @@ import { useConfirm } from '../ui/ConfirmDialog';
 import { scheduledConversationsApi } from '../../utils/api';
 import type { ScheduledConversation } from '../../types';
 import { SCHEDULES_CHANGED_EVENT } from '../dashboard/FunnelReminders';
-import { googleCalendarApi } from '../../services/api/assistants';
+import { googleCalendarApi, type GoogleCalendarEvent } from '../../services/api/assistants';
 import { BrandIcon } from '../base/BrandIcon';
 import { isNativeApp, openBrowser } from '../../../native';
 
@@ -196,6 +196,24 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
   const [calendarBusy, setCalendarBusy] = useState(false);
   const refreshCalendar = useCallback(() => { googleCalendarApi.status().then(setCalendar).catch(() => setCalendar(null)); }, []);
   useEffect(() => { refreshCalendar(); }, [refreshCalendar]);
+
+  // Próximos 30 dias do calendário ligado (só leitura; os assistentes marcam lá)
+  const [calendarEvents, setCalendarEvents] = useState<GoogleCalendarEvent[] | null>(null);
+  const [showAllEvents, setShowAllEvents] = useState(false);
+  useEffect(() => {
+    if (!calendar?.connected) { setCalendarEvents(null); return; }
+    let alive = true;
+    googleCalendarApi.events(30)
+      .then((list) => { if (alive) setCalendarEvents(list); })
+      .catch((err: any) => {
+        if (!alive) return;
+        setCalendarEvents([]);
+        if (err?.response?.status === 409) toast.error('Ligue o Google Calendar de novo.');
+        if (err?.response?.status === 404) refreshCalendar();
+      });
+    return () => { alive = false; };
+  }, [calendar?.connected, refreshCalendar]);
+
   useEffect(() => {
     const done = (params: Record<string, string>) => {
       setCalendarBusy(false);
@@ -408,6 +426,33 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
               <button type="button" onClick={() => void disconnectCalendar()} className="h-10 rounded-lg px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
                 Desligar
               </button>
+              <div className="w-full border-t border-border pt-2">
+                {calendarEvents === null ? (
+                  <p className="py-2 text-sm text-muted-foreground">A carregar eventos…</p>
+                ) : calendarEvents.length === 0 ? (
+                  <p className="py-2 text-sm text-muted-foreground">Sem eventos nos próximos 30 dias</p>
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {(showAllEvents ? calendarEvents : calendarEvents.slice(0, 5)).map((ev) => {
+                      const start = new Date(ev.allDay ? `${ev.start}T00:00:00` : ev.start);
+                      const day = isToday(start) ? 'Hoje' : format(start, "EEE, d MMM", { locale: ptBR });
+                      return (
+                        <li key={ev.id} className="flex items-baseline gap-3 py-2">
+                          <span className="w-32 flex-shrink-0 text-xs text-muted-foreground">
+                            {day} · {ev.allDay ? 'Dia todo' : format(start, 'HH:mm')}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-sm text-foreground" translate="no">{ev.summary}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {calendarEvents && calendarEvents.length > 5 && (
+                  <button type="button" onClick={() => setShowAllEvents((v) => !v)} className="h-10 text-sm font-medium text-primary hover:underline">
+                    {showAllEvents ? 'Mostrar menos' : `Ver todos (${calendarEvents.length})`}
+                  </button>
+                )}
+              </div>
             </>
           ) : (
             <>

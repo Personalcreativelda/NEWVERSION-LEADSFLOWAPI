@@ -176,6 +176,31 @@ export async function getBusy(userId: string, from: Date, to: Date): Promise<Bus
   }
 }
 
+export interface CalendarEvent { id: string; summary: string; start: string; end: string; allDay: boolean; location: string | null; link: string | null }
+
+/** Próximos eventos do calendário ligado, para mostrar nas Tarefas (null = não ligado) */
+export async function listEvents(userId: string, from: Date, to: Date): Promise<CalendarEvent[] | null> {
+  const conn = await calendarConnection(userId);
+  if (!conn) return null;
+  const qs = new URLSearchParams({
+    timeMin: from.toISOString(), timeMax: to.toISOString(),
+    singleEvents: 'true', orderBy: 'startTime', maxResults: '100',
+  });
+  const data = await calendarFetch(userId, `/calendars/${encodeURIComponent(conn.calendarId)}/events?${qs}`);
+  if (!data) return null;
+  return (data.items || [])
+    .filter((e: any) => e.status !== 'cancelled' && (e.start?.dateTime || e.start?.date))
+    .map((e: any) => ({
+      id: String(e.id),
+      summary: e.summary || '(sem título)',
+      start: e.start.dateTime || e.start.date,
+      end: e.end?.dateTime || e.end?.date || e.start.dateTime || e.start.date,
+      allDay: !e.start.dateTime,
+      location: e.location || null,
+      link: e.htmlLink || null,
+    }));
+}
+
 export interface EventInput { summary: string; description?: string; start: Date; end: Date }
 
 /** Cria o evento; devolve o id (ou null sem calendário ligado / em erro) */

@@ -1156,6 +1156,13 @@ export const leadsApi = {
     }, true);
   },
 
+  deleteMany: async (ids: string[]) => {
+    return apiCall('/leads/delete-many', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }, true);
+  },
+
   removeDuplicates: async () => {
     return apiCall('/leads/remove-duplicates', {
       method: 'POST',

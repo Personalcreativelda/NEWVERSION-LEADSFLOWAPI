@@ -332,7 +332,13 @@ export const googleCalendarApi = {
     async disconnect(): Promise<void> {
         await api.delete('/oauth/google-calendar');
     },
+    async events(days = 30): Promise<GoogleCalendarEvent[]> {
+        const { data } = await api.get<{ events: GoogleCalendarEvent[] }>('/oauth/google-calendar/events', { params: { days } });
+        return data.events || [];
+    },
 };
+
+export interface GoogleCalendarEvent { id: string; summary: string; start: string; end: string; allDay: boolean; location: string | null; link: string | null }
 
 // ── Conversa de teste (antes ou depois de ligar; nada vai para os canais) ──
 export async function testAssistantChat(input: {

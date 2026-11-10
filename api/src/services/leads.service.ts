@@ -243,6 +243,15 @@ export class LeadsService {
     return result.rows[0];
   }
 
+  // Apagar vários de uma vez (seleção na tabela). Só ids válidos e só da própria conta.
+  async deleteMany(ids: string[], userId: string): Promise<string[]> {
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const valid = [...new Set(ids.filter((id) => typeof id === 'string' && uuid.test(id)))];
+    if (valid.length === 0) return [];
+    const result = await query('DELETE FROM leads WHERE user_id = $1 AND id = ANY($2::uuid[]) RETURNING id', [userId, valid]);
+    return result.rows.map((r: any) => r.id);
+  }
+
   async count(userId: string, filters?: any) {
     let sql = 'SELECT COUNT(*) FROM leads WHERE user_id = $1';
     const params: any[] = [userId];

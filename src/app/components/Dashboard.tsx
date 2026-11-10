@@ -1450,6 +1450,28 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     }
   };
 
+  // Apagar os leads selecionados na tabela (a confirmação é feita na tabela)
+  const handleDeleteMultiple = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    try {
+      setLoading(true);
+      const response = await leadsApi.deleteMany(ids);
+      const removed = new Set<string>(response?.ids || []);
+      setLeads((prev) => prev.filter((l) => !removed.has(l.id)));
+      toast.success(`${response?.deleted ?? removed.size} lead(s) apagado(s)`);
+      try {
+        await onRefreshUser();
+      } catch {
+        onUserUpdate({ ...user, usage: { ...user.usage, leads: Math.max(0, (user.usage?.leads || 0) - removed.size) } });
+      }
+    } catch (error: any) {
+      console.error('[Dashboard] Error deleting leads:', error);
+      toast.error(`Erro ao apagar leads: ${error.message || ''}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRemoveDuplicates = async () => {
     try {
       // Confirmar ação com o usuário
@@ -1792,6 +1814,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                   onImport={handleImport}
                   onImportWhatsApp={handleImportWhatsApp}
                   onRemoveDuplicates={handleRemoveDuplicates}
+                  onDeleteMultiple={handleDeleteMultiple}
                   onView={handleViewLead}
                   onNovoLead={handleNovoLeadFab}
                   onToggleEmailMarketing={handleToggleEmailMarketing}
