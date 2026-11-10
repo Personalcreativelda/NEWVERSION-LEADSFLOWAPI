@@ -11,7 +11,7 @@ import crypto from 'crypto';
 import { query } from '../database/connection';
 import { encryptSecret, decryptSecret } from '../utils/secret-box';
 import { apiBaseUrl } from './meta-oauth.service';
-import { AIService } from './ai.service';
+import { AIService, getAvailableProviders } from './ai.service';
 import { MAX_KNOWLEDGE_FILES } from './assistants.service';
 
 export type DrivePlatform = 'web' | 'app';
@@ -29,8 +29,12 @@ export const DRIVE_MIME_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
   'text/csv',
   'text/plain',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
 ];
 
 const EXPORTS: Record<string, string> = {
@@ -203,6 +207,7 @@ async function driveFetch(token: string, path: string): Promise<Response> {
     const body: any = await res.json().catch(() => ({}));
     const err: any = new Error(body?.error?.message || `Google Drive respondeu ${res.status}`);
     err.status = res.status;
+    err.reason = body?.error?.errors?.[0]?.reason || body?.error?.status || '';
     throw err;
   }
   return res;
@@ -231,6 +236,11 @@ export async function driveFileText(token: string, meta: DriveFileMeta): Promise
   if (buffer.length > MAX_BYTES) throw new Error('O ficheiro excede o limite de 10MB');
   if (meta.mimeType.startsWith('text/')) return { text: buffer.toString('utf8').slice(0, MAX_TEXT), bytes: buffer.length };
   const dataUri = `data:${meta.mimeType};base64,${buffer.toString('base64')}`;
+  // Imagem: a IA lê o texto e descreve o que se vê
+  if (meta.mimeType.startsWith('image/')) {
+    const text = await new AIService().analyzeImageWithVision(dataUri, '', getAvailableProviders());
+    return { text: String(text || '').slice(0, MAX_TEXT), bytes: buffer.length };
+  }
   const text = await new AIService().extractDocumentText(dataUri, meta.mimeType, process.env.GEMINI_API_KEY, MAX_TEXT, process.env.OPENAI_API_KEY);
   return { text: String(text || '').slice(0, MAX_TEXT), bytes: buffer.length };
 }
@@ -277,6 +287,23 @@ export async function queueDriveFiles(userId: string, assistantId: string, fileI
   return { queued, skipped };
 }
 
+/** Mensagem para o painel conforme a resposta do Google (o motivo técnico fica nos logs) */
+export function driveErrorMessage(err: any, wasImported: boolean): string {
+  const reason = String(err.reason || '');
+  const text = String(err.message || '');
+  // API do Drive desligada no projeto da Google Cloud (só o seletor estava ativo)
+  if (/accessNotConfigured|SERVICE_DISABLED/i.test(reason) || /has not been used|is disabled/i.test(text)) {
+    return 'O Google Drive não está disponível de momento. Tente de novo mais tarde.';
+  }
+  if (/insufficient|PERMISSION_DENIED|forbidden/i.test(reason) || err.status === 403 || (err.status === 404 && !wasImported)) {
+    // Ficheiro escolhido mas sem acesso dado ao LeadsFlow: escolher de novo no seletor
+    return 'Sem acesso a este ficheiro. Volte a escolhê-lo no Google Drive.';
+  }
+  if (err.status === 404) return 'O ficheiro já não está disponível no Google Drive.';
+  if (/excede/.test(text)) return text;
+  return 'Não foi possível ler o ficheiro.';
+}
+
 /** Lê um ficheiro do Drive e grava o texto (force: lê mesmo sem alterações no Drive) */
 async function syncOne(token: string, row: any, force: boolean): Promise<'updated' | 'unchanged' | 'failed' | 'removed'> {
   try {
@@ -298,10 +325,12 @@ async function syncOne(token: string, row: any, force: boolean): Promise<'update
     );
     return clean ? 'updated' : 'failed';
   } catch (err: any) {
-    const gone = err.status === 404 || err.status === 403;
+    console.warn(`[GoogleDrive] Ler ${row.external_id}: ${err.status || ''} ${err.reason || ''} ${err.message}`);
+    // "Removido" só quando já tinha sido lido e o Drive deixou de o ter
+    const gone = err.status === 404 && !!row.external_modified_at;
     await query(
       `UPDATE assistant_knowledge_files SET status = 'failed', error_message = $2, synced_at = NOW(), updated_at = NOW() WHERE id = $1`,
-      [row.id, gone ? 'O ficheiro já não está disponível no Google Drive.' : String(err.message || 'Não foi possível ler o ficheiro.').slice(0, 300)]
+      [row.id, driveErrorMessage(err, !!row.external_modified_at)]
     );
     return gone ? 'removed' : 'failed';
   }

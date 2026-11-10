@@ -51,6 +51,7 @@ import { isInstagramLoginToken, metaMessagesUrl } from '../utils/meta-send';
 import { CloudSendError, cloudMediaKind, cloudRecipient, sendCloudMedia, sendCloudReaction, sendCloudText } from '../services/whatsapp-cloud.service';
 import { applyWhatsAppEvent } from '../services/whatsapp-events.service';
 import { quotedFromRow } from '../utils/whatsapp-message';
+import { appTimezone, formatLocal, localToUtc, toLocalIso } from '../utils/timezone';
 
 const router = Router();
 
@@ -2800,12 +2801,13 @@ router.post('/conversations/:id/summarize', async (req, res, next) => {
 Analise o histórico da conversa e crie um "Briefing" super direto e profissional focado em:
 1) Perfil/Desejo do cliente; 2) Qual foi o último status/acordo; 3) Próximo passo sugerido.
 Verifique também se o cliente ou o assistente concordaram em fazer um acompanhamento/ligação futura.
+Agora: ${toLocalIso(new Date(), appTimezone())} (${formatLocal(new Date(), appTimezone())}), fuso ${appTimezone()}. Use isto para "hoje", "amanhã", "sexta"...
 
 Responda EXATAMENTE neste formato JSON:
 {
   "summary": "Seu resumo em até 100 palavras",
   "has_scheduling": boolean (true se houver promessa de contato futuro),
-  "scheduled_date": "YYYY-MM-DDTHH:mm:ssZ" (melhor estimativa da data/hora acordada, ou null),
+  "scheduled_date": "AAAA-MM-DDTHH:mm" (data e hora combinadas, na hora local; sem hora combinada use 09:00; null se não houver data),
   "scheduling_description": "Ligar para confirmar proposta" (ou null)
 }`
       },
@@ -2832,13 +2834,17 @@ Responda EXATAMENTE neste formato JSON:
       );
     }
 
-    // Se houver agendamento detectado
-    if (result.has_scheduling && result.scheduled_date) {
+    // Se houver agendamento detectado (hora local da empresa → instante certo)
+    const rawDate = String(result.scheduled_date || '');
+    const scheduledAt = result.has_scheduling && rawDate
+      ? (localToUtc(rawDate, appTimezone()) || localToUtc(`${rawDate.slice(0, 10)}T09:00`, appTimezone()))
+      : null;
+    if (scheduledAt) {
       const description = result.scheduling_description || 'Agendamento automático IA';
       const created = await dbQuery(
         `INSERT INTO scheduled_conversations (user_id, lead_id, conversation_id, title, description, scheduled_at, metadata)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        [user.id, leadId, conversationId, String(description).slice(0, 255), description, result.scheduled_date, JSON.stringify({ source: 'ai_summary', type: 'follow-up' })]
+        [user.id, leadId, conversationId, String(description).slice(0, 255), description, scheduledAt, JSON.stringify({ source: 'ai_summary', type: 'follow-up' })]
       );
       if (created.rows[0]) {
         const { queueTaskSync } = await import('../services/task-calendar-sync.service');
