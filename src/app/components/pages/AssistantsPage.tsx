@@ -8,7 +8,7 @@ import {
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, Send, Mail, Hash, Globe,
   Smartphone, History, Lock, AlertTriangle, Mic,
-  Image, FileText, Upload, BookOpen, FileSpreadsheet, ChevronDown, ChevronUp, ShieldCheck, RefreshCw
+  Image, FileText, Upload, BookOpen, FileSpreadsheet, ChevronDown, ChevronUp, ShieldCheck, RefreshCw, ArrowLeft
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -18,6 +18,7 @@ import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { assistantsApi, googleDriveApi, MAX_KNOWLEDGE_FILES, type AssistantVoice, type Assistant, type UserAssistant, type CreateAssistantInput, type KnowledgeFile } from '../../services/api/assistants';
 import { BrandIcon } from '../base/BrandIcon';
+import { AssistantTestChat } from '../assistants/AssistantTestChat';
 import { isNativeApp, openBrowser } from '../../../native';
 import { channelsApi } from '../../services/api/inbox';
 import type { Channel } from '../../types/inbox';
@@ -49,6 +50,17 @@ const ptMZ = (text?: string) => PT_MZ.reduce((t, [re, to]) => t.replace(re, to),
 interface AssistantsPageProps {
   isDark: boolean;
 }
+
+// Secções das definições de um assistente (cada função na sua)
+const SETTINGS_SECTIONS = [
+  { key: 'geral', label: 'Geral' },
+  { key: 'testar', label: 'Testar' },
+  { key: 'vendas', label: 'Vendas e agenda' },
+  { key: 'conhecimento', label: 'Conhecimento' },
+  { key: 'midia', label: 'Voz e media' },
+  { key: 'seguranca', label: 'Equipa e segurança' },
+  { key: 'avancado', label: 'Avançado' },
+] as const;
 
 // Ritmo dos follow-ups automáticos (horas entre cada mensagem, desde a última)
 const FOLLOWUP_PRESETS: Array<{ label: string; hint: string; steps: number[] }> = [
@@ -169,6 +181,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   // Modal states
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
+  // Definições numa página com secções (cada função na sua)
+  type SettingsSection = 'geral' | 'vendas' | 'conhecimento' | 'midia' | 'seguranca' | 'avancado' | 'testar';
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('geral');
   const [configLoadingFresh, setConfigLoadingFresh] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedAssistant, setSelectedAssistant] = useState<Assistant | null>(null);
@@ -335,6 +350,21 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   // Handle save config
   const handleSaveConfig = async () => {
     if (!selectedUserAssistant) return;
+    const isPreview = !selectedUserAssistant.id;
+    const previewAssistant = selectedUserAssistant.assistant as Assistant | undefined;
+    if (isPreview) {
+      if (!previewAssistant) return;
+      if (!previewAssistant.is_custom && !isFreeTrialAssistant(previewAssistant) && !planLimits.features.marketplaceAssistants) {
+        setPremiumModalReason('marketplace');
+        setPremiumModalOpen(true);
+        return;
+      }
+      if (selectedChannelIds.length === 0) {
+        setSettingsSection('geral');
+        toast.error('Escolha pelo menos um canal para ligar o assistente');
+        return;
+      }
+    }
 
     // Basic validation: require AI api key if provider is configured
     if (configValues.ai_provider && !configValues.ai_api_key?.trim()) {
@@ -359,14 +389,19 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
           delete valuesToSave.escalation_keywords;
         }
       }
+      let targetId = selectedUserAssistant.id;
+      if (isPreview) {
+        const connected = await assistantsApi.connect(selectedUserAssistant.assistant_id, selectedChannelIds);
+        targetId = connected.id;
+      }
       await assistantsApi.configure(
-        selectedUserAssistant.id,
+        targetId,
         valuesToSave,
         selectedChannelIds.length > 0 ? selectedChannelIds : undefined
       );
-      toast.success('Configuração guardada com sucesso!');
-      setConfigModalOpen(false);
-      setSelectedUserAssistant(null);
+      toast.success(isPreview ? `${previewAssistant?.name || 'Assistente'} ligado com sucesso!` : 'Configuração guardada com sucesso!');
+      closeSettings();
+      if (isPreview) setActiveTab('connected');
       loadData();
     } catch (error: any) {
       console.error('[AssistantsPage] Error saving config:', error);
@@ -595,7 +630,40 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   };
 
   // Open config modal — fetch fresh data to avoid stale cached config
+  // Ver um assistente do marketplace antes de o ligar: as mesmas definições e a conversa de teste
+  const openPreview = (assistant: Assistant) => {
+    const defaults = ((assistant as any).default_config || {}) as Record<string, any>;
+    const preview = { id: '', assistant_id: assistant.id, assistant, config: {}, channel_ids: [], is_active: false } as unknown as UserAssistant;
+    setSelectedUserAssistant(preview);
+    setConfigValues(normalizeConfig({ ...withAgentDefaults(preview), instructions: defaults.instructions || '', greeting: defaults.greeting || '' }));
+    setSelectedChannelIds([]);
+    setKnowledgeFiles([]);
+    setClientFiles([]);
+    setSettingsSection('testar');
+    setConfigModalOpen(true);
+  };
+
+  const closeSettings = () => {
+    setConfigModalOpen(false);
+    setSelectedUserAssistant(null);
+  };
+
+  // Botão "voltar" do telemóvel/browser: fecha as definições em vez de sair da página
+  const settingsOpen = configModalOpen && !!selectedUserAssistant;
+  const settingsIsPreview = settingsOpen && !selectedUserAssistant?.id;
+  useEffect(() => {
+    if (!settingsOpen) return;
+    window.history.pushState({ ...(window.history.state || {}), assistantSettings: true }, '');
+    const onPop = () => { setConfigModalOpen(false); setSelectedUserAssistant(null); };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      if (window.history.state?.assistantSettings) window.history.back();
+    };
+  }, [settingsOpen]);
+
   const openConfigModal = async (userAssistant: UserAssistant) => {
+    setSettingsSection('geral');
     setSelectedUserAssistant(userAssistant);
     setConfigValues(normalizeConfig(withAgentDefaults(userAssistant)));
     setSelectedChannelIds(userAssistant.channel_ids || []);
@@ -903,6 +971,14 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             ) : (
               <>
                 <Button
+                  variant="outline"
+                  className="flex-1"
+                  size="sm"
+                  onClick={() => openPreview(assistant)}
+                >
+                  Ver e testar
+                </Button>
+                <Button
                   className="flex-1 bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
                   size="sm"
                   onClick={() => {
@@ -989,6 +1065,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   return (
     // Página de ecrã inteiro (dentro do InboxPage): mesmas margens do PageContainer do Dashboard
     <div className="flex flex-col h-full overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-10 lg:py-8">
+      {!settingsOpen && (<>
       {(() => {
         const customCount = availableAssistants.filter(a => a.is_custom).length;
         const canCreate = planLimits.canCreateCustomAssistant(customCount);
@@ -1147,6 +1224,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         </div>
       )}
 
+      </>)}
+
       {/* Connect Modal - Multi-channel */}
       {connectModalOpen && selectedAssistant && (
         <OverlayModal onClose={() => { setConnectModalOpen(false); setSelectedAssistant(null); setSelectedChannelIds([]); }} className="max-w-md">
@@ -1271,27 +1350,75 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         </OverlayModal>
       )}
 
-      {/* Config Modal */}
-      {configModalOpen && selectedUserAssistant && (
-        <OverlayModal onClose={() => { setConfigModalOpen(false); setSelectedUserAssistant(null); }} className="max-w-lg">
-            <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-card border-border">
-              <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
-                Configurar {selectedUserAssistant.assistant?.name}
-                {configLoadingFresh && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
-              </h3>
-              <button
-                onClick={() => {
-                  setConfigModalOpen(false);
-                  setSelectedUserAssistant(null);
-                }}
-                className="p-2 rounded-lg transition-colors hover:bg-muted text-muted-foreground"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {/* Definições do assistente: página com uma secção por função */}
+      {settingsOpen && selectedUserAssistant && (
+        <div className="flex min-h-full flex-col">
+          {/* Cabeçalho: voltar, assistente e guardar */}
+          <div className="mb-4 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={closeSettings}
+              aria-label="Voltar aos assistentes"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <AssistantLogo icon={selectedUserAssistant.assistant?.icon} color={selectedUserAssistant.assistant?.color} />
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate font-serif text-xl text-foreground">{selectedUserAssistant.assistant?.name}</h2>
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                {settingsIsPreview ? 'Não ligado' : selectedUserAssistant.is_active ? 'Ativo' : 'Pausado'}
+                {configLoadingFresh && <Loader2 className="h-3 w-3 animate-spin" />}
+              </p>
             </div>
+            <div className="hidden gap-2 sm:flex">
+              <Button variant="outline" onClick={closeSettings}>Cancelar</Button>
+              <Button onClick={handleSaveConfig} disabled={actionLoading}>
+                {settingsIsPreview ? 'Ligar' : 'Guardar'}
+                {actionLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+              </Button>
+            </div>
+          </div>
 
-            <div className="p-4 space-y-4">
-              {/* Channel Selection */}
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
+            {/* Secções: em linha no telemóvel, coluna no computador */}
+            <nav
+              aria-label="Secções"
+              className="-mx-3 flex gap-1.5 overflow-x-auto scrollbar-none px-3 pb-1 pr-6 lg:sticky lg:top-0 lg:mx-0 lg:w-52 lg:flex-shrink-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pr-0"
+              style={{ maskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent)', WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent)' }}
+            >
+              {SETTINGS_SECTIONS.map((sec) => (
+                <button
+                  key={sec.key}
+                  type="button"
+                  onClick={() => setSettingsSection(sec.key)}
+                  aria-current={settingsSection === sec.key ? 'page' : undefined}
+                  className={`h-9 flex-shrink-0 whitespace-nowrap rounded-full border px-3.5 text-sm transition-colors lg:h-10 lg:w-full lg:rounded-lg lg:border-0 lg:text-left ${
+                    settingsSection === sec.key
+                      ? 'border-foreground/25 bg-muted font-medium text-foreground'
+                      : 'border-border text-muted-foreground hover:text-foreground lg:hover:bg-muted/60'
+                  }`}
+                >
+                  {sec.label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="min-w-0 flex-1 space-y-4 pb-24 sm:pb-6 lg:max-w-2xl">
+              {settingsSection === 'testar' && (
+                <AssistantTestChat
+                  key={selectedUserAssistant.id || selectedUserAssistant.assistant_id}
+                  name={selectedUserAssistant.assistant?.name || 'Assistente'}
+                  assistantId={selectedUserAssistant.assistant_id}
+                  userAssistantId={selectedUserAssistant.id || undefined}
+                  instructions={configValues.instructions}
+                  greeting={configValues.greeting}
+                  businessName={(() => { const ch = channels.find((c) => selectedChannelIds.includes(c.id)) || channels[0]; return ch ? assistantChannelName(ch) : undefined; })()}
+                />
+              )}
+
+              {settingsSection === 'geral' && (<>
+              {/* Channel Selection */}              {/* Channel Selection */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-foreground">
                   Canais ligados
@@ -1380,6 +1507,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
               </div>
 
+              </>)}
+
+              {settingsSection === 'vendas' && (<>
               {/* Vendas automáticas: follow-ups e agenda */}
               <div className="p-4 rounded-lg border bg-muted/30 border-border space-y-4">
                 <div className="flex items-start justify-between gap-4">
@@ -1463,6 +1593,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 )}
               </div>
 
+              </>)}
+
+              {settingsSection === 'seguranca' && (<>
               {/* Proteção contra manipulação (prompt injection) */}
               <div className="p-4 rounded-lg border bg-muted/30 border-border">
                 <div className="flex items-start justify-between gap-4">
@@ -1556,6 +1689,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
               </div>
 
+              </>)}
+
+              {settingsSection === 'avancado' && (<>
               {/* Memory & Context Window */}
               <div className="p-4 rounded-lg border bg-muted/30 border-border">
                 <div className="flex items-center gap-2 mb-4">
@@ -1657,6 +1793,9 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
               </div>
 
+              </>)}
+
+              {settingsSection === 'midia' && (<>
               {/* 🎙️ Voz Mágica */}
               <div className="p-4 rounded-lg border bg-muted/30 border-border">
                 <div className="flex items-center gap-2 mb-4">
@@ -1803,6 +1942,12 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
               </div>
 
+              </>)}
+
+              {settingsSection === 'conhecimento' && settingsIsPreview && (
+                <EmptyState icon={BookOpen} title="Documentos depois de ligar" description="Ligue o assistente para lhe juntar documentos e ficheiros." />
+              )}
+              {settingsSection === 'conhecimento' && !settingsIsPreview && (<>
               {/* 📚 Base de Conhecimento (o assistente CONSULTA para responder) */}
               <div className="p-4 rounded-lg border bg-muted/30 border-border">
                 <div className="flex items-center gap-2 mb-2">
@@ -2055,8 +2200,10 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
               </div>
 
+              </>)}
+
               {/* Stats */}
-              {selectedUserAssistant.stats && (
+              {settingsSection === 'geral' && selectedUserAssistant.stats && (
                 <div className="p-3 rounded-lg bg-muted">
                   <h4 className="text-sm font-medium mb-2 text-foreground">
                     Estatísticas
@@ -2084,31 +2231,17 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 </div>
               )}
             </div>
+          </div>
 
-            <div className="flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end sticky bottom-0 p-4 border-t bg-card border-border">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setConfigModalOpen(false);
-                  setSelectedUserAssistant(null);
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleSaveConfig}
-                disabled={actionLoading}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {actionLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <Check className="w-4 h-4 mr-2" />
-                )}
-                Guardar
-              </Button>
-            </div>
-        </OverlayModal>
+          {/* Telemóvel: Cancelar | Guardar sempre à mão */}
+          <div className="sticky bottom-0 -mx-3 mt-auto flex gap-2 border-t border-border bg-background p-3 sm:hidden [&>*]:flex-1">
+            <Button variant="outline" onClick={closeSettings}>Cancelar</Button>
+            <Button onClick={handleSaveConfig} disabled={actionLoading}>
+              {settingsIsPreview ? 'Ligar' : 'Guardar'}
+              {actionLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Create/Edit Assistant Modal */}

@@ -230,6 +230,28 @@ router.get('/:id', async (req, res, next) => {
     }
 });
 
+// POST /api/assistants/test-chat - Conversa de teste (antes ou depois de ligar), sem enviar nada aos canais
+router.post('/test-chat', async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+        const { testRateLimited, cleanMessages, testReply } = await import('../services/assistant-test.service');
+        const messages = cleanMessages(req.body?.messages);
+        if (!messages) return res.status(400).json({ error: 'Mensagens inválidas' });
+        if (testRateLimited(user.id)) return res.status(429).json({ error: 'Muitas mensagens de teste. Espere alguns minutos.' });
+        const reply = await testReply(user.id, {
+            assistantId: typeof req.body?.assistant_id === 'string' ? req.body.assistant_id : undefined,
+            userAssistantId: typeof req.body?.user_assistant_id === 'string' ? req.body.user_assistant_id : undefined,
+            instructions: typeof req.body?.instructions === 'string' ? req.body.instructions.slice(0, 20000) : undefined,
+            messages,
+        });
+        res.json({ reply });
+    } catch (error: any) {
+        if (error?.status) return res.status(error.status).json({ error: error.message });
+        next(error);
+    }
+});
+
 // POST /api/assistants/connect - Conecta um assistente (ou atualiza canais se já existe)
 router.post('/connect', async (req, res, next) => {
     try {

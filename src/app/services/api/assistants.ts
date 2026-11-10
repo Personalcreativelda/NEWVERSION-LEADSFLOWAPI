@@ -331,3 +331,14 @@ export const googleCalendarApi = {
         await api.delete('/oauth/google-calendar');
     },
 };
+
+// ── Conversa de teste (antes ou depois de ligar; nada vai para os canais) ──
+export async function testAssistantChat(input: {
+    assistant_id?: string;
+    user_assistant_id?: string;
+    instructions?: string;
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+}): Promise<string> {
+    const { data } = await api.post<{ reply: string }>('/assistants/test-chat', input);
+    return data.reply;
+}
