@@ -38,6 +38,9 @@ import { useConfirm } from '../ui/ConfirmDialog';
 import { scheduledConversationsApi } from '../../utils/api';
 import type { ScheduledConversation } from '../../types';
 import { SCHEDULES_CHANGED_EVENT } from '../dashboard/FunnelReminders';
+import { googleCalendarApi } from '../../services/api/assistants';
+import { BrandIcon } from '../base/BrandIcon';
+import { isNativeApp, openBrowser } from '../../../native';
 
 const notifySchedulesChanged = () => window.dispatchEvent(new Event(SCHEDULES_CHANGED_EVENT));
 
@@ -174,13 +177,64 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
     })();
   }, [loadTasks]);
 
-  // O assistente de IA guarda o agendamento no servidor e avisa por WebSocket
+  // O assistente de IA marca, remarca ou desmarca no servidor e avisa por WebSocket
   useWebSocket({
     onAiTaskCreated: ({ task }) => {
       void loadTasks();
-      toast.success('Agendamento detectado automaticamente', { description: task?.title, duration: 6000 });
+      const change = task?.change;
+      toast.success(
+        change === 'cancelled' ? 'O assistente desmarcou uma marcação'
+          : change === 'rescheduled' ? 'O assistente remarcou uma marcação'
+          : 'Nova marcação do assistente',
+        { description: task?.title, duration: 6000 },
+      );
     },
   });
+
+  // ── Google Calendar: os assistentes veem os horários ocupados e marcam lá ──
+  const [calendar, setCalendar] = useState<{ configured: boolean; connected: boolean; email: string | null } | null>(null);
+  const [calendarBusy, setCalendarBusy] = useState(false);
+  const refreshCalendar = useCallback(() => { googleCalendarApi.status().then(setCalendar).catch(() => setCalendar(null)); }, []);
+  useEffect(() => { refreshCalendar(); }, [refreshCalendar]);
+  useEffect(() => {
+    const done = (params: Record<string, string>) => {
+      setCalendarBusy(false);
+      if (params.calendar === 'connected') { toast.success('Google Calendar ligado'); refreshCalendar(); }
+      else if (params.calendar === 'error') toast.error('Não foi possível ligar o Google Calendar. Tente de novo.');
+    };
+    const onApp = (e: Event) => done((e as CustomEvent).detail || {});
+    const apiOrigin = (() => { try { return new URL(import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com').origin; } catch { return ''; } })();
+    const onMessage = (e: MessageEvent) => { if (e.origin === apiOrigin && e.data?.type === 'leadsflow-calendar') done(e.data); };
+    window.addEventListener('leadsflow-calendar', onApp);
+    window.addEventListener('message', onMessage);
+    return () => { window.removeEventListener('leadsflow-calendar', onApp); window.removeEventListener('message', onMessage); };
+  }, [refreshCalendar]);
+
+  const connectCalendar = async () => {
+    const native = isNativeApp();
+    const popup = native ? null : window.open('', 'leadsflow-calendar', 'width=560,height=720');
+    try {
+      setCalendarBusy(true);
+      const url = await googleCalendarApi.start(native ? 'app' : 'web');
+      if (native) { await openBrowser(url); return; }
+      if (popup) {
+        popup.location.href = url;
+        const timer = window.setInterval(() => { if (popup.closed) { window.clearInterval(timer); setCalendarBusy(false); refreshCalendar(); } }, 800);
+      } else {
+        window.location.href = url;
+      }
+    } catch (err: any) {
+      popup?.close();
+      setCalendarBusy(false);
+      toast.error(err?.response?.data?.error || 'Não foi possível abrir o Google Calendar.');
+    }
+  };
+
+  const disconnectCalendar = async () => {
+    const ok = await confirm('Os assistentes deixam de ver o Google Calendar e de marcar lá.', { title: 'Desligar o Google Calendar?', confirmLabel: 'Desligar', variant: 'danger' });
+    if (!ok) return;
+    try { await googleCalendarApi.disconnect(); refreshCalendar(); } catch { toast.error('Não foi possível desligar.'); }
+  };
 
   // Filtrar tarefas
   const filteredTasks = tasks.filter(task => {
@@ -189,7 +243,8 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
     // Atrasada: hora já passou e continua pendente (também as de hoje)
     if (filter === 'overdue' && !(isPast(new Date(task.dueDate)) && task.status === 'pending')) return false;
     if (filter === 'upcoming' && (isPast(new Date(task.dueDate)) || isToday(new Date(task.dueDate)))) return false;
-    if (filter === 'completed' && task.status !== 'completed') return false;
+    if (filter === 'completed' && task.status === 'pending') return false;
+    if (filter !== 'completed' && task.status === 'cancelled') return false;
     if (filter === 'all' && task.status === 'completed') return false;
 
     // Filtro de prioridade
@@ -203,11 +258,11 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
 
   // Estatísticas
   const stats = {
-    total: tasks.filter(t => t.status !== 'completed').length,
-    today: tasks.filter(t => isToday(new Date(t.dueDate)) && t.status !== 'completed').length,
+    total: tasks.filter(t => t.status === 'pending').length,
+    today: tasks.filter(t => isToday(new Date(t.dueDate)) && t.status === 'pending').length,
     overdue: tasks.filter(t => isPast(new Date(t.dueDate)) && t.status === 'pending').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    upcoming: tasks.filter(t => !isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate)) && t.status !== 'completed').length,
+    completed: tasks.filter(t => t.status !== 'pending').length,
+    upcoming: tasks.filter(t => !isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate)) && t.status === 'pending').length,
   };
   const [showFilters, setShowFilters] = useState(false);
   const activeFilterCount = (priorityFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0);
@@ -340,6 +395,36 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
         icon={CheckSquare}
         create={{ label: 'Nova tarefa', onClick: () => setShowNewTaskModal(true) }}
       />
+
+      {calendar?.configured && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+          <BrandIcon brand="googlecalendar" className="h-5 w-5 flex-shrink-0" />
+          {calendar.connected ? (
+            <>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground">Google Calendar</p>
+                <p className="truncate text-xs text-muted-foreground" translate="no">{calendar.email || 'Ligado'}</p>
+              </div>
+              <button type="button" onClick={() => void disconnectCalendar()} className="h-10 rounded-lg px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+                Desligar
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="min-w-0 flex-1 text-sm text-foreground">Google Calendar</p>
+              <button
+                type="button"
+                onClick={() => void connectCalendar()}
+                disabled={calendarBusy}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+              >
+                Ligar
+                {calendarBusy && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Separadores com o número de cada um (em vez de 4 cartões) + botão de filtros */}
       <div className="flex items-center gap-2 border-b border-border">
@@ -529,6 +614,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                       {isOverdue ? <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" /> : <CalendarIcon className="h-3.5 w-3.5 flex-shrink-0" />}
                       <span className="truncate">{format(new Date(task.dueDate), "dd MMM, HH:mm", { locale: ptBR })}</span>
                       {isOverdue && <><span aria-hidden>·</span><span className="flex-shrink-0">Atrasada</span></>}
+                      {task.status === 'cancelled' && <><span aria-hidden>·</span><span className="flex-shrink-0">Desmarcada</span></>}
                     </div>
                     <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
                       {task.leadName && (
@@ -607,6 +693,9 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                             {format(new Date(task.dueDate), "dd 'de' MMMM, HH:mm", { locale: ptBR })}
                           </Badge>
 
+                          {task.status === 'cancelled' && (
+                            <Badge variant="outline" className="text-muted-foreground">Desmarcada</Badge>
+                          )}
                           {isOverdue && (
                             <Badge variant="destructive" className="gap-1">
                               <AlertCircle className="w-3 h-3" />

@@ -582,6 +582,8 @@ initDatabase().then(() => {
   const syncDrive = () => import('./services/google-drive.service').then((m) => m.syncAllDriveFiles()).catch((err) => console.error('[GoogleDrive] Sincronização:', err?.message));
   setTimeout(syncDrive, 5 * 60_000);
   setInterval(syncDrive, 6 * 60 * 60 * 1000);
+  // Follow-ups automáticos dos assistentes (clientes que deixaram de responder)
+  import('./services/assistant-followup.service').then((m) => m.startFollowupWorker()).catch((err) => console.error('[Followup] Arranque:', err?.message));
 
   // ✅ Iniciar scheduler de campanhas agendadas
   campaignScheduler.start();

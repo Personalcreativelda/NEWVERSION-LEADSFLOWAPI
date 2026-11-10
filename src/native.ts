@@ -79,6 +79,14 @@ function handleDriveDeepLink(url: string) {
   window.dispatchEvent(new CustomEvent('leadsflow-drive', { detail: params }));
 }
 
+// Regresso do Google Calendar (Tarefas): fecha a aba e avisa a página
+function handleCalendarDeepLink(url: string) {
+  Browser.close().catch(() => {});
+  const queryIndex = url.indexOf('?');
+  const params = Object.fromEntries(new URLSearchParams(queryIndex >= 0 ? url.slice(queryIndex + 1) : ''));
+  window.dispatchEvent(new CustomEvent('leadsflow-calendar', { detail: params }));
+}
+
 function handleOAuthDeepLink(url: string) {
   oauthCompleting = true;
   Browser.close().catch(() => {});
@@ -251,6 +259,7 @@ export async function initNative() {
   App.addListener('appUrlOpen', ({ url }) => {
     if (url.startsWith(`${NATIVE_OAUTH_REDIRECT}/meta`)) handleMetaDeepLink(url);
     else if (url.startsWith(`${NATIVE_OAUTH_REDIRECT}/drive`)) handleDriveDeepLink(url);
+    else if (url.startsWith(`${NATIVE_OAUTH_REDIRECT}/calendar`)) handleCalendarDeepLink(url);
     else if (url.startsWith(NATIVE_OAUTH_REDIRECT)) handleOAuthDeepLink(url);
   });
 

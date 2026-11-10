@@ -1,5 +1,6 @@
 // Service para gerenciar assistentes do marketplace (produtos de IA)
 import { query } from '../database/connection';
+import { SALES_AGENTS } from './sales-agents';
 
 export const MAX_KNOWLEDGE_FILES = 20; // limite de documentos por assistente
 
@@ -379,7 +380,9 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
             },
         ];
 
-        for (const a of platformAssistants) {
+        // Agentes de vendas (sales-agents.ts): especialidades com follow-up, agenda e funil ligados
+        const allPlatform: Array<typeof platformAssistants[number] & { defaults?: Record<string, unknown> }> = [...platformAssistants, ...SALES_AGENTS];
+        for (const a of allPlatform) {
             try {
                 await query(
                     `INSERT INTO assistants (
@@ -393,7 +396,7 @@ Se o problema não for resolvido em 3 tentativas, diga: "Vou transferir o seu ca
                         a.name, a.slug, a.description, a.short_description,
                         a.icon, a.color, a.category, a.features,
                         a.is_free, a.is_featured,
-                        JSON.stringify({ instructions: a.instructions, greeting: a.greeting })
+                        JSON.stringify({ instructions: a.instructions, greeting: a.greeting, ...(a.defaults || {}) })
                     ]
                 );
             } catch (err: any) {

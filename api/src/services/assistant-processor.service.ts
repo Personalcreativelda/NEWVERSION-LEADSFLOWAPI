@@ -3,6 +3,7 @@
 import { flowNoteForAssistant } from './flow-context.service';
 import { canSetDealValue, formatDealValue, mentionsPrice, parseDealValue } from './deal-value.service';
 import { GUARDRAIL_RULES, INJECTION_NOTE, checkReply, detectInjection, fenceCustomerMessage, safeRefusal } from './guardrails.service';
+import { agendaBlock, agendaOptions, applyDecision, decisionPrompt, hasSchedulingIntent, parseDecision, pendingForConversation } from './appointments.service';
 import { query } from '../database/connection';
 import { AIService, getAvailableProviders, needsWrittenCopy, type AIMessage, type AIProvider, type ProviderConfig } from './ai.service';
 import { AssistantsService } from './assistants.service';
@@ -809,6 +810,17 @@ export class AssistantProcessorService {
             }
         }
         // ─────────────────────────────────────────────────────────────────────────
+
+        // Agenda: horários ocupados (tarefas + Google Calendar) quando a conversa fala de marcações
+        const agenda = agendaOptions(config, defaultConfig);
+        const recentText = [ctx.messageContent, ...history.slice(-3).map((m: any) => String(m.content || ''))].join(' ');
+        if (agenda.enabled && config.scheduling_enabled !== false && hasSchedulingIntent(recentText)) {
+            try {
+                messages[0].content += await agendaBlock(ctx.userId, ctx.conversationId, agenda);
+            } catch (agendaErr: any) {
+                console.warn('[AssistantProcessor] Agenda indisponível:', agendaErr.message);
+            }
+        }
 
         // Proteção contra manipulação (ativa por omissão)
         const guardrailsOn = config.guardrails_enabled !== false;
@@ -2736,8 +2748,8 @@ Valor registado neste momento: ${current > 0 ? current : 'nenhum'}`,
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Detecta intenção de agendamento na conversa e cria tarefa automaticamente.
-     * Emite evento WebSocket (ai_task_created) para o frontend criar a tarefa no TaskManager.
+     * Marcações confirmadas na conversa: cria, remarca ou desmarca a tarefa (e o evento no
+     * Google Calendar, se ligado). Só age quando a resposta do assistente CONFIRMA data e hora.
      */
     private async detectAndCreateSchedulingTask(
         ctx: IncomingMessageContext,
@@ -2747,151 +2759,38 @@ Valor registado neste momento: ${current > 0 ? current : 'nenhum'}`,
         model?: string
     ): Promise<void> {
         try {
-            // 1. Detecção rule-based rápida (evitar chamar IA desnecessariamente)
-            const combinedText = `${ctx.messageContent} ${aiReply}`.toLowerCase()
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            if (providers.length === 0 || !ctx.conversationId) return;
+            if (!hasSchedulingIntent(`${ctx.messageContent} ${aiReply}`)) return;
 
-            const schedulingKeywords = [
-                'agendar', 'agendamento', 'reuniao', 'marcar reuniao', 'marcar call',
-                'agendar call', 'agendar reuniao', 'videoconferencia', 'video chamada',
-                'meet', 'teams', 'zoom', 'chamada', 'horario disponivel', 'quando posso',
-                'que dia', 'que hora', 'disponibilidade', 'consulta', 'visita', 'demonstracao',
-                'demo', 'apresentacao', 'segunda', 'terca', 'quarta', 'quinta', 'sexta',
-                'amanha', 'semana que vem', 'proximo', 'as 9', 'as 10', 'as 11', 'as 14',
-                'as 15', 'as 16', 'as 17', 'confirmado para', 'marcado para', 'combinamos'
-            ];
+            const conv = (await query(
+                `SELECT c.lead_id, l.name FROM conversations c LEFT JOIN leads l ON l.id = c.lead_id WHERE c.id = $1 AND c.user_id = $2 LIMIT 1`,
+                [ctx.conversationId, ctx.userId]
+            )).rows[0];
+            const existing = await pendingForConversation(ctx.userId, ctx.conversationId);
+            const history = (await aiService.getConversationHistory(ctx.conversationId, 8)).slice(-6)
+                .map((m: any) => `${m.role === 'user' ? 'Cliente' : 'Assistente'}: ${String(m.content || '').slice(0, 300)}`);
+            const last = `Assistente: ${aiReply.slice(0, 500)}`;
+            if (history[history.length - 1] !== last) history.push(last);
 
-            const hasSchedulingIntent = schedulingKeywords.some(kw => combinedText.includes(kw));
-            if (!hasSchedulingIntent) return;
+            const response = await aiService.generateResponseWithFallback([
+                { role: 'system', content: decisionPrompt(new Date(), existing) },
+                { role: 'user', content: history.join('\n') },
+            ], providers, model);
+            const decision = parseDecision(response.content);
+            if (!decision || decision.action === 'none') return;
 
-            console.log('[AssistantProcessor] 📅 Intenção de agendamento detectada, extraindo detalhes...');
-
-            if (providers.length === 0) return;
-
-            // 2. Usar IA para extrair data/hora e contexto do agendamento
-            const now = new Date();
-            const todayStr = now.toISOString().split('T')[0];
-            const extractionMessages = [
-                {
-                    role: 'system' as const,
-                    content: `Você é um extrator de agendamentos. Analise a conversa e retorne um JSON válido com os campos:
-- has_scheduling: boolean (true SOMENTE se há agendamento concreto ou confirmação de data/hora)
-- task_title: string (título curto, ex: "Reunião com João Silva")
-- task_description: string (descrição breve do que foi agendado)
-- task_type: "meeting" | "call" | "follow-up" (tipo mais adequado)
-- scheduled_date: string | null (data ISO 8601, use ${todayStr} como hoje para calcular datas relativas)
-- priority: "low" | "medium" | "high" | "urgent"
-- contact_name: string (nome do contato se mencionado)
-
-Responda APENAS com o JSON, sem markdown ou texto adicional.`
-                },
-                {
-                    role: 'user' as const,
-                    content: `Cliente disse: "${ctx.messageContent.substring(0, 400)}"
-
-Assistente respondeu: "${aiReply.substring(0, 400)}"
-
-Contato: ${ctx.contactName || 'Desconhecido'}`,
-                }
-            ];
-
-            const response = await aiService.generateResponseWithFallback(extractionMessages, providers, model);
-            if (!response.content) return;
-
-            // 3. Parsear resposta da IA
-            let parsed: any;
-            try {
-                const clean = response.content.replace(/```json|```/g, '').trim();
-                parsed = JSON.parse(clean);
-            } catch {
-                console.warn('[Scheduling] Resposta IA não é JSON válido:', response.content.substring(0, 100));
-                return;
-            }
-
-            if (!parsed.has_scheduling) {
-                console.log('[Scheduling] IA determinou que não há agendamento concreto.');
-                return;
-            }
-
-            // 4. Buscar lead_id vinculado à conversa
-            let leadId: string | null = null;
-            let leadName = ctx.contactName || parsed.contact_name || 'Contato';
-            try {
-                const convResult = await query(
-                    `SELECT c.lead_id, l.name FROM conversations c LEFT JOIN leads l ON l.id = c.lead_id WHERE c.id = $1 LIMIT 1`,
-                    [ctx.conversationId]
-                );
-                if (convResult.rows[0]?.lead_id) {
-                    leadId = convResult.rows[0].lead_id;
-                    leadName = convResult.rows[0].name || leadName;
-                }
-            } catch { /* ignore */ }
-
-            // 5. Calcular data da tarefa
-            let dueDate: string;
-            if (parsed.scheduled_date) {
-                try {
-                    const d = new Date(parsed.scheduled_date);
-                    dueDate = isNaN(d.getTime()) ? new Date(Date.now() + 86400000).toISOString() : d.toISOString();
-                } catch {
-                    dueDate = new Date(Date.now() + 86400000).toISOString();
-                }
-            } else {
-                dueDate = new Date(Date.now() + 86400000).toISOString(); // Amanhã como fallback
-            }
-
-            // 6. Montar objeto da tarefa (mesmo formato do TaskManager frontend)
-            const task = {
-                id: `task-ai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                title: parsed.task_title || `Reunião com ${leadName}`,
-                description: parsed.task_description || `Agendamento detectado automaticamente pelo assistente de IA`,
-                leadId: leadId || undefined,
-                leadName: leadName,
-                type: parsed.task_type || 'meeting',
-                priority: parsed.priority || 'medium',
-                status: 'pending',
-                dueDate,
-                createdAt: new Date().toISOString(),
-                notes: `Criada automaticamente pelo assistente "${assistant.assistant_name}" com base na conversa com ${leadName}.`,
-                source: 'ai_assistant',
-            };
-
-            console.log(`[Scheduling] ✅ Tarefa criada: "${task.title}" para ${dueDate}`);
-
-            // 7. Gravar no banco de dados (tabela scheduled_conversations para persistência)
-            try {
-                await query(
-                    `INSERT INTO scheduled_conversations
-                     (user_id, conversation_id, lead_id, title, description, scheduled_at, status, metadata)
-                     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)`,
-                    [
-                        ctx.userId,
-                        ctx.conversationId,
-                        leadId,
-                        String(task.title).slice(0, 255),
-                        task.description,
-                        new Date(dueDate),
-                        JSON.stringify({ type: task.type, priority: task.priority, notes: task.notes, source: 'ai_assistant', assistant: assistant.assistant_name })
-                    ]
-                );
-                console.log('[Scheduling] 💾 Agendamento salvo no banco scheduled_conversations');
-            } catch (dbErr: any) {
-                console.warn('[Scheduling] Erro ao salvar no banco:', dbErr.message);
-            }
-
-            // 8. Emitir WebSocket para o frontend criar a tarefa no localStorage (TaskManager)
-            try {
-                const wsService = getWebSocketService();
-                if (wsService) {
-                    wsService.emitToUser(ctx.userId, 'ai_task_created', { task });
-                    console.log(`[Scheduling] 📡 WebSocket emitido: ai_task_created → user ${ctx.userId}`);
-                }
-            } catch (wsErr: any) {
-                console.warn('[Scheduling] Falha ao emitir WebSocket:', wsErr.message);
-            }
-
+            const result = await applyDecision({
+                userId: ctx.userId,
+                conversationId: ctx.conversationId,
+                leadId: conv?.lead_id || null,
+                leadName: conv?.name || ctx.contactName || 'Cliente',
+                contactPhone: ctx.contactPhone,
+                channelType: ctx.channelType,
+                assistantName: assistant.assistant_name || 'Assistente',
+            }, decision, agendaOptions(assistant.config || {}, assistant.default_config || {}));
+            console.log(`[Scheduling] ${decision.action} → ${result.done}${result.reason ? ` (${result.reason})` : ''}`);
         } catch (err: any) {
-            console.warn('[Scheduling] Erro ao detectar agendamento (não crítico):', err.message);
+            console.warn('[Scheduling] Erro ao tratar marcação (não crítico):', err.message);
         }
     }
 }

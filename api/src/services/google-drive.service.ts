@@ -125,7 +125,7 @@ export function driveReturnUrl(platform: DrivePlatform, params: Record<string, s
 
 // ── Tokens ────────────────────────────────────────────────────────────────────────────
 
-async function tokenRequest(params: Record<string, string>): Promise<any> {
+export async function tokenRequest(params: Record<string, string>): Promise<any> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -351,8 +351,8 @@ export async function syncAllDriveFiles(): Promise<void> {
 
 // ── Páginas mostradas no browser durante o fluxo ──────────────────────────────────────
 
-const esc = (v: string) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
-const js = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c');
+export const esc = (v: string) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+export const js = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c');
 
 /** Política de segurança das páginas (scripts só com nonce; o seletor vem dos domínios do Google) */
 export function drivePageCsp(nonce: string): string {
@@ -369,7 +369,7 @@ export function drivePageCsp(nonce: string): string {
   ].join('; ');
 }
 
-function shell(title: string, body: string, script = '', nonce = ''): string {
+export function shell(title: string, body: string, script = '', nonce = ''): string {
   return `<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)}</title>
 <style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#111827}

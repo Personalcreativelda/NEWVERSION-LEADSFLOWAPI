@@ -8,7 +8,7 @@ import {
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, Send, Mail, Hash, Globe,
   Smartphone, History, Lock, AlertTriangle, Mic,
-  Image, FileText, Upload, BookOpen, FileSpreadsheet, ChevronDown, ChevronUp, ShieldCheck
+  Image, FileText, Upload, BookOpen, FileSpreadsheet, ChevronDown, ChevronUp, ShieldCheck, RefreshCw
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -49,6 +49,13 @@ const ptMZ = (text?: string) => PT_MZ.reduce((t, [re, to]) => t.replace(re, to),
 interface AssistantsPageProps {
   isDark: boolean;
 }
+
+// Ritmo dos follow-ups automáticos (horas entre cada mensagem, desde a última)
+const FOLLOWUP_PRESETS: Array<{ label: string; hint: string; steps: number[] }> = [
+  { label: 'Rápido', hint: '4 h, 1 dia, 3 dias', steps: [4, 24, 72] },
+  { label: 'Normal', hint: '1, 2 e 4 dias', steps: [24, 48, 96] },
+  { label: 'Suave', hint: '2, 5 e 10 dias', steps: [48, 120, 240] },
+];
 
 // Map icon names to Lucide components
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
@@ -385,7 +392,19 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     file_sending_enabled: cfg.file_sending_enabled !== false,
     escalation_enabled: cfg.escalation_enabled !== false,
     guardrails_enabled: cfg.guardrails_enabled !== false,
+    followup_enabled: cfg.followup_enabled === true || cfg.followup_enabled === 'true',
+    followup_steps_hours: Array.isArray(cfg.followup_steps_hours) ? cfg.followup_steps_hours : [24, 48, 96],
+    calendar_check_enabled: cfg.calendar_check_enabled !== false,
+    appointment_minutes: Number(cfg.appointment_minutes) || 60,
   });
+
+  // Agentes do marketplace trazem as suas funções de vendas ligadas (follow-ups, agenda…)
+  const SALES_DEFAULT_KEYS = ['followup_enabled', 'followup_steps_hours', 'calendar_check_enabled', 'appointment_minutes'];
+  const withAgentDefaults = (ua: UserAssistant) => {
+    const defaults = ((ua as any).assistant?.default_config || {}) as Record<string, any>;
+    const picked = Object.fromEntries(SALES_DEFAULT_KEYS.filter((k) => defaults[k] !== undefined).map((k) => [k, defaults[k]]));
+    return { ...picked, ...(ua.config || {}) };
+  };
 
   // ========== Base de Conhecimento / Arquivos para clientes ==========
 
@@ -578,7 +597,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   // Open config modal — fetch fresh data to avoid stale cached config
   const openConfigModal = async (userAssistant: UserAssistant) => {
     setSelectedUserAssistant(userAssistant);
-    setConfigValues(normalizeConfig(userAssistant.config || {}));
+    setConfigValues(normalizeConfig(withAgentDefaults(userAssistant)));
     setSelectedChannelIds(userAssistant.channel_ids || []);
     setConfigModalOpen(true);
     void loadKnowledgeFiles(userAssistant.id);
@@ -587,7 +606,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     try {
       const fresh = await assistantsApi.getUserAssistantById(userAssistant.id);
       setSelectedUserAssistant(fresh);
-      setConfigValues(normalizeConfig(fresh.config || {}));
+      setConfigValues(normalizeConfig(withAgentDefaults(fresh)));
       setSelectedChannelIds(fresh.channel_ids || []);
     } catch (err) {
       // Keep cached data on error — just warn
@@ -1359,6 +1378,89 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Vendas automáticas: follow-ups e agenda */}
+              <div className="p-4 rounded-lg border bg-muted/30 border-border space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-emerald-500" />
+                      <h4 className="text-sm font-semibold text-foreground">Follow-ups automáticos</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Volta a escrever a quem deixa de responder</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!!configValues.followup_enabled}
+                    aria-label="Follow-ups automáticos"
+                    onClick={() => setConfigValues({ ...configValues, followup_enabled: !configValues.followup_enabled })}
+                    className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                    style={{ width: 44, height: 24, background: configValues.followup_enabled ? '#10b981' : '#6b7280' }}
+                  >
+                    <span
+                      className="inline-block rounded-full bg-white shadow transition-transform"
+                      style={{ width: 18, height: 18, transform: configValues.followup_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                    />
+                  </button>
+                </div>
+                {configValues.followup_enabled && (
+                  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Ritmo dos follow-ups">
+                    {FOLLOWUP_PRESETS.map((preset) => {
+                      const active = JSON.stringify(configValues.followup_steps_hours) === JSON.stringify(preset.steps);
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          onClick={() => setConfigValues({ ...configValues, followup_steps_hours: preset.steps })}
+                          className={`h-9 rounded-full border px-3.5 text-sm transition-colors ${active ? 'border-foreground/25 bg-muted text-foreground font-medium' : 'border-border text-muted-foreground hover:text-foreground'}`}
+                        >
+                          {preset.label} <span className="text-xs text-muted-foreground">· {preset.hint}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-violet-500" />
+                      <h4 className="text-sm font-semibold text-foreground">Consultar a agenda</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Só propõe horários livres e marca, remarca e desmarca nas Tarefas</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!!configValues.calendar_check_enabled}
+                    aria-label="Consultar a agenda"
+                    onClick={() => setConfigValues({ ...configValues, calendar_check_enabled: !configValues.calendar_check_enabled })}
+                    className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
+                    style={{ width: 44, height: 24, background: configValues.calendar_check_enabled ? '#8b5cf6' : '#6b7280' }}
+                  >
+                    <span
+                      className="inline-block rounded-full bg-white shadow transition-transform"
+                      style={{ width: 18, height: 18, transform: configValues.calendar_check_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
+                    />
+                  </button>
+                </div>
+                {configValues.calendar_check_enabled && (
+                  <div className="flex items-center justify-between gap-3">
+                    <label htmlFor="appointment-minutes" className="text-sm text-foreground">Duração de cada marcação</label>
+                    <select
+                      id="appointment-minutes"
+                      value={configValues.appointment_minutes || 60}
+                      onChange={(e) => setConfigValues({ ...configValues, appointment_minutes: Number(e.target.value) })}
+                      className="w-32 text-sm"
+                    >
+                      {[15, 30, 45, 60, 90, 120].map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60} h`.replace('.5 h', ' h 30')}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Proteção contra manipulação (prompt injection) */}

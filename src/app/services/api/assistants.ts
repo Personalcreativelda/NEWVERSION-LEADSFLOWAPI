@@ -316,3 +316,18 @@ export const googleDriveApi = {
         await api.delete('/oauth/google-drive');
     },
 };
+
+// ── Google Calendar (Tarefas: os assistentes veem os horários ocupados e marcam lá) ──
+export const googleCalendarApi = {
+    async status(): Promise<{ configured: boolean; connected: boolean; email: string | null }> {
+        const { data } = await api.get('/oauth/google-calendar/status');
+        return data;
+    },
+    async start(platform: 'web' | 'app'): Promise<string> {
+        const { data } = await api.post<{ url: string }>('/oauth/google-calendar/start', { platform });
+        return data.url;
+    },
+    async disconnect(): Promise<void> {
+        await api.delete('/oauth/google-calendar');
+    },
+};

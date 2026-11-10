@@ -62,6 +62,8 @@ const noOriginRequiredPaths = [
   '/api/oauth/google-drive/callback', // o Google redireciona o browser para aqui (sem Origin)
   '/api/oauth/google-drive/import', // o seletor do Google navega para aqui (sem Origin)
   '/api/oauth/google-drive/done', // página final no browser (sem Origin)
+  '/api/oauth/google-calendar/callback', // o Google redireciona o browser para aqui (sem Origin)
+  '/api/oauth/google-calendar/done', // página final no browser (sem Origin)
   '/api/inbox/media-proxy',
   '/api/diagnostics', // direct browser navigation with ?secret= or Bearer token
   '/api/version/mobile/release', // script release:mobile (protegido por MOBILE_RELEASE_KEY)
