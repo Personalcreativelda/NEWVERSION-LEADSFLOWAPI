@@ -1,16 +1,16 @@
 {
 "61":["📷 Photo","📷 Foto","📷 Photo"],
 "576":["Cancel reply","Cancelar respuesta","Annuler la réponse"],
-"915":["Unpin chat","Desfijar chat","Désépingler la discussion"],
-"1429":["This message can't receive reactions","Este mensaje no puede recibir reacciones","Ce message ne peut pas recevoir de réactions"],
-"1452":["This channel doesn't support reactions","Este canal no permite reacciones","Ce canal ne permet pas les réactions"],
-"1604":["Pinned","Fijado","Épinglée"],
-"1605":["Pin chat","Fijar chat","Épingler la discussion"],
-"2201":["Couldn't pin the chat.","No se pudo fijar el chat.","Impossible d'épingler la discussion."],
-"2232":["Couldn't react. Try again.","No se pudo reaccionar. Inténtalo de nuevo.","Impossible de réagir. Réessayez."],
-"2487":["This chat's WhatsApp isn't connected","El WhatsApp de este chat no está conectado","Le WhatsApp de cette discussion n'est pas connecté"],
-"3125":["You can pin up to 3 chats","Solo puedes fijar hasta 3 chats","Vous pouvez épingler jusqu'à 3 discussions"],
-"3133":["Sticker","Sticker","Sticker"],
-"3234":["Remove reaction","Quitar reacción","Retirer la réaction"],
-"3474":["You","Tú","Vous"]
+"916":["Unpin chat","Desfijar chat","Désépingler la discussion"],
+"1427":["This message can't receive reactions","Este mensaje no puede recibir reacciones","Ce message ne peut pas recevoir de réactions"],
+"1450":["This channel doesn't support reactions","Este canal no permite reacciones","Ce canal ne permet pas les réactions"],
+"1601":["Pinned","Fijado","Épinglée"],
+"1602":["Pin chat","Fijar chat","Épingler la discussion"],
+"2197":["Couldn't pin the chat.","No se pudo fijar el chat.","Impossible d'épingler la discussion."],
+"2228":["Couldn't react. Try again.","No se pudo reaccionar. Inténtalo de nuevo.","Impossible de réagir. Réessayez."],
+"2484":["This chat's WhatsApp isn't connected","El WhatsApp de este chat no está conectado","Le WhatsApp de cette discussion n'est pas connecté"],
+"3123":["You can pin up to 3 chats","Solo puedes fijar hasta 3 chats","Vous pouvez épingler jusqu'à 3 discussions"],
+"3131":["Sticker","Sticker","Sticker"],
+"3232":["Remove reaction","Quitar reacción","Retirer la réaction"],
+"3473":["You","Tú","Vous"]
 }

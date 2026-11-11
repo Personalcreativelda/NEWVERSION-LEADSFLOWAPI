@@ -1217,12 +1217,13 @@ main > div {
   margin: 0 0 0.5em;
 }
 
-/* Telemóvel: texto pequeno um pouco maior (como nos apps nativos — Claude, Slack):
-   text-xs 12→13px, text-sm 14→15px. O tamanho base (16px) não muda. */
+/* Telemóvel: escala dos apps nativos (Claude, iOS): text-xs 12→13px, text-sm 14→15px,
+   text-base 16→17px (rótulos das listas de definições). Os campos ficam nos 16px. */
 @media (max-width: 639px) {
   :root {
     --text-xs: 0.8125rem;
     --text-sm: 0.9375rem;
+    --text-base: 1.0625rem;
   }
 }
 

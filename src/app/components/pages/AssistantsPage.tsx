@@ -16,6 +16,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { EmptyState } from '../base/EmptyState';
+import { SettingsAction, SettingsField, SettingsGroup, SettingsItem, SettingsToggle } from '../base/SettingsList';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { assistantsApi, googleDriveApi, MAX_KNOWLEDGE_FILES, type AssistantVoice, type Assistant, type UserAssistant, type CreateAssistantInput, type KnowledgeFile } from '../../services/api/assistants';
@@ -1430,7 +1431,11 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 <button
                   key={sec.key}
                   type="button"
-                  onClick={() => setSettingsSection(sec.key)}
+                  onClick={(e) => {
+                    setSettingsSection(sec.key);
+                    // Telemóvel: a secção escolhida fica à vista na barra
+                    e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+                  }}
                   aria-current={settingsSection === sec.key ? 'page' : undefined}
                   className={`h-9 flex-shrink-0 whitespace-nowrap rounded-full border px-3.5 text-sm transition-colors lg:h-10 lg:w-full lg:rounded-lg lg:border-0 lg:text-left ${
                     settingsSection === sec.key
@@ -1443,7 +1448,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               ))}
             </nav>
 
-            <div className="min-w-0 flex-1 space-y-4 pb-24 sm:pb-6 lg:max-w-2xl">
+            <div className="min-w-0 flex-1 space-y-6 pb-24 sm:pb-6 lg:max-w-2xl">
               {settingsSection === 'testar' && (
                 <AssistantTestChat
                   key={selectedUserAssistant.id || selectedUserAssistant.assistant_id}
@@ -1457,147 +1462,105 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               )}
 
               {settingsSection === 'geral' && (<>
-              {/* Channel Selection */}              {/* Channel Selection */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-foreground">
-                  Canais ligados
-                </label>
-                <div className="space-y-2 max-h-36 overflow-y-auto">
-                  {channels.map(channel => {
-                    const isSelected = selectedChannelIds.includes(channel.id);
-                    return (
-                      <button
-                        key={channel.id}
-                        type="button"
-                        onClick={() => toggleChannelSelection(channel.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors text-left ${
-                          isSelected
-                            ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-500/50 text-blue-700 dark:text-blue-400'
-                            : 'bg-background border-border hover:border-muted-foreground/40 text-foreground'
-                        }`}
-                      >
-                        <div className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
-                          isSelected ? 'bg-blue-600 border-blue-600' : 'border-border'
-                        }`}>
-                          {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
-                        </div>
-                        {renderChannelIcon(channel.type, 'w-3.5 h-3.5')}
-                        <span className="min-w-0 flex-1 truncate text-sm">{assistantChannelName(channel)}</span>
-                        {channelOwner(channel.id, selectedUserAssistant.id || undefined) && (
-                          <span className="max-w-[45%] flex-shrink-0 truncate text-xs text-muted-foreground">
-                            {channelOwner(channel.id, selectedUserAssistant.id || undefined)!.assistant?.name}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <SettingsGroup title="Canais">
+                {channels.length === 0 ? (
+                  <SettingsItem label="Sem canais ligados" />
+                ) : channels.map((channel) => {
+                  const isSelected = selectedChannelIds.includes(channel.id);
+                  const owner = channelOwner(channel.id, selectedUserAssistant.id || undefined);
+                  return (
+                    <button
+                      key={channel.id}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={isSelected}
+                      onClick={() => toggleChannelSelection(channel.id)}
+                      className="flex min-h-[56px] w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-muted/60 active:bg-muted"
+                    >
+                      <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center">{renderChannelIcon(channel.type, 'w-5 h-5')}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-base text-foreground">{assistantChannelName(channel)}</span>
+                        {owner && <span className="block truncate text-sm text-muted-foreground">{owner.assistant?.name}</span>}
+                      </span>
+                      <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'}`}>
+                        {isSelected && <Check className="h-3 w-3" strokeWidth={3} />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </SettingsGroup>
 
-              {/* Equipa: o que este assistente faz quando partilha o canal com outros */}
-              {selectedChannelIds.some((id) => channelOwner(id, selectedUserAssistant.id || undefined)) && (
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-foreground">
-                    Função na equipa
-                  </label>
+              <SettingsGroup title="Respostas">
+                {/* Equipa: o que este assistente faz quando partilha o canal com outros */}
+                {selectedChannelIds.some((id) => channelOwner(id, selectedUserAssistant.id || undefined)) && (
+                  <SettingsField label="Função na equipa" htmlFor="assistant-team-role">
+                    <textarea
+                      id="assistant-team-role"
+                      value={configValues.team_role || ''}
+                      onChange={(e) => setConfigValues({ ...configValues, team_role: e.target.value })}
+                      rows={2}
+                      maxLength={240}
+                      className="w-full px-3 py-2"
+                      placeholder={(selectedUserAssistant.assistant as Assistant | undefined)?.short_description || 'Ex.: Marcações e reagendamentos'}
+                    />
+                  </SettingsField>
+                )}
+                <SettingsField label="Mensagem de boas-vindas" htmlFor="assistant-greeting">
                   <textarea
-                    value={configValues.team_role || ''}
-                    onChange={(e) => setConfigValues({ ...configValues, team_role: e.target.value })}
-                    rows={2}
-                    maxLength={240}
-                    className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
-                    placeholder={(selectedUserAssistant.assistant as Assistant | undefined)?.short_description || 'Ex.: Marcações e reagendamentos'}
+                    id="assistant-greeting"
+                    value={configValues.greeting || ''}
+                    onChange={(e) => setConfigValues({ ...configValues, greeting: e.target.value })}
+                    rows={3}
+                    className="w-full px-3 py-2"
+                    placeholder="Ex: Olá! Como posso ajudar você hoje?"
                   />
-                </div>
-              )}
+                </SettingsField>
+                <SettingsField label="Instruções do assistente" htmlFor="assistant-instructions">
+                  <textarea
+                    id="assistant-instructions"
+                    value={configValues.instructions || ''}
+                    onChange={(e) => setConfigValues({ ...configValues, instructions: e.target.value })}
+                    rows={6}
+                    className="w-full px-3 py-2"
+                    placeholder="Ex: Você é um assistente de vendas amigável que ajuda clientes a encontrar os melhores produtos..."
+                  />
+                </SettingsField>
+              </SettingsGroup>
 
-              {/* Greeting */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-foreground">
-                  Mensagem de boas-vindas
-                </label>
-                <textarea
-                  value={configValues.greeting || ''}
-                  onChange={(e) => setConfigValues({ ...configValues, greeting: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
-                  placeholder="Ex: Olá! Como posso ajudar você hoje?"
-                />
-              </div>
-
-              {/* Instructions */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-foreground">
-                  Instruções do assistente
-                </label>
-                <textarea
-                  value={configValues.instructions || ''}
-                  onChange={(e) => setConfigValues({ ...configValues, instructions: e.target.value })}
-                  rows={4}
-                  className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground placeholder:text-muted-foreground"
-                  placeholder="Ex: Você é um assistente de vendas amigável que ajuda clientes a encontrar os melhores produtos..."
-                />
-              </div>
-
-              {/* Business Hours */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-foreground">
-                  Horário de funcionamento
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground">Início</label>
-                    <input
-                      type="time"
-                      value={configValues.business_hours_start || '09:00'}
-                      onChange={(e) => setConfigValues({ ...configValues, business_hours_start: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
-                      style={{ colorScheme: isDark ? 'dark' : 'light' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Fim</label>
-                    <input
-                      type="time"
-                      value={configValues.business_hours_end || '18:00'}
-                      onChange={(e) => setConfigValues({ ...configValues, business_hours_end: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
-                      style={{ colorScheme: isDark ? 'dark' : 'light' }}
-                    />
-                  </div>
-                </div>
-              </div>
-
+              <SettingsGroup title="Horário de funcionamento">
+                <SettingsItem label="Início">
+                  <input
+                    type="time"
+                    aria-label="Início"
+                    value={configValues.business_hours_start || '09:00'}
+                    onChange={(e) => setConfigValues({ ...configValues, business_hours_start: e.target.value })}
+                    className="w-32 px-3"
+                    style={{ colorScheme: isDark ? 'dark' : 'light' }}
+                  />
+                </SettingsItem>
+                <SettingsItem label="Fim">
+                  <input
+                    type="time"
+                    aria-label="Fim"
+                    value={configValues.business_hours_end || '18:00'}
+                    onChange={(e) => setConfigValues({ ...configValues, business_hours_end: e.target.value })}
+                    className="w-32 px-3"
+                    style={{ colorScheme: isDark ? 'dark' : 'light' }}
+                  />
+                </SettingsItem>
+              </SettingsGroup>
               </>)}
 
               {settingsSection === 'vendas' && (<>
-              {/* Vendas automáticas: follow-ups e agenda */}
-              <div className="p-4 rounded-lg border bg-muted/30 border-border space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <RefreshCw className="w-4 h-4 text-emerald-500" />
-                      <h4 className="text-sm font-semibold text-foreground">Follow-ups automáticos</h4>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Volta a escrever a quem deixa de responder</p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={!!configValues.followup_enabled}
-                    aria-label="Follow-ups automáticos"
-                    onClick={() => setConfigValues({ ...configValues, followup_enabled: !configValues.followup_enabled })}
-                    className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                    style={{ width: 44, height: 24, background: configValues.followup_enabled ? '#10b981' : '#6b7280' }}
-                  >
-                    <span
-                      className="inline-block rounded-full bg-white shadow transition-transform"
-                      style={{ width: 18, height: 18, transform: configValues.followup_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                    />
-                  </button>
-                </div>
+              <SettingsGroup title="Follow-ups">
+                <SettingsToggle
+                  label="Follow-ups automáticos"
+                  hint="Volta a escrever a quem deixa de responder"
+                  checked={!!configValues.followup_enabled}
+                  onChange={(v) => setConfigValues({ ...configValues, followup_enabled: v })}
+                />
                 {configValues.followup_enabled && (
-                  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Ritmo dos follow-ups">
+                  <div className="flex flex-wrap gap-2 px-4 py-3" role="radiogroup" aria-label="Ritmo dos follow-ups">
                     {FOLLOWUP_PRESETS.map((preset) => {
                       const active = JSON.stringify(configValues.followup_steps_hours) === JSON.stringify(preset.steps);
                       return (
@@ -1607,289 +1570,150 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                           role="radio"
                           aria-checked={active}
                           onClick={() => setConfigValues({ ...configValues, followup_steps_hours: preset.steps })}
-                          className={`h-9 rounded-full border px-3.5 text-sm transition-colors ${active ? 'border-foreground/25 bg-muted text-foreground font-medium' : 'border-border text-muted-foreground hover:text-foreground'}`}
+                          className={`h-10 rounded-full border px-4 text-sm transition-colors ${active ? 'border-foreground/25 bg-muted font-medium text-foreground' : 'border-border text-muted-foreground hover:text-foreground'}`}
                         >
-                          {preset.label} <span className="text-xs text-muted-foreground">· {preset.hint}</span>
+                          {preset.label} <span className="text-muted-foreground">· {preset.hint}</span>
                         </button>
                       );
                     })}
                   </div>
                 )}
+              </SettingsGroup>
 
-                <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-violet-500" />
-                      <h4 className="text-sm font-semibold text-foreground">Consultar a agenda</h4>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Só propõe horários livres e marca, remarca e desmarca nas Tarefas</p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={!!configValues.calendar_check_enabled}
-                    aria-label="Consultar a agenda"
-                    onClick={() => setConfigValues({ ...configValues, calendar_check_enabled: !configValues.calendar_check_enabled })}
-                    className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                    style={{ width: 44, height: 24, background: configValues.calendar_check_enabled ? '#8b5cf6' : '#6b7280' }}
-                  >
-                    <span
-                      className="inline-block rounded-full bg-white shadow transition-transform"
-                      style={{ width: 18, height: 18, transform: configValues.calendar_check_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                    />
-                  </button>
-                </div>
+              <SettingsGroup title="Agenda">
+                <SettingsToggle
+                  label="Consultar a agenda"
+                  hint="Só propõe horários livres e marca nas Tarefas"
+                  checked={!!configValues.calendar_check_enabled}
+                  onChange={(v) => setConfigValues({ ...configValues, calendar_check_enabled: v })}
+                />
                 {configValues.calendar_check_enabled && (
-                  <div className="flex items-center justify-between gap-3">
-                    <label htmlFor="appointment-minutes" className="text-sm text-foreground">Duração de cada marcação</label>
+                  <SettingsItem label="Duração de cada marcação">
                     <select
-                      id="appointment-minutes"
+                      aria-label="Duração de cada marcação"
                       value={configValues.appointment_minutes || 60}
                       onChange={(e) => setConfigValues({ ...configValues, appointment_minutes: Number(e.target.value) })}
-                      className="w-32 text-sm"
+                      className="w-32 px-3"
                     >
                       {[15, 30, 45, 60, 90, 120].map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60} h`.replace('.5 h', ' h 30')}</option>)}
                     </select>
-                  </div>
+                  </SettingsItem>
                 )}
-              </div>
-
+              </SettingsGroup>
               </>)}
 
               {settingsSection === 'seguranca' && (<>
-              {/* Proteção contra manipulação (prompt injection) */}
-              <div className="p-4 rounded-lg border bg-muted/30 border-border">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-blue-500" />
-                      <h4 className="text-sm font-semibold text-foreground">Proteção contra manipulação</h4>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Ignora pedidos para mudar as regras ou revelar as instruções
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={!!configValues.guardrails_enabled}
-                    aria-label="Proteção contra manipulação"
-                    onClick={() => setConfigValues({ ...configValues, guardrails_enabled: !configValues.guardrails_enabled })}
-                    className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                    style={{ width: 44, height: 24, background: configValues.guardrails_enabled ? '#2563eb' : '#6b7280' }}
-                  >
-                    <span
-                      className="inline-block rounded-full bg-white shadow transition-transform"
-                      style={{ width: 18, height: 18, transform: configValues.guardrails_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                    />
-                  </button>
-                </div>
-              </div>
+              <SettingsGroup title="Proteção">
+                <SettingsToggle
+                  label="Proteção contra manipulação"
+                  hint="Ignora pedidos para mudar as regras ou revelar as instruções"
+                  checked={!!configValues.guardrails_enabled}
+                  onChange={(v) => setConfigValues({ ...configValues, guardrails_enabled: v })}
+                />
+              </SettingsGroup>
 
-              {/* Escalar para humano */}
-              <div className="p-4 rounded-lg border bg-muted/30 border-border">
-                <div className="flex items-center gap-2 mb-3">
-                  <Users className="w-4 h-4 text-orange-500" />
-                  <h4 className="text-sm font-semibold text-foreground">Escalar para humano</h4>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={!!configValues.escalation_enabled}
-                    onClick={() => setConfigValues({ ...configValues, escalation_enabled: !configValues.escalation_enabled })}
-                    className="ml-auto flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                    style={{ width: 44, height: 24, background: configValues.escalation_enabled ? '#f97316' : '#6b7280' }}
-                  >
-                    <span
-                      className="inline-block rounded-full bg-white shadow transition-transform"
-                      style={{ width: 18, height: 18, transform: configValues.escalation_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                    />
-                  </button>
-                </div>
-
-                <p className="text-xs text-muted-foreground mb-3">
-                  Pausa a IA e avisa a equipa quando o cliente pede um humano.
-                </p>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground">WhatsApp do responsável (DDI + número)</label>
+              <SettingsGroup title="Passar para humano">
+                <SettingsToggle
+                  label="Escalar para humano"
+                  hint="Pausa a IA e avisa a equipa quando o cliente pede"
+                  checked={!!configValues.escalation_enabled}
+                  onChange={(v) => setConfigValues({ ...configValues, escalation_enabled: v })}
+                />
+                {configValues.escalation_enabled && (<>
+                  <SettingsField label="WhatsApp do responsável" htmlFor="escalation-phone">
                     <input
+                      id="escalation-phone"
                       type="tel"
                       placeholder="Ex: 5511999999999"
                       value={configValues.escalation_phone || ''}
                       onChange={(e) => setConfigValues({ ...configValues, escalation_phone: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
+                      className="w-full px-3"
                     />
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      Este número recebe a notificação da conversa escalada, com um código, e passa a receber as mensagens do cliente. O que ele responder é enviado ao cliente pelo número da empresa (com várias conversas abertas: <strong>#código mensagem</strong>). Para devolver a conversa à IA, basta responder <strong>resolvido &lt;código&gt;</strong> (ou <strong>pendentes</strong> para ver a lista).
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-muted-foreground">Mensagem enviada ao cliente ao escalar</label>
+                    <details className="text-sm text-muted-foreground">
+                      <summary className="cursor-pointer select-none">Como responder ao cliente</summary>
+                      <p className="mt-2">
+                        Este número recebe a notificação da conversa escalada, com um código, e passa a receber as mensagens do cliente. O que ele responder é enviado ao cliente pelo número da empresa (com várias conversas abertas: <strong>#código mensagem</strong>). Para devolver a conversa à IA, basta responder <strong>resolvido &lt;código&gt;</strong> (ou <strong>pendentes</strong> para ver a lista).
+                      </p>
+                    </details>
+                  </SettingsField>
+                  <SettingsField label="Mensagem enviada ao cliente" htmlFor="escalation-message">
                     <textarea
+                      id="escalation-message"
                       rows={2}
                       placeholder="Entendido! Vou te ligar com um atendente humano..."
                       value={configValues.escalation_message || ''}
                       onChange={(e) => setConfigValues({ ...configValues, escalation_message: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
+                      className="w-full px-3 py-2"
                     />
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-muted-foreground">Gatilhos de escalação (separados por vírgula)</label>
+                  </SettingsField>
+                  <SettingsField label="Gatilhos (separados por vírgula)" htmlFor="escalation-keywords" hint="Vazio usa os gatilhos padrão">
                     <input
+                      id="escalation-keywords"
                       type="text"
                       placeholder="falar com humano, quero atendente, cancelar assinatura"
                       value={typeof configValues.escalation_keywords === 'string' ? configValues.escalation_keywords : (Array.isArray(configValues.escalation_keywords) ? configValues.escalation_keywords.join(', ') : '')}
                       onChange={(e) => setConfigValues({ ...configValues, escalation_keywords: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border text-sm bg-background border-border text-foreground"
+                      className="w-full px-3"
                     />
-                    <p className="text-[11px] text-muted-foreground mt-1">Deixe vazio para usar os gatilhos padrão.</p>
-                  </div>
-                </div>
-              </div>
-
+                  </SettingsField>
+                </>)}
+              </SettingsGroup>
               </>)}
 
               {settingsSection === 'avancado' && (<>
-              {/* Memory & Context Window */}
-              <div className="p-4 rounded-lg border bg-muted/30 border-border">
-                <div className="flex items-center gap-2 mb-4">
-                  <History className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  <h4 className="text-sm font-semibold text-foreground">Memória & Contexto</h4>
-                </div>
+              <SettingsGroup title="Memória e contexto">
+                <SettingsToggle
+                  label="Janela de contexto"
+                  hint="Lembra a última conversa"
+                  checked={!!configValues.context_window_enabled}
+                  onChange={(v) => setConfigValues({ ...configValues, context_window_enabled: v })}
+                />
+                {configValues.context_window_enabled && (
+                  <SettingsItem label="Mensagens anteriores" hint="De 4 a 30">
+                    <input
+                      type="number"
+                      aria-label="Mensagens anteriores"
+                      min={4}
+                      max={30}
+                      value={configValues.context_window_messages}
+                      onChange={(e) => setConfigValues({
+                        ...configValues,
+                        context_window_messages: Math.min(30, Math.max(4, Number(e.target.value) || 10)),
+                      })}
+                      className="w-20 px-3 text-center tabular-nums"
+                    />
+                  </SettingsItem>
+                )}
+                <SettingsToggle
+                  label="Memória de longo prazo"
+                  hint="Guarda o que aprende sobre o contacto"
+                  checked={!!configValues.memory_enabled}
+                  onChange={(v) => setConfigValues({ ...configValues, memory_enabled: v })}
+                />
+              </SettingsGroup>
 
-                <div className="space-y-4">
-                  {/* Context Window toggle */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">Janela de contexto</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Lembra a última conversa
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={!!configValues.context_window_enabled}
-                      onClick={() => setConfigValues({ ...configValues, context_window_enabled: !configValues.context_window_enabled })}
-                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                      style={{ width: 44, height: 24, background: configValues.context_window_enabled ? '#2563eb' : '#6b7280' }}
-                    >
-                      <span
-                        className="inline-block rounded-full bg-white shadow transition-transform"
-                        style={{ width: 18, height: 18, transform: configValues.context_window_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                      />
-                    </button>
-                  </div>
-
-                  {configValues.context_window_enabled && (
-                    <div className="pl-0">
-                      <label className="text-xs text-muted-foreground">
-                        Mensagens anteriores a incluir no contexto
-                      </label>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <input
-                          type="number"
-                          min={4}
-                          max={30}
-                          value={configValues.context_window_messages}
-                          onChange={(e) => setConfigValues({
-                            ...configValues,
-                            context_window_messages: Math.min(30, Math.max(4, Number(e.target.value) || 10))
-                          })}
-                          className="w-20 px-3 py-1.5 rounded-lg border text-sm bg-background border-border text-foreground"
-                        />
-                        <span className="text-xs text-muted-foreground">mensagens (4 – 30)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Long-term memory toggle */}
-                  <div className="flex items-start justify-between gap-4 pt-3 border-t border-border">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">Memória de longo prazo</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Guarda o que aprende sobre o contacto
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={!!configValues.memory_enabled}
-                      onClick={() => setConfigValues({ ...configValues, memory_enabled: !configValues.memory_enabled })}
-                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                      style={{ width: 44, height: 24, background: configValues.memory_enabled ? '#2563eb' : '#6b7280' }}
-                    >
-                      <span
-                        className="inline-block rounded-full bg-white shadow transition-transform"
-                        style={{ width: 18, height: 18, transform: configValues.memory_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Funnel tracking toggle */}
-                  <div className="flex items-start justify-between gap-4 pt-3 border-t border-border">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">Movimentação automática do funil</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Avança os leads no funil e preenche o valor do negócio
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={!!configValues.funnel_tracking_enabled}
-                      onClick={() => setConfigValues({ ...configValues, funnel_tracking_enabled: !configValues.funnel_tracking_enabled })}
-                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                      style={{ width: 44, height: 24, background: configValues.funnel_tracking_enabled ? '#2563eb' : '#6b7280' }}
-                    >
-                      <span
-                        className="inline-block rounded-full bg-white shadow transition-transform"
-                        style={{ width: 18, height: 18, transform: configValues.funnel_tracking_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                      />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
+              <SettingsGroup title="Funil">
+                <SettingsToggle
+                  label="Movimentação automática do funil"
+                  hint="Avança os leads no funil e preenche o valor do negócio"
+                  checked={!!configValues.funnel_tracking_enabled}
+                  onChange={(v) => setConfigValues({ ...configValues, funnel_tracking_enabled: v })}
+                />
+              </SettingsGroup>
               </>)}
 
               {settingsSection === 'midia' && (<>
-              {/* 🎙️ Voz Mágica */}
-              <div className="p-4 rounded-lg border bg-muted/30 border-border">
-                <div className="flex items-center gap-2 mb-4">
-                  <Mic className="w-4 h-4 text-violet-500" />
-                  <h4 className="text-sm font-semibold text-foreground">Voz Mágica</h4>
-                </div>
-
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground">Responder em áudio quando receber áudio</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Responde a áudios com voz gerada por IA.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={!!configValues.audio_enabled}
-                    onClick={() => setConfigValues({ ...configValues, audio_enabled: !configValues.audio_enabled })}
-                    className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                    style={{ width: 44, height: 24, background: configValues.audio_enabled ? '#7c3aed' : '#6b7280' }}
-                  >
-                    <span
-                      className="inline-block rounded-full bg-white shadow transition-transform"
-                      style={{ width: 18, height: 18, transform: configValues.audio_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                    />
-                  </button>
-                </div>
-
+              <SettingsGroup title="Voz">
+                <SettingsToggle
+                  label="Responder em áudio"
+                  hint="Quando o cliente envia um áudio"
+                  checked={!!configValues.audio_enabled}
+                  onChange={(v) => setConfigValues({ ...configValues, audio_enabled: v })}
+                />
                 {configValues.audio_enabled && (
-                  <div className="mt-4 space-y-2">
-                    <label className="block text-sm font-medium text-foreground">Voz</label>
+                  <SettingsField label="Voz" htmlFor="assistant-voice">
                     <select
+                      id="assistant-voice"
                       value={configValues.voice_id || ''}
                       onChange={(e) => setConfigValues({ ...configValues, voice_id: e.target.value })}
                       className="w-full px-3"
@@ -1911,148 +1735,123 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                         className="h-10 w-full"
                       />
                     )}
-                  </div>
+                  </SettingsField>
                 )}
-              </div>
+              </SettingsGroup>
 
-              {/* 🖼️ Multimodalidade — Imagens e Documentos */}
-              <div className="p-4 rounded-lg border bg-muted/30 border-border">
-                <div className="flex items-center gap-2 mb-4">
-                  <Image className="w-4 h-4 text-blue-500" />
-                  <h4 className="text-sm font-semibold text-foreground">Imagens e documentos</h4>
-                </div>
-
-                <div className="space-y-4">
-                  {/* Vision toggle */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                        <Image className="w-3.5 h-3.5 text-blue-400" />
-                        Entender imagens
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Entende imagens enviadas pelo cliente.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={!!configValues.vision_enabled}
-                      onClick={() => setConfigValues({ ...configValues, vision_enabled: !configValues.vision_enabled })}
-                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                      style={{ width: 44, height: 24, background: configValues.vision_enabled ? '#3b82f6' : '#6b7280' }}
-                    >
-                      <span
-                        className="inline-block rounded-full bg-white shadow transition-transform"
-                        style={{ width: 18, height: 18, transform: configValues.vision_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Document toggle */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-blue-400" />
-                        Ler PDFs e documentos
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Responde com base em PDFs e documentos
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={!!configValues.document_enabled}
-                      onClick={() => setConfigValues({ ...configValues, document_enabled: !configValues.document_enabled })}
-                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                      style={{ width: 44, height: 24, background: configValues.document_enabled ? '#3b82f6' : '#6b7280' }}
-                    >
-                      <span
-                        className="inline-block rounded-full bg-white shadow transition-transform"
-                        style={{ width: 18, height: 18, transform: configValues.document_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Reactions toggle */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                        <span className="text-base leading-none"></span>
-                        Reagir às mensagens
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Reage às mensagens recebidas no WhatsApp.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={!!configValues.reactions_enabled}
-                      onClick={() => setConfigValues({ ...configValues, reactions_enabled: !configValues.reactions_enabled })}
-                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                      style={{ width: 44, height: 24, background: configValues.reactions_enabled ? '#f59e0b' : '#6b7280' }}
-                    >
-                      <span
-                        className="inline-block rounded-full bg-white shadow transition-transform"
-                        style={{ width: 18, height: 18, transform: configValues.reactions_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                      />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
+              <SettingsGroup title="Imagens e documentos">
+                <SettingsToggle
+                  label="Entender imagens"
+                  hint="Imagens enviadas pelo cliente"
+                  checked={!!configValues.vision_enabled}
+                  onChange={(v) => setConfigValues({ ...configValues, vision_enabled: v })}
+                />
+                <SettingsToggle
+                  label="Ler PDFs e documentos"
+                  hint="Documentos enviados pelo cliente"
+                  checked={!!configValues.document_enabled}
+                  onChange={(v) => setConfigValues({ ...configValues, document_enabled: v })}
+                />
+                <SettingsToggle
+                  label="Reagir às mensagens"
+                  hint="No WhatsApp"
+                  checked={!!configValues.reactions_enabled}
+                  onChange={(v) => setConfigValues({ ...configValues, reactions_enabled: v })}
+                />
+              </SettingsGroup>
               </>)}
 
               {settingsSection === 'conhecimento' && settingsIsPreview && (
                 <EmptyState icon={BookOpen} title="Documentos depois de ligar" description="Ligue o assistente para lhe juntar documentos e ficheiros." />
               )}
               {settingsSection === 'conhecimento' && !settingsIsPreview && (<>
-              {/* 📚 Base de Conhecimento (o assistente CONSULTA para responder) */}
-              <div className="p-4 rounded-lg border bg-muted/30 border-border">
-                <div className="flex items-center gap-2 mb-2">
-                  <BookOpen className="w-4 h-4 text-emerald-500" />
-                  <h4 className="text-sm font-semibold text-foreground">Base de conhecimento</h4>
-                </div>
-
-
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">Usar base de conhecimento</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Usa os documentos nas respostas
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={!!configValues.knowledge_base_enabled}
-                      onClick={() => setConfigValues({ ...configValues, knowledge_base_enabled: !configValues.knowledge_base_enabled })}
-                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                      style={{ width: 44, height: 24, background: configValues.knowledge_base_enabled ? '#10b981' : '#6b7280' }}
-                    >
-                      <span
-                        className="inline-block rounded-full bg-white shadow transition-transform"
-                        style={{ width: 18, height: 18, transform: configValues.knowledge_base_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                      />
-                    </button>
-                  </div>
-
-                  {knowledgeFiles.length >= MAX_KNOWLEDGE_FILES ? (
-                    <div className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-                      <Lock className="w-4 h-4" />
-                      <span>Limite de {MAX_KNOWLEDGE_FILES} documentos atingido</span>
-                    </div>
-                  ) : (
-                    <label className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 hover:border-emerald-500/50 transition-colors">
-                      {uploadingKind === 'rag' ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
-                      ) : (
-                        <Upload className="w-4 h-4" />
+              {/* Base de conhecimento: o assistente CONSULTA para responder */}
+              <div className="space-y-2">
+                <SettingsGroup
+                  title="Base de conhecimento"
+                  action={<span className="text-xs tabular-nums text-muted-foreground">{knowledgeFiles.length}/{MAX_KNOWLEDGE_FILES}</span>}
+                >
+                  <SettingsToggle
+                    label="Usar base de conhecimento"
+                    hint="Usa os documentos nas respostas"
+                    checked={!!configValues.knowledge_base_enabled}
+                    onChange={(v) => setConfigValues({ ...configValues, knowledge_base_enabled: v })}
+                  />
+                  {knowledgeLoading ? (
+                    <SettingsItem icon={<Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />} label="A carregar documentos..." />
+                  ) : knowledgeFiles.map((kf) => (
+                    <div key={kf.id}>
+                      <div className="flex min-h-[56px] items-center gap-3 py-2 pl-4 pr-2">
+                        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
+                          {kf.status === 'processing' ? (
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                          ) : kf.source === 'google_drive' ? (
+                            <BrandIcon brand="googledrive" className={`h-5 w-5 ${kf.status === 'failed' ? 'opacity-50' : ''}`} />
+                          ) : (
+                            <FileText className={`h-5 w-5 ${kf.status === 'failed' ? 'text-red-500' : 'text-muted-foreground'}`} strokeWidth={1.75} />
+                          )}
+                        </span>
+                        <button type="button" onClick={() => handleTogglePreview(kf.id)} className="min-w-0 flex-1 py-1 text-left">
+                          <span className="block truncate text-base text-foreground" translate="no">{kf.file_name}</span>
+                          <span className={`block truncate text-sm ${kf.status === 'failed' ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {kf.status === 'processing'
+                              ? 'A importar…'
+                              : kf.status === 'failed'
+                                ? (kf.error_message || 'Sem texto extraído')
+                                : <>{formatFileSize(kf.size_bytes)} · {kf.char_count} caracteres</>}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePreview(kf.id)}
+                          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
+                          aria-label="Ver texto"
+                        >
+                          {expandedFileId === kf.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteKnowledgeFile(kf.id, 'rag')}
+                          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-red-500"
+                          aria-label="Remover documento"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      {expandedFileId === kf.id && (
+                        <div className="px-4 pb-3">
+                          {kf.status === 'failed' ? (
+                            <p className="text-sm text-red-500">{kf.preview || kf.error_message || 'Não foi possível extrair texto deste documento.'}</p>
+                          ) : (
+                            <>
+                              <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-muted/50 p-3 font-sans text-sm text-muted-foreground">
+                                {fullTextCache[kf.id] ?? kf.preview ?? 'Sem pré-visualização'}
+                              </pre>
+                              {fullTextCache[kf.id] === undefined && kf.char_count > 220 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewFullText(kf.id)}
+                                  disabled={loadingFullTextId === kf.id}
+                                  className="mt-2 flex items-center gap-1 text-sm text-primary hover:underline"
+                                >
+                                  Ver texto completo ({kf.char_count} caracteres)
+                                  {loadingFullTextId === kf.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
                       )}
-                      <span>{uploadingKind === 'rag' ? 'A enviar...' : 'Adicionar documento (PDF, Excel, CSV — máx 5MB)'}</span>
+                    </div>
+                  ))}
+                  {knowledgeFiles.length >= MAX_KNOWLEDGE_FILES ? (
+                    <SettingsItem icon={<Lock className="h-5 w-5 text-muted-foreground" strokeWidth={1.75} />} label={`Limite de ${MAX_KNOWLEDGE_FILES} documentos atingido`} />
+                  ) : (<>
+                    <SettingsAction
+                      icon={uploadingKind === 'rag' ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" strokeWidth={1.75} />}
+                      label={uploadingKind === 'rag' ? 'A enviar...' : 'Adicionar documento'}
+                      disabled={uploadingKind !== null}
+                    >
                       <input
                         type="file"
                         accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc"
@@ -2060,165 +1859,77 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                         onChange={(e) => handleUploadKnowledge(e, 'rag')}
                         disabled={uploadingKind !== null}
                       />
-                    </label>
+                    </SettingsAction>
+                    {drive?.configured && (
+                      <SettingsAction
+                        icon={driveBusy === 'connect' ? <Loader2 className="h-5 w-5 animate-spin" /> : <BrandIcon brand="googledrive" className="h-5 w-5" />}
+                        label="Escolher do Google Drive"
+                        onClick={() => void handleAddFromDrive()}
+                        disabled={driveBusy !== null}
+                      />
+                    )}
+                  </>)}
+                  {drive?.configured && knowledgeFiles.some((f) => f.source === 'google_drive') && (
+                    <SettingsAction
+                      icon={driveBusy === 'sync' ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" strokeWidth={1.75} />}
+                      label="Ler de novo o Google Drive"
+                      onClick={() => void handleSyncDrive()}
+                      disabled={driveBusy !== null}
+                    />
                   )}
-
-                  {drive?.configured && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      {knowledgeFiles.length < MAX_KNOWLEDGE_FILES && (
-                        <button
-                          type="button"
-                          onClick={() => void handleAddFromDrive()}
-                          disabled={driveBusy !== null}
-                          className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-60"
-                        >
-                          {driveBusy === 'connect' ? <Loader2 className="h-4 w-4 animate-spin" /> : <BrandIcon brand="googledrive" className="h-4 w-4" />}
-                          Google Drive
-                        </button>
-                      )}
-                      {knowledgeFiles.some((f) => f.source === 'google_drive') && (
-                        <button
-                          type="button"
-                          onClick={() => void handleSyncDrive()}
-                          disabled={driveBusy !== null}
-                          className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60"
-                          title="Ler de novo os documentos do Google Drive"
-                        >
-                          Sincronizar
-                          {driveBusy === 'sync' && <Loader2 className="h-4 w-4 animate-spin" />}
-                        </button>
-                      )}
-                      {drive.connected && drive.email && (
-                        <span className="min-w-0 truncate text-xs text-muted-foreground" translate="no">{drive.email}</span>
-                      )}
-                    </div>
-                  )}
-
-                  {knowledgeLoading ? (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> A carregar documentos...
-                    </div>
-                  ) : knowledgeFiles.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Sem documentos.</p>
-                  ) : (
-                    <ul className="space-y-1.5 max-h-96 overflow-y-auto">
-                      {knowledgeFiles.map(kf => (
-                        <li key={kf.id} className="rounded-lg border border-border bg-background">
-                          <div className="flex items-center gap-2 px-3 py-2">
-                            {kf.status === 'processing' ? (
-                              <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin text-muted-foreground" />
-                            ) : kf.source === 'google_drive' ? (
-                              <BrandIcon brand="googledrive" className={`w-4 h-4 flex-shrink-0 ${kf.status === 'failed' ? 'opacity-50' : ''}`} />
-                            ) : (
-                              <FileSpreadsheet className={`w-4 h-4 flex-shrink-0 ${kf.status === 'failed' ? 'text-red-400' : 'text-emerald-500'}`} />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-foreground truncate" translate="no">{kf.file_name}</p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {kf.status === 'processing'
-                                  ? 'A importar…'
-                                  : <>{formatFileSize(kf.size_bytes)} · {kf.char_count > 0 ? `${kf.char_count} caracteres` : kf.status === 'failed' ? (kf.source === 'google_drive' ? (kf.error_message || 'sem texto') : 'sem texto extraído') : '—'}</>}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleTogglePreview(kf.id)}
-                              className="p-1.5 rounded-md text-muted-foreground hover:bg-muted transition-colors"
-                              title="Ver prévia do texto"
-                            >
-                              {expandedFileId === kf.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteKnowledgeFile(kf.id, 'rag')}
-                              className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                              title="Remover documento"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-
-                          {expandedFileId === kf.id && (
-                            <div className="px-3 pb-2 pl-4">
-                              {kf.status === 'failed' ? (
-                                <p className="text-xs text-red-400">{kf.preview || kf.error_message || 'Não foi possível extrair texto deste documento.'}</p>
-                              ) : (
-                                <>
-                                  <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words max-h-48 overflow-y-auto bg-muted/40 rounded p-2">
-                                    {fullTextCache[kf.id] ?? kf.preview ?? 'Sem pré-visualização'}
-                                  </pre>
-                                  {fullTextCache[kf.id] === undefined && kf.char_count > 220 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleViewFullText(kf.id)}
-                                      disabled={loadingFullTextId === kf.id}
-                                      className="mt-1.5 text-[11px] text-blue-500 hover:underline flex items-center gap-1"
-                                    >
-                                      {loadingFullTextId === kf.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                                      Ver texto completo ({kf.char_count} caracteres)
-                                    </button>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                </SettingsGroup>
+                <p className="px-1 text-sm text-muted-foreground">
+                  PDF, Word, Excel, CSV ou TXT · máx 5MB
+                  {drive?.connected && drive.email && <> · <span translate="no">{drive.email}</span></>}
+                </p>
               </div>
 
-              {/* 📁 Arquivos para clientes (o assistente ENVIA quando pedido) */}
-              <div className="p-4 rounded-lg border bg-muted/30 border-border">
-                <div className="flex items-center gap-2 mb-2">
-                  <Send className="w-4 h-4 text-blue-500" />
-                  <h4 className="text-sm font-semibold text-foreground">Ficheiros para clientes</h4>
-                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-medium border border-blue-500/20">
-                    Envio pelo canal
-                  </span>
-                </div>
-
-                <p className="text-xs text-muted-foreground mb-3">
-                  Enviados quando o cliente os pede pelo nome.
-                </p>
-
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">Enviar ficheiros quando pedidos</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Envia o ficheiro pedido pelo cliente no canal da conversa.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={!!configValues.file_sending_enabled}
-                      onClick={() => setConfigValues({ ...configValues, file_sending_enabled: !configValues.file_sending_enabled })}
-                      className="mt-0.5 flex-shrink-0 relative inline-flex items-center rounded-full transition-colors focus:outline-none"
-                      style={{ width: 44, height: 24, background: configValues.file_sending_enabled ? '#10b981' : '#6b7280' }}
-                    >
-                      <span
-                        className="inline-block rounded-full bg-white shadow transition-transform"
-                        style={{ width: 18, height: 18, transform: configValues.file_sending_enabled ? 'translateX(22px)' : 'translateX(3px)' }}
-                      />
-                    </button>
-                  </div>
-
+              {/* Ficheiros para clientes: o assistente ENVIA quando pedidos ou quando a resposta está neles */}
+              <div className="space-y-2">
+                <SettingsGroup
+                  title="Ficheiros para clientes"
+                  action={<span className="text-xs tabular-nums text-muted-foreground">{clientFiles.length}/{MAX_KNOWLEDGE_FILES}</span>}
+                >
+                  <SettingsToggle
+                    label="Enviar ficheiros aos clientes"
+                    hint="Quando os pedem ou a resposta está neles"
+                    checked={!!configValues.file_sending_enabled}
+                    onChange={(v) => setConfigValues({ ...configValues, file_sending_enabled: v })}
+                  />
+                  {knowledgeLoading ? (
+                    <SettingsItem icon={<Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />} label="A carregar ficheiros..." />
+                  ) : clientFiles.map((kf) => {
+                    const isImg = /^image\//.test(kf.mime_type || '') || /\.(jpe?g|png|webp)$/i.test(kf.file_name || '');
+                    return (
+                      <div key={kf.id} className="flex min-h-[56px] items-center gap-3 py-2 pl-4 pr-2">
+                        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
+                          {isImg
+                            ? <Image className="h-5 w-5 text-muted-foreground" strokeWidth={1.75} />
+                            : <FileText className={`h-5 w-5 ${kf.status === 'failed' ? 'text-red-500' : 'text-muted-foreground'}`} strokeWidth={1.75} />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-base text-foreground" translate="no">{kf.file_name}</span>
+                          <span className="block truncate text-sm text-muted-foreground">{formatFileSize(kf.size_bytes)}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteKnowledgeFile(kf.id, 'client')}
+                          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-red-500"
+                          aria-label="Remover ficheiro"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
                   {clientFiles.length >= MAX_KNOWLEDGE_FILES ? (
-                    <div className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-                      <Lock className="w-4 h-4" />
-                      <span>Limite de {MAX_KNOWLEDGE_FILES} ficheiros atingido</span>
-                    </div>
+                    <SettingsItem icon={<Lock className="h-5 w-5 text-muted-foreground" strokeWidth={1.75} />} label={`Limite de ${MAX_KNOWLEDGE_FILES} ficheiros atingido`} />
                   ) : (
-                    <label className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-border text-sm text-muted-foreground cursor-pointer hover:bg-muted/50 hover:border-blue-500/50 transition-colors">
-                      {uploadingKind === 'client' ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                      ) : (
-                        <Upload className="w-4 h-4" />
-                      )}
-                      <span>{uploadingKind === 'client' ? 'A enviar...' : 'Adicionar ficheiro ou imagem (PDF, Excel, JPG, PNG — máx 5MB)'}</span>
+                    <SettingsAction
+                      icon={uploadingKind === 'client' ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" strokeWidth={1.75} />}
+                      label={uploadingKind === 'client' ? 'A enviar...' : 'Adicionar ficheiro ou imagem'}
+                      disabled={uploadingKind !== null}
+                    >
                       <input
                         type="file"
                         accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc,.jpg,.jpeg,.png,.webp"
@@ -2226,72 +1937,27 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                         onChange={(e) => handleUploadKnowledge(e, 'client')}
                         disabled={uploadingKind !== null}
                       />
-                    </label>
+                    </SettingsAction>
                   )}
-
-                  {knowledgeLoading ? (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> A carregar ficheiros...
-                    </div>
-                  ) : clientFiles.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Sem ficheiros.</p>
-                  ) : (
-                    <ul className="space-y-1.5 max-h-96 overflow-y-auto">
-                      {clientFiles.map(kf => (
-                        <li key={kf.id} className="rounded-lg border border-border bg-background">
-                          <div className="flex items-center gap-2 px-3 py-2">
-                            {/^image\//.test(kf.mime_type || '') || /\.(jpe?g|png|webp)$/i.test(kf.file_name || '')
-                              ? <Image className="w-4 h-4 flex-shrink-0 text-blue-500" />
-                              : <FileText className={`w-4 h-4 flex-shrink-0 ${kf.status === 'failed' ? 'text-red-400' : 'text-blue-500'}`} />}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-foreground truncate">{kf.file_name}</p>
-                              <p className="text-[10px] text-muted-foreground">{formatFileSize(kf.size_bytes)}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteKnowledgeFile(kf.id, 'client')}
-                              className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                              title="Remover ficheiro"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                </SettingsGroup>
+                <p className="px-1 text-sm text-muted-foreground">PDF, Word, Excel, JPG ou PNG · máx 5MB</p>
               </div>
-
               </>)}
-
-              {/* Stats */}
               {settingsSection === 'geral' && selectedUserAssistant.stats && (
-                <div className="p-3 rounded-lg bg-muted">
-                  <h4 className="text-sm font-medium mb-2 text-foreground">
-                    Estatísticas
-                  </h4>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-foreground">
-                        {selectedUserAssistant.stats.conversations || 0}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Conversas</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-foreground">
-                        {selectedUserAssistant.stats.messages_received || 0}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Recebidas</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-foreground">
-                        {selectedUserAssistant.stats.messages_sent || 0}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Enviadas</p>
-                    </div>
+                <SettingsGroup title="Estatísticas">
+                  <div className="grid grid-cols-3 divide-x divide-border">
+                    {[
+                      ['Conversas', selectedUserAssistant.stats.conversations],
+                      ['Recebidas', selectedUserAssistant.stats.messages_received],
+                      ['Enviadas', selectedUserAssistant.stats.messages_sent],
+                    ].map(([label, value]) => (
+                      <div key={label as string} className="px-3 py-4 text-center">
+                        <p className="font-serif text-2xl tabular-nums text-foreground">{(value as number) || 0}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{label}</p>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                </SettingsGroup>
               )}
             </div>
           </div>

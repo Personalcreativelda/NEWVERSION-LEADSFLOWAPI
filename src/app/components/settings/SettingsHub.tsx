@@ -43,7 +43,7 @@ export function Group({ title, children }: { title: string; children: ReactNode 
   return (
     <section>
       <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
-      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">{children}</div>
+      <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">{children}</div>
     </section>
   );
 }
