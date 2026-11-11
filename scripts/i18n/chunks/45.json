@@ -7,9 +7,9 @@
 "1424":["This message has already been deleted","Este mensaje ya fue eliminado","Ce message a déjà été supprimé"],
 "1447":["This channel doesn't allow changing sent messages","Este canal no permite cambiar mensajes enviados","Ce canal ne permet pas de modifier les messages envoyés"],
 "1834":["The time to delete for everyone has passed","Ya pasó el tiempo para eliminar para todos","Le délai pour supprimer pour tous est dépassé"],
-"2157":["Couldn't delete the message.","No se pudo eliminar el mensaje.","Impossible de supprimer le message."],
-"2179":["Couldn't edit the message.","No se pudo editar el mensaje.","Impossible de modifier le message."],
-"3118":["You can only change messages you sent","Solo puedes cambiar los mensajes que enviaste","Vous ne pouvez modifier que les messages que vous avez envoyés"],
-"3119":["You can only edit text messages","Solo puedes editar mensajes de texto","Vous ne pouvez modifier que les messages texte"],
-"3120":["You can only edit within the first 15 minutes","Solo puedes editar en los primeros 15 minutos","Modification possible uniquement dans les 15 premières minutes"]
+"2159":["Couldn't delete the message.","No se pudo eliminar el mensaje.","Impossible de supprimer le message."],
+"2181":["Couldn't edit the message.","No se pudo editar el mensaje.","Impossible de modifier le message."],
+"3122":["You can only change messages you sent","Solo puedes cambiar los mensajes que enviaste","Vous ne pouvez modifier que les messages que vous avez envoyés"],
+"3123":["You can only edit text messages","Solo puedes editar mensajes de texto","Vous ne pouvez modifier que les messages texte"],
+"3124":["You can only edit within the first 15 minutes","Solo puedes editar en los primeros 15 minutos","Modification possible uniquement dans les 15 premières minutes"]
 }

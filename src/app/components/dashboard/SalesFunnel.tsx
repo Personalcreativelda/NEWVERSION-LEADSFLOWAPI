@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef, memo, useContext } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, memo, useContext, useDeferredValue } from 'react';
 import { formatMoney } from '../../utils/format';
 import { OverlayModal } from '../base/OverlayModal';
 import { AppModal } from '../base/AppModal';
@@ -12,6 +12,8 @@ import { api } from '../../../lib/api';
 import { saveFile } from '../../lib/saveFile';
 import { Trash2, Edit2, MoreVertical, ChevronDown, Share2, GripVertical, Settings, Plus, X, RotateCcw, Briefcase, Home, ShoppingCart, Wrench, Monitor, Users2, MoveRight, Workflow, CalendarClock, type LucideIcon, MoreHorizontal } from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
+import { SearchInput } from '../base/SearchInput';
+import { matchesSearch } from '../../utils/search';
 import { haptic } from '../../../native';
 import type { TabKey } from '../modals/LeadDetailModal';
 import { FunnelReminders, LeadRemindersContext, useLeadReminders, reminderLabel, isOverdue } from './FunnelReminders';
@@ -287,6 +289,7 @@ const FunnelColumn = memo(({
   stages = [],
   onMoveToStage,
   onRequestMove,
+  emptyLabel = 'Sem leads nesta etapa',
 }: any) => {
   const { setNodeRef: setDroppableRef } = useDroppable({ id: stage.id });
   const {
@@ -461,7 +464,7 @@ const FunnelColumn = memo(({
                   />
                 ))
               ) : (
-                <p className="py-6 text-center text-xs text-muted-foreground">Sem leads nesta etapa</p>
+                <p className="py-6 text-center text-xs text-muted-foreground">{emptyLabel}</p>
               )}
 
               {leads.length > 0 && (
@@ -576,22 +579,35 @@ function stageOfLead(lead: Lead, leadsByStatus: Record<string, Lead[]>) {
 }
 
 // Telemóvel: chips deslizáveis com as etapas e o número de leads; toque mostra a lista.
-const MobileFunnel = ({ stages, leadsByStatus, currency, onOpen, onRequestMove }: any) => {
+const MobileFunnel = ({ stages, leadsByStatus, currency, onOpen, onRequestMove, searching }: any) => {
   const firstWithLeads = stages.find((st: FunnelStage) => (leadsByStatus[st.id] || []).length > 0)?.id || stages[0]?.id;
   const [selected, setSelected] = useState<string>(firstWithLeads);
   useEffect(() => {
     if (!stages.some((st: FunnelStage) => st.id === selected)) setSelected(firstWithLeads);
   }, [stages, selected, firstWithLeads]);
+  // A pesquisar: se a etapa aberta não tem resultados, abre a primeira que tem
+  useEffect(() => {
+    if (searching && !(leadsByStatus[selected] || []).length && firstWithLeads !== selected) setSelected(firstWithLeads);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searching, leadsByStatus]);
   const fullList: Lead[] = leadsByStatus[selected] || [];
   const [shown, setShown] = useState(DEFAULT_VISIBLE_PER_STAGE);
   useEffect(() => { setShown(DEFAULT_VISIBLE_PER_STAGE); }, [selected]);
   const list = fullList.slice(0, shown);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressed = useRef(false);
+  // A etapa escolhida (à mão ou pela pesquisa) fica à vista na fila de etapas
+  const chipsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const row = chipsRef.current;
+    const chip = row?.querySelector<HTMLElement>(`[data-stage="${window.CSS.escape(selected)}"]`);
+    if (row && chip) row.scrollTo({ left: chip.offsetLeft - (row.clientWidth - chip.offsetWidth) / 2, behavior: 'smooth' });
+  }, [selected]);
 
   return (
     <div className="-mx-1">
       <div
+        ref={chipsRef}
         className="flex gap-2 overflow-x-auto scrollbar-none px-1 pb-3 pr-6"
         style={{ maskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent)', WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent)' }}
       >
@@ -602,6 +618,7 @@ const MobileFunnel = ({ stages, leadsByStatus, currency, onOpen, onRequestMove }
             <button
               key={st.id}
               type="button"
+              data-stage={st.id}
               onClick={() => setSelected(st.id)}
               className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${active ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground'}`}
             >
@@ -614,7 +631,7 @@ const MobileFunnel = ({ stages, leadsByStatus, currency, onOpen, onRequestMove }
       </div>
 
       {list.length === 0 ? (
-        <p className="px-1 py-10 text-center text-sm text-muted-foreground">Sem leads nesta etapa</p>
+        <p className="px-1 py-10 text-center text-sm text-muted-foreground">{searching ? 'Sem resultados' : 'Sem leads nesta etapa'}</p>
       ) : (
         <ul className="mx-1 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
           {list.map((lead) => {
@@ -865,6 +882,23 @@ export default function SalesFunnel({
     return grouped;
   }, [localLeads, stages]);
 
+  // Pesquisa: mostra só os leads encontrados em cada etapa (arrastar e mover continuam)
+  const [search, setSearch] = useState('');
+  const query = useDeferredValue(search.trim());
+  const shownByStatus = useMemo(() => {
+    if (!query) return leadsByStatus;
+    const out: Record<string, Lead[]> = {};
+    for (const [stageId, list] of Object.entries(leadsByStatus)) {
+      out[stageId] = list.filter((l: any) =>
+        matchesSearch(query, leadDisplayName(l), l.nome, l.name, l.email, l.telefone, l.phone, l.whatsapp, l.empresa, l.company));
+    }
+    return out;
+  }, [leadsByStatus, query]);
+  const matchCount = useMemo(
+    () => (query ? Object.values(shownByStatus).reduce((n, list) => n + list.length, 0) : 0),
+    [shownByStatus, query],
+  );
+
   const stats = useMemo(() => {
     const total = localLeads.length;
 
@@ -1021,13 +1055,32 @@ export default function SalesFunnel({
 
         {/* Total, convertidos e taxa vivem no Início/Relatórios; aqui só o valor em
             negociação, que é exclusivo do funil */}
-        <p className="mb-4 text-sm text-muted-foreground">
-          Valor do funil:{' '}
-          <span className="font-semibold text-foreground tabular-nums">{formatCurrency(stats.pipelineValue, currency)}</span>
-        </p>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-w-0 text-sm text-muted-foreground">
+            {query ? (
+              <span aria-live="polite">
+                <span className="font-semibold text-foreground tabular-nums">{matchCount}</span>{' '}
+                {matchCount === 1 ? 'lead encontrado' : 'leads encontrados'}
+              </span>
+            ) : (
+              <>
+                Valor do funil:{' '}
+                <span className="font-semibold text-foreground tabular-nums">{formatCurrency(stats.pipelineValue, currency)}</span>
+              </>
+            )}
+          </p>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Pesquisar no funil..."
+            aria-label="Pesquisar no funil"
+            containerClassName="w-full sm:w-72"
+          />
+        </div>
 
         {/* Agendamentos pendentes dos leads: ao entrar no funil vê-se logo o que está marcado */}
-        <FunnelReminders reminders={reminders} leads={localLeads} onOpen={(l) => onViewLeadDetails?.(l, 'agendamentos')} />
+        {/* A pesquisar: os resultados sobem (sem os lembretes por cima) */}
+        {!query && <FunnelReminders reminders={reminders} leads={localLeads} onOpen={(l) => onViewLeadDetails?.(l, 'agendamentos')} />}
 
         {/* Stage Editor Modal */}
         {showStageEditor && (
@@ -1254,7 +1307,8 @@ export default function SalesFunnel({
         {isMobile && (
           <MobileFunnel
             stages={stages}
-            leadsByStatus={leadsByStatus}
+            leadsByStatus={shownByStatus}
+            searching={!!query}
             currency={currency}
             onOpen={(lead: Lead) => onViewLeadDetails?.(lead, 'notas')}
             onRequestMove={setMoveLead}
@@ -1301,14 +1355,15 @@ export default function SalesFunnel({
                     {stages.map(stage => (
                       <div
                         key={stage.id}
-                        className={`snap-start h-full transition-all duration-300 ${expandedColumns[stage.id] === false
+                        className={`snap-start h-full transition-all duration-300 ${query && !(shownByStatus[stage.id] || []).length ? 'opacity-50' : ''} ${expandedColumns[stage.id] === false
                           ? 'w-[60px] flex-none'
                           : 'w-[320px] flex-none'
                           }`}
                       >
                         <FunnelColumn
                           stage={stage}
-                          leads={leadsByStatus[stage.id] || []}
+                          leads={shownByStatus[stage.id] || []}
+                          emptyLabel={query ? 'Sem resultados' : undefined}
                           isDark={isDark}
                           isOver={overId === stage.id}
                           expandedColumns={expandedColumns}
