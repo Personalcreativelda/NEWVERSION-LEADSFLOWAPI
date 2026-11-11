@@ -1,10 +1,10 @@
 {
 "366":["Delete selected leads","Eliminar leads seleccionados","Supprimer les leads sélectionnés"],
 "373":["Delete all leads","Eliminar todos los leads","Supprimer tous les leads"],
-"3583":["{0} lead(s) deleted","{0} lead(s) eliminado(s)","{0} lead(s) supprimé(s)"],
-"3644":["Delete {0} selected lead(s)? This action cannot be undone.","¿Eliminar {0} lead(s) seleccionado(s)? Esta acción no se puede deshacer.","Supprimer {0} lead(s) sélectionné(s) ? Cette action est irréversible."],
-"3646":["Delete selected ({0})","Eliminar seleccionados ({0})","Supprimer la sélection ({0})"],
-"3647":["Delete all ({0})","Eliminar todos ({0})","Tout supprimer ({0})"],
-"3648":["Delete all {0} leads? This action cannot be undone.","¿Eliminar los {0} leads? Esta acción no se puede deshacer.","Supprimer les {0} leads ? Cette action est irréversible."],
-"3714":["Error deleting leads: {0}","Error al eliminar leads: {0}","Erreur lors de la suppression des leads : {0}"]
+"3581":["{0} lead(s) deleted","{0} lead(s) eliminado(s)","{0} lead(s) supprimé(s)"],
+"3642":["Delete {0} selected lead(s)? This action cannot be undone.","¿Eliminar {0} lead(s) seleccionado(s)? Esta acción no se puede deshacer.","Supprimer {0} lead(s) sélectionné(s) ? Cette action est irréversible."],
+"3644":["Delete selected ({0})","Eliminar seleccionados ({0})","Supprimer la sélection ({0})"],
+"3645":["Delete all ({0})","Eliminar todos ({0})","Tout supprimer ({0})"],
+"3646":["Delete all {0} leads? This action cannot be undone.","¿Eliminar los {0} leads? Esta acción no se puede deshacer.","Supprimer les {0} leads ? Cette action est irréversible."],
+"3712":["Error deleting leads: {0}","Error al eliminar leads: {0}","Erreur lors de la suppression des leads : {0}"]
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Copy, RefreshCw, Workflow } from 'lucide-react';
+import { CheckCircle2, Copy, LayoutGrid, List, RefreshCw, Workflow } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { EmptyState } from '../base/EmptyState';
@@ -60,6 +60,11 @@ export const BUCKETS: { key: Bucket; label: string; dot: string }[] = [
 export const bucketDot = (b: Bucket) => BUCKETS.find((x) => x.key === b)?.dot || 'bg-muted-foreground';
 
 const PAGE = 20;
+const VIEW_KEY = 'leadsflow_insights_view';
+type View = 'list' | 'grid';
+
+// Cartões como os dos assistentes: fundo do cartão, contorno fino e sombra suave no modo claro
+const CARD = 'rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,40,0.05)] dark:shadow-none';
 
 // Nomes guardados todos em maiúsculas (ex.: "JOAO SILVA") passam a "Joao Silva"
 export function displayName(name?: string) {
@@ -83,6 +88,13 @@ export default function AIInsightsPage({ onOpenConversation, onOpenLead, onNavig
   const [composers, setComposers] = useState<Record<string, Composer>>({});
   const [sent, setSent] = useState<Record<string, true>>({});
   const [reactivating, setReactivating] = useState(false);
+  const [view, setView] = useState<View>(() => {
+    try { return localStorage.getItem(VIEW_KEY) === 'grid' ? 'grid' : 'list'; } catch { return 'list'; }
+  });
+  const changeView = (v: View) => {
+    setView(v);
+    try { localStorage.setItem(VIEW_KEY, v); } catch { /* só nesta sessão */ }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -213,8 +225,8 @@ export default function AIInsightsPage({ onOpenConversation, onOpenLead, onNavig
                     aria-pressed={active}
                     onClick={() => { setFilter(active ? null : b.key); setVisible(PAGE); }}
                     className={cn(
-                      'min-w-0 rounded-xl border bg-card p-3 text-left transition-colors sm:p-4',
-                      active ? 'border-foreground/25 bg-muted/60' : 'border-border hover:bg-muted/40',
+                      CARD, 'min-w-0 p-3 text-left transition-colors sm:p-4',
+                      active ? 'border-foreground/25 bg-muted/60' : 'hover:bg-muted/40',
                     )}
                   >
                     <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -229,16 +241,33 @@ export default function AIInsightsPage({ onOpenConversation, onOpenLead, onNavig
               })}
             </div>
 
-            {(queue.value_at_stake > 0 || loading) && (
-              <div className="flex items-center justify-between gap-3">
-                {queue.value_at_stake > 0 ? (
-                  <p className="min-w-0 text-sm text-muted-foreground">
-                    <span className="font-semibold text-foreground tabular-nums">{formatMoney(queue.value_at_stake)}</span> em negócios à espera de si
-                  </p>
-                ) : <span />}
+            <div className="flex min-h-9 items-center justify-between gap-3">
+              {queue.value_at_stake > 0 ? (
+                <p className="min-w-0 text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground tabular-nums">{formatMoney(queue.value_at_stake)}</span> em negócios à espera de si
+                </p>
+              ) : <span />}
+              <div className="flex flex-shrink-0 items-center gap-2">
                 {loading && <UpdatingBadge />}
+                {items.length > 0 && (
+                  <div className="flex items-center rounded-lg bg-muted p-0.5" role="group" aria-label="Vista">
+                    {([['list', List, 'Lista'], ['grid', LayoutGrid, 'Grelha']] as const).map(([v, VIcon, label]) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => changeView(v)}
+                        aria-pressed={view === v}
+                        aria-label={label}
+                        title={label}
+                        className={cn('flex h-8 w-8 items-center justify-center rounded-md transition-colors', view === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+                      >
+                        <VIcon className="h-4 w-4" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             {total === 0 ? (
               <EmptyState
@@ -249,11 +278,12 @@ export default function AIInsightsPage({ onOpenConversation, onOpenLead, onNavig
             ) : items.length === 0 ? (
               <EmptyState icon={CheckCircle2} title="Nada nesta situação" />
             ) : (
-              <div className="space-y-3">
+              <div className={view === 'grid' ? 'grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3' : 'space-y-3'}>
                 {items.slice(0, visible).map((o) => (
                   <OpportunityCard
                     key={o.lead_id}
                     o={o}
+                    grid={view === 'grid'}
                     composer={composers[o.lead_id]}
                     sent={!!sent[o.lead_id]}
                     onGenerate={() => generate(o)}
@@ -266,8 +296,8 @@ export default function AIInsightsPage({ onOpenConversation, onOpenLead, onNavig
                     onOpenLead={onOpenLead ? () => onOpenLead(o.lead_id) : undefined}
                   />
                 ))}
-                {items.length > visible && (
-                  <Button variant="outline" className="w-full" onClick={() => setVisible((v) => v + PAGE)}>
+ {items.length > visible && (
+                  <Button variant="outline" className="w-full col-span-full" onClick={() => setVisible((v) => v + PAGE)}>
                     Ver mais ({formatNumber(items.length - visible)})
                   </Button>
                 )}
@@ -275,7 +305,7 @@ export default function AIInsightsPage({ onOpenConversation, onOpenLead, onNavig
             )}
 
             {queue.stale > 0 && (
-              <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className={cn(CARD, 'flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between')}>
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                     <Workflow className="h-5 w-5" />
@@ -315,9 +345,11 @@ export default function AIInsightsPage({ onOpenConversation, onOpenLead, onNavig
 }
 
 function OpportunityCard({
-  o, composer, sent, onGenerate, onChoose, onDraft, onCancel, onSend, onCopy, onOpenConversation, onOpenLead,
+  o, grid, composer, sent, onGenerate, onChoose, onDraft, onCancel, onSend, onCopy, onOpenConversation, onOpenLead,
 }: {
   o: Opportunity;
+  /** Vista em grelha: cartões da mesma altura; a escrever, ocupa a linha toda */
+  grid?: boolean;
   composer?: Composer;
   sent: boolean;
   onGenerate: () => void;
@@ -332,7 +364,12 @@ function OpportunityCard({
   const ready = composer && !composer.loading && composer.suggestions.length > 0;
 
   return (
-    <article className={cn('rounded-xl border border-border bg-card p-4 transition-opacity', sent && 'opacity-70')}>
+    <article className={cn(
+      CARD, 'flex flex-col p-4 transition-opacity sm:p-5',
+      grid && 'h-full',
+      grid && (ready || composer?.loading) && 'md:col-span-2 2xl:col-span-3',
+      sent && 'opacity-70',
+    )}>
       <div className="flex items-start gap-3">
         <div className="relative flex-shrink-0">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-sm font-semibold text-foreground" translate="no">
@@ -371,10 +408,12 @@ function OpportunityCard({
       </div>
 
       {o.last_client_message && (
-        <p className="mt-2 rounded-lg bg-muted/60 px-3 py-2 text-sm text-foreground/80" translate="no">
-          <span className="line-clamp-2">“{o.last_client_message}”</span>
+        <p className="mt-2 border-l-2 border-border py-0.5 pl-3 text-sm text-muted-foreground" translate="no">
+          <span className={grid ? 'line-clamp-2 min-h-[2.5rem]' : 'line-clamp-2'}>“{o.last_client_message}”</span>
         </p>
       )}
+      {/* Na grelha os botões ficam todos à mesma altura */}
+      {grid && <div className="flex-1" />}
 
       {sent ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -431,7 +470,7 @@ function OpportunityCard({
           </div>
         </div>
       ) : (
-        <div className="mt-4 flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">
+        <div className={cn('mt-4 flex gap-2 [&>*]:flex-1', !grid && 'sm:[&>*]:flex-none')}>
           <Button size="sm" onClick={onGenerate} disabled={composer?.loading}>
             {composer?.loading ? 'A escrever…' : o.action}
           </Button>

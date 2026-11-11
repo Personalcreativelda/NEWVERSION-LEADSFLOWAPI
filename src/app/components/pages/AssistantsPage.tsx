@@ -171,7 +171,9 @@ function isFreeTrialAssistant(assistant: Assistant): boolean {
 export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const confirm = useConfirm();
   const planLimits = usePlanLimits();
-  const [activeTab, setActiveTab] = useState<'marketplace' | 'connected'>('marketplace');
+  const [activeTab, setActiveTab] = useState<'marketplace' | 'connected'>('connected');
+  // Só na primeira carga: sem assistentes ligados abre no Marketplace
+  const tabChosenRef = useRef(false);
   const [availableAssistants, setAvailableAssistants] = useState<Assistant[]>([]);
   const [userAssistants, setUserAssistants] = useState<UserAssistant[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -236,6 +238,10 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       setAvailableAssistants(assistants);
       setUserAssistants(userAssists);
       setChannels(channelsList);
+      if (!tabChosenRef.current) {
+        tabChosenRef.current = true;
+        if (userAssists.length === 0) setActiveTab('marketplace');
+      }
     } catch (error) {
       console.error('[AssistantsPage] Error loading data:', error);
       toast.error('Erro ao carregar assistentes');
@@ -860,71 +866,61 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     return (
       <div
         key={assistant.id}
-        className={`relative flex flex-col rounded-2xl border p-4 transition-all duration-200 hover:shadow-lg ${
-          isFree
-            ? 'bg-card border-2 border-blue-500/40 text-card-foreground shadow-sm shadow-blue-500/10'
-            : 'bg-muted/30 border border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/50'
-        }`}
+        className="relative flex flex-col rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-[box-shadow,border-color] duration-200 hover:border-foreground/20 hover:shadow-[0_8px_24px_-12px_rgba(16,24,40,0.18)] dark:shadow-none dark:hover:shadow-none"
       >
-        {/* Free plan glow strip at top */}
-        {isFree && (
-          <div className="absolute top-0 left-4 right-4 h-0.5 rounded-full bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-400 opacity-70" />
-        )}
-        {/* Header */}
-        <div className="flex items-start gap-3 mb-3">
+        {/* Cabeçalho: logótipo, nome e "categoria · plano" numa só linha (sem selos coloridos) */}
+        <div className="flex items-center gap-3.5">
           <AssistantLogo icon={assistant.icon} color={assistant.color} />
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <h3 className="font-semibold text-base text-foreground">{assistant.name}</h3>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <h3 className="truncate text-base font-semibold text-foreground">{assistant.name}</h3>
               {assistant.is_featured && (
-                <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-0 gap-1 px-1.5 py-0 text-[11px] font-medium">
-                  <Star className="h-2.5 w-2.5" />
-                  Destaque
-                </Badge>
-              )}
-              {assistant.is_custom ? (
-                <Badge className="bg-primary/10 text-primary border-0 px-1.5 py-0 text-[11px] font-medium">Personalizado</Badge>
-              ) : isFree ? (
-                <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 border-0 px-1.5 py-0 text-[11px] font-medium">Grátis</Badge>
-              ) : (
-                <Badge className="bg-muted text-muted-foreground border-0 px-1.5 py-0 text-[11px] font-medium">Pro</Badge>
+                <Star className="h-3.5 w-3.5 flex-shrink-0 fill-amber-400 text-amber-400" aria-label="Destaque" />
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">
               {CATEGORY_LABELS[assistant.category] || assistant.category}
+              {' · '}
+              {assistant.is_custom ? 'Personalizado' : isFree
+                ? <span className="font-medium text-emerald-600 dark:text-emerald-400">Grátis</span>
+                : 'Pro'}
             </p>
           </div>
         </div>
 
-        {/* Description */}
+        {/* Descrição: sempre com a altura de duas linhas (os cartões ficam alinhados) */}
         {assistant.short_description && (
-          <p className="text-sm mb-3 line-clamp-2 text-muted-foreground">
+          <p className="mt-4 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-muted-foreground">
             {ptMZ(assistant.short_description)}
           </p>
         )}
 
-        {/* Features */}
+        {/* Funções principais */}
         {(assistant.features?.length || 0) > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-          {assistant.features?.slice(0, 2).map((feature, idx) => (
-            <span
-              key={idx}
-              className={`text-[10px] px-2 py-0.5 rounded-full ${
-                  'bg-muted text-muted-foreground'
-              }`}
-            >
-              {ptMZ(feature)}
-            </span>
-          ))}
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {assistant.features?.slice(0, 2).map((feature, idx) => (
+              <span key={idx} className="max-w-full truncate rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
+                {ptMZ(feature)}
+              </span>
+            ))}
           </div>
         )}
+
+        {/* Grátis: o que inclui (só antes de ligar) */}
+        {isFree && isMarketplace && !connected && (
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Zap className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
+            200 mensagens/mês incluídas
+          </p>
+        )}
+
+        <div className="mb-4" />
 
         {/* Connected channels */}
         {resolvedChannels.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 mb-3">
-            <span className="text-[10px] font-medium text-muted-foreground">Canais:</span>
             {resolvedChannels.map(channel => (
-              <span key={channel.id} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-muted border border-border">
+              <span key={channel.id} className="inline-flex max-w-full items-center gap-1.5 truncate rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
                 {renderChannelIcon(channel.type, 'w-3 h-3')}
                 {assistantChannelName(channel)}
                 {connected && <Check className="w-3 h-3 text-green-500 ml-0.5" />}
@@ -955,8 +951,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
             {/* Monthly messages usage bar */}
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-muted-foreground">Mensagens este mês</span>
-                <span className={`text-[10px] font-semibold ${atLimit ? 'text-red-500' : nearLimit ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                <span className="text-xs text-muted-foreground">Mensagens este mês</span>
+                <span className={`text-xs font-medium tabular-nums ${atLimit ? 'text-red-500' : nearLimit ? 'text-amber-500' : 'text-muted-foreground'}`}>
                   {monthlyUsed}/{monthlyLimit}
                 </span>
               </div>
@@ -972,17 +968,8 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
           </div>
         )}
 
-        {/* Free plan callout (only on marketplace card when not yet connected) */}
-        {isFree && isMarketplace && !connected && (
-          <div className="mb-3 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5"
-            style={{ backgroundColor: 'hsl(210 100% 56% / 0.10)', borderLeft: '2px solid hsl(210 100% 56% / 0.5)' }}>
-            <Zap className="w-3 h-3 flex-shrink-0 text-blue-400" />
-            <span className="text-[10px] text-blue-400 font-medium">Disponível gratuitamente · 200 msg/mês incluídas</span>
-          </div>
-        )}
-
         {/* Actions */}
-        <div className="flex items-center gap-2 mt-auto pt-1">
+        <div className="mt-auto flex items-center gap-2">
           {isMarketplace ? (
             connected ? (
               <>
@@ -1184,18 +1171,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       {/* Tabs */}
       <div className="flex gap-1 p-1 rounded-lg mb-6 w-fit bg-muted">
         <button
-          onClick={() => setActiveTab('marketplace')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'marketplace'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 inline-block mr-1.5" />
-          Marketplace
-        </button>
-        <button
-          onClick={() => setActiveTab('connected')}
+          onClick={() => { tabChosenRef.current = true; setActiveTab('connected'); }}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             activeTab === 'connected'
               ? 'bg-background text-foreground shadow-sm'
@@ -1209,6 +1185,17 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               {userAssistants.length}
             </Badge>
           )}
+        </button>
+        <button
+          onClick={() => { tabChosenRef.current = true; setActiveTab('marketplace'); }}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'marketplace'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 inline-block mr-1.5" />
+          Marketplace
         </button>
       </div>
 
@@ -1255,7 +1242,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               icon={Bot}
               title="Ainda sem assistentes ligados"
               description="Escolha um assistente pronto no marketplace e ligue-o aos seus canais."
-              action={<PageAction variant="primary" icon={Sparkles} label="Explorar marketplace" onClick={() => setActiveTab('marketplace')} />}
+              action={<PageAction variant="primary" icon={Sparkles} label="Explorar marketplace" onClick={() => { tabChosenRef.current = true; setActiveTab('marketplace'); }} />}
             />
           )}
         </div>
