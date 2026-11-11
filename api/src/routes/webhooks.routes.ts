@@ -411,7 +411,65 @@ router.post('/evolution/setup-all', async (req, res) => {
 });
 
 // INBOX: ✅ Webhook para Evolution API receber mensagens do WhatsApp
-router.post('/evolution/messages', async (req, res) => {
+//
+// Responde logo à Evolution e trata a mensagem em segundo plano. Antes só respondia no fim
+// (mídia, @lid, foto de perfil, ~20 consultas): com contas cheias de grupos a Evolution ficava
+// à espera/voltava a tentar e as mensagens entravam atrasadas, "quando queriam".
+// Ordem: as mensagens da mesma conversa são tratadas uma de cada vez, pela ordem de chegada;
+// conversas diferentes não esperam umas pelas outras.
+const evolutionChains = new Map<string, Promise<void>>();
+const EVOLUTION_JOB_TIMEOUT_MS = 90_000;
+
+/** Resposta "de mentira" para o tratamento em segundo plano (a verdadeira já foi enviada) */
+function backgroundResponse(label: string) {
+  let statusCode = 200;
+  const r: any = {
+    status(code: number) { statusCode = code; return r; },
+    json(payload: any) {
+      if (statusCode >= 400) console.warn(`[Evolution Webhook] ${label} → ${statusCode}`, JSON.stringify(payload).slice(0, 300));
+      return r;
+    },
+  };
+  return r;
+}
+
+function evolutionChainKey(body: any): string {
+  let instance = body?.instance || body?.instanceName || body?.sender?.instance || '';
+  if (typeof instance === 'object' && instance) instance = instance.instanceName || instance.instance || instance.name || '';
+  const data = Array.isArray(body?.data) ? body.data[0] : (body?.data || body);
+  const jid = data?.key?.remoteJid || data?.remoteJid || data?.messages?.[0]?.key?.remoteJid || '';
+  return `${instance}|${jid}`;
+}
+
+// Foto de perfil: pedida ao WhatsApp no máximo de 6 em 6 horas por contacto (era em cada mensagem)
+const profilePicCache = new Map<string, { url: string | null; at: number }>();
+const PROFILE_PIC_TTL_MS = 6 * 60 * 60_000;
+async function cachedProfilePicture(instance: string, jid: string): Promise<string | null> {
+  const key = `${instance}|${jid}`;
+  const hit = profilePicCache.get(key);
+  if (hit && Date.now() - hit.at < PROFILE_PIC_TTL_MS) return hit.url;
+  const url = (await whatsappService.fetchProfilePicture(instance, jid).catch(() => null)) || null;
+  if (profilePicCache.size > 5000) profilePicCache.clear();
+  profilePicCache.set(key, { url, at: Date.now() });
+  return url;
+}
+
+router.post('/evolution/messages', (req, res) => {
+  res.json({ success: true, queued: true });
+  const key = evolutionChainKey(req.body);
+  const prev = evolutionChains.get(key) || Promise.resolve();
+  const job = prev.then(() => Promise.race([
+    handleEvolutionMessage(req, backgroundResponse(key)),
+    new Promise<void>((resolve) => setTimeout(() => {
+      console.warn('[Evolution Webhook] Mensagem demorou mais de 90 s, a seguinte avança:', key);
+      resolve();
+    }, EVOLUTION_JOB_TIMEOUT_MS).unref?.()),
+  ])).catch((err) => console.error('[Evolution Webhook] Erro em segundo plano:', err?.message || err));
+  evolutionChains.set(key, job);
+  void job.finally(() => { if (evolutionChains.get(key) === job) evolutionChains.delete(key); });
+});
+
+async function handleEvolutionMessage(req: any, res: any): Promise<void> {
   try {
     console.log('\n' + '='.repeat(80));
     console.log('[Evolution Webhook] ===== WEBHOOK RECEBIDO EM:', new Date().toISOString(), '=====');
@@ -1346,7 +1404,7 @@ router.post('/evolution/messages', async (req, res) => {
       const instanceName = instance;
       if (instanceName) {
         const jidForPic = resolvedJid || remoteJid;
-        waProfilePic = await whatsappService.fetchProfilePicture(instanceName, jidForPic);
+        waProfilePic = await cachedProfilePicture(instanceName, jidForPic);
         if (waProfilePic) {
           console.log('[Evolution Webhook] ✅ Foto de perfil encontrada');
         }
@@ -1794,7 +1852,7 @@ router.post('/evolution/messages', async (req, res) => {
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-});
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TELEGRAM WEBHOOKS

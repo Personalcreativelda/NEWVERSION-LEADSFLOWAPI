@@ -111,6 +111,17 @@ export function useInbox(options: UseInboxOptions = {}) {
         refreshMessagesRef.current = refreshMessages;
     }, [refreshMessages]);
 
+    // A lista mostra uma mensagem da conversa aberta que o chat ainda não tem (evento em
+    // tempo real perdido, ou a lista atualizou-se primeiro): o chat vai buscá-la logo, em vez
+    // de esperar pelo pedido de segurança ou por sair e voltar a entrar na conversa.
+    const lastListMessageId = selectedConversation?.last_message?.id;
+    useEffect(() => {
+        if (!lastListMessageId || String(lastListMessageId).startsWith('temp_')) return;
+        if (messages.some((m) => m.id === lastListMessageId)) return;
+        refreshMessagesRef.current({ silent: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lastListMessageId, selectedConversation?.id]);
+
     // ── Notification sound ────────────────────────────────────────────────────
     const playNotificationSound = useCallback(() => {
         try {
@@ -230,6 +241,19 @@ export function useInbox(options: UseInboxOptions = {}) {
         },
         [setActiveConversation, markConversationAsRead, wsMarkAsRead],
     );
+
+    // Mensagem nova na conversa que está aberta e à vista: fica lida (não acumula "não lidas")
+    const openUnread = selectedConversation?.unread_count ?? 0;
+    useEffect(() => {
+        if (!selectedConversation?.id || openUnread <= 0 || document.visibilityState !== 'visible') return;
+        const id = selectedConversation.id;
+        const t = setTimeout(() => {
+            void markConversationAsRead(id);
+            wsMarkAsRead(id);
+        }, 800);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedConversation?.id, openUnread]);
 
     // ── Send message ──────────────────────────────────────────────────────────
     const handleSendMessage = useCallback(

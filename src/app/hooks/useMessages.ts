@@ -55,7 +55,7 @@ function withQueuedBubbles(conversationId: string, list: MessageWithSender[]): M
 /** Mensagens por página: a primeira traz as mais recentes, as seguintes vêm ao subir no chat */
 const PAGE_SIZE = 50;
 // Pedido de segurança caso o WebSocket perca eventos: raro com a ligação ativa, mais frequente sem ela
-const POLL_CONNECTED = 60_000;
+const POLL_CONNECTED = 20_000; // conversa aberta: rede de segurança se um evento em tempo real se perder
 const POLL_DISCONNECTED = 15_000;
 
 const isTemp = (m: MessageWithSender) => m.id.startsWith('temp_');
