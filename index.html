@@ -5,6 +5,8 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
+    <!-- Cor da barra do browser no telemóvel: igual ao fundo (atualizada ao mudar o tema, theme.ts) -->
+    <meta name="theme-color" content="#f3f4f6" />
     <title>LeadsFlow</title>
     <script>
       // Tema antes do primeiro desenho: sem isto a página abria clara e só escurecia quando o
@@ -13,13 +15,16 @@
         try {
           var mode = localStorage.getItem('crm_tema_source') === 'manual' ? localStorage.getItem('crm_tema_mode') : null;
           var dark = mode === 'dark' || mode === 'light' ? mode === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-          if (dark) document.documentElement.classList.add('dark');
+          if (dark) {
+            document.documentElement.classList.add('dark');
+            document.querySelector('meta[name="theme-color"]').setAttribute('content', '#18191b');
+          }
         } catch (e) {}
       })();
     </script>
     <style>
       /* Fundo certo antes de o CSS do app chegar */
-      html { background-color: #f3f4f6; }
+      html { background-color: #f3f4f6; color-scheme: light; } /* tema claro escolhido com o sistema escuro: campos e barras de scroll claros */
       html.dark { background-color: #18191b; color-scheme: dark; }
       /* Ecrã de abertura do app Android (logo + nome sobre azul). Só aparece no app:
          o script abaixo marca <html> antes do primeiro paint; src/native.ts esconde-o. */

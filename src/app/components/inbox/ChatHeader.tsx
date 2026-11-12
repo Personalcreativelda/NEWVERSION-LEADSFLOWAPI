@@ -212,7 +212,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                             placeholder="Pesquisar..."
                             className="w-32 sm:w-40 bg-transparent text-sm text-foreground outline-none"
                         />
-                        <button 
+                        <button aria-label="Fechar pesquisa" 
                             onClick={() => { setShowSearch(false); setSearchQuery(''); }}
                             className="p-0.5 rounded text-muted-foreground hover:bg-muted"
                         >

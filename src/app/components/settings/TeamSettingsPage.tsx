@@ -124,7 +124,7 @@ function InviteModal({
                     <h2 className="text-base font-semibold flex items-center gap-2">
                         Convidar membro
                     </h2>
-                    <button onClick={onClose} className="p-1 hover:bg-muted/50 rounded">
+                    <button aria-label="Fechar" onClick={onClose} className="p-1 hover:bg-muted/50 rounded">
                         <X size={18} className="text-muted-foreground" />
                     </button>
                 </div>
@@ -463,7 +463,7 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
                             <p className="text-xs text-muted-foreground truncate mt-1 font-mono">{lastInviteUrl}</p>
                         </div>
                         <Button size="sm" variant="outline" className="flex-shrink-0" onClick={() => copyInviteUrl(lastInviteUrl)}>Copiar</Button>
-                        <button onClick={() => setLastInviteUrl(null)} className="p-1 hover:bg-muted/50 rounded">
+                        <button aria-label="Fechar" onClick={() => setLastInviteUrl(null)} className="p-1 hover:bg-muted/50 rounded">
                             <X size={14} className="text-muted-foreground" />
                         </button>
                     </div>

@@ -61,7 +61,7 @@ export default function SidebarGroup({
   if (isCollapsed) {
     return (
       <li ref={itemRef} className="relative group flex justify-center py-0.5 px-2">
-        <button
+        <button aria-label={label}
           onClick={handleCollapsedClick}
           className={`sidebar-icon-btn ${
             isActive || isFlyoutOpen ? 'sidebar-icon-btn-active' : 'sidebar-icon-btn-inactive'

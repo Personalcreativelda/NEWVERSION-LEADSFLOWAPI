@@ -1,4 +1,5 @@
 // INBOX: Modal de Conexão Email com SMTP/IMAP
+import { celebrate } from '../../../lib/celebrate';
 import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import type { Channel } from '../../../types/inbox';
@@ -184,6 +185,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                 toast.success('Canal de email atualizado com sucesso!');
             } else {
                 channel = await channelsApi.create(channelData);
+                celebrate('Canal ligado');
                 toast.success('Canal de email ligado!');
             }
 
@@ -342,7 +344,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                             color: 'hsl(var(--foreground))'
                                         }}
                                     />
-                                    <button
+                                    <button aria-label={showPassword ? 'Esconder' : 'Mostrar'}
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
                                         className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted/50"

@@ -485,7 +485,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                                 >
                                     {getWidgetCode()}
                                 </pre>
-                                <button
+                                <button aria-label="Copiar"
                                     onClick={() => copyToClipboard(getWidgetCode())}
                                     className="absolute top-2 right-2 p-2 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors"
                                 >

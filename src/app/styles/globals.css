@@ -26,7 +26,7 @@
   --secondary: 220 14% 96%;
   --secondary-foreground: 222 39% 11%;
   --muted: 220 14% 95%;
-  --muted-foreground: 220 9% 46%;
+  --muted-foreground: 220 9% 44%;
   --accent: 221 83% 96%;
   --accent-foreground: 221 83% 53%;
   --destructive: 0 62% 55%;
@@ -1235,6 +1235,47 @@ html.native-app body {
   touch-action: manipulation; /* sem atraso de 300ms no toque, mantém o zoom por pinça */
 }
 
+/* Comportamentos de site que não existem num app: segurar o dedo num botão, menu, imagem
+   ou cabeçalho selecionava o texto. O texto das conversas, notas e campos continua
+   selecionável (só a "moldura" do app deixa de o ser). */
+html.native-app :is(button, a, label, nav, header, img, svg, [role="button"], [role="tab"], [role="menuitem"], [role="option"], .mobile-bottom-nav) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+html.native-app img {
+  -webkit-user-drag: none;
+}
+
+/* Teclado aberto (classe posta em src/native.ts): barra inferior e botão flutuante saem
+   do caminho, como nos apps nativos — antes subiam com o teclado e tapavam o que se escrevia */
+html.keyboard-open .mobile-bottom-nav,
+html.keyboard-open .page-fab {
+  display: none !important;
+}
+
+/* Transições entre páginas (lib/pageTransition.ts, só telemóvel). Cabeçalho, barra inferior
+   e botão flutuante ficam parados; só o conteúdo se move. */
+.app-header { view-transition-name: app-header; }
+.mobile-bottom-nav { view-transition-name: bottom-nav; }
+.page-fab { view-transition-name: page-fab; }
+::view-transition-group(root) { animation-duration: 240ms; }
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 240ms;
+  animation-timing-function: var(--ease-app);
+}
+html[data-page-dir="forward"]::view-transition-old(root) { animation-name: lf-page-out-left; }
+html[data-page-dir="forward"]::view-transition-new(root) { animation-name: lf-page-in-right; }
+html[data-page-dir="back"]::view-transition-old(root) { animation-name: lf-page-out-right; }
+html[data-page-dir="back"]::view-transition-new(root) { animation-name: lf-page-in-left; }
+html[data-page-dir="tab"]::view-transition-old(root),
+html[data-page-dir="tab"]::view-transition-new(root) { animation-duration: 160ms; }
+@keyframes lf-page-in-right { from { opacity: 0; transform: translateX(28px); } }
+@keyframes lf-page-out-left { to { opacity: 0; transform: translateX(-14px); } }
+@keyframes lf-page-in-left { from { opacity: 0; transform: translateX(-28px); } }
+@keyframes lf-page-out-right { to { opacity: 0; transform: translateX(14px); } }
+
 /* Conversa aberta no telemóvel: chat em ecrã inteiro (classe posta pela inbox) */
 html.inbox-chat-open .app-header,
 html.inbox-chat-open .mobile-bottom-nav {
@@ -1318,6 +1359,62 @@ html.native-app #lfw-close {
 .stagger > *:nth-child(4) { animation-delay: 120ms; }
 .stagger > *:nth-child(5) { animation-delay: 160ms; }
 .stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
+
+/* Momento de sucesso (lib/celebrate.ts): visto verde ao centro que salta e desaparece */
+.lf-celebrate {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.lf-celebrate-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 9999px;
+  color: #fff;
+  background: hsl(152 60% 40%);
+  box-shadow: 0 12px 32px -8px hsl(152 60% 40% / 0.55);
+  animation: lf-celebrate-pop 1.3s var(--ease-app) forwards;
+}
+.lf-celebrate-check {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: lf-celebrate-draw 360ms 120ms ease-out forwards;
+}
+@keyframes lf-celebrate-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  18% { opacity: 1; transform: scale(1.06); }
+  28% { transform: scale(1); }
+  78% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.96); }
+}
+@keyframes lf-celebrate-draw { to { stroke-dashoffset: 0; } }
+/* Reduzir movimento: sem salto nem traço animado (a regra global acabava a animação já invisível) */
+@media (prefers-reduced-motion: reduce) {
+  .lf-celebrate-badge { animation: none; }
+  .lf-celebrate-check { animation: none; stroke-dashoffset: 0; }
+}
+
+/* Alvos de toque (ecrã tátil): botões pequenos só com ícone (p-1/p-1.5, 24–32px) ganham
+   uma área de toque invisível de ~44px à volta, sem mudar o desenho. Os que já são
+   posicionados (absolute/fixed/sticky) ou usam ::after ficam como estão. */
+@media (pointer: coarse) {
+  :is(button, [role="button"]):is([class~="p-0.5"], [class~="p-1"], [class~="p-1.5"], [class~="h-6"], [class~="h-7"], [class~="h-8"], [class~="w-6"], [class~="w-7"], [class~="w-8"]):not([class*="absolute"]):not([class*="fixed"]):not([class*="sticky"]):not([class*="after:"]) {
+    position: relative;
+  }
+  :is(button, [role="button"]):is([class~="p-0.5"], [class~="p-1"], [class~="p-1.5"], [class~="h-6"], [class~="h-7"], [class~="h-8"], [class~="w-6"], [class~="w-7"], [class~="w-8"]):not([class*="absolute"]):not([class*="fixed"]):not([class*="sticky"]):not([class*="after:"])::after {
+    content: '';
+    position: absolute;
+    /* Só cresce até 44px no total e só onde o botão é menor (um chip largo não invade o vizinho) */
+    inset: min(0px, calc((100% - 44px) / 2));
+  }
+}
 
 /* Menu lateral no telemóvel (gaveta): alvos de toque de ~44px e texto maior,
    como nas gavetas do Slack, Notion e ChatGPT */

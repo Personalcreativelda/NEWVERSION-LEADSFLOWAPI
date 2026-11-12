@@ -22,7 +22,13 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={cn('pl-9', value && 'pr-9', className)}
+          // Nome para leitores de ecrã (o placeholder desaparece ao escrever)
+          aria-label={props['aria-label'] ?? placeholder.replace(/…$/, '')}
+          type="search"
+          enterKeyHint="search"
+          autoComplete="off"
+          spellCheck={false}
+          className={cn('pl-9 [&::-webkit-search-cancel-button]:appearance-none', value && 'pr-9', className)}
           {...props}
         />
         {value && (
@@ -30,7 +36,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
             type="button"
             aria-label="Limpar pesquisa"
             onClick={() => (onClear ? onClear() : onChange(''))}
-            className="absolute right-3 text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute right-1 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="size-4" />
           </button>

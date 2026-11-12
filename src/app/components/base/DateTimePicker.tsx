@@ -124,7 +124,7 @@ export function DateTimePicker({ value, onChange, placeholder = 'Escolher data e
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="h-10 flex-shrink-0 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-all hover:brightness-110"
+                className="h-10 flex-shrink-0 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:brightness-110"
               >
                 OK
               </button>

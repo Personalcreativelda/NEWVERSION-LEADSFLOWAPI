@@ -72,7 +72,7 @@ export default function TagEditModal({ tag, onClose, onUpdate }: TagEditModalPro
                     <h2 className="text-xl font-bold" style={{ color: 'hsl(var(--foreground))' }}>
                         Editar Etiqueta
                     </h2>
-                    <button
+                    <button aria-label="Fechar"
                         onClick={onClose}
                         className="p-1 hover:bg-muted rounded-md transition-colors"
                     >

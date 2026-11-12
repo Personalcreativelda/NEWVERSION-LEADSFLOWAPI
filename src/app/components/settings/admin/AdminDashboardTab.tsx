@@ -124,7 +124,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({
               </div>
               <h3 className="text-xl sm:text-2xl font-semibold text-foreground tabular-nums truncate">{stat.value}</h3>
               <p className="text-muted-foreground text-sm mt-1">{stat.label}</p>
-              <p className="text-xs text-muted-foreground/70 mt-0.5">{stat.sub}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{stat.sub}</p>
             </div>
           );
         })}

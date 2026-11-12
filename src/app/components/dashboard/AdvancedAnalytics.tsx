@@ -572,7 +572,7 @@ export default function AdvancedAnalytics({ leads, isDark = false }: AdvancedAna
                     style={{ backgroundColor: STATUS_COLORS[entry.name] || PIE_COLORS[index % PIE_COLORS.length] }}
                   />
                   <span className="text-sm text-muted-foreground">
-                    {entry.name} <span className="text-muted-foreground/70">({entry.value})</span>
+                    {entry.name} <span className="text-muted-foreground">({entry.value})</span>
                   </span>
                 </div>
               ))}

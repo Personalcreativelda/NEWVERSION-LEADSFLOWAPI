@@ -658,6 +658,7 @@ export const authApi = {
         clearOfflineCache(),
         clearOutbox(),
         import('../lib/userScope').then((m) => m.forgetDataOwner()).catch(() => {}),
+        import('../components/base/RecentSearches').then((m) => m.clearRecentSearches()).catch(() => {}),
       ]);
     }
   },

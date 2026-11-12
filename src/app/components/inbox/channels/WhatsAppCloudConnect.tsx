@@ -130,7 +130,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                             </p>
                         </div>
                     </div>
-                    <button
+                    <button aria-label="Fechar"
                         onClick={onClose}
                         className="transition-colors p-1 rounded-full hover:bg-muted/50"
                         style={{ color: 'hsl(var(--muted-foreground))' }}
@@ -376,7 +376,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                         >
                                             {webhookUrl}
                                         </code>
-                                        <button
+                                        <button aria-label="Copiar"
                                             onClick={() => copyToClipboard(webhookUrl)}
                                             className="p-2 rounded-lg border transition-colors hover:bg-muted/50"
                                             style={{ borderColor: 'hsl(var(--border))' }}
@@ -400,7 +400,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                         >
                                             {formData.verifyToken || 'leadflow_verify'}
                                         </code>
-                                        <button
+                                        <button aria-label="Copiar"
                                             onClick={() => copyToClipboard(formData.verifyToken || 'leadflow_verify')}
                                             className="p-2 rounded-lg border transition-colors hover:bg-muted/50"
                                             style={{ borderColor: 'hsl(var(--border))' }}

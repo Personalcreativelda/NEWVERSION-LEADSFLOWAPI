@@ -3,6 +3,12 @@ import { formatMoney } from '../../utils/format';
 import { OverlayModal } from '../base/OverlayModal';
 import { AppModal } from '../base/AppModal';
 import { getOriginInfo, leadDisplayName } from './leadDisplay';
+import { useStableCallback } from '../../hooks/useStableCallback';
+import { RecentSearchChips, useRecentSearches } from '../base/RecentSearches';
+import { celebrate } from '../../lib/celebrate';
+
+/** Etapa de negócio fechado (mesma regra das estatísticas do funil) */
+const isWonStage = (s?: { id: string; label: string }) => !!s && (s.id === 'convertido' || s.label.toLowerCase() === 'convertidos');
 import type { UIEvent } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, useDroppable, DragStartEvent, useDraggable, DragOverEvent, KeyboardSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
@@ -168,6 +174,8 @@ const formatCurrency = (value: number | undefined | null, currency?: CurrencyCod
 
 interface SalesFunnelProps {
   leads: Lead[];
+  /** Botão flutuante "Novo lead" (zona do polegar, como na página de leads) */
+  onNewLead?: () => void;
   onUpdateLeadStatus: (leadId: string, newStatus: string) => Promise<void>;
   onEditLead?: (lead: Lead) => void;
   onDeleteLead?: (leadId: string) => void;
@@ -547,7 +555,7 @@ const FunnelColumn = memo(({
                 </span>
               </div>
 
-              <Button
+              <Button aria-label="Expandir etapa"
                 variant="ghost"
                 size="sm"
                 className="h-6 w-6 p-0 rounded hover:bg-[hsl(var(--muted))]"
@@ -737,7 +745,17 @@ export default function SalesFunnel({
   currency,
   customStages,
   onStagesChange,
+  onNewLead,
 }: SalesFunnelProps) {
+  // O Dashboard cria estes callbacks em cada render: com identidade fixa, as colunas e os
+  // cartões memorizados não se redesenham todos (ex.: a cada movimento ao arrastar)
+  const onEditLeadStable = useStableCallback(onEditLead);
+  const onDeleteLeadStable = useStableCallback(onDeleteLead);
+  const onResetStable = useStableCallback(onResetLeadToInitial);
+  const onCallStable = useStableCallback(onCallLead);
+  const onEmailStable = useStableCallback(onEmailLead);
+  const onWhatsAppStable = useStableCallback(onWhatsAppLead);
+  const onViewDetailsStable = useStableCallback(onViewLeadDetails);
   const { reminders, byLead } = useLeadReminders();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -884,6 +902,8 @@ export default function SalesFunnel({
 
   // Pesquisa: mostra só os leads encontrados em cada etapa (arrastar e mover continuam)
   const [search, setSearch] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
+  const recentSearches = useRecentSearches('funil');
   const query = useDeferredValue(search.trim());
   const shownByStatus = useMemo(() => {
     if (!query) return leadsByStatus;
@@ -998,7 +1018,7 @@ export default function SalesFunnel({
       const normalizedNewStatus = newStatusValue.toLowerCase();
 
       if (normalizedNewStatus !== currentStatus) {
-        haptic('medium');
+        if (isWonStage(targetStage)) celebrate('Negócio fechado'); else haptic('medium');
         // Optimistic update
         setLocalLeads(prev =>
           prev.map(l => l.id === activeId ? { ...l, status: newStatusValue } : l)
@@ -1023,7 +1043,7 @@ export default function SalesFunnel({
     if (!newStage || !localLeads.some(l => l.id === leadId)) return;
     // Mesmo valor que o arrastar: id da etapa (ou o nome, nas etapas personalizadas)
     const newStatus = newStage.id.startsWith('stage_') ? newStage.label : newStage.id;
-    haptic('medium');
+    if (isWonStage(newStage)) celebrate('Negócio fechado'); else haptic('medium');
     setLocalLeads(prev => prev.map(l => (l.id === leadId ? { ...l, status: newStatus } : l)));
     onUpdateLeadStatus(leadId, newStatus).catch(() => setLocalLeads(leads));
   }, [stages, localLeads, onUpdateLeadStatus, leads]);
@@ -1047,10 +1067,10 @@ export default function SalesFunnel({
     <LeadRemindersContext.Provider value={byLead}>
       <div className="flex flex-col h-full">
         <PageHeader
-          title="Funil de Vendas"
-          description="Arraste os leads entre as etapas do funil"
+          title="Funil de vendas"
           icon={Workflow}
           actions={<PageAction icon={Settings} label="Personalizar etapas" onClick={() => setShowStageEditor(true)} />}
+          create={onNewLead ? { label: 'Novo lead', onClick: onNewLead } : undefined}
         />
 
         {/* Total, convertidos e taxa vivem no Início/Relatórios; aqui só o valor em
@@ -1069,13 +1089,17 @@ export default function SalesFunnel({
               </>
             )}
           </p>
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Pesquisar no funil..."
-            aria-label="Pesquisar no funil"
-            containerClassName="w-full sm:w-72"
-          />
+          <div className="w-full sm:w-72 min-w-0">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Pesquisar no funil…"
+              aria-label="Pesquisar no funil"
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => { setSearchFocused(false); recentSearches.remember(search); }}
+            />
+            <RecentSearchChips items={recentSearches.items} visible={searchFocused && !search} onPick={setSearch} />
+          </div>
         </div>
 
         {/* Agendamentos pendentes dos leads: ao entrar no funil vê-se logo o que está marcado */}
@@ -1089,7 +1113,7 @@ export default function SalesFunnel({
                 <h3 className="text-lg font-semibold text-foreground">
                   Personalizar Etapas do Funil
                 </h3>
-                <button
+                <button aria-label="Fechar"
                   onClick={() => setShowStageEditor(false)}
                   className="p-2 rounded-lg transition-colors hover:bg-muted/50 text-muted-foreground"
                 >
@@ -1208,7 +1232,7 @@ export default function SalesFunnel({
                       },
                     ]);
                   }}
-                  className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed transition-colors border-border text-muted-foreground/70 hover:text-muted-foreground"
+                  className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed transition-colors border-border text-muted-foreground hover:text-muted-foreground"
                 >
                   <Plus className="w-4 h-4" />
                   Adicionar Etapa
@@ -1242,7 +1266,7 @@ export default function SalesFunnel({
                 <h3 className="text-lg font-semibold text-foreground">
                   Editar Etapa
                 </h3>
-                <button
+                <button aria-label="Fechar"
                   onClick={() => setEditingStage(null)}
                   className="p-2 rounded-lg transition-colors hover:bg-muted/50 text-muted-foreground"
                 >
@@ -1368,16 +1392,16 @@ export default function SalesFunnel({
                           isOver={overId === stage.id}
                           expandedColumns={expandedColumns}
                           toggleExpanded={toggleExpanded}
-                          onEdit={onEditLead}
-                          onDelete={onDeleteLead}
+                          onEdit={onEditLeadStable}
+                          onDelete={onDeleteLeadStable}
                           onRemoveStage={handleRemoveStage}
                           onEditStage={setEditingStage}
                           onExportStage={handleExportStage}
-                          onResetToInitial={onResetLeadToInitial}
-                          onCall={onCallLead}
-                          onEmail={onEmailLead}
-                          onWhatsApp={onWhatsAppLead}
-                          onViewDetails={onViewLeadDetails}
+                          onResetToInitial={onResetStable}
+                          onCall={onCallStable}
+                          onEmail={onEmailStable}
+                          onWhatsApp={onWhatsAppStable}
+                          onViewDetails={onViewDetailsStable}
                           visibleCount={visibleCounts[stage.id] ?? DEFAULT_VISIBLE_PER_STAGE}
                           onLoadMore={handleLoadMore}
                           onShowLess={handleShowLess}

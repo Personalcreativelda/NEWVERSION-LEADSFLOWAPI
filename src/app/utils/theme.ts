@@ -36,6 +36,8 @@ export function resolveTheme(): ThemeMode {
 
 export function applyThemeClass(mode: ThemeMode) {
   document.documentElement.classList.toggle('dark', mode === 'dark');
+  // Barra do browser no telemóvel com a cor do fundo (mesmos valores do index.html)
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', mode === 'dark' ? '#18191b' : '#f3f4f6');
   try {
     localStorage.setItem(MODE_KEY, mode);
   } catch {

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { createPortal } from 'react-dom';
 import { Download, Loader2, X } from 'lucide-react';
 import { saveRemoteFile } from '../../lib/saveFile';
@@ -16,6 +17,8 @@ interface ImageViewerProps {
  */
 export function ImageViewer({ src, fileName, onClose }: ImageViewerProps) {
   const [saving, setSaving] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(boxRef);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -45,7 +48,7 @@ export function ImageViewer({ src, fileName, onClose }: ImageViewerProps) {
   const iconButton = 'flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20';
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex flex-col bg-black/95" onClick={onClose} role="dialog" aria-modal="true">
+    <div ref={boxRef} tabIndex={-1} className="fixed inset-0 z-[60] flex flex-col bg-black/95 outline-none" onClick={onClose} role="dialog" aria-modal="true" aria-label="Imagem">
       <div className="flex justify-end gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button type="button" className={iconButton} aria-label="Guardar" disabled={saving}
           onClick={(e) => { e.stopPropagation(); void save(); }}>
@@ -56,7 +59,7 @@ export function ImageViewer({ src, fileName, onClose }: ImageViewerProps) {
         </button>
       </div>
       <div className="flex min-h-0 flex-1 items-center justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <img src={src} alt="" className="max-h-full max-w-full object-contain" onClick={(e) => e.stopPropagation()} />
+        <img src={src} alt="Imagem" className="max-h-full max-w-full object-contain" onClick={(e) => e.stopPropagation()} />
       </div>
     </div>,
     document.body,

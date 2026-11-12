@@ -1,7 +1,10 @@
 import { matchesSearch } from '../../utils/search';
 import { LeadListRow } from './LeadListRow';
+import { RecentSearchChips, useRecentSearches } from '../base/RecentSearches';
 import { Edit, Trash2, MessageCircle, RefreshCw, Download, Upload, Mail, Megaphone, Smartphone, Search, Plus, CopyX, Users } from 'lucide-react';
-import { useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
+import { useStableCallback } from '../../hooks/useStableCallback';
+import { useIsDesktop } from '../../hooks/useMediaQuery';
 import type { Lead } from '../../types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { useConfirm } from '../ui/ConfirmDialog';
@@ -16,6 +19,7 @@ import { BrandIcon } from '../base/BrandIcon';
 import { WhatsAppIcon } from './leadDisplay';
 
 const LEADS_POR_PAGINA = 50;
+const getLeadId = (lead: Lead) => lead.id;
 
 
 // Helper para renderizar origem com ícone apropriado
@@ -182,15 +186,29 @@ export default function LeadsTable({
 }: LeadsTableProps) {
   const confirm = useConfirm();
   const [busca, setBusca] = useState('');
+  const [buscaFocada, setBuscaFocada] = useState(false);
+  const recentes = useRecentSearches('leads');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // Só a versão visível é montada (antes as duas listas existiam ao mesmo tempo)
+  const isDesktop = useIsDesktop();
+  // Telemóvel: quantos leads mostrar antes de "Mostrar mais"
+  const [mobileLimit, setMobileLimit] = useState(LEADS_POR_PAGINA);
 
-  // Filtrar leads pela busca
-  const leadsFiltrados = leads.filter((lead) => {
-    return matchesSearch(busca, lead.nome, lead.telefone, lead.email, lead.interesse, lead.origem, lead.status, (lead as any).empresa);
-  });
+  // Filtrar leads pela busca. Adiado: o campo responde logo a cada tecla e a lista
+  // atualiza a seguir (com milhares de leads, filtrar em cada tecla atrasava a escrita)
+  const buscaAdiada = useDeferredValue(busca);
+  const leadsFiltrados = useMemo(() => leads.filter((lead) =>
+    matchesSearch(buscaAdiada, lead.nome, lead.telefone, lead.email, lead.interesse, lead.origem, lead.status, (lead as any).empresa),
+  ), [leads, buscaAdiada]);
+
+  // Ações das linhas com identidade fixa: as linhas memorizadas não se redesenham todas
+  const chat = useStableCallback((lead: Lead) => onChat(lead.id!));
+  const edit = useStableCallback((lead: Lead) => onEdit(lead.id!));
+  const remove = useStableCallback((lead: Lead) => onDelete(lead.id!));
+  const open = useStableCallback((lead: Lead) => (onView ? onView(lead.id!) : onEdit(lead.id!)));
 
   // Pesquisa nova limpa a seleção: nunca apagar leads que deixaram de estar à vista
-  const handleBuscaChange = (valor: string) => { setBusca(valor); setSelectedIds([]); };
+  const handleBuscaChange = (valor: string) => { setBusca(valor); setSelectedIds([]); setMobileLimit(LEADS_POR_PAGINA); };
 
   // Apaga sempre só os selecionados. Com pesquisa ativa, "todos" são os que aparecem — nunca a conta inteira.
   const allSelected = selectedIds.length > 0 && selectedIds.length === leads.length;
@@ -223,7 +241,7 @@ export default function LeadsTable({
     onNovoLead?.();
   };
 
-  const columns: ResponsiveTableColumn<Lead>[] = [
+  const columns = useMemo<ResponsiveTableColumn<Lead>[]>(() => [
     {
       key: 'data',
       label: 'Data',
@@ -297,21 +315,21 @@ export default function LeadsTable({
       render: (lead) => (
         <div className="flex gap-1.5 justify-end">
           <button
-            onClick={() => onChat(lead.id)}
+            onClick={() => chat(lead)}
             className="p-1.5 rounded-md text-muted-foreground hover:text-green-600 dark:hover:text-green-400 hover:bg-green-500/10 transition-all duration-150"
             title="WhatsApp"
           >
             <MessageCircle className="w-4 h-4" />
           </button>
           <button
-            onClick={() => onEdit(lead.id)}
+            onClick={() => edit(lead)}
             className="p-1.5 rounded-md text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-500/10 transition-all duration-150"
             title="Editar"
           >
             <Edit className="w-4 h-4" />
           </button>
           <button
-            onClick={() => onDelete(lead.id)}
+            onClick={() => remove(lead)}
             className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-all duration-150"
             title="Apagar"
           >
@@ -320,11 +338,9 @@ export default function LeadsTable({
         </div>
       ),
     },
-  ];
+  ], [chat, edit, remove]);
 
 
-  // Telemóvel: quantos leads mostrar antes de "Mostrar mais"
-  const [mobileLimit, setMobileLimit] = useState(LEADS_POR_PAGINA);
   const emptyStateNode = (
     busca.trim() ? (
       <EmptyState icon={Search} title="Nenhum lead encontrado" description={`Nada corresponde a "${busca.trim()}".`} />
@@ -346,15 +362,22 @@ export default function LeadsTable({
         <div className="block md:hidden space-y-3">
 
 
+          <div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
-              type="text"
+              type="search"
+              aria-label="Pesquisar leads"
+              enterKeyHint="search"
               value={busca}
               onChange={(e) => handleBuscaChange(e.target.value)}
-              placeholder="Pesquisar leads..."
+              onFocus={() => setBuscaFocada(true)}
+              onBlur={() => { setBuscaFocada(false); recentes.remember(busca); }}
+              placeholder="Pesquisar leads…"
               className="w-full pl-9 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all duration-150"
             />
+          </div>
+          <RecentSearchChips items={recentes.items} visible={buscaFocada && !busca} onPick={handleBuscaChange} />
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -490,7 +513,7 @@ export default function LeadsTable({
       ) : (
         <>
         {/* Telemóvel: linhas de lista (toque abre o detalhe; deslizar mostra Mensagem e Eliminar) */}
-        <div className="md:hidden">
+        {!isDesktop && <div>
           {leadsFiltrados.length === 0 ? (
             <div className="p-4">{emptyStateNode}</div>
           ) : (
@@ -500,9 +523,9 @@ export default function LeadsTable({
                   <LeadListRow
                     key={lead.id}
                     lead={lead}
-                    onOpen={(l) => (onView ? onView(l.id!) : onEdit(l.id!))}
-                    onMessage={(l) => onChat(l.id!)}
-                    onDelete={(l) => onDelete(l.id!)}
+                    onOpen={open}
+                    onMessage={chat}
+                    onDelete={remove}
                   />
                 ))}
               </ul>
@@ -519,12 +542,12 @@ export default function LeadsTable({
               )}
             </>
           )}
-        </div>
-        <div className="hidden md:block p-4 md:p-5">
+        </div>}
+        {isDesktop && <div className="p-4 md:p-5">
           <ResponsiveTable
             columns={columns}
             rows={leadsFiltrados}
-            getRowId={(lead) => lead.id}
+            getRowId={getLeadId}
             selectable
             selected={selectedIds}
             onSelectionChange={setSelectedIds}
@@ -534,7 +557,7 @@ export default function LeadsTable({
             rowClassName={(lead) => (lead.marcado_email ? 'bg-primary/5 hover:bg-primary/10' : undefined)}
             emptyState={emptyStateNode}
           />
-        </div>
+        </div>}
         </>
       )}
     </DashboardCard>

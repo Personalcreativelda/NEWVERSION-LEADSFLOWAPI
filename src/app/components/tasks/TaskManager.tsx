@@ -41,6 +41,7 @@ import { SCHEDULES_CHANGED_EVENT } from '../dashboard/FunnelReminders';
 import { googleCalendarApi, type GoogleCalendarEvent } from '../../services/api/assistants';
 import { BrandIcon } from '../base/BrandIcon';
 import { isNativeApp, openBrowser } from '../../../native';
+import { celebrate } from '../../lib/celebrate';
 
 const notifySchedulesChanged = () => window.dispatchEvent(new Event(SCHEDULES_CHANGED_EVENT));
 
@@ -390,6 +391,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
     const status: Task['status'] = task.status === 'completed' ? 'pending' : 'completed';
     const completedAt = status === 'completed' ? new Date().toISOString() : undefined;
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status, completedAt } : t)));
+    if (status === 'completed') celebrate('Tarefa concluída');
     try {
       await scheduledConversationsApi.update(taskId, { status, metadata: { completed_at: completedAt ?? null } as any });
       notifySchedulesChanged();
@@ -793,7 +795,7 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button
+                        <Button aria-label="Apagar"
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteTask(task.id)}

@@ -526,7 +526,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                             </p>
                         </div>
                     </div>
-                    <button
+                    <button aria-label="Fechar"
                         onClick={onClose}
                         className="transition-colors p-1 rounded-full hover:bg-muted/50"
                         style={{ color: 'hsl(var(--muted-foreground))' }}

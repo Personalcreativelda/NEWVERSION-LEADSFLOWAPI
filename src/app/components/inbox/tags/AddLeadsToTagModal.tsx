@@ -144,7 +144,7 @@ export default function AddLeadsToTagModal({
                             </p>
                         </div>
                     </div>
-                    <button
+                    <button aria-label="Fechar"
                         onClick={onClose}
                         className="p-1 hover:bg-muted rounded-md transition-colors"
                     >

@@ -81,7 +81,7 @@ export default function Features() {
           <h2 className="text-white mb-4 text-3xl sm:text-4xl lg:text-5xl font-bold">
             Tudo que você precisa para vender mais
           </h2>
-          <p className="text-muted-foreground/70 max-w-2xl mx-auto text-base sm:text-lg">
+          <p className="text-muted-foreground max-w-2xl mx-auto text-base sm:text-lg">
             LeadsFlow API oferece ferramentas completas para captar, qualificar e
             converter leads de forma eficiente.
           </p>
@@ -116,7 +116,7 @@ export default function Features() {
 
         {/* Bottom CTA */}
         <div className="text-center mt-12">
-          <p className="text-muted-foreground/70 mb-4">
+          <p className="text-muted-foreground mb-4">
             Explore todos os recursos gratuitamente
           </p>
           <a

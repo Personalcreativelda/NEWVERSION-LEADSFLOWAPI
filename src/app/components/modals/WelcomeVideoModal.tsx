@@ -25,7 +25,7 @@ export default function WelcomeVideoModal({ isOpen, onClose, onOpenFeedback }: W
               Veja o que pode fazer com a plataforma
             </p>
           </div>
-          <button
+          <button aria-label="Fechar"
             onClick={onClose}
             className="p-2 rounded-lg transition-colors hover:bg-muted/50 flex-shrink-0"
             style={{ color: 'hsl(var(--muted-foreground))' }}

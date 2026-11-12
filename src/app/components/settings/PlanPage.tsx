@@ -343,7 +343,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
           <div className="py-12 text-center">
             <History className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">Nenhum pagamento registado ainda.</p>
-            <p className="text-xs text-muted-foreground/60 mt-1">Os pagamentos via Stripe serão registados automaticamente.</p>
+            <p className="text-xs text-muted-foreground mt-1">Os pagamentos via Stripe serão registados automaticamente.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

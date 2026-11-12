@@ -76,7 +76,7 @@ export default function AvatarUploadModal({
                     {/* Header */}
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold">Upload de Avatar</h3>
-                        <button
+                        <button aria-label="Fechar"
                             onClick={onClose}
                             disabled={uploading}
                             className={`p-2 rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}

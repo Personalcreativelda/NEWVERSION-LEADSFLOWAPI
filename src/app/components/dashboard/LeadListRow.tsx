@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import { MessageCircle, Trash2, User } from 'lucide-react';
 import type { Lead } from '../../types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -32,7 +32,7 @@ function initials(name: string) {
  * ícone da origem e data relativa. Toque abre o detalhe; deslizar para a esquerda
  * mostra Mensagem e Eliminar.
  */
-export function LeadListRow({ lead, onOpen, onMessage, onDelete }: LeadListRowProps) {
+export const LeadListRow = memo(function LeadListRow({ lead, onOpen, onMessage, onDelete }: LeadListRowProps) {
   const actions = [onMessage && 'message', onDelete && 'delete'].filter(Boolean) as string[];
   const maxOffset = actions.length * ACTION_WIDTH;
   const [offset, setOffset] = useState(0);
@@ -74,7 +74,8 @@ export function LeadListRow({ lead, onOpen, onMessage, onDelete }: LeadListRowPr
   };
 
   return (
-    <li className="relative overflow-hidden bg-card">
+    // content-visibility: as linhas fora do ecrã não são desenhadas (lista longa após "Mostrar mais")
+    <li className="relative overflow-hidden bg-card [content-visibility:auto] [contain-intrinsic-size:auto_68px]">
       {/* Ações reveladas ao deslizar */}
       {/* Só existem enquanto a linha está deslizada: com a linha parada, um toque (fundo
           de toque) deixava-as ver por trás do conteúdo */}
@@ -141,4 +142,4 @@ export function LeadListRow({ lead, onOpen, onMessage, onDelete }: LeadListRowPr
       </button>
     </li>
   );
-}
+});

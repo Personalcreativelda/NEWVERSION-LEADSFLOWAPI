@@ -435,7 +435,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                                 <span className="text-xs text-blue-300">Callback URL:</span>
                                                 <div className="flex items-center gap-1">
                                                     <code className="text-xs font-mono text-blue-100">{webhookUrl}</code>
-                                                    <button
+                                                    <button aria-label="Copiar"
                                                         onClick={() => copyToClipboard(webhookUrl, 'URL')}
                                                         className="p-1 hover:bg-blue-500/20 rounded"
                                                     >
@@ -448,7 +448,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                                 <span className="text-xs text-blue-300">Verify Token:</span>
                                                 <div className="flex items-center gap-1">
                                                     <code className="text-xs font-mono text-blue-100">{verifyToken}</code>
-                                                    <button
+                                                    <button aria-label="Copiar"
                                                         onClick={() => copyToClipboard(verifyToken, 'Token')}
                                                         className="p-1 hover:bg-blue-500/20 rounded"
                                                     >

@@ -80,7 +80,7 @@ export default function HeroSection({ onGetStarted }: HeroSectionProps) {
             </h1>
 
             {/* Subtitle */}
-            <p className="text-muted-foreground/70 mb-8 text-base sm:text-lg lg:text-xl leading-relaxed max-w-2xl mx-auto">
+            <p className="text-muted-foreground mb-8 text-base sm:text-lg lg:text-xl leading-relaxed max-w-2xl mx-auto">
               Automatize seu funil de vendas, acompanhe cada interação e converta mais leads com
               o poder da inteligência artificial.
             </p>

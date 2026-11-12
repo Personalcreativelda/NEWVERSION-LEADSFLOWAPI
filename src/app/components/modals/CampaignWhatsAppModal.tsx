@@ -2229,7 +2229,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                               Tentar
                             </button>
                           ) : null}
-                          <button
+                          <button aria-label="Remover anexo"
                             type="button"
                             onClick={() => removeAttachment(index)}
                             className="text-red-500 hover:text-red-700 dark:text-red-400 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"

@@ -33,13 +33,12 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
   const badgeTotalLeads = formatPercentage(progressTotalLeads);
   const badgeLeadsHoje = formatPercentage(progressLeadsHoje);
   const badgeConvertidos = formatPercentage(progressConvertidos);
-  const badgeTaxaConversao = formatPercent(parseFloat(taxaConversao));
 
   const stats = [
     {
       id: 'total-leads-card',
       value: totalLeads.toLocaleString(getLocale(), NUMBER_OPTS),
-      label: 'Total de Leads',
+      label: 'Total de leads',
       icon: Database,
       iconColor: '#B794F6',
       badge: badgeTotalLeads,
@@ -49,7 +48,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
     {
       id: 'leads-today-card',
       value: leadsNovosHoje.toLocaleString(getLocale(), NUMBER_OPTS),
-      label: 'Leads Captados Hoje',
+      label: 'Leads captados hoje',
       icon: TrendingUp,
       iconColor: '#5B9FED',
       badge: badgeLeadsHoje,
@@ -59,7 +58,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
     {
       id: 'leads-converted-card',
       value: leadsFechados.toLocaleString(getLocale(), NUMBER_OPTS),
-      label: 'Leads Convertidos',
+      label: 'Leads convertidos',
       icon: CheckCircle2,
       iconColor: '#00D9A3',
       badge: badgeConvertidos,
@@ -69,10 +68,10 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
     {
       id: 'conversion-rate-card',
       value: formatPercent(parseFloat(taxaConversao)),
-      label: 'Taxa de Conversão',
+      label: 'Taxa de conversão',
       icon: Target,
       iconColor: '#FFA26B',
-      badge: badgeTaxaConversao,
+      badge: null as string | null,
       progressColor: '#FFA26B',
       progress: parseFloat(taxaConversao),
     },
@@ -80,16 +79,10 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
 
   return (
     <div className="stagger grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
-      {stats.map((stat, index) => {
+      {stats.map((stat) => {
         const Icon = stat.icon;
-        const isPrimary = index === 0;
         return (
-          <DashboardCard
-            key={index}
-            className="group"
-            disableContentPadding
-            style={isPrimary ? { transform: 'scale(1.02)' } : undefined}
-          >
+          <DashboardCard key={stat.id} className="group" disableContentPadding>
             <div id={stat.id} className="p-3 sm:p-5">
               {/* Header: icon + badge */}
               <div className="flex items-center justify-between mb-4">
@@ -100,17 +93,19 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
                   <Icon className="w-5 h-5" style={{ color: stat.iconColor }} />
                 </div>
 
-                <span
-                  className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                  style={{ backgroundColor: `${stat.progressColor}12`, color: stat.progressColor }}
-                >
-                  {stat.badge}
-                </span>
+                {stat.badge && (
+                  <span
+                    className="px-2 py-0.5 rounded-full text-[11px] font-semibold tabular-nums"
+                    style={{ backgroundColor: `${stat.progressColor}12`, color: stat.progressColor }}
+                  >
+                    {stat.badge}
+                  </span>
+                )}
               </div>
 
               {/* Value */}
               <div className="mb-0.5">
-                <span className="text-2xl sm:text-3xl font-semibold leading-tight text-foreground tracking-tight">
+                <span className="text-2xl sm:text-3xl font-semibold leading-tight text-foreground tracking-tight tabular-nums">
                   {stat.value}
                 </span>
               </div>
@@ -122,10 +117,11 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
 
               {/* Progress bar */}
               <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                {/* scaleX em vez de width: anima sem recalcular o layout */}
                 <div
-                  className="h-full rounded-full transition-all duration-700 ease-out"
+                  className="h-full w-full origin-left rounded-full transition-transform duration-700 ease-out"
                   style={{
-                    width: `${Math.min(100, stat.progress)}%`,
+                    transform: `scaleX(${Math.min(100, Math.max(0, stat.progress)) / 100})`,
                     backgroundColor: stat.progressColor
                   }}
                 />

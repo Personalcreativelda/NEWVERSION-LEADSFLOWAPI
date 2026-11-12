@@ -789,7 +789,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                     <Layout className="w-4 h-4 text-primary" />
                     <h4 className="text-sm font-bold">Modelos de E-mail</h4>
                   </div>
-                  <button onClick={() => setShowTemplates(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <button aria-label="Fechar" onClick={() => setShowTemplates(false)} className="text-muted-foreground hover:text-foreground transition-colors">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
@@ -906,7 +906,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
                       </div>
                       <p className="text-xs text-muted-foreground">{formatFileSize(att.size)}</p>
                     </div>
-                    <button
+                    <button aria-label="Remover anexo"
                       type="button"
                       onClick={() => removeAttachment(index)}
                       className="text-red-500 hover:text-red-700 dark:text-red-400 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"

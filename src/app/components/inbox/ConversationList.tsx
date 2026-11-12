@@ -87,7 +87,7 @@ export function ConversationList({
                 <p className="text-sm font-medium text-muted-foreground">
                     Nenhuma conversa
                 </p>
-                <p className="text-xs mt-1 text-muted-foreground/70">
+                <p className="text-xs mt-1 text-muted-foreground">
                     Seu histórico aparecerá aqui.
                 </p>
             </div>
@@ -99,7 +99,7 @@ export function ConversationList({
             {conversations.map((conversation) => (
                 <div key={conversation.id} className="relative flex items-center">
                     {isSelectMode && (
-                        <button
+                        <button aria-label="Selecionar conversa"
                             onClick={(e) => { e.stopPropagation(); onToggleSelect?.(conversation.id); }}
                             className="absolute left-2 z-10 p-1 rounded transition-colors text-muted-foreground hover:text-primary"
                         >

@@ -306,14 +306,14 @@ function NotasTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  <div className="flex items-center gap-1">
  <button
  onClick={() => startEdit(note)}
- className="p-1.5 rounded-md transition-colors hover:bg-muted text-muted-foreground/70 hover:text-foreground"
+ className="p-1.5 rounded-md transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
  title="Editar nota"
  >
  <Edit2 className="w-3.5 h-3.5" />
  </button>
  <button
  onClick={() => { setDeletingId(note.id); setEditingId(null); }}
- className="p-1.5 rounded-md transition-colors hover:bg-red-50 dark:hover:bg-red-900/40 text-muted-foreground/70 hover:text-red-500 dark:hover:text-red-400"
+ className="p-1.5 rounded-md transition-colors hover:bg-red-50 dark:hover:bg-red-900/40 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
  title="Eliminar nota"
  >
  <Trash2 className="w-3.5 h-3.5" />
@@ -527,8 +527,8 @@ function AgendamentosTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  <button
  onClick={() => handleStatusChange(conv.id, 'completed')}
  className={`p-1.5 rounded-md text-xs transition-colors ${isDark
- ? 'hover:bg-green-900/40 text-muted-foreground/70 hover:text-green-400'
- : 'hover:bg-green-50 text-muted-foreground/70 hover:text-green-600'
+ ? 'hover:bg-green-900/40 text-muted-foreground hover:text-green-400'
+ : 'hover:bg-green-50 text-muted-foreground hover:text-green-600'
  }`}
  title="Marcar como concluido"
  >
@@ -537,8 +537,8 @@ function AgendamentosTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  <button
  onClick={() => handleStatusChange(conv.id, 'cancelled')}
  className={`p-1.5 rounded-md text-xs transition-colors ${isDark
- ? 'hover:bg-red-900/40 text-muted-foreground/70 hover:text-red-400'
- : 'hover:bg-red-50 text-muted-foreground/70 hover:text-red-500'
+ ? 'hover:bg-red-900/40 text-muted-foreground hover:text-red-400'
+ : 'hover:bg-red-50 text-muted-foreground hover:text-red-500'
  }`}
  title="Cancelar agendamento"
  >
@@ -760,7 +760,7 @@ function ValorTab({ lead, isDark, onLeadUpdated }: { lead: Lead; isDark: boolean
  <span
  className={`text-[10px] leading-tight text-center truncate w-full ${isCurrent
  ? 'text-blue-600 dark:text-blue-400 font-semibold'
- : 'text-muted-foreground/70 dark:text-muted-foreground'
+ : 'text-muted-foreground'
  }`}
  >
  {stageCfg.label}

@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { createPortal } from 'react-dom';
 import { cn } from '../ui/utils';
 
@@ -20,6 +21,8 @@ interface OverlayModalProps {
  * centrado no desktop; fecha com Esc e ao tocar fora; bloqueia o scroll da página.
  */
 export function OverlayModal({ onClose, children, className, stickyEdges = true }: OverlayModalProps) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(boxRef);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -47,9 +50,12 @@ export function OverlayModal({ onClose, children, className, stickyEdges = true 
       }}
     >
       <div
+        ref={boxRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         className={cn(
+          'outline-none',
           'relative flex flex-col w-full max-w-lg bg-card text-card-foreground border border-border shadow-2xl',
           'rounded-t-2xl rounded-b-none sm:rounded-2xl',
           'max-h-[92dvh] sm:max-h-[min(88dvh,820px)] overflow-y-auto overflow-x-hidden overscroll-contain',

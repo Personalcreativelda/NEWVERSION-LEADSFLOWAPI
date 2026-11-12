@@ -300,7 +300,7 @@ export default function NavigationSidebar({
         )}
         <li className={`relative ${isCollapsed ? 'group flex justify-center py-[3px] px-2' : ''}`}>
           {isCollapsed ? (
-            <button
+            <button aria-label={t[item.labelKey as keyof Translations]}
               onClick={() => handleItemClick(pageId)}
               className={`sidebar-icon-btn ${isActive ? 'sidebar-icon-btn-active' : 'sidebar-icon-btn-inactive'}`}
             >
@@ -505,7 +505,7 @@ export default function NavigationSidebar({
                     <div className="absolute top-0 left-3 right-3 h-px bg-[hsl(var(--sidebar-border))]" />
                   )}
                   {isCollapsed ? (
-                    <button
+                    <button aria-label={t.admin}
                       onClick={() => handleItemClick('admin')}
                       className={`sidebar-icon-btn ${
                         currentPage === 'admin' ? 'sidebar-icon-btn-active' : 'sidebar-icon-btn-inactive'
@@ -634,7 +634,7 @@ export default function NavigationSidebar({
               {/* Help */}
               {isCollapsed ? (
                 <div className="group relative flex justify-center py-0.5 px-2">
-                  <button
+                  <button aria-label="Ajuda"
                     onClick={onHelp}
                     className="sidebar-icon-btn sidebar-icon-btn-inactive"
                   >
@@ -657,7 +657,7 @@ export default function NavigationSidebar({
               {/* Feedback */}
               {isCollapsed ? (
                 <div className="group relative flex justify-center py-0.5 px-2">
-                  <button
+                  <button aria-label="Opinião"
                     onClick={onFeedback}
                     className="sidebar-icon-btn sidebar-icon-btn-inactive"
                   >
@@ -696,7 +696,7 @@ export default function NavigationSidebar({
               {onLogout && (
                 isCollapsed ? (
                   <div className="group relative flex justify-center py-0.5 px-2">
-                    <button
+                    <button aria-label="Terminar sessão"
                       onClick={onLogout}
                       className="sidebar-icon-btn sidebar-icon-btn-inactive !text-red-400 hover:!bg-red-500/10"
                     >

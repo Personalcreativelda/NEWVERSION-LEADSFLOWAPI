@@ -98,7 +98,7 @@ export default function InboxTeam() {
                 <form onSubmit={handleAdd} className="mb-6 rounded-xl border border-border bg-card p-4 space-y-3">
                     <div className="flex items-center justify-between">
                         <h2 className="text-sm font-semibold text-foreground">Novo Membro</h2>
-                        <button type="button" onClick={() => { setShowAdd(false); setForm(emptyForm); }} className="text-muted-foreground hover:text-foreground">
+                        <button aria-label="Fechar" type="button" onClick={() => { setShowAdd(false); setForm(emptyForm); }} className="text-muted-foreground hover:text-foreground">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
@@ -233,14 +233,14 @@ export default function InboxTeam() {
                             <div className="flex items-center gap-1 flex-shrink-0">
                                 {editingId === m.id ? (
                                     <>
-                                        <button
+                                        <button aria-label="Guardar"
                                             onClick={() => handleEdit(m.id)}
                                             disabled={saving}
                                             className="p-2.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                         >
                                             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                                         </button>
-                                        <button onClick={() => setEditingId(null)} className="p-2.5 rounded-lg text-muted-foreground hover:bg-muted">
+                                        <button aria-label="Cancelar" onClick={() => setEditingId(null)} className="p-2.5 rounded-lg text-muted-foreground hover:bg-muted">
                                             <X className="w-4 h-4" />
                                         </button>
                                     </>
@@ -252,7 +252,7 @@ export default function InboxTeam() {
                                         >
                                             <Pencil className="w-4 h-4" />
                                         </button>
-                                        <button
+                                        <button aria-label="Apagar"
                                             onClick={() => handleDelete(m.id)}
                                             disabled={deletingId === m.id}
                                             className="p-2.5 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 disabled:opacity-50"

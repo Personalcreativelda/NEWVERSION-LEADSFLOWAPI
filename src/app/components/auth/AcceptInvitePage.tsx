@@ -252,7 +252,7 @@ export default function AcceptInvitePage({ onSuccess }: AcceptInvitePageProps) {
                                     className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition-all"
                                     autoFocus={hasAccount}
                                 />
-                                <button
+                                <button aria-label={showPassword ? 'Esconder' : 'Mostrar'}
                                     type="button"
                                     onClick={() => setShowPassword(p => !p)}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"

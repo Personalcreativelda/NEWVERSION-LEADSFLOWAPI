@@ -1022,14 +1022,14 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 {/* Edit/Delete for custom assistants */}
                 {assistant.is_custom && (
                   <>
-                    <Button
+                    <Button aria-label="Editar"
                       variant="ghost"
                       size="sm"
                       onClick={() => openEditModal(assistant)}
                     >
                       <Edit3 className="w-4 h-4" />
                     </Button>
-                    <Button
+                    <Button aria-label="Apagar"
                       variant="ghost"
                       size="sm"
                       className="text-red-500 hover:text-red-600 hover:bg-red-50"
@@ -1257,7 +1257,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               <h3 className="text-lg font-semibold text-foreground">
                 Ligar Assistente
               </h3>
-              <button
+              <button aria-label="Fechar"
                 onClick={() => {
                   setConnectModalOpen(false);
                   setSelectedAssistant(null);
@@ -1967,7 +1967,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               <h3 className="text-lg font-semibold text-foreground">
                 {editingAssistantId ? 'Editar Assistente' : 'Criar Assistente'}
               </h3>
-              <button
+              <button aria-label="Fechar"
                 onClick={() => {
                   setCreateModalOpen(false);
                   resetCreateForm();

@@ -84,6 +84,10 @@ import { formatLeadStatus } from './dashboard/leadDisplay';
 import { OriginsList } from './dashboard/OriginsList';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { getLocale } from '../utils/format';
+import { withPageTransition } from '../lib/pageTransition';
+
+// Separadores da barra inferior: trocar entre eles cruza as páginas; o resto desliza
+const TAB_PAGES = new Set(['dashboard', 'leads', 'inbox', 'analytics']);
 
 // Types
 interface Lead {
@@ -184,6 +188,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   };
 
   const [currentPage, setCurrentPage] = useState(() => getSubPageFromUrl());
+  // Página atual para listeners registados uma só vez (popstate): evita closures antigas
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
   const [conversationIdToOpen, setConversationIdToOpen] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     // Carregar estado da sidebar do localStorage
@@ -455,7 +462,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       }
     }
 
-    setCurrentPage(pageId);
+    withPageTransition(() => setCurrentPage(pageId), TAB_PAGES.has(pageId) ? 'tab' : 'forward');
     const path = subPageToPath[pageId] ?? `/dashboard/${pageId}`;
     if (window.location.pathname !== path) {
       window.history.pushState({ dashboardPage: pageId }, '', path);
@@ -501,8 +508,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     if (isTabPage || !isMobile) return;
     const onNativeBack = (e: Event) => {
       if (e.defaultPrevented) return;
-      // Diálogos abertos fecham primeiro (native.ts trata-os a seguir)
-      if (document.querySelector('[role="dialog"]')) return;
+      // Diálogos e menus abertos fecham primeiro (native.ts trata-os a seguir)
+      if (document.querySelector('[role="dialog"], [data-radix-popper-content-wrapper]')) return;
       e.preventDefault();
       goBack();
     };
@@ -513,7 +520,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   // Sync internal page with browser back/forward navigation
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentPage(getSubPageFromUrl());
+      const next = getSubPageFromUrl();
+      // Voltar (botão do Android ou do browser): a página anterior entra pela esquerda
+      if (next !== currentPageRef.current) withPageTransition(() => setCurrentPage(next), 'back');
+      else setCurrentPage(next);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -1873,12 +1883,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                 {loading && leads.length === 0 ? (
                   <>
                     {/* Mesmo cabeçalho do SalesFunnel, para a página não "saltar" ao carregar */}
-                    <PageHeader title="Funil de Vendas" description="Arraste os leads entre as etapas do funil" icon={Workflow} />
+                    <PageHeader title="Funil de vendas" icon={Workflow} />
                     <SkeletonFunnel />
                   </>
                 ) : (
                 <SalesFunnel
                   leads={leads as any}
+                  onNewLead={handleNovoLeadFab}
                   onUpdateLeadStatus={async (leadId, newStatus) => {
                     // Atualização otimista: move o lead no estado local imediatamente
                     const leadIndex = leads.findIndex(l => l.id === leadId);

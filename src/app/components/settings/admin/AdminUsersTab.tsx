@@ -257,7 +257,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="relative" ref={openMenuUserId === user.id ? menuRef : undefined}>
-                        <button
+                        <button aria-label="Mais opções"
                           onClick={() => setOpenMenuUserId(openMenuUserId === user.id ? null : user.id)}
                           className="p-2 hover:bg-muted rounded-lg transition-colors"
                         >

@@ -400,7 +400,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-xs">O seu token de API</Label>
-                    <Button onClick={() => copyToClipboard(generatedToken)} size="sm" variant="ghost"><Copy className="w-4 h-4" /></Button>
+                    <Button aria-label="Copiar" onClick={() => copyToClipboard(generatedToken)} size="sm" variant="ghost"><Copy className="w-4 h-4" /></Button>
                   </div>
                   <code className="text-xs font-mono break-all">{generatedToken}</code>
                 </div>
@@ -423,7 +423,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
               <Label htmlFor="current-password">Palavra-passe atual</Label>
               <div className="relative mt-1.5">
                 <Input id="current-password" type={showCurrentPassword ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Escreva a sua palavra-passe atual" />
-                <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
+                <Button aria-label={showCurrentPassword ? 'Esconder' : 'Mostrar'} type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
                   {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
               </div>
@@ -432,7 +432,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
               <Label htmlFor="new-password">Nova palavra-passe</Label>
               <div className="relative mt-1.5">
                 <Input id="new-password" type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nova palavra-passe (mín. 8 caracteres)" />
-                <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowNewPassword(!showNewPassword)}>
+                <Button aria-label={showNewPassword ? 'Esconder' : 'Mostrar'} type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowNewPassword(!showNewPassword)}>
                   {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
               </div>

@@ -596,7 +596,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
                   }}
                   className="placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]"
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                <button aria-label={showPassword ? 'Esconder' : 'Mostrar'} type="button" onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
                   style={{ color: c.subtle }}>
                   {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}

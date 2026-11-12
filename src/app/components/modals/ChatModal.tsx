@@ -116,7 +116,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
               {lead?.telefone || 'Sem telefone'}
             </p>
           </div>
-          <button
+          <button aria-label="Fechar"
             onClick={onClose}
             className="w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
           >
@@ -179,7 +179,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
               disabled={enviando}
               className="flex-1 px-4 py-2 border border-border rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm bg-background text-foreground placeholder:text-muted-foreground"
             />
-            <button
+            <button aria-label="Enviar"
               onClick={handleEnviar}
               disabled={enviando || !mensagem.trim()}
               className="w-10 h-10 bg-green-600 hover:bg-green-700 text-white rounded-full flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

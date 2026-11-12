@@ -73,7 +73,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
           <h2 className="text-base font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
             {type === 'rating' ? 'Avaliar plataforma' : 'Relatar problema'}
           </h2>
-          <button onClick={handleClose} className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors">
+          <button aria-label="Fechar" onClick={handleClose} className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors">
             <X className="w-4 h-4" style={{ color: 'hsl(var(--muted-foreground))' }} />
           </button>
         </div>

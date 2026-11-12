@@ -43,7 +43,7 @@ export const ActivatePlanModal: React.FC<ActivatePlanModalProps> = ({
   const selectedPillClass = "border-blue-600 dark:border-blue-500 bg-blue-600 dark:bg-blue-500 text-white shadow-md";
   const unselectedPillClass = "border-border bg-card text-foreground hover:bg-muted";
   const mutedTextClass = "text-sm text-muted-foreground";
-  const tinyMutedTextClass = "text-[10px] text-muted-foreground/70";
+  const tinyMutedTextClass = "text-[10px] text-muted-foreground";
 
   return (
     <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-md p-6">
@@ -202,7 +202,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
               <p className="text-xs text-muted-foreground">Criar conta manualmente</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground">
+          <button aria-label="Fechar" onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -231,7 +231,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onCreated }
                 placeholder="Mínimo 6 caracteres"
                 className="pr-10"
               />
-              <button
+              <button aria-label={showPassword ? 'Esconder' : 'Mostrar'}
                 type="button"
                 onClick={() => setShowPassword(v => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"

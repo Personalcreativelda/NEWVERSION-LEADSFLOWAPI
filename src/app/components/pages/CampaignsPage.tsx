@@ -867,9 +867,9 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
     return (
       <div className="relative">
-        <button
+        <button aria-label="Mais opções"
           onClick={() => setDropdownOpen(isOpen ? null : campaign.id)}
-          className="w-8 h-8 flex items-center justify-center text-muted-foreground/70 hover:text-muted-foreground hover:bg-muted/50 rounded-lg transition-all duration-150"
+          className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-muted-foreground hover:bg-muted/50 rounded-lg transition-all duration-150"
         >
           <MoreVertical className="w-5 h-5" />
         </button>

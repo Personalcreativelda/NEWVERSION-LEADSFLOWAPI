@@ -1,5 +1,7 @@
 // Topo da lista de conversas ao estilo do WhatsApp: título com ações, pesquisa e filtros
 // em "chips" só com texto. O mesmo componente no computador e no telemóvel.
+import { useState } from 'react';
+import { RecentSearchChips, useRecentSearches } from '../base/RecentSearches';
 import { Search, X, MessageSquarePlus, MoreVertical, ChevronDown, Check, CheckSquare, Square, PanelLeftClose, RefreshCw, MessageCircle } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -76,6 +78,8 @@ export function ConversationListHeader(props: ConversationListHeaderProps) {
     onNewConversation, onCollapse, onSyncGroups, syncingGroups,
     isSelectMode, selectedCount, allSelected, onStartSelect, onToggleSelectAll, onDeleteSelected, onExitSelect,
   } = props;
+  const [searchFocused, setSearchFocused] = useState(false);
+  const recentSearches = useRecentSearches('conversas');
 
   const moreActive = MORE.find((m) => m.id === quickFilter);
   const activeChannel = channels.find((c) => c.id === channelFilter);
@@ -155,9 +159,13 @@ export function ConversationListHeader(props: ConversationListHeaderProps) {
           <Search className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
           <input
             data-bare
-            type="text"
+            type="search"
+            aria-label="Pesquisar conversas"
+            enterKeyHint="search"
             value={searchQuery}
             onChange={(e) => onSearch(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => { setSearchFocused(false); recentSearches.remember(searchQuery); }}
             placeholder="Pesquisar"
             className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
@@ -169,6 +177,7 @@ export function ConversationListHeader(props: ConversationListHeaderProps) {
         </label>
         {isMobile && menu}
       </div>
+      <RecentSearchChips items={recentSearches.items} visible={searchFocused && !searchQuery} onPick={onSearch} />
 
       <div
         className="-mx-3 flex gap-2 overflow-x-auto px-3 scrollbar-none"

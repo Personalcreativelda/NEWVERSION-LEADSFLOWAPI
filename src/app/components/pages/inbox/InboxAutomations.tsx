@@ -492,7 +492,7 @@ export default function InboxAutomations() {
                   >
                     <Settings className="w-4 h-4" />
                   </Button>
-                  <Button
+                  <Button aria-label={webhook.is_active ? 'Desativar' : 'Ativar'}
                     variant={webhook.is_active ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => handleToggle(webhook)}
@@ -507,7 +507,7 @@ export default function InboxAutomations() {
                       <PowerOff className="w-4 h-4" />
                     )}
                   </Button>
-                  <Button
+                  <Button aria-label="Apagar"
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDelete(webhook)}
@@ -537,7 +537,7 @@ export default function InboxAutomations() {
               <h3 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
                 {editingId ? 'Editar Webhook' : 'Novo Webhook'}
               </h3>
-              <button
+              <button aria-label="Fechar"
                 onClick={() => {
                   setCreateModalOpen(false);
                   resetForm();
@@ -728,7 +728,7 @@ export default function InboxAutomations() {
                         style={{ backgroundColor: 'hsl(var(--secondary))' }}
                       >
                         <code className="text-xs flex-1">{key}: {value}</code>
-                        <button
+                        <button aria-label="Remover"
                           type="button"
                           onClick={() => removeHeader(key)}
                           className="text-red-500 hover:text-red-600"
@@ -754,7 +754,7 @@ export default function InboxAutomations() {
                     placeholder="Valor"
                     className="flex-1"
                   />
-                  <Button
+                  <Button aria-label="Adicionar"
                     type="button"
                     variant="outline"
                     size="sm"
@@ -846,7 +846,7 @@ export default function InboxAutomations() {
                     Copiar Secret
                   </Button>
                 )}
-                <button
+                <button aria-label="Fechar"
                   onClick={() => {
                     setLogsModalOpen(false);
                     setSelectedWebhook(null);

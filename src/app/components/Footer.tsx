@@ -58,7 +58,7 @@ export default function Footer() {
               </div>
               <span className="text-white text-xl font-semibold">LeadsFlow API</span>
             </div>
-            <p className="text-muted-foreground/70 mb-6 max-w-sm leading-relaxed">
+            <p className="text-muted-foreground mb-6 max-w-sm leading-relaxed">
               A solução completa para gerir seus leads, automatizar processos
               e aumentar suas vendas com inteligência.
             </p>
@@ -77,7 +77,7 @@ export default function Footer() {
 
             {/* Newsletter */}
             <div className="mb-6">
-              <p className="text-sm text-muted-foreground/70 mb-3">
+              <p className="text-sm text-muted-foreground mb-3">
                 Receba novidades e dicas
               </p>
               <div className="flex gap-2">
@@ -106,7 +106,7 @@ export default function Footer() {
                     aria-label={social.label}
                     className="w-9 h-9 bg-muted hover:bg-purple-500/20 border border-purple-500/20 hover:border-purple-500/40 rounded-lg flex items-center justify-center transition-all group"
                   >
-                    <Icon className="w-4 h-4 text-muted-foreground/70 group-hover:text-purple-400 transition-colors" />
+                    <Icon className="w-4 h-4 text-muted-foreground group-hover:text-purple-400 transition-colors" />
                   </a>
                 );
               })}
@@ -121,7 +121,7 @@ export default function Footer() {
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="text-sm text-muted-foreground/70 hover:text-purple-400 transition-colors"
+                    className="text-sm text-muted-foreground hover:text-purple-400 transition-colors"
                   >
                     {link.label}
                   </a>
@@ -138,7 +138,7 @@ export default function Footer() {
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="text-sm text-muted-foreground/70 hover:text-purple-400 transition-colors"
+                    className="text-sm text-muted-foreground hover:text-purple-400 transition-colors"
                   >
                     {link.label}
                   </a>
@@ -155,7 +155,7 @@ export default function Footer() {
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="text-sm text-muted-foreground/70 hover:text-purple-400 transition-colors"
+                    className="text-sm text-muted-foreground hover:text-purple-400 transition-colors"
                   >
                     {link.label}
                   </a>
@@ -172,7 +172,7 @@ export default function Footer() {
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="text-sm text-muted-foreground/70 hover:text-purple-400 transition-colors"
+                    className="text-sm text-muted-foreground hover:text-purple-400 transition-colors"
                   >
                     {link.label}
                   </a>

@@ -57,7 +57,7 @@ export function PageFab({ label, onClick, icon: Icon = Plus, disabled }: PageCre
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="fixed right-4 z-[44] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-[transform,filter] duration-150 hover:brightness-110 active:scale-95 disabled:opacity-50 bottom-[calc(5rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-24 animate-in fade-in zoom-in-75 duration-200"
+      className="page-fab fixed right-4 z-[44] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-[transform,filter] duration-150 hover:brightness-110 active:scale-95 disabled:opacity-50 bottom-[calc(5rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-24 animate-in fade-in zoom-in-75 duration-200"
     >
       <Icon className="h-6 w-6" strokeWidth={2.25} aria-hidden />
     </button>,

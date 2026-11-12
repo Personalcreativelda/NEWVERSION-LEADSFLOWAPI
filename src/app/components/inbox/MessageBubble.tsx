@@ -536,7 +536,7 @@ function MessageBubbleView({
                 {canShowMenu && isOut && (hovered || menuOpen) && (
                     <div className="absolute top-1 right-1 z-10">
                         <div className="relative">
-                            <button
+                            <button aria-label="Opções da mensagem"
                                 ref={chevronRef as any}
                                 onClick={() => setMenuOpen((v) => !v)}
                                 className="w-6 h-6 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
@@ -647,7 +647,7 @@ function MessageBubbleView({
                                 preload="metadata"
                             />
                         ) : (
-                            <button type="button" onClick={() => void saveRemoteFile(message.media_url!, fileName)}
+                            <button aria-label="Transferir" type="button" onClick={() => void saveRemoteFile(message.media_url!, fileName)}
                                 className={`flex w-full items-center gap-2 p-2.5 rounded-xl text-left ${isOut ? 'bg-primary/15 text-foreground' : 'bg-muted text-foreground'}`}>
                                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -762,7 +762,7 @@ function MessageBubbleView({
             {canShowMenu && !isOut && (
                 <div className={`flex items-center self-end mb-1 mx-1 transition-opacity ${(hovered || menuOpen) ? 'opacity-100' : 'opacity-0'}`}>
                     <div className="relative">
-                        <button
+                        <button aria-label="Opções da mensagem"
                             ref={chevronRef as any}
                             onClick={() => setMenuOpen((v) => !v)}
                             className="w-7 h-7 rounded-full bg-card shadow flex items-center justify-center hover:bg-muted transition-colors"

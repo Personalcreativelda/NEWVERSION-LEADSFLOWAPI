@@ -930,7 +930,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                     <Edit3 className="w-3 h-3 mr-1" />
                     Editar
                   </Button>
-                  <Button
+                  <Button aria-label={agent.is_active ? 'Desativar' : 'Ativar'}
                     size="sm"
                     variant="outline"
                     onClick={() => handleToggle(agent.id, agent.is_active)}
@@ -950,7 +950,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       : <Phone className="w-3 h-3" />
                     }
                   </Button>
-                  <Button
+                  <Button aria-label="Apagar"
                     size="sm"
                     variant="outline"
                     onClick={() => handleDelete(agent.id)}
@@ -972,7 +972,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
               <h2 className={`text-base sm:text-lg md:text-xl font-bold flex-1 text-foreground`}>
                 {selectedAgent ? 'Editar Agente de Voz' : 'Criar Agente de Voz'}
               </h2>
-              <button 
+              <button aria-label="Fechar" 
                 type="button"
                 onClick={() => setModalOpen(false)} 
                 className={`flex-shrink-0 p-1 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted`}
@@ -1227,7 +1227,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                   <h3 className={`text-base sm:text-lg font-semibold text-foreground`}>
                     Definições de API
                   </h3>
-                  <button
+                  <button aria-label="Fechar"
                     onClick={() => setSettingsModalOpen(false)}
                     className={`p-1.5 rounded-md transition-colors w-6 h-6 flex items-center justify-center hover:bg-muted`}
                   >
@@ -1274,7 +1274,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       placeholder={savedApiKeys.elevenlabs ? "Digite uma nova chave para atualizar..." : "sk_..."}
                       className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
                     />
-                    <button
+                    <button aria-label={showSettingsApiKey.elevenlabs ? 'Esconder' : 'Mostrar'}
                       type="button"
                       onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, elevenlabs: !showSettingsApiKey.elevenlabs })}
                       className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
@@ -1309,7 +1309,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       placeholder={savedApiKeys.openai ? "Digite uma nova chave para atualizar..." : "sk-..."}
                       className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
                     />
-                    <button
+                    <button aria-label={showSettingsApiKey.openai ? 'Esconder' : 'Mostrar'}
                       type="button"
                       onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, openai: !showSettingsApiKey.openai })}
                       className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
@@ -1344,7 +1344,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       placeholder={savedApiKeys.anthropic ? "Digite uma nova chave para atualizar..." : "sk-ant-..."}
                       className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
                     />
-                    <button
+                    <button aria-label={showSettingsApiKey.anthropic ? 'Esconder' : 'Mostrar'}
                       type="button"
                       onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, anthropic: !showSettingsApiKey.anthropic })}
                       className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
@@ -1379,7 +1379,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                       placeholder={savedApiKeys.google ? "Digite uma nova chave para atualizar..." : "AIza..."}
                       className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
                     />
-                    <button
+                    <button aria-label={showSettingsApiKey.google ? 'Esconder' : 'Mostrar'}
                       type="button"
                       onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, google: !showSettingsApiKey.google })}
                       className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
@@ -1459,7 +1459,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                             placeholder="Palavra-passe SIP"
                             className={`text-xs pr-8 bg-muted border-border text-foreground`}
                           />
-                          <button type="button"
+                          <button aria-label={showSettingsApiKey.sip_password ? 'Esconder' : 'Mostrar'} type="button"
                             onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, sip_password: !showSettingsApiKey.sip_password })}
                             className={`absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground`}>
                             {showSettingsApiKey.sip_password ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
@@ -1491,12 +1491,12 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                             className={`flex items-center justify-between px-2 py-1.5 rounded text-xs bg-muted text-foreground/80`}>
                             <div>
                               <span className="font-medium">{pn.label || pn.phone_number}</span>
-                              <span className={`ml-1 text-muted-foreground/70`}>({pn.phone_number})</span>
+                              <span className={`ml-1 text-muted-foreground`}>({pn.phone_number})</span>
                               {pn.assigned_agent && (
                                 <span className="ml-1 text-purple-500">→ {pn.assigned_agent.agent_name}</span>
                               )}
                             </div>
-                            <button
+                            <button aria-label="Desligar número"
                               type="button"
                               onClick={() => handleDeletePhoneNumber(pn.phone_number_id)}
                               className="text-red-400 hover:text-red-600 ml-2"
@@ -1580,7 +1580,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
                      activeCall.status === 'in-progress' ? 'Em andamento' :
                      activeCall.status === 'completed' ? 'Concluída' : 'Falha'}
                   </span>
-                  <button
+                  <button aria-label="Fechar"
                     onClick={() => { stopCallPolling(); setActiveCall(null); }}
                     className={`p-1 rounded hover:bg-muted text-muted-foreground`}
                   >

@@ -108,7 +108,7 @@ export function NewConversationModal({ isOpen, onClose, onCreateConversation, on
                     >
                         Nova conversa
                     </h2>
-                    <button
+                    <button aria-label="Fechar"
                         onClick={onClose}
                         className="p-1 rounded-lg hover:bg-muted/50 transition-colors"
                         disabled={loading}

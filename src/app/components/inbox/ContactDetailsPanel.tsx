@@ -1099,7 +1099,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <button
+                        <button aria-label="Apagar nota"
                           onClick={() => handleDeleteNote(note.id)}
                           disabled={deletingNoteId === note.id}
                           className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded text-muted-foreground hover:text-red-400 disabled:opacity-50"
@@ -1130,7 +1130,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                     rows={2}
                     className="flex-1 px-2.5 py-2 rounded-lg text-xs border border-border bg-muted text-foreground outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all placeholder:text-muted-foreground/50"
                   />
-                  <button
+                  <button aria-label="Guardar nota"
                     onClick={handleAddNote}
                     disabled={!newNote.trim() || savingNote}
                     className="p-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 transition-all flex-shrink-0"
@@ -1421,7 +1421,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
                   placeholder="Nota para a equipa…"
                   className="flex-1 px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
                 />
-                <button
+                <button aria-label="Adicionar nota interna"
                   onClick={handleAddInternalNote}
                   disabled={savingInternalNote || !newInternalNote.trim()}
                   className="inline-flex items-center justify-center px-3 h-10 rounded-lg text-sm bg-primary text-primary-foreground disabled:opacity-50 hover:bg-primary/90 transition-colors"

@@ -131,7 +131,7 @@ export default function PlanUpgradeSuccessModal({ isOpen, plan, onClose }: PlanU
           <div className="my-5 border-t border-border" />
 
           {/* Features unlocked */}
-          <p className="text-muted-foreground/60 text-xs font-medium uppercase tracking-wider mb-3">
+          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-3">
             O que você desbloqueou
           </p>
           <ul className="space-y-2.5 mb-6">

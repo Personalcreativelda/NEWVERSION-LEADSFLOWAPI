@@ -3,6 +3,7 @@ import { App } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { SplashScreen } from '@capacitor/splash-screen';
+import { toast } from 'sonner';
 import { initLiveUpdates } from './live-update';
 
 // Plugin nativo do app (android/.../SystemBarsPlugin.java).
@@ -198,6 +199,50 @@ function keepLinksInApp() {
   });
 }
 
+// Teclado aberto: o WebView encolhe (MainActivity afasta-o do teclado). Marca <html> com
+// "keyboard-open" (a barra inferior e o botão flutuante escondem-se, globals.css) e mantém
+// o campo em foco à vista. A altura sem teclado guarda-se por orientação.
+function trackKeyboard() {
+  const fullHeight: Record<string, number> = {};
+  const isEditable = (el: Element | null) =>
+    !!el && (el.matches('input:not([type="checkbox"]):not([type="radio"]):not([type="button"]), textarea, select') || (el as HTMLElement).isContentEditable);
+  const update = () => {
+    const key = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+    fullHeight[key] = Math.max(fullHeight[key] ?? 0, window.innerHeight);
+    const open = window.innerHeight < fullHeight[key] * 0.8 && isEditable(document.activeElement);
+    const root = document.documentElement;
+    if (open === root.classList.contains('keyboard-open')) return;
+    root.classList.toggle('keyboard-open', open);
+    if (open) (document.activeElement as HTMLElement | null)?.scrollIntoView?.({ block: 'nearest' });
+  };
+  window.addEventListener('resize', update);
+  // Fechar o teclado sem mudar de altura de imediato (ex.: tocar fora do campo)
+  document.addEventListener('focusout', () => window.setTimeout(update, 100));
+  update();
+}
+
+// Segurar o dedo num link ou imagem abria o menu do browser ("Abrir num novo separador",
+// "Transferir imagem"): num app não existe. Texto das conversas e campos ficam como estão.
+function blockWebContextMenu() {
+  document.addEventListener('contextmenu', (event) => {
+    const el = event.target as Element | null;
+    if (el?.closest?.('input, textarea, [contenteditable="true"]')) return;
+    if (el?.closest?.('a, img, button, [role="button"], nav, header')) event.preventDefault();
+  });
+}
+
+// "Prima de novo para sair": na página inicial, o primeiro Voltar só avisa (fechar o app
+// por engano era fácil); o segundo, até 2 s depois, fecha.
+let exitArmedAt = 0;
+function exitOrWarn() {
+  if (Date.now() - exitArmedAt < 2000) {
+    App.exitApp();
+    return;
+  }
+  exitArmedAt = Date.now();
+  toast('Prima voltar de novo para sair', { duration: 2000 });
+}
+
 // O App avisa ('app-ready') quando termina o carregamento inicial — pode acontecer antes
 // de o splash nativo sair, por isso fica registado desde o carregamento deste módulo.
 let appReady = false;
@@ -235,6 +280,8 @@ export async function initNative() {
 
   document.documentElement.classList.add('native-app');
   keepLinksInApp();
+  trackKeyboard();
+  blockWebContextMenu();
 
   // Botão "voltar" do Android, por ordem: painéis do app (evento 'native-back', que um
   // componente cancela com preventDefault), chat de suporte, diálogos/modais Radix
@@ -247,13 +294,25 @@ export async function initNative() {
       document.getElementById('lfw-close')?.click();
       return;
     }
-    if (document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) {
+    // Menus suspensos, listas de escolha e popovers abertos (Radix) fecham antes de mudar de página
+    if (document.querySelector('[data-radix-popper-content-wrapper]') ||
+        document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) {
       const target = document.activeElement ?? document.body;
       target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
       return;
     }
-    if (canGoBack) window.history.back();
-    else App.exitApp();
+    if (canGoBack) {
+      window.history.back();
+      return;
+    }
+    // Sem histórico numa página do painel que não é o Início: vai para o Início (como os
+    // separadores dos apps nativos); no Início, avisa antes de fechar
+    if (window.location.pathname.startsWith('/dashboard/')) {
+      window.history.replaceState({}, '', '/dashboard');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      return;
+    }
+    exitOrWarn();
   });
 
   App.addListener('appUrlOpen', ({ url }) => {

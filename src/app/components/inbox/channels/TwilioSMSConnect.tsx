@@ -233,7 +233,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
                                     className="font-mono text-sm pr-10"
                                     disabled={loading}
                                 />
-                                <button
+                                <button aria-label={showAuthToken ? 'Esconder' : 'Mostrar'}
                                     type="button"
                                     onClick={() => setShowAuthToken(!showAuthToken)}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"

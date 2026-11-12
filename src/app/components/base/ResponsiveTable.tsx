@@ -135,6 +135,7 @@ export function ResponsiveTable<Row>({
         {selectable && (
           <TableHead className="w-10">
             <Checkbox
+              aria-label="Selecionar todos"
               checked={allSelected ? true : someSelected ? 'indeterminate' : false}
               onCheckedChange={(checked) => {
                 const next = checked
@@ -196,6 +197,7 @@ export function ResponsiveTable<Row>({
                     {selectable && (
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox
+                          aria-label="Selecionar linha"
                           checked={selected.includes(id)}
                           onCheckedChange={(checked) => {
                             const next = checked

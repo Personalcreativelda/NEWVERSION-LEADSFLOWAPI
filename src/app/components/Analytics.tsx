@@ -62,7 +62,7 @@ export default function Analytics() {
               Decisões baseadas em dados reais
             </h2>
 
-            <p className="text-muted-foreground/70 mb-8 text-base sm:text-lg">
+            <p className="text-muted-foreground mb-8 text-base sm:text-lg">
               Acompanhe o desempenho das suas campanhas em tempo real. Identifique
               oportunidades e otimize sua estratégia com insights acionáveis.
             </p>
@@ -81,7 +81,7 @@ export default function Analytics() {
                         <Icon className="w-4 h-4 text-blue-600" />
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground/70 mb-1">{stat.label}</p>
+                    <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
                     <div className="flex items-end justify-between">
                       <p className="text-foreground text-xl font-bold">{stat.value}</p>
                       <span

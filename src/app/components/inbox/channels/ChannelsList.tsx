@@ -1,4 +1,5 @@
 // INBOX: Lista e gestão de canais com UI Moderna inspirada no Chatwoot
+import { celebrate } from '../../../lib/celebrate';
 import { useState, useEffect } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { ChannelRow, ChannelDetailSheet, AddChannelSheet } from './ChannelRows';
@@ -143,6 +144,7 @@ export function ChannelsList() {
             if (ret?.session) setMetaSession(ret.session);
             else if (ret?.whatsapp) {
                 loadChannels();
+                celebrate('Canal ligado');
                 toast.success(`WhatsApp ${ret.whatsapp} ligado`, {
                     description: 'As mensagens começam a chegar à caixa de entrada.',
                     action: {
@@ -166,6 +168,7 @@ export function ChannelsList() {
         if (!result.connected.length) return;
         if (!result.failed.length) setMetaSession(null);
         const names = result.connected.map((c) => c.name).join(', ');
+        celebrate('Canal ligado');
         toast.success(result.connected.length === 1 ? `${names} ligado` : `Ligados: ${names}`, {
             description: 'As mensagens começam a chegar à caixa de entrada.',
             action: {
@@ -341,6 +344,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setModalOpen);
                     loadChannels();
+                    celebrate('Canal ligado');
                     toast.success('Canal ligado!');
                 }}
                 editingChannel={editingChannel?.type === 'whatsapp' ? editingChannel : undefined}
@@ -352,6 +356,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setCloudModalOpen);
                     loadChannels();
+                    celebrate('Canal ligado');
                     toast.success('WhatsApp Business ligado');
                 }}
                 editingChannel={editingChannel?.type === 'whatsapp_cloud' ? editingChannel : undefined}
@@ -363,6 +368,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setTelegramModalOpen);
                     loadChannels();
+                    celebrate('Canal ligado');
                     toast.success('Telegram ligado!');
                 }}
                 editingChannel={editingChannel?.type === 'telegram' ? editingChannel : undefined}
@@ -374,6 +380,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setFacebookModalOpen);
                     loadChannels();
+                    celebrate('Canal ligado');
                     toast.success('Facebook Messenger ligado!');
                 }}
                 editingChannel={editingChannel?.type === 'facebook' ? editingChannel : undefined}
@@ -385,6 +392,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setInstagramModalOpen);
                     loadChannels();
+                    celebrate('Canal ligado');
                     toast.success('Instagram ligado!');
                 }}
                 editingChannel={editingChannel?.type === 'instagram' ? editingChannel : undefined}
