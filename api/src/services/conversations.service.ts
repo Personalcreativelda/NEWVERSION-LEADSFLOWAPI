@@ -65,6 +65,16 @@ export class ConversationsService {
         );
 
         if (result.rows.length > 0) {
+            // Conversa sem lead (criada antes de o lead existir): liga-a agora. Sem isto os
+            // fluxos e o perfil do contacto não a encontravam pelo lead.
+            const current = result.rows[0];
+            if (leadId && !current.lead_id && !isGroupRemote) {
+                await query(
+                    'UPDATE conversations SET lead_id = $1, updated_at = NOW() WHERE id = $2 AND lead_id IS NULL',
+                    [leadId, current.id]
+                );
+                current.lead_id = leadId;
+            }
             // Atualizar metadata se fornecida (contact_name, profile_picture, etc.)
             if (metadata && Object.keys(metadata).length > 0) {
                 const existing = result.rows[0];

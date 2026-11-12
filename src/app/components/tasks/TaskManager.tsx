@@ -630,9 +630,10 @@ export default function TaskManager({ leads, isDark = false }: TaskManagerProps)
                   className={`flex min-w-0 items-start gap-3 p-4 bg-card border-border ${done ? 'opacity-60' : ''} ${view === 'tiles' ? 'flex-col' : ''}`}
                 >
                   <BrandIcon brand="googlecalendar" className="mt-0.5 h-5 w-5 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate font-medium text-foreground" translate="no">{task.title}</h3>
-                    {task.description && <p className="truncate text-sm text-muted-foreground" translate="no">{task.description}</p>}
+                  {/* w-full: em grelha o cartão é uma coluna com items-start e o texto saía do cartão */}
+                  <div className="w-full min-w-0 flex-1">
+                    <h3 className={`font-medium text-foreground break-words ${view === 'tiles' ? 'line-clamp-2' : 'truncate'}`} translate="no">{task.title}</h3>
+                    {task.description && <p className={`text-sm text-muted-foreground break-words ${view === 'tiles' ? 'line-clamp-2' : 'truncate'}`} translate="no">{task.description}</p>}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className={`gap-1 ${isDueToday && !done ? 'border-orange-500 text-orange-600' : ''}`}>
                         <CalendarIcon className="w-3 h-3" />

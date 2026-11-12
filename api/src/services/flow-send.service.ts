@@ -80,7 +80,40 @@ export async function resolveTarget(lead: FlowLead, channel?: string | null): Pr
       LIMIT 1`,
     [lead.id, lead.user_id, wanted],
   );
-  const row = conv.rows?.[0];
+  let row = conv.rows?.[0];
+
+  // Conversa que existe mas não ficou ligada ao lead (o lead foi criado depois da conversa,
+  // ex.: pelo assistente de IA, ou foi fundido com um duplicado): procura-a pelos
+  // identificadores do lead e liga-a. Sem isto o lead ficava "sem canal" nos fluxos.
+  if (!row?.remote_jid) {
+    const digits = leadDigits(lead);
+    const ids = [lead.instagram_id, lead.facebook_id, lead.telegram_id]
+      .map((v) => (v == null ? '' : String(v).trim()))
+      .filter(Boolean);
+    if (digits.length >= 8) ids.push(digits, `${digits}@s.whatsapp.net`, `${digits}@c.us`);
+    if (ids.length > 0) {
+      const orphan = await dbQuery(
+        `SELECT c.id, c.remote_jid, c.channel_id, ch.type AS channel_type, ch.credentials AS channel_credentials,
+                (SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id = c.id AND m.direction = 'in') AS last_inbound_at
+           FROM conversations c
+           JOIN channels ch ON ch.id = c.channel_id
+          WHERE c.user_id = $1 AND c.lead_id IS NULL AND COALESCE(c.is_group, false) = false
+            AND c.remote_jid = ANY($2::text[])
+            AND ch.type = ANY($3::text[]) AND ch.status IN ('active', 'connected')
+          ORDER BY c.last_message_at DESC NULLS LAST
+          LIMIT 1`,
+        [lead.user_id, ids, wanted],
+      );
+      row = orphan.rows?.[0];
+      if (row?.id) {
+        await dbQuery(
+          'UPDATE conversations SET lead_id = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 AND lead_id IS NULL',
+          [lead.id, row.id, lead.user_id],
+        ).catch(() => {});
+      }
+    }
+  }
+
   if (row?.remote_jid) {
     return {
       conversationId: row.id,

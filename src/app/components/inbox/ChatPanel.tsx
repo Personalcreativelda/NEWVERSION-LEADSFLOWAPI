@@ -11,6 +11,8 @@ import { ChatHeader } from './ChatHeader';
 import { ChatBackground } from './ChatBackground';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
+import { useConversationUploadQueue } from '../../context/UploadQueueContext';
+import { filesFrom, hasFiles } from './droppedFiles';
 import { ForwardMessageModal } from './ForwardMessageModal';
 import type { ConversationWithDetails, MessageWithSender } from '../../types/inbox';
 import { SkeletonMessageBubble } from '../ui/skeletons';
@@ -132,6 +134,10 @@ export function ChatPanel({
     onEditMessage,
     onRevokeMessage,
 }: ChatPanelProps) {
+    // Arrastar ficheiros para a conversa: mesma fila de anexos do campo de mensagem
+    const { addFiles: addDroppedFiles } = useConversationUploadQueue(conversation.id);
+    const [draggingFiles, setDraggingFiles] = useState(false);
+    const dragDepth = useRef(0);
     const [forwardTarget, setForwardTarget] = useState<MessageWithSender | null>(null);
     // Mensagem a que se está a responder (barra por cima da caixa de texto)
     const [replyTo, setReplyTo] = useState<MessageWithSender | null>(null);
@@ -281,7 +287,38 @@ export function ChatPanel({
     );
 
     return (
-        <div className={`flex flex-col h-full max-h-full relative overflow-hidden bg-background ${slideIn ? 'animate-in fade-in slide-in-from-right-8 duration-200' : ''}`}>
+        <div
+            className={`flex flex-col h-full max-h-full relative overflow-hidden bg-background ${slideIn ? 'animate-in fade-in slide-in-from-right-8 duration-200' : ''}`}
+            onDragEnter={(e) => {
+                if (!hasFiles(e.dataTransfer)) return;
+                e.preventDefault();
+                dragDepth.current += 1;
+                setDraggingFiles(true);
+            }}
+            onDragOver={(e) => {
+                if (!hasFiles(e.dataTransfer)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+            }}
+            onDragLeave={() => {
+                dragDepth.current = Math.max(0, dragDepth.current - 1);
+                if (dragDepth.current === 0) setDraggingFiles(false);
+            }}
+            onDrop={(e) => {
+                if (!hasFiles(e.dataTransfer)) return;
+                e.preventDefault();
+                dragDepth.current = 0;
+                setDraggingFiles(false);
+                const files = filesFrom(e.dataTransfer);
+                if (files.length > 0) addDroppedFiles(files);
+            }}
+        >
+            {/* Largar ficheiros em qualquer ponto da conversa (como no WhatsApp Web) */}
+            {draggingFiles && (
+                <div className="pointer-events-none absolute inset-2 z-40 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/50 bg-background/90">
+                    <p className="text-sm font-medium text-foreground">Largue para enviar</p>
+                </div>
+            )}
 
             {/* Header */}
             <div className="flex-shrink-0">

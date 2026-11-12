@@ -44,7 +44,7 @@ export function OverlayModal({ onClose, children, className, stickyEdges = true 
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-[2px] sm:p-6 animate-in fade-in duration-200"
+      className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center bg-black/55 sm:backdrop-blur-[2px] sm:p-6 animate-in fade-in duration-200"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

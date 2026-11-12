@@ -18,6 +18,7 @@ import { inboxApi } from '../../services/api/inbox';
 import { apiErrorMessage } from '../../lib/apiError';
 import { useConversationUploadQueue } from '../../context/UploadQueueContext';
 import { AttachmentPreviewCard } from './AttachmentPreviewCard';
+import { filesFrom } from './droppedFiles';
 import type { MessageWithSender } from '../../types/inbox';
 
 interface MessageInputProps {
@@ -342,6 +343,15 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
         e.target.value = '';
     };
 
+    // Colar (Ctrl+V) uma captura de ecrã ou ficheiros copiados: vão para a fila de anexos,
+    // com pré-visualização e legenda, como no WhatsApp
+    const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        const files = filesFrom(e.clipboardData, { pasting: true });
+        if (files.length === 0) return;
+        e.preventDefault();
+        addFiles(files);
+    };
+
     // Send message (text + any uploaded/uploading attachments)
     const handleSendWithFile = async () => {
         const hasText = content.trim();
@@ -660,6 +670,7 @@ export function MessageInput({ onSendMessage, onTyping, onSendAudio, conversatio
                         ref={textareaRef}
                         value={content}
                         onChange={handleChange}
+                        onPaste={handlePaste}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();

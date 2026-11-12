@@ -1259,10 +1259,10 @@ html.keyboard-open .page-fab {
 .app-header { view-transition-name: app-header; }
 .mobile-bottom-nav { view-transition-name: bottom-nav; }
 .page-fab { view-transition-name: page-fab; }
-::view-transition-group(root) { animation-duration: 240ms; }
+::view-transition-group(root) { animation-duration: 200ms; }
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 240ms;
+  animation-duration: 200ms;
   animation-timing-function: var(--ease-app);
 }
 html[data-page-dir="forward"]::view-transition-old(root) { animation-name: lf-page-out-left; }
@@ -1270,7 +1270,7 @@ html[data-page-dir="forward"]::view-transition-new(root) { animation-name: lf-pa
 html[data-page-dir="back"]::view-transition-old(root) { animation-name: lf-page-out-right; }
 html[data-page-dir="back"]::view-transition-new(root) { animation-name: lf-page-in-left; }
 html[data-page-dir="tab"]::view-transition-old(root),
-html[data-page-dir="tab"]::view-transition-new(root) { animation-duration: 160ms; }
+html[data-page-dir="tab"]::view-transition-new(root) { animation-duration: 120ms; }
 @keyframes lf-page-in-right { from { opacity: 0; transform: translateX(28px); } }
 @keyframes lf-page-out-left { to { opacity: 0; transform: translateX(-14px); } }
 @keyframes lf-page-in-left { from { opacity: 0; transform: translateX(-28px); } }

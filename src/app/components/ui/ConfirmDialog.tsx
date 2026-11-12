@@ -50,14 +50,14 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   return (
     <ConfirmContext.Provider value={{ confirm }}>
       {children}
-      {open && (
-        <ConfirmModal
-          message={message}
-          options={options}
-          onConfirm={handleConfirm}
-          onCancel={handleCancel}
-        />
-      )}
+      {/* Sempre montado: o Radix anima a saída (antes desaparecia de repente ao fechar) */}
+      <ConfirmModal
+        open={open}
+        message={message}
+        options={options}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </ConfirmContext.Provider>
   );
 }
@@ -98,13 +98,14 @@ const variantConfig = {
 };
 
 interface ConfirmModalProps {
+  open: boolean;
   message: string;
   options: ConfirmOptions;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-function ConfirmModal({ message, options, onConfirm, onCancel }: ConfirmModalProps) {
+function ConfirmModal({ open, message, options, onConfirm, onCancel }: ConfirmModalProps) {
   const variant = options.variant || 'default';
   const { icon: Icon, iconClass, iconBg, confirmClass } = variantConfig[variant];
 
@@ -113,15 +114,16 @@ function ConfirmModal({ message, options, onConfirm, onCancel }: ConfirmModalPro
        not just a portaled div — so when this opens on top of an already-open
        AppModal, Radix's own dialog stack manages the layering/body-lock
        correctly instead of two independent fixed overlays racing on z-index. */
-    <DialogPrimitive.Root open onOpenChange={(open) => !open && onCancel()}>
+    <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next && open) onCancel(); }}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[9998] bg-black/55 backdrop-blur-[2px]" />
+        {/* Desfoque só no desktop: no WebView do Android tornava a abertura lenta */}
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[9998] bg-black/55 sm:backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 duration-150" />
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
           <DialogPrimitive.Content
-            className="pointer-events-auto relative w-full max-w-sm rounded-lg shadow-2xl border border-border bg-card text-card-foreground animate-in zoom-in-95 fade-in duration-150"
+            className="pointer-events-auto relative w-full max-w-sm rounded-2xl shadow-2xl border border-border bg-card text-card-foreground duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
           >
             {/* Close button */}
-            <DialogPrimitive.Close className="absolute top-3 right-3 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            <DialogPrimitive.Close aria-label="Fechar" className="absolute top-3 right-3 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
               <X className="w-4 h-4" />
             </DialogPrimitive.Close>
 
@@ -164,13 +166,13 @@ function ConfirmModal({ message, options, onConfirm, onCancel }: ConfirmModalPro
             <div className="flex gap-2 px-6 pb-6">
               <button
                 onClick={onCancel}
-                className="flex-1 px-4 py-2 rounded-lg text-sm font-medium border border-border bg-transparent text-foreground hover:bg-muted transition-colors"
+                className="h-10 flex-1 px-4 rounded-lg text-sm font-medium border border-border bg-transparent text-foreground hover:bg-muted transition-colors"
               >
                 {options.cancelLabel || 'Cancelar'}
               </button>
               <button
                 onClick={onConfirm}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${confirmClass}`}
+                className={`h-10 flex-1 px-4 rounded-lg text-sm font-medium transition-colors ${confirmClass}`}
               >
                 {options.confirmLabel || 'Confirmar'}
               </button>
