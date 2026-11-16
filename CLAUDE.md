@@ -44,6 +44,14 @@ Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
 - O pacote entra quando o app vai para segundo plano/reabre (2.ª abertura). A versão em uso
   aparece no fundo do menu do telemóvel. APKs anteriores ao 1.1 não recebem atualizações.
 - Chave `MOBILE_RELEASE_KEY` em `.env.release.local` (git-ignored) e no Coolify (API).
+- Publicar com `--notes` envia push (sino + telemóvel) a quem tem o app; as novidades ficam em
+  Definições → Sobre o app (`pages/AboutPage.tsx`), com "Atualizar agora" (aplica já, sem 2.ª abertura).
+  Já não há aviso de versão ao entrar no app.
+- APK novo sem loja: subir versionCode/versionName, `android:sync`, gerar o APK e
+  `npm run release:apk -- --notes "..."` (`scripts/release-apk.mjs` → `/api/version/apk/*`). O app
+  descarrega-o e abre o instalador (`AppUpdaterPlugin.java`, desde o versionCode 6; antes disso o
+  botão descarrega pelo browser). Só instala por cima se for assinado com a MESMA chave:
+  hoje `~/.android/debug.keystore` deste computador — guardar cópia; perdê-la obriga a desinstalar.
 
 ## Ligar canais
 

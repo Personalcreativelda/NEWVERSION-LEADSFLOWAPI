@@ -33,6 +33,7 @@ import RemarketingPage from './pages/RemarketingPage';
 import AIInsightsPage from './pages/AIInsightsPage';
 import InboxPage from './pages/InboxPage';
 import NotificationsPage from './pages/NotificationsPage';
+import AboutPage from './pages/AboutPage';
 import { SkeletonStatCardsRow, UpdatingBadge, SkeletonFunnel, SkeletonLimitCards } from './ui/skeletons';
 
 // Modal imports
@@ -165,6 +166,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       '/dashboard/security': 'security',
       '/dashboard/account': 'account',
       '/dashboard/notifications': 'notifications',
+      '/dashboard/about': 'about',
     };
     const path = window.location.pathname.split('?')[0];
     return subPathMap[path] || 'dashboard';
@@ -188,6 +190,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     'security': '/dashboard/security',
     'account': '/dashboard/account',
     'notifications': '/dashboard/notifications',
+    'about': '/dashboard/about',
   };
 
   const [currentPage, setCurrentPage] = useState(() => getSubPageFromUrl());
@@ -490,7 +493,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     const tr = translations[language] as Translations;
     const item = sidebarConfig.find((i) => (pathToPageId[i.path] || i.id) === currentPage);
     if (item) return tr[item.labelKey as keyof Translations] as string;
-    const extra: Record<string, string> = { 'inbox-settings': 'Canais', 'inbox-team': 'Equipa', security: 'Segurança', notifications: 'Notificações', admin: 'Administração', contacts: 'Contactos' };
+    const extra: Record<string, string> = { 'inbox-settings': 'Canais', 'inbox-team': 'Equipa', security: 'Segurança', notifications: 'Notificações', about: 'Sobre o app', admin: 'Administração', contacts: 'Contactos' };
     return extra[currentPage] || '';
   }, [currentPage, language]);
 
@@ -2016,12 +2019,14 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
                 onUpdateUser={onUserUpdate}
                 onOpenChannels={() => handleNavigate('inbox-settings')}
                 onOpenNotifications={() => handleNavigate('notifications')}
+                onOpenAbout={() => handleNavigate('about')}
                 onHelp={handleStartTour}
                 onFeedback={() => setShowFeedback(true)}
                 onLogout={onLogout}
               />
             )}
 
+            {currentPage === 'about' && <AboutPage />}
             {currentPage === 'notifications' && <NotificationsPage isAdmin={(user as any)?.isAdmin === true || (user as any)?.role === 'admin' || user?.email === 'admin@leadflow.com'} />}
 
             {currentPage === 'admin' && (

@@ -94,3 +94,128 @@ export function initLiveUpdates() {
   setTimeout(() => void checkForLiveUpdate(true), 5000);
   App.addListener('resume', () => void checkForLiveUpdate());
 }
+
+// ── Sobre o app: verificar e aplicar atualizações à mão ───────────────────────
+
+type AppUpdaterPlugin = {
+  canInstall(): Promise<{ allowed: boolean }>;
+  openInstallSettings(): Promise<void>;
+  downloadAndInstall(options: { url: string; checksum?: string }): Promise<void>;
+  addListener(event: 'progress', cb: (data: { percent: number }) => void): Promise<{ remove: () => Promise<void> }>;
+};
+
+let appUpdater: AppUpdaterPlugin | null = null;
+async function getAppUpdater(): Promise<AppUpdaterPlugin | null> {
+  const { Capacitor, registerPlugin } = await import('@capacitor/core');
+  // APKs anteriores ao 1.5 não têm o plugin: a atualização do APK é feita à mão
+  if (!Capacitor.isPluginAvailable('AppUpdater')) return null;
+  appUpdater = appUpdater ?? registerPlugin<AppUpdaterPlugin>('AppUpdater');
+  return appUpdater;
+}
+
+export interface AppUpdateStatus {
+  /** Versão em uso (pacote ao vivo ou APK) */
+  current: string | null;
+  /** APK instalado */
+  nativeVersion: string | null;
+  nativeBuild: number;
+  /** Atualização do código (entra sem reinstalar) */
+  web: { version: string; notes: string | null } | null;
+  /** APK novo (instalador do Android) */
+  apk: { versionName: string; versionCode: number; notes: string | null; size: number | null; url: string; checksum: string | null } | null;
+  /** O APK instalado já sabe atualizar-se sozinho */
+  canSelfUpdateApk: boolean;
+}
+
+export interface ChangelogItem { kind: 'app' | 'apk'; version: string; notes: string; date: string }
+
+export async function getChangelog(): Promise<ChangelogItem[]> {
+  const apiBase = getApiBaseUrl();
+  if (!apiBase) return [];
+  const res = await fetch(`${apiBase}/api/version/changelog`, { cache: 'no-store' });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+/** O que há para atualizar neste telemóvel (Sobre o app) */
+export async function getAppUpdateStatus(): Promise<AppUpdateStatus> {
+  const apiBase = getApiBaseUrl();
+  const { build, version: nativeVersion } = await App.getInfo();
+  const nativeBuild = parseInt(build, 10) || 0;
+  const status: AppUpdateStatus = {
+    current: await getInstalledVersion(),
+    nativeVersion,
+    nativeBuild,
+    web: null,
+    apk: null,
+    canSelfUpdateApk: !!(await getAppUpdater()),
+  };
+  if (!apiBase) return status;
+
+  const [webRes, apkRes, changelog] = await Promise.all([
+    fetch(`${apiBase}/api/version/mobile?native=${nativeBuild}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    fetch(`${apiBase}/api/version/apk/latest?native=${nativeBuild}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    getChangelog().catch(() => [] as ChangelogItem[]),
+  ]);
+
+  const release = webRes as MobileRelease | null;
+  if (release?.available && release.version && release.builtAt && new Date(release.builtAt).getTime() > __APP_BUILD_TIME__) {
+    const notes = changelog.find((c) => c.kind === 'app' && c.version === release.version)?.notes || null;
+    status.web = { version: release.version, notes };
+  }
+  if (apkRes?.available) {
+    status.apk = {
+      versionName: apkRes.versionName,
+      versionCode: apkRes.versionCode,
+      notes: apkRes.notes || null,
+      size: apkRes.size || null,
+      url: `${apiBase}${apkRes.path}`,
+      checksum: apkRes.checksum || null,
+    };
+  }
+  return status;
+}
+
+/** Descarrega a versão nova do código e reinicia o app já com ela */
+export async function applyLiveUpdateNow(): Promise<void> {
+  const apiBase = getApiBaseUrl();
+  if (!apiBase) throw new Error('Sem ligação ao servidor');
+  const { build } = await App.getInfo();
+  const res = await fetch(`${apiBase}/api/version/mobile?native=${encodeURIComponent(build)}`, { cache: 'no-store' });
+  const release: MobileRelease = await res.json();
+  if (!release.available || !release.version || !release.path) throw new Error('Não há atualização');
+  const { bundles } = await CapacitorUpdater.list();
+  const existing = bundles.find((b) => b.version === release.version && b.status !== 'error' && b.status !== 'downloading');
+  const bundle = existing ?? await CapacitorUpdater.download({
+    url: `${apiBase}${release.path}`,
+    version: release.version,
+    checksum: release.checksum,
+  });
+  // Recarrega o app com o pacote novo (a sessão fica)
+  await CapacitorUpdater.set({ id: bundle.id });
+}
+
+/**
+ * Descarrega o APK novo e abre o instalador do Android. Devolve 'needs-permission' quando
+ * falta "permitir instalar a partir do LeadsFlow" (abre-se esse ecrã do Android).
+ */
+export async function installApkUpdate(
+  apk: NonNullable<AppUpdateStatus['apk']>,
+  onProgress?: (percent: number) => void,
+): Promise<'started' | 'needs-permission' | 'unsupported'> {
+  const updater = await getAppUpdater();
+  if (!updater) return 'unsupported';
+  const { allowed } = await updater.canInstall();
+  if (!allowed) {
+    await updater.openInstallSettings();
+    return 'needs-permission';
+  }
+  const sub = onProgress ? await updater.addListener('progress', ({ percent }) => onProgress(percent)) : null;
+  try {
+    await updater.downloadAndInstall({ url: apk.url, checksum: apk.checksum || undefined });
+    return 'started';
+  } finally {
+    await sub?.remove();
+  }
+}

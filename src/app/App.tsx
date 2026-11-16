@@ -208,7 +208,6 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
   // Prevent concurrent checkAuth calls (e.g. React StrictMode double-invocation in dev)
   const isCheckingAuthRef = useRef(false);
   const [appVersion, setAppVersion] = useState<string>('...');
-  const [versionNotification, setVersionNotification] = useState<{ id: number; version: string; releaseNotes: string } | null>(null);
   const envMetaPixelId = import.meta.env.VITE_META_PIXEL_ID as string | undefined;
   const [metaPixelId, setMetaPixelId] = useState<string>(envMetaPixelId ? envMetaPixelId.trim() : '');
   const [googleAnalyticsId, setGoogleAnalyticsId] = useState<string>('');
@@ -449,44 +448,6 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     fetchVersion();
   }, []);
 
-  // Check for version notification when user logs in.
-  // Uses raw fetch (not apiRequest) so a transient 401 never clears the active tokens.
-  useEffect(() => {
-    const checkVersionNotification = async () => {
-      if (!user) return;
-      const token = localStorage.getItem('leadflow_access_token');
-      if (!token) return;
-      try {
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-        const res = await fetch(`${baseUrl}/api/version/check-notification`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.hasNewVersion && data.version) {
-          setVersionNotification({
-            id: data.version.id,
-            version: data.version.version,
-            releaseNotes: data.version.release_notes || '',
-          });
-        }
-      } catch {
-        // Version notifications are non-critical — silently ignore network/parse errors.
-      }
-    };
-    void checkVersionNotification();
-  }, [user]);
-
-  const dismissVersionNotification = async () => {
-    if (!versionNotification) return;
-    
-    try {
-      await apiRequest('/version/mark-seen', 'POST', { versionId: versionNotification.id });
-    } catch (error) {
-      console.error('[App] Error marking version as seen:', error);
-    }
-    setVersionNotification(null);
-  };
 
   // OAuth error handler — success path is handled at module level (early capture above).
   // Only need to surface provider errors returned via ?error=... query params.
@@ -1061,29 +1022,6 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
 
 
-      {/* Version Notification Modal */}
-      {versionNotification && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a1a] rounded-2xl shadow-2xl p-8 max-w-md w-full border border-[#2a2a2a] text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#00C48C]/20 flex items-center justify-center">
-              <svg className="w-8 h-8 text-[#00C48C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-              </svg>
-            </div>
-            <h3 className="text-white text-2xl font-semibold mb-2">Nova Versão Disponível!</h3>
-            <p className="text-[#00C48C] text-lg font-medium mb-4">Versão {versionNotification.version}</p>
-            {versionNotification.releaseNotes && (
-              <p className="text-gray-400 text-sm mb-6 whitespace-pre-line">{versionNotification.releaseNotes}</p>
-            )}
-            <button
-              onClick={dismissVersionNotification}
-              className="w-full py-3 bg-[#00C48C] hover:bg-[#00a576] text-white font-medium rounded-xl transition-colors"
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
-      )}
 
     </ConfirmProvider>
   );

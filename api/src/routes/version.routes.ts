@@ -176,6 +176,7 @@ router.post('/mobile/release', (req: Request, res: Response, next) => {
       await client.query('COMMIT');
 
       console.log(`[Version] Mobile bundle ${version} published (${file.size} bytes)`);
+      if (notifyUsers) void notifyAppUpdate(`Atualização ${version} disponível`, releaseNotes);
       res.json({ success: true, version: result.rows[0], url, checksum });
     } catch (err) {
       await client.query('ROLLBACK');
@@ -186,6 +187,196 @@ router.post('/mobile/release', (req: Request, res: Response, next) => {
   } catch (error: any) {
     console.error('[Version] Error publishing mobile bundle:', error);
     res.status(500).json({ error: 'Failed to publish mobile bundle' });
+  }
+});
+
+// ── Atualizações do APK (sem loja) ─────────────────────────────────────────────
+// Mudanças nativas (plugins, permissões, ícone) precisam de um APK novo. O script
+// `npm run release:apk` publica-o aqui; o app (Sobre o app) vê que há um versionCode
+// maior, descarrega o ficheiro e abre o instalador do Android por cima do atual.
+// Só instala por cima se o APK for assinado com a MESMA chave que o instalado.
+
+let apkTableReady: Promise<void> | null = null;
+function ensureApkTable(): Promise<void> {
+  if (!apkTableReady) {
+    apkTableReady = pool.query(`
+      CREATE TABLE IF NOT EXISTS mobile_apk_releases (
+        id SERIAL PRIMARY KEY,
+        version_code INTEGER NOT NULL UNIQUE,
+        version_name VARCHAR(50) NOT NULL,
+        release_notes TEXT,
+        file_url TEXT NOT NULL,
+        file_size INTEGER,
+        checksum TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `).then(() => undefined).catch((error) => {
+      apkTableReady = null;
+      throw error;
+    });
+  }
+  return apkTableReady;
+}
+
+const apkUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024 },
+});
+
+/** Aviso (sino + push) a quem tem o app instalado: há uma versão nova, com as novidades */
+async function notifyAppUpdate(title: string, notes: string | null) {
+  try {
+    const { notificationsService } = await import('../services/notifications.service');
+    const owners = await pool.query(
+      'SELECT DISTINCT user_id FROM push_device_tokens WHERE is_active = true',
+    );
+    const userIds = owners.rows.map((r: any) => r.user_id);
+    if (userIds.length === 0) return;
+    const summary = (notes || 'Melhorias e correções.').replace(/\s+/g, ' ').trim();
+    await notificationsService.sendBatch(userIds, {
+      type: 'app_update',
+      title,
+      description: summary.length > 180 ? `${summary.slice(0, 179)}…` : summary,
+      icon: 'download',
+      delivery: { actionUrl: '/dashboard/about', category: 'system', priority: 'normal' },
+    });
+  } catch (error: any) {
+    console.warn('[Version] Aviso de atualização falhou:', error?.message || error);
+  }
+}
+
+// APK mais recente que o instalado (?native=<versionCode>)
+router.get('/apk/latest', async (req: Request, res: Response) => {
+  try {
+    await ensureApkTable();
+    const nativeBuild = parseInt(String(req.query.native || '0'), 10) || 0;
+    const result = await pool.query(
+      `SELECT version_code, version_name, release_notes, file_size, checksum, created_at
+         FROM mobile_apk_releases WHERE version_code > $1
+        ORDER BY version_code DESC LIMIT 1`,
+      [nativeBuild],
+    );
+    res.setHeader('Cache-Control', 'no-store');
+    const row = result.rows[0];
+    if (!row) return res.json({ available: false });
+    res.json({
+      available: true,
+      versionCode: row.version_code,
+      versionName: row.version_name,
+      notes: row.release_notes,
+      size: row.file_size,
+      checksum: row.checksum,
+      publishedAt: new Date(row.created_at).toISOString(),
+      path: `/api/version/apk/file/${row.version_code}`,
+    });
+  } catch (error: any) {
+    console.error('[Version] Error fetching APK release:', error);
+    res.status(500).json({ error: 'Failed to fetch APK release' });
+  }
+});
+
+// Ficheiro do APK (descarregado pelo código nativo do app, sem Origin)
+router.get('/apk/file/:code', async (req: Request, res: Response) => {
+  try {
+    await ensureApkTable();
+    const code = parseInt(String(req.params.code), 10);
+    if (!code) return res.status(400).json({ error: 'Invalid version code' });
+    const result = await pool.query(
+      'SELECT file_url, file_size, version_name FROM mobile_apk_releases WHERE version_code = $1',
+      [code],
+    );
+    const row = result.rows[0];
+    const storage = getStorageService();
+    const stream = row && storage.getFileStream ? await storage.getFileStream(row.file_url) : null;
+    if (!stream) return res.status(404).json({ error: 'APK not found' });
+
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', `attachment; filename="LeadsFlow-${row.version_name}.apk"`);
+    if (row.file_size) res.setHeader('Content-Length', String(row.file_size));
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    stream.on('error', (err) => {
+      console.error('[Version] Error streaming APK:', err);
+      res.destroy(err);
+    });
+    stream.pipe(res);
+  } catch (error: any) {
+    console.error('[Version] Error serving APK:', error);
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to serve APK' });
+  }
+});
+
+// Publicar um APK. Protegido pela chave MOBILE_RELEASE_KEY (script release:apk).
+router.post('/apk/release', (req: Request, res: Response, next) => {
+  if (!process.env.MOBILE_RELEASE_KEY) {
+    return res.status(503).json({ error: 'Mobile releases are disabled (MOBILE_RELEASE_KEY not set)' });
+  }
+  if (!isValidReleaseKey(req.headers['x-release-key'])) {
+    return res.status(401).json({ error: 'Invalid release key' });
+  }
+  next();
+}, apkUpload.single('apk'), async (req: Request, res: Response) => {
+  try {
+    await ensureApkTable();
+    const file = (req as any).file as Express.Multer.File | undefined;
+    const versionCode = parseInt(String(req.body.versionCode || ''), 10);
+    const versionName = String(req.body.versionName || '').trim();
+    const notes = String(req.body.releaseNotes || '').trim() || null;
+    const notify = req.body.notifyUsers === 'true';
+    if (!file || !versionCode || !/^[0-9A-Za-z.\-_]{1,50}$/.test(versionName)) {
+      return res.status(400).json({ error: 'apk, versionCode and versionName are required' });
+    }
+    // Um APK começa sempre por "PK" (é um zip)
+    if (file.buffer.length < 4 || file.buffer[0] !== 0x50 || file.buffer[1] !== 0x4b) {
+      return res.status(400).json({ error: 'The file is not an APK' });
+    }
+    const checksum = crypto.createHash('sha256').update(file.buffer).digest('hex');
+    if (req.body.checksum && req.body.checksum !== checksum) {
+      return res.status(400).json({ error: 'Checksum mismatch — upload corrupted' });
+    }
+    const existing = await pool.query('SELECT 1 FROM mobile_apk_releases WHERE version_code = $1', [versionCode]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: `versionCode ${versionCode} already published` });
+    }
+    const url = await getStorageService().uploadBuffer(
+      file.buffer, `leadsflow-${versionName}-${versionCode}.apk`, 'application/vnd.android.package-archive', 'mobile-apks',
+    );
+    if (url.startsWith('data:')) {
+      return res.status(500).json({ error: 'File storage (MinIO) is not available' });
+    }
+    await pool.query(
+      `INSERT INTO mobile_apk_releases (version_code, version_name, release_notes, file_url, file_size, checksum)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [versionCode, versionName, notes, url, file.size, checksum],
+    );
+    console.log(`[Version] APK ${versionName} (${versionCode}) published (${file.size} bytes)`);
+    if (notify) void notifyAppUpdate(`Nova versão do app: ${versionName}`, notes);
+    res.json({ success: true, versionCode, versionName, checksum });
+  } catch (error: any) {
+    console.error('[Version] Error publishing APK:', error);
+    res.status(500).json({ error: 'Failed to publish APK' });
+  }
+});
+
+// Novidades (Sobre o app): as últimas versões publicadas, do código e do APK
+router.get('/changelog', async (_req: Request, res: Response) => {
+  try {
+    await Promise.all([ensureMobileColumns(), ensureApkTable()]);
+    const [bundles, apks] = await Promise.all([
+      pool.query(`SELECT version, release_notes, created_at FROM app_version
+                   WHERE mobile_bundle_url IS NOT NULL AND release_notes IS NOT NULL AND release_notes <> ''
+                   ORDER BY created_at DESC LIMIT 15`),
+      pool.query(`SELECT version_name, release_notes, created_at FROM mobile_apk_releases
+                   ORDER BY created_at DESC LIMIT 10`),
+    ]);
+    const items = [
+      ...bundles.rows.map((r: any) => ({ kind: 'app', version: r.version, notes: r.release_notes, date: r.created_at })),
+      ...apks.rows.map((r: any) => ({ kind: 'apk', version: r.version_name, notes: r.release_notes, date: r.created_at })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 20);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ items });
+  } catch (error: any) {
+    console.error('[Version] Error fetching changelog:', error);
+    res.status(500).json({ error: 'Failed to fetch changelog' });
   }
 });
 

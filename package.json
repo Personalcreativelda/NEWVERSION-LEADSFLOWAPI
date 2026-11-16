@@ -12,6 +12,7 @@
     "build:android": "vite build --mode android",
     "android:sync": "npm run build:android && npx cap sync android",
     "release:mobile": "node scripts/release-mobile.mjs",
+    "release:apk": "node scripts/release-apk.mjs",
     "android:open": "npx cap open android",
     "android:run": "npm run android:sync && npx cap run android"
   },

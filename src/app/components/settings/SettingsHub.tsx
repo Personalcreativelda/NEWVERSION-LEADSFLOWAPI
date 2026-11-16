@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ChevronRight, Code2, FileText, HelpCircle, LifeBuoy, LogOut, MessageCircle, MessageSquareHeart, Radio, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { ChevronRight, Code2, FileText, HelpCircle, Info, LifeBuoy, LogOut, MessageCircle, MessageSquareHeart, Radio, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { isNativeApp, openSupportChat } from '../../../native';
 import { getInstalledVersion } from '../../../live-update';
 
@@ -10,6 +10,8 @@ interface SettingsHubProps {
   onHelp?: () => void;
   onFeedback?: () => void;
   onLogout?: () => void;
+  /** Sobre o app: versão, atualizações e novidades */
+  onOpenAbout?: () => void;
   /** Grupos mostrados antes dos de Canais/Suporte (ex.: Conta) */
   before?: ReactNode;
 }
@@ -52,7 +54,7 @@ export function Group({ title, children }: { title: string; children: ReactNode 
  * Definições gerais (fora do perfil): Canais, Suporte e terminar sessão. Antes estavam
  * no menu lateral; o menu ficou só com páginas e o cartão do perfil.
  */
-export function SettingsHub({ onOpenChannels, onOpenWhatsAppBusiness, onHelp, onFeedback, onLogout, before }: SettingsHubProps) {
+export function SettingsHub({ onOpenChannels, onOpenWhatsAppBusiness, onHelp, onFeedback, onLogout, onOpenAbout, before }: SettingsHubProps) {
   const [version, setVersion] = useState<string | null>(null);
   useEffect(() => {
     if (isNativeApp()) void getInstalledVersion().then(setVersion);
@@ -72,15 +74,10 @@ export function SettingsHub({ onOpenChannels, onOpenWhatsAppBusiness, onHelp, on
         {onHelp && <Row icon={HelpCircle} label="Ajuda" onClick={onHelp} />}
         <Row icon={LifeBuoy} label="Falar com o suporte" onClick={() => openSupportChat()} />
         {onFeedback && <Row icon={MessageSquareHeart} label="Enviar opinião" onClick={onFeedback} />}
-        {version && (
-          <div className="flex min-h-[52px] items-center justify-between px-4 text-muted-foreground">
-            <span>Versão da app</span>
-            <span className="tabular-nums">{version}</span>
-          </div>
-        )}
       </Group>
 
       <Group title="Sobre">
+        {onOpenAbout && <Row icon={Info} label="Sobre o app" hint={version || undefined} onClick={onOpenAbout} />}
         <Row icon={FileText} label="Termos de uso" onClick={() => { window.location.href = '/termos'; }} />
         <Row icon={ShieldCheck} label="Política de privacidade" onClick={() => { window.location.href = '/privacidade'; }} />
         <Row icon={Code2} label="Documentação da API" onClick={() => { window.location.href = '/docs'; }} />

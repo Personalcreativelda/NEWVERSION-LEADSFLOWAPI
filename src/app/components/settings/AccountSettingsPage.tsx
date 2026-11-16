@@ -23,6 +23,8 @@ interface AccountSettingsPageProps {
   /** Definições gerais (Canais, Suporte, terminar sessão) no topo da página */
   onOpenChannels?: () => void;
   onOpenNotifications?: () => void;
+  /** Sobre o app: versão, atualizações e novidades */
+  onOpenAbout?: () => void;
   onHelp?: () => void;
   onFeedback?: () => void;
   onLogout?: () => void;
@@ -40,7 +42,7 @@ interface ApiToken {
 
 type TabType = 'profile' | 'security' | 'team' | 'whatsapp';
 
-export default function AccountSettingsPage({ user, onUpdateUser, initialTab, onOpenChannels, onOpenNotifications, onHelp, onFeedback, onLogout }: AccountSettingsPageProps) {
+export default function AccountSettingsPage({ user, onUpdateUser, initialTab, onOpenChannels, onOpenNotifications, onOpenAbout, onHelp, onFeedback, onLogout }: AccountSettingsPageProps) {
   const confirm = useConfirm();
   // null = lista; uma secção = subpágina (com entrada no histórico: voltar fecha-a)
   const [activeTab, setActiveTab] = useState<TabType | null>(initialTab || null);
@@ -221,6 +223,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
           onHelp={onHelp}
           onFeedback={onFeedback}
           onLogout={onLogout}
+          onOpenAbout={onOpenAbout}
           before={
             <Group title="Conta">
               <button
