@@ -1254,6 +1254,15 @@ html.keyboard-open .page-fab {
   display: none !important;
 }
 
+/* Página com botão flutuante (PageFab): espaço no fim do conteúdo para o botão não tapar
+   o último cartão (ex.: tapava o botão "Desligar" dos assistentes) */
+main:has(.page-fab)::after {
+  content: '';
+  display: block;
+  flex-shrink: 0;
+  height: 4.5rem;
+}
+
 /* Transições entre páginas (lib/pageTransition.ts, só telemóvel). Cabeçalho, barra inferior
    e botão flutuante ficam parados; só o conteúdo se move. */
 .app-header { view-transition-name: app-header; }

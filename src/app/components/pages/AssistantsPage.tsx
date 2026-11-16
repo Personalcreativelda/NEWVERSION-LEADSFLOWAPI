@@ -10,9 +10,10 @@ import {
   MessageSquare, Clock, Star, Sparkles, Link2, Unlink2,
   Edit3, Send, Mail, Hash, Globe,
   Smartphone, History, Lock, AlertTriangle, Mic,
-  Image, FileText, Upload, BookOpen, FileSpreadsheet, ChevronDown, ChevronUp, ShieldCheck, RefreshCw, ArrowLeft
+  Image, FileText, Upload, BookOpen, FileSpreadsheet, ChevronDown, ChevronUp, ShieldCheck, RefreshCw, ArrowLeft, MoreVertical
 } from 'lucide-react';
 import { Button } from '../ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Input } from '../ui/input';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { EmptyState } from '../base/EmptyState';
@@ -352,21 +353,20 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
   // Handle disconnect
   const handleDisconnect = async (userAssistant: UserAssistant) => {
-    const confirmed = await confirm(`Deseja realmente desligar ${userAssistant.assistant?.name}?`, {
-      title: 'Desligar assistente',
-      confirmLabel: 'Desligar',
-      variant: 'warning',
-    });
+    const confirmed = await confirm(
+      `${userAssistant.assistant?.name || 'O assistente'} deixa de responder e a configuração dele (instruções, conhecimento e canais) é apagada. Para parar só por agora, toque em "Ativo" para o pausar.`,
+      { title: 'Remover assistente?', confirmLabel: 'Remover', variant: 'danger' },
+    );
     if (!confirmed) return;
 
     try {
       setActionLoading(true);
       await assistantsApi.disconnect(userAssistant.id);
-      toast.success('Assistente desligado');
+      toast.success('Assistente removido');
       loadData();
     } catch (error) {
       console.error('[AssistantsPage] Error disconnecting:', error);
-      toast.error('Erro ao desligar assistente');
+      toast.error('Não foi possível remover o assistente');
     } finally {
       setActionLoading(false);
     }
@@ -376,7 +376,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
   const handleToggle = async (userAssistant: UserAssistant) => {
     try {
       await assistantsApi.toggle(userAssistant.id, !userAssistant.is_active);
-      toast.success(userAssistant.is_active ? 'Assistente desativado' : 'Assistente ativado');
+      toast.success(userAssistant.is_active ? 'Assistente pausado' : 'Assistente ativado');
       loadData();
     } catch (error) {
       console.error('[AssistantsPage] Error toggling:', error);
@@ -982,15 +982,20 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                   <Settings className="w-4 h-4 mr-1.5" />
                   Configurar
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
-                  onClick={() => userAssistant && handleDisconnect(userAssistant)}
-                >
-                  <Unlink2 className="w-4 h-4 mr-1.5" />
-                  Desligar
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="ml-auto" aria-label="Mais opções">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {/* Apagar fica fora do cartão (era fácil carregar por engano ao lado de "Pausar") */}
+                    <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => userAssistant && handleDisconnect(userAssistant)}>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remover assistente
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             ) : (
               <>
@@ -1057,7 +1062,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                 ) : (
                   <>
                     <PowerOff className="w-4 h-4 mr-1.5" />
-                    Inativo
+                    Pausado
                   </>
                 )}
               </Button>
@@ -1069,15 +1074,20 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
               >
                 <Settings className="w-4 h-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-auto text-red-600 hover:text-red-700 hover:bg-red-500/10"
-                onClick={() => userAssistant && handleDisconnect(userAssistant)}
-              >
-                <Unlink2 className="w-4 h-4 mr-1.5" />
-                Desligar
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="ml-auto" aria-label="Mais opções">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {/* Apagar fica fora do cartão (era fácil carregar por engano ao lado de "Pausar") */}
+                  <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => userAssistant && handleDisconnect(userAssistant)}>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Remover assistente
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
         </div>
