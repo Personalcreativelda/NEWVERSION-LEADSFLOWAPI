@@ -38,6 +38,12 @@ services:
       - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-}
       - SERVICE_USER_MINIO=${SERVICE_USER_MINIO:-}
       - SERVICE_PASSWORD_MINIO=${SERVICE_PASSWORD_MINIO:-}
+      # Firebase Admin: manter apenas no ambiente da API/Coolify.
+      # FIREBASE_SERVICE_ACCOUNT_JSON pode ser o JSON da conta de serviço em base64.
+      - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL:-}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY:-}
     restart: unless-stopped
     # O processo 1 de um contentor ignora sinais enviados de dentro dele: com o init (tini)
     # o vigilante da API consegue terminá-la quando bloqueia (api/src/services/health.service.ts)

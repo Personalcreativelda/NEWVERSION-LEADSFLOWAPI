@@ -634,6 +634,14 @@ export const authApi = {
     try {
       const refreshToken = localStorage.getItem('leadflow_refresh_token');
 
+      // Desassocia só este aparelho antes de apagar o access token. Outros aparelhos
+      // do mesmo utilizador continuam a receber notificações.
+      if (isNativeApp()) {
+        await import('../../push-notifications')
+          .then((module) => module.unregisterCurrentPushDevice())
+          .catch((error) => logger.warn('[Push] Não foi possível desativar este dispositivo:', error));
+      }
+
       try {
         await apiCall('/auth/logout', {
           method: 'POST',

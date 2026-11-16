@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { SettingsHub, Group, Row } from './SettingsHub';
 import WhatsAppBusinessSettings from './WhatsAppBusinessSettings';
 import { ProfileSection } from './ProfileSection';
-import { BookOpen, Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog, ChevronRight } from 'lucide-react';
+import { Bell, BookOpen, Shield, Key, Smartphone, Copy, Trash2, Plus, Eye, EyeOff, Lock, Users, UserCog, ChevronRight } from 'lucide-react';
 import { PageHeader } from '../base/PageHeader';
 import { SubpageBack } from '../base/SubpageBack';
 import { Button } from '../ui/button';
@@ -22,6 +22,7 @@ interface AccountSettingsPageProps {
   initialTab?: TabType;
   /** Definições gerais (Canais, Suporte, terminar sessão) no topo da página */
   onOpenChannels?: () => void;
+  onOpenNotifications?: () => void;
   onHelp?: () => void;
   onFeedback?: () => void;
   onLogout?: () => void;
@@ -39,7 +40,7 @@ interface ApiToken {
 
 type TabType = 'profile' | 'security' | 'team' | 'whatsapp';
 
-export default function AccountSettingsPage({ user, onUpdateUser, initialTab, onOpenChannels, onHelp, onFeedback, onLogout }: AccountSettingsPageProps) {
+export default function AccountSettingsPage({ user, onUpdateUser, initialTab, onOpenChannels, onOpenNotifications, onHelp, onFeedback, onLogout }: AccountSettingsPageProps) {
   const confirm = useConfirm();
   // null = lista; uma secção = subpágina (com entrada no histórico: voltar fecha-a)
   const [activeTab, setActiveTab] = useState<TabType | null>(initialTab || null);
@@ -240,6 +241,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
                 <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
               </button>
               <Row icon={Shield} label="Segurança" onClick={() => openSection('security')} />
+              {onOpenNotifications && <Row icon={Bell} label="Notificações" onClick={onOpenNotifications} />}
               <Row icon={Users} label="Equipa" onClick={() => openSection('team')} />
             </Group>
           }

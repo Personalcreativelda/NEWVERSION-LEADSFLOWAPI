@@ -290,6 +290,12 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
     }
   }, [dismissedReady, loadNotifications]);
 
+  useEffect(() => {
+    const refresh = () => void loadNotifications();
+    window.addEventListener('leadflow:notifications-changed', refresh);
+    return () => window.removeEventListener('leadflow:notifications-changed', refresh);
+  }, [loadNotifications]);
+
   // Refresh when the bell panel is opened
   useEffect(() => {
     if (open) {
@@ -369,6 +375,9 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
           console.log('[Tour] Starting tour from notification');
           onStartTour();
         }
+      } else if (notification.actionUrl.startsWith('/dashboard')) {
+        window.history.pushState({ dashboardPage: true, source: 'notification' }, '', notification.actionUrl);
+        window.dispatchEvent(new PopStateEvent('popstate'));
       } else if (onNavigate) {
         // Remove a barra inicial se existir (ex: /funnel -> funnel)
         const cleanUrl = notification.actionUrl.startsWith('/') 
@@ -677,6 +686,20 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
             </div>
           )}
         </div>
+        {onNavigate && (
+          <div className="flex-shrink-0 border-t border-border p-2">
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => {
+                setOpen(false);
+                onNavigate('notifications');
+              }}
+            >
+              Ver histórico
+            </Button>
+          </div>
+        )}
       </>
   );
 

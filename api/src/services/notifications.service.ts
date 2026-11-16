@@ -1,6 +1,12 @@
 import { query } from '../database/connection';
 import { emailService } from './email.service';
 import { getAdminNotificationEmail } from '../templates/email.template';
+import {
+  categoryForNotificationType,
+  pushNotificationService,
+  type NotificationCategory,
+  type NotificationPriority,
+} from './push-notification.service';
 
 /** Email para os avisos do administrador (mesmo texto da notificação do sino) */
 export function adminNotificationEmail(title: string, description: string) {
@@ -21,14 +27,72 @@ export interface Notification {
   icon?: string;
   isRead: boolean;
   metadata?: Record<string, any>;
+  actionUrl?: string;
+  category: NotificationCategory;
+  priority: NotificationPriority;
+  pushStatus: string;
+  pushSentAt?: string;
+  pushSuccessCount: number;
+  pushFailureCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface NotificationDeliveryOptions {
+  actionUrl?: string;
+  category?: NotificationCategory;
+  priority?: NotificationPriority;
+  sendPush?: boolean;
+}
+
+const NOTIFICATION_COLUMNS = `id, user_id, type, title, description, icon, is_read, metadata,
+  action_url, category, priority, push_status, push_sent_at, push_success_count,
+  push_failure_count, created_at, updated_at`;
+
+function toIso(value: unknown): string | undefined {
+  if (!value) return undefined;
+  return typeof value === 'string' ? value : new Date(value as any).toISOString();
+}
+
+function mapNotification(row: any): Notification {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    title: row.title,
+    description: row.description,
+    icon: row.icon,
+    isRead: row.is_read,
+    metadata: row.metadata,
+    actionUrl: row.action_url || undefined,
+    category: row.category || categoryForNotificationType(row.type),
+    priority: row.priority || 'normal',
+    pushStatus: row.push_status || 'pending',
+    pushSentAt: toIso(row.push_sent_at),
+    pushSuccessCount: Number(row.push_success_count || 0),
+    pushFailureCount: Number(row.push_failure_count || 0),
+    createdAt: toIso(row.created_at)!,
+    updatedAt: toIso(row.updated_at)!,
+  };
+}
+
+async function dispatchPush(notification: Notification) {
+  return pushNotificationService.sendStoredNotification({
+    id: notification.id,
+    userId: notification.userId,
+    type: notification.type,
+    title: notification.title,
+    description: notification.description,
+    actionUrl: notification.actionUrl,
+    category: notification.category,
+    priority: notification.priority,
+  });
 }
 
 export const notificationsService = {
   async getNotifications(userId: string, limit = 20, offset = 0): Promise<Notification[]> {
     const result = await query(
-      `SELECT id, user_id, type, title, description, icon, is_read, metadata, created_at, updated_at
+      `SELECT ${NOTIFICATION_COLUMNS}
        FROM notifications
        WHERE user_id = $1
        ORDER BY created_at DESC
@@ -36,18 +100,7 @@ export const notificationsService = {
       [userId, limit, offset]
     );
 
-    return result.rows.map((row: any) => ({
-      id: row.id,
-      userId: row.user_id,
-      type: row.type,
-      title: row.title,
-      description: row.description,
-      icon: row.icon,
-      isRead: row.is_read,
-      metadata: row.metadata,
-      createdAt: typeof row.created_at === 'string' ? row.created_at : new Date(row.created_at).toISOString(),
-      updatedAt: typeof row.updated_at === 'string' ? row.updated_at : new Date(row.updated_at).toISOString(),
-    }));
+    return result.rows.map(mapNotification);
   },
 
   async createNotification(
@@ -56,28 +109,88 @@ export const notificationsService = {
     title: string,
     description?: string,
     icon?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
+    delivery: NotificationDeliveryOptions = {},
   ): Promise<Notification> {
+    const actionUrl = delivery.actionUrl || metadata?.actionUrl || metadata?.action_url || null;
+    const category = delivery.category || categoryForNotificationType(type);
+    const priority = delivery.priority || (category === 'messages' || category === 'tasks' ? 'high' : 'normal');
     const result = await query(
-      `INSERT INTO notifications (user_id, type, title, description, icon, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, user_id, type, title, description, icon, is_read, metadata, created_at, updated_at`,
-      [userId, type, title, description || null, icon || null, JSON.stringify(metadata || {})]
+      `INSERT INTO notifications
+        (user_id, type, title, description, icon, metadata, action_url, category, priority)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING ${NOTIFICATION_COLUMNS}`,
+      [userId, type, title, description || null, icon || null, JSON.stringify(metadata || {}), actionUrl, category, priority]
     );
 
-    const row = result.rows[0];
-    return {
-      id: row.id,
-      userId: row.user_id,
-      type: row.type,
-      title: row.title,
-      description: row.description,
-      icon: row.icon,
-      isRead: row.is_read,
-      metadata: row.metadata,
-      createdAt: typeof row.created_at === 'string' ? row.created_at : new Date(row.created_at).toISOString(),
-      updatedAt: typeof row.updated_at === 'string' ? row.updated_at : new Date(row.updated_at).toISOString(),
-    };
+    const notification = mapNotification(result.rows[0]);
+    if (delivery.sendPush !== false) {
+      void dispatchPush(notification).catch((error) =>
+        console.warn(`[Push] Falha ao enviar a notificação ${notification.id}:`, error?.message || error));
+    }
+    return notification;
+  },
+
+  async createAndSendNotification(
+    userId: string,
+    type: string,
+    title: string,
+    description?: string,
+    icon?: string,
+    metadata?: Record<string, any>,
+    delivery: NotificationDeliveryOptions = {},
+  ) {
+    const notification = await this.createNotification(
+      userId,
+      type,
+      title,
+      description,
+      icon,
+      metadata,
+      { ...delivery, sendPush: false },
+    );
+    const push = await dispatchPush(notification);
+    return { notification, push };
+  },
+
+  async sendBatch(
+    userIds: string[],
+    payload: {
+      type: string;
+      title: string;
+      description?: string;
+      icon?: string;
+      metadata?: Record<string, any>;
+      delivery?: NotificationDeliveryOptions;
+    },
+  ) {
+    const results: Array<{ userId: string; notificationId?: string; success: boolean; push?: any; error?: string }> = [];
+    for (let start = 0; start < userIds.length; start += 10) {
+      const chunk = userIds.slice(start, start + 10);
+      const sent = await Promise.all(chunk.map(async (userId) => {
+        try {
+          const { notification, push } = await this.createAndSendNotification(
+            userId,
+            payload.type,
+            payload.title,
+            payload.description,
+            payload.icon,
+            payload.metadata,
+            payload.delivery,
+          );
+          return { userId, notificationId: notification.id, success: true, push };
+        } catch (error: any) {
+          return { userId, success: false, error: String(error?.message || error) };
+        }
+      }));
+      results.push(...sent);
+    }
+    return results;
+  },
+
+  async getTotalCount(userId: string): Promise<number> {
+    const result = await query('SELECT COUNT(*) AS count FROM notifications WHERE user_id = $1', [userId]);
+    return Number(result.rows[0]?.count || 0);
   },
 
   async markAsRead(notificationId: string, userId: string): Promise<boolean> {
@@ -173,11 +286,7 @@ export const notificationsService = {
 
           if (!enabled) continue;
 
-          await query(
-            `INSERT INTO notifications (user_id, type, title, description, icon, metadata)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [admin.id, type, title, description, icon, JSON.stringify(metadata)]
-          );
+          await this.createNotification(admin.id, type, title, description, icon, metadata);
 
           const to = notificationEmail || admin.email;
           if (to && emailService.configured) {

@@ -979,6 +979,17 @@ const runPendingMigrations = async () => {
   } catch (error: any) {
     console.warn('[DB] Migration 023 (user_feedback) warning:', error.message);
   }
+
+  // Migração 024: notificações Push Android (FCM)
+  try {
+    const primaryPath = path.join(__dirname, 'migrations', '024_push_notifications.sql');
+    const fallbackPath = path.join(process.cwd(), 'src', 'database', 'migrations', '024_push_notifications.sql');
+    const migrationPath = fs.existsSync(primaryPath) ? primaryPath : fallbackPath;
+    await pool.query(fs.readFileSync(migrationPath, 'utf-8'));
+    console.log('[DB] push_device_tokens, notification_preferences e campos Push prontos');
+  } catch (error: any) {
+    console.warn('[DB] Migration 024 (push notifications) warning:', error.message);
+  }
 };
 
 export const initDatabase = async () => {

@@ -48,14 +48,14 @@ const checkExpiredPlans = async () => {
 
         // Criar notificação para o usuário
         try {
-          await query(
-            `INSERT INTO notifications (user_id, type, title, description, icon, metadata)
-             VALUES ($1, 'plan_expired', 'Plano Expirado', $2, 'alert-triangle', $3)`,
-            [
-              user.id,
-              `Seu plano ${user.plan} expirou. Você foi revertido para o plano gratuito. Faça upgrade para continuar com todos os recursos.`,
-              JSON.stringify({ previousPlan: user.plan, expiredAt: user.plan_expires_at }),
-            ]
+          await notificationsService.createNotification(
+            user.id,
+            'plan_expired',
+            'Plano expirado',
+            `O seu plano ${user.plan} expirou. A conta passou para o plano gratuito.`,
+            'alert-triangle',
+            { previousPlan: user.plan, expiredAt: user.plan_expires_at },
+            { actionUrl: '/dashboard/plan', category: 'system', priority: 'high' },
           );
         } catch (notifErr) {
           console.warn(`[PlanExpiration] Could not create notification for ${user.email}:`, notifErr);

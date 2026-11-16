@@ -334,6 +334,16 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     return () => clearInterval(intervalId);
   }, [user, forceLogout]);
 
+  // No Android, a sessão autenticada é a autoridade para associar o token FCM.
+  // Também consome um destino pendente quando o app foi aberto ao tocar numa notificação.
+  useEffect(() => {
+    if (!user?.id) return;
+    void import('../push-notifications').then(({ consumePendingPushNavigation, syncPushRegistration }) => {
+      consumePendingPushNavigation();
+      return syncPushRegistration(user.id);
+    }).catch((error) => console.warn('[Push] Inicialização adiada:', error));
+  }, [user?.id]);
+
   useEffect(() => {
     // Add listener for upgrade modal events
     const handleOpenUpgradeModal = () => {

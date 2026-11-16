@@ -5,6 +5,7 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { toast } from 'sonner';
 import { initLiveUpdates } from './live-update';
+import { initPushNotifications } from './push-notifications';
 
 // Plugin nativo do app (android/.../SystemBarsPlugin.java).
 const SystemBars = registerPlugin<{
@@ -277,6 +278,7 @@ export async function initNative() {
 
   // Primeiro de tudo: confirmar que este pacote web arrancou (ver live-update.ts)
   initLiveUpdates();
+  void initPushNotifications();
 
   document.documentElement.classList.add('native-app');
   keepLinksInApp();

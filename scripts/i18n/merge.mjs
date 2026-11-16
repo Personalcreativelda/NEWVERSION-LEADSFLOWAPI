@@ -32,7 +32,13 @@ const vars = (s) => (s.match(/\{\d+\}/g) || []).sort().join(',');
 const dicts = Object.fromEntries(LANGS.map((l) => [l, load(l)]));
 let added = 0;
 const problems = [];
-for (const name of readdirSync(CHUNKS).filter((n) => /^\d+\.json$/.test(n)).sort()) {
+const onlyChunkAt = process.argv.indexOf('--chunk');
+const onlyChunk = onlyChunkAt >= 0 ? process.argv[onlyChunkAt + 1] : null;
+const chunkFiles = readdirSync(CHUNKS)
+  .filter((n) => /^\d+\.json$/.test(n))
+  .filter((n) => !onlyChunk || n === `${onlyChunk}.json`)
+  .sort();
+for (const name of chunkFiles) {
   const chunk = JSON.parse(readFileSync(join(CHUNKS, name), 'utf8'));
   for (const [idx, outs] of Object.entries(chunk)) {
     const pt = all[Number(idx)];

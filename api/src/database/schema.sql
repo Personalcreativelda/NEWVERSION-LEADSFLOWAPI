@@ -217,6 +217,48 @@ CREATE TABLE notifications (
     icon VARCHAR(50),
     is_read BOOLEAN DEFAULT false,
     metadata JSONB DEFAULT '{}',
+    action_url TEXT,
+    category VARCHAR(30) NOT NULL DEFAULT 'system',
+    priority VARCHAR(20) NOT NULL DEFAULT 'normal',
+    push_status VARCHAR(30) NOT NULL DEFAULT 'pending',
+    push_sent_at TIMESTAMP WITH TIME ZONE,
+    push_success_count INTEGER NOT NULL DEFAULT 0,
+    push_failure_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Tokens FCM: um utilizador pode ter vários dispositivos ativos.
+CREATE TABLE push_device_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT NOT NULL UNIQUE,
+    platform VARCHAR(20) NOT NULL DEFAULT 'android' CHECK (platform IN ('android', 'ios', 'web')),
+    device_id VARCHAR(255) NOT NULL,
+    device_name VARCHAR(255),
+    app_version VARCHAR(50),
+    locale VARCHAR(20),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    failure_count INTEGER NOT NULL DEFAULT 0,
+    last_error VARCHAR(255),
+    last_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Preferências Push por utilizador. Sem linha gravada usam-se estes valores por omissão.
+CREATE TABLE notification_preferences (
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    push_enabled BOOLEAN NOT NULL DEFAULT true,
+    messages_enabled BOOLEAN NOT NULL DEFAULT true,
+    leads_enabled BOOLEAN NOT NULL DEFAULT true,
+    campaigns_enabled BOOLEAN NOT NULL DEFAULT true,
+    tasks_enabled BOOLEAN NOT NULL DEFAULT true,
+    system_enabled BOOLEAN NOT NULL DEFAULT true,
+    quiet_hours_enabled BOOLEAN NOT NULL DEFAULT false,
+    quiet_hours_start TIME NOT NULL DEFAULT '22:00',
+    quiet_hours_end TIME NOT NULL DEFAULT '07:00',
+    timezone VARCHAR(100) NOT NULL DEFAULT 'Africa/Maputo',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -289,6 +331,9 @@ CREATE INDEX idx_plans_is_active ON plans(is_active);
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_is_read ON notifications(is_read);
 CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX idx_notifications_user_unread_created ON notifications(user_id, is_read, created_at DESC);
+CREATE INDEX idx_push_device_tokens_user_active ON push_device_tokens(user_id, is_active);
+CREATE INDEX idx_push_device_tokens_device ON push_device_tokens(user_id, device_id);
 CREATE INDEX idx_users_plan ON users(plan);
 CREATE INDEX idx_users_plan_expires_at ON users(plan_expires_at);
 
@@ -325,6 +370,8 @@ CREATE TRIGGER update_whatsapp_instances_updated_at BEFORE UPDATE ON whatsapp_in
 CREATE TRIGGER update_message_templates_updated_at BEFORE UPDATE ON message_templates FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_notifications_updated_at BEFORE UPDATE ON notifications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_push_device_tokens_updated_at BEFORE UPDATE ON push_device_tokens FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_notification_preferences_updated_at BEFORE UPDATE ON notification_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_api_tokens_updated_at BEFORE UPDATE ON api_tokens FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 DO $$ BEGIN

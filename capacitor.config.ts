@@ -33,6 +33,9 @@ const config: CapacitorConfig = {
       backgroundColor: '#2563EB',
       showSpinner: false,
     },
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
     // Atualizações ao vivo auto-hospedadas (src/live-update.ts + /api/version/mobile).
     // Modo manual: nada é pedido aos servidores da Capgo, e statsUrl vazio desliga o
     // envio de estatísticas para eles.
