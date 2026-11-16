@@ -19,6 +19,7 @@ import { query, transaction } from '../database/connection';
 import { plansService } from './plans.service';
 import { notificationsService } from './notifications.service';
 import { clearPlanEnforcementCache } from '../middleware/plan-enforcement.middleware';
+import { isServableKey, isStorageUrl, storageKeyFromUrl } from '../utils/storage-urls';
 
 export type MobileMethod = 'mpesa' | 'emola';
 export type BillingCycle = 'monthly' | 'annual';
@@ -115,10 +116,19 @@ const withMethodDefaults = (list: any): MobileMethodConfig[] =>
     };
   });
 
-// Só endereços de ficheiros (http/https, /api/files/…) ou imagem em base64 (sem MinIO); nada de javascript:
+// Logótipos nossos guardam-se como "/api/files/<chave>" (sem protocolo nem host): a API podia
+// devolver "http://…" atrás do proxy e o WebView do Android bloqueia imagens http numa página https.
+// O app junta-lhe o endereço da API. Também aceita imagem em base64 (sem MinIO); nada de javascript:.
 const safeLogoUrl = (v: any): string => {
   const s = String(v ?? '').trim();
-  if (/^(https?:\/\/|\/api\/files\/)/i.test(s) && s.length <= 1000) return s;
+  if (!s) return '';
+  if (!s.startsWith('data:')) {
+    let key: string | null = null;
+    try { key = storageKeyFromUrl(s); } catch { key = null; }
+    if (key && isServableKey(key)) return `/api/files/${key.split('/').map(encodeURIComponent).join('/')}`;
+    if (s.includes('/api/files/') || isStorageUrl(s)) return '';
+  }
+  if (/^https:\/\//i.test(s) && s.length <= 1000) return s;
   if (/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(s) && s.length <= 3_000_000) return s;
   return '';
 };
