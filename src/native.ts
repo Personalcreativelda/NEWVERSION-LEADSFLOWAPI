@@ -272,6 +272,35 @@ function finishBootScreen() {
   waitUntilReady();
 }
 
+// Vibração curta ao tocar em botões, separadores, interruptores, links… (como noutros apps).
+// Um pulso de ~12 ms: o "leve" do plugin (50 ms) parece um zumbido num toque normal.
+// Só em toques reais (click: não vibra ao fazer scroll) e nunca em elementos desativados.
+const TAP_TARGETS = [
+  'button', 'a[href]', 'summary', 'label', 'select',
+  'input[type="checkbox"]', 'input[type="radio"]', 'input[type="submit"]', 'input[type="button"]',
+  '[role="button"]', '[role="tab"]', '[role="switch"]', '[role="radio"]', '[role="checkbox"]',
+  '[role="menuitem"]', '[role="menuitemradio"]', '[role="menuitemcheckbox"]', '[role="option"]',
+].join(',');
+
+function tapHaptics() {
+  let last = 0;
+  document.addEventListener('click', (e) => {
+    const el = (e.target as Element | null)?.closest?.(TAP_TARGETS) as HTMLElement | null;
+    if (!el || el.closest('[data-no-haptic]')) return;
+    if ((el as HTMLButtonElement).disabled || el.getAttribute('aria-disabled') === 'true') return;
+    // Um label que só aponta para um campo de texto não é um "botão"
+    if (el.tagName === 'LABEL' && !el.querySelector('input[type="checkbox"],input[type="radio"],[role="switch"],[role="checkbox"],[role="radio"]')) {
+      const forId = el.getAttribute('for');
+      const target = forId ? document.getElementById(forId) : null;
+      if (!target || !/^(checkbox|radio)$/.test((target as HTMLInputElement).type || '')) return;
+    }
+    const now = Date.now();
+    if (now - last < 80) return; // um só pulso por toque (label + input disparam dois clicks)
+    last = now;
+    Haptics.vibrate({ duration: 12 }).catch(() => {});
+  }, { capture: true, passive: true });
+}
+
 // Integração com o Android — no navegador não faz nada.
 export async function initNative() {
   if (!isNativeApp()) return;
@@ -284,6 +313,7 @@ export async function initNative() {
   keepLinksInApp();
   trackKeyboard();
   blockWebContextMenu();
+  tapHaptics();
 
   // Botão "voltar" do Android, por ordem: painéis do app (evento 'native-back', que um
   // componente cancela com preventDefault), chat de suporte, diálogos/modais Radix

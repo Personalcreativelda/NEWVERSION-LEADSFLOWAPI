@@ -19,6 +19,25 @@ interface MobileConfig {
   latest: MobilePaymentRecord | null;
 }
 
+// Carteiras móveis: pedidas quando a página do plano abre (o modal fica montado) e guardadas aqui,
+// para o modal já abrir com M-Pesa/e-Mola. Antes eram pedidas só ao abrir e as linhas entravam a
+// meio da animação, o que fazia o modal crescer e saltar.
+let mobileCache: MobileConfig | null = null;
+let mobileRequest: Promise<MobileConfig | null> | null = null;
+
+function loadMobileConfig(): Promise<MobileConfig | null> {
+  if (!mobileRequest) {
+    mobileRequest = apiRequest('/payments/mobile/config', 'GET')
+      .then((res) => {
+        mobileCache = res?.success ? { methods: res.methods || [], prices: res.prices || {}, latest: res.latest || null } : null;
+        return mobileCache;
+      })
+      .catch(() => mobileCache)
+      .finally(() => { mobileRequest = null; });
+  }
+  return mobileRequest;
+}
+
 // PayPal Payment Links - Direct checkout links
 const PAYPAL_PAYMENT_LINKS: Record<string, string> = {
   'business-monthly': 'https://www.paypal.com/ncp/payment/MJFXSMAZY9VPS',
@@ -47,22 +66,32 @@ export default function PaymentMethodModal({
   const billingPeriod = initialBillingPeriod;
 
   // M-Pesa / e-Mola (configurados em Admin → Pagamentos)
-  const [mobile, setMobile] = useState<MobileConfig | null>(null);
+  const [mobile, setMobile] = useState<MobileConfig | null>(
+    // Da cópia só os métodos e preços: o último pagamento vem sempre do pedido novo (pode ser outra conta)
+    mobileCache ? { ...mobileCache, latest: null } : null,
+  );
   const [mobileMethod, setMobileMethod] = useState<MobileMethodPublic | null>(null);
   const [mobileSending, setMobileSending] = useState(false);
   const [mobileValid, setMobileValid] = useState(false);
   const [sentPayment, setSentPayment] = useState<MobilePaymentRecord | null>(null);
 
-  useEffect(() => {
-    if (!isOpen) {
+  // Ao abrir volta à lista. Feito no render (não num efeito, nem ao fechar): assim nunca aparece
+  // um frame do passo anterior ao abrir, nem a lista a meio da animação de saída.
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
       setMobileMethod(null);
       setSentPayment(null);
       setMobileValid(false);
-      return;
     }
-    apiRequest('/payments/mobile/config', 'GET')
-      .then((res) => setMobile(res?.success ? { methods: res.methods || [], prices: res.prices || {}, latest: res.latest || null } : null))
-      .catch(() => setMobile(null));
+  }
+
+  // Ao montar (página do plano) e de novo ao abrir, para o estado do último pagamento estar certo
+  useEffect(() => {
+    let alive = true;
+    void loadMobileConfig().then((cfg) => { if (alive) setMobile(cfg); });
+    return () => { alive = false; };
   }, [isOpen]);
 
   const mobileAmount = planId ? mobile?.prices?.[planId]?.[billingPeriod] ?? null : null;
