@@ -589,8 +589,19 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
                       <div
                         id={`notification-${notification.id}`}
                         key={notification.id}
+                        // Tocar na notificação abre o destino (ex.: atualização → Sobre o app);
+                        // os botões ✓ e ✕ param o toque (stopPropagation)
+                        {...(notification.actionUrl ? {
+                          role: 'button',
+                          tabIndex: 0,
+                          onClick: () => handleAction(notification),
+                          onKeyDown: (e: React.KeyboardEvent) => {
+                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAction(notification); }
+                          },
+                        } : {})}
                         className={cn(
-                          'relative p-4 hover:bg-muted/50 transition-all duration-200 group',
+                          'relative p-4 hover:bg-muted/50 transition-colors duration-200 group',
+                          notification.actionUrl && 'cursor-pointer active:bg-muted',
                           !notification.read && 'bg-muted/30'
                         )}
                       >
