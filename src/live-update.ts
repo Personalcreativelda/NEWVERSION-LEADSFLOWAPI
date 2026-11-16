@@ -139,12 +139,25 @@ export async function getChangelog(): Promise<ChangelogItem[]> {
 }
 
 /** O que há para atualizar neste telemóvel (Sobre o app) */
+/** Rejeita se a promessa não responder a tempo (o ecrã nunca fica preso à espera) */
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then(
+      (value) => { window.clearTimeout(timer); resolve(value); },
+      (error) => { window.clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
 export async function getAppUpdateStatus(): Promise<AppUpdateStatus> {
   const apiBase = getApiBaseUrl();
-  const { build, version: nativeVersion } = await App.getInfo();
+  const { build, version: nativeVersion } = await withTimeout(App.getInfo(), 3000);
   const nativeBuild = parseInt(build, 10) || 0;
+  // Sem perguntar ao plugin de atualizações ao vivo: logo a seguir a instalar um APK novo
+  // ele está ocupado a descarregar o pacote e não responde (o ecrã ficava em "A carregar…")
   const status: AppUpdateStatus = {
-    current: await getInstalledVersion(),
+    current: null,
     nativeVersion,
     nativeBuild,
     web: null,
@@ -154,9 +167,9 @@ export async function getAppUpdateStatus(): Promise<AppUpdateStatus> {
   if (!apiBase) return status;
 
   const [webRes, apkRes, changelog] = await Promise.all([
-    fetch(`${apiBase}/api/version/mobile?native=${nativeBuild}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch(`${apiBase}/api/version/apk/latest?native=${nativeBuild}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    getChangelog().catch(() => [] as ChangelogItem[]),
+    withTimeout(fetch(`${apiBase}/api/version/mobile?native=${nativeBuild}`, { cache: 'no-store' }), 10000).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    withTimeout(fetch(`${apiBase}/api/version/apk/latest?native=${nativeBuild}`, { cache: 'no-store' }), 10000).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    withTimeout(getChangelog(), 10000).catch(() => [] as ChangelogItem[]),
   ]);
 
   const release = webRes as MobileRelease | null;

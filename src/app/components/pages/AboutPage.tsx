@@ -11,6 +11,7 @@ import {
   getAppUpdateStatus,
   getChangelog,
   installApkUpdate,
+  withTimeout,
   type AppUpdateStatus,
   type ChangelogItem,
 } from '../../../live-update';
@@ -37,16 +38,20 @@ export default function AboutPage() {
   const [applying, setApplying] = useState(false);
   const [apkPercent, setApkPercent] = useState<number | null>(null);
 
+  // Estado e novidades carregam em separado e com tempo máximo: o ecrã nunca fica preso
   const check = useCallback(async () => {
     setChecking(true);
-    try {
-      if (native) setStatus(await getAppUpdateStatus());
-      setChangelog(await getChangelog());
-    } catch {
-      toast.error('Não foi possível verificar as atualizações');
-    } finally {
-      setChecking(false);
-    }
+    const loadChangelog = withTimeout(getChangelog(), 10000)
+      .then(setChangelog)
+      .catch(() => setChangelog((prev) => prev ?? []));
+    const loadStatus = native
+      ? getAppUpdateStatus().then(setStatus).catch(() => {
+          setStatus((prev) => prev ?? { current: null, nativeVersion: null, nativeBuild: 0, web: null, apk: null, canSelfUpdateApk: false });
+          toast.error('Não foi possível verificar as atualizações');
+        })
+      : Promise.resolve();
+    await Promise.all([loadChangelog, loadStatus]);
+    setChecking(false);
   }, [native]);
 
   useEffect(() => { void check(); }, [check]);
@@ -89,21 +94,19 @@ export default function AboutPage() {
 
       <div className="grid gap-5 xl:grid-cols-2">
         <div className="space-y-5">
-          {native && (
-            <SettingsGroup title="Versão">
-              <SettingsItem label="Em uso">
-                <span className="text-sm tabular-nums text-muted-foreground">{status?.current ?? '…'}</span>
+          {native && !status && (
+            <SettingsGroup>
+              <SettingsItem label="A verificar atualizações…" />
+            </SettingsGroup>
+          )}
+
+          {upToDate && (
+            <SettingsGroup>
+              <SettingsItem label="O app está atualizado">
+                <Button variant="outline" size="sm" onClick={() => void check()} disabled={checking}>
+                  {checking ? 'A verificar…' : 'Verificar'}
+                </Button>
               </SettingsItem>
-              <SettingsItem label="App instalado">
-                <span className="text-sm tabular-nums text-muted-foreground">{status?.nativeVersion ?? '…'}</span>
-              </SettingsItem>
-              {upToDate && (
-                <SettingsItem label="Atualizado">
-                  <Button variant="outline" size="sm" onClick={() => void check()} disabled={checking}>
-                    {checking ? 'A verificar…' : 'Verificar'}
-                  </Button>
-                </SettingsItem>
-              )}
             </SettingsGroup>
           )}
 
