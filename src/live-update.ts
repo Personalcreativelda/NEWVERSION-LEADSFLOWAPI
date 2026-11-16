@@ -52,6 +52,9 @@ export async function checkForLiveUpdate(force = false) {
 
     // Este código já é esta versão ou mais recente (ex.: APK novo instalado depois)
     if (new Date(release.builtAt).getTime() <= __APP_BUILD_TIME__) return;
+    // Já está a correr esta versão: nunca a instalar outra vez. Se a hora publicada não bater
+    // com a do pacote (aconteceu na 1.0.58), o app reinstalava-se e reiniciava sem fim.
+    if ((await withTimeout(getInstalledVersion(), 2500).catch(() => null)) === release.version) return;
 
     const { bundles } = await CapacitorUpdater.list();
     const existing = bundles.find((bundle) => bundle.version === release.version);
@@ -172,7 +175,8 @@ export async function getAppUpdateStatus(): Promise<AppUpdateStatus> {
   ]);
 
   const release = webRes as MobileRelease | null;
-  if (release?.available && release.version && release.builtAt && new Date(release.builtAt).getTime() > __APP_BUILD_TIME__) {
+  if (release?.available && release.version && release.builtAt && new Date(release.builtAt).getTime() > __APP_BUILD_TIME__
+      && release.version !== status.current) {
     const notes = changelog.find((c) => c.kind === 'app' && c.version === release.version)?.notes || null;
     status.web = { version: release.version, notes };
   }

@@ -124,12 +124,38 @@ form.append('releaseNotes', notes);
 form.append('notifyUsers', String(notify));
 
 console.log(`▶ A publicar em ${apiUrl} …`);
-const res = await fetch(`${apiUrl}/api/version/mobile/release`, {
-  method: 'POST',
-  headers: { 'x-release-key': releaseKey },
-  body: form,
-});
-const body = await res.json().catch(() => ({}));
-if (!res.ok) fail(`A API recusou (${res.status}): ${body.error || 'erro desconhecido'}`);
+// O envio (~5 MB) por vezes é cortado a meio (ECONNRESET). Tenta de novo e, por fim, pelo curl —
+// sempre com o MESMO builtAt que ficou dentro do pacote: se for outro, o app julga que há uma
+// versão mais nova (ela própria) e reinstala-se sem fim (aconteceu na 1.0.58).
+let published = false;
+for (let attempt = 1; attempt <= 3 && !published; attempt++) {
+  try {
+    const res = await fetch(`${apiUrl}/api/version/mobile/release`, {
+      method: 'POST',
+      headers: { 'x-release-key': releaseKey },
+      body: form,
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) fail(`A API recusou (${res.status}): ${body.error || 'erro desconhecido'}`);
+    published = true;
+  } catch (err) {
+    console.warn(`  envio ${attempt}/3 falhou: ${err?.cause?.code || err?.message || err}`);
+  }
+}
+if (!published) {
+  console.log('▶ A enviar pelo curl …');
+  const curl = spawnSync('curl', [
+    '-sS', '--fail-with-body', '-m', '300', '-X', 'POST', `${apiUrl}/api/version/mobile/release`,
+    '-H', `x-release-key: ${releaseKey}`,
+    '-F', `bundle=@${zipPath};type=application/zip;filename=leadsflow-${version}.zip`,
+    '--form-string', `version=${version}`,
+    '--form-string', `builtAt=${builtAt}`,
+    '--form-string', `minNativeBuild=${minNativeBuild}`,
+    '--form-string', `checksum=${checksum}`,
+    '--form-string', `releaseNotes=${notes}`,
+    '--form-string', `notifyUsers=${notify}`,
+  ], { encoding: 'utf8' });
+  if (curl.status !== 0) fail(`O envio falhou: ${(curl.stdout || '') + (curl.stderr || '')}`.trim());
+}
 
 console.log(`\n✔ Versão ${version} publicada. Os telemóveis recebem-na na próxima vez que abrirem o app.`);
