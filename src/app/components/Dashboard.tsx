@@ -195,6 +195,18 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   const currentPageRef = useRef(currentPage);
   currentPageRef.current = currentPage;
   const [conversationIdToOpen, setConversationIdToOpen] = useState<string | null>(null);
+  // Toque numa notificação de mensagem: /dashboard/inbox?conversa=<id> abre essa conversa
+  useEffect(() => {
+    const openFromUrl = () => {
+      const id = new URLSearchParams(window.location.search).get('conversa');
+      if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return;
+      setConversationIdToOpen(id);
+      window.history.replaceState(window.history.state, '', window.location.pathname);
+    };
+    openFromUrl();
+    window.addEventListener('popstate', openFromUrl);
+    return () => window.removeEventListener('popstate', openFromUrl);
+  }, []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     // Carregar estado da sidebar do localStorage
     const saved = localStorage.getItem('sidebar_open');

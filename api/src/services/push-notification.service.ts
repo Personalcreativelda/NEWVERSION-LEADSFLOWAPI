@@ -14,7 +14,14 @@ export interface StoredPushNotification {
   actionUrl?: string;
   category: NotificationCategory;
   priority: NotificationPriority;
+  /** Notificações com a mesma tag substituem-se no telemóvel (ex.: uma por conversa) */
+  tag?: string;
+  /** Dados extra para o app (ex.: conversation_id) */
+  data?: Record<string, string>;
 }
+
+/** Push sem linha no histórico (mensagens de clientes: o sino encheria com cada mensagem) */
+export type DirectPushNotification = Omit<StoredPushNotification, 'id'>;
 
 export interface NotificationPreferences {
   pushEnabled: boolean;
@@ -347,9 +354,20 @@ export const pushNotificationService = {
   },
 
   async sendStoredNotification(notification: StoredPushNotification) {
+    return this.deliver(notification, true);
+  },
+
+  /** Envia para os aparelhos sem gravar no histórico (respeita preferências e horas de silêncio) */
+  async sendDirect(notification: DirectPushNotification) {
+    return this.deliver({ ...notification, id: '' }, false);
+  },
+
+  async deliver(notification: StoredPushNotification, persist: boolean) {
+    const setStatus = (...args: Parameters<typeof setNotificationPushStatus>) =>
+      persist ? setNotificationPushStatus(...args) : Promise.resolve();
     const app = getFirebaseApp();
     if (!app) {
-      await setNotificationPushStatus(notification.id, 'not_configured');
+      await setStatus(notification.id, 'not_configured');
       return { successCount: 0, failureCount: 0, status: 'not_configured' };
     }
 
@@ -364,17 +382,17 @@ export const pushNotificationService = {
     ]);
 
     if (!preferenceAllows(preferences, notification.category)) {
-      await setNotificationPushStatus(notification.id, 'disabled');
+      await setStatus(notification.id, 'disabled');
       return { successCount: 0, failureCount: 0, status: 'disabled' };
     }
     if (notification.priority !== 'urgent' && isInsideQuietHours(preferences)) {
-      await setNotificationPushStatus(notification.id, 'quiet_hours');
+      await setStatus(notification.id, 'quiet_hours');
       return { successCount: 0, failureCount: 0, status: 'quiet_hours' };
     }
 
     const tokens = tokenResult.rows.map((row: any) => String(row.token));
     if (tokens.length === 0) {
-      await setNotificationPushStatus(notification.id, 'no_devices');
+      await setStatus(notification.id, 'no_devices');
       return { successCount: 0, failureCount: 0, status: 'no_devices' };
     }
 
@@ -391,6 +409,7 @@ export const pushNotificationService = {
             body: notification.description || notification.title,
           },
           data: {
+            ...(notification.data || {}),
             notification_id: notification.id,
             type: notification.type,
             category: notification.category,
@@ -399,11 +418,11 @@ export const pushNotificationService = {
           android: {
             priority: notification.priority === 'normal' ? 'normal' : 'high',
             ttl: 24 * 60 * 60 * 1000,
-            collapseKey: `${notification.type}:${notification.userId}`,
+            collapseKey: notification.tag || `${notification.type}:${notification.userId}`,
             notification: {
               channelId: channelFor(notification.category),
               sound: 'default',
-              tag: notification.type,
+              tag: notification.tag || notification.type,
               visibility: 'private',
               defaultVibrateTimings: true,
               priority: notification.priority === 'normal' ? 'default' : 'high',
@@ -417,12 +436,12 @@ export const pushNotificationService = {
         if (response.failureCount > 0) await recordTokenFailures(chunk, response);
       }
     } catch (error) {
-      await setNotificationPushStatus(notification.id, 'failed', successCount, Math.max(failureCount, tokens.length - successCount));
+      await setStatus(notification.id, 'failed', successCount, Math.max(failureCount, tokens.length - successCount));
       throw error;
     }
 
     const status = successCount > 0 ? 'sent' : 'failed';
-    await setNotificationPushStatus(notification.id, status, successCount, failureCount);
+    await setStatus(notification.id, status, successCount, failureCount);
     return { successCount, failureCount, status };
   },
 };

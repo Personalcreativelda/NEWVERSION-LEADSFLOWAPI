@@ -152,6 +152,10 @@ export class WebSocketService {
         conversation?: any;
     }) {
         console.log(`[WebSocket] Emitindo nova mensagem para usuário ${userId}`);
+        // Push no telemóvel quando um cliente escreve (só mensagens recebidas, fora de grupos)
+        void import('./message-push.service')
+            .then(({ notifyInboundMessage }) => notifyInboundMessage(userId, data))
+            .catch((err) => console.warn('[Push] Mensagem recebida sem push:', err?.message || err));
         this.io.to(`user:${userId}`).emit('new_message', {
             // URLs de ficheiros pela API, sem o endereço do armazenamento
             ...rewriteStorageUrls(data),

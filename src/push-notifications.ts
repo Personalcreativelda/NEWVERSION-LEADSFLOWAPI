@@ -65,6 +65,8 @@ function openPushRoute(data: Record<string, unknown> = {}) {
 
 function showForegroundNotification(notification: PushNotificationSchema) {
   const data = (notification.data || {}) as Record<string, unknown>;
+  // Mensagem de cliente com a inbox aberta: já aparece na lista, sem aviso por cima
+  if (data.category === 'messages' && window.location.pathname.startsWith('/dashboard/inbox')) return;
   const title = notification.title || 'Nova notificação';
   toast(title, {
     description: notification.body,
@@ -130,8 +132,11 @@ async function registerTokenWithBackend(token: string) {
   });
 }
 
+// APK anterior ao 1.4 (sem o plugin nativo) com este código por atualização ao vivo: não há push
+const pushAvailable = () => Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('PushNotifications');
+
 export async function initPushNotifications(): Promise<void> {
-  if (!Capacitor.isNativePlatform() || initialized) return;
+  if (!pushAvailable() || initialized) return;
   initialized = true;
 
   await createAndroidChannels().catch((error) =>
@@ -154,7 +159,7 @@ export async function initPushNotifications(): Promise<void> {
 }
 
 export function syncPushRegistration(userId: string): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return Promise.resolve();
+  if (!pushAvailable()) return Promise.resolve();
   activeUserId = userId;
   if (registrationPromise) return registrationPromise;
 
@@ -174,7 +179,7 @@ export function syncPushRegistration(userId: string): Promise<void> {
 }
 
 export async function unregisterCurrentPushDevice(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!pushAvailable()) return;
   const deviceId = getDeviceId();
   const token = localStorage.getItem(FCM_TOKEN_KEY);
   try {
@@ -196,7 +201,7 @@ export function consumePendingPushNavigation(): void {
 }
 
 export async function getPushPermissionState(): Promise<PermissionState | 'web'> {
-  if (!Capacitor.isNativePlatform()) return 'web';
+  if (!pushAvailable()) return 'web';
   const status = await PushNotifications.checkPermissions();
   setPermissionState(status.receive);
   return status.receive;

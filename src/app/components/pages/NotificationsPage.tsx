@@ -70,6 +70,24 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  // Envia um push só para os aparelhos desta conta e diz o que aconteceu
+  const sendTest = async () => {
+    setTesting(true);
+    try {
+      const r = await apiRequest('/notifications/test', 'POST');
+      if (r?.status === 'sent') toast.success('Teste enviado: deve chegar ao telemóvel em segundos');
+      else if (r?.status === 'no_devices') toast.error('Nenhum telemóvel registado. Abra o app Android e permita as notificações.');
+      else if (r?.status === 'disabled') toast.error('Os avisos de Sistema estão desligados.');
+      else if (r?.status === 'not_configured') toast.error('O envio de notificações não está disponível de momento.');
+      else toast.error('O envio falhou. Tente de novo.');
+    } catch (err: any) {
+      toast.error(err?.message || 'O envio falhou. Tente de novo.');
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const loadHistory = useCallback(async (offset = 0) => {
     const data = await apiRequest(`/notifications?limit=${PAGE_SIZE}&offset=${offset}`, 'GET');
@@ -196,6 +214,11 @@ export default function NotificationsPage() {
               onChange={(value) => toggle('pushEnabled', value)}
               disabled={saving}
             />
+            <SettingsItem label="Notificação de teste">
+              <Button variant="outline" size="sm" onClick={sendTest} disabled={testing || !preferences.pushEnabled}>
+                {testing ? 'A enviar…' : 'Enviar teste'}
+              </Button>
+            </SettingsItem>
             <SettingsToggle
               label="Horário silencioso"
               hint={preferences.quietHoursEnabled ? `${preferences.quietHoursStart}–${preferences.quietHoursEnd}` : undefined}

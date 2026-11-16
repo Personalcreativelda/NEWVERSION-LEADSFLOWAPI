@@ -143,6 +143,35 @@ router.put('/preferences', requireAuth, async (req: AuthenticatedRequest, res, n
 });
 
 // Envio administrativo individual ou em lote. Tokens de API pública nunca chegam aqui.
+// Notificação de teste para os aparelhos da própria conta (Definições → Notificações).
+// Qualquer utilizador; no máximo uma a cada 20 s. Ignora as horas de silêncio.
+const lastTestAt = new Map<string, number>();
+router.post('/test', requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.user?.id) return res.status(401).json({ error: 'Não autenticado' });
+    const now = Date.now();
+    const last = lastTestAt.get(req.user.id) || 0;
+    if (now - last < 20_000) {
+      res.setHeader('Retry-After', String(Math.ceil((20_000 - (now - last)) / 1000)));
+      return res.status(429).json({ error: 'Aguarde uns segundos antes de testar de novo' });
+    }
+    lastTestAt.set(req.user.id, now);
+    const result = await pushNotificationService.sendDirect({
+      userId: req.user.id,
+      type: 'push_test',
+      title: 'Notificações ativas',
+      description: 'Este telemóvel vai receber os avisos do LeadsFlow.',
+      category: 'system',
+      priority: 'urgent',
+      actionUrl: '/dashboard/notifications',
+      tag: 'push_test',
+    });
+    return res.json({ success: result.status === 'sent', ...result });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/send', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
   try {
     const body = req.body || {};
