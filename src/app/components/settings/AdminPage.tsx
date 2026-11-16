@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import {
   Star, AlertTriangle, Loader2, MessageSquare, Search,
   Activity, Megaphone, Settings, Users, UserPlus, RefreshCw,
+  CreditCard,
 } from 'lucide-react';
 import { PageHeader, PageAction } from '../base/PageHeader';
 
@@ -14,6 +15,7 @@ import { AdminActivityTab } from './admin/AdminActivityTab';
 import { AdminMarketingTab } from './admin/AdminMarketingTab';
 import { AdminDashboardTab } from './admin/AdminDashboardTab';
 import { AdminDiagnosticsTab } from './admin/AdminDiagnosticsTab';
+import { AdminPaymentsTab } from './admin/AdminPaymentsTab';
 
 import { UserDetailsModal } from './admin/UserDetailsModal';
 import { ActivatePlanModal, AddUserModal } from './admin/AdminModals';
@@ -63,7 +65,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
   const [plansPricing, setPlansPricing] = useState<PlanPricing[]>([]);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [filterPlan, setFilterPlan] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'activity' | 'marketing' | 'settings' | 'feedback' | 'diagnostics'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'activity' | 'marketing' | 'payments' | 'settings' | 'feedback' | 'diagnostics'>('dashboard');
   const [feedbackList, setFeedbackList] = useState<any[]>([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [activities, setActivities] = useState<any[]>([]);
@@ -533,6 +535,13 @@ export default function AdminPage(_props: AdminPageProps = {}) {
         <div>
           <PageHeader title="Definições" icon={Settings} />
           <AdminNotificationsTab />
+        </div>
+      )}
+
+      {activeTab === 'payments' && (
+        <div>
+          <PageHeader title="Pagamentos" icon={CreditCard} />
+          <AdminPaymentsTab />
         </div>
       )}
 

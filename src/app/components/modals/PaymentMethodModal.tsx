@@ -1,8 +1,24 @@
-import { useState } from 'react';
-import { plansApi } from '../../utils/api';
+import { useEffect, useState } from 'react';
+import { apiRequest, plansApi } from '../../utils/api';
 import { toast } from 'sonner';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import { AppModal } from '../base/AppModal';
+import { Button } from '../ui/button';
+import { formatMoney } from '../../utils/format';
+import { MobileMoneyLogo } from '../payments/MobileMoneyLogo';
+import {
+  MOBILE_PAY_FORM_ID,
+  MobileMoneyCheckout,
+  MobilePaymentStatus,
+  type MobileMethodPublic,
+  type MobilePaymentRecord,
+} from '../payments/MobileMoneyCheckout';
+
+interface MobileConfig {
+  methods: MobileMethodPublic[];
+  prices: Record<string, { monthly: number | null; annual: number | null }>;
+  latest: MobilePaymentRecord | null;
+}
 
 // PayPal Payment Links - Direct checkout links
 const PAYPAL_PAYMENT_LINKS: Record<string, string> = {
@@ -25,10 +41,39 @@ export default function PaymentMethodModal({
   onClose,
   planId,
   billingPeriod: initialBillingPeriod,
+  onPaymentSuccess,
 }: PaymentMethodModalProps) {
   const [loading, setLoading] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'paypal' | null>(null);
   const billingPeriod = initialBillingPeriod;
+
+  // M-Pesa / e-Mola (configurados em Admin → Pagamentos)
+  const [mobile, setMobile] = useState<MobileConfig | null>(null);
+  const [mobileMethod, setMobileMethod] = useState<MobileMethodPublic | null>(null);
+  const [mobileSending, setMobileSending] = useState(false);
+  const [mobileValid, setMobileValid] = useState(false);
+  const [sentPayment, setSentPayment] = useState<MobilePaymentRecord | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setMobileMethod(null);
+      setSentPayment(null);
+      setMobileValid(false);
+      return;
+    }
+    apiRequest('/payments/mobile/config', 'GET')
+      .then((res) => setMobile(res?.success ? { methods: res.methods || [], prices: res.prices || {}, latest: res.latest || null } : null))
+      .catch(() => setMobile(null));
+  }, [isOpen]);
+
+  const mobileAmount = planId ? mobile?.prices?.[planId]?.[billingPeriod] ?? null : null;
+  const mobileMethods = mobileAmount ? mobile?.methods || [] : [];
+  // Pagamento já enviado para este plano e ainda à espera de confirmação
+  const pendingMobile =
+    sentPayment ||
+    (mobile?.latest?.status === 'pending' && mobile.latest.plan_id === planId ? mobile.latest : null);
+  const rejectedReason =
+    mobile?.latest?.status === 'rejected' && mobile.latest.plan_id === planId ? mobile.latest.rejected_reason : null;
 
   const handleStripePayment = async () => {
     if (!planId) return;
@@ -116,6 +161,54 @@ export default function PaymentMethodModal({
       ) },
   ];
 
+  // ── Passo M-Pesa / e-Mola ──────────────────────────────────────────────────
+  if (isOpen && mobileMethod && mobileAmount) {
+    const done = sentPayment;
+    return (
+      <AppModal
+        open={isOpen}
+        onOpenChange={(open) => { if (!open && !mobileSending) onClose(); }}
+        size="sm"
+        logo={<MobileMoneyLogo method={mobileMethod.id} logoUrl={mobileMethod.logoUrl} />}
+        title={`Pagar com ${mobileMethod.label}`}
+        description={billingPeriod === 'monthly' ? 'Plano mensal' : 'Plano anual'}
+        footer={done ? (
+          <Button onClick={onClose}>Fechar</Button>
+        ) : (
+          <>
+            <Button variant="outline" onClick={() => setMobileMethod(null)} disabled={mobileSending}>Voltar</Button>
+            <Button type="submit" form={MOBILE_PAY_FORM_ID} disabled={mobileSending || !mobileValid}>
+              {mobileSending ? 'A enviar…' : 'Enviar código'}
+            </Button>
+          </>
+        )}
+      >
+        {done ? (
+          <MobilePaymentStatus payment={done} />
+        ) : (
+          <MobileMoneyCheckout
+            method={mobileMethod}
+            planId={planId!}
+            billingCycle={billingPeriod}
+            amount={mobileAmount}
+            rejectedReason={rejectedReason}
+            onSendingChange={setMobileSending}
+            onValidChange={setMobileValid}
+            onSubmitted={(payment, paid) => {
+              setSentPayment(payment);
+              if (paid) {
+                toast.success('Pagamento confirmado. O plano já está ativo.');
+                // Recarrega para o painel mostrar o plano novo e os limites
+                if (onPaymentSuccess) onPaymentSuccess();
+                else setTimeout(() => window.location.reload(), 1500);
+              }
+            }}
+          />
+        )}
+      </AppModal>
+    );
+  }
+
   return (
     <AppModal
       open={isOpen}
@@ -124,7 +217,28 @@ export default function PaymentMethodModal({
       title="Pagamento"
       description={billingPeriod === 'monthly' ? 'Plano mensal' : 'Plano anual · −20%'}
     >
+      {pendingMobile && (
+        <div className="mb-4">
+          <MobilePaymentStatus payment={pendingMobile} />
+        </div>
+      )}
       <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+        {mobileMethods.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => { setMobileMethod(m); setMobileValid(false); }}
+            disabled={loading}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 active:bg-muted disabled:opacity-60"
+          >
+            <MobileMoneyLogo method={m.id} logoUrl={m.logoUrl} className="mx-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-foreground" translate="no">{m.label}</p>
+              <p className="text-sm text-muted-foreground truncate">{formatMoney(mobileAmount, 'MZN')}</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </button>
+        ))}
         {methods.map((method) => (
           <button
             key={method.id}

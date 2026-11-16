@@ -51,6 +51,7 @@ if (allowedOrigins.length === 0) {
 const noOriginRequiredPaths = [
   '/api/webhooks/',
   '/api/plans/stripe/webhook',
+  '/api/payments/mobile/sms/', // app de reencaminhamento de SMS do comerciante (M-Pesa / e-Mola)
   '/api/whatsapp/config',
   '/api/whatsapp/validate-numbers',
   '/api/whatsapp/validate-leads',

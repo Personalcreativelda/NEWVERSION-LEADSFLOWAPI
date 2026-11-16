@@ -50,6 +50,7 @@ import diagnosticsRoutes from './diagnostics.routes';
 // Plan enforcement middleware (blocks writes when plan is expired or lead limit reached)
 import { requireAuth } from '../middleware/auth.middleware';
 import { planEnforcement } from '../middleware/plan-enforcement.middleware';
+import mobilePaymentsRoutes from './mobile-payments.routes';
 
 const router = Router();
 
@@ -60,6 +61,7 @@ const withPlan = [requireAuth, planEnforcement];
 // ── Public / exempt routes (no plan enforcement) ────────────────────────────
 router.use('/auth', authRoutes);
 router.use('/plans', plansRoutes);        // must stay accessible so users can upgrade
+router.use('/payments/mobile', mobilePaymentsRoutes); // M-Pesa / e-Mola nos planos (auth dentro das rotas; /sms/:segredo sem sessão)
 router.use('/webhooks', webhooksRoutes);  // external Stripe / provider webhooks
 router.use('/version', versionRoutes);
 router.use('/files', filesRoutes);          // ficheiros guardados (sem expor o MinIO)

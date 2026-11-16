@@ -493,6 +493,10 @@ export const apiRequest = async (
   return apiCall(endpoint, options, needsAuth);
 };
 
+/** Envia ficheiros (multipart) a uma rota autenticada. */
+export const apiUpload = (endpoint: string, formData: FormData): Promise<any> =>
+  apiCall(endpoint, { method: 'POST', body: formData }, true);
+
 // ============================================
 // AUTH API
 // ============================================

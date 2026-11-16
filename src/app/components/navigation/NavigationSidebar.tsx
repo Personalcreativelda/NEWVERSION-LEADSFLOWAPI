@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   X, Zap, UserCog, LogOut, ChevronRight, Search, PanelLeft, HelpCircle, LifeBuoy
 } from 'lucide-react';
-import { LayoutDashboard, Users, BarChart3, Megaphone, Settings, MessageSquare, Star, Activity } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, Megaphone, Settings, MessageSquare, Star, Activity, CreditCard } from 'lucide-react';
 import { Language, translations, Translations } from '../../utils/i18n';
 import { sidebarConfig, SidebarItemConfig } from '../../config/sidebarConfig';
 import SidebarGroup from './SidebarGroup';
@@ -93,6 +93,7 @@ export default function NavigationSidebar({
     { id: 'users', label: 'Usu\u00e1rios', icon: Users },
     { id: 'activity', label: 'Atividade', icon: BarChart3 },
     { id: 'marketing', label: 'Marketing', icon: Megaphone },
+    { id: 'payments', label: 'Pagamentos', icon: CreditCard },
     { id: 'feedback', label: 'Opiniões', icon: MessageSquare },
     { id: 'diagnostics', label: 'Diagn\u00f3sticos', icon: Activity },
     { id: 'settings', label: 'Configura\u00e7\u00f5es', icon: Settings },
