@@ -2696,6 +2696,9 @@ export class AssistantProcessorService {
             );
 
             console.log(`[FunnelAI] ✅ Lead "${lead_name}" movido: ${safeStatus} → ${detectedStatus}`);
+            // Push no telemóvel: o utilizador não viu o assistente mover o lead
+            void import('./notifications.service').then(({ notificationsService }) =>
+                notificationsService.notifyLeadStageChange(ctx.userId, { id: lead_id, name: lead_name }, safeStatus, detectedStatus, 'ai'));
 
             // 6. Emitir WebSocket para atualização em tempo real no dashboard
             try {

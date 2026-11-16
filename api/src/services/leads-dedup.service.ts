@@ -224,5 +224,21 @@ export async function findOrCreateLead(input: LeadLookupInput): Promise<LeadRow>
   );
 
   console.log(`[LeadsDedup] ✨ Novo lead criado: ${result.rows[0].id} (${leadName}) — canal ${source}`);
+
+  // Lead que chegou sozinho: aviso no histórico. Push só quando não veio de uma mensagem
+  // (site, formulário…): nas mensagens o push da própria mensagem já avisa.
+  const fromMessage = ['whatsapp', 'whatsapp_cloud', 'instagram', 'facebook', 'messenger', 'telegram', 'email', 'sms']
+    .includes(String(source || '').toLowerCase());
+  void import('./notifications.service').then(({ notificationsService }) =>
+    notificationsService.createNotification(
+      userId,
+      'lead_created',
+      'Novo lead',
+      `${leadName} chegou${source ? ` por ${source}` : ''}`,
+      'user-plus',
+      { leadId: result.rows[0].id, leadName, source: source || null },
+      { actionUrl: '/dashboard/leads', category: 'leads', sendPush: !fromMessage },
+    )).catch((err) => console.warn('[LeadsDedup] Aviso de lead novo falhou:', err?.message || err));
+
   return result.rows[0];
 }

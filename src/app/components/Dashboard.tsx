@@ -2022,7 +2022,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
               />
             )}
 
-            {currentPage === 'notifications' && <NotificationsPage />}
+            {currentPage === 'notifications' && <NotificationsPage isAdmin={(user as any)?.isAdmin === true || (user as any)?.role === 'admin' || user?.email === 'admin@leadflow.com'} />}
 
             {currentPage === 'admin' && (
               <AdminPage />

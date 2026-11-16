@@ -858,8 +858,12 @@ export class FlowExecutionService {
   }
 
   private async moveStage(lead: FlowLead, stage: string) {
+    const previous = lead.status;
     await dbQuery('UPDATE leads SET status = $1 WHERE id = $2 AND user_id = $3', [stage, lead.id, lead.user_id]);
     lead.status = stage;
+    if (String(previous || '').toLowerCase() !== stage.toLowerCase()) {
+      void notificationsService.notifyLeadStageChange(lead.user_id, lead, previous, stage, 'flow');
+    }
     // O funil atualiza em direto
     try {
       getWebSocketService()?.emitLeadFunnelUpdate(lead.user_id, { leadId: lead.id, leadName: lead.name, newStatus: stage });

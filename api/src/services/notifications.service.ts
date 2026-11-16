@@ -89,7 +89,49 @@ async function dispatchPush(notification: Notification) {
   });
 }
 
+// Nomes das etapas do funil por omissão (as personalizadas já chegam com o nome)
+const STAGE_LABELS: Record<string, string> = {
+  novo: 'Novos', contatado: 'Contactados', contactado: 'Contactados', qualificado: 'Qualificados',
+  negociacao: 'Negociação', em_negociacao: 'Negociação', convertido: 'Convertidos', perdido: 'Perdidos',
+};
+const stageLabel = (status: string) =>
+  STAGE_LABELS[String(status).toLowerCase()] || String(status).replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+export type StageChangeSource = 'manual' | 'ai' | 'flow';
+
 export const notificationsService = {
+  /**
+   * Lead mudou de etapa no funil. Movido pelo assistente de IA ou por um fluxo: push no
+   * telemóvel (o utilizador não viu acontecer). Movido à mão: só fica no histórico (quem
+   * moveu já sabe; o telemóvel não toca a cada lead arrastado).
+   */
+  async notifyLeadStageChange(
+    userId: string,
+    lead: { id: string; name?: string | null; email?: string | null },
+    fromStatus: string | null | undefined,
+    toStatus: string,
+    source: StageChangeSource,
+  ) {
+    const leadName = lead.name || lead.email || 'Lead sem nome';
+    const to = stageLabel(toStatus);
+    const won = ['convertido', 'ganho', 'fechado'].includes(String(toStatus).toLowerCase());
+    const by = source === 'ai' ? 'O assistente de IA moveu' : source === 'flow' ? 'Um fluxo moveu' : 'Moveu';
+    return this.createNotification(
+      userId,
+      'lead_status_changed',
+      won ? `Negócio fechado: ${leadName}` : `${leadName} → ${to}`,
+      `${by} ${leadName} para ${to}`,
+      'arrow-right',
+      { leadId: lead.id, leadName, oldStatus: fromStatus || null, newStatus: toStatus, source },
+      {
+        actionUrl: '/dashboard/funnel',
+        category: 'leads',
+        priority: won ? 'high' : 'normal',
+        sendPush: source !== 'manual',
+      },
+    ).catch((err) => console.warn('[Notifications] Aviso de etapa falhou:', err?.message || err));
+  },
+
   async getNotifications(userId: string, limit = 20, offset = 0): Promise<Notification[]> {
     const result = await query(
       `SELECT ${NOTIFICATION_COLUMNS}

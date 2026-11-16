@@ -448,7 +448,9 @@ router.post('/', async (req, res, next) => {
       'Novo Lead',
       `${leadName} foi adicionado(a) como novo lead`,
       'user-plus',
-      { leadId: lead.id, leadName, email: lead.email }
+      { leadId: lead.id, leadName, email: lead.email },
+      // Criado à mão: fica no histórico, sem push (quem o criou já sabe)
+      { actionUrl: '/dashboard/leads', category: 'leads', sendPush: false },
     );
     
     // 📝 Log activity for admin monitoring
@@ -499,15 +501,7 @@ router.put('/:id', async (req, res, next) => {
     // Create notification if status changed
     if (req.body.status && oldLead.status !== req.body.status) {
       const leadName = lead.name || lead.email || 'Sem nome';
-      const newStatusLabel = req.body.status.charAt(0).toUpperCase() + req.body.status.slice(1);
-      await notificationsService.createNotification(
-        user.id,
-        'lead_status_changed',
-        'Lead Movido',
-        `${leadName} foi movido(a) para ${newStatusLabel}`,
-        'arrow-right',
-        { leadId: lead.id, leadName, email: lead.email, oldStatus: oldLead.status, newStatus: req.body.status }
-      );
+      await notificationsService.notifyLeadStageChange(user.id, lead, oldLead.status, req.body.status, 'manual');
 
       // 📊 Registrar mudança de status no tracking
       try {

@@ -61,7 +61,7 @@ function permissionLabel(permission: string): string {
   return 'Por confirmar';
 }
 
-export default function NotificationsPage() {
+export default function NotificationsPage({ isAdmin = false }: { isAdmin?: boolean }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [permission, setPermission] = useState('prompt');
@@ -70,17 +70,40 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Administração: enviar uma notificação de teste para a conta escolhida
+  const [testUsers, setTestUsers] = useState<{ id: string; label: string }[] | null>(null);
+  const [testUserId, setTestUserId] = useState('');
   const [testing, setTesting] = useState(false);
+  useEffect(() => {
+    if (!isAdmin) return;
+    apiRequest('/admin/users', 'GET')
+      .then((r: any) => {
+        const list: any[] = r?.users || r?.data || (Array.isArray(r) ? r : []);
+        setTestUsers(list
+          .map((u) => ({ id: String(u.id), label: [u.name, u.email].filter(Boolean).join(' · ') || String(u.id) }))
+          .sort((a, b) => a.label.localeCompare(b.label)));
+      })
+      .catch(() => setTestUsers([]));
+  }, [isAdmin]);
 
-  // Envia um push só para os aparelhos desta conta e diz o que aconteceu
   const sendTest = async () => {
+    if (!testUserId) return;
     setTesting(true);
     try {
-      const r = await apiRequest('/notifications/test', 'POST');
-      if (r?.status === 'sent') toast.success('Teste enviado: deve chegar ao telemóvel em segundos');
-      else if (r?.status === 'no_devices') toast.error('Nenhum telemóvel registado. Abra o app Android e permita as notificações.');
-      else if (r?.status === 'disabled') toast.error('Os avisos de Sistema estão desligados.');
-      else if (r?.status === 'not_configured') toast.error('O envio de notificações não está disponível de momento.');
+      const r = await apiRequest('/notifications/send', 'POST', {
+        userId: testUserId,
+        type: 'push_test',
+        title: 'Teste de notificação',
+        description: 'Notificação de teste enviada pela administração do LeadsFlow.',
+        category: 'system',
+        priority: 'urgent',
+        actionUrl: '/dashboard/notifications',
+      });
+      const push = r?.results?.[0]?.push || r?.results?.[0]?.delivery || {};
+      if (push.status === 'sent') toast.success(`Teste enviado para ${push.successCount} telemóvel(is)`);
+      else if (push.status === 'no_devices') toast.error('Esta conta não tem nenhum telemóvel registado.');
+      else if (push.status === 'disabled') toast.error('Esta conta desligou os avisos de Sistema.');
+      else if (push.status === 'not_configured') toast.error('O envio de notificações não está disponível de momento.');
       else toast.error('O envio falhou. Tente de novo.');
     } catch (err: any) {
       toast.error(err?.message || 'O envio falhou. Tente de novo.');
@@ -214,11 +237,6 @@ export default function NotificationsPage() {
               onChange={(value) => toggle('pushEnabled', value)}
               disabled={saving}
             />
-            <SettingsItem label="Notificação de teste">
-              <Button variant="outline" size="sm" onClick={sendTest} disabled={testing || !preferences.pushEnabled}>
-                {testing ? 'A enviar…' : 'Enviar teste'}
-              </Button>
-            </SettingsItem>
             <SettingsToggle
               label="Horário silencioso"
               hint={preferences.quietHoursEnabled ? `${preferences.quietHoursStart}–${preferences.quietHoursEnd}` : undefined}
@@ -259,6 +277,28 @@ export default function NotificationsPage() {
             <SettingsToggle label="Tarefas" checked={preferences.tasksEnabled} onChange={(value) => toggle('tasksEnabled', value)} disabled={saving || !preferences.pushEnabled} />
             <SettingsToggle label="Sistema" checked={preferences.systemEnabled} onChange={(value) => toggle('systemEnabled', value)} disabled={saving || !preferences.pushEnabled} />
           </SettingsGroup>
+
+          {isAdmin && (
+            <SettingsGroup title="Teste (administração)">
+              <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row">
+                <select
+                  aria-label="Conta a testar"
+                  value={testUserId}
+                  onChange={(event) => setTestUserId(event.target.value)}
+                  disabled={!testUsers || testing}
+                  className="min-w-0 flex-1"
+                >
+                  <option value="">{testUsers ? 'Escolha a conta…' : 'A carregar…'}</option>
+                  {(testUsers || []).map((u) => (
+                    <option key={u.id} value={u.id}>{u.label}</option>
+                  ))}
+                </select>
+                <Button onClick={sendTest} disabled={!testUserId || testing}>
+                  {testing ? 'A enviar…' : 'Enviar teste'}
+                </Button>
+              </div>
+            </SettingsGroup>
+          )}
         </div>
       )}
 
