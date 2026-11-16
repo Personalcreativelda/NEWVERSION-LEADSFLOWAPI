@@ -1,4 +1,5 @@
 import { App } from '@capacitor/app';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { getApiBaseUrl } from './app/utils/api-client';
 
@@ -104,14 +105,12 @@ type AppUpdaterPlugin = {
   addListener(event: 'progress', cb: (data: { percent: number }) => void): Promise<{ remove: () => Promise<void> }>;
 };
 
-let appUpdater: AppUpdaterPlugin | null = null;
-async function getAppUpdater(): Promise<AppUpdaterPlugin | null> {
-  const { Capacitor, registerPlugin } = await import('@capacitor/core');
-  // APKs anteriores ao 1.5 não têm o plugin: a atualização do APK é feita à mão
-  if (!Capacitor.isPluginAvailable('AppUpdater')) return null;
-  appUpdater = appUpdater ?? registerPlugin<AppUpdaterPlugin>('AppUpdater');
-  return appUpdater;
-}
+// O plugin é usado diretamente, nunca devolvido por uma função async nem passado a um
+// await: o proxy do Capacitor responde a qualquer propriedade, incluindo "then", e o await
+// tratava-o como promessa e ficava à espera para sempre ("A verificar atualizações…").
+const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater');
+/** APKs anteriores ao 1.5 não têm o plugin: a atualização do APK é feita pelo browser */
+const hasAppUpdater = () => Capacitor.isPluginAvailable('AppUpdater');
 
 export interface AppUpdateStatus {
   /** Versão em uso (pacote ao vivo ou APK) */
@@ -157,12 +156,12 @@ export async function getAppUpdateStatus(): Promise<AppUpdateStatus> {
   // Sem perguntar ao plugin de atualizações ao vivo: logo a seguir a instalar um APK novo
   // ele está ocupado a descarregar o pacote e não responde (o ecrã ficava em "A carregar…")
   const status: AppUpdateStatus = {
-    current: null,
+    current: await withTimeout(getInstalledVersion(), 2500).catch(() => null),
     nativeVersion,
     nativeBuild,
     web: null,
     apk: null,
-    canSelfUpdateApk: !!(await getAppUpdater()),
+    canSelfUpdateApk: hasAppUpdater(),
   };
   if (!apiBase) return status;
 
@@ -217,16 +216,15 @@ export async function installApkUpdate(
   apk: NonNullable<AppUpdateStatus['apk']>,
   onProgress?: (percent: number) => void,
 ): Promise<'started' | 'needs-permission' | 'unsupported'> {
-  const updater = await getAppUpdater();
-  if (!updater) return 'unsupported';
-  const { allowed } = await updater.canInstall();
+  if (!hasAppUpdater()) return 'unsupported';
+  const { allowed } = await AppUpdater.canInstall();
   if (!allowed) {
-    await updater.openInstallSettings();
+    await AppUpdater.openInstallSettings();
     return 'needs-permission';
   }
-  const sub = onProgress ? await updater.addListener('progress', ({ percent }) => onProgress(percent)) : null;
+  const sub = onProgress ? await AppUpdater.addListener('progress', ({ percent }) => onProgress(percent)) : null;
   try {
-    await updater.downloadAndInstall({ url: apk.url, checksum: apk.checksum || undefined });
+    await AppUpdater.downloadAndInstall({ url: apk.url, checksum: apk.checksum || undefined });
     return 'started';
   } finally {
     await sub?.remove();
