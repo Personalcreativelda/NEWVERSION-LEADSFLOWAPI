@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import { AppModal } from '../base/AppModal';
 import { Button } from '../ui/button';
-import { formatMoney } from '../../utils/format';
 import { MobileMoneyLogo } from '../payments/MobileMoneyLogo';
 import {
   MOBILE_PAY_FORM_ID,
@@ -234,7 +233,7 @@ export default function PaymentMethodModal({
             <MobileMoneyLogo method={m.id} logoUrl={m.logoUrl} className="mx-0.5" />
             <div className="flex-1 min-w-0">
               <p className="font-medium text-foreground" translate="no">{m.label}</p>
-              <p className="text-sm text-muted-foreground truncate">{formatMoney(mobileAmount, 'MZN')}</p>
+              <p className="text-sm text-muted-foreground truncate">Carteira móvel</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
