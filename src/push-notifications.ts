@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, type PermissionStatus, type PushNotificationSchema } from '@capacitor/push-notifications';
+import { Haptics } from '@capacitor/haptics';
 import { toast } from 'sonner';
 import { getInstalledVersion } from './live-update';
 
@@ -63,11 +64,46 @@ function openPushRoute(data: Record<string, unknown> = {}) {
   if (localStorage.getItem('leadflow_access_token')) consumePendingPushNavigation();
 }
 
+// Com o app aberto o Android entrega a notificação ao app (não à barra do sistema):
+// sem isto o aviso aparecia mudo. Vibração + som curto, como o WhatsApp faz em primeiro plano.
+let audioCtx: AudioContext | null = null;
+function playChime() {
+  try {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx = audioCtx ?? new Ctx();
+    const ctx = audioCtx;
+    void ctx.resume?.();
+    const now = ctx.currentTime;
+    [880, 1318.5].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const start = now + i * 0.12;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.3);
+    });
+  } catch {
+    // sem som: fica a vibração
+  }
+}
+
+function signalForeground() {
+  Haptics.vibrate({ duration: 220 }).catch(() => {});
+  playChime();
+}
+
 function showForegroundNotification(notification: PushNotificationSchema) {
   const data = (notification.data || {}) as Record<string, unknown>;
   // Mensagem de cliente com a inbox aberta: já aparece na lista, sem aviso por cima
   if (data.category === 'messages' && window.location.pathname.startsWith('/dashboard/inbox')) return;
   const title = notification.title || 'Nova notificação';
+  signalForeground();
   toast(title, {
     description: notification.body,
     duration: 6000,
