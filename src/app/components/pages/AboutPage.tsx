@@ -45,13 +45,22 @@ export default function AboutPage() {
   const [apkPercent, setApkPercent] = useState<number | null>(null);
 
   // Estado e novidades carregam em separado e com tempo máximo: o ecrã nunca fica preso
-  const check = useCallback(async () => {
+  // manual = toque em "Verificar": diz sempre o resultado (como nos outros apps)
+  const check = useCallback(async (manual = false) => {
     setChecking(true);
     const loadChangelog = withTimeout(getChangelog(), 10000)
       .then(setChangelog)
       .catch(() => setChangelog((prev) => prev ?? []));
     const loadStatus = native
-      ? withTimeout(getAppUpdateStatus(), 15000).then(setStatus).catch(() => {
+      ? withTimeout(getAppUpdateStatus(), 15000).then((next) => {
+          setStatus(next);
+          if (!manual) return;
+          if (next.web || next.apk) toast.success('Atualização disponível');
+          else {
+            const v = next.current || next.nativeVersion;
+            toast.success(v ? `Tem a versão mais recente (${v})` : 'Tem a versão mais recente');
+          }
+        }).catch(() => {
           setStatus((prev) => prev ?? EMPTY_STATUS);
           toast.error('Não foi possível verificar as atualizações');
         })
@@ -106,7 +115,7 @@ export default function AboutPage() {
 
             {upToDate && (
               <SettingsItem label="O app está atualizado" hint={version ? `Versão ${version}` : undefined}>
-                <Button variant="outline" size="sm" onClick={() => void check()} disabled={checking}>
+                <Button variant="outline" size="sm" onClick={() => void check(true)} disabled={checking}>
                   {checking ? 'A verificar…' : 'Verificar'}
                 </Button>
               </SettingsItem>

@@ -4057,6 +4057,8 @@
  "Telegram: reativar contactos": "Telegram: reactivate contacts",
  "Tem": "You have",
  "Tem a tag": "Has the tag",
+ "Tem a versão mais recente": "You have the latest version",
+ "Tem a versão mais recente ({0})": "You have the latest version ({0})",
  "Tem certeza que deseja apagar {0} conversa(s) selecionada(s)? Esta ação não pode ser desfeita.": "Are you sure you want to delete {0} selected conversation(s)? This action cannot be undone.",
  "Tem certeza que deseja apagar {0} lead(s) selecionado(s)?": "Are you sure you want to delete {0} selected lead(s)?",
  "Tem certeza que deseja apagar esta conversa? Todas as mensagens serão removidas.": "Are you sure you want to delete this conversation? All messages will be removed.",
