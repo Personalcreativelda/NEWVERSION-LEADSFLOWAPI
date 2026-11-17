@@ -24,6 +24,26 @@ export function logoSrc(url?: string | null): string | null {
   return url;
 }
 
+// Imagens já descarregadas e descodificadas (guardadas aqui para o browser não as largar)
+const preloaded = new Map<string, HTMLImageElement>();
+
+/**
+ * Descarrega e prepara os logótipos antes de o modal abrir. Sem isto, as imagens só eram
+ * pedidas ao abrir e apareciam ~150 ms depois: caixas vazias durante a animação, e depois
+ * o logótipo "piscava" (sobretudo no app, que perde a cache ao reiniciar).
+ */
+export function preloadMobileLogos(urls: (string | null | undefined)[]) {
+  for (const url of urls) {
+    const src = logoSrc(url);
+    if (!src || preloaded.has(src)) continue;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+    img.decode?.().catch(() => {});
+    preloaded.set(src, img);
+  }
+}
+
 export function MobileMoneyLogo({ method, logoUrl, className }: { method: MobileMethod; logoUrl?: string | null; className?: string }) {
   const b = BRAND[method];
   const src = logoSrc(logoUrl);
@@ -32,7 +52,7 @@ export function MobileMoneyLogo({ method, logoUrl, className }: { method: Mobile
   if (src && failedSrc !== src) {
     return (
       <span className={cn('flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white', className)}>
-        <img src={src} alt="" className="h-full w-full object-contain" loading="lazy" onError={() => setFailedSrc(src)} />
+        <img src={src} alt="" className="h-full w-full object-contain" decoding="sync" onError={() => setFailedSrc(src)} />
       </span>
     );
   }

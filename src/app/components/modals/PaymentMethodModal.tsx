@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import { AppModal } from '../base/AppModal';
 import { Button } from '../ui/button';
-import { MobileMoneyLogo } from '../payments/MobileMoneyLogo';
+import { MobileMoneyLogo, preloadMobileLogos } from '../payments/MobileMoneyLogo';
 import {
   MOBILE_PAY_FORM_ID,
   MobileMoneyCheckout,
@@ -30,6 +30,8 @@ function loadMobileConfig(): Promise<MobileConfig | null> {
     mobileRequest = apiRequest('/payments/mobile/config', 'GET')
       .then((res) => {
         mobileCache = res?.success ? { methods: res.methods || [], prices: res.prices || {}, latest: res.latest || null } : null;
+        // Os logótipos ficam prontos antes de o modal abrir (senão apareciam a meio da animação)
+        if (mobileCache) preloadMobileLogos(mobileCache.methods.map((m) => m.logoUrl));
         return mobileCache;
       })
       .catch(() => mobileCache)
