@@ -857,6 +857,21 @@ export const plansApi = {
     return apiCall('/plans/payment-history', {}, true);
   },
 
+  getBillingStatus: async () => {
+    return apiCall('/plans/billing-status', {}, true);
+  },
+
+  getGooglePlayConfig: async () => {
+    return apiCall('/plans/google-play/config', {}, true);
+  },
+
+  verifyGooglePlayPurchase: async (purchaseToken: string, productId: string) => {
+    return apiCall('/plans/google-play/verify', {
+      method: 'POST',
+      body: JSON.stringify({ purchaseToken, productId }),
+    }, true);
+  },
+
   cancelPlan: async () => {
     return apiCall('/plans/cancel', { method: 'POST' }, true);
   },

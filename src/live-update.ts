@@ -102,6 +102,7 @@ export function initLiveUpdates() {
 // ── Sobre o app: verificar e aplicar atualizações à mão ───────────────────────
 
 type AppUpdaterPlugin = {
+  info(): Promise<{ selfUpdate: boolean; store?: 'direct' | 'play' }>;
   canInstall(): Promise<{ allowed: boolean }>;
   openInstallSettings(): Promise<void>;
   downloadAndInstall(options: { url: string; checksum?: string }): Promise<void>;
@@ -114,6 +115,26 @@ type AppUpdaterPlugin = {
 const AppUpdater = registerPlugin<AppUpdaterPlugin>('AppUpdater');
 /** APKs anteriores ao 1.5 não têm o plugin: a atualização do APK é feita pelo browser */
 const hasAppUpdater = () => Capacitor.isPluginAvailable('AppUpdater');
+
+export type AppDistribution = 'web' | 'direct' | 'play';
+let distributionPromise: Promise<AppDistribution> | null = null;
+
+/** Origem do binário: a build Play nunca pode mostrar checkouts externos. */
+export function getAppDistribution(): Promise<AppDistribution> {
+  // Pré-visualização visual local. É eliminada pela build de produção.
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('store') === 'play') {
+    return Promise.resolve('play');
+  }
+  if (!Capacitor.isNativePlatform()) return Promise.resolve('web');
+  if (!distributionPromise) {
+    distributionPromise = hasAppUpdater()
+      ? AppUpdater.info()
+          .then((info) => info.store || (info.selfUpdate ? 'direct' : 'play'))
+          .catch(() => 'direct')
+      : Promise.resolve('direct');
+  }
+  return distributionPromise;
+}
 
 export interface AppUpdateStatus {
   /** Versão em uso (pacote ao vivo ou APK) */
@@ -179,6 +200,14 @@ export async function getAppUpdateStatus(): Promise<AppUpdateStatus> {
       && release.version !== status.current) {
     const notes = changelog.find((c) => c.kind === 'app' && c.version === release.version)?.notes || null;
     status.web = { version: release.version, notes };
+  }
+  // Instalado pela Google Play: os APKs novos chegam pela loja (o app não os instala)
+  if (status.canSelfUpdateApk) {
+    const selfUpdate = await withTimeout(AppUpdater.info(), 2000)
+      .then((r) => r.selfUpdate)
+      .catch(() => true); // APK 1.5 (antes desta função): é a variante direta
+    if (!selfUpdate) status.canSelfUpdateApk = false;
+    if (!selfUpdate) return status;
   }
   if (apkRes?.available) {
     status.apk = {

@@ -27,6 +27,15 @@ import java.security.MessageDigest;
 @CapacitorPlugin(name = "AppUpdater")
 public class AppUpdaterPlugin extends Plugin {
 
+    /** Esta variante atualiza-se sozinha? (direct = sim; play = não, atualiza-se pela loja) */
+    @PluginMethod
+    public void info(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("selfUpdate", BuildConfig.SELF_UPDATE);
+        ret.put("store", BuildConfig.SELF_UPDATE ? "direct" : "play");
+        call.resolve(ret);
+    }
+
     /** Pode instalar APKs? (Android 8+: autorização "Instalar apps desconhecidas" para este app) */
     @PluginMethod
     public void canInstall(PluginCall call) {
@@ -52,6 +61,10 @@ public class AppUpdaterPlugin extends Plugin {
     public void downloadAndInstall(PluginCall call) {
         String url = call.getString("url");
         String checksum = call.getString("checksum");
+        if (!BuildConfig.SELF_UPDATE) {
+            call.reject("Este app atualiza-se pela Google Play", "STORE_MANAGED");
+            return;
+        }
         if (url == null || !url.startsWith("https://")) {
             call.reject("Endereço inválido");
             return;

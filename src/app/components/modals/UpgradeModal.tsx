@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import { Check, Loader2, Zap, Rocket, Crown } from 'lucide-react';
 import PaymentMethodModal from './PaymentMethodModal';
+import { getAppDistribution } from '../../../live-update';
+import { manageGooglePlaySubscriptions } from '../../lib/googlePlayBilling';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 
@@ -56,7 +58,7 @@ export default function UpgradeModal({
       return;
     }
 
-    // Para plano free, processar diretamente
+    // O plano gratuito só entra depois de cancelar a subscrição na respetiva loja.
     handleFreeUpgrade(planId);
   };
 
@@ -65,11 +67,20 @@ export default function UpgradeModal({
     setSelectedPlan(planId);
 
     try {
-      const response = await plansApi.upgrade(planId);
+      const [distribution, billing] = await Promise.all([
+        getAppDistribution(),
+        plansApi.getBillingStatus(),
+      ]);
+      if (billing?.effective?.provider === 'google_play') {
+        if (distribution === 'play') await manageGooglePlaySubscriptions();
+        toast.info('Cancele a subscrição na Google Play. O plano continua ativo até ao fim do período pago.');
+        return;
+      }
+
+      const response = await plansApi.cancelPlan();
       if (response.success) {
-        toast.success('Plano atualizado para Grátis!');
-        onUpgradeSuccess(response.user);
-        onClose();
+        toast.success(response.message || 'Subscrição cancelada.');
+        window.location.reload();
       }
     } catch (error: any) {
       console.error('Error upgrading plan:', error);
@@ -237,8 +248,8 @@ export default function UpgradeModal({
       }}
       planId={planForPayment}
       billingPeriod={billingPeriod}
+      onPaymentSuccess={() => window.location.reload()}
     />
   </>
   );
 }
-

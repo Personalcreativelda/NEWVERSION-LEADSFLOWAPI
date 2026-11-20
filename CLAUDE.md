@@ -33,8 +33,13 @@ tmpdir de unix sockets, senão falha com erro de loopback:
 cd android && export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ANDROID_HOME="$LOCALAPPDATA/Android/Sdk" TEMP='C:\tmp' TMP='C:\tmp' JAVA_TOOL_OPTIONS='-Djdk.net.unixdomain.tmpdir=C:\tmp -Djava.io.tmpdir=C:\tmp' && ./gradlew assembleDebug --no-daemon --console=plain -q
 ```
 
-APK em `android/app/build/outputs/apk/debug/app-debug.apk` (copiar para o Ambiente de
-Trabalho como `LeadsFlow.apk`). Há um emulador `Medium_Phone_API_37.0`.
+Duas variantes (`productFlavors`): `assembleDirectDebug` → `android/app/build/outputs/apk/direct/debug/app-direct-debug.apk`
+(APK distribuído à mão; copiar para o Ambiente de Trabalho como `LeadsFlow.apk`) e `bundlePlayRelease` →
+`android/app/build/outputs/bundle/playRelease/app-play-release.aab` (Google Play, assinado com a chave de
+upload `~/.leadsflow-keys/leadsflow-upload.jks` via `android/keystore.properties`, ambos fora do git).
+A `play` não tem `REQUEST_INSTALL_PACKAGES` (src/play/AndroidManifest.xml) e `BuildConfig.SELF_UPDATE=false`:
+atualiza-se pela loja. Passos e textos da Play Store em `docs/play-store.md`. targetSdk 36.
+Há um emulador `Medium_Phone_API_37.0`.
 
 ## Atualizações ao vivo (Capgo auto-hospedado)
 

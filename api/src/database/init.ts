@@ -990,6 +990,17 @@ const runPendingMigrations = async () => {
   } catch (error: any) {
     console.warn('[DB] Migration 024 (push notifications) warning:', error.message);
   }
+
+  // Migração 025: direitos separados por fornecedor (Stripe, Google Play, carteiras e admin)
+  try {
+    const primaryPath = path.join(__dirname, 'migrations', '025_billing_subscriptions.sql');
+    const fallbackPath = path.join(process.cwd(), 'src', 'database', 'migrations', '025_billing_subscriptions.sql');
+    const migrationPath = fs.existsSync(primaryPath) ? primaryPath : fallbackPath;
+    await pool.query(fs.readFileSync(migrationPath, 'utf-8'));
+    console.log('[DB] billing_subscriptions pronta');
+  } catch (error: any) {
+    console.warn('[DB] Migration 025 (billing subscriptions) warning:', error.message);
+  }
 };
 
 export const initDatabase = async () => {

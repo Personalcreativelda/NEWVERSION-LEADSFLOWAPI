@@ -41,7 +41,7 @@ const apiUrl = (process.env.RELEASE_API_URL || 'https://api.leadsflowapi.com').r
 const releaseKey = process.env.MOBILE_RELEASE_KEY;
 if (!releaseKey) fail('Defina MOBILE_RELEASE_KEY (ambiente ou .env.release.local), igual à da API.');
 
-const apkPath = option('apk') || join(root, 'android/app/build/outputs/apk/debug/app-debug.apk');
+const apkPath = option('apk') || join(root, 'android/app/build/outputs/apk/direct/debug/app-direct-debug.apk');
 if (!existsSync(apkPath)) fail(`APK não encontrado: ${apkPath}`);
 
 const gradle = readFileSync(join(root, 'android/app/build.gradle'), 'utf8');

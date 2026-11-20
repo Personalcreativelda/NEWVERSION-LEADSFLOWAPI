@@ -7,8 +7,13 @@ import { toast } from 'sonner';
 import PaymentMethodModal from '../modals/PaymentMethodModal';
 import { SkeletonPlanCards } from '../ui/skeletons';
 import { formatMoney, getLocale } from '../../utils/format';
+import { getAppDistribution, type AppDistribution } from '../../../live-update';
+import {
+  manageGooglePlaySubscriptions,
+  restoreGooglePlayPurchases,
+} from '../../lib/googlePlayBilling';
 
-// Os planos são cobrados pelo Stripe nesta moeda (os preços na BD não têm moeda própria)
+// Moeda base mostrada pela API (a Play Store apresenta a moeda local no checkout nativo)
 const PLAN_CURRENCY = 'USD';
 const planPrice = (value: number) => formatMoney(value, PLAN_CURRENCY);
 // Aviso de renovação a partir de quantos dias antes de expirar
@@ -49,6 +54,9 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [planForPayment, setPlanForPayment] = useState<string | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [distribution, setDistribution] = useState<AppDistribution>('web');
+  const [billingProvider, setBillingProvider] = useState<string | null>(null);
 
   const currentPlan = user?.plan || 'free';
   const subscriptionStatus = user?.subscriptionStatus || user?.subscription_status;
@@ -104,8 +112,20 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
       }
     };
 
+    const fetchBilling = async () => {
+      const appDistribution = await getAppDistribution();
+      setDistribution(appDistribution);
+      try {
+        const response = await plansApi.getBillingStatus();
+        if (response.success) setBillingProvider(response.effective?.provider || null);
+      } catch {
+        // O plano continua visível com os dados da sessão.
+      }
+    };
+
     fetchPlans();
     fetchHistory();
+    fetchBilling();
   }, []);
 
   const handleSelectPlan = (planId: string) => {
@@ -116,6 +136,18 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
   const handleOpenPortal = async () => {
     setOpeningPortal(true);
     try {
+      if (distribution === 'play') {
+        if (billingProvider === 'google_play') {
+          await manageGooglePlaySubscriptions();
+        } else {
+          toast.info('Esta subscrição deve ser gerida no local onde foi iniciada.');
+        }
+        return;
+      }
+      if (billingProvider === 'google_play') {
+        toast.info('Esta subscrição deve ser gerida na Google Play.');
+        return;
+      }
       const res = await plansApi.createPortalSession();
       if (res?.url) {
         window.location.href = res.url;
@@ -129,7 +161,25 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
     }
   };
 
-  const paymentProviderLabel: Record<string, string> = { stripe: 'Stripe', paypal: 'PayPal' };
+  const handleRestorePurchases = async () => {
+    setRestoring(true);
+    try {
+      await restoreGooglePlayPurchases();
+      toast.success('Compras restauradas.');
+    } catch (error: any) {
+      toast.error(error?.message || 'Não foi possível restaurar as compras.');
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const paymentProviderLabel: Record<string, string> = {
+    stripe: 'Stripe',
+    paypal: 'PayPal',
+    google_play: 'Google Play',
+    mobile_money: 'Carteira móvel',
+    manual: 'Manual',
+  };
   const paymentStatusLabel: Record<string, { label: string; cls: string }> = {
     completed: { label: 'Concluído', cls: 'bg-emerald-500/15 text-emerald-400' },
     pending:   { label: 'Pendente',  cls: 'bg-yellow-500/15 text-yellow-400' },
@@ -222,6 +272,14 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
           </div>
         )}
       </div>
+
+      {distribution === 'play' && (
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={handleRestorePurchases} disabled={restoring}>
+            {restoring ? 'A restaurar…' : 'Restaurar compras'}
+          </Button>
+        </div>
+      )}
 
       {/* ── TOGGLE MENSAL / ANUAL ── */}
       <div className="flex justify-center">
@@ -343,7 +401,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
           <div className="py-12 text-center">
             <History className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">Nenhum pagamento registado ainda.</p>
-            <p className="text-xs text-muted-foreground mt-1">Os pagamentos via Stripe serão registados automaticamente.</p>
+            <p className="text-xs text-muted-foreground mt-1">Os pagamentos confirmados serão registados automaticamente.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -407,6 +465,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
         onClose={() => { setShowPaymentModal(false); setPlanForPayment(null); }}
         planId={planForPayment}
         billingPeriod={billingPeriod}
+        onPaymentSuccess={() => window.location.reload()}
       />
 
 

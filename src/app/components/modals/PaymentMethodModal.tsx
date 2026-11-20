@@ -3,7 +3,16 @@ import { apiRequest, plansApi } from '../../utils/api';
 import { toast } from 'sonner';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import { AppModal } from '../base/AppModal';
+import { LogoBox } from '../base/LogoBox';
 import { Button } from '../ui/button';
+import { getAppDistribution, type AppDistribution } from '../../../live-update';
+import {
+  GOOGLE_PLAY_BILLING_EVENT,
+  initGooglePlayBilling,
+  purchaseGooglePlay,
+  restoreGooglePlayPurchases,
+  type GooglePlayConfig,
+} from '../../lib/googlePlayBilling';
 import { MobileMoneyLogo, preloadMobileLogos } from '../payments/MobileMoneyLogo';
 import {
   MOBILE_PAY_FORM_ID,
@@ -65,6 +74,10 @@ export default function PaymentMethodModal({
 }: PaymentMethodModalProps) {
   const [loading, setLoading] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'paypal' | null>(null);
+  const [distribution, setDistribution] = useState<AppDistribution | null>(null);
+  const [playConfig, setPlayConfig] = useState<GooglePlayConfig | null>(null);
+  const [playError, setPlayError] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const billingPeriod = initialBillingPeriod;
 
   // M-Pesa / e-Mola (configurados em Admin → Pagamentos)
@@ -92,9 +105,66 @@ export default function PaymentMethodModal({
   // Ao montar (página do plano) e de novo ao abrir, para o estado do último pagamento estar certo
   useEffect(() => {
     let alive = true;
-    void loadMobileConfig().then((cfg) => { if (alive) setMobile(cfg); });
+    void getAppDistribution().then(async (value) => {
+      if (!alive) return;
+      setDistribution(value);
+      if (value === 'play') {
+        try {
+          const config = await initGooglePlayBilling();
+          if (alive) setPlayConfig(config);
+        } catch (error: any) {
+          if (alive) setPlayError(error?.message || 'Não foi possível ligar à Google Play.');
+        }
+      } else {
+        void loadMobileConfig().then((cfg) => { if (alive) setMobile(cfg); });
+      }
+    });
     return () => { alive = false; };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || distribution !== 'play') return;
+    const handleBillingEvent = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {};
+      if (detail.type === 'verified') {
+        setLoading(false);
+        toast.success('Pagamento confirmado. O plano já está ativo.');
+        onPaymentSuccess?.();
+        onClose();
+      } else if (detail.type === 'pending') {
+        setLoading(false);
+        toast.info('Pagamento pendente na Google Play.');
+      } else if (detail.type === 'error') {
+        setLoading(false);
+        toast.error(detail.message || 'Não foi possível concluir a compra na Google Play.');
+      }
+    };
+    window.addEventListener(GOOGLE_PLAY_BILLING_EVENT, handleBillingEvent);
+    return () => window.removeEventListener(GOOGLE_PLAY_BILLING_EVENT, handleBillingEvent);
+  }, [distribution, isOpen, onClose, onPaymentSuccess]);
+
+  const handleGooglePlayPayment = async () => {
+    if (!planId) return;
+    setLoading(true);
+    try {
+      await purchaseGooglePlay(planId, billingPeriod);
+    } catch (error: any) {
+      setLoading(false);
+      toast.error(error?.message || 'Não foi possível concluir a compra na Google Play.');
+    }
+  };
+
+  const handleRestoreGooglePlay = async () => {
+    setRestoring(true);
+    try {
+      await restoreGooglePlayPurchases();
+      toast.success('Compras restauradas.');
+    } catch (error: any) {
+      toast.error(error?.message || 'Não foi possível restaurar as compras.');
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const mobileAmount = planId ? mobile?.prices?.[planId]?.[billingPeriod] ?? null : null;
   const mobileMethods = mobileAmount ? mobile?.methods || [] : [];
@@ -190,6 +260,57 @@ export default function PaymentMethodModal({
           </svg>
       ) },
   ];
+
+  // A versão distribuída pela Play Store nunca mostra Stripe, PayPal ou carteiras externas.
+  if (isOpen && (distribution === null || distribution === 'play')) {
+    const available = Boolean(
+      playConfig?.enabled &&
+      planId &&
+      playConfig.products.some((product) => product.planId === planId && product.billingCycle === billingPeriod),
+    );
+    return (
+      <AppModal
+        open={isOpen}
+        onOpenChange={(open) => { if (!open && !loading && !restoring) onClose(); }}
+        size="sm"
+        logo={<LogoBox brand="googleplay" />}
+        title="Google Play"
+        description={billingPeriod === 'monthly' ? 'Plano mensal' : 'Plano anual'}
+        footer={(
+          <>
+            <Button variant="outline" onClick={onClose} disabled={loading || restoring}>Cancelar</Button>
+            <Button onClick={handleGooglePlayPayment} disabled={!available || loading || restoring}>
+              {loading ? 'A aguardar…' : 'Continuar'}
+            </Button>
+          </>
+        )}
+      >
+        {distribution === null || (!playConfig && !playError) ? (
+          <div className="flex min-h-24 items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : playError || !playConfig?.enabled ? (
+          <p className="text-sm text-destructive">
+            {playError || 'Os pagamentos Google Play ainda não estão configurados.'}
+          </p>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              A compra e a renovação são processadas com segurança pela sua conta Google Play.
+            </p>
+            <button
+              type="button"
+              onClick={handleRestoreGooglePlay}
+              disabled={loading || restoring}
+              className="text-sm font-medium text-primary hover:underline disabled:opacity-60"
+            >
+              {restoring ? 'A restaurar…' : 'Restaurar compras'}
+            </button>
+          </div>
+        )}
+      </AppModal>
+    );
+  }
 
   // ── Passo M-Pesa / e-Mola ──────────────────────────────────────────────────
   if (isOpen && mobileMethod && mobileAmount) {

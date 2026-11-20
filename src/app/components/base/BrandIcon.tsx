@@ -2,7 +2,7 @@
 // Usar sempre estes em vez de ícones genéricos para canais, origens e integrações.
 import {
   siWhatsapp, siFacebook, siMessenger, siInstagram, siTelegram, siGoogle, siGooglesheets,
-  siMeta, siGoogleanalytics, siN8n, siTiktok, siX, siYoutube, siGmail, siGoogledrive, siGooglecalendar,
+  siMeta, siGoogleanalytics, siGoogleplay, siN8n, siTiktok, siX, siYoutube, siGmail, siGoogledrive, siGooglecalendar,
   type SimpleIcon,
 } from 'simple-icons';
 
@@ -16,6 +16,7 @@ const BRANDS = {
   googlesheets: siGooglesheets,
   meta: siMeta,
   googleanalytics: siGoogleanalytics,
+  googleplay: siGoogleplay,
   n8n: siN8n,
   tiktok: siTiktok,
   x: siX,

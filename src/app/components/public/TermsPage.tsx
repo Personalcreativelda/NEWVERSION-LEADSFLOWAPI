@@ -7,7 +7,7 @@ export default function TermsPage({ path }: { path?: string } = {}) {
     <PublicPageShell
       path={path}
       title="Termos de uso"
-      updated="26 de outubro de 2026"
+      updated="20 de novembro de 2026"
       intro="Estes termos regem a utilização do LeadsFlow. Ao criar uma conta ou usar o serviço, aceita-os."
     >
       <Section id="servico" title="O serviço">
@@ -34,6 +34,7 @@ export default function TermsPage({ path }: { path?: string } = {}) {
         <ul>
           <li>Há um plano gratuito com limites e planos pagos, mensais ou anuais. Os limites de cada plano (leads, mensagens, campanhas, canais) são os indicados na página de planos.</li>
           <li>As subscrições renovam-se automaticamente no fim de cada período, até as cancelar. Pode cancelar a qualquer momento; o plano mantém-se até ao fim do período já pago.</li>
+          <li>Na aplicação distribuída pela Google Play, as compras, renovações e cancelamentos são geridos pela sua conta Google Play.</li>
           <li>Os valores pagos não são reembolsáveis, salvo quando a lei o exigir.</li>
           <li>Se um pagamento falhar ou o plano expirar, algumas funcionalidades ficam limitadas até a situação ser regularizada; os seus dados não são apagados por esse motivo.</li>
           <li>Podemos alterar preços; as alterações aplicam-se a partir da renovação seguinte e são avisadas com antecedência.</li>

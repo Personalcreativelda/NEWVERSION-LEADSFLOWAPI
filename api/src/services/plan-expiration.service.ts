@@ -1,5 +1,6 @@
 import { query } from '../database/connection';
 import { notificationsService } from './notifications.service';
+import { recomputeEffectiveEntitlement } from './billing-entitlement.service';
 
 /**
  * Plan Expiration Service
@@ -28,21 +29,23 @@ const checkExpiredPlans = async () => {
 
     console.log(`[PlanExpiration] Found ${result.rows.length} expired plans to downgrade`);
 
-    const freeLimits = JSON.stringify({ leads: 100, messages: 100, massMessages: 200 });
-
     for (const user of result.rows) {
       try {
         await query(
-          `UPDATE users 
-           SET plan = 'free', 
-               subscription_plan = 'free',
-               subscription_status = 'expired',
-               plan_limits = $1,
-               plan_expires_at = NULL,
-               updated_at = NOW()
-           WHERE id = $2`,
-          [freeLimits, user.id]
+          `UPDATE billing_subscriptions
+           SET status = 'expired', auto_renew = FALSE, updated_at = NOW()
+           WHERE user_id = $1
+             AND current_period_end IS NOT NULL
+             AND current_period_end <= NOW()
+             AND status = ANY($2::varchar[])`,
+          [user.id, ['active', 'trialing', 'grace_period', 'cancel_at_period_end', 'cancelled']],
         );
+
+        const effective = await recomputeEffectiveEntitlement(user.id, undefined, 'expired');
+        if (effective.planId !== 'free') {
+          console.log(`[PlanExpiration] Fonte expirada para ${user.email}; plano efetivo continua ${effective.planId}`);
+          continue;
+        }
 
         console.log(`[PlanExpiration] ⬇️ Downgraded ${user.email} from ${user.plan} to free (expired: ${user.plan_expires_at})`);
 

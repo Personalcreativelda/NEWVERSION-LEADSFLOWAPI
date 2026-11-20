@@ -4,6 +4,8 @@ import { plansApi } from '../../utils/api';
 import { toast } from 'sonner';
 import UpgradeModal from './UpgradeModal';
 import { OverlayModal } from '../base/OverlayModal';
+import { getAppDistribution } from '../../../live-update';
+import { manageGooglePlaySubscriptions } from '../../lib/googlePlayBilling';
 
 interface PlanEnforcementModalProps {
   /** One of PLAN_EXPIRED | PAYMENT_OVERDUE | LEAD_LIMIT_EXCEEDED (null = hidden) */
@@ -41,6 +43,23 @@ export default function PlanEnforcementModal({
   const handlePortal = async () => {
     setLoadingPortal(true);
     try {
+      const [distribution, billing] = await Promise.all([
+        getAppDistribution(),
+        plansApi.getBillingStatus().catch(() => null),
+      ]);
+      const hasGooglePlay = billing?.sources?.some((source: any) => source.provider === 'google_play');
+      if (hasGooglePlay) {
+        if (distribution === 'play') {
+          await manageGooglePlaySubscriptions();
+        } else {
+          toast.info('Esta subscrição deve ser gerida na Google Play.');
+        }
+        return;
+      }
+      if (distribution === 'play') {
+        setShowUpgrade(true);
+        return;
+      }
       const result = await plansApi.createPortalSession();
       if (result?.url) {
         window.location.href = result.url;

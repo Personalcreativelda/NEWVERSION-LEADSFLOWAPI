@@ -7,7 +7,7 @@ export default function PrivacyPage({ path }: { path?: string } = {}) {
     <PublicPageShell
       path={path}
       title="Política de privacidade"
-      updated="26 de outubro de 2026"
+      updated="20 de novembro de 2026"
       intro="Esta política explica que dados o LeadsFlow trata, para quê, com quem os partilha e que direitos tem sobre eles."
     >
       <Section id="quem-somos" title="Quem somos">
@@ -77,7 +77,7 @@ export default function PrivacyPage({ path }: { path?: string } = {}) {
         <ul>
           <li><strong>Alojamento e armazenamento</strong> dos servidores, da base de dados e dos ficheiros.</li>
           <li><strong>Plataformas de mensagens</strong> que liga à sua conta (Meta — WhatsApp, Facebook e Instagram —, Telegram, fornecedores de email e de SMS), para entregar as mensagens.</li>
-          <li><strong>Pagamentos</strong>: Stripe e PayPal processam os pagamentos das subscrições.</li>
+          <li><strong>Pagamentos</strong>: Google Play, Stripe, PayPal e os operadores de carteira móvel processam os pagamentos das subscrições, conforme o método escolhido.</li>
           <li><strong>Inteligência artificial</strong>: quando usa assistentes virtuais, agentes de voz ou análises com IA, o conteúdo necessário (por exemplo, a mensagem a que se vai responder) é enviado a fornecedores de modelos de IA para gerar a resposta.</li>
           <li><strong>Meta, para medir anúncios</strong>: só se ativar a ligação em Integrações → Meta. Enviamos à sua própria conta da Meta os eventos do funil dos seus clientes (lead, lead qualificado, compra e o valor), com o telefone, o email e o nome cifrados (SHA-256) ou o identificador do clique no anúncio. Está desligado por omissão.</li>
           <li><strong>Integrações que configurar</strong> (por exemplo, webhooks, folhas de cálculo ou píxeis de conversão), que recebem os dados que escolher enviar.</li>

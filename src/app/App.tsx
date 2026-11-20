@@ -20,6 +20,7 @@ import UpgradeModal from './components/modals/UpgradeModal';
 import PlanUpgradeSuccessModal from './components/modals/PlanUpgradeSuccessModal';
 import { MetaPixel } from './components/MetaPixel';
 import { GoogleAnalytics } from './components/GoogleAnalytics';
+import { isNativeApp } from '../native';
 import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import { authApi, apiRequest, plansApi, isSessionExpired, startSessionExpiryTimer, refreshAccessToken } from './utils/api';
 import { ensureDataOwner } from './lib/userScope';
@@ -28,6 +29,10 @@ import { Toaster } from './components/ui/sonner';
 import { OfflineBanner } from './components/base/OfflineState';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { toast } from 'sonner';
+import {
+  GOOGLE_PLAY_BILLING_EVENT,
+  initGooglePlayBilling,
+} from './lib/googlePlayBilling';
 
 // ============================================
 // CAPTURE OAUTH HASH IMMEDIATELY ON SCRIPT LOAD
@@ -559,6 +564,32 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
     }
   }, []);
 
+  // A Play Store volta a entregar compras por concluir e renovações ao abrir a app.
+  // O servidor confirma sempre o recibo antes de atualizar o plano mostrado no painel.
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    const handleBillingUpdate = async (event: Event) => {
+      const detail = (event as CustomEvent).detail || {};
+      if (detail.type !== 'verified') return;
+      try {
+        const updatedUser = await fetchUserContext();
+        if (active) setUser(updatedUser);
+      } catch {
+        // A compra já foi confirmada; a sessão volta a sincronizar no próximo pedido.
+      }
+    };
+
+    window.addEventListener(GOOGLE_PLAY_BILLING_EVENT, handleBillingUpdate);
+    void initGooglePlayBilling().catch((error) => {
+      console.warn('[Google Play] Não foi possível iniciar a faturação:', error);
+    });
+    return () => {
+      active = false;
+      window.removeEventListener(GOOGLE_PLAY_BILLING_EVENT, handleBillingUpdate);
+    };
+  }, [fetchUserContext, user?.id]);
+
   const checkAuth = useCallback(async () => {
     // Guard: prevent concurrent executions (React StrictMode runs effects twice in dev)
     if (isCheckingAuthRef.current) {
@@ -908,8 +939,9 @@ export default function App({ initialPage, landingEnabled = true }: AppProps = {
 
   return (
     <ConfirmProvider>
-      <MetaPixel pixelId={metaPixelId} />
-      <GoogleAnalytics gaId={googleAnalyticsId} />
+      {/* Só no site: no app Android não há rastreio (declaração "Segurança dos dados" da Google Play) */}
+      {!isNativeApp() && <MetaPixel pixelId={metaPixelId} />}
+      {!isNativeApp() && <GoogleAnalytics gaId={googleAnalyticsId} />}
       <Toaster />
       {!isOnline && currentPage !== 'dashboard' && <OfflineBanner />}
       {/* Landing Page */}

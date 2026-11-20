@@ -12,6 +12,11 @@ import bcrypt from 'bcryptjs';
 import { adminUserDetails } from '../services/admin-user-details.service';
 import { WhatsAppService } from '../services/whatsapp.service';
 import { CloudSendError, sendCloudText } from '../services/whatsapp-cloud.service';
+import {
+  recomputeEffectiveEntitlement,
+  setBillingSubscriptionStatus,
+  upsertBillingSubscription,
+} from '../services/billing-entitlement.service';
 
 const router = Router();
 
@@ -154,7 +159,30 @@ router.post('/activate-plan', requireAuth, requireAdmin, async (req: Authenticat
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const user = result.rows[0];
+    let user = result.rows[0];
+    if (planId === 'free') {
+      await setBillingSubscriptionStatus('manual', `manual:${userId}`, 'expired', new Date());
+      await recomputeEffectiveEntitlement(userId, undefined, 'free');
+    } else {
+      await upsertBillingSubscription({
+        userId,
+        provider: 'manual',
+        providerReference: `manual:${userId}`,
+        planId,
+        status: 'active',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: expiresAt || null,
+        autoRenew: false,
+        acknowledged: true,
+        metadata: { activatedBy: req.user?.id || null },
+      });
+      await recomputeEffectiveEntitlement(userId);
+    }
+    const refreshed = await query(
+      `SELECT id, email, name, plan, plan_expires_at FROM users WHERE id = $1`,
+      [userId],
+    );
+    user = refreshed.rows[0] || user;
     console.log(`[Admin] Plan ${planId} activated for user ${user.email} (expires: ${expiresAt || 'never'})`);
 
     // Enviar notificação ao(s) admin(s)

@@ -5,9 +5,18 @@ import { query } from '../database/connection';
 import { plansService } from '../services/plans.service';
 import { notificationsService } from '../services/notifications.service';
 import { clearPlanEnforcementCache } from '../middleware/plan-enforcement.middleware';
+import {
+  getEffectiveBillingStatus,
+  recomputeEffectiveEntitlement,
+  setBillingSubscriptionStatus,
+  upsertBillingSubscription,
+} from '../services/billing-entitlement.service';
+import googlePlayRoutes from './google-play.routes';
 import Stripe from 'stripe';
 
 const router = Router();
+
+router.use('/google-play', googlePlayRoutes);
 
 // Get all available plans (public endpoint)
 router.get('/', async (_req, res, next) => {
@@ -34,6 +43,34 @@ router.post('/upgrade', requireAuth, async (req: AuthenticatedRequest, res, next
       return res.status(400).json({ error: 'Plan ID is required' });
     }
 
+    // Planos pagos só podem ser ativados por um fornecedor que apresente prova de
+    // pagamento (Stripe, Google Play, carteira confirmada ou administrador).
+    if (planId !== 'free') {
+      return res.status(402).json({
+        error: 'Escolha um método de pagamento para ativar este plano.',
+        code: 'PAYMENT_REQUIRED',
+      });
+    }
+
+    // Mudar apenas a cópia em `users` não cancela uma subscrição real e faria a
+    // cobrança continuar. O utilizador tem de cancelar no fornecedor correspondente.
+    const activeSource = await query(
+      `SELECT provider
+       FROM billing_subscriptions
+       WHERE user_id = $1
+         AND status = ANY($2::varchar[])
+         AND (current_period_end IS NULL OR current_period_end > NOW())
+       LIMIT 1`,
+      [req.user.id, ['active', 'trialing', 'grace_period', 'cancel_at_period_end', 'cancelled']],
+    );
+    if (activeSource.rows.length) {
+      return res.status(409).json({
+        error: 'Cancele primeiro a subscrição ativa.',
+        code: 'ACTIVE_SUBSCRIPTION',
+        provider: activeSource.rows[0].provider,
+      });
+    }
+
     // Validate plan exists in database
     const planExists = await plansService.validatePlanId(planId);
     if (!planExists) {
@@ -58,7 +95,9 @@ router.post('/upgrade', requireAuth, async (req: AuthenticatedRequest, res, next
     // Update user's plan in database
     const result = await query(
       `UPDATE users
-       SET plan = $1, subscription_plan = $1, plan_limits = $2, updated_at = NOW()
+       SET plan = $1, subscription_plan = $1, plan_limits = $2,
+           subscription_status = 'free', plan_activated_at = NULL,
+           plan_expires_at = NULL, updated_at = NOW()
        WHERE id = $3
        RETURNING id, email, name, avatar_url, plan, subscription_plan`,
       [planId, JSON.stringify(limits), req.user.id]
@@ -131,6 +170,16 @@ router.get('/payment-history', requireAuth, async (req: AuthenticatedRequest, re
     res.json({ success: true, history: result.rows });
   } catch (error) {
     console.error('[Plans] Error fetching payment history:', error);
+    next(error);
+  }
+});
+
+router.get('/billing-status', requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Não autorizado' });
+    const status = await getEffectiveBillingStatus(req.user.id);
+    return res.json({ success: true, ...status });
+  } catch (error) {
     next(error);
   }
 });
@@ -317,6 +366,23 @@ router.post('/stripe/webhook', async (req, res) => {
           [planId, JSON.stringify(planLimits), expiresAt, stripeCustomerId, stripeSubscriptionId, userId]
         );
 
+        if (stripeSubscriptionId) {
+          await upsertBillingSubscription({
+            userId,
+            provider: 'stripe',
+            providerReference: stripeSubscriptionId,
+            planId,
+            billingCycle,
+            status: 'active',
+            currentPeriodStart: new Date(),
+            currentPeriodEnd: expiresAt,
+            autoRenew: true,
+            acknowledged: true,
+            metadata: { customerId: stripeCustomerId, checkoutSessionId: session.id },
+          });
+          await recomputeEffectiveEntitlement(userId);
+        }
+
         // Idempotency: only insert if no completed record exists for this subscription
         // (prevents duplicate when both /sync-subscription and webhook run for the same checkout)
         const chkExisting = await query(
@@ -430,6 +496,20 @@ router.post('/stripe/webhook', async (req, res) => {
               [expiresAt, user.id]
             );
 
+            await upsertBillingSubscription({
+              userId: user.id,
+              provider: 'stripe',
+              providerReference: stripeSubscriptionId,
+              planId: user.plan,
+              billingCycle: billingCycle as 'monthly' | 'annual',
+              status: 'active',
+              currentPeriodEnd: expiresAt,
+              autoRenew: true,
+              acknowledged: true,
+              metadata: { customerId: stripeCustomerId },
+            });
+            await recomputeEffectiveEntitlement(user.id);
+
             // Idempotency: only insert if this specific invoice hasn't been recorded yet
             const renewalExisting = await query(
               `SELECT id FROM payment_history WHERE provider_transaction_id = $1 LIMIT 1`,
@@ -471,37 +551,31 @@ router.post('/stripe/webhook', async (req, res) => {
           console.warn(`[Stripe Webhook] No user found for deleted subscription customer ${stripeCustomerId}`);
         } else {
           const user = userResult.rows[0];
-          if (user.plan !== 'free') {
-            await query(
-              `UPDATE users
-               SET plan = 'free', subscription_plan = 'free',
-                   subscription_status = 'cancelled',
-                   stripe_subscription_id = NULL,
-                   plan_expires_at = NULL,
-                   plan_activated_at = NULL,
-                   updated_at = NOW()
-               WHERE id = $1`,
-              [user.id]
-            );
-            await notificationsService.createNotification(
-              user.id,
-              'plan_upgraded',
-              'Plano Cancelado',
-              'Sua assinatura foi cancelada. Você foi movido para o plano gratuito.',
-              'zap',
-              { previousPlan: user.plan }
-            );
-            void notificationsService.sendAdminNotification(
-              'upgradeNotifications',
-              'admin_plan_upgrade',
-              'Plano Cancelado via Portal',
-              `${user.name || user.email} cancelou o plano ${user.plan.toUpperCase()} via portal Stripe.`,
-              'trending-up',
-              { userId: user.id, email: user.email, plan: user.plan }
-            );
-            console.log(`[Stripe Webhook] Subscription deleted for user ${user.id}, downgraded to free`);
-            clearPlanEnforcementCache(user.id);
-          }
+          await setBillingSubscriptionStatus('stripe', sub.id, 'cancelled', new Date());
+          await query(
+            `UPDATE users SET stripe_subscription_id = NULL, updated_at = NOW() WHERE id = $1`,
+            [user.id],
+          );
+          const effective = await recomputeEffectiveEntitlement(user.id, undefined, 'cancelled');
+          await notificationsService.createNotification(
+            user.id,
+            'plan_upgraded',
+            'Subscrição cancelada',
+            effective.planId === 'free'
+              ? 'A subscrição foi cancelada. A conta passou para o plano gratuito.'
+              : `A subscrição Stripe foi cancelada. O plano ${effective.planId.toUpperCase()} continua ativo.`,
+            'zap',
+            { previousPlan: user.plan, effectivePlan: effective.planId },
+          );
+          void notificationsService.sendAdminNotification(
+            'upgradeNotifications',
+            'admin_plan_upgrade',
+            'Subscrição Stripe cancelada',
+            `${user.name || user.email} cancelou a subscrição Stripe do plano ${user.plan.toUpperCase()}.`,
+            'trending-up',
+            { userId: user.id, email: user.email, plan: user.plan, effectivePlan: effective.planId },
+          );
+          console.log(`[Stripe Webhook] Subscription ${sub.id} deleted for user ${user.id}; effective=${effective.planId}`);
         }
       } catch (err) {
         console.error('[Stripe Webhook] Error processing subscription.deleted:', err);
@@ -520,32 +594,39 @@ router.post('/stripe/webhook', async (req, res) => {
         );
         if (userResult.rows.length) {
           const user = userResult.rows[0];
+          const storedSource = await query(
+            `SELECT plan_id, billing_cycle FROM billing_subscriptions
+             WHERE provider = 'stripe' AND provider_reference = $1 LIMIT 1`,
+            [sub.id],
+          );
+          const sourcePlan = storedSource.rows[0]?.plan_id || user.plan;
+          const interval = sub.items?.data?.[0]?.price?.recurring?.interval;
+          const sourceCycle = storedSource.rows[0]?.billing_cycle || (interval === 'year' ? 'annual' : 'monthly');
+          const subAny = sub as any;
+          const periodEnd: number | undefined = subAny.current_period_end ?? subAny.currentPeriodEnd;
+          const expiresAt = periodEnd ? new Date(periodEnd * 1000) : new Date();
           if (subStatus === 'canceled') {
-            await query(
-              `UPDATE users
-               SET plan = 'free', subscription_plan = 'free',
-                   subscription_status = 'cancelled',
-                   stripe_subscription_id = NULL,
-                   plan_expires_at = NULL,
-                   plan_activated_at = NULL,
-                   updated_at = NOW()
-               WHERE id = $1`,
-              [user.id]
-            );
+            await setBillingSubscriptionStatus('stripe', sub.id, 'cancelled', expiresAt);
           } else if (subStatus === 'active' || subStatus === 'trialing') {
-            const subAny = sub as any;
-            const periodEnd: number | undefined = subAny.current_period_end ?? subAny.currentPeriodEnd;
-            if (periodEnd) {
-              const expiresAt = new Date(periodEnd * 1000);
-              await query(
-                `UPDATE users
-                 SET subscription_status = 'active', plan_expires_at = $1, updated_at = NOW()
-                 WHERE id = $2`,
-                [expiresAt, user.id]
-              );
-            }
+            await upsertBillingSubscription({
+              userId: user.id,
+              provider: 'stripe',
+              providerReference: sub.id,
+              planId: sourcePlan,
+              billingCycle: sourceCycle,
+              status: subStatus,
+              currentPeriodEnd: expiresAt,
+              autoRenew: !sub.cancel_at_period_end,
+              acknowledged: true,
+              metadata: { customerId: stripeCustomerId },
+            });
           }
-          console.log(`[Stripe Webhook] Subscription updated for user ${user.id}, status=${subStatus}`);
+          const effective = await recomputeEffectiveEntitlement(
+            user.id,
+            undefined,
+            subStatus === 'canceled' ? 'cancelled' : 'expired',
+          );
+          console.log(`[Stripe Webhook] Subscription updated for user ${user.id}, status=${subStatus}, effective=${effective.planId}`);
         }
       } catch (err) {
         console.error('[Stripe Webhook] Error processing subscription.updated:', err);
@@ -734,6 +815,24 @@ router.post('/sync-active-subscription', requireAuth, async (req: AuthenticatedR
       [resolvedPlanId, JSON.stringify(planLimits), expiresAt, stripeCustomerId, sub.id, user.id]
     );
 
+    await upsertBillingSubscription({
+      userId: user.id,
+      provider: 'stripe',
+      providerReference: sub.id,
+      productId: typeof (sub.items?.data?.[0]?.price as any)?.product === 'string'
+        ? (sub.items.data[0].price as any).product
+        : null,
+      planId: resolvedPlanId,
+      billingCycle,
+      status: 'active',
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: expiresAt,
+      autoRenew: true,
+      acknowledged: true,
+      metadata: { customerId: stripeCustomerId },
+    });
+    await recomputeEffectiveEntitlement(user.id);
+
     // Record in payment history only if not already recorded (idempotent by subscription ID)
     const existing = await query(
       'SELECT id FROM payment_history WHERE stripe_subscription_id = $1 AND status = $2 LIMIT 1',
@@ -791,7 +890,25 @@ router.post('/cancel', requireAuth, async (req: AuthenticatedRequest, res, next)
       return res.status(400).json({ error: 'Você já está no plano gratuito.' });
     }
 
+    const billingStatus = await getEffectiveBillingStatus(user.id);
+    if (!user.stripe_subscription_id) {
+      if (billingStatus.effective.provider === 'google_play') {
+        return res.status(409).json({
+          error: 'Gerir esta subscrição na Google Play.',
+          code: 'MANAGE_GOOGLE_PLAY',
+        });
+      }
+      return res.status(409).json({
+        error: 'Esta subscrição não é gerida pelo Stripe.',
+        code: 'SUBSCRIPTION_PROVIDER_MISMATCH',
+        provider: billingStatus.effective.provider,
+      });
+    }
+
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) {
+      return res.status(503).json({ error: 'Stripe não está configurado.' });
+    }
     let refundIssued = false;
     let refundAmount: number | null = null;
     let refundCurrency = 'USD';
@@ -843,22 +960,19 @@ router.post('/cancel', requireAuth, async (req: AuthenticatedRequest, res, next)
         await stripe.subscriptions.cancel(user.stripe_subscription_id);
         console.log(`[Plans Cancel] Stripe subscription ${user.stripe_subscription_id} cancelled for user ${user.id}`);
       } catch (cancelErr: any) {
-        console.warn('[Plans Cancel] Stripe subscription cancel failed:', cancelErr?.message);
+        console.error('[Plans Cancel] Stripe subscription cancel failed:', cancelErr?.message);
+        return res.status(502).json({ error: 'Não foi possível cancelar a subscrição no Stripe. Tente novamente.' });
       }
     }
 
-    // Downgrade user to free in database
+    await setBillingSubscriptionStatus('stripe', user.stripe_subscription_id, 'cancelled', new Date());
     await query(
       `UPDATE users
-       SET plan = 'free', subscription_plan = 'free',
-           subscription_status = 'cancelled',
-           stripe_subscription_id = NULL,
-           plan_expires_at = NULL,
-           plan_activated_at = NULL,
-           updated_at = NOW()
+       SET stripe_subscription_id = NULL, updated_at = NOW()
        WHERE id = $1`,
       [user.id]
     );
+    const effective = await recomputeEffectiveEntitlement(user.id, undefined, 'cancelled');
 
     // Record cancellation (and refund if applicable) in payment history
     if (refundIssued && refundAmount !== null) {
@@ -878,9 +992,11 @@ router.post('/cancel', requireAuth, async (req: AuthenticatedRequest, res, next)
       refundIssued ? 'Plano Cancelado com Reembolso' : 'Plano Cancelado',
       refundIssued
         ? `Seu plano foi cancelado e um reembolso de ${refundCurrency} ${refundAmount?.toFixed(2)} foi solicitado.`
-        : 'Seu plano foi cancelado. Você voltou ao plano gratuito.',
+        : effective.planId === 'free'
+          ? 'A subscrição foi cancelada. A conta passou para o plano gratuito.'
+          : `A subscrição Stripe foi cancelada. O plano ${effective.planId.toUpperCase()} continua ativo.`,
       'zap',
-      { planId: user.plan, refundIssued, refundAmount }
+      { planId: user.plan, effectivePlan: effective.planId, refundIssued, refundAmount }
     );
 
     // Notify admins
@@ -900,7 +1016,10 @@ router.post('/cancel', requireAuth, async (req: AuthenticatedRequest, res, next)
       refundCurrency,
       message: refundIssued
         ? `Plano cancelado. Reembolso de ${refundCurrency} ${refundAmount?.toFixed(2)} solicitado ao Stripe.`
-        : 'Plano cancelado. Você foi movido para o plano gratuito.',
+        : effective.planId === 'free'
+          ? 'Plano cancelado. A conta passou para o plano gratuito.'
+          : `Subscrição Stripe cancelada. O plano ${effective.planId.toUpperCase()} continua ativo.`,
+      effectivePlan: effective.planId,
     });
   } catch (error) {
     console.error('[Plans] Error cancelling plan:', error);

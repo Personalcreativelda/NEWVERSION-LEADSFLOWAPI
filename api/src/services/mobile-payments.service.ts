@@ -20,6 +20,7 @@ import { plansService } from './plans.service';
 import { notificationsService } from './notifications.service';
 import { clearPlanEnforcementCache } from '../middleware/plan-enforcement.middleware';
 import { isServableKey, isStorageUrl, storageKeyFromUrl } from '../utils/storage-urls';
+import { recomputeEffectiveEntitlement, upsertBillingSubscription } from './billing-entitlement.service';
 
 export type MobileMethod = 'mpesa' | 'emola';
 export type BillingCycle = 'monthly' | 'annual';
@@ -296,13 +297,20 @@ export async function confirmMobilePayment(paymentId: string, confirmedBy: strin
        WHERE id = $1 RETURNING *`,
       [paymentId, String(confirmedBy || 'admin')]
     );
-    await client.query(
-      `UPDATE users
-       SET plan = $1, subscription_plan = $1, plan_limits = $2,
-           plan_activated_at = NOW(), plan_expires_at = $3, subscription_status = 'active', updated_at = NOW()
-       WHERE id = $4`,
-      [p.plan_id, JSON.stringify(limits), expiresAt, p.user_id]
-    );
+    await upsertBillingSubscription({
+      userId: p.user_id,
+      provider: 'mobile_money',
+      providerReference: `${p.method}:${p.transaction_id}`,
+      planId: p.plan_id,
+      billingCycle: p.billing_cycle,
+      status: 'active',
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: expiresAt,
+      autoRenew: false,
+      acknowledged: true,
+      metadata: { method: p.method, confirmedBy: String(confirmedBy || 'admin') },
+    }, client);
+    await recomputeEffectiveEntitlement(p.user_id, client);
     await client.query(
       `INSERT INTO payment_history
          (user_id, plan_id, amount, currency, billing_cycle, payment_method, payment_provider, status, provider_transaction_id)
