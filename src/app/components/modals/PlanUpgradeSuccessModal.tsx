@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { OverlayModal } from '../base/OverlayModal';
-import { X, CheckCircle, Zap, Crown, Rocket, Infinity } from 'lucide-react';
+import { Button } from '../ui/button';
+import { X, Check, Zap, Crown, Rocket } from 'lucide-react';
 
 interface PlanUpgradeSuccessModalProps {
   isOpen: boolean;
@@ -8,48 +9,21 @@ interface PlanUpgradeSuccessModalProps {
   onClose: () => void;
 }
 
-const PLAN_CONFIG: Record<string, {
-  label: string;
-  icon: React.ComponentType<any>;
-  color: string;
-  gradientFrom: string;
-  gradientTo: string;
-  badgeBg: string;
-  badgeText: string;
-  ringColor: string;
-  features: string[];
-}> = {
+// O que cada plano inclui (o mesmo que a página de planos mostra)
+const PLAN_CONFIG: Record<string, { label: string; icon: React.ComponentType<any>; features: string[] }> = {
   business: {
     label: 'Business',
     icon: Zap,
-    color: 'text-blue-400',
-    gradientFrom: 'from-blue-600/20',
-    gradientTo: 'to-purple-600/20',
-    badgeBg: 'bg-blue-500/20 border border-blue-500/40',
-    badgeText: 'text-blue-300',
-    ringColor: 'ring-blue-500/30',
     features: ['2.000 leads', '1.000 mensagens individuais', '5.000 campanhas em massa'],
   },
   enterprise: {
     label: 'Enterprise',
     icon: Crown,
-    color: 'text-amber-400',
-    gradientFrom: 'from-amber-600/20',
-    gradientTo: 'to-orange-600/20',
-    badgeBg: 'bg-amber-500/20 border border-amber-500/40',
-    badgeText: 'text-amber-300',
-    ringColor: 'ring-amber-500/30',
     features: ['Leads ilimitados', 'Mensagens ilimitadas', 'Envios em massa ilimitados'],
   },
   pro: {
     label: 'Pro',
     icon: Rocket,
-    color: 'text-violet-400',
-    gradientFrom: 'from-violet-600/20',
-    gradientTo: 'to-pink-600/20',
-    badgeBg: 'bg-violet-500/20 border border-violet-500/40',
-    badgeText: 'text-violet-300',
-    ringColor: 'ring-violet-500/30',
     features: ['Recursos avançados', 'Suporte prioritário', 'Integrações ilimitadas'],
   },
 };
@@ -57,19 +31,14 @@ const PLAN_CONFIG: Record<string, {
 const DEFAULT_CONFIG = {
   label: 'Premium',
   icon: Rocket,
-  color: 'text-emerald-400',
-  gradientFrom: 'from-emerald-600/20',
-  gradientTo: 'to-teal-600/20',
-  badgeBg: 'bg-emerald-500/20 border border-emerald-500/40',
-  badgeText: 'text-emerald-300',
-  ringColor: 'ring-emerald-500/30',
-  features: ['Todos os recursos desbloqueados', 'Suporte prioritário', 'Sem limitações'],
+  features: ['Todos os recursos', 'Suporte prioritário', 'Sem limites'],
 };
 
 export default function PlanUpgradeSuccessModal({ isOpen, plan, onClose }: PlanUpgradeSuccessModalProps) {
   const config = PLAN_CONFIG[plan?.toLowerCase()] ?? DEFAULT_CONFIG;
   const PlanIcon = config.icon;
-  // Auto-close after 10s
+
+  // Fecha sozinho ao fim de 10 s
   useEffect(() => {
     if (!isOpen) return;
     const t = setTimeout(onClose, 10000);
@@ -79,94 +48,50 @@ export default function PlanUpgradeSuccessModal({ isOpen, plan, onClose }: PlanU
   if (!isOpen) return null;
 
   return (
-    <OverlayModal onClose={onClose} stickyEdges={false} className={`max-w-md ring-1 ${config.ringColor}`}>
-        {/* Top gradient strip */}
-        <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${config.gradientFrom.replace('/20', '')} ${config.gradientTo.replace('/20', '')}`} />
+    <OverlayModal onClose={onClose} stickyEdges={false} className="max-w-md">
+      {/* Pega da folha no telemóvel */}
+      <div className="flex justify-center pt-3 sm:hidden">
+        <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+      </div>
 
-        {/* Mobile drag handle */}
-        <div className="flex justify-center pt-3 sm:hidden">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        aria-label="Fechar"
+      >
+        <X className="w-4 h-4" />
+      </button>
 
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          aria-label="Fechar"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        <div className="px-6 pt-6 pb-8 sm:px-8 sm:pt-8">
-          {/* Icon + sparkle */}
-          <div className="flex justify-center mb-5">
-            <div className="relative">
-              <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${config.gradientFrom} ${config.gradientTo} border border-white/10 flex items-center justify-center`}>
-                <PlanIcon className={`w-10 h-10 ${config.color}`} />
-              </div>
-              {/* Success badge */}
-                <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center ring-2 ring-card">
-                <CheckCircle className="w-4 h-4 text-white" />
-              </div>
+      <div className="px-6 pt-6 pb-6 sm:px-8 sm:pt-8 sm:pb-8">
+        <div className="flex justify-center mb-5">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-2xl border border-border bg-muted flex items-center justify-center">
+              <PlanIcon className="w-7 h-7 text-foreground" strokeWidth={1.5} />
+            </div>
+            <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center ring-2 ring-card">
+              <Check className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
             </div>
           </div>
-
-          {/* Title */}
-          <div className="text-center mb-2">
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-widest ${config.badgeBg} ${config.badgeText} mb-3`}>
-              <PlanIcon className="w-3 h-3" />
-              {config.label}
-            </span>
-            <h2 className="text-foreground text-2xl sm:text-3xl font-bold leading-tight">
-              Parabéns! 
- </h2>
-            <p className="text-muted-foreground text-sm sm:text-base mt-1">
-              Seu plano foi atualizado para{' '}
-              <span className={`font-semibold ${config.color}`}>{config.label}</span>
-              {' '}com sucesso!
-            </p>
-          </div>
-
-          {/* Divider */}
-          <div className="my-5 border-t border-border" />
-
-          {/* Features unlocked */}
-          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-3">
-            O que você desbloqueou
-          </p>
-          <ul className="space-y-2.5 mb-6">
-            {config.features.map((feat) => (
-              <li key={feat} className="flex items-center gap-3">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                  <CheckCircle className="w-3 h-3 text-emerald-400" />
-                </span>
-                <span className="text-foreground/80 text-sm">{feat}</span>
-                {feat.toLowerCase().includes('ilimitad') && (
-                  <Infinity className="w-3.5 h-3.5 text-emerald-400 ml-auto flex-shrink-0" />
-                )}
-              </li>
-            ))}
-          </ul>
-
-          {/* CTA */}
-          <button
-            onClick={onClose}
-            className={`
-              w-full py-3 px-6 rounded-xl font-semibold text-sm
-              bg-gradient-to-r ${config.gradientFrom.replace('/20', '/80')} ${config.gradientTo.replace('/20', '/80')}
-              border border-border/50 text-foreground
-              hover:brightness-110 active:scale-95
-              transition-all duration-150
-            `}
-          >
-            Começar a usar agora
-          </button>
-
-          {/* Auto-close hint */}
-          <p className="text-center text-muted-foreground/40 text-xs mt-3">
-            Fecha automaticamente em alguns segundos
-          </p>
         </div>
+
+        <h2 className="font-serif text-center text-2xl font-medium text-foreground">
+          {`Plano ${config.label} ativo`}
+        </h2>
+
+        <div className="my-6 border-t border-border" />
+
+        <p className="text-sm text-muted-foreground mb-3">Incluído no plano</p>
+        <ul className="space-y-2.5 mb-6">
+          {config.features.map((feat) => (
+            <li key={feat} className="flex items-center gap-3">
+              <Check className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+              <span className="text-sm text-foreground">{feat}</span>
+            </li>
+          ))}
+        </ul>
+
+        <Button onClick={onClose} className="w-full">Começar a usar</Button>
+      </div>
     </OverlayModal>
   );
 }

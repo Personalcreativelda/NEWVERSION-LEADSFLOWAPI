@@ -335,11 +335,11 @@ const FunnelColumn = memo(({
     <div
       ref={setNodeRef}
       style={style}
-      className={`transition-all duration-300 ${isDragging ? 'opacity-50' : ''} ${isExpanded ? '' : 'flex-shrink-0'
+      className={`transition-opacity duration-200 ${isDragging ? 'opacity-50' : ''} ${isExpanded ? '' : 'flex-shrink-0'
         }`}
     >
       <div
-        className={`rounded-xl transition-all duration-300 flex flex-col min-h-[240px] ${isOver ? `ring-2 ${stage.color} ring-opacity-50` : ''
+        className={`rounded-xl transition-shadow duration-200 flex flex-col min-h-[240px] ${isOver ? `ring-2 ${stage.color} ring-opacity-50` : ''
           } ${isExpanded ? 'w-full' : 'w-[50px] shadow-sm'
           } border-0`}
         style={{
@@ -368,7 +368,7 @@ const FunnelColumn = memo(({
                 </div>
                 <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${stage.color}`}></div>
                 <h3 
-                  className="font-bold text-base truncate tracking-tight"
+                  className="font-medium text-base truncate"
                   style={{ color: 'hsl(var(--foreground))' }}
                 >
                   {stage.label}
@@ -532,7 +532,7 @@ const FunnelColumn = memo(({
                 {/* Nome rotacionado */}
                 <div className="flex-1 flex items-center justify-center">
                   <h3
-                    className="font-bold text-sm tracking-wide whitespace-nowrap"
+                    className="font-medium text-sm whitespace-nowrap"
                     style={{
                       writingMode: 'vertical-rl',
                       textOrientation: 'mixed',
@@ -1140,7 +1140,7 @@ export default function SalesFunnel({
                               setStages(template.stages);
                             }
                           }}
-                          className="flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all hover:scale-105 bg-card border-border hover:bg-muted/50"
+                          className="flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-colors bg-card border-border hover:bg-muted/50"
                         >
                           <TemplateIcon className={`w-6 h-6 ${template.iconColor}`} />
                           <span className="text-xs font-medium text-foreground">
@@ -1251,7 +1251,7 @@ export default function SalesFunnel({
                 </button>
                 <button
                   onClick={() => setShowStageEditor(false)}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-all duration-150"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity duration-150"
                 >
                   Fechar
                 </button>
@@ -1296,8 +1296,8 @@ export default function SalesFunnel({
                       <button
                         key={colorConfig.color}
                         onClick={() => setEditingStage({ ...editingStage, ...colorConfig })}
-                        className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all ${editingStage.color === colorConfig.color
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${editingStage.color === colorConfig.color
+                          ? 'border-foreground/25 bg-muted'
                           : 'border-border'
                           }`}
                       >
@@ -1379,7 +1379,7 @@ export default function SalesFunnel({
                     {stages.map(stage => (
                       <div
                         key={stage.id}
-                        className={`snap-start h-full transition-all duration-300 ${query && !(shownByStatus[stage.id] || []).length ? 'opacity-50' : ''} ${expandedColumns[stage.id] === false
+                        className={`snap-start h-full transition-opacity duration-200 ${query && !(shownByStatus[stage.id] || []).length ? 'opacity-50' : ''} ${expandedColumns[stage.id] === false
                           ? 'w-[60px] flex-none'
                           : 'w-[320px] flex-none'
                           }`}

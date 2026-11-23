@@ -108,11 +108,11 @@ export default function UpgradeModal({
 
           {/* Header */}
           <DialogHeader className="px-12 sm:px-6 pt-5 sm:pt-6 pb-2 sm:pb-3 flex-shrink-0">
-            <DialogTitle className="text-lg sm:text-xl text-center text-foreground font-bold">
+            <DialogTitle className="font-serif text-xl sm:text-2xl text-center text-foreground font-medium">
               Escolha o seu plano
             </DialogTitle>
             <DialogDescription className="text-center text-muted-foreground text-xs sm:text-sm mt-1">
-              Desbloqueie recursos e leve a sua operação ao próximo nível
+              Mais leads, mensagens e canais para a sua equipa
             </DialogDescription>
           </DialogHeader>
 
@@ -138,7 +138,7 @@ export default function UpgradeModal({
                 }`}
               >
                 Anual
-                <span className="ml-1.5 text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">-20%</span>
+                <span className="ml-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">−20%</span>
               </button>
             </div>
           </div>
@@ -155,7 +155,7 @@ export default function UpgradeModal({
                 return (
                   <div
                     key={plan.id}
-                    className={`relative rounded-xl p-4 sm:p-5 border bg-card transition flex flex-col ${
+                    className={`relative rounded-xl p-4 sm:p-5 border bg-card transition-colors flex flex-col ${
                       isBestValue ? 'border-foreground/25' : 'border-border hover:border-muted-foreground/40'
                     }`}
                   >
@@ -166,7 +166,7 @@ export default function UpgradeModal({
                     )}
                     {isCurrentPlan && (
                       <div className="absolute top-3 right-3">
-                        <span className="bg-green-500/10 text-green-600 dark:text-green-300 px-1.5 py-0.5 rounded text-[10px] border border-green-500/20">
+                        <span className="bg-muted text-muted-foreground px-2 py-0.5 rounded text-xs border border-border">
                           Atual
                         </span>
                       </div>
@@ -174,13 +174,13 @@ export default function UpgradeModal({
 
                     {/* Icon + name + price in one row on mobile */}
                     <div className="flex items-center gap-3 mb-3">
-                      <div className={`${config.bg} p-2 rounded-lg flex-shrink-0`}>
-                        <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${config.color}`} />
+                      <div className="p-2 rounded-lg flex-shrink-0 border border-border bg-muted">
+                        <Icon className="w-5 h-5 text-foreground" strokeWidth={1.5} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm sm:text-base font-bold text-foreground">{plan.name}</h3>
+                        <h3 className="text-sm sm:text-base font-medium text-foreground">{plan.name}</h3>
                         <div className="flex items-baseline gap-1 mt-0.5">
-                          <span className="text-xl sm:text-3xl font-bold text-foreground">
+                          <span className="text-xl sm:text-3xl font-medium tabular-nums text-foreground">
                             {plan.id === 'free' ? 'Grátis' : billingPeriod === 'annual' ? `$${plan.price?.annual || 0}` : `$${plan.price?.monthly || 0}`}
                           </span>
                           {plan.id !== 'free' && (
@@ -206,7 +206,7 @@ export default function UpgradeModal({
                     <Button
                       onClick={() => handleSelectPlan(plan.id)}
                       disabled={isCurrentPlan || loading}
-                      className={`w-full text-sm font-medium h-11 sm:h-9 rounded-lg mt-4 transition-all ${
+                      className={`w-full text-sm font-medium h-11 sm:h-9 rounded-lg mt-4 transition-colors ${
                         isCurrentPlan
                           ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-60'
                           : plan.id !== 'free'
@@ -217,9 +217,9 @@ export default function UpgradeModal({
                       {loading && selectedPlan === plan.id ? (
                         <span className="flex items-center justify-center gap-1.5">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          A carregar...
+                          A carregar…
                         </span>
-                      ) : isCurrentPlan ? 'Plano Atual' : plan.id === 'free' ? 'Fazer Downgrade' : 'Selecionar Plano'}
+                      ) : isCurrentPlan ? 'Plano atual' : plan.id === 'free' ? 'Mudar para grátis' : `Escolher ${plan.name}`}
                     </Button>
                   </div>
                 );
@@ -230,9 +230,11 @@ export default function UpgradeModal({
           {/* Footer */}
           <div className="flex-shrink-0 border-t border-border px-4 sm:px-6 py-3">
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-muted-foreground text-xs">
-              <span>✓ Sem taxas ocultas</span>
-              <span>✓ Cancele quando quiser</span>
-              <span>✓ Pagamento seguro</span>
+              <span>Sem taxas ocultas</span>
+              <span aria-hidden>·</span>
+              <span>Cancele quando quiser</span>
+              <span aria-hidden>·</span>
+              <span>Pagamento seguro</span>
             </div>
           </div>
 

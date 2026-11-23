@@ -198,12 +198,12 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
 
           {/* Icon + nome */}
           <div className="flex items-center gap-4 flex-1">
-            <div className={`w-14 h-14 bg-gradient-to-br ${colorMap[currentPlan] || 'from-gray-500 to-gray-600'} rounded-xl flex items-center justify-center flex-shrink-0`}>
-              <CurrentPlanIcon className="w-7 h-7 text-white" />
+            <div className="w-14 h-14 rounded-xl border border-border bg-muted flex items-center justify-center flex-shrink-0">
+              <CurrentPlanIcon className="w-6 h-6 text-foreground" strokeWidth={1.5} />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg font-bold text-foreground">{planNames[currentPlan] || 'Plano Atual'}</h2>
+                <h2 className="text-lg font-medium text-foreground">{planNames[currentPlan] || 'Plano atual'}</h2>
                 <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border ${statusInfo.color}`}>
                   <StatusIcon className="w-3 h-3" />
                   {statusInfo.label}
@@ -219,7 +219,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                 <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1 sm:justify-end">
                   <Calendar className="w-3 h-3" /> Ativação
                 </p>
-                <p className="text-sm font-semibold text-foreground">{fmt(user.plan_activated_at || user.planActivatedAt)}</p>
+                <p className="text-sm font-medium tabular-nums text-foreground">{fmt(user.plan_activated_at || user.planActivatedAt)}</p>
               </div>
             ) : null}
 
@@ -228,7 +228,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                 <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1 sm:justify-end">
                   <Clock className="w-3 h-3" /> Expiração
                 </p>
-                <p className={`text-sm font-semibold ${diasRestantes === 0 ? 'text-red-400' : diasRestantes !== null && diasRestantes <= RENEW_WARNING_DAYS ? 'text-orange-500' : 'text-foreground'}`}>
+                <p className={`text-sm font-medium tabular-nums ${diasRestantes === 0 ? 'text-red-400' : diasRestantes !== null && diasRestantes <= RENEW_WARNING_DAYS ? 'text-orange-500' : 'text-foreground'}`}>
                   {fmt(user.planExpiresAt || user.plan_expires_at)}
                 </p>
               </div>
@@ -239,7 +239,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                 <p className="text-xs text-muted-foreground mb-0.5 sm:justify-end flex items-center gap-1 sm:ml-auto">
                   <ShieldCheck className="w-3 h-3" /> Restam
                 </p>
-                <p className={`text-sm font-semibold ${diasRestantes === 0 ? 'text-red-400' : diasRestantes <= RENEW_WARNING_DAYS ? 'text-orange-500' : 'text-emerald-500'}`}>
+                <p className={`text-sm font-medium tabular-nums ${diasRestantes === 0 ? 'text-red-400' : diasRestantes <= RENEW_WARNING_DAYS ? 'text-orange-500' : 'text-foreground'}`}>
                   {diasRestantes === 0 ? 'Expirado' : `${diasRestantes} dia${diasRestantes === 1 ? '' : 's'}`}
                 </p>
               </div>
@@ -303,7 +303,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
             }`}
           >
             Anual
-            <span className="ml-2 text-xs bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">-20%</span>
+            <span className="ml-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">−20%</span>
           </button>
         </div>
       </div>
@@ -321,7 +321,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
             return (
               <div
                 key={plan.id}
-                className={`relative bg-card rounded-xl border transition-all flex flex-col ${
+                className={`relative bg-card rounded-xl border transition-colors flex flex-col ${
                   isCurrentPlan
                     ? 'border-foreground/25'
                     : 'border-border hover:border-muted-foreground/40'
@@ -329,7 +329,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
               >
                 {isCurrentPlan && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className={`bg-gradient-to-r ${colorMap[plan.id]} text-white text-xs font-medium px-3 py-1 rounded-full shadow`}>
+                    <span className="bg-foreground text-background text-xs font-medium px-3 py-1 rounded-full">
                       Plano atual
                     </span>
                   </div>
@@ -338,15 +338,15 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                 <div className="p-6 flex flex-col flex-1">
                   {/* Icon + name */}
                   <div className="flex items-center gap-3 mb-4">
-                    <div className={`w-12 h-12 bg-gradient-to-br ${plan.color} rounded-xl flex items-center justify-center`}>
-                      <Icon className="w-6 h-6 text-white" />
+                    <div className="w-12 h-12 rounded-xl border border-border bg-muted flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-foreground" strokeWidth={1.5} />
                     </div>
-                    <h3 className="text-xl font-bold text-foreground">{plan.id === 'free' || /^free$/i.test(plan.name) ? 'Grátis' : plan.name}</h3>
+                    <h3 className="text-xl font-medium text-foreground">{plan.id === 'free' || /^free$/i.test(plan.name) ? 'Grátis' : plan.name}</h3>
                   </div>
 
                   {/* Price */}
                   <div className="mb-5">
-                    <span className="text-4xl font-bold tabular-nums text-foreground">{planPrice(price)}</span>
+                    <span className="text-4xl font-medium tabular-nums text-foreground">{planPrice(price)}</span>
                     <span className="text-muted-foreground text-sm ml-1">/{billingPeriod === 'monthly' ? 'mês' : 'ano'}</span>
                     {billingPeriod === 'annual' && price > 0 && (
                       <p className="text-xs text-emerald-500 mt-1">≈ {planPrice(price / 12)}/mês</p>
@@ -357,7 +357,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                   <ul className="space-y-2.5 mb-6 flex-1">
                     {(plan.features || []).map((feature: string, i: number) => (
                       <li key={i} className="flex items-start gap-2.5">
-                        <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                        <Check className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                         <span className="text-sm text-muted-foreground">{feature}</span>
                       </li>
                     ))}
@@ -400,21 +400,20 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
         ) : paymentHistory.length === 0 ? (
           <div className="py-12 text-center">
             <History className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">Nenhum pagamento registado ainda.</p>
-            <p className="text-xs text-muted-foreground mt-1">Os pagamentos confirmados serão registados automaticamente.</p>
+            <p className="text-sm text-muted-foreground">Ainda sem pagamentos</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/20">
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Data</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Plano</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Ciclo</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Valor</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Cartão</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Método</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground">Data</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground">Plano</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground">Ciclo</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground">Valor</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground">Cartão</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground">Método</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -435,7 +434,7 @@ export default function PlanPage({ user, onUpgrade, diasRestantes = null }: Plan
                       <td className="px-6 py-4">
                         {item.card_brand && item.card_last4 ? (
                           <span className="inline-flex items-center gap-1.5 text-sm text-foreground">
-                            <span className="inline-flex items-center justify-center bg-blue-600 text-white text-xs font-bold px-1.5 py-0.5 rounded uppercase tracking-wide">
+                            <span className="inline-flex items-center justify-center bg-muted text-foreground text-xs font-medium px-1.5 py-0.5 rounded uppercase">
                               {item.card_brand}
                             </span>
                             •••• {item.card_last4}
