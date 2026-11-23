@@ -40,7 +40,7 @@ export default function ForgotPasswordPage({ onBackToLogin, onHaveCode }: Forgot
   if (success) {
     return (
       <AuthShell>
-        <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'rgba(103,93,255,0.12)' }}>
+        <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'rgba(37,99,235,0.12)' }}>
           <MailCheck className="h-6 w-6" style={{ color: PRIMARY }} />
         </div>
         <AuthTitle
@@ -76,7 +76,7 @@ export default function ForgotPasswordPage({ onBackToLogin, onHaveCode }: Forgot
               background: c.inputBg, border: `1px solid ${c.border}`,
               borderRadius: '6px', fontSize: '16px', color: c.inputText, caretColor: PRIMARY,
             }}
-            className="placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]"
+            className="placeholder:text-[#BFC8D6] transition-colors focus:outline-none focus:border-[#2563EB] focus:shadow-[0_0_0_4px_rgba(37,99,235,0.1)]"
           />
         </div>
         <AuthPrimaryButton disabled={!email.trim()} loading={loading}>

@@ -4,28 +4,10 @@ import { Mail, Lock, AlertCircle, Eye, EyeOff, Zap, Star } from 'lucide-react';
 import { authApi } from '../../utils/api';
 import { AppModal } from '../base/AppModal';
 import { AppButton } from '../base/AppButton';
-import { useThemeMode } from '../../context/ThemeModeContext';
-import { EmailCodeStep } from './AuthShared';
+import { EmailCodeStep, useAuthColors } from './AuthShared';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.leadsflowapi.com';
 
-// Cores do cartão de login por tema (o tema segue o telemóvel — ver utils/theme.ts)
-const LOGIN_COLORS = {
-  light: {
-    card: 'rgba(255,255,255,0.97)', cardBorder: 'rgba(255,255,255,0.3)',
-    title: '#1A2C44', muted: '#6B7280', label: '#414552', body: '#3C4257', link: '#533AFD',
-    inputBg: '#FFFFFF', inputText: '#273951', border: '#D4DEE9',
-    subtle: '#8A9BB0', faint: '#B0B8C4', divider: '#EEF0F3',
-    errorBg: '#FFF0F3', errorIcon: '#E61947', errorText: '#C0123C', warnBg: '#FFF8E6', warnText: '#CC4B00',
-  },
-  dark: {
-    card: 'rgba(22,23,27,0.95)', cardBorder: 'rgba(255,255,255,0.08)',
-    title: '#F1F5F9', muted: '#9CA3AF', label: '#D1D5DB', body: '#C7CBD4', link: '#A5B4FC',
-    inputBg: '#0F1013', inputText: '#F1F5F9', border: '#2E3240',
-    subtle: '#8B93A7', faint: '#6B7280', divider: '#24262B',
-    errorBg: 'rgba(230,25,71,0.12)', errorIcon: '#FB7185', errorText: '#FDA4AF', warnBg: 'rgba(204,75,0,0.14)', warnText: '#FDBA74',
-  },
-} as const;
 
 interface RatingSummary {
   average: number;
@@ -60,7 +42,7 @@ interface ErrorState {
 
 
 export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPassword }: LoginPageProps) {
-  const c = LOGIN_COLORS[useThemeMode()];
+  const c = useAuthColors();
   const [ratings, setRatings] = useState<RatingSummary | null>(null);
   const [, setCurrentReview] = useState(0);
   const [email, setEmail] = useState('');
@@ -512,7 +494,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
         {/* Logo — acima do card, alinhado à esquerda */}
         <div className="flex items-center gap-2.5 mb-5 sm:mb-8">
           <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
-            style={{ background: '#675DFF', boxShadow: '0 2px 12px rgba(103,93,255,0.45)' }}>
+            style={{ background: '#2563EB' }}>
             <Zap className="w-5 h-5 text-white" />
           </div>
           <span className="text-[19px] font-semibold text-white tracking-tight">LeadsFlow</span>
@@ -521,18 +503,15 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
         <div className="rounded-[12px] p-6 sm:p-10"
           style={{
             background: c.card,
-            border: '1px solid rgba(255,255,255,0.3)',
+            border: `1px solid ${c.cardBorder}`,
             boxShadow: '0 4px 16px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.06)',
             backdropFilter: 'blur(20px)',
           }}>
 
           {/* Title */}
-          <h1 className="text-[24px] leading-[32px] sm:text-[28px] sm:leading-[36px] font-semibold mb-1 sm:mb-2" style={{ color: c.title }}>
+          <h1 className="font-serif text-[28px] leading-[36px] sm:text-[32px] sm:leading-[40px] font-medium mb-6 sm:mb-8" style={{ color: c.title }}>
             Entrar na conta
           </h1>
-          <p className="text-[15px] mb-5 sm:mb-7" style={{ color: c.muted, fontWeight: 300 }}>
-            Bem-vindo de volta
-          </p>
 
           {/* Error */}
           {error && (
@@ -543,7 +522,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
                 border: `1px solid ${error.type === 'rate_limit' ? 'rgba(204,75,0,0.3)' : 'rgba(230,25,71,0.3)'}`,
               }}>
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: error.type === 'rate_limit' ? c.warnText : c.errorIcon }} />
-              <p className="text-[13px] leading-[18px] whitespace-pre-line" style={{ color: error.type === 'rate_limit' ? c.warnText : c.errorText, fontWeight: 300 }}>
+              <p className="text-[13px] leading-[18px] whitespace-pre-line" style={{ color: error.type === 'rate_limit' ? c.warnText : c.errorText, fontWeight: 400 }}>
                 {error.message}
               </p>
             </div>
@@ -559,14 +538,14 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
                 aria-invalid={!!fieldErrors.email} aria-describedby={fieldErrors.email ? 'email-error' : undefined}
                 style={{
                   width: '100%', height: '48px', paddingLeft: '14px', paddingRight: '14px',
-                  background: c.inputBg, border: `1px solid ${fieldErrors.email ? '#E61947' : c.border}`,
-                  borderRadius: '6px', fontSize: '16px', color: c.inputText, caretColor: '#675DFF',
+                  background: c.inputBg, border: `1px solid ${fieldErrors.email ? c.errorIcon : c.border}`,
+                  borderRadius: '6px', fontSize: '16px', color: c.inputText, caretColor: '#2563EB',
                   boxShadow: fieldErrors.email ? '0 0 0 4px rgba(230,25,71,0.1)' : 'none',
                 }}
-                className="placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]"
+                className="placeholder:text-[#BFC8D6] transition-colors focus:outline-none focus:border-[#2563EB] focus:shadow-[0_0_0_4px_rgba(37,99,235,0.1)]"
               />
               {fieldErrors.email && (
-                <p id="email-error" className="mt-1.5 flex items-center gap-1" style={{ fontSize: '13px', color: '#E61947', fontWeight: 300 }}>
+                <p id="email-error" className="mt-1.5 flex items-center gap-1" style={{ fontSize: '13px', color: c.errorIcon, fontWeight: 400 }}>
                   <AlertCircle className="w-3.5 h-3.5" />{fieldErrors.email}
                 </p>
               )}
@@ -578,8 +557,8 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
                 <label htmlFor="password" style={{ fontSize: '14px', color: c.label, fontWeight: 500 }}>Palavra-passe</label>
                 <button type="button"
                   onClick={() => onForgotPassword ? onForgotPassword() : setShowForgotPassword(true)}
-                  style={{ fontSize: '14px', color: c.link, fontWeight: 300 }}
-                  className="transition-colors hover:text-[#635BFF]">
+                  style={{ fontSize: '14px', color: c.link, fontWeight: 400 }}
+                  className="transition-colors hover:text-[#2563EB]">
                   Esqueceu a palavra-passe?
                 </button>
               </div>
@@ -590,11 +569,11 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
                   aria-invalid={!!fieldErrors.password} aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                   style={{
                     width: '100%', height: '48px', paddingLeft: '14px', paddingRight: '48px',
-                    background: c.inputBg, border: `1px solid ${fieldErrors.password ? '#E61947' : c.border}`,
-                    borderRadius: '6px', fontSize: '16px', color: c.inputText, caretColor: '#675DFF',
+                    background: c.inputBg, border: `1px solid ${fieldErrors.password ? c.errorIcon : c.border}`,
+                    borderRadius: '6px', fontSize: '16px', color: c.inputText, caretColor: '#2563EB',
                     boxShadow: fieldErrors.password ? '0 0 0 4px rgba(230,25,71,0.1)' : 'none',
                   }}
-                  className="placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]"
+                  className="placeholder:text-[#BFC8D6] transition-colors focus:outline-none focus:border-[#2563EB] focus:shadow-[0_0_0_4px_rgba(37,99,235,0.1)]"
                 />
                 <button aria-label={showPassword ? 'Esconder' : 'Mostrar'} type="button" onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
@@ -603,7 +582,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
                 </button>
               </div>
               {fieldErrors.password && (
-                <p id="password-error" className="mt-1.5 flex items-center gap-1" style={{ fontSize: '13px', color: '#E61947', fontWeight: 300 }}>
+                <p id="password-error" className="mt-1.5 flex items-center gap-1" style={{ fontSize: '13px', color: c.errorIcon, fontWeight: 400 }}>
                   <AlertCircle className="w-3.5 h-3.5" />{fieldErrors.password}
                 </p>
               )}
@@ -616,12 +595,12 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
               style={{
                 width: '100%', height: '50px', fontSize: '16px', fontWeight: 500,
                 borderRadius: '6px', border: 'none', marginTop: '8px',
-                background: loading || (lockUntil !== null && Date.now() < lockUntil) ? c.border : '#675DFF',
-                color: loading || (lockUntil !== null && Date.now() < lockUntil) ? c.body : c.inputBg,
-                boxShadow: loading || (lockUntil !== null && Date.now() < lockUntil) ? 'none' : '0 0 0 1px #675DFF',
+                background: loading || (lockUntil !== null && Date.now() < lockUntil) ? c.border : '#2563EB',
+                color: loading || (lockUntil !== null && Date.now() < lockUntil) ? c.body : '#FFFFFF',
+                boxShadow: loading || (lockUntil !== null && Date.now() < lockUntil) ? 'none' : '0 0 0 1px #2563EB',
                 transition: 'background-color 200ms ease',
               }}
-              className="transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60">
+              className="transition-colors hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60">
               {loading
                 ? 'Entrando...'
                 : lockUntil && Date.now() < lockUntil
@@ -632,9 +611,9 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           </form>
 
           {/* Create account */}
-          <p className="text-center mb-4 sm:mb-6" style={{ fontSize: '14px', color: c.body, fontWeight: 300 }}>
+          <p className="text-center mb-4 sm:mb-6" style={{ fontSize: '14px', color: c.body, fontWeight: 400 }}>
             Não tem uma conta?{' '}
-            <button onClick={onSwitchToSignup} style={{ color: c.link, fontWeight: 400 }} className="transition-colors hover:text-[#635BFF]">
+            <button onClick={onSwitchToSignup} style={{ color: c.link, fontWeight: 400 }} className="transition-colors hover:text-[#2563EB]">
               Criar conta
             </button>
           </p>
@@ -642,7 +621,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           {/* Divider */}
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 border-t" style={{ borderColor: c.border }} />
-            <span style={{ fontSize: '13px', color: c.subtle, fontWeight: 300 }}>ou continue com</span>
+            <span style={{ fontSize: '13px', color: c.subtle, fontWeight: 400 }}>ou continue com</span>
             <div className="flex-1 border-t" style={{ borderColor: c.border }} />
           </div>
 
@@ -653,7 +632,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
               borderRadius: '6px', background: c.inputBg, border: `1px solid ${c.border}`,
               color: c.label, boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
             }}
-            className="flex items-center justify-center gap-3 transition-all hover:border-[#A497FC] hover:shadow-sm disabled:opacity-50">
+            className="flex items-center justify-center gap-3 transition-colors hover:border-[#93C5FD] hover:shadow-sm disabled:opacity-50">
             <GoogleIcon /><span>Entrar com Google</span>
           </AppButton>
 
@@ -667,7 +646,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
                     stroke={n <= Math.round(ratings.average) ? '#FBBF24' : c.border} strokeWidth={1.5} />
                 ))}
               </div>
-              <span style={{ fontSize: '13px', color: c.subtle, fontWeight: 300 }}>
+              <span style={{ fontSize: '13px', color: c.subtle, fontWeight: 400 }}>
                 {ratings.average.toFixed(1)} de 5 · <span style={{ color: c.faint }}>{ratings.total} avaliações</span>
               </span>
             </div>
@@ -692,11 +671,11 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           title={
             <div className="text-center space-y-2 w-full" style={{ fontFamily: FONT }}>
               <div className="w-12 h-12 mx-auto rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(103,93,255,0.08)', border: '1px solid rgba(103,93,255,0.15)' }}>
-                <Lock className="w-5 h-5" style={{ color: '#675DFF' }} />
+                style={{ background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.15)' }}>
+                <Lock className="w-5 h-5" style={{ color: '#2563EB' }} />
               </div>
-              <span className="block" style={{ fontSize: '20px', fontWeight: 600, color: '#1A2C44' }}>Verificação em dois fatores</span>
-              <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>Insira o código de 6 dígitos do seu app autenticador.</p>
+              <span className="block" style={{ fontSize: '20px', fontWeight: 600, color: c.title }}>Verificação em dois fatores</span>
+              <p style={{ fontSize: '14px', color: c.body, fontWeight: 400 }}>Insira o código de 6 dígitos do seu app autenticador.</p>
             </div>
           }
         >
@@ -704,22 +683,22 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
             <form onSubmit={handle2FASubmit} className="space-y-4">
               <Input ref={twoFAInputRef} inputMode="numeric" placeholder="000000"
                 value={twoFACode} onChange={(e) => { setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6)); setTwoFAError(null); }} maxLength={6}
-                style={{ width: '100%', height: '56px', background: '#FFFFFF', border: '1px solid #D4DEE9', borderRadius: '6px', fontSize: '24px', letterSpacing: '0.5em', textAlign: 'center', color: '#273951', caretColor: '#675DFF' }}
-                className="placeholder:text-[#BFC8D6] focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)] transition-all"
+                style={{ width: '100%', height: '56px', background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: '6px', fontSize: '24px', letterSpacing: '0.5em', textAlign: 'center', color: c.inputText, caretColor: '#2563EB' }}
+                className="placeholder:text-[#BFC8D6] focus:outline-none focus:border-[#2563EB] focus:shadow-[0_0_0_4px_rgba(37,99,235,0.1)] transition-colors"
               />
               {twoFAError && (
-                <p className="flex items-center gap-1" style={{ fontSize: '13px', color: '#E61947' }}>
+                <p className="flex items-center gap-1" style={{ fontSize: '13px', color: c.errorIcon }}>
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />{twoFAError}
                 </p>
               )}
               <AppButton type="submit" loading={twoFAStatus === 'loading'} disabled={twoFACode.length < 6}
-                style={{ width: '100%', background: '#675DFF', borderRadius: '6px', height: '44px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
-                className="transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed">
+                style={{ width: '100%', background: '#2563EB', borderRadius: '6px', height: '44px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #2563EB' }}
+                className="transition-colors hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed">
                 {twoFAStatus === 'loading' ? 'A verificar...' : 'Verificar'}
               </AppButton>
             </form>
-            <button type="button" style={{ width: '100%', textAlign: 'center', fontSize: '13px', color: '#8A9BB0', fontWeight: 300 }}
-              className="transition-colors hover:text-[#533AFD]"
+            <button type="button" style={{ width: '100%', textAlign: 'center', fontSize: '13px', color: c.subtle, fontWeight: 400 }}
+              className="transition-colors hover:underline"
               onClick={() => { setShow2FAModal(false); setTwoFACode(''); setTwoFAError(null); }}>
               Cancelar e voltar
             </button>
@@ -736,39 +715,39 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
           className="p-8 space-y-0"
           title={
             <div className="text-center space-y-1.5 w-full" style={{ fontFamily: FONT }}>
-              <span className="block" style={{ fontSize: '24px', fontWeight: 600, color: '#1A2C44' }}>Recuperar palavra-passe</span>
-              <p style={{ fontSize: '14px', color: '#3C4257', fontWeight: 300 }}>Digite seu email para receber o link de recuperação</p>
+              <span className="block" style={{ fontSize: '24px', fontWeight: 600, color: c.title }}>Recuperar palavra-passe</span>
+              <p style={{ fontSize: '14px', color: c.body, fontWeight: 400 }}>Digite seu email para receber o link de recuperação</p>
             </div>
           }
         >
           <div className="space-y-6 pt-6" style={{ fontFamily: FONT }}>
             {resetSuccess && (
-              <div className="p-4 rounded-[8px]" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-                <p style={{ fontSize: '14px', color: '#15803D' }}>Email enviado! Verifique sua caixa de entrada.</p>
+              <div className="p-4 rounded-[8px]" style={{ background: c.okBg, border: '1px solid rgba(5,150,105,0.3)' }}>
+                <p style={{ fontSize: '14px', color: c.okText }}>Email enviado. Veja a sua caixa de entrada.</p>
               </div>
             )}
             {error && (
-              <div className="p-4 rounded-[8px] flex items-start gap-3" style={{ background: '#FFF0F3', border: '1px solid rgba(230,25,71,0.25)' }}>
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#E61947' }} />
-                <p style={{ fontSize: '13px', color: '#C0123C' }}>{error.message}</p>
+              <div className="p-4 rounded-[8px] flex items-start gap-3" style={{ background: c.errorBg, border: '1px solid rgba(230,25,71,0.25)' }}>
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: c.errorIcon }} />
+                <p style={{ fontSize: '13px', color: c.errorText }}>{error.message}</p>
               </div>
             )}
             <form onSubmit={(e) => { e.preventDefault(); handleForgotPassword(); }} className="space-y-4">
               <div>
-                <label style={{ display: 'block', fontSize: '14px', color: '#414552', marginBottom: '8px' }}>Email</label>
+                <label style={{ display: 'block', fontSize: '14px', color: c.label, marginBottom: '8px' }}>Email</label>
                 <Input id="reset-email" type="email" placeholder="seu@email.com" value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
-                  style={{ width: '100%', height: '44px', paddingLeft: '12px', background: '#FFFFFF', border: '1px solid #D4DEE9', borderRadius: '6px', fontSize: '16px', color: '#273951', caretColor: '#675DFF' }}
-                  className="placeholder:text-[#BFC8D6] focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)] transition-all" required />
+                  style={{ width: '100%', height: '44px', paddingLeft: '12px', background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: '6px', fontSize: '16px', color: c.inputText, caretColor: '#2563EB' }}
+                  className="placeholder:text-[#BFC8D6] focus:outline-none focus:border-[#2563EB] focus:shadow-[0_0_0_4px_rgba(37,99,235,0.1)] transition-colors" required />
               </div>
               <div className="flex gap-3">
                 <AppButton type="button" onClick={() => { setShowForgotPassword(false); setResetEmail(''); setError(null); }}
-                  style={{ flex: 1, background: 'rgba(239,239,239,0.3)', border: '1px solid #D4DEE9', borderRadius: '6px', height: '44px', fontSize: '14px', color: '#414552', fontWeight: 300 }}
-                  className="transition-all hover:border-[#A497FC]">Cancelar
+                  style={{ flex: 1, background: 'rgba(239,239,239,0.3)', border: `1px solid ${c.border}`, borderRadius: '6px', height: '44px', fontSize: '14px', color: c.label, fontWeight: 400 }}
+                  className="transition-colors hover:border-[#93C5FD]">Cancelar
                 </AppButton>
                 <AppButton type="submit" loading={loading}
-                  style={{ flex: 1, background: '#675DFF', borderRadius: '6px', height: '44px', fontSize: '14px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #675DFF' }}
-                  className="transition-all hover:brightness-110 disabled:opacity-60">
+                  style={{ flex: 1, background: '#2563EB', borderRadius: '6px', height: '44px', fontSize: '14px', fontWeight: 500, border: 'none', color: '#fff', boxShadow: '0 0 0 1px #2563EB' }}
+                  className="transition-colors hover:brightness-110 disabled:opacity-60">
                   {loading ? 'A enviar...' : 'Enviar link'}
                 </AppButton>
               </div>

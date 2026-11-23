@@ -12,7 +12,7 @@ export const AUTH_FONT = 'var(--font-sans)';
 export const AUTH_COLORS = {
   light: {
     card: 'rgba(255,255,255,0.97)', cardBorder: 'rgba(255,255,255,0.3)',
-    title: '#1A2C44', muted: '#6B7280', label: '#414552', body: '#3C4257', link: '#533AFD',
+    title: '#1A2C44', muted: '#6B7280', label: '#414552', body: '#3C4257', link: '#1D4ED8',
     inputBg: '#FFFFFF', inputText: '#273951', border: '#D4DEE9',
     subtle: '#8A9BB0', faint: '#B0B8C4', divider: '#EEF0F3',
     errorBg: '#FFF0F3', errorIcon: '#E61947', errorText: '#C0123C', warnBg: '#FFF8E6', warnText: '#CC4B00',
@@ -20,7 +20,7 @@ export const AUTH_COLORS = {
   },
   dark: {
     card: 'rgba(22,23,27,0.95)', cardBorder: 'rgba(255,255,255,0.08)',
-    title: '#F1F5F9', muted: '#9CA3AF', label: '#D1D5DB', body: '#C7CBD4', link: '#A5B4FC',
+    title: '#F1F5F9', muted: '#9CA3AF', label: '#D1D5DB', body: '#C7CBD4', link: '#93C5FD',
     inputBg: '#0F1013', inputText: '#F1F5F9', border: '#2E3240',
     subtle: '#8B93A7', faint: '#6B7280', divider: '#24262B',
     errorBg: 'rgba(230,25,71,0.12)', errorIcon: '#FB7185', errorText: '#FDA4AF', warnBg: 'rgba(204,75,0,0.14)', warnText: '#FDBA74',
@@ -34,7 +34,7 @@ export function useAuthColors(): AuthColors {
   return AUTH_COLORS[useThemeMode()];
 }
 
-export const PRIMARY = '#675DFF';
+export const PRIMARY = '#2563EB';
 
 /** Logótipo + cartão, igual em todas as páginas de entrada */
 export function AuthShell({ children }: { children: ReactNode }) {
@@ -45,7 +45,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
       <div className="relative z-10 w-full max-w-[520px] flex flex-col">
         <div className="flex items-center gap-2.5 mb-5 sm:mb-8">
           <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
-            style={{ background: PRIMARY, boxShadow: '0 2px 12px rgba(103,93,255,0.45)' }}>
+            style={{ background: PRIMARY }}>
             <Zap className="w-5 h-5 text-white" />
           </div>
           <span className="text-[19px] font-semibold text-white tracking-tight">LeadsFlow</span>
@@ -69,11 +69,11 @@ export function AuthTitle({ title, subtitle }: { title: string; subtitle?: React
   const c = useAuthColors();
   return (
     <>
-      <h1 className="text-[24px] leading-[32px] sm:text-[28px] sm:leading-[36px] font-semibold mb-1 sm:mb-2" style={{ color: c.title }}>
+      <h1 className={`font-serif text-[28px] leading-[36px] sm:text-[32px] sm:leading-[40px] font-medium ${subtitle ? "mb-2" : "mb-6 sm:mb-8"}`} style={{ color: c.title }}>
         {title}
       </h1>
       {subtitle && (
-        <p className="text-[15px] mb-5 sm:mb-7" style={{ color: c.muted, fontWeight: 300 }}>{subtitle}</p>
+        <p className="text-[15px] mb-5 sm:mb-7" style={{ color: c.muted, fontWeight: 400 }}>{subtitle}</p>
       )}
     </>
   );
@@ -106,7 +106,7 @@ export function AuthPrimaryButton({ children, disabled, loading, type = 'submit'
         background: off ? c.border : PRIMARY, color: off ? c.body : '#FFFFFF',
         boxShadow: off ? 'none' : `0 0 0 1px ${PRIMARY}`, transition: 'background-color 200ms ease',
       }}
-      className="transition-all hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-70">
+      className="transition-colors hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-70">
       {children}
     </AppButton>
   );
@@ -181,7 +181,7 @@ export function CodeInput({ value, onChange, length = 6, autoFocus = true, inval
             } else if (e.key === 'ArrowLeft' && i > 0) refs.current[i - 1]?.focus();
             else if (e.key === 'ArrowRight' && i < length - 1) refs.current[i + 1]?.focus();
           }}
-          className="h-14 w-full min-w-0 rounded-[8px] text-center text-[24px] font-semibold tabular-nums transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.15)] disabled:opacity-60"
+          className="h-14 w-full min-w-0 rounded-[8px] text-center text-[24px] font-semibold tabular-nums transition-colors focus:outline-none focus:border-[#2563EB] focus:shadow-[0_0_0_4px_rgba(37,99,235,0.15)] disabled:opacity-60"
           style={{
             background: c.inputBg, color: c.inputText, caretColor: PRIMARY,
             border: `1px solid ${invalid ? '#E61947' : d ? PRIMARY : c.border}`,

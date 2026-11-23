@@ -172,8 +172,8 @@ export default function AcceptInvitePage({ onSuccess }: AcceptInvitePageProps) {
                     <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
                         <CheckCircle className="w-8 h-8 text-green-500" />
                     </div>
-                    <h1 className="text-xl font-semibold text-foreground mb-2">Convite aceite!</h1>
-                    <p className="text-muted-foreground">Bem-vindo à equipa <strong>{acceptedWorkspace}</strong>. A redirecionar…</p>
+                    <h1 className="text-xl font-semibold text-foreground mb-2">Convite aceite</h1>
+                    <p className="text-muted-foreground">Entrou na equipa <strong>{acceptedWorkspace}</strong>. A redirecionar…</p>
                     <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mx-auto mt-4" />
                 </div>
             </div>
@@ -230,7 +230,7 @@ export default function AcceptInvitePage({ onSuccess }: AcceptInvitePageProps) {
                                         value={name}
                                         onChange={e => setName(e.target.value)}
                                         placeholder="O teu nome"
-                                        className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                                        className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition-colors"
                                         autoFocus
                                     />
                                 </div>
@@ -249,7 +249,7 @@ export default function AcceptInvitePage({ onSuccess }: AcceptInvitePageProps) {
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
                                     placeholder={hasAccount ? 'A tua palavra-passe' : 'Mínimo 6 caracteres'}
-                                    className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                                    className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition-colors"
                                     autoFocus={hasAccount}
                                 />
                                 <button aria-label={showPassword ? 'Esconder' : 'Mostrar'}
@@ -275,7 +275,7 @@ export default function AcceptInvitePage({ onSuccess }: AcceptInvitePageProps) {
                                         value={confirmPassword}
                                         onChange={e => setConfirmPassword(e.target.value)}
                                         placeholder="Repete a palavra-passe"
-                                        className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                                        className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition-colors"
                                     />
                                 </div>
                             </div>

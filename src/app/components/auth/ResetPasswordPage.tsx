@@ -74,7 +74,7 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
     background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: '6px',
     fontSize: '16px', color: c.inputText, caretColor: PRIMARY,
   } as const;
-  const inputClass = 'placeholder:text-[#BFC8D6] transition-all focus:outline-none focus:border-[#635BFF] focus:shadow-[0_0_0_4px_rgba(99,91,255,0.1)]';
+  const inputClass = 'placeholder:text-[#BFC8D6] transition-colors focus:outline-none focus:border-[#2563EB] focus:shadow-[0_0_0_4px_rgba(37,99,235,0.1)]';
   const labelStyle = { display: 'block', fontSize: '14px', color: c.label, marginBottom: '8px', fontWeight: 500 } as const;
 
   if (success) {
@@ -130,7 +130,7 @@ export default function ResetPasswordPage({ onSuccess, onBackToLogin }: ResetPas
           <label htmlFor="confirmPassword" style={labelStyle}>Confirmar palavra-passe</label>
           <Input id="confirmPassword" type={showPassword ? 'text' : 'password'} autoComplete="new-password" placeholder="Repita a palavra-passe"
             value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required
-            style={{ ...inputStyle, paddingRight: '14px', borderColor: mismatch ? '#E61947' : c.border }} className={inputClass} />
+            style={{ ...inputStyle, paddingRight: '14px', borderColor: mismatch ? c.errorIcon : c.border }} className={inputClass} />
           {mismatch && <p className="mt-1.5" style={{ fontSize: '13px', color: c.errorIcon }}>As palavras-passe não coincidem</p>}
         </div>
 
