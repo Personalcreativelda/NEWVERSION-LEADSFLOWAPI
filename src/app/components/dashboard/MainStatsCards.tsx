@@ -40,9 +40,8 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
       value: totalLeads.toLocaleString(getLocale(), NUMBER_OPTS),
       label: 'Total de leads',
       icon: Database,
-      iconColor: '#B794F6',
       badge: badgeTotalLeads,
-      progressColor: '#B794F6',
+      progressColor: 'hsl(var(--primary))',
       progress: progressTotalLeads,
     },
     {
@@ -50,9 +49,8 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
       value: leadsNovosHoje.toLocaleString(getLocale(), NUMBER_OPTS),
       label: 'Leads captados hoje',
       icon: TrendingUp,
-      iconColor: '#5B9FED',
       badge: badgeLeadsHoje,
-      progressColor: '#5B9FED',
+      progressColor: 'hsl(var(--primary))',
       progress: progressLeadsHoje,
     },
     {
@@ -60,9 +58,8 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
       value: leadsFechados.toLocaleString(getLocale(), NUMBER_OPTS),
       label: 'Leads convertidos',
       icon: CheckCircle2,
-      iconColor: '#00D9A3',
       badge: badgeConvertidos,
-      progressColor: '#00D9A3',
+      progressColor: 'hsl(var(--primary))',
       progress: progressConvertidos,
     },
     {
@@ -70,9 +67,8 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
       value: formatPercent(parseFloat(taxaConversao)),
       label: 'Taxa de conversão',
       icon: Target,
-      iconColor: '#FFA26B',
       badge: null as string | null,
-      progressColor: '#FFA26B',
+      progressColor: 'hsl(var(--primary))',
       progress: parseFloat(taxaConversao),
     },
   ];
@@ -86,18 +82,12 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
             <div id={stat.id} className="p-3 sm:p-5">
               {/* Header: icon + badge */}
               <div className="flex items-center justify-between mb-4">
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: `${stat.iconColor}15` }}
-                >
-                  <Icon className="w-5 h-5" style={{ color: stat.iconColor }} />
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                  <Icon className="w-5 h-5 text-muted-foreground" />
                 </div>
 
                 {stat.badge && (
-                  <span
-                    className="px-2 py-0.5 rounded-full text-[11px] font-semibold tabular-nums"
-                    style={{ backgroundColor: `${stat.progressColor}12`, color: stat.progressColor }}
-                  >
+                  <span className="text-xs text-muted-foreground tabular-nums">
                     {stat.badge}
                   </span>
                 )}
@@ -105,7 +95,7 @@ export default function MainStatsCards({ totalLeads, leadsNovosHoje, leadsFechad
 
               {/* Value */}
               <div className="mb-0.5">
-                <span className="text-2xl sm:text-3xl font-semibold leading-tight text-foreground tracking-tight tabular-nums">
+                <span className="text-2xl sm:text-3xl font-medium leading-tight text-foreground tabular-nums">
                   {stat.value}
                 </span>
               </div>

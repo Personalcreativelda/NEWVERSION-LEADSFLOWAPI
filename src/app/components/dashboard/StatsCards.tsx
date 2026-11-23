@@ -65,29 +65,29 @@ export default function StatsCards({ leads = [] }: StatsCardsProps) {
       title: 'Leads novos',
       value: leadsNovos.toLocaleString(getLocale(), NUMBER_OPTS),
       icon: TrendingUp,
-      iconBg: 'bg-blue-500/10',
-      iconColor: 'text-blue-600 dark:text-blue-400',
+      iconBg: 'bg-muted',
+      iconColor: 'text-muted-foreground',
     },
     {
       title: 'Em negociação',
       value: leadsEmNegociacao.toLocaleString(getLocale(), NUMBER_OPTS),
       icon: Target,
-      iconBg: 'bg-orange-500/10',
-      iconColor: 'text-orange-600 dark:text-orange-400',
+      iconBg: 'bg-muted',
+      iconColor: 'text-muted-foreground',
     },
     {
       title: 'Qualificados',
       value: leadsQualificados.toLocaleString(getLocale(), NUMBER_OPTS),
       icon: CheckCircle2,
-      iconBg: 'bg-purple-500/10',
-      iconColor: 'text-purple-600 dark:text-purple-400',
+      iconBg: 'bg-muted',
+      iconColor: 'text-muted-foreground',
     },
     {
       title: 'Leads perdidos',
       value: leadsPerdidos.toLocaleString(getLocale(), NUMBER_OPTS),
       icon: XCircle,
-      iconBg: 'bg-red-500/10',
-      iconColor: 'text-red-600 dark:text-red-400',
+      iconBg: 'bg-muted',
+      iconColor: 'text-muted-foreground',
     },
   ];
 
@@ -103,7 +103,7 @@ export default function StatsCards({ leads = [] }: StatsCardsProps) {
                 <Icon className={`w-5 h-5 ${stat.iconColor}`} />
               </div>
               <div className="w-full min-w-0 sm:flex-1">
-                <p className="text-2xl font-semibold text-foreground tracking-tight tabular-nums">
+                <p className="text-2xl font-medium text-foreground tabular-nums">
                   {stat.value}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">

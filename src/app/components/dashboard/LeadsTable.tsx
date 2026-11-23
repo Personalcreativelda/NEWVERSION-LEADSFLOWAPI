@@ -316,21 +316,21 @@ export default function LeadsTable({
         <div className="flex gap-1.5 justify-end">
           <button
             onClick={() => chat(lead)}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-green-600 dark:hover:text-green-400 hover:bg-green-500/10 transition-all duration-150"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-green-600 dark:hover:text-green-400 hover:bg-green-500/10 transition-colors duration-150"
             title="WhatsApp"
           >
             <MessageCircle className="w-4 h-4" />
           </button>
           <button
             onClick={() => edit(lead)}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-500/10 transition-all duration-150"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-500/10 transition-colors duration-150"
             title="Editar"
           >
             <Edit className="w-4 h-4" />
           </button>
           <button
             onClick={() => remove(lead)}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-all duration-150"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors duration-150"
             title="Apagar"
           >
             <Trash2 className="w-4 h-4" />
@@ -374,7 +374,7 @@ export default function LeadsTable({
               onFocus={() => setBuscaFocada(true)}
               onBlur={() => { setBuscaFocada(false); recentes.remember(busca); }}
               placeholder="Pesquisar leads…"
-              className="w-full pl-9 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all duration-150"
+              className="w-full pl-9 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-colors duration-150"
             />
           </div>
           <RecentSearchChips items={recentes.items} visible={buscaFocada && !busca} onPick={handleBuscaChange} />
@@ -441,7 +441,7 @@ export default function LeadsTable({
                 value={busca}
                 onChange={(e) => handleBuscaChange(e.target.value)}
                 placeholder="Pesquisar leads..."
-                className="pl-9 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-all duration-150"
+                className="pl-9 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring transition-colors duration-150"
               />
             </div>
           </div>
