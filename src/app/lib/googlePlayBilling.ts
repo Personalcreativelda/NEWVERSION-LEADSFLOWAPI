@@ -29,6 +29,13 @@ function emit(detail: Record<string, unknown>) {
   window.dispatchEvent(new CustomEvent(GOOGLE_PLAY_BILLING_EVENT, { detail }));
 }
 
+/** O utilizador fechou o checkout da Google: não é um erro, não se mostra nada. */
+function isCancelled(error: { code?: unknown; message?: unknown } | null | undefined): boolean {
+  if (!error) return false;
+  if (billingModule && error.code === billingModule.ErrorCode.PAYMENT_CANCELLED) return true;
+  return /cancel/i.test(String(error.message || ''));
+}
+
 function errorMessage(error: unknown, fallback = 'Não foi possível concluir a compra na Google Play.') {
   if (error && typeof error === 'object' && 'message' in error) {
     const message = String((error as { message?: unknown }).message || '').trim();
@@ -111,6 +118,7 @@ export async function initGooglePlayBilling(): Promise<GooglePlayConfig> {
         });
 
       store.error((error) => {
+        if (isCancelled(error)) return;
         emit({ type: 'error', code: error.code, message: error.message });
       });
     }
@@ -134,7 +142,11 @@ export async function initGooglePlayBilling(): Promise<GooglePlayConfig> {
   return initPromise;
 }
 
-export async function purchaseGooglePlay(planId: string, billingCycle: 'monthly' | 'annual') {
+/** Abre o checkout da Google. Devolve 'cancelled' se o utilizador o fechar sem comprar. */
+export async function purchaseGooglePlay(
+  planId: string,
+  billingCycle: 'monthly' | 'annual',
+): Promise<'started' | 'cancelled'> {
   const config = await initGooglePlayBilling();
   if (!config.enabled) throw new Error('Os pagamentos Google Play ainda não estão configurados.');
   if (!Capacitor.isNativePlatform()) throw new Error('A compra só pode ser concluída na aplicação Android.');
@@ -152,7 +164,11 @@ export async function purchaseGooglePlay(planId: string, billingCycle: 'monthly'
   if (!offer) throw new Error('Este plano ainda não está disponível na Google Play.');
 
   const orderError = await offer.order({ applicationUsername: config.accountId || undefined });
-  if (orderError) throw new Error(orderError.message || 'A compra não foi concluída.');
+  if (orderError) {
+    if (isCancelled(orderError)) return 'cancelled';
+    throw new Error(orderError.message || 'A compra não foi concluída.');
+  }
+  return 'started';
 }
 
 export async function restoreGooglePlayPurchases() {

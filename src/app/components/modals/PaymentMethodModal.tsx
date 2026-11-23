@@ -1,17 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiRequest, plansApi } from '../../utils/api';
 import { toast } from 'sonner';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import { AppModal } from '../base/AppModal';
-import { LogoBox } from '../base/LogoBox';
 import { Button } from '../ui/button';
 import { getAppDistribution, type AppDistribution } from '../../../live-update';
 import {
   GOOGLE_PLAY_BILLING_EVENT,
   initGooglePlayBilling,
   purchaseGooglePlay,
-  restoreGooglePlayPurchases,
-  type GooglePlayConfig,
 } from '../../lib/googlePlayBilling';
 import { MobileMoneyLogo, preloadMobileLogos } from '../payments/MobileMoneyLogo';
 import {
@@ -75,9 +72,6 @@ export default function PaymentMethodModal({
   const [loading, setLoading] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'paypal' | null>(null);
   const [distribution, setDistribution] = useState<AppDistribution | null>(null);
-  const [playConfig, setPlayConfig] = useState<GooglePlayConfig | null>(null);
-  const [playError, setPlayError] = useState<string | null>(null);
-  const [restoring, setRestoring] = useState(false);
   const billingPeriod = initialBillingPeriod;
 
   // M-Pesa / e-Mola (configurados em Admin → Pagamentos)
@@ -109,12 +103,8 @@ export default function PaymentMethodModal({
       if (!alive) return;
       setDistribution(value);
       if (value === 'play') {
-        try {
-          const config = await initGooglePlayBilling();
-          if (alive) setPlayConfig(config);
-        } catch (error: any) {
-          if (alive) setPlayError(error?.message || 'Não foi possível ligar à Google Play.');
-        }
+        // Deixa a loja pronta antes do toque no plano (os erros aparecem ao comprar)
+        void initGooglePlayBilling().catch(() => {});
       } else {
         void loadMobileConfig().then((cfg) => { if (alive) setMobile(cfg); });
       }
@@ -122,49 +112,49 @@ export default function PaymentMethodModal({
     return () => { alive = false; };
   }, [isOpen]);
 
+  // Compra iniciada aqui: só ela mostra avisos (as renovações chegam pelo mesmo evento e são silenciosas).
+  // O componente fica montado na página do plano, por isso o aviso chega mesmo com o modal fechado.
+  const playPurchaseRef = useRef(false);
+  const onPaymentSuccessRef = useRef(onPaymentSuccess);
+  onPaymentSuccessRef.current = onPaymentSuccess;
+
   useEffect(() => {
-    if (!isOpen || distribution !== 'play') return;
+    if (distribution !== 'play') return;
     const handleBillingEvent = (event: Event) => {
+      if (!playPurchaseRef.current) return;
       const detail = (event as CustomEvent).detail || {};
       if (detail.type === 'verified') {
-        setLoading(false);
+        playPurchaseRef.current = false;
         toast.success('Pagamento confirmado. O plano já está ativo.');
-        onPaymentSuccess?.();
-        onClose();
+        onPaymentSuccessRef.current?.();
       } else if (detail.type === 'pending') {
-        setLoading(false);
+        playPurchaseRef.current = false;
         toast.info('Pagamento pendente na Google Play.');
       } else if (detail.type === 'error') {
-        setLoading(false);
+        playPurchaseRef.current = false;
         toast.error(detail.message || 'Não foi possível concluir a compra na Google Play.');
       }
     };
     window.addEventListener(GOOGLE_PLAY_BILLING_EVENT, handleBillingEvent);
     return () => window.removeEventListener(GOOGLE_PLAY_BILLING_EVENT, handleBillingEvent);
-  }, [distribution, isOpen, onClose, onPaymentSuccess]);
+  }, [distribution]);
 
-  const handleGooglePlayPayment = async () => {
-    if (!planId) return;
-    setLoading(true);
-    try {
-      await purchaseGooglePlay(planId, billingPeriod);
-    } catch (error: any) {
-      setLoading(false);
-      toast.error(error?.message || 'Não foi possível concluir a compra na Google Play.');
-    }
-  };
-
-  const handleRestoreGooglePlay = async () => {
-    setRestoring(true);
-    try {
-      await restoreGooglePlayPurchases();
-      toast.success('Compras restauradas.');
-    } catch (error: any) {
-      toast.error(error?.message || 'Não foi possível restaurar as compras.');
-    } finally {
-      setRestoring(false);
-    }
-  };
+  // Versão da Play Store: escolher o plano abre logo o checkout da Google, sem passo intermédio.
+  useEffect(() => {
+    if (!isOpen || distribution !== 'play' || !planId) return;
+    const plan = planId;
+    onClose();
+    playPurchaseRef.current = true;
+    void purchaseGooglePlay(plan, billingPeriod)
+      .then((result) => {
+        if (result === 'cancelled') playPurchaseRef.current = false;
+      })
+      .catch((error: any) => {
+        playPurchaseRef.current = false;
+        toast.error(error?.message || 'Não foi possível concluir a compra na Google Play.');
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, distribution, planId]);
 
   const mobileAmount = planId ? mobile?.prices?.[planId]?.[billingPeriod] ?? null : null;
   const mobileMethods = mobileAmount ? mobile?.methods || [] : [];
@@ -261,56 +251,9 @@ export default function PaymentMethodModal({
       ) },
   ];
 
-  // A versão distribuída pela Play Store nunca mostra Stripe, PayPal ou carteiras externas.
-  if (isOpen && (distribution === null || distribution === 'play')) {
-    const available = Boolean(
-      playConfig?.enabled &&
-      planId &&
-      playConfig.products.some((product) => product.planId === planId && product.billingCycle === billingPeriod),
-    );
-    return (
-      <AppModal
-        open={isOpen}
-        onOpenChange={(open) => { if (!open && !loading && !restoring) onClose(); }}
-        size="sm"
-        logo={<LogoBox brand="googleplay" />}
-        title="Google Play"
-        description={billingPeriod === 'monthly' ? 'Plano mensal' : 'Plano anual'}
-        footer={(
-          <>
-            <Button variant="outline" onClick={onClose} disabled={loading || restoring}>Cancelar</Button>
-            <Button onClick={handleGooglePlayPayment} disabled={!available || loading || restoring}>
-              {loading ? 'A aguardar…' : 'Continuar'}
-            </Button>
-          </>
-        )}
-      >
-        {distribution === null || (!playConfig && !playError) ? (
-          <div className="flex min-h-24 items-center justify-center">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : playError || !playConfig?.enabled ? (
-          <p className="text-sm text-destructive">
-            {playError || 'Os pagamentos Google Play ainda não estão configurados.'}
-          </p>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              A compra e a renovação são processadas com segurança pela sua conta Google Play.
-            </p>
-            <button
-              type="button"
-              onClick={handleRestoreGooglePlay}
-              disabled={loading || restoring}
-              className="text-sm font-medium text-primary hover:underline disabled:opacity-60"
-            >
-              {restoring ? 'A restaurar…' : 'Restaurar compras'}
-            </button>
-          </div>
-        )}
-      </AppModal>
-    );
-  }
+  // A versão distribuída pela Play Store nunca mostra Stripe, PayPal ou carteiras externas:
+  // o checkout é o da própria Google (efeito acima). Enquanto não se sabe a distribuição, nada.
+  if (distribution === null || distribution === 'play') return null;
 
   // ── Passo M-Pesa / e-Mola ──────────────────────────────────────────────────
   if (isOpen && mobileMethod && mobileAmount) {
