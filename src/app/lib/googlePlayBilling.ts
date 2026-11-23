@@ -155,19 +155,33 @@ export async function purchaseGooglePlay(
   const selected = config.products.find((product) =>
     product.planId === planId && product.billingCycle === billingCycle,
   );
-  if (!selected) throw new Error('Este plano não está disponível na Google Play.');
+  if (!selected) {
+    // Diagnóstico temporário: o que a API enviou ao app
+    const sent = config.products.map((p) => `${p.planId}/${p.billingCycle}`).join(', ') || 'nenhum';
+    throw new Error(`Este plano não está disponível na Google Play. [${planId}/${billingCycle} · API: ${sent}]`);
+  }
 
   const { store, Platform } = billingModule;
   const offerId = `${selected.productId}@${selected.basePlanId}`;
-  const findOffer = () => store.get(selected.productId, Platform.GOOGLE_PLAY)
-    ?.offers.find((candidate) => candidate.id === offerId);
+  const findOffer = () => {
+    const offers = store.get(selected.productId, Platform.GOOGLE_PLAY)?.offers || [];
+    // O plano base sem oferta extra; se só houver ofertas (ex.: período grátis), serve a primeira desse plano base.
+    return offers.find((candidate) => candidate.id === offerId)
+      || offers.find((candidate) => candidate.id.startsWith(`${offerId}@`));
+  };
   let offer = findOffer();
   if (!offer) {
     // A lista é pedida à Google ao abrir o app: um plano ativado depois só aparece se a pedirmos de novo.
     await store.update();
     offer = findOffer();
   }
-  if (!offer) throw new Error('Este plano ainda não está disponível na Google Play.');
+  if (!offer) {
+    // Diagnóstico temporário: o que a Google devolveu para este produto
+    const product = store.get(selected.productId, Platform.GOOGLE_PLAY);
+    const got = product ? (product.offers.map((o) => o.id).join(', ') || 'sem planos') : 'produto não devolvido';
+    const registered = store.products.map((p) => p.id).join(', ') || 'nenhum';
+    throw new Error(`Este plano ainda não está disponível na Google Play. [${offerId} · Google: ${got} · registados: ${registered}]`);
+  }
 
   const orderError = await offer.order({ applicationUsername: config.accountId || undefined });
   if (orderError) {
