@@ -155,11 +155,7 @@ export async function purchaseGooglePlay(
   const selected = config.products.find((product) =>
     product.planId === planId && product.billingCycle === billingCycle,
   );
-  if (!selected) {
-    // Diagnóstico temporário: o que a API enviou ao app
-    const sent = config.products.map((p) => `${p.planId}/${p.billingCycle}`).join(', ') || 'nenhum';
-    throw new Error(`Este plano não está disponível na Google Play. [${planId}/${billingCycle} · API: ${sent}]`);
-  }
+  if (!selected) throw new Error('Este plano não está disponível na Google Play.');
 
   const { store, Platform } = billingModule;
   const offerId = `${selected.productId}@${selected.basePlanId}`;
@@ -176,11 +172,9 @@ export async function purchaseGooglePlay(
     offer = findOffer();
   }
   if (!offer) {
-    // Diagnóstico temporário: o que a Google devolveu para este produto
-    const product = store.get(selected.productId, Platform.GOOGLE_PLAY);
-    const got = product ? (product.offers.map((o) => o.id).join(', ') || 'sem planos') : 'produto não devolvido';
-    const registered = store.products.map((p) => p.id).join(', ') || 'nenhum';
-    throw new Error(`Este plano ainda não está disponível na Google Play. [${offerId} · Google: ${got} · registados: ${registered}]`);
+    // A Google pode demorar horas a entregar um plano acabado de ativar
+    console.warn('[Google Play] Plano não devolvido pela Google:', offerId);
+    throw new Error('Este plano ainda não está disponível na Google Play.');
   }
 
   const orderError = await offer.order({ applicationUsername: config.accountId || undefined });
