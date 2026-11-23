@@ -158,9 +158,15 @@ export async function purchaseGooglePlay(
   if (!selected) throw new Error('Este plano não está disponível na Google Play.');
 
   const { store, Platform } = billingModule;
-  const product = store.get(selected.productId, Platform.GOOGLE_PLAY);
   const offerId = `${selected.productId}@${selected.basePlanId}`;
-  const offer = product?.offers.find((candidate) => candidate.id === offerId);
+  const findOffer = () => store.get(selected.productId, Platform.GOOGLE_PLAY)
+    ?.offers.find((candidate) => candidate.id === offerId);
+  let offer = findOffer();
+  if (!offer) {
+    // A lista é pedida à Google ao abrir o app: um plano ativado depois só aparece se a pedirmos de novo.
+    await store.update();
+    offer = findOffer();
+  }
   if (!offer) throw new Error('Este plano ainda não está disponível na Google Play.');
 
   const orderError = await offer.order({ applicationUsername: config.accountId || undefined });
