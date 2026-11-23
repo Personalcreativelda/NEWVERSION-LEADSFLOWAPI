@@ -345,7 +345,7 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
             toast.success(`Email de convite enviado para ${member.email}${sourceLabel}!`);
         } else {
             toast.warning(
-                `Membro adicionado! Sem SMTP configurado — email não enviado. Partilha o link manualmente.`,
+                `Membro adicionado. Sem SMTP configurado — email não enviado. Partilha o link manualmente.`,
                 { duration: 8000 }
             );
         }
@@ -388,9 +388,9 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
             const result = await apiRequest(`/team/invites/${invite.id}/resend`, 'POST');
             if (result.invite_url) { setLastInviteUrl(result.invite_url); setLastEmailSent(result.email_sent ?? false); }
             if (result.email_sent) {
-                toast.success('Email de convite reenviado!');
+                toast.success('Email de convite reenviado');
             } else {
-                toast.warning('Convite renovado! Sem SMTP — partilha o link manualmente.', { duration: 6000 });
+                toast.warning('Convite renovado. Sem SMTP — partilha o link manualmente.', { duration: 6000 });
             }
         } catch (err: any) {
             toast.error(err.message || 'Erro ao reenviar convite');
@@ -409,7 +409,7 @@ export function TeamSettingsPage({ currentUser }: TeamSettingsPageProps) {
     };
 
     const copyInviteUrl = (url: string) => {
-        navigator.clipboard.writeText(url).then(() => toast.success('Link copiado!'));
+        navigator.clipboard.writeText(url).then(() => toast.success('Link copiado'));
     };
 
     const pendingInvites = invites.filter(i => i.status === 'pending');

@@ -242,10 +242,10 @@ export default function InboxAutomations() {
       setActionLoading('save');
       if (editingId) {
         await userWebhooksApi.update(editingId, formData);
-        toast.success('Webhook atualizado com sucesso!');
+        toast.success('Webhook atualizado com sucesso');
       } else {
         await userWebhooksApi.create(formData);
-        toast.success('Webhook criado com sucesso!');
+        toast.success('Webhook criado com sucesso');
       }
       setCreateModalOpen(false);
       resetForm();
@@ -277,7 +277,7 @@ export default function InboxAutomations() {
       setActionLoading(`test-${webhook.id}`);
       const result = await userWebhooksApi.test(webhook.id);
       if (result.success) {
-        toast.success(`Teste enviado! Estado: ${result.status}`);
+        toast.success(`Teste enviado. Estado: ${result.status}`);
       } else {
         toast.error(`Falha no teste: ${result.error}`);
       }
@@ -323,7 +323,7 @@ export default function InboxAutomations() {
   // Copy to clipboard
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    toast.success(`${label} copiado!`);
+    toast.success(`${label} copiado`);
   };
 
   // Toggle category expansion
@@ -512,7 +512,7 @@ export default function InboxAutomations() {
                     size="sm"
                     onClick={() => handleDelete(webhook)}
                     disabled={actionLoading === webhook.id}
-                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                    className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>

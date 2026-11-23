@@ -45,7 +45,7 @@ export class ErrorBoundary extends Component<Props, State> {
                             <span className="text-3xl"></span> Something went wrong
                         </h1>
 
-                        <div className="bg-red-50 p-4 rounded-md mb-6 overflow-auto max-h-[300px]">
+                        <div className="bg-red-500/10 p-4 rounded-md mb-6 overflow-auto max-h-[300px]">
                             <p className="font-mono text-sm text-red-800 font-bold mb-2">
                                 {this.state.error?.toString()}
                             </p>

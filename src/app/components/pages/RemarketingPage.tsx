@@ -536,7 +536,7 @@ export default function RemarketingPage() {
       }
     }
     setSyncing(false);
-    if (ok > 0) toast.success(`${ok} fluxo(s) sincronizados com o servidor!`);
+    if (ok > 0) toast.success(`${ok} fluxo(s) sincronizados com o servidor`);
     if (fail > 0) toast.error(`${fail} fluxo(s) falharam — veja o console para detalhes.`);
     if (ok === 0 && fail === 0) toast.info('Todos os fluxos já estão no servidor.');
     fetchFlows(true);

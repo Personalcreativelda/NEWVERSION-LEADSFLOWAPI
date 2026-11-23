@@ -237,7 +237,7 @@ export function ChannelsList() {
         } else if (channelId === 'sms') {
             setSmsModalOpen(true);
         } else {
-            toast.info('Integração em breve!', {
+            toast.info('Integração em breve', {
                 description: 'Estamos finalizando os últimos ajustes deste canal.'
             });
         }
@@ -345,7 +345,7 @@ export function ChannelsList() {
                     closeModalAndResetEditing(setModalOpen);
                     loadChannels();
                     celebrate('Canal ligado');
-                    toast.success('Canal ligado!');
+                    toast.success('Canal ligado');
                 }}
                 editingChannel={editingChannel?.type === 'whatsapp' ? editingChannel : undefined}
             />
@@ -369,7 +369,7 @@ export function ChannelsList() {
                     closeModalAndResetEditing(setTelegramModalOpen);
                     loadChannels();
                     celebrate('Canal ligado');
-                    toast.success('Telegram ligado!');
+                    toast.success('Telegram ligado');
                 }}
                 editingChannel={editingChannel?.type === 'telegram' ? editingChannel : undefined}
             />
@@ -381,7 +381,7 @@ export function ChannelsList() {
                     closeModalAndResetEditing(setFacebookModalOpen);
                     loadChannels();
                     celebrate('Canal ligado');
-                    toast.success('Facebook Messenger ligado!');
+                    toast.success('Facebook Messenger ligado');
                 }}
                 editingChannel={editingChannel?.type === 'facebook' ? editingChannel : undefined}
             />
@@ -393,7 +393,7 @@ export function ChannelsList() {
                     closeModalAndResetEditing(setInstagramModalOpen);
                     loadChannels();
                     celebrate('Canal ligado');
-                    toast.success('Instagram ligado!');
+                    toast.success('Instagram ligado');
                 }}
                 editingChannel={editingChannel?.type === 'instagram' ? editingChannel : undefined}
             />
@@ -404,7 +404,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setWebsiteModalOpen);
                     loadChannels();
-                    toast.success('Chat do site configurado!');
+                    toast.success('Chat do site configurado');
                 }}
                 editingChannel={editingChannel?.type === 'website' ? editingChannel : undefined}
             />
@@ -415,7 +415,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setEmailModalOpen);
                     loadChannels();
-                    toast.success('Canal de email criado!');
+                    toast.success('Canal de email criado');
                 }}
                 editingChannel={editingChannel?.type === 'email' ? editingChannel : undefined}
             />
@@ -425,7 +425,7 @@ export function ChannelsList() {
                 onSuccess={() => {
                     closeModalAndResetEditing(setSmsModalOpen);
                     loadChannels();
-                    toast.success('Canal SMS configurado!');
+                    toast.success('Canal SMS configurado');
                 }}
                 editingChannel={editingChannel?.type === 'twilio_sms' ? editingChannel : undefined}
             />        </div>

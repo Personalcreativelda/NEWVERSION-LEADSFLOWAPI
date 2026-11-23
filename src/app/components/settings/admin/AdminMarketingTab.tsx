@@ -181,7 +181,7 @@ export const TEMPLATE_OPTIONS: { key: TemplateKey; label: string }[] = [
   { key: 'promo', label: 'Promoção' },
 ];
 
-const sectionTitle = 'mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
+const sectionTitle ='mb-2 px-1 text-xs font-medium text-muted-foreground';
 
 export const AdminMarketingTab: React.FC<AdminMarketingTabProps> = ({
   totalUsers, freeCount, businessCount, enterpriseCount, users,

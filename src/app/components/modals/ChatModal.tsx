@@ -41,7 +41,7 @@ export default function ChatModal({ isOpen, lead, onClose, webhookUrl }: ChatMod
     if (!mensagem.trim()) return;
 
     if (!webhookUrl || webhookUrl.trim() === '') {
-      alert('Configure o webhook de envio de mensagens nas definições!');
+      alert('Configure o webhook de envio de mensagens nas definições');
       return;
     }
 

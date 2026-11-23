@@ -188,7 +188,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
       });
 
       if (response.success) {
-        toast.success(`Plano ${selectedPlan} ativado com sucesso!`);
+        toast.success(`Plano ${selectedPlan} ativado com sucesso`);
         setShowActivateModal(false);
         setSelectedUser(null);
         loadUsers();
@@ -290,7 +290,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
       });
 
       if (response.success) {
-        toast.success(`Utilizador ${isSuspended ? 'reativado' : 'suspenso'} com sucesso!`);
+        toast.success(`Utilizador ${isSuspended ? 'reativado' : 'suspenso'} com sucesso`);
         loadUsers();
       }
     } catch (error: any) {
@@ -320,7 +320,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
     try {
       const response = await apiRequest(`/admin/delete-user/${userId}`, 'DELETE');
       if (response.success) {
-        toast.success('Utilizador removido com sucesso!');
+        toast.success('Utilizador removido com sucesso');
         loadUsers();
       }
     } catch (error: any) {
@@ -552,7 +552,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
         <AddUserModal
           onClose={() => setShowAddUserModal(false)}
           onCreated={() => {
-            toast.success('Utilizador criado com sucesso!');
+            toast.success('Utilizador criado com sucesso');
             loadUsers();
           }}
         />

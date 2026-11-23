@@ -168,25 +168,25 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
           <table className="w-full">
             <thead>
               <tr className="border-b border-border bg-muted">
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <th className="px-6 py-3.5 text-left text-xs font-medium text-muted-foreground r">
                   Utilizador
                 </th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <th className="px-6 py-3.5 text-left text-xs font-medium text-muted-foreground r">
                   Plano
                 </th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <th className="px-6 py-3.5 text-left text-xs font-medium text-muted-foreground r">
                   Estado
                 </th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <th className="px-6 py-3.5 text-left text-xs font-medium text-muted-foreground r">
                   Data de Entrada
                 </th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <th className="px-6 py-3.5 text-left text-xs font-medium text-muted-foreground r">
                   Receita Mensal
                 </th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <th className="px-6 py-3.5 text-left text-xs font-medium text-muted-foreground r">
                   Expira em
                 </th>
-                <th className="px-6 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <th className="px-6 py-3.5 text-left text-xs font-medium text-muted-foreground r">
                   Ações
                 </th>
               </tr>

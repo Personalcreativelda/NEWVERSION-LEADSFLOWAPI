@@ -92,17 +92,17 @@ export default function MassMessageModal({ isOpen, leads, onClose, webhookUrl, u
 
   const handleEnviar = async () => {
     if (selecionados.length === 0) {
-      alert('Selecione pelo menos um lead!');
+      alert('Selecione pelo menos um lead');
       return;
     }
 
     if (!mensagem.trim()) {
-      alert('Digite uma mensagem!');
+      alert('Digite uma mensagem');
       return;
     }
 
     if (!webhookUrl || webhookUrl.trim() === '') {
-      alert('Configure o webhook de envio em massa nas definições!');
+      alert('Configure o webhook de envio em massa nas definições');
       return;
     }
 

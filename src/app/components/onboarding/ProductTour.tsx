@@ -22,9 +22,9 @@ interface ProductTourProps {
 const tourSteps: TourStep[] = [
   {
     target: '#dashboard-welcome',
-    title: 'Bem-vindo ao LeadsFlow!',
+    title: 'Bem-vindo ao LeadsFlow',
     description: 'A plataforma completa de vendas e automação. Em poucos minutos vamos mostrar tudo o que precisa para fechar mais negócios.',
-    tip: 'Dica: Empresas que usam CRM vendem até 29% mais. Vamos configurar o seu!',
+    tip: 'Dica: Empresas que usam CRM vendem até 29% mais. Vamos configurar o seu',
     icon: <Target className="w-5 h-5" />,
     position: 'bottom',
   },
@@ -56,7 +56,7 @@ const tourSteps: TourStep[] = [
     target: '#leads-converted-card',
     title: 'Leads Convertidos',
     description: 'Leads marcados como "Convertido" no funil de vendas. Analise quais abordagens têm melhor resultado e replique para o time.',
-    tip: 'Dica: Celebre cada conversão! Defina metas semanais e acompanhe aqui.',
+    tip: 'Dica: Celebre cada conversão. Defina metas semanais e acompanhe aqui.',
     icon: <Check className="w-5 h-5" />,
     position: 'right',
   },
@@ -141,7 +141,7 @@ const tourSteps: TourStep[] = [
   },
   {
     target: '#dashboard-welcome',
-    title: 'Está pronto para vender mais!',
+    title: 'Está pronto para vender mais',
     description: 'Agora conhece todas as ferramentas do LeadsFlow. O próximo passo é ligar o seu WhatsApp, importar os primeiros leads e lançar uma campanha.',
     tip: 'Meta: nas próximas 24h conecte o WhatsApp e importe pelo menos 10 leads.',
     icon: <Target className="w-5 h-5" />,

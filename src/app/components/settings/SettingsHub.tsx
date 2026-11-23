@@ -43,7 +43,7 @@ export function Row({ icon: Icon, label, hint, onClick, danger, trailing }: {
 export function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
+      <h2 className="mb-2 px-1 text-xs font-medium text-muted-foreground">{title}</h2>
       <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">{children}</div>
     </section>
   );

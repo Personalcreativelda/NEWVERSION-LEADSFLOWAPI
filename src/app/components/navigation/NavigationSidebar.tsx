@@ -228,7 +228,7 @@ export default function NavigationSidebar({
               isCollapsed
                 ? <li className="sidebar-collapsed-divider" />
                 : <li className={`px-3 ${isMobile ? 'pt-4' : 'pt-6'} pb-1.5 sidebar-section-label`}>
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[hsl(var(--sidebar-muted))] opacity-60">
+                    <span className="text-xs font-medium text-[hsl(var(--sidebar-muted))] opacity-60">
                       {item.sectionLabel}
                     </span>
                   </li>
@@ -256,7 +256,7 @@ export default function NavigationSidebar({
             isCollapsed
               ? <li className="sidebar-collapsed-divider" />
               : <li className={`px-3 ${isMobile ? 'pt-4' : 'pt-6'} pb-1.5 sidebar-section-label`}>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[hsl(var(--sidebar-muted))] opacity-60">
+                  <span className="text-xs font-medium text-[hsl(var(--sidebar-muted))] opacity-60">
                     {item.sectionLabel}
                   </span>
                 </li>
@@ -294,7 +294,7 @@ export default function NavigationSidebar({
           isCollapsed
             ? <li className="sidebar-collapsed-divider" />
             : <li className={`px-3 ${isMobile ? 'pt-4' : 'pt-6'} pb-1.5 sidebar-section-label`}>
-                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[hsl(var(--sidebar-muted))] opacity-60">
+                <span className="text-xs font-medium text-[hsl(var(--sidebar-muted))] opacity-60">
                   {item.sectionLabel}
                 </span>
               </li>
@@ -416,7 +416,7 @@ export default function NavigationSidebar({
         className={`sidebar-root flex flex-col flex-shrink-0 ${
           isMobile
             // Fechado: sem sombra — fora do ecrã ela aparecia como uma linha na borda esquerda
-            ? `sidebar-mobile fixed top-0 right-0 z-[47] h-[100dvh] w-[85vw] max-w-[320px] rounded-l-2xl overflow-hidden ease-[cubic-bezier(0.32,0.72,0,1)] ${dragX ? '' : 'transition-transform duration-300'} ${isOpen ? 'translate-x-0 shadow-2xl' : 'translate-x-full shadow-none!'}`
+            ? `sidebar-mobile fixed top-0 right-0 z-[47] h-[100dvh] w-[85vw] max-w-[320px] rounded-l-2xl overflow-hidden ease-[cubic-bezier(0.32,0.72,0,1)] ${dragX ? '' : 'transition-transform duration-300'} ${isOpen ? 'translate-x-0 shadow-2xl' : 'translate-x-full shadow-none'}`
             : `fixed top-0 left-0 h-screen z-40 ${isResizing ? '' : 'transition-[width] duration-200 ease-out'}`
         }`}
         style={!isMobile ? { width: computedWidth } : dragX ? { transform: `translateX(${dragX}px)` } : undefined}

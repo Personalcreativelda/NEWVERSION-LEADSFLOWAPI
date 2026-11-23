@@ -69,7 +69,7 @@ export async function notifyLeadConverted(leadName: string, value?: number) {
   const valueText = value ? ` no valor de R$ ${value.toLocaleString(getLocale())}` : '';
   await createNotification({
     type: 'lead_converted',
-    title: 'Lead convertido!',
+    title: 'Lead convertido',
     message: `${leadName} fechou negócio${valueText}`,
     actionLabel: 'Ver deal',
     actionUrl: '/leads?filter=converted',
@@ -142,7 +142,7 @@ export async function notifyTaskReminder(taskName: string, leadName: string, tim
 export async function notifyWelcome() {
   await createNotification({
     type: 'welcome',
-    title: 'Bem-vindo ao LeadsFlow!',
+    title: 'Bem-vindo ao LeadsFlow',
     message: 'Comece a importar seus leads ou a ligar suas integrações.',
     actionLabel: 'Começar tour',
     actionUrl: '/tour',

@@ -338,7 +338,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
     try {
       setActionLoading(true);
       await assistantsApi.connect(selectedAssistant.id, selectedChannelIds, replaceChannelIds);
-      toast.success(`${selectedAssistant.name} ligado com sucesso!`);
+      toast.success(`${selectedAssistant.name} ligado com sucesso`);
       setConnectModalOpen(false);
       setSelectedAssistant(null);
       setSelectedChannelIds([]);
@@ -439,7 +439,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
         selectedChannelIds.length > 0 ? selectedChannelIds : undefined,
         replaceChannelIds
       );
-      toast.success(isPreview ? `${previewAssistant?.name || 'Assistente'} ligado com sucesso!` : 'Configuração guardada com sucesso!');
+      toast.success(isPreview ? `${previewAssistant?.name || 'Assistente'} ligado com sucesso` : 'Configuração guardada com sucesso');
       closeSettings();
       if (isPreview) setActiveTab('connected');
       loadData();
@@ -623,7 +623,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
       if (kbFile.status === 'failed') {
         toast.warning('Ficheiro enviado, mas não foi possível extrair texto dele (documento sem texto selecionável ou formato não suportado).');
       } else {
-        toast.success(kind === 'client' ? 'Ficheiro adicionado aos ficheiros para clientes!' : 'Documento adicionado à base de conhecimento!');
+        toast.success(kind === 'client' ? 'Ficheiro adicionado aos ficheiros para clientes' : 'Documento adicionado à base de conhecimento');
       }
       await loadKnowledgeFiles(selectedUserAssistant.id);
     } catch (err: any) {
@@ -739,10 +739,10 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
 
       if (editingAssistantId) {
         await assistantsApi.update(editingAssistantId, createForm);
-        toast.success('Assistente atualizado com sucesso!');
+        toast.success('Assistente atualizado com sucesso');
       } else {
         await assistantsApi.create(createForm);
-        toast.success('Assistente criado com sucesso!');
+        toast.success('Assistente criado com sucesso');
       }
 
       setCreateModalOpen(false);
@@ -1037,7 +1037,7 @@ export default function AssistantsPage({ isDark }: AssistantsPageProps) {
                     <Button aria-label="Apagar"
                       variant="ghost"
                       size="sm"
-                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                      className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
                       onClick={() => handleDeleteAssistant(assistant)}
                     >
                       <Trash2 className="w-4 h-4" />

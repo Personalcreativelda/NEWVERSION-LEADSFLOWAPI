@@ -206,7 +206,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
       const { teamApi } = await import('../../services/api/inbox');
       await teamApi.assignConversation(conversation.id, { assignee_id: memberId });
       setAssigneeId(memberId);
-      toast.success(memberId ? 'Conversa atribuída com sucesso!' : 'Atribuição removida');
+      toast.success(memberId ? 'Conversa atribuída com sucesso' : 'Atribuição removida');
     } catch (err: any) {
       toast.error(err?.response?.data?.error || err?.message || 'Erro ao atribuir conversa');
     }
@@ -395,7 +395,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
     setSendingMsgId(msg.id);
     try {
       await onSendMessage(resolved);
-      toast.success('Mensagem enviada!');
+      toast.success('Mensagem enviada');
     } catch (err) {
       console.error('[QuickMessage] Erro ao enviar:', err);
       toast.error('Erro ao enviar mensagem');
@@ -407,7 +407,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
   const handleCopyMessage = (msg: QuickMessage) => {
     const resolved = resolveTemplate(msg.text);
     navigator.clipboard.writeText(resolved);
-    toast.success('Copiado!');
+    toast.success('Copiado');
   };
 
   // Editable quick messages handlers
@@ -427,7 +427,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
     setQuickMessages(updated);
     saveQuickMessages(updated);
     setEditingMsgId(null);
-    toast.success('Mensagem atualizada!');
+    toast.success('Mensagem atualizada');
   };
 
   const handleDeleteMsg = (id: string) => {
@@ -515,7 +515,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
         }
       });
       if (res.ok) {
-        toast.success('Resumo gerado com sucesso!');
+        toast.success('Resumo gerado com sucesso');
         fetchNotes(); // Recarrega as notas para exibir o novo resumo
       } else {
         const errorData = await res.json();
@@ -601,7 +601,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
       
       setAvatarPreview(null);
       setIsEditing(false);
-      toast.success('Lead atualizado com sucesso!');
+      toast.success('Lead atualizado com sucesso');
     } catch (err) {
       console.error('Error saving lead:', err);
       setError('Erro ao guardar alterações');
@@ -622,7 +622,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
         description: 'Tarefa',
         scheduled_at: new Date(taskDate).toISOString(),
       });
-      toast.success('Tarefa criada com sucesso!');
+      toast.success('Tarefa criada com sucesso');
       setTaskTitle('');
       setTaskDate('');
       setActiveAction(null);
@@ -645,7 +645,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
         title: scheduleTitle.trim(),
         scheduled_at: new Date(scheduleDate).toISOString(),
       });
-      toast.success('Agendamento criado com sucesso!');
+      toast.success('Agendamento criado com sucesso');
       setScheduleTitle('');
       setScheduleDate('');
       setActiveAction(null);
@@ -994,7 +994,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             {/* Details Card */}
             <div className="rounded-xl border border-border/60 overflow-hidden">
               <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40">
-                <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                <h5 className="text-xs font-medium st text-muted-foreground">
                   Detalhes
                 </h5>
               </div>
@@ -1072,7 +1072,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             {/* Quick Notes Card */}
             <div className="rounded-xl border border-border/60 overflow-hidden">
               <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40 flex items-center justify-between">
-                <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <h5 className="text-xs font-medium st text-muted-foreground flex items-center gap-1.5">
                   <StickyNote className="w-3 h-3" />
                   Notas do lead
                 </h5>
@@ -1145,7 +1145,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             {editNotes && (
               <div className="rounded-xl border border-border/60 overflow-hidden">
                 <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40">
-                  <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  <h5 className="text-xs font-medium st text-muted-foreground">
                     Observações
                   </h5>
                 </div>
@@ -1158,7 +1158,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             {/* Quick Messages Card */}
             <div className="rounded-xl border border-border/60 overflow-hidden">
               <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40 flex items-center justify-between">
-                <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <h5 className="text-xs font-medium st text-muted-foreground flex items-center gap-1.5">
                   <Zap className="w-3 h-3" />
                   Mensagens Rápidas
                 </h5>
@@ -1312,7 +1312,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             {remarketingFlows.length > 0 && (
               <div className="rounded-xl border border-border/60 overflow-hidden">
                 <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40">
-                  <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <h5 className="text-xs font-medium st text-muted-foreground flex items-center gap-1.5">
                     <Target className="w-3 h-3" />
                     Remarketing
                   </h5>
@@ -1346,7 +1346,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
             {schedules.length > 0 && (
               <div className="rounded-xl border border-border/60 overflow-hidden">
                 <div className="px-3 py-2.5 bg-muted/40 border-b border-border/40">
-                  <h5 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  <h5 className="text-xs font-medium st text-muted-foreground">
                     Compromissos e Tarefas
                   </h5>
                 </div>
@@ -1387,7 +1387,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
 
             {/* Responsável (Assignee) */}
             <div className="space-y-2">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                 <UserCheck className="w-3 h-3" />
                 Responsável
               </div>
@@ -1406,7 +1406,7 @@ export function ContactDetailsPanel({ conversation, onClose, isEditingExternal, 
 
             {/* Internal Notes */}
             <div className="space-y-2">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                 <StickyNote className="w-3 h-3" />
                 Notas da conversa
               </div>

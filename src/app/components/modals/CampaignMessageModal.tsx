@@ -98,7 +98,7 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
           {/* Pré-visualização no estilo WhatsApp */}
           {campaign.type === 'whatsapp' && (
             <div className="mb-6">
-              <h3 className="text-sm font-semibold text-foreground/80 uppercase tracking-wider mb-3">Pré-visualização WhatsApp</h3>
+              <h3 className="text-sm font-medium text-foreground/80 r mb-3">Pré-visualização WhatsApp</h3>
               <div className="bg-[#ECE5DD] rounded-lg p-4">
                 <div className="bg-card rounded-lg shadow-sm p-4 max-w-md">
                   {/* Imagem/mídia anexada */}
@@ -153,7 +153,7 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
           {/* Pré-visualização Email */}
           {campaign.type === 'email' && (
             <div className="mb-6">
-              <h3 className="text-sm font-semibold text-foreground/80 uppercase tracking-wider mb-3">Pré-visualização Email</h3>
+              <h3 className="text-sm font-medium text-foreground/80 r mb-3">Pré-visualização Email</h3>
               <div className="border border-border rounded-lg overflow-hidden">
                 <div className="bg-muted/50 border-b border-border px-4 py-3">
                   <div className="flex items-center gap-2 text-sm">
@@ -200,7 +200,7 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
           {/* Pré-visualização SMS */}
           {campaign.type === 'sms' && (
             <div className="mb-6">
-              <h3 className="text-sm font-semibold text-foreground/80 uppercase tracking-wider mb-3">Pré-visualização SMS</h3>
+              <h3 className="text-sm font-medium text-foreground/80 r mb-3">Pré-visualização SMS</h3>
               <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 max-w-sm">
                 <div className="bg-[#34C759] text-white rounded-2xl rounded-br-sm px-4 py-3 max-w-xs ml-auto">
                   {message ? (
@@ -219,7 +219,7 @@ export default function CampaignMessageModal({ isOpen, onClose, campaign }: Camp
           {/* Mensagem Raw */}
           {message && (
             <div>
-              <h3 className="text-sm font-semibold text-foreground/80 uppercase tracking-wider mb-3">Mensagem Original</h3>
+              <h3 className="text-sm font-medium text-foreground/80 r mb-3">Mensagem Original</h3>
               <div className="bg-muted/50 rounded-lg p-4 border border-border">
                 <pre className="text-sm text-foreground/80 whitespace-pre-wrap font-mono">{message}</pre>
               </div>

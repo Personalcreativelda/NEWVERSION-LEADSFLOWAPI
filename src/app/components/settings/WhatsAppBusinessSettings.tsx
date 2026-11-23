@@ -183,7 +183,7 @@ function AccountTab({ channelId }: { channelId: string }) {
   return (
     <div className="space-y-5">
       <section>
-        <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conta</h3>
+        <h3 className="mb-2 px-1 text-xs font-medium text-muted-foreground">Conta</h3>
         <div className="divide-y divide-border rounded-xl border border-border bg-card">
           <InfoRow label="Nome" value={data.account.name} />
           <InfoRow
@@ -199,7 +199,7 @@ function AccountTab({ channelId }: { channelId: string }) {
 
       <section>
         <div className="mb-2 flex items-center justify-between px-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Números</h3>
+          <h3 className="text-xs font-medium text-muted-foreground">Números</h3>
           <Button variant="ghost" size="icon" onClick={load} aria-label="Atualizar"><RefreshCw className="h-4 w-4" /></Button>
         </div>
         <ul className="divide-y divide-border rounded-xl border border-border bg-card">

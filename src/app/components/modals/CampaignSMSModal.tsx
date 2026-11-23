@@ -197,9 +197,9 @@ export default function CampaignSMSModal({
         if (!sendResult.success) {
           throw new Error(sendResult.error || 'Erro ao iniciar envio');
         }
-        toast.success(`Campanha "${campaignName}" iniciada! A enviar para ${sendResult.recipientCount} contactos via Twilio.`);
+        toast.success(`Campanha "${campaignName}" iniciada. A enviar para ${sendResult.recipientCount} contactos via Twilio.`);
       } else {
-        toast.success(`Campanha "${campaignName}" agendada com sucesso!`);
+        toast.success(`Campanha "${campaignName}" agendada com sucesso`);
       }
 
       if (campaignId) {

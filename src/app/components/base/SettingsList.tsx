@@ -18,7 +18,7 @@ export function SettingsGroup({ title, action, children, className }: {
     <section className={className}>
       {(title || action) && (
         <div className="mb-2 flex min-h-5 items-center justify-between gap-3 px-1">
-          {title && <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>}
+          {title && <h2 className="text-xs font-medium text-muted-foreground">{title}</h2>}
           {action}
         </div>
       )}

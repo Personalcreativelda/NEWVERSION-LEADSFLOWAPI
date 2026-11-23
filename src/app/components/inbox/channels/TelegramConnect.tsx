@@ -100,7 +100,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                         bot_name: data.result.first_name
                     }
                 });
-                toast.success('Canal Telegram atualizado!');
+                toast.success('Canal Telegram atualizado');
             } else {
                 // Criar novo canal
                 await channelsApi.create({
@@ -114,7 +114,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                         bot_name: data.result.first_name
                     }
                 });
-                toast.success('Telegram ligado com sucesso!');
+                toast.success('Telegram ligado com sucesso');
             }
 
             setConnectionStatus('connected');
@@ -288,7 +288,7 @@ export function TelegramConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 <CheckCircle className="w-10 h-10 text-green-500" />
                             </div>
                             <h3 className="text-xl font-semibold mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                Telegram Ligado!
+                                Telegram Ligado
                             </h3>
                             <p className="text-sm mb-4" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 Seu bot <strong>@{botInfo?.username}</strong> está pronto para receber mensagens.

@@ -124,7 +124,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
             let channel;
             if (isEditing && editingChannel) {
                 channel = await channelsApi.update(editingChannel.id, channelData);
-                toast.success('Canal Website atualizado com sucesso!');
+                toast.success('Canal Website atualizado com sucesso');
                 onSuccess();
                 // Stay open so user can copy the widget code
                 setStep('code');
@@ -133,7 +133,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
                 if (channel) {
                     setChannelId(channel.id);
                     setStep('code');
-                    toast.success('Canal criado com sucesso!');
+                    toast.success('Canal criado com sucesso');
                 }
             }
         } catch (err: any) {
@@ -166,7 +166,7 @@ export function WebsiteWidgetConnect({ isOpen, onClose, onSuccess, editingChanne
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
-        toast.success('Código copiado!');
+        toast.success('Código copiado');
     };
 
     if (!isOpen) return null;

@@ -153,7 +153,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
     try {
       const response = await fetch(getApiUrl('/security/2fa/verify'), { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ code: verificationCode }) });
       if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Código inválido'); }
-      setSetupStep('backup'); setTwoFactorEnabled(true); toast.success('2FA ativado com sucesso!');
+      setSetupStep('backup'); setTwoFactorEnabled(true); toast.success('2FA ativado com sucesso');
     } catch (e: any) { toast.error(e.message || 'Código inválido'); }
     finally { setLoading(false); }
   };
@@ -177,7 +177,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Erro ao criar token'); }
       const data = await response.json();
       setGeneratedToken(data.apiToken); setShowGeneratedToken(true); loadTokens(); setNewTokenName('');
-      toast.success('Token criado com sucesso!', { description: 'Copie o token agora: não o vai poder ver de novo.' });
+      toast.success('Token criado com sucesso', { description: 'Copie o token agora: não o vai poder ver de novo.' });
     } catch (e: any) { toast.error(e.message || 'Erro ao criar token'); }
     finally { setLoading(false); }
   };
@@ -203,7 +203,7 @@ export default function AccountSettingsPage({ user, onUpdateUser, initialTab, on
       const response = await fetch(getApiUrl('/security/change-password'), { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ currentPassword, newPassword }) });
       if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Erro ao alterar senha'); }
       setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
-      toast.success('Palavra-passe alterada com sucesso!', { description: 'Enviámos-lhe um email de confirmação.' });
+      toast.success('Palavra-passe alterada com sucesso', { description: 'Enviámos-lhe um email de confirmação.' });
     } catch (e: any) { toast.error(e.message || 'Erro ao alterar palavra-passe'); }
     finally { setLoading(false); }
   };

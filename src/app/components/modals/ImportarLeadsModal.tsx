@@ -384,7 +384,7 @@ export default function ImportarLeadsModal({
  if (duplicatesSkipped > 0) {
  toast.success(`${imported} leads importados! (${duplicatesSkipped} duplicados ignorados)`);
  } else {
- toast.success(`${imported} leads importados com sucesso!`);
+ toast.success(`${imported} leads importados com sucesso`);
  }
 
  // Close modal after 2 seconds

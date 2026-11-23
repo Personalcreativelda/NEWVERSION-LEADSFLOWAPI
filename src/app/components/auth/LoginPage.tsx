@@ -223,7 +223,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
         
         // If the response indicates we need to wait, show message
         if (response.needsWait) {
-          setError({ message: 'Conta de teste criada! Aguarde 10 segundos e clique em "Entrar".\n\nEmail: demo@leadflow.com\nSenha: demo123456', type: 'general' });
+          setError({ message: 'Conta de teste criada. Aguarde 10 segundos e clique em "Entrar".\n\nEmail: demo@leadflow.com\nSenha: demo123456', type: 'general' });
           setLoading(false);
           return;
         }
@@ -237,7 +237,7 @@ export default function LoginPage({ onSuccess, onSwitchToSignup, onForgotPasswor
             onSuccess();
           } catch (loginErr: any) {
             console.error('Auto-login failed:', loginErr);
-            setError({ message: 'Conta criada! Clique em "Entrar" para acessar.\n\nEmail: demo@leadflow.com\nSenha: demo123456', type: 'general' });
+            setError({ message: 'Conta criada. Clique em "Entrar" para acessar.\n\nEmail: demo@leadflow.com\nSenha: demo123456', type: 'general' });
             setLoading(false);
           }
         }, 3000);

@@ -370,7 +370,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
               setScheduleDate(parsed.scheduleDate || '');
               setScheduleTime(parsed.scheduleTime || '');
               setSendSpeed(parsed.sendSpeed || 'normal');
-              toast.success('Rascunho restaurado!');
+              toast.success('Rascunho restaurado');
             } else {
               localStorage.removeItem('whatsapp_campaign_draft');
               toast.info('Rascunho descartado');
@@ -766,7 +766,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       textarea.setSelectionRange(newPos, newPos);
     }, 10);
 
-    toast.success(`Variável ${variable} inserida!`);
+    toast.success(`Variável ${variable} inserida`);
   };
 
   const handleEditorDragOver = (e: React.DragEvent) => {
@@ -1555,7 +1555,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
           );
           if (executeResponse.ok) {
             console.log('[Campaign WhatsApp] ✅ Execução iniciada pelo backend');
-            toast.success('Disparo iniciado com sucesso!');
+            toast.success('Disparo iniciado com sucesso');
             const started = await executeResponse.json().catch(() => ({}));
             if (started?.plan && (started.totalLeads ?? 0) > started.plan.remaining) {
               toast.warning(`O seu plano permite enviar mais ${started.plan.remaining} mensagens neste período. A campanha pausa quando chegar ao limite.`);
@@ -1742,7 +1742,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
       const savedCampaign = await response.json();
       console.log(`[Campaign Save] ✅ Campanha ${isEditing ? 'atualizada' : 'salva'} com sucesso:`, savedCampaign);
 
-      toast.success(` ${isEditing ? 'Alterações guardadas' : 'Rascunho guardado'} com sucesso!`, { duration: 3000 });
+      toast.success(` ${isEditing ? 'Alterações guardadas' : 'Rascunho guardado'} com sucesso`, { duration: 3000 });
 
       // ✅ Notificar componente pai
       if (isEditing && onCampaignUpdated) {

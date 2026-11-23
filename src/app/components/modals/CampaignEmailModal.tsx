@@ -79,7 +79,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
       }
       setHtmlContent(content);
       setUseHtml(true);
-      toast.success('Modelo HTML importado!');
+      toast.success('Modelo HTML importado');
     };
     reader.readAsText(file);
   };
@@ -94,7 +94,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
     setHtmlContent(templateHtml);
     setUseHtml(true);
     setShowTemplates(false);
-    toast.success('Modelo aplicado com sucesso!');
+    toast.success('Modelo aplicado com sucesso');
   };
 
   // Resolve which SMTP/email source will be used (channel or integrations)
@@ -441,12 +441,12 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
           throw new Error(sendResult.error || 'Erro ao processar envio no servidor');
         }
 
-        toast.success(`Campanha "${campaignName}" iniciada com sucesso!`);
+        toast.success(`Campanha "${campaignName}" iniciada com sucesso`);
         if (sendResult.plan && (sendResult.recipientCount ?? 0) > sendResult.plan.remaining) {
           toast.warning(`O seu plano permite enviar mais ${sendResult.plan.remaining} mensagens neste período. A campanha pausa quando chegar ao limite.`);
         }
       } else {
-        toast.success(`Campanha "${campaignName}" agendada com sucesso!`);
+        toast.success(`Campanha "${campaignName}" agendada com sucesso`);
       }
 
       localStorage.removeItem('email_campaign_draft');
@@ -527,7 +527,7 @@ export default function CampaignEmailModal({ isOpen, onClose, leads, onCampaignC
         } else if (campaignId) {
           onCampaignUpdated?.({ ...campaignData, id: campaignId });
         }
-        toast.success('Rascunho guardado no banco de dados!');
+        toast.success('Rascunho guardado no banco de dados');
       } else {
         throw new Error(result.error || 'Erro ao salvar');
       }

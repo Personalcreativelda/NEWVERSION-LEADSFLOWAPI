@@ -116,7 +116,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
                         phoneNumber: formData.phoneNumber
                     }
                 });
-                toast.success('Canal SMS atualizado com sucesso!');
+                toast.success('Canal SMS atualizado com sucesso');
             } else {
                 // Criar novo canal
                 await channelsApi.create({
@@ -129,7 +129,7 @@ export function TwilioSMSConnect({ isOpen, onClose, onSuccess, editingChannel }:
                         phoneNumber: formData.phoneNumber
                     }
                 });
-                toast.success('Canal SMS criado com sucesso!');
+                toast.success('Canal SMS criado com sucesso');
             }
 
             setSuccess(true);

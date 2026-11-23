@@ -32,7 +32,7 @@ const TOGGLES: { key: ToggleKey; label: string }[] = [
   { key: 'suspensionNotifications', label: 'Conta suspensa' },
 ];
 
-const sectionTitle = 'mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
+const sectionTitle ='mb-2 px-1 text-xs font-medium text-muted-foreground';
 
 /** Avisos do administrador: aparecem no sino e chegam por email (ao email indicado ou ao da conta) */
 export const AdminNotificationsTab: React.FC = () => {

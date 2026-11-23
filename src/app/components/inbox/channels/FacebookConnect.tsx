@@ -37,7 +37,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
 
     const copyToClipboard = (text: string, label: string) => {
         navigator.clipboard.writeText(text);
-        toast.success(`${label} copiado!`);
+        toast.success(`${label} copiado`);
     };
 
     // Preencher dados quando for edição
@@ -120,7 +120,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                         page_picture: data.picture?.data?.url
                     }
                 });
-                toast.success('Canal Facebook atualizado com sucesso!');
+                toast.success('Canal Facebook atualizado com sucesso');
             } else {
                 await channelsApi.create({
                     type: 'facebook',
@@ -133,7 +133,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                         page_picture: data.picture?.data?.url
                     }
                 });
-                toast.success('Facebook Messenger ligado com sucesso!');
+                toast.success('Facebook Messenger ligado com sucesso');
             }
 
             setConnectionStatus('connected');
@@ -169,7 +169,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 {isEditing ? 'Editar Canal Facebook' : 'Ligar Facebook Messenger'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                {isEditing ? 'Atualize o token de acesso' : step === 'webhook' ? 'Passo 1 de 2 — Configurar Webhook' : step === 'token' ? 'Passo 2 de 2 — Token de Acesso' : 'Ligado!'}
+                                {isEditing ? 'Atualize o token de acesso' : step === 'webhook' ? 'Passo 1 de 2 — Configurar Webhook' : step === 'token' ? 'Passo 2 de 2 — Token de Acesso' : 'Ligado'}
                             </p>
                         </div>
                     </div>
@@ -483,7 +483,7 @@ export function FacebookConnect({ isOpen, onClose, onSuccess, editingChannel }: 
                                 <CheckCircle className="w-10 h-10 text-green-500" />
                             </div>
                             <h3 className="text-xl font-semibold mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                Facebook Messenger Ligado!
+                                Facebook Messenger Ligado
                             </h3>
                             <p className="text-sm mb-4" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 Sua página <strong>{pageInfo?.name}</strong> está pronta para receber mensagens.

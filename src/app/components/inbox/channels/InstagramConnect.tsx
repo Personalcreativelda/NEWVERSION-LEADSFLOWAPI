@@ -46,7 +46,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
     // Copiar para clipboard
     const copyToClipboard = (text: string, label: string) => {
         navigator.clipboard.writeText(text);
-        toast.success(`${label} copiado!`);
+        toast.success(`${label} copiado`);
     };
 
     // Preencher dados quando for edição
@@ -332,7 +332,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                         page_access_token: igAccount.page_access_token
                     }
                 });
-                toast.success('Canal Instagram atualizado com sucesso!');
+                toast.success('Canal Instagram atualizado com sucesso');
             } else {
                 await channelsApi.create({
                     type: 'instagram',
@@ -350,7 +350,7 @@ export function InstagramConnect({ isOpen, onClose, onSuccess, editingChannel }:
                         page_access_token: igAccount.page_access_token
                     }
                 });
-                toast.success('Instagram ligado com sucesso!');
+                toast.success('Instagram ligado com sucesso');
             }
 
             setConnectionStatus('connected');

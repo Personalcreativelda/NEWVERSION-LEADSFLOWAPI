@@ -191,7 +191,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                         }
                         
                         setStep('success');
-                        toast.success('WhatsApp ligado com sucesso!');
+                        toast.success('WhatsApp ligado com sucesso');
                     } else if (isConnecting) {
                         setConnectionStatus('connecting');
                         
@@ -269,7 +269,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                 
                 // Check if instance already exists and is connected
                 if (errorData.message?.includes('already exists') && errorData.state === 'open') {
-                    toast.success('WhatsApp já está ligado!');
+                    toast.success('WhatsApp já está ligado');
                     setStep('success');
                     setConnectionStatus('connected');
                     onSuccess();
@@ -298,7 +298,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
 
                 // Check if already connected
                 if (instanceData.state === 'open') {
-                    toast.success('WhatsApp já está ligado!');
+                    toast.success('WhatsApp já está ligado');
                     setStep('success');
                     setConnectionStatus('connected');
                     onSuccess();
@@ -345,7 +345,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                 setConnectionStatus('waiting_qr');
                 connectingStartRef.current = 0;
 
-                toast.info('QR Code gerado!', {
+                toast.info('QR Code gerado', {
                     description: 'Escaneie o código com seu WhatsApp',
                 });
             } else {
@@ -397,7 +397,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 setStep('qr');
                                 setConnectionStatus('waiting_qr');
                                 connectingStartRef.current = 0;
-                                toast.info('QR Code gerado!', { description: 'Escaneie o código com seu WhatsApp' });
+                                toast.info('QR Code gerado', { description: 'Escaneie o código com seu WhatsApp' });
                                 return;
                             }
                         }
@@ -475,7 +475,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 setQrCode(qrCodeData.startsWith('data:') ? qrCodeData : `data:image/png;base64,${qrCodeData}`);
                                 connectingStartRef.current = 0;
                                 setConnectionStatus('waiting_qr');
-                                toast.success('QR Code atualizado!');
+                                toast.success('QR Code atualizado');
                                 return;
                             }
                         }
@@ -492,7 +492,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                 connectingStartRef.current = 0;
                 setConnectionStatus('waiting_qr');
                 setError(null);
-                toast.success('QR Code atualizado!');
+                toast.success('QR Code atualizado');
             } else {
                 throw new Error('QR Code não disponível');
             }
@@ -646,7 +646,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                     <div className="flex flex-col items-center gap-2">
                                         <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            QR Code escaneado! A ligar...
+                                            QR Code escaneado. A ligar...
                                         </div>
                                         <p className="text-xs text-center" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                             A sincronizar... isso pode levar alguns segundos.
@@ -698,7 +698,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                                 pollIntervalRef.current = null;
                                             }
                                             setStep('success');
-                                            toast.success('WhatsApp ligado com sucesso!');
+                                            toast.success('WhatsApp ligado com sucesso');
                                         }}
                                         className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-all duration-150"
                                     >

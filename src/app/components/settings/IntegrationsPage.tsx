@@ -140,7 +140,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
   }, []);
 
   const handleSaveWebhook = () => {
-    toast.success('Webhook configurado com sucesso!');
+    toast.success('Webhook configurado com sucesso');
   };
 
   const handleSaveSmtp = async () => {
@@ -200,7 +200,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
 
       // Sucesso!
       setSmtpSaveState('saved');
-      toast.success('Definições SMTP guardadas com sucesso!', {
+      toast.success('Definições SMTP guardadas com sucesso', {
         description: `Host: ${smtpHost}\nEmail: ${smtpUser}`,
         duration: 4000,
       });
@@ -243,7 +243,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       // Sync com localStorage para backward compatibility
       localStorage.setItem('n8n_webhook_url', n8nWebhookUrl);
       setIsN8nConfigured(true);
-      toast.success('Webhook N8N configurado com sucesso!');
+      toast.success('Webhook N8N configurado com sucesso');
 
       console.log('[N8N Save] URL salva no backend:', n8nWebhookUrl);
     } catch (error) {
@@ -290,7 +290,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       // Sync com localStorage
       localStorage.setItem('n8n_whatsapp_import_url', n8nWhatsAppImportUrl);
       setIsN8nWhatsAppImportConfigured(true);
-      toast.success('URL de importação de contactos configurada com sucesso!');
+      toast.success('URL de importação de contactos configurada com sucesso');
 
       console.log('[N8N WhatsApp Import] URL salva no backend:', n8nWhatsAppImportUrl);
     } catch (error) {
@@ -328,7 +328,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
       // Sync com localStorage
       localStorage.setItem('google_analytics_id', googleAnalyticsId);
       setIsGoogleAnalyticsConfigured(true);
-      toast.success('Google Analytics configurado com sucesso!');
+      toast.success('Google Analytics configurado com sucesso');
     } catch (error) {
       console.error('[Google Analytics Save] Error:', error);
       toast.error('Erro ao guardar Google Analytics');
@@ -574,7 +574,7 @@ export default function IntegrationsPage({ user }: IntegrationsPageProps) {
                           {smtpSaveState === 'saved' && (
                             <>
                               <CheckCircle2 className="w-4 h-4 mr-2" />
-                              Guardado!
+                              Guardado
                             </>
                           )}
                           {smtpSaveState === 'idle' && 'Guardar'}

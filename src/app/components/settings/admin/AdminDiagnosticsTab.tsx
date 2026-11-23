@@ -53,7 +53,7 @@ const checkLabel = (name: string) =>
   CHECK_LABELS[name] ?? name.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
 const ORDER = { error: 0, warn: 1, ok: 2 };
-const sectionTitle = 'mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
+const sectionTitle ='mb-2 px-1 text-xs font-medium text-muted-foreground';
 
 const authHeaders = (): Record<string, string> => {
   const token = localStorage.getItem('leadflow_access_token');

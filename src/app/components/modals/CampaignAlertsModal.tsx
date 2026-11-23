@@ -39,7 +39,7 @@ export default function CampaignAlertsModal({ isOpen, onClose, campaign }: Campa
     // Salvar no localStorage
     localStorage.setItem(`campaign_${campaign.id}_alerts`, JSON.stringify(alertsConfig));
 
-    toast.success('Alertas configurados com sucesso!');
+    toast.success('Alertas configurados com sucesso');
     onClose();
   };
 

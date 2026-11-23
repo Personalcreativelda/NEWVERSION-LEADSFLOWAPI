@@ -776,7 +776,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
         await carregarLeads();
         setModalEditarLead(false);
         setLeadSelecionado(null);
-        if (!options.silent) toast.success('Lead atualizado com sucesso!');
+        if (!options.silent) toast.success('Lead atualizado com sucesso');
         return true;
       }
       if (!options.silent) toast.error('Erro ao atualizar lead. Por favor, tente novamente.');
@@ -794,7 +794,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       const response = await leadsApi.delete(leadId);
       if (response.success) {
         setLeads(leads.filter(l => l.id !== leadId));
-        toast.success('Lead apagado com sucesso!');
+        toast.success('Lead apagado com sucesso');
         try {
           await onRefreshUser?.();
         } catch (_) {
@@ -1538,7 +1538,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
           { duration: 5000 }
         );
       } else {
-        toast.info('Nenhum lead duplicado encontrado!', { duration: 3000 });
+        toast.info('Nenhum lead duplicado encontrado', { duration: 3000 });
       }
       
     } catch (error: any) {
@@ -1621,7 +1621,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
   const handleTourComplete = () => {
     localStorage.setItem('leadsflow_tour_completed', 'true');
     setShowTour(false);
-    toast.success('Visita guiada concluído! Agora você conhece todas as funcionalidades!');
+    toast.success('Visita guiada concluído. Agora você conhece todas as funcionalidades');
   };
 
   const handleTourSkip = () => {

@@ -575,7 +575,7 @@ export function NotificationBell({ onNavigate, onStartTour }: NotificationBellPr
                 <div key={group.title}>
                   {/* Group Header */}
                   <div className="px-4 py-2 bg-muted/20">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    <p className="text-xs font-medium text-muted-foreground">
                       {group.title}
                     </p>
                   </div>

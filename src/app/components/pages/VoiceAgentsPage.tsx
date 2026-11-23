@@ -308,10 +308,10 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
       setActionLoading(true);
       if (selectedAgent) {
         await voiceAgentsApi.update(selectedAgent.id, form);
-        toast.success('Agente atualizado com sucesso!');
+        toast.success('Agente atualizado com sucesso');
       } else {
         await voiceAgentsApi.create(form);
-        toast.success('Agente criado com sucesso!');
+        toast.success('Agente criado com sucesso');
       }
       setModalOpen(false);
       loadData();
@@ -333,7 +333,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
 
     try {
       await voiceAgentsApi.delete(id);
-      toast.success('Agente eliminado com sucesso!');
+      toast.success('Agente eliminado com sucesso');
       loadData();
     } catch (error) {
       console.error('[VoiceAgentsPage] Error deleting agent:', error);
@@ -489,7 +489,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         label: sipForm.label || `Wavoip ${sipForm.phone_number}`,
       });
       const registeredLabel = sipForm.label || `Wavoip ${sipForm.phone_number}`;
-      toast.success(`Número "${registeredLabel}" registrado com sucesso!`);
+      toast.success(`Número "${registeredLabel}" registrado com sucesso`);
       // Keep form data visible so user can see what was registered; refresh list
       const updated = await voiceAgentsApi.listPhoneNumbers();
       setPhoneNumbers(updated);
@@ -515,7 +515,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         language: createAgentForm.language,
         llm: createAgentForm.llm,
       });
-      toast.success(`Agente "${result.agent.name}" criado com sucesso!`);
+      toast.success(`Agente "${result.agent.name}" criado com sucesso`);
       // Reload agents list and auto-select the new agent
       const updatedAgents = await voiceAgentsApi.listConvAIAgents();
       setConvAIAgents(updatedAgents);
@@ -700,7 +700,7 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
         google: savedApiKeys.google || !!dataToSave.google_api_key,
       });
       
-      toast.success('Definições guardadas com sucesso! Recarregando...');
+      toast.success('Definições guardadas com sucesso. Recarregando...');
       
       // Keep modal open for a moment while showing loading state
       // This prevents UI flicker

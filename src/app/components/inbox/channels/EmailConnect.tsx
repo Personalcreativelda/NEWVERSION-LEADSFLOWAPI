@@ -182,11 +182,11 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
             let channel;
             if (isEditing && editingChannel) {
                 channel = await channelsApi.update(editingChannel.id, channelData);
-                toast.success('Canal de email atualizado com sucesso!');
+                toast.success('Canal de email atualizado com sucesso');
             } else {
                 channel = await channelsApi.create(channelData);
                 celebrate('Canal ligado');
-                toast.success('Canal de email ligado!');
+                toast.success('Canal de email ligado');
             }
 
             if (channel) {
@@ -217,7 +217,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                         })()}
                         <div>
                             <h2 className="text-lg font-semibold" style={{ color: 'hsl(var(--foreground))' }}>
-                                {isEditing ? 'Editar Canal Email' : step === 'provider' ? 'Ligar Email' : step === 'config' ? (selectedProvider?.name || 'Configurar Email') : 'Sucesso!'}
+                                {isEditing ? 'Editar Canal Email' : step === 'provider' ? 'Ligar Email' : step === 'config' ? (selectedProvider?.name || 'Configurar Email') : 'Sucesso'}
                             </h2>
                             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 {isEditing ? 'Atualize as definições do canal' : step === 'provider' ? 'Escolha seu provedor de email' : step === 'config' ? 'Configure SMTP e IMAP' : 'Canal criado com sucesso'}
@@ -356,7 +356,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
 
                             {/* SMTP Config */}
                             <div className="pt-2 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
-                                <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                <h4 className="text-xs font-medium r mb-3" style={{ color:'hsl(var(--muted-foreground))' }}>
                                     Servidor SMTP (Envio)
                                 </h4>
                                 <div className="grid grid-cols-3 gap-3">
@@ -403,7 +403,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
 
                             {/* IMAP Config */}
                             <div className="pt-2 border-t" style={{ borderColor: 'hsl(var(--border))' }}>
-                                <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                <h4 className="text-xs font-medium r mb-3" style={{ color:'hsl(var(--muted-foreground))' }}>
                                     Servidor IMAP (Recebimento)
                                 </h4>
                                 <div className="grid grid-cols-3 gap-3">
@@ -490,7 +490,7 @@ export function EmailConnect({ isOpen, onClose, onSuccess, editingChannel }: Ema
                                 <CheckCircle className="w-10 h-10 text-green-500" />
                             </div>
                             <h3 className="text-xl font-semibold mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                Canal de Email Ligado!
+                                Canal de Email Ligado
                             </h3>
                             <p className="text-sm mb-6" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                 Seu email foi configurado via SMTP/IMAP. As mensagens começarão a aparecer na sua caixa de entrada.

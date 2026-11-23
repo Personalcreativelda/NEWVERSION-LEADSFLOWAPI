@@ -101,7 +101,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
             await navigator.clipboard.writeText(text);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
-            toast.success('Copiado!');
+            toast.success('Copiado');
         } catch (err) {
             toast.error('Erro ao copiar');
         }
@@ -363,7 +363,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                 }}
                             >
                                 <div>
-                                    <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    <label className="block text-xs font-medium mb-2 r" style={{ color:'hsl(var(--muted-foreground))' }}>
                                         Callback URL
                                     </label>
                                     <div className="flex items-center gap-2">
@@ -387,7 +387,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    <label className="block text-xs font-medium mb-2 r" style={{ color:'hsl(var(--muted-foreground))' }}>
                                         Verify Token
                                     </label>
                                     <div className="flex items-center gap-2">
@@ -411,7 +411,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                                    <label className="block text-xs font-medium mb-2 r" style={{ color:'hsl(var(--muted-foreground))' }}>
                                         Webhook Fields (Selecione)
                                     </label>
                                     <div className="flex flex-wrap gap-2">

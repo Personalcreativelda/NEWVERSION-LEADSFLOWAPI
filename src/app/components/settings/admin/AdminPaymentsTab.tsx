@@ -65,7 +65,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: 'rejected', label: 'Rejeitados' },
 ];
 
-const sectionTitle = 'mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
+const sectionTitle ='mb-2 px-1 text-xs font-medium text-muted-foreground';
 const priceStr = (v: number | null | undefined) => (v ? String(v) : '');
 
 function CopyField({ value, label }: { value: string; label: string }) {

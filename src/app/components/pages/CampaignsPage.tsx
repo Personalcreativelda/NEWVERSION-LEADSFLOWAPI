@@ -429,7 +429,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
 
   // ✅ useEffect para debugar mudanças no estado
   useEffect(() => {
-    debugLog('[CampaignsPage] 🔄 Estado de campanhas mudou!');
+    debugLog('[CampaignsPage] 🔄 Estado de campanhas mudou');
     debugLog('[CampaignsPage] 📊 Total de campanhas:', campaigns.length);
     debugLog('[CampaignsPage] 📊 Campanhas:', campaigns.map(c => ({ id: c.id, name: c.name, type: c.type, status: c.status })));
   }, [campaigns]);
@@ -564,7 +564,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
       // Optimistic: remove imediatamente da UI
       setCampaigns(prev => prev.filter(c => c.id !== campaign.id));
       setDropdownOpen(null);
-      toast.success(`Campanha "${campaign.name}" cancelada!`);
+      toast.success(`Campanha "${campaign.name}" cancelada`);
 
       // Sincronizar com banco em background
       const token = localStorage.getItem('leadflow_access_token');
@@ -596,7 +596,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
       const snapshot = campaigns.find(c => c.id === id) ?? null;
       setCampaigns(prev => prev.filter(c => c.id !== id));
       setDropdownOpen(null);
-      toast.success(`Campanha "${name}" eliminada com sucesso!`);
+      toast.success(`Campanha "${name}" eliminada com sucesso`);
 
       // Sincronizar com banco em background
       const token = localStorage.getItem('leadflow_access_token');
@@ -667,7 +667,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
           const result = await executeResponse.json();
           console.log('[CampaignsPage] Campanha iniciada:', result);
 
-          toast.success(`Campanha "${name}" iniciada! A enviar para ${result.totalLeads} contactos...`);
+          toast.success(`Campanha "${name}" iniciada. A enviar para ${result.totalLeads} contactos...`);
           warnPlanLimit(result);
         } else if (type === 'sms') {
           // Para campanhas SMS, acionar endpoint de send dedicado
@@ -686,7 +686,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
           }
 
           const smsResult = await smsResponse.json();
-          toast.success(`Campanha SMS "${name}" iniciada! A enviar para ${smsResult.recipientCount} contactos...`);
+          toast.success(`Campanha SMS "${name}" iniciada. A enviar para ${smsResult.recipientCount} contactos...`);
           warnPlanLimit({ totalLeads: smsResult.recipientCount, plan: smsResult.plan });
         } else {
           // Para outros tipos (email), apenas atualizar status
@@ -705,7 +705,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
             throw new Error('Erro ao iniciar campanha');
           }
 
-          toast.success(`Campanha "${name}" iniciada!`);
+          toast.success(`Campanha "${name}" iniciada`);
         }
 
         // ✅ Recarregar campanhas do banco
@@ -760,7 +760,7 @@ export default function CampaignsPage({ leads, activeTab: initialTab = 'whatsapp
       // ✅ Recarregar campanhas do banco
       await reloadCampaigns();
 
-      toast.success(`Campanha "${campaign.name}" duplicada com sucesso!`);
+      toast.success(`Campanha "${campaign.name}" duplicada com sucesso`);
       setDropdownOpen(null);
     } catch (error) {
       console.error('[CampaignsPage] Erro ao duplicar campanha:', error);

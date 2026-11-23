@@ -85,7 +85,7 @@ export default function SidebarGroup({
           >
             <div className="sidebar-flyout-header px-4 py-2.5 flex items-center gap-2">
               <Icon className="w-3.5 h-3.5 text-[hsl(var(--sidebar-muted))]" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--sidebar-muted))]">
+              <span className="text-[11px] font-medium r text-[hsl(var(--sidebar-muted))]">
                 {label}
               </span>
             </div>

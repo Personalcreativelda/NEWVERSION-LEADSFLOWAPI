@@ -39,7 +39,7 @@ export default function DeletionSuccessModal({
 
         {/* Título */}
         <h2 className="text-center text-foreground mb-4">
-          {isSuccess ? 'Deleção Concluída!' : 'Deleção Parcial'}
+          {isSuccess ? 'Deleção Concluída' : 'Deleção Parcial'}
         </h2>
 
         {/* Mensagem */}

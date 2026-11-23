@@ -270,7 +270,7 @@ export function SendMessageModal({
           setSuccess(true);
           setSummary(response.summary);
           toast.success(
-            `Mensagem enviada para ${response.summary.successful} de ${response.summary.total} leads!`
+            `Mensagem enviada para ${response.summary.successful} de ${response.summary.total} leads`
           );
           
           // Wait 2 seconds before closing
@@ -310,7 +310,7 @@ export function SendMessageModal({
 
         if (response.success) {
           setSuccess(true);
-          toast.success('Mensagem enviada com sucesso!');
+          toast.success('Mensagem enviada com sucesso');
           
           // Wait 1 second before closing
           setTimeout(() => {
@@ -328,11 +328,11 @@ export function SendMessageModal({
       
       // Show specific error for WhatsApp not connected
       if (errorMessage.includes('WhatsApp not connected') || errorMessage.includes('WhatsApp não conectado')) {
-        setError('WhatsApp não ligado! Vá em Definições > Integrações para ligar seu WhatsApp escaneando o QR Code.');
-        toast.error('WhatsApp não ligado! Configure nas Integrações.');
+        setError('WhatsApp não ligado. Vá em Definições > Integrações para ligar seu WhatsApp escaneando o QR Code.');
+        toast.error('WhatsApp não ligado. Configure nas Integrações.');
       } else if (errorMessage.includes('limit reached') || errorMessage.includes('limit')) {
-        setError('Limite de mensagens atingido! Faça melhorar o plano do seu plano.');
-        toast.error('Limite de mensagens atingido! Faça melhorar o plano do seu plano.');
+        setError('Limite de mensagens atingido. Faça melhorar o plano do seu plano.');
+        toast.error('Limite de mensagens atingido. Faça melhorar o plano do seu plano.');
       } else if (errorMessage.includes('não está registrado no WhatsApp') || errorMessage.includes('not registered')) {
         toast.error('Este número não está registrado no WhatsApp. Verifique o telefone do lead.');
       } else {
@@ -348,7 +348,7 @@ export function SendMessageModal({
     const webhookUrl = localStorage.getItem('n8n_mass_webhook_url');
     
     if (!webhookUrl) {
-      throw new Error('Configure o webhook N8N nas Configurações > Integrações primeiro!');
+      throw new Error('Configure o webhook N8N nas Configurações > Integrações primeiro');
     }
 
     console.log('[N8N Webhook] Sending to:', webhookUrl);
@@ -588,7 +588,7 @@ export function SendMessageModal({
               <AlertDescription className="text-green-900 dark:text-green-100">
                 {isMassMessage && summary ? (
                   <div>
-                    <p className="font-medium mb-1">Mensagens enviadas!</p>
+                    <p className="font-medium mb-1">Mensagens enviadas</p>
                     <p className="text-sm">
                       ✓ {summary.successful || summary.sent || 0} enviadas com sucesso
                       {(summary.failed > 0) && (
@@ -597,7 +597,7 @@ export function SendMessageModal({
                     </p>
                   </div>
                 ) : (
-                  'Mensagem enviada com sucesso!'
+                  'Mensagem enviada com sucesso'
                 )}
               </AlertDescription>
             </Alert>

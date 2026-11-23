@@ -272,7 +272,7 @@ export default function EditarLeadModal({ isOpen, lead, onClose, onSave }: Edita
         onAvatarUpdated={(newUrl) => {
           setFormData((prev) => ({ ...prev, avatarUrl: newUrl }));
           setShowAvatarUpload(false);
-          toast.success('Avatar atualizado!');
+          toast.success('Avatar atualizado');
         }}
         isDark={document.documentElement.classList.contains('dark')}
       />

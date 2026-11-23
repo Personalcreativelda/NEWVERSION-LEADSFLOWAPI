@@ -528,7 +528,7 @@ function AgendamentosTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  onClick={() => handleStatusChange(conv.id, 'completed')}
  className={`p-1.5 rounded-md text-xs transition-colors ${isDark
  ? 'hover:bg-green-900/40 text-muted-foreground hover:text-green-400'
- : 'hover:bg-green-50 text-muted-foreground hover:text-green-600'
+ : 'hover:bg-green-500/10 text-muted-foreground hover:text-green-600'
  }`}
  title="Marcar como concluido"
  >
@@ -538,7 +538,7 @@ function AgendamentosTab({ lead, isDark }: { lead: Lead; isDark: boolean }) {
  onClick={() => handleStatusChange(conv.id, 'cancelled')}
  className={`p-1.5 rounded-md text-xs transition-colors ${isDark
  ? 'hover:bg-red-900/40 text-muted-foreground hover:text-red-400'
- : 'hover:bg-red-50 text-muted-foreground hover:text-red-500'
+ : 'hover:bg-red-500/10 text-muted-foreground hover:text-red-500'
  }`}
  title="Cancelar agendamento"
  >
@@ -684,7 +684,7 @@ function ValorTab({ lead, isDark, onLeadUpdated }: { lead: Lead; isDark: boolean
  <div className="flex flex-col gap-6">
  {/* Deal value card */}
  <div className="rounded-xl border p-5 text-center bg-muted border-border">
- <p className={`text-xs uppercase tracking-wider font-medium mb-1 text-muted-foreground`}>
+ <p className={`text-xs r font-medium mb-1 text-muted-foreground`}>
  Valor do negocio
  </p>
  <p className={`text-3xl font-bold ${parsedValue > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
@@ -775,7 +775,7 @@ function ValorTab({ lead, isDark, onLeadUpdated }: { lead: Lead; isDark: boolean
 
  {/* Lead info summary */}
  <div className="rounded-xl border p-4 bg-muted border-border">
- <p className={`text-xs uppercase tracking-wider font-medium mb-3 text-muted-foreground`}>
+ <p className={`text-xs r font-medium mb-3 text-muted-foreground`}>
  Informacoes do lead
  </p>
  <div className="grid grid-cols-2 gap-3">

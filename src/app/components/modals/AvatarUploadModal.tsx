@@ -53,7 +53,7 @@ export default function AvatarUploadModal({
             const result = await leadsApi.uploadAvatar(leadId, file);
             if (result.success) {
                 onAvatarUpdated(result.avatarUrl);
-                toast.success('Avatar atualizado com sucesso!');
+                toast.success('Avatar atualizado com sucesso');
                 setTimeout(() => {
                     onClose();
                 }, 500);
