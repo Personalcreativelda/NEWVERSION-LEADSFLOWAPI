@@ -13,6 +13,7 @@ import { campaignCleanupService } from './services/campaign-cleanup.service';
 import { inactivityScheduler } from './services/inactivity-scheduler.service';
 import { flowExecutionService } from './services/flow-execution.service';
 import { campaignEngine } from './services/campaign-engine.service';
+import { commentAutomationService } from './services/comment-automation.service';
 import { metaConversionsWorker } from './services/meta-conversions.service';
 // INBOX: Importar WebSocket service e Email Polling
 import { initializeWebSocket } from './services/websocket.service';
@@ -598,6 +599,10 @@ initDatabase().then(() => {
   flowExecutionService.start();
   campaignEngine.start();
   metaConversionsWorker.start();
+  // Páginas do Facebook já ligadas passam a receber também os comentários (uma vez por página)
+  setTimeout(() => {
+    commentAutomationService.subscribeExistingPages().catch((err) => console.warn('[CommentAutomation] Subscrição das páginas:', err?.message));
+  }, 30_000).unref?.();
 
   // INBOX: Criar HTTP server e inicializar WebSocket
   const server = http.createServer(app);

@@ -57,6 +57,7 @@ services:
       - GOOGLE_PLAY_PUBSUB_AUDIENCE=${GOOGLE_PLAY_PUBSUB_AUDIENCE:-}
       - GOOGLE_PLAY_PUBSUB_SERVICE_ACCOUNT_EMAIL=${GOOGLE_PLAY_PUBSUB_SERVICE_ACCOUNT_EMAIL:-}
       - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY:-}
+      - META_FACEBOOK_COMMENTS=${META_FACEBOOK_COMMENTS:-true}
       - META_COMMENTS_ENABLED=${META_COMMENTS_ENABLED:-false}
     restart: unless-stopped
     # O processo 1 de um contentor ignora sinais enviados de dentro dele: com o init (tini)

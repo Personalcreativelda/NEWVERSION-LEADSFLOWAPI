@@ -173,6 +173,10 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                                 {channelInfo.label}
                             </p>
                         )}
+                        {/* Conversa de um comentário: a resposta vai em privado ao comentário */}
+                        {(conversation.metadata?.is_comment || String((conversation as any).remote_jid || '').startsWith('comment:')) && (
+                            <p className="text-xs text-muted-foreground truncate">Comentário · a resposta vai em privado</p>
+                        )}
                     </div>
                 </button>
 

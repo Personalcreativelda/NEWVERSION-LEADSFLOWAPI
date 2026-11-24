@@ -7,6 +7,14 @@
 import { query } from '../database/connection';
 import { isInstagramLoginToken, metaMessagesUrl } from '../utils/meta-send';
 import { checkLeadLimit } from '../middleware/plan-enforcement.middleware';
+import { ConversationsService } from './conversations.service';
+import { getWebSocketService } from './websocket.service';
+import { subscribePage } from './meta-oauth.service';
+import { commentsEnabled, facebookCommentFields, facebookCommentsEnabled } from '../utils/meta-comments';
+
+const conversationsService = new ConversationsService();
+// Os mesmos campos do Messenger que o login subscreve (a Meta substitui a lista inteira)
+const MESSENGER_FIELDS = ['messages', 'messaging_postbacks', 'messaging_optins', 'message_deliveries', 'message_reads'];
 
 const FB_GRAPH = 'https://graph.facebook.com/v21.0';
 const IG_GRAPH = 'https://graph.instagram.com/v21.0';
@@ -97,6 +105,8 @@ async function findChannel(ev: CommentEvent) {
 
 /** Lead de quem comentou: reutiliza o que já existe para esta pessoa, senão cria (se o plano deixar) */
 async function upsertLead(userId: string, ev: CommentEvent, tag: string | null): Promise<string | null> {
+  // Sem saber quem comentou (a Meta pode não o enviar) não há lead a criar
+  if (!ev.fromId) return null;
   const found = await query(
     `SELECT id, tags FROM leads WHERE user_id = $1 AND custom_fields->>'social_id' = $2 LIMIT 1`,
     [userId, ev.fromId],
@@ -131,6 +141,27 @@ async function upsertLead(userId: string, ev: CommentEvent, tag: string | null):
   return created.rows[0]?.id || null;
 }
 
+/** Erro que a caixa de entrada mostra tal como está */
+export class CommentReplyError extends Error {}
+
+/** Conversa de um comentário: comment:<quem comentou> (ou o próprio comentário, se a Meta não disser quem foi) */
+export const commentJid = (ev: Pick<CommentEvent, 'fromId' | 'commentId'>) => `comment:${ev.fromId || ev.commentId}`;
+export const isCommentJid = (jid?: string | null) => String(jid || '').startsWith('comment:');
+
+async function emitToInbox(userId: string, conversationId: string, message: any) {
+  const ws = getWebSocketService();
+  if (!ws) return;
+  const conv = await query(
+    `SELECT c.*, ch.name AS channel_name, l.name AS lead_name
+       FROM conversations c LEFT JOIN channels ch ON c.channel_id = ch.id LEFT JOIN leads l ON c.lead_id = l.id
+      WHERE c.id = $1`,
+    [conversationId],
+  );
+  ws.emitNewMessage(userId, { conversationId, message, conversation: conv.rows[0] });
+  const unread = await query('SELECT SUM(unread_count) AS total FROM conversations WHERE user_id = $1', [userId]);
+  ws.emitUnreadCountUpdate(userId, { totalUnread: parseInt(unread.rows[0]?.total || '0', 10), conversationId });
+}
+
 export class CommentAutomationService {
   /** Trata um evento "changes" de um webhook da Meta. Nunca lança: os erros ficam no registo. */
   async handleChange(platform: CommentPlatform, accountId: string, change: any): Promise<void> {
@@ -143,7 +174,16 @@ export class CommentAutomationService {
     }
   }
 
+  private enabledFor(platform: CommentPlatform) {
+    return platform === 'facebook' ? facebookCommentsEnabled() : commentsEnabled();
+  }
+
+  /**
+   * Cada comentário entra na caixa de entrada (sem configuração). Se houver uma regra que se
+   * aplique, sai também a mensagem privada automática.
+   */
   async handle(ev: CommentEvent): Promise<'sent' | 'failed' | 'skipped'> {
+    if (!this.enabledFor(ev.platform)) return 'skipped';
     const channel = await findChannel(ev);
     if (!channel) return 'skipped';
 
@@ -152,56 +192,161 @@ export class CommentAutomationService {
       [channel.id],
     );
     const rule = rules.rows.find((a: any) => matchesAutomation(a, ev));
+
+    const leadId = await upsertLead(channel.user_id, ev, rule?.tag || null).catch((err: any) => {
+      console.warn('[CommentAutomation] Lead não criado:', err?.message);
+      return null;
+    });
+    const conversationId = await this.recordInInbox(ev, channel, leadId).catch((err: any) => {
+      console.error('[CommentAutomation] Comentário não gravado na caixa de entrada:', err?.message);
+      return null;
+    });
     if (!rule) return 'skipped';
 
-    // A Meta reenvia eventos: o comentário só é tratado uma vez
+    // A Meta reenvia eventos: o comentário só recebe uma resposta privada
     const claimed = await query(
-      `INSERT INTO comment_replies (comment_id, automation_id, user_id, channel_id, platform, commenter_id, commenter_name, comment_text)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO comment_replies (comment_id, automation_id, user_id, channel_id, platform, commenter_id, commenter_name, comment_text, lead_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (comment_id) DO NOTHING RETURNING id`,
-      [ev.commentId, rule.id, channel.user_id, channel.id, ev.platform, ev.fromId, ev.fromName || null, ev.text.slice(0, 2000)],
+      [ev.commentId, rule.id, channel.user_id, channel.id, ev.platform, ev.fromId || null, ev.fromName || null, ev.text.slice(0, 2000), leadId],
     );
     const replyId = claimed.rows[0]?.id;
     if (!replyId) return 'skipped';
 
     const creds = channel.credentials || {};
-    const token: string = creds.access_token || creds.page_access_token || '';
+    const token: string = creds.page_access_token || creds.access_token || '';
     const pageId: string | null = creds.page_id || null;
+    const text = renderCommentText(rule.dm_message, ev.fromName);
     let error: string | null = null;
+    let externalId: string | null = null;
 
     try {
       if (!token) throw new Error('O canal não tem token de acesso. Ligue-o de novo.');
-      // Mensagem privada: o mesmo endpoint das mensagens, com o comentário como destinatário
-      await postJson(metaMessagesUrl(token, pageId), token, {
+      const sent = await postJson(metaMessagesUrl(token, pageId), token, {
         recipient: { comment_id: ev.commentId },
-        message: { text: renderCommentText(rule.dm_message, ev.fromName) },
+        message: { text },
       });
+      externalId = sent?.message_id || null;
     } catch (err: any) {
       error = String(err?.message || 'Não foi possível enviar a mensagem privada').slice(0, 500);
     }
 
-    // Resposta pública (opcional): só depois de a privada sair, para não prometer uma mensagem que não chegou
-    if (!error && rule.public_reply) {
-      const text = renderCommentText(rule.public_reply, ev.fromName);
+    // Resposta pública: só com a permissão aprovada, e depois de a privada sair
+    if (!error && rule.public_reply && commentsEnabled()) {
       const url = ev.platform === 'facebook'
         ? `${FB_GRAPH}/${encodeURIComponent(ev.commentId)}/comments`
         : `${isInstagramLoginToken(token) ? IG_GRAPH : FB_GRAPH}/${encodeURIComponent(ev.commentId)}/replies`;
-      await postJson(url, token, { message: text }).catch((err: any) => {
+      await postJson(url, token, { message: renderCommentText(rule.public_reply, ev.fromName) }).catch((err: any) => {
         console.warn('[CommentAutomation] Resposta pública falhou:', err?.message);
       });
     }
 
-    const leadId = await upsertLead(channel.user_id, ev, rule.tag || null).catch((err: any) => {
-      console.warn('[CommentAutomation] Lead não criado:', err?.message);
-      return null;
-    });
+    // A resposta automática também aparece na conversa
+    if (!error && conversationId) {
+      const out = await query(
+        `INSERT INTO messages (user_id, conversation_id, lead_id, direction, channel, content, status, external_id, metadata)
+         VALUES ($1, $2, $3, 'out', $4, $5, 'sent', $6, $7) RETURNING *`,
+        [channel.user_id, conversationId, leadId, ev.platform, text, externalId,
+          JSON.stringify({ kind: 'comment_reply', comment_id: ev.commentId, automation_id: rule.id })],
+      ).catch(() => null);
+      if (out?.rows[0]) await emitToInbox(channel.user_id, conversationId, out.rows[0]).catch(() => {});
+    }
+
+    await query(`UPDATE comment_replies SET status = $2, error = $3 WHERE id = $1`, [replyId, error ? 'failed' : 'sent', error]);
+    return error ? 'failed' : 'sent';
+  }
+
+  /** Grava o comentário na caixa de entrada (uma conversa por pessoa) e avisa o painel */
+  async recordInInbox(ev: CommentEvent, channel: any, leadId: string | null): Promise<string> {
+    const meta = { is_comment: true, last_comment_id: ev.commentId, post_id: ev.postId, comment_from_id: ev.fromId || null };
+    const conv: any = await conversationsService.findOrCreate(
+      channel.user_id, channel.id, commentJid(ev), leadId || undefined,
+      { contact_name: ev.fromName || (ev.platform === 'facebook' ? 'Comentário no Facebook' : 'Comentário no Instagram'), ...meta },
+    );
+
+    // A Meta reenvia eventos: o mesmo comentário só entra uma vez
+    const dup = await query('SELECT 1 FROM messages WHERE user_id = $1 AND external_id = $2 LIMIT 1', [channel.user_id, ev.commentId]);
+    if (dup.rows.length) return conv.id;
 
     await query(
-      `UPDATE comment_replies SET status = $2, error = $3, lead_id = $4 WHERE id = $1`,
-      [replyId, error ? 'failed' : 'sent', error, leadId],
+      `UPDATE conversations
+          SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb, last_message_at = NOW(), updated_at = NOW(),
+              status = CASE WHEN status IN ('closed', 'resolved') THEN 'open' ELSE status END
+        WHERE id = $1`,
+      [conv.id, JSON.stringify(meta)],
     );
-    return error ? 'failed' : 'sent';
+    const saved = await query(
+      `INSERT INTO messages (user_id, conversation_id, lead_id, direction, channel, content, status, external_id, metadata)
+       VALUES ($1, $2, $3, 'in', $4, $5, 'delivered', $6, $7) RETURNING *`,
+      [channel.user_id, conv.id, leadId, ev.platform, ev.text || '[comentário]', ev.commentId,
+        JSON.stringify({ kind: 'comment', comment_id: ev.commentId, post_id: ev.postId, from_id: ev.fromId || null })],
+    );
+    await conversationsService.updateUnreadCount(conv.id, 1);
+    await emitToInbox(channel.user_id, conv.id, saved.rows[0]).catch(() => {});
+    return conv.id;
+  }
+
+  /**
+   * Resposta escrita na caixa de entrada numa conversa de comentário: vai como mensagem privada ao
+   * último comentário ainda sem resposta (a Meta só deixa uma por comentário, até 7 dias depois).
+   * Quando a pessoa responde, a conversa continua por mensagem (Messenger).
+   */
+  async replyFromInbox(conversationId: string, credentials: any, text: string): Promise<{ message_id?: string }> {
+    const r = await query(
+      `SELECT m.metadata->>'comment_id' AS comment_id
+         FROM messages m
+        WHERE m.conversation_id = $1 AND m.direction = 'in' AND m.metadata->>'comment_id' IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM comment_replies cr WHERE cr.comment_id = m.metadata->>'comment_id')
+        ORDER BY m.created_at DESC LIMIT 1`,
+      [conversationId],
+    );
+    const commentId: string | undefined = r.rows[0]?.comment_id;
+    if (!commentId) {
+      throw new CommentReplyError('Já respondeu a este comentário. Quando a pessoa responder, a conversa continua por mensagem.');
+    }
+    const token: string = credentials?.page_access_token || credentials?.access_token || '';
+    if (!token) throw new CommentReplyError('O canal não tem token de acesso. Ligue-o de novo.');
+
+    let sent: any;
+    try {
+      sent = await postJson(metaMessagesUrl(token, credentials?.page_id || null), token, {
+        recipient: { comment_id: commentId },
+        message: { text },
+      });
+    } catch (err: any) {
+      throw new CommentReplyError(`A Meta recusou a resposta: ${err?.message || 'erro desconhecido'}`);
+    }
+    await query(
+      `INSERT INTO comment_replies (comment_id, user_id, channel_id, platform, status)
+       SELECT $1, c.user_id, c.channel_id, ch.type, 'sent'
+         FROM conversations c JOIN channels ch ON ch.id = c.channel_id WHERE c.id = $2
+       ON CONFLICT (comment_id) DO NOTHING`,
+      [commentId, conversationId],
+    );
+    return sent || {};
+  }
+
+  /** Páginas ligadas antes desta funcionalidade: subscreve também os comentários (uma vez por canal) */
+  async subscribeExistingPages(): Promise<void> {
+    if (!facebookCommentsEnabled()) return;
+    const r = await query(
+      `SELECT * FROM channels WHERE type = 'facebook' AND status = 'active'
+          AND COALESCE(settings->>'comments_subscribed', '') = ''`,
+    );
+    for (const ch of r.rows) {
+      const creds = ch.credentials || {};
+      const token = creds.page_access_token || creds.access_token;
+      if (!token || !creds.page_id) continue;
+      const sub = await subscribePage(creds.page_id, token, [...MESSENGER_FIELDS, ...facebookCommentFields()]).catch(() => ({ ok: false }));
+      if (sub.ok) {
+        await query(
+          `UPDATE channels SET settings = COALESCE(settings, '{}'::jsonb) || '{"comments_subscribed": true}'::jsonb WHERE id = $1`,
+          [ch.id],
+        );
+      }
+    }
   }
 }
 
 export const commentAutomationService = new CommentAutomationService();
+

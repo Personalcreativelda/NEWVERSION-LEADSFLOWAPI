@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { commentAutomationService, isCommentJid } from '../services/comment-automation.service';
 import multer from 'multer';
 import { isStorageUrl, publicFileUrl } from '../utils/storage-urls';
 import { convertToM4a, isMetaFriendlyAudio } from '../utils/media-convert';
@@ -1645,6 +1646,20 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         console.error('[Inbox] WhatsApp Cloud send error:', whatsappCloudError?.message);
         const message = whatsappCloudError instanceof CloudSendError ? whatsappCloudError.message : 'Não foi possível enviar pelo WhatsApp. Tente de novo.';
         return res.status(422).json({ error: message, details: whatsappCloudError?.metaMessage });
+      }
+
+    } else if ((messageChannel === 'instagram' || messageChannel === 'facebook') && isCommentJid(remoteJid)) {
+      // ===== RESPOSTA A UM COMENTÁRIO: mensagem privada ao comentário (API oficial da Meta) =====
+      if (media_url) {
+        return res.status(400).json({ error: 'Numa resposta a um comentário só se pode enviar texto' });
+      }
+      if (!conversationId) {
+        return res.status(404).json({ error: 'Conversa não encontrada' });
+      }
+      try {
+        externalResult = await commentAutomationService.replyFromInbox(conversationId, channelCredentials, messageContent);
+      } catch (commentErr: any) {
+        return res.status(422).json({ error: commentErr?.message || 'Não foi possível responder ao comentário' });
       }
 
     } else if (messageChannel === 'instagram' || messageChannel === 'facebook') {

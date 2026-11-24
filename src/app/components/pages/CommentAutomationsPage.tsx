@@ -42,7 +42,8 @@ const emptyForm = { channel_id: '', name: '', keywords: '', dm_message: '', publ
 
 export default function CommentAutomationsPage() {
   const [loading, setLoading] = useState(true);
-  const [enabled, setEnabled] = useState(true);
+  const [instagramEnabled, setInstagramEnabled] = useState(false);
+  const [publicReplies, setPublicReplies] = useState(false);
   const [rules, setRules] = useState<Rule[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
@@ -58,7 +59,8 @@ export default function CommentAutomationsPage() {
         apiRequest('/comment-automations', 'GET'),
         apiRequest('/comment-automations/replies', 'GET').catch(() => ({ replies: [] })),
       ]);
-      setEnabled(r?.comments_enabled !== false);
+      setInstagramEnabled(r?.instagram_enabled === true);
+      setPublicReplies(r?.public_replies === true);
       setRules(r?.automations || []);
       setChannels(r?.channels || []);
       setReplies(rep?.replies || []);
@@ -147,9 +149,9 @@ export default function CommentAutomationsPage() {
         create={channels.length ? { label: 'Nova regra', onClick: openNew, icon: Plus } : undefined}
       />
 
-      {!enabled && (
+      {!instagramEnabled && channels.some((c) => c.type === 'instagram') && (
         <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          Começa a funcionar quando a Meta aprovar as permissões de comentários
+          Instagram: começa a funcionar quando a Meta aprovar as permissões de comentários
         </div>
       )}
 
@@ -266,6 +268,7 @@ export default function CommentAutomationsPage() {
             />
           </div>
 
+          {publicReplies && (
           <div>
             <Label htmlFor="ca-public" className="mb-1.5 block">Resposta pública (opcional)</Label>
             <Input
@@ -276,6 +279,7 @@ export default function CommentAutomationsPage() {
               placeholder="Enviámos-lhe uma mensagem privada"
             />
           </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>

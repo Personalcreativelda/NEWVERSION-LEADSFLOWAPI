@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { query } from '../database/connection';
-import { commentsEnabled, facebookCommentFields } from '../utils/meta-comments';
+import { commentsEnabled, facebookCommentFields, facebookCommentsEnabled } from '../utils/meta-comments';
 import { isInstagramLoginToken } from '../utils/meta-send';
 import { subscribePage } from '../services/meta-oauth.service';
 import { subscribeInstagramAccount } from '../services/instagram-oauth.service';
@@ -62,14 +62,13 @@ async function ownChannel(userId: string, channelId: string) {
 
 /** Canais ligados antes desta funcionalidade: volta a subscrever, agora também com os comentários */
 async function ensureCommentWebhook(channel: any): Promise<void> {
-  if (!commentsEnabled()) return;
   const creds = channel.credentials || {};
-  const token: string = creds.access_token || '';
+  const token: string = creds.page_access_token || creds.access_token || '';
   if (!token) return;
   try {
-    if (channel.type === 'instagram' && isInstagramLoginToken(token)) {
+    if (channel.type === 'instagram' && isInstagramLoginToken(token) && commentsEnabled()) {
       await subscribeInstagramAccount(token);
-    } else if (channel.type === 'facebook' && creds.page_id) {
+    } else if (channel.type === 'facebook' && creds.page_id && facebookCommentsEnabled()) {
       // A Meta substitui a lista inteira: os mesmos campos do Messenger de sempre + "feed"
       await subscribePage(creds.page_id, token, [...MESSENGER_FIELDS, ...facebookCommentFields()]);
     }
@@ -96,7 +95,14 @@ router.get('/', async (req: any, res, next) => {
         [userId],
       ),
     ]);
-    res.json({ success: true, comments_enabled: commentsEnabled(), automations: rules.rows, channels: channels.rows });
+    res.json({
+      success: true,
+      facebook_enabled: facebookCommentsEnabled(),
+      instagram_enabled: commentsEnabled(),
+      public_replies: commentsEnabled(), // pages_manage_engagement ainda por aprovar
+      automations: rules.rows,
+      channels: channels.rows,
+    });
   } catch (error) {
     next(error);
   }

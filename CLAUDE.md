@@ -86,10 +86,15 @@ Há um emulador `Medium_Phone_API_37.0`.
   API (New) oficial com `GOOGLE_PLACES_API_KEY`. Cada página de 20 resultados conta para o limite mensal
   (`MONTHLY_SEARCHES` por plano, tabela `lead_searches`). Só se guarda o que a pessoa importa (termos da Google).
   Nada de scraping de Instagram/Facebook/LinkedIn nem de membros de grupos (risco para a aprovação da Meta).
+- Comentários na caixa de entrada: cada comentário de uma página do Facebook entra sozinho como conversa
+  (`remote_jid` = `comment:<quem comentou>`, mensagem com `metadata.comment_id`). Responder nessa conversa envia
+  uma resposta privada ao último comentário sem resposta (`replyFromInbox`, só texto); a pessoa responde no
+  Messenger, noutra conversa (PSID ≠ id do comentário). Funciona com as permissões já aprovadas
+  (`META_FACEBOOK_COMMENTS`, ligado por omissão); ao arrancar, as páginas já ligadas são subscritas com `feed`.
 - Respostas a comentários (`pages/CommentAutomationsPage.tsx`, `/api/comment-automations`,
   `services/comment-automation.service.ts`): webhooks `comments` (Instagram) e `feed` (Facebook) → resposta
   privada (`recipient.comment_id`, uma por comentário, até 7 dias) + resposta pública opcional + lead
-  (`custom_fields.social_id`). As permissões e campos extra só entram com `META_COMMENTS_ENABLED=true`
+  (`custom_fields.social_id`). Instagram e respostas públicas só com `META_COMMENTS_ENABLED=true`
   (`utils/meta-comments.ts`), depois da revisão da Meta; canais antigos voltam a subscrever ao guardar uma regra.
 
 ## API pública e páginas públicas
