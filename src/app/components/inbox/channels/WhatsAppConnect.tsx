@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { channelsApi } from '../../../services/api/inbox';
 import { toast } from 'sonner';
-import { QrCode, Smartphone, Check, AlertCircle, RefreshCw, Loader2, Wifi, XCircle, CheckCircle } from 'lucide-react';
+import { QrCode, Smartphone, Check, AlertCircle, RefreshCw, Loader2, XCircle } from 'lucide-react';
 import { OverlayModal } from '../../base/OverlayModal';
 import { LogoBox } from '../../base/LogoBox';
 
@@ -113,124 +113,104 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
         }
     }, [getAuthHeaders]);
 
-    // Poll for connection status
-    useEffect(() => {
-        if (step === 'qr' && connectionStatus === 'waiting_qr' && fullInstanceName) {
-            console.log('[WhatsApp Channel] Starting status polling for:', fullInstanceName);
-            
-            pollIntervalRef.current = setInterval(async () => {
-                const status = await checkStatus(fullInstanceName);
-                
-                if (status) {
-                    // Check various connection indicators
-                    const isConnected = 
-                        status.state === 'open' || 
-                        status.connected === true ||
-                        status.state === 'connected' ||
-                        (status.instance?.state === 'open') ||
-                        (status.instance?.status === 'open');
-                    
-                    const isConnecting = status.state === 'connecting' && !isConnected;
-
-                    console.log('[WhatsApp Channel] Connection state:', { 
-                        state: status.state, 
-                        connected: status.connected, 
-                        isConnected, 
-                        isConnecting,
-                        instanceState: status.instance?.state
-                    });
-
-                    if (isConnected) {
-                        console.log('[WhatsApp Channel] ✅ Connected!');
-                        setConnectionStatus('connected');
-                        setProfileInfo({
-                            name: status.profileName,
-                            picture: status.profilePictureUrl
-                        });
-                        
-                        // Save to channels database
-                        try {
-                            await channelsApi.create({
-                                type: 'whatsapp',
-                                name: instanceName,
-                                provider: 'evolution_api',
-                                status: 'active',
-                                credentials: {
-                                    instance_id: fullInstanceName,
-                                    instance_name: instanceName,
-                                    phone_number: status.profileName || undefined
-                                }
-                            });
-                        } catch (e) {
-                            console.warn('[WhatsApp Channel] Error saving to channels:', e);
-                        }
-
-                        // Save to user settings (same as Integrações page)
-                        try {
-                            await fetch(`${API_URL}/api/users/settings`, {
-                                method: 'PUT',
-                                headers: getAuthHeaders(),
-                                body: JSON.stringify({
-                                    whatsapp_connected: true,
-                                    whatsapp_instance_name: fullInstanceName,
-                                    whatsapp_profile_name: status.profileName || null,
-                                    whatsapp_connected_at: new Date().toISOString(),
-                                }),
-                            });
-                        } catch (e) {
-                            console.warn('[WhatsApp Channel] Error saving settings:', e);
-                        }
-
-                        // Dispatch event for other components
-                        window.dispatchEvent(new Event('whatsapp-connected'));
-                        
-                        // Stop polling and go to success
-                        if (pollIntervalRef.current) {
-                            clearInterval(pollIntervalRef.current);
-                            pollIntervalRef.current = null;
-                        }
-                        
-                        setStep('success');
-                        toast.success('WhatsApp ligado com sucesso');
-                    } else if (isConnecting) {
-                        setConnectionStatus('connecting');
-                        
-                        // Track connecting time
-                        if (connectingStartRef.current === 0) {
-                            connectingStartRef.current = Date.now();
-                        } else {
-                            const connectingTime = Date.now() - connectingStartRef.current;
-                            
-                            // Só se mostra ligado quando a Evolution confirma "open" (sem assumir ligações)
-                            // Timeout after 60 seconds
-                            if (connectingTime > 60000) {
-                                console.warn('[WhatsApp Channel] Connection timeout');
-                                setError('O WhatsApp não confirmou a ligação. Leia o código QR de novo.');
-                                setConnectionStatus('error');
-                                connectingStartRef.current = 0;
-                            }
-                        }
-                    }
-                }
-            }, 3000);
+    // Grava o canal depois de a Evolution confirmar a ligação. Só aqui se mostra sucesso:
+    // se a gravação falhar, o utilizador vê o erro (antes aparecia "ligado" na mesma).
+    const finishConnection = useCallback(async (status: any, instId: string = fullInstanceName) => {
+        try {
+            await channelsApi.create({
+                type: 'whatsapp',
+                name: instanceName,
+                provider: 'evolution_api',
+                status: 'active',
+                credentials: {
+                    instance_id: instId,
+                    instance_name: instanceName,
+                    phone_number: status.profileName || undefined,
+                },
+            });
+        } catch (e: any) {
+            // 409: o canal desta ligação já existe (voltar a ligar o mesmo número)
+            if (e?.response?.status !== 409) {
+                console.error('[WhatsApp Channel] Erro ao gravar o canal:', e);
+                setError('O WhatsApp ligou, mas não foi possível guardar o canal. Tente de novo.');
+                setConnectionStatus('error');
+                return;
+            }
         }
 
-        return () => {
+        // Definições do utilizador (o mesmo que a página de Integrações); secundário
+        fetch(`${API_URL}/api/users/settings`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                whatsapp_connected: true,
+                whatsapp_instance_name: instId,
+                whatsapp_profile_name: status.profileName || null,
+                whatsapp_connected_at: new Date().toISOString(),
+            }),
+        }).catch(() => {});
+
+        setProfileInfo({ name: status.profileName, picture: status.profilePictureUrl });
+        setConnectionStatus('connected');
+        window.dispatchEvent(new Event('whatsapp-connected'));
+        setStep('success');
+        toast.success('WhatsApp ligado com sucesso');
+    }, [instanceName, fullInstanceName, getAuthHeaders]);
+
+    // Verifica a ligação a cada 3 s enquanto o código está no ecrã. A Evolution responde
+    // "connecting" desde que o QR aparece; só "open" quer dizer ligado. Antes a verificação
+    // parava ao receber "connecting" e a ligação nunca era detetada sozinha.
+    useEffect(() => {
+        if (step !== 'qr' || connectionStatus !== 'waiting_qr' || !fullInstanceName) return;
+        const startedAt = Date.now();
+        let stopped = false;
+        let busy = false;
+
+        const stop = () => {
+            stopped = true;
             if (pollIntervalRef.current) {
                 clearInterval(pollIntervalRef.current);
                 pollIntervalRef.current = null;
             }
         };
-    }, [step, connectionStatus, fullInstanceName, instanceName, checkStatus, getAuthHeaders]);
+
+        pollIntervalRef.current = setInterval(async () => {
+            if (stopped || busy) return;
+            busy = true;
+            try {
+                const status = await checkStatus(fullInstanceName);
+                if (stopped || !status) return;
+                const isOpen =
+                    status.state === 'open' ||
+                    status.state === 'connected' ||
+                    status.connected === true ||
+                    status.instance?.state === 'open' ||
+                    status.instance?.status === 'open';
+                if (isOpen) {
+                    stop();
+                    await finishConnection(status);
+                } else if (Date.now() - startedAt > 180000) {
+                    // Ninguém leu o código em 3 minutos: o QR já expirou
+                    stop();
+                    setError('O código expirou. Atualize o QR e leia-o de novo.');
+                    setConnectionStatus('error');
+                }
+            } finally {
+                busy = false;
+            }
+        }, 3000);
+
+        return stop;
+    }, [step, connectionStatus, fullInstanceName, checkStatus, finishConnection]);
 
     // Auto-close modal when connection succeeds
     useEffect(() => {
         if (step === 'success') {
-            // Auto-close after 2 seconds
+            // Mostra o sucesso e fecha sozinho
             const timer = setTimeout(() => {
                 onSuccess();
                 onClose();
-            }, 2000);
+            }, 2500);
             return () => clearTimeout(timer);
         }
     }, [step, onSuccess, onClose]);
@@ -269,10 +249,8 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                 
                 // Check if instance already exists and is connected
                 if (errorData.message?.includes('already exists') && errorData.state === 'open') {
-                    toast.success('WhatsApp já está ligado');
-                    setStep('success');
-                    setConnectionStatus('connected');
-                    onSuccess();
+                    setFullInstanceName(generatedName);
+                    await finishConnection(errorData, generatedName);
                     return;
                 }
 
@@ -298,10 +276,8 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
 
                 // Check if already connected
                 if (instanceData.state === 'open') {
-                    toast.success('WhatsApp já está ligado');
-                    setStep('success');
-                    setConnectionStatus('connected');
-                    onSuccess();
+                    setFullInstanceName(generatedName);
+                    await finishConnection(instanceData, generatedName);
                     return;
                 }
             }
@@ -634,131 +610,55 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 )}
                             </div>
 
-                            {/* Status indicator */}
+                            {/* Estado: à espera da leitura ou erro (o sucesso tem o seu próprio ecrã) */}
                             <div className="mb-4 w-full">
                                 {connectionStatus === 'waiting_qr' && (
-                                    <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400">
-                                        <Wifi className="w-4 h-4" />
-                                        A aguardar leitura do QR Code...
-                                    </div>
-                                )}
-                                {connectionStatus === 'connecting' && (
-                                    <div className="flex flex-col items-center gap-2">
-                                        <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            QR Code escaneado. A ligar...
-                                        </div>
-                                        <p className="text-xs text-center" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                            A sincronizar... isso pode levar alguns segundos.
-                                        </p>
+                                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        A aguardar a leitura do código
                                     </div>
                                 )}
                                 {connectionStatus === 'error' && (
-                                    <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
-                                        <XCircle className="w-4 h-4" />
-                                        {error || 'Erro na ligação'}
+                                    <div className="flex items-start justify-center gap-2 rounded-lg px-4 py-2 text-sm bg-red-500/10 text-red-600 dark:text-red-400">
+                                        <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                        {error || 'Não foi possível ligar. Atualize o QR e tente de novo.'}
                                     </div>
                                 )}
                             </div>
 
-                            <div className="flex gap-3 w-full">
-                                {connectionStatus === 'connecting' ? (
-                                    <button
-                                        onClick={async () => {
-                                            // Force complete connection
-                                            setConnectionStatus('connected');
-                                            try {
-                                                await channelsApi.create({
-                                                    type: 'whatsapp',
-                                                    name: instanceName,
-                                                    provider: 'evolution_api',
-                                                    status: 'active',
-                                                    credentials: {
-                                                        instance_id: fullInstanceName,
-                                                        instance_name: instanceName
-                                                    }
-                                                });
-                                            } catch (e) {
-                                                console.warn('[WhatsApp Channel] Error saving:', e);
-                                            }
-                                            try {
-                                                await fetch(`${API_URL}/api/users/settings`, {
-                                                    method: 'PUT',
-                                                    headers: getAuthHeaders(),
-                                                    body: JSON.stringify({
-                                                        whatsapp_connected: true,
-                                                        whatsapp_instance_name: fullInstanceName,
-                                                        whatsapp_connected_at: new Date().toISOString(),
-                                                    }),
-                                                });
-                                            } catch (e) {}
-                                            window.dispatchEvent(new Event('whatsapp-connected'));
-                                            if (pollIntervalRef.current) {
-                                                clearInterval(pollIntervalRef.current);
-                                                pollIntervalRef.current = null;
-                                            }
-                                            setStep('success');
-                                            toast.success('WhatsApp ligado com sucesso');
-                                        }}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-all duration-150"
-                                    >
-                                        <CheckCircle className="w-4 h-4" />
-                                        Concluir Ligação
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={handleRefreshQR}
-                                        disabled={loading}
-                                        className="flex-1 flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50"
-                                        style={{ 
-                                            borderColor: 'hsl(var(--border))',
-                                            color: 'hsl(var(--foreground))'
-                                        }}
-                                    >
-                                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                                        Atualizar QR
-                                    </button>
-                                )}
+                            <div className="flex gap-2 w-full [&>*]:flex-1">
                                 <button
                                     onClick={onClose}
-                                    className="flex-1 h-10 border rounded-lg text-sm font-medium transition-colors"
-                                    style={{ 
-                                        borderColor: 'hsl(var(--border))',
-                                        color: 'hsl(var(--muted-foreground))'
-                                    }}
+                                    className="h-10 border rounded-lg text-sm font-medium transition-colors hover:bg-muted/50"
+                                    style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--muted-foreground))' }}
                                 >
                                     Cancelar
                                 </button>
+                                <button
+                                    onClick={handleRefreshQR}
+                                    disabled={loading}
+                                    className="h-10 rounded-lg border text-sm font-medium transition-colors hover:bg-muted/50 disabled:opacity-60"
+                                    style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                >
+                                    {loading ? 'A atualizar…' : 'Atualizar QR'}
+                                </button>
                             </div>
-
-                            <p className="text-xs mt-4 text-center" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                O status é verificado automaticamente a cada 3 segundos.
-                            </p>
                         </div>
                     )}
 
                     {step === 'success' && (
                         <div className="text-center py-8 animate-fadeIn">
-                            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Check className="w-8 h-8" strokeWidth={3} />
+                            <div className="w-16 h-16 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Check className="w-8 h-8" strokeWidth={2.5} />
                             </div>
-                            <h4 className="text-xl font-bold mb-2" style={{ color: 'hsl(var(--foreground))' }}>
-                                Ligado!
+                            <h4 className="text-xl font-medium mb-1" style={{ color: 'hsl(var(--foreground))' }}>
+                                WhatsApp ligado
                             </h4>
                             {profileInfo?.name && (
-                                <p className="text-sm mb-2" style={{ color: 'hsl(var(--foreground))' }}>
+                                <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
                                     {profileInfo.name}
                                 </p>
                             )}
-                            <p className="mb-8 max-w-xs mx-auto" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Seu WhatsApp foi vinculado. As mensagens recebidas aparecerão no Inbox automaticamente.
-                            </p>
-                            <button
-                                onClick={() => { onSuccess(); onClose(); }}
-                                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold shadow-lg transition-colors"
-                            >
-                                Ir para Inbox
-                            </button>
                         </div>
                     )}
                 </div>
