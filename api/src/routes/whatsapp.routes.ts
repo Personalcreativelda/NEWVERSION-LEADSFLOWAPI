@@ -7,12 +7,15 @@ import { ChannelsService } from '../services/channels.service';
 import { ConversationsService } from '../services/conversations.service';
 import { MessagesService } from '../services/messages.service';
 import { query } from '../database/connection';
+import { CampaignsService } from '../services/campaigns.service';
+import { campaignEngine, CampaignError } from '../services/campaign-engine.service';
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 
 const router = Router();
 const whatsappService = new WhatsAppService();
 const leadsService = new LeadsService();
 const channelsService = new ChannelsService();
+const campaignsService = new CampaignsService();
 const conversationsService = new ConversationsService();
 const messagesService = new MessagesService();
 
@@ -207,7 +210,9 @@ router.post('/send', async (req, res, next) => {
   }
 });
 
-// Send mass messages
+// Mensagem a vários leads (lista de leads → "Enviar mensagem"): passa pelo motor de campanhas,
+// com o mesmo ritmo seguro, aquecimento, limite diário, horário e exclusões (quem pediu para sair,
+// números sem WhatsApp). Antes enviava tudo de seguida de 1,5 em 1,5 s — o que bloqueia números.
 router.post('/send-mass', async (req, res, next) => {
   try {
     const user = req.user;
@@ -215,118 +220,49 @@ router.post('/send-mass', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { leadIds, message, instanceId: requestedInstanceId } = req.body;
-
-    if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
-      return res.status(400).json({ error: 'leadIds array is required' });
+    const { leadIds, message, channelId, instanceId } = req.body || {};
+    const ids: string[] = Array.isArray(leadIds)
+      ? [...new Set(leadIds.filter((id: unknown) => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)))] as string[]
+      : [];
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'Escolha pelo menos um lead' });
+    }
+    if (typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'Escreva a mensagem' });
+    }
+    if (instanceId && !instanceBelongsToUser(instanceId, user.id)) {
+      return res.status(403).json({ error: 'Forbidden: You can only use your own instances' });
     }
 
-    if (!message || !message.trim()) {
-      return res.status(400).json({ error: 'Message is required' });
-    }
-
-    // Get instance to use
-    let instanceId = requestedInstanceId;
-    
-    if (!instanceId) {
-      // Find first active WhatsApp channel for user
-      const channels = await channelsService.findByType('whatsapp', user.id);
-      const activeChannel = channels.find(c => c.status === 'active');
-      
-      if (activeChannel && activeChannel.credentials?.instance_id) {
-        instanceId = activeChannel.credentials.instance_id;
-      } else {
-        return res.status(400).json({ 
-          error: 'No active WhatsApp instance found. Please connect WhatsApp first.' 
-        });
-      }
-    } else {
-      // Verify user owns this instance
-      if (!instanceBelongsToUser(instanceId, user.id)) {
-        return res.status(403).json({ error: 'Forbidden: You can only use your own instances' });
-      }
-    }
-
-    console.log(`[WhatsApp Routes] Sending mass messages via instance: ${instanceId}`);
-
-    const summary = {
-      total: leadIds.length,
-      successful: 0,
-      failed: 0,
-      errors: [] as string[],
-    };
-
-    // Send messages to each lead
-    for (const leadId of leadIds) {
-      try {
-        // Get lead data
-        const lead = await leadsService.findById(leadId, user.id);
-
-        if (!lead) {
-          summary.failed++;
-          summary.errors.push(`Lead ${leadId} not found`);
-          continue;
-        }
-
-        // Get phone from lead (support both Portuguese and English field names)
-        const phone = (lead as any).telefone || (lead as any).phone;
-
-        if (!phone) {
-          summary.failed++;
-          summary.errors.push(`Lead ${leadId} has no phone number`);
-          continue;
-        }
-
-        // Send message through user's specific instance
-        await whatsappService.sendMessage({
-          instanceId: instanceId,
-          number: phone,
-          text: message.trim(),
-        });
-
-        summary.successful++;
-
-        // Add small delay between messages to avoid rate limiting
-        if (leadIds.indexOf(leadId) < leadIds.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1500));
-        }
-      } catch (error: any) {
-        console.error(`[WhatsApp Routes] Error sending to lead ${leadId}:`, error);
-        summary.failed++;
-        summary.errors.push(`Lead ${leadId}: ${error.message || 'Unknown error'}`);
-        // If the instance doesn't exist, abort the entire batch and mark channel as error
-        const errMsg: string = error?.message || '';
-        if (errMsg.includes('does not exist') || errMsg.includes('Not Found')) {
-          console.error(`[WhatsApp Routes] Instance "${instanceId}" does not exist in Evolution API. Aborting mass send and marking remaining leads as failed.`);
-          const remaining = leadIds.length - leadIds.indexOf(leadId) - 1;
-          summary.failed += remaining;
-          // Mark the active channel as error so it's no longer selected
-          try {
-            const channels = await channelsService.findByType('whatsapp', user.id);
-            const ch = channels.find((c: any) => c.credentials?.instance_id === instanceId || c.credentials?.instance_name === instanceId);
-            if (ch) {
-              await query(`UPDATE channels SET status = 'error', updated_at = NOW() WHERE id = $1`, [ch.id]);
-              console.warn(`[WhatsApp Routes] Marked channel ${ch.id} as error`);
-            }
-          } catch (dbErr) {
-            console.error('[WhatsApp Routes] Failed to update channel status:', dbErr);
-          }
-          break;
-        }
-      }
-    }
-
-    console.log(`[WhatsApp Routes] Mass send complete:`, summary);
-
-    res.json({
-      success: true,
-      summary: {
-        total: summary.total,
-        successful: summary.successful,
-        failed: summary.failed,
+    const campaign = await campaignsService.create({
+      name: `Mensagem a ${ids.length} ${ids.length === 1 ? 'lead' : 'leads'}`,
+      type: 'whatsapp',
+      status: 'draft',
+      template: message.trim(),
+      settings: {
+        recipientMode: 'leads',
+        leadIds: ids,
+        ...(typeof channelId === 'string' && channelId ? { channelId } : {}),
+        ...(typeof instanceId === 'string' && instanceId ? { instanceId } : {}),
       },
-      errors: summary.errors.length > 0 ? summary.errors : undefined,
-    });
+    }, user.id);
+
+    try {
+      const started = await campaignEngine.startCampaign(campaign.id, user.id);
+      return res.json({
+        success: true,
+        queued: true,
+        campaignId: campaign.id,
+        summary: { total: started.total, successful: started.queued, failed: 0, excluded: started.excluded },
+      });
+    } catch (err: any) {
+      // Não chegou a começar: não deixa uma campanha vazia na lista
+      await query('DELETE FROM campaigns WHERE id = $1 AND user_id = $2', [campaign.id, user.id]).catch(() => {});
+      if (err instanceof CampaignError) {
+        return res.status(err.status).json({ error: err.message, ...(err.details || {}) });
+      }
+      throw err;
+    }
   } catch (error) {
     console.error('[WhatsApp Routes] Error in mass send:', error);
     next(error);

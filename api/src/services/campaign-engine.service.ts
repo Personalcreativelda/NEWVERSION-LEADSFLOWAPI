@@ -47,7 +47,7 @@ export type PauseReason =
   | 'CHANNEL_MISSING'
   | 'ENGINE_UPDATED';
 
-export type ExcludeReason = 'opted_out' | 'recent_campaign' | 'already_sent' | 'invalid' | 'duplicate';
+export type ExcludeReason = 'opted_out' | 'never_talked' | 'recent_campaign' | 'already_sent' | 'invalid' | 'duplicate';
 
 export class CampaignError extends Error {
   constructor(message: string, public status = 400, public details?: Record<string, unknown>) {
@@ -106,14 +106,18 @@ export function campaignPace(raw: any, official: boolean): Pace {
   const batchPauseMinMs = Math.max(30_000, numberOr(s.batchPauseMinSeconds, 90) * 1000);
   const batchPauseMaxMs = Math.max(batchPauseMinMs + 30_000, numberOr(s.batchPauseMaxSeconds, 180) * 1000);
   const rawLimit = numberOr(s.dailyLimit, 150);
+  // Membros de grupos em privado são desconhecidos: o público que mais denuncia. Ritmo mais lento.
+  const coldGroupMembers = s.recipientMode === 'groups' && s.groupSendMode === 'private';
+  const coldMinDelayMs = coldGroupMembers ? Math.max(minDelayMs, 30_000) : minDelayMs;
+  const dailyCap = coldGroupMembers ? 50 : 300;
   return {
-    minDelayMs,
-    maxDelayMs,
+    minDelayMs: coldMinDelayMs,
+    maxDelayMs: Math.max(maxDelayMs, coldMinDelayMs + 5_000),
     batchSize: clamp(Math.trunc(numberOr(s.batchSize, 20)), 5, 50),
     batchPauseMinMs,
     batchPauseMaxMs,
     // -1 era "sem limite": pelo QR há sempre um teto
-    dailyLimit: rawLimit <= 0 ? 300 : clamp(Math.trunc(rawLimit), 1, 300),
+    dailyLimit: rawLimit <= 0 ? dailyCap : clamp(Math.trunc(rawLimit), 1, dailyCap),
     windowStart,
     windowEnd,
     timezone,
@@ -345,6 +349,7 @@ export class CampaignEngine {
   private excludedMessage(excluded: Record<string, number>) {
     const parts: string[] = [];
     if (excluded.opted_out) parts.push(`${excluded.opted_out} pediram para não receber mensagens`);
+    if (excluded.never_talked) parts.push(`${excluded.never_talked} nunca conversaram com este número`);
     if (excluded.recent_campaign) parts.push(`${excluded.recent_campaign} receberam outra campanha há poucos dias`);
     if (excluded.already_sent) parts.push(`${excluded.already_sent} já receberam esta campanha`);
     if (excluded.invalid) parts.push(`${excluded.invalid} têm um número inválido`);
@@ -460,7 +465,27 @@ export class CampaignEngine {
   /** Grava a lista: quem fica de fora fica marcado com o motivo */
   private async buildRecipients(campaign: any, channel: any, audience: AudienceItem[], pace: Pace) {
     const userId = campaign.user_id;
-    const excluded: Record<ExcludeReason, number> = { opted_out: 0, recent_campaign: 0, already_sent: 0, invalid: 0, duplicate: 0 };
+    const excluded: Record<ExcludeReason, number> = { opted_out: 0, never_talked: 0, recent_campaign: 0, already_sent: 0, invalid: 0, duplicate: 0 };
+
+    // "Só quem já conversou": quem nunca escreveu ao número fica de fora. Para quem já escreveu, o
+    // WhatsApp não mostra o aviso de denúncia — é o público mais seguro.
+    const onlyConversed = parseJson(campaign.settings).onlyConversed === true;
+    const talkedKeys = new Set<string>();
+    const talkedLeads = new Set<string>();
+    if (onlyConversed) {
+      const talked = await query(
+        `SELECT DISTINCT c.lead_id, split_part(COALESCE(c.remote_jid, ''), '@', 1) AS phone
+           FROM conversations c
+          WHERE c.user_id = $1
+            AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.direction = 'in')`,
+        [userId],
+      );
+      for (const row of talked.rows) {
+        const k = phoneKey(row.phone || '');
+        if (k) talkedKeys.add(k);
+        if (row.lead_id) talkedLeads.add(row.lead_id);
+      }
+    }
 
     // Números escritos à mão ou de grupos que já são leads: as tags (ex.: nao-contactar) contam
     const unknownKeys = [...new Set(audience.filter((a) => !a.leadId && !a.isGroup).map((a) => phoneKey(a.phone)).filter((k) => k.length >= 7))];
@@ -530,6 +555,7 @@ export class CampaignEngine {
       let reason: ExcludeReason | null = null;
       if (!item.isGroup) {
         if ((known?.tags || []).some((t) => NO_CONTACT_TAGS.includes(t)) || optedOut.has(key)) reason = 'opted_out';
+        else if (onlyConversed && !talkedKeys.has(key) && !(leadId && talkedLeads.has(leadId))) reason = 'never_talked';
         else if (sentHere.has(key) || (leadId && sentHere.has(`lead:${leadId}`))) reason = 'already_sent';
         else if (recentKeys.has(key) || (leadId && recentLeads.has(leadId))) reason = 'recent_campaign';
       }
@@ -607,7 +633,7 @@ export class CampaignEngine {
     if (waitWindow > 0) return this.defer(campaign, waitWindow, 'window');
 
     const sentToday = official ? 0 : await this.sentTodayOnChannel(channel.id, pace.timezone);
-    const warmup = official ? null : await this.warmupLimit(campaign.user_id);
+    const warmup = official ? null : await this.warmupLimit(channel.id);
     const dailyLimit = warmup !== null ? Math.min(pace.dailyLimit, warmup) : pace.dailyLimit;
     if (sentToday >= dailyLimit) {
       return this.defer(campaign, msUntilTomorrowWindow(pace), 'daily_limit', warmup !== null && warmup < pace.dailyLimit);
@@ -745,16 +771,20 @@ export class CampaignEngine {
     return null;
   }
 
-  /** Limite do aquecimento, ou null quando a conta já envia pelo WhatsApp há mais de 14 dias */
-  async warmupLimit(userId: string, now = Date.now()): Promise<number | null> {
-    let cached = this.firstSendCache.get(userId);
+  /**
+   * Limite do aquecimento, ou null quando ESTE número já envia pelo LeadsFlow há mais de 14 dias.
+   * É por número (canal), não por conta: um número novo ligado a uma conta antiga também aquece.
+   */
+  async warmupLimit(channelId: string, now = Date.now()): Promise<number | null> {
+    let cached = this.firstSendCache.get(channelId);
     if (!cached || now - cached.at > 3_600_000) {
       const r = await query(
-        `SELECT MIN(created_at) AS first FROM messages WHERE user_id = $1 AND direction = 'out' AND channel = 'whatsapp'`,
-        [userId],
+        `SELECT MIN(m.created_at) AS first FROM messages m JOIN conversations c ON c.id = m.conversation_id
+          WHERE c.channel_id = $1 AND m.direction = 'out'`,
+        [channelId],
       );
       cached = { first: r.rows[0]?.first ? new Date(r.rows[0].first) : null, at: now };
-      this.firstSendCache.set(userId, cached);
+      this.firstSendCache.set(channelId, cached);
     }
     const days = cached.first ? Math.floor((now - cached.first.getTime()) / 86_400_000) : 0;
     if (days >= WARMUP_DAYS) return null;

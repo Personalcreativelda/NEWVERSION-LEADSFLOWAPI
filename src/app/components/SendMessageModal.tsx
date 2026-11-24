@@ -269,9 +269,10 @@ export function SendMessageModal({
         if (response.success) {
           setSuccess(true);
           setSummary(response.summary);
-          toast.success(
-            `Mensagem enviada para ${response.summary.successful} de ${response.summary.total} leads`
-          );
+          // O envio vai pelo motor de campanhas (ritmo seguro): fica na fila e sai aos poucos
+          toast.success(`Envio iniciado para ${response.summary.successful} contactos`, {
+            description: 'Acompanhe em Campanhas',
+          });
           
           // Wait 2 seconds before closing
           setTimeout(() => {
@@ -588,12 +589,10 @@ export function SendMessageModal({
               <AlertDescription className="text-green-900 dark:text-green-100">
                 {isMassMessage && summary ? (
                   <div>
-                    <p className="font-medium mb-1">Mensagens enviadas</p>
+                    <p className="font-medium mb-1">Envio iniciado</p>
                     <p className="text-sm">
-                      ✓ {summary.successful || summary.sent || 0} enviadas com sucesso
-                      {(summary.failed > 0) && (
-                        <> • ✗ {summary.failed} falharam</>
-                      )}
+                      {summary.successful || summary.sent || 0} na fila de envio
+                      {(summary.excluded > 0) && <> · {summary.excluded} ficaram de fora</>}
                     </p>
                   </div>
                 ) : (

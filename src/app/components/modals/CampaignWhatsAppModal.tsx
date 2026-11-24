@@ -155,6 +155,8 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
   const [windowStart, setWindowStart] = useState(8);
   const [windowEnd, setWindowEnd] = useState(20);
   const [frequencyDays, setFrequencyDays] = useState(7);
+  // Só para quem já escreveu ao número: o WhatsApp não lhes mostra o aviso de denúncia
+  const [onlyConversed, setOnlyConversed] = useState(false);
   // Versões da mensagem: cada contacto recebe uma (o mesmo texto para todos é sinal de envio em massa)
   const [variations, setVariations] = useState<string[]>([]);
   const [generatingVariations, setGeneratingVariations] = useState(false);
@@ -220,6 +222,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
         setWindowStart(Number.isFinite(settings.windowStart) ? settings.windowStart : 8);
         setWindowEnd(Number.isFinite(settings.windowEnd) ? settings.windowEnd : 20);
         setFrequencyDays(Number.isFinite(settings.frequencyDays) ? settings.frequencyDays : 7);
+        setOnlyConversed(settings.onlyConversed === true);
         setVariations(Array.isArray(settings.variations) ? settings.variations : []);
         setUseTemplate(settings.useTemplate || false);
         setTemplateName(settings.templateName || '');
@@ -1381,6 +1384,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             windowStart,
             windowEnd: Math.max(windowEnd, windowStart + 1),
             frequencyDays,
+            onlyConversed,
             variations: variations.map((v) => v.trim()).filter(Boolean),
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             channelId: selectedChannel,
@@ -1500,6 +1504,7 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
             windowStart,
             windowEnd: Math.max(windowEnd, windowStart + 1),
             frequencyDays,
+            onlyConversed,
             variations: variations.map((v) => v.trim()).filter(Boolean),
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             channelId: selectedChannel,
@@ -2651,6 +2656,16 @@ export default function CampaignWhatsAppModal({ isOpen, onClose, leads, onCampai
                         <option value={30}>30 dias fica de fora</option>
                       </select>
                     </div>
+
+                    <label className="flex items-center justify-between gap-3 cursor-pointer">
+                      <span className="text-xs text-foreground/80">Só quem já conversou com este número</span>
+                      <input
+                        type="checkbox"
+                        checked={onlyConversed}
+                        onChange={(e) => setOnlyConversed(e.target.checked)}
+                        className="h-4 w-4 accent-[hsl(var(--primary))]"
+                      />
+                    </label>
 
                     <div className="flex items-center gap-2 text-xs text-foreground/80 pt-2 border-t border-border">
                       <Clock className="w-3 h-3" />
