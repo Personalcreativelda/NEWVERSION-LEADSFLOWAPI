@@ -9,7 +9,6 @@ import { LogoBox } from '../../base/LogoBox';
 import { brandForChannel } from '../../base/BrandIcon';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
-import { Switch } from '../../ui/switch';
 import { cn } from '../../ui/utils';
 import { apiRequest } from '../../../utils/api';
 import { formatNumber, formatRelativeDay, getLocale } from '../../../utils/format';
@@ -153,7 +152,6 @@ export function UserDetailsModal({ userId, onClose }: { userId: string; onClose:
   const [details, setDetails] = useState<Details | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('summary');
-  const [savingQr, setSavingQr] = useState(false);
 
   // Mensagem
   const [via, setVia] = useState<'email' | 'whatsapp'>('email');
@@ -179,22 +177,6 @@ export function UserDetailsModal({ userId, onClose }: { userId: string; onClose:
   }, [userId]);
 
   useEffect(() => { void load(); }, [load]);
-
-  const toggleQr = async (enabled: boolean) => {
-    if (!details) return;
-    setSavingQr(true);
-    setDetails({ ...details, user: { ...details.user, allow_whatsapp_qr: enabled } });
-    try {
-      const res = await apiRequest(`/admin/users/${userId}/whatsapp-qr`, 'POST', { enabled });
-      if (!res?.success) throw new Error();
-      toast.success(enabled ? 'WhatsApp por código QR disponível nesta conta' : 'WhatsApp por código QR escondido nesta conta');
-    } catch {
-      setDetails({ ...details, user: { ...details.user, allow_whatsapp_qr: !enabled } });
-      toast.error('Não foi possível guardar');
-    } finally {
-      setSavingQr(false);
-    }
-  };
 
   const applyTemplate = (key: TemplateKey) => {
     const t = TEXT_TEMPLATES[key];
@@ -322,11 +304,6 @@ export function UserDetailsModal({ userId, onClose }: { userId: string; onClose:
                   {formatNumber(d.usage.conversations)} conversas · {formatNumber(d.usage.received_30d)} mensagens recebidas em 30 dias ·{' '}
                   {formatNumber(d.usage.campaigns.total)} campanhas ({formatNumber(d.usage.campaigns.active)} em curso)
                 </p>
-
-                <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
-                  <label htmlFor="admin-whatsapp-qr" className="text-sm font-medium text-foreground">WhatsApp por código QR</label>
-                  <Switch id="admin-whatsapp-qr" checked={d.user.allow_whatsapp_qr} disabled={savingQr} onCheckedChange={toggleQr} />
-                </div>
 
                 <Section title="Canais" aside={d.deleted_channels > 0 ? `${d.deleted_channels} apagados` : undefined}>
                   {d.channels.length === 0 ? (

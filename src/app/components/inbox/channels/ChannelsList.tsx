@@ -29,7 +29,7 @@ import {
 // Ordem: WhatsApp primeiro, depois Facebook, Instagram, Telegram e outros
 const AVAILABLE_CHANNELS = [
     {
-        // Ligação por código QR: só aparece para contas que já a usam (ver pickableChannels)
+        // Ligação por código QR (Evolution), disponível para todas as contas
         id: 'whatsapp',
         name: 'WhatsApp (código QR)',
         description: 'Ligação pelo telemóvel',
@@ -107,16 +107,8 @@ const AVAILABLE_CHANNELS = [
 
 export function ChannelsList() {
     const [channels, setChannels] = useState<Channel[]>([]);
-    // O WhatsApp por código QR deixa de ser oferecido a contas novas; quem já o tem ligado
-    // continua a vê-lo (para ligar outro número ou voltar a ligar), e a administração pode
-    // permiti-lo numa conta (Administração → utilizador)
-    const [qrAllowed, setQrAllowed] = useState(false);
-    useEffect(() => {
-        channelsApi.getOptions().then((o) => setQrAllowed(!!o?.whatsapp_qr)).catch(() => {});
-    }, []);
-    const pickableChannels = AVAILABLE_CHANNELS.filter(
-        (c) => c.id !== 'whatsapp' || qrAllowed || channels.some((ch) => ch.type === 'whatsapp'),
-    );
+    // Todos os canais, incluindo o WhatsApp por código QR, estão disponíveis para todas as contas
+    const pickableChannels = AVAILABLE_CHANNELS;
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [cloudModalOpen, setCloudModalOpen] = useState(false);
