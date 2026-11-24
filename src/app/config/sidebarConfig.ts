@@ -1,7 +1,7 @@
 import {
     Home, Users, MessageSquare, Workflow, BarChart3,
     CheckSquare, Megaphone, Crown, Settings, User,
-    Bot, PhoneCall, Globe, Target, Brain
+    Bot, PhoneCall, Globe, Target, Brain, MapPin, MessageCircle
 } from 'lucide-react';
 
 export interface SidebarItemConfig {
@@ -27,6 +27,7 @@ export const sidebarConfig: SidebarItemConfig[] = [
     // Comunicação
     { id: 'inbox', labelKey: 'inbox', icon: MessageSquare, path: '/dashboard/inbox', sectionLabel: 'Comunicação', keywords: 'conversas mensagens chat caixa de entrada whatsapp instagram facebook messenger telegram email' },
     { id: 'leads', labelKey: 'contactos', icon: Users, path: '/dashboard/leads', keywords: 'leads contatos clientes lista importar exportar' },
+    { id: 'lead-finder', labelKey: 'leadFinder', icon: MapPin, path: '/dashboard/lead-finder', keywords: 'encontrar procurar prospetar prospeccao google maps empresas novos leads' },
     // Vendas
     { id: 'funnel', labelKey: 'salesFunnel', icon: Workflow, path: '/dashboard/funnel', sectionLabel: 'Vendas', keywords: 'funil pipeline kanban etapas negocios oportunidades' },
     { id: 'campaigns', labelKey: 'campaigns', icon: Megaphone, path: '/dashboard/campaigns', keywords: 'disparos envio em massa broadcast whatsapp email sms' },
@@ -36,6 +37,7 @@ export const sidebarConfig: SidebarItemConfig[] = [
     { id: 'tasks', labelKey: 'tasksFollowup', icon: CheckSquare, path: '/dashboard/tasks', keywords: 'tarefas follow-up lembretes agenda agendamentos' },
     // Automação
     { id: 'ai-assistants', labelKey: 'aiAssistants', icon: Bot, path: '/dashboard/ai-assistants', sectionLabel: 'Automação', keywords: 'ia bot chatbot agentes atendimento automatico gpt' },
+    { id: 'comment-automations', labelKey: 'commentReplies', icon: MessageCircle, path: '/dashboard/comment-automations', keywords: 'comentarios instagram facebook resposta privada dm mensagem automatica' },
     { id: 'voice-agents', labelKey: 'voiceAgents', icon: PhoneCall, path: '/dashboard/voice-agents', keywords: 'voz chamadas telefone ligacoes' },
     { id: 'webhook', labelKey: 'webhook', icon: Globe, path: '/dashboard/automations', keywords: 'webhooks automacoes eventos n8n api' },
     // Configurações

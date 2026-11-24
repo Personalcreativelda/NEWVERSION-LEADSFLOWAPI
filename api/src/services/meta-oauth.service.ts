@@ -5,6 +5,7 @@
 import crypto from 'crypto';
 import { query } from '../database/connection';
 import { encryptCredentials } from '../utils/secret-box';
+import { facebookCommentScopes } from '../utils/meta-comments';
 
 export const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v21.0';
 const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
@@ -38,7 +39,8 @@ export function instagramViaFacebook(): boolean {
 function requestedScopes(): string[] {
   const custom = (process.env.META_OAUTH_SCOPES || '').split(',').map((s) => s.trim()).filter(Boolean);
   if (custom.length) return custom;
-  return instagramViaFacebook() ? META_SCOPES : META_SCOPES.filter((s) => !INSTAGRAM_VIA_PAGE_SCOPES.includes(s));
+  const base = instagramViaFacebook() ? META_SCOPES : META_SCOPES.filter((s) => !INSTAGRAM_VIA_PAGE_SCOPES.includes(s));
+  return [...new Set([...base, ...facebookCommentScopes(instagramViaFacebook())])];
 }
 
 export type OAuthPlatform = 'web' | 'app';

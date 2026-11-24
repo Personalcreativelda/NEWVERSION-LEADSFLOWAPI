@@ -4,6 +4,7 @@
 //   GET  /sessions/:id        (sessão)  → páginas e contas do Instagram para escolher (sem tokens)
 //   POST /sessions/:id/connect (sessão) → cria/atualiza os canais escolhidos
 import { Router } from 'express';
+import { facebookCommentFields } from '../utils/meta-comments';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth.middleware';
 import { ChannelsService } from '../services/channels.service';
 import { validateChannelCredentials } from '../services/channel-validation.service';
@@ -121,7 +122,7 @@ router.post('/sessions/:id/connect', requireAuth, async (req: AuthenticatedReque
           connected_via: 'meta_oauth',
         };
         const check = await validateChannelCredentials('facebook', credentials);
-        const sub = check.ok ? await subscribePage(page.id, page.access_token, MESSENGER_FIELDS) : null;
+        const sub = check.ok ? await subscribePage(page.id, page.access_token, [...MESSENGER_FIELDS, ...facebookCommentFields()]) : null;
         if (!check.ok || !sub?.ok) {
           failed.push({ id: page.id, name: page.name, error: check.error || sub?.error || 'A Meta não ativou as mensagens desta página.' });
         } else {

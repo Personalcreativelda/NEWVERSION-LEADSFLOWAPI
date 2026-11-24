@@ -1001,6 +1001,17 @@ const runPendingMigrations = async () => {
   } catch (error: any) {
     console.warn('[DB] Migration 025 (billing subscriptions) warning:', error.message);
   }
+
+  // Migração 026: comentário → mensagem privada e pesquisas de leads (Google Maps)
+  try {
+    const primaryPath = path.join(__dirname, 'migrations', '026_comment_automations_lead_finder.sql');
+    const fallbackPath = path.join(process.cwd(), 'src', 'database', 'migrations', '026_comment_automations_lead_finder.sql');
+    const migrationPath = fs.existsSync(primaryPath) ? primaryPath : fallbackPath;
+    await pool.query(fs.readFileSync(migrationPath, 'utf-8'));
+    console.log('[DB] comment_automations, comment_replies e lead_searches prontas');
+  } catch (error: any) {
+    console.warn('[DB] Migration 026 (comentários e pesquisa de leads) warning:', error.message);
+  }
 };
 
 export const initDatabase = async () => {

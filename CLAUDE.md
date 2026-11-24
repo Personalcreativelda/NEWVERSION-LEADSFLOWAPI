@@ -80,6 +80,18 @@ Há um emulador `Medium_Phone_API_37.0`.
   perfil e modelos (criar/apagar/estado). API em `/api/whatsapp-business/*`
   (`services/whatsapp-business.service.ts`); o token vai no cabeçalho, nunca no URL.
 
+## Encontrar leads e comentários
+
+- Encontrar leads (`pages/LeadFinderPage.tsx`, `/api/lead-finder`, `services/lead-finder.service.ts`): Google Places
+  API (New) oficial com `GOOGLE_PLACES_API_KEY`. Cada página de 20 resultados conta para o limite mensal
+  (`MONTHLY_SEARCHES` por plano, tabela `lead_searches`). Só se guarda o que a pessoa importa (termos da Google).
+  Nada de scraping de Instagram/Facebook/LinkedIn nem de membros de grupos (risco para a aprovação da Meta).
+- Respostas a comentários (`pages/CommentAutomationsPage.tsx`, `/api/comment-automations`,
+  `services/comment-automation.service.ts`): webhooks `comments` (Instagram) e `feed` (Facebook) → resposta
+  privada (`recipient.comment_id`, uma por comentário, até 7 dias) + resposta pública opcional + lead
+  (`custom_fields.social_id`). As permissões e campos extra só entram com `META_COMMENTS_ENABLED=true`
+  (`utils/meta-comments.ts`), depois da revisão da Meta; canais antigos voltam a subscrever ao guardar uma regra.
+
 ## API pública e páginas públicas
 
 - Tokens de API `lf_…` (Definições → Segurança) entram no `requireAuth` só nas rotas de

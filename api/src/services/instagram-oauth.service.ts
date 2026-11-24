@@ -2,6 +2,7 @@
 // a pessoa entra com a conta profissional do Instagram, sem precisar de página do Facebook.
 // Configuração: META_INSTAGRAM_APP_ID e META_INSTAGRAM_APP_SECRET (caso de uso "API do
 // Instagram" → ID e chave secreta do app do Instagram). Os webhooks vêm assinados com essa chave.
+import { instagramCommentFields, instagramCommentScopes } from '../utils/meta-comments';
 import { query } from '../database/connection';
 import { apiBaseUrl } from './meta-oauth.service';
 import { encryptCredentials } from '../utils/secret-box';
@@ -24,7 +25,7 @@ export function buildInstagramAuthorizeUrl(state: string): string {
     client_id: process.env.META_INSTAGRAM_APP_ID || '',
     redirect_uri: instagramRedirectUri(),
     response_type: 'code',
-    scope: INSTAGRAM_SCOPES.join(','),
+    scope: [...INSTAGRAM_SCOPES, ...instagramCommentScopes()].join(','),
     state,
   });
   return `https://www.instagram.com/oauth/authorize?${params.toString()}`;
@@ -114,7 +115,7 @@ export async function exchangeInstagramCode(rawCode: string): Promise<InstagramL
 export async function subscribeInstagramAccount(token: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch(`${IG_GRAPH}/me/subscribed_apps?${new URLSearchParams({
-      subscribed_fields: 'messages,messaging_postbacks,messaging_seen',
+      subscribed_fields: ['messages', 'messaging_postbacks', 'messaging_seen', ...instagramCommentFields()].join(','),
       access_token: token,
     })}`, { method: 'POST', signal: AbortSignal.timeout(TIMEOUT_MS) });
     const data = await res.json().catch(() => ({}));

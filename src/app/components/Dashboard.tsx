@@ -30,6 +30,8 @@ import AccountSettingsPage from './settings/AccountSettingsPage';
 import AdminPage from './settings/AdminPage';
 import CampaignsPage from './pages/CampaignsPage';
 import RemarketingPage from './pages/RemarketingPage';
+import LeadFinderPage from './pages/LeadFinderPage';
+import CommentAutomationsPage from './pages/CommentAutomationsPage';
 import AIInsightsPage from './pages/AIInsightsPage';
 import InboxPage from './pages/InboxPage';
 import NotificationsPage from './pages/NotificationsPage';
@@ -161,6 +163,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
       '/dashboard/tasks': 'tasks',
       '/dashboard/campaigns': 'campaigns',
       '/dashboard/remarketing': 'remarketing',
+      '/dashboard/lead-finder': 'lead-finder',
+      '/dashboard/comment-automations': 'comment-automations',
       '/dashboard/plan': 'plan',
       '/dashboard/integrations': 'integrations',
       '/dashboard/security': 'security',
@@ -185,6 +189,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
     'tasks': '/dashboard/tasks',
     'campaigns': '/dashboard/campaigns',
     'remarketing': '/dashboard/remarketing',
+    'lead-finder': '/dashboard/lead-finder',
+    'comment-automations': '/dashboard/comment-automations',
     'plan': '/dashboard/plan',
     'integrations': '/dashboard/integrations',
     'security': '/dashboard/security',
@@ -1872,6 +1878,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate, onRefreshUser,
             {currentPage === 'remarketing' && (
               <RemarketingPage />
             )}
+
+            {currentPage === 'lead-finder' && <LeadFinderPage />}
+
+            {currentPage === 'comment-automations' && <CommentAutomationsPage />}
 
             {currentPage === 'ai-insights' && (
               <AIInsightsPage

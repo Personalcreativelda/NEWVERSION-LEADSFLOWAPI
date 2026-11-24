@@ -56,6 +56,8 @@ services:
       - GOOGLE_PLAY_ENTERPRISE_ANNUAL_BASE_PLAN_ID=${GOOGLE_PLAY_ENTERPRISE_ANNUAL_BASE_PLAN_ID:-annual}
       - GOOGLE_PLAY_PUBSUB_AUDIENCE=${GOOGLE_PLAY_PUBSUB_AUDIENCE:-}
       - GOOGLE_PLAY_PUBSUB_SERVICE_ACCOUNT_EMAIL=${GOOGLE_PLAY_PUBSUB_SERVICE_ACCOUNT_EMAIL:-}
+      - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY:-}
+      - META_COMMENTS_ENABLED=${META_COMMENTS_ENABLED:-false}
     restart: unless-stopped
     # O processo 1 de um contentor ignora sinais enviados de dentro dele: com o init (tini)
     # o vigilante da API consegue terminá-la quando bloqueia (api/src/services/health.service.ts)

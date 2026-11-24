@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { commentAutomationService } from '../services/comment-automation.service';
 import multer from 'multer';
 import { query } from '../database/connection';
 // INBOX: Importar services para webhook do Evolution
@@ -2499,6 +2500,11 @@ router.post('/facebook', async (req, res) => {
 
       console.log('[Facebook Webhook] Processing entry for Page ID:', pageId);
 
+      // Comentários na página (campo feed): comentário → mensagem privada, em segundo plano
+      for (const change of entry.changes || []) {
+        void commentAutomationService.handleChange('facebook', String(pageId), change);
+      }
+
       for (const messagingEvent of entry.messaging || []) {
         const senderId = messagingEvent.sender?.id;
         const recipientId = messagingEvent.recipient?.id;
@@ -3349,10 +3355,9 @@ router.post('/instagram', async (req, res) => {
         }
       }
 
-      // Processar mudanças (changes) - stories, mentions, etc.
+      // Comentários: comentário → mensagem privada (em segundo plano; a Meta tem de receber o 200 logo)
       for (const change of entry.changes || []) {
-        console.log('[Instagram Webhook] Change:', change.field, change.value);
-        // Por enquanto, apenas logamos - pode ser expandido no futuro
+        void commentAutomationService.handleChange('instagram', String(entry.id), change);
       }
     }
 
