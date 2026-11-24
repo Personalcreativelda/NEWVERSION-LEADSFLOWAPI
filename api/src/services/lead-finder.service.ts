@@ -52,7 +52,7 @@ export async function searchesThisMonth(userId: string): Promise<{ used: number;
 /** Pesquisa no Google Maps. Marca as empresas que já são leads desta conta. */
 export async function searchPlaces(userId: string, what: string, where: string, pageToken?: string) {
   if (!isPlacesConfigured()) {
-    throw new LeadFinderError('A pesquisa no Google Maps ainda não está configurada.', 503, 'places_not_configured');
+    throw new LeadFinderError('A pesquisa no Google Maps ainda não está configurada.', 422, 'places_not_configured');
   }
   const q = what.trim().slice(0, 120);
   const loc = where.trim().slice(0, 120);
@@ -63,25 +63,39 @@ export async function searchPlaces(userId: string, what: string, where: string, 
     throw new LeadFinderError(`Chegou ao limite de ${usage.limit} pesquisas deste mês.`, 403, 'search_limit');
   }
 
-  const res = await fetch(PLACES_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY as string,
-      'X-Goog-FieldMask': FIELD_MASK,
-    },
-    body: JSON.stringify({
-      textQuery: loc ? `${q} em ${loc}` : q,
-      languageCode: 'pt',
-      pageSize: 20,
-      ...(pageToken ? { pageToken } : {}),
-    }),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  // Erros da Google vão com 422 e a mensagem dela: um 5xx é trocado pela página do Cloudflare/proxy
+  // (sem CORS) e o painel só via "Sem ligação ao servidor", sem saber porquê.
+  let res: Response;
+  try {
+    res = await fetch(PLACES_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY as string,
+        'X-Goog-FieldMask': FIELD_MASK,
+      },
+      body: JSON.stringify({
+        textQuery: loc ? `${q} em ${loc}` : q,
+        languageCode: 'pt',
+        pageSize: 20,
+        ...(pageToken ? { pageToken } : {}),
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err: any) {
+    console.error('[LeadFinder] Sem ligação à Places API:', err?.message, err?.cause?.code || '');
+    throw new LeadFinderError('Não foi possível ligar ao Google. Tente de novo.', 422, 'places_unreachable');
+  }
   const data: any = await res.json().catch(() => ({}));
   if (!res.ok) {
-    console.error('[LeadFinder] Places API:', res.status, JSON.stringify(data?.error || data).slice(0, 500));
-    throw new LeadFinderError('O Google não respondeu à pesquisa. Tente de novo.', 502);
+    const googleMessage = String(data?.error?.message || '').slice(0, 300);
+    console.error('[LeadFinder] Places API:', res.status, data?.error?.status || '', googleMessage);
+    // Faturação desligada, API não ativada, chave restrita… a mensagem da Google diz qual
+    throw new LeadFinderError(
+      googleMessage ? `O Google recusou a pesquisa: ${googleMessage}` : 'O Google recusou a pesquisa. Tente de novo.',
+      422,
+      'places_error',
+    );
   }
 
   const places: FoundPlace[] = (data.places || [])
