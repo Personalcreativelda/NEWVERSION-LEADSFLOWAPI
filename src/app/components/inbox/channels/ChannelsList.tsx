@@ -48,6 +48,16 @@ const AVAILABLE_CHANNELS = [
         provider: 'cloud_api'
     },
     {
+        // Coexistence da Meta: o número continua na app WhatsApp Business do telemóvel
+        id: 'whatsapp_coexistence',
+        name: 'WhatsApp Business (app no telemóvel)',
+        description: 'Use o mesmo número aqui e na app',
+        icon: brandIcon('whatsapp'),
+        color: 'text-green-600',
+        available: true,
+        provider: 'cloud_api'
+    },
+    {
         id: 'facebook',
         name: 'Facebook Messenger',
         description: 'Ligue a sua página do Facebook',
@@ -239,6 +249,11 @@ export function ChannelsList() {
             setModalOpen(true);
         } else if (channelId === 'whatsapp_cloud') {
             void startWhatsAppConnect().then((ok) => { if (!ok) setCloudModalOpen(true); });
+        } else if (channelId === 'whatsapp_coexistence') {
+            // Número que fica também na app WhatsApp Business (só pelo login da Meta; sem formulário manual)
+            void startWhatsAppConnect({ coexistence: true }).then((ok) => {
+                if (!ok) toast.error('A ligação do WhatsApp Business ainda não está disponível.');
+            });
         } else if (channelId === 'telegram') {
             setTelegramModalOpen(true);
         } else if (channelId === 'facebook') {

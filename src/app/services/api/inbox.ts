@@ -192,8 +192,9 @@ export const instagramOAuthApi = {
 
 export const whatsappSignupApi = {
     /** URL da página do Embedded Signup. Erro 'wa_not_configured' (503) quando ainda não está configurado. */
-    async start(platform: 'web' | 'app'): Promise<string> {
-        const { data } = await api.post<{ url: string }>('/oauth/whatsapp/start', { platform });
+    /** coexistence: número que continua na app WhatsApp Business do telemóvel */
+    async start(platform: 'web' | 'app', coexistence = false): Promise<string> {
+        const { data } = await api.post<{ url: string }>('/oauth/whatsapp/start', { platform, ...(coexistence ? { coexistence: true } : {}) });
         return data.url;
     },
 };

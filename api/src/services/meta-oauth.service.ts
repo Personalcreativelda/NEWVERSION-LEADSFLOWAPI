@@ -76,16 +76,18 @@ function stateKey(): string {
 /** kind 'whatsapp': o Embedded Signup volta ao mesmo /callback e segue para o WhatsApp oficial */
 export type OAuthKind = 'meta' | 'whatsapp';
 
-export function createState(userId: string, platform: OAuthPlatform, kind: OAuthKind = 'meta'): string {
+/** coexistence: número que continua na app WhatsApp Business do telemóvel (Coexistence da Meta) */
+export function createState(userId: string, platform: OAuthPlatform, kind: OAuthKind = 'meta', opts: { coexistence?: boolean } = {}): string {
   const payload = Buffer.from(JSON.stringify({
     u: userId, p: platform, n: crypto.randomBytes(12).toString('hex'), e: Date.now() + STATE_TTL_MS,
     ...(kind === 'whatsapp' ? { k: 'wa' } : {}),
+    ...(kind === 'whatsapp' && opts.coexistence ? { c: 1 } : {}),
   })).toString('base64url');
   const sig = crypto.createHmac('sha256', stateKey()).update(payload).digest('base64url');
   return `${payload}.${sig}`;
 }
 
-export function readState(state: string): { userId: string; platform: OAuthPlatform; kind: OAuthKind } | null {
+export function readState(state: string): { userId: string; platform: OAuthPlatform; kind: OAuthKind; coexistence: boolean } | null {
   const [payload, sig] = String(state || '').split('.');
   if (!payload || !sig) return null;
   const expected = crypto.createHmac('sha256', stateKey()).update(payload).digest('base64url');
@@ -95,7 +97,10 @@ export function readState(state: string): { userId: string; platform: OAuthPlatf
   try {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
     if (!data.u || typeof data.e !== 'number' || data.e < Date.now()) return null;
-    return { userId: String(data.u), platform: data.p === 'app' ? 'app' : 'web', kind: data.k === 'wa' ? 'whatsapp' : 'meta' };
+    return {
+      userId: String(data.u), platform: data.p === 'app' ? 'app' : 'web', kind: data.k === 'wa' ? 'whatsapp' : 'meta',
+      coexistence: data.k === 'wa' && data.c === 1,
+    };
   } catch {
     return null;
   }

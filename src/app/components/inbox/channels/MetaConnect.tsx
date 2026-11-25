@@ -52,10 +52,11 @@ export async function startInstagramConnect(): Promise<boolean> {
  * WhatsApp Business oficial (Embedded Signup): abre o login da Meta diretamente.
  * Devolve false quando ainda não está configurado no servidor (o app usa o formulário manual).
  */
-export async function startWhatsAppConnect(): Promise<boolean> {
+/** coexistence: liga um número que continua a ser usado na app WhatsApp Business do telemóvel */
+export async function startWhatsAppConnect(opts: { coexistence?: boolean } = {}): Promise<boolean> {
   try {
     const native = isNativeApp();
-    const url = await whatsappSignupApi.start(native ? 'app' : 'web');
+    const url = await whatsappSignupApi.start(native ? 'app' : 'web', !!opts.coexistence);
     if (native) await openBrowser(url);
     else window.location.assign(url);
     return true;

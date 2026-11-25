@@ -140,6 +140,25 @@ export function ChannelDetailSheet({ channel, onClose, onRename, onOpenSettings,
           {instance && <span className="ml-auto truncate font-mono text-xs font-normal text-muted-foreground">{instance}</span>}
         </div>
 
+        {channel.type === 'whatsapp_cloud' && (channel.credentials as any)?.is_on_biz_app && (() => {
+          // Coexistence: o número continua na app WhatsApp Business; conversas antigas a ser importadas
+          const sync = (channel as any).settings?.coexistence || {};
+          const progress = Number(sync.history_progress);
+          const state = sync.history_error
+            ? 'Conversas antigas não partilhadas'
+            : sync.history_done_at || progress >= 100
+              ? 'Conversas importadas'
+              : Number.isFinite(progress) && sync.onboarded_at
+                ? `A importar conversas · ${progress}%`
+                : null;
+          return (
+            <div className="rounded-lg border border-border px-4 py-3 text-sm">
+              <p className="font-medium text-foreground">Também na app WhatsApp Business</p>
+              {state && <p className="mt-0.5 text-muted-foreground">{state}</p>}
+            </div>
+          );
+        })()}
+
         {!connected && channel.type === 'whatsapp' && (
           <button
             type="button"

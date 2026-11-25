@@ -20,6 +20,9 @@ const aiService = new AIService();
 const assistantsService = new AssistantsService();
 const whatsappService = new WhatsAppService();
 
+/** Coexistence: minutos sem IA numa conversa depois de alguém responder pela app WhatsApp Business */
+const HUMAN_ECHO_PAUSE_MIN = Math.max(1, Number(process.env.HUMAN_ECHO_PAUSE_MIN) || 60);
+
 /** Marcador que a IA inclui na resposta para transferir a conversa a um humano */
 const ESCALATION_MARKER = '[[ESCALAR]]';
 const ESCALATION_MARKER_RE = /\[\[\s*ESCALAR\s*\]\]/i;
@@ -177,6 +180,20 @@ export class AssistantProcessorService {
                     console.log(`[AssistantProcessor] 🛑 Conversa ${ctx.conversationId} está em modo humano (pending) — IA pausada.`);
                     // Modo ponte: o responsável recebe a mensagem no WhatsApp dele
                     await this.relayCustomerMessageToResponsible(ctx);
+                    return false;
+                }
+
+                // 0c. Coexistence: alguém da empresa respondeu pela app WhatsApp Business do telemóvel há
+                // pouco tempo — a IA não fala por cima dessa pessoa (as respostas chegam como ecos)
+                const humanEcho = await query(
+                    `SELECT 1 FROM messages
+                      WHERE conversation_id = $1 AND direction = 'out' AND metadata->>'source' = 'business_app'
+                        AND created_at > NOW() - make_interval(mins => $2::int)
+                      LIMIT 1`,
+                    [ctx.conversationId, HUMAN_ECHO_PAUSE_MIN]
+                );
+                if (humanEcho.rows.length) {
+                    console.log(`[AssistantProcessor] 🛑 Conversa ${ctx.conversationId}: a equipa respondeu pela app do telemóvel — IA em pausa.`);
                     return false;
                 }
             }

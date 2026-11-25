@@ -29,6 +29,7 @@ import { describeWhatsAppMessage, unwrapWhatsAppMessage, whatsAppEvent, whatsApp
 import { applyWhatsAppEvent, quotedForIncoming } from '../services/whatsapp-events.service';
 import { isBridgeRequest, whatsappCallsService } from '../services/whatsapp-calls.service';
 import { channelHealthService } from '../services/channel-health.service';
+import { whatsappCoexistenceService } from '../services/whatsapp-coexistence.service';
 
 const router = Router();
 
@@ -3482,6 +3483,11 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
         // Chamadas de voz (atendidas por um agente de voz; desligado sem WHATSAPP_CALLS_ENABLED)
         if (change.field === 'calls') {
           void whatsappCallsService.handleCallsChange(change.value);
+          continue;
+        }
+        // Coexistence (número também na app WhatsApp Business): histórico, contactos, ecos e ligação desfeita
+        if (['history', 'smb_app_state_sync', 'smb_message_echoes', 'account_update'].includes(change.field)) {
+          whatsappCoexistenceService.enqueue(change.field, change.value, wabaId);
           continue;
         }
         if (change.field !== 'messages') continue;

@@ -4957,5 +4957,12 @@
  "Entregue · Respondeu": "Delivered · Replied",
  "Enviada · Respondeu": "Sent · Replied",
  "Sem destinatários.": "No recipients.",
- "Ninguém nesta lista.": "No one in this list."
+ "Ninguém nesta lista.": "No one in this list.",
+ "WhatsApp Business (app no telemóvel)": "WhatsApp Business (phone app)",
+ "Use o mesmo número aqui e na app": "Use the same number here and in the app",
+ "A ligação do WhatsApp Business ainda não está disponível.": "WhatsApp Business connection is not available yet.",
+ "Também na app WhatsApp Business": "Also in the WhatsApp Business app",
+ "Conversas antigas não partilhadas": "Old chats not shared",
+ "Conversas importadas": "Chats imported",
+ "A Meta desfez a ligação deste número. Abra o canal e ligue de novo.": "Meta disconnected this number. Open the channel and connect again."
 }

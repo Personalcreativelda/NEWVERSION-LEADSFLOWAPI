@@ -52,7 +52,7 @@ async function graph(method: 'GET' | 'POST', path: string, token: string, body?:
  * Diálogo do Embedded Signup aberto diretamente no Facebook (sem página intermédia da API):
  * o cliente só vê facebook.com e volta ao /api/oauth/meta/callback com ?code&state.
  */
-export function buildSignupDialogUrl(state: string): string {
+export function buildSignupDialogUrl(state: string, opts: { coexistence?: boolean } = {}): string {
   const params = new URLSearchParams({
     client_id: process.env.META_APP_ID || '',
     redirect_uri: metaRedirectUri(),
@@ -60,7 +60,13 @@ export function buildSignupDialogUrl(state: string): string {
     config_id: waConfigId(),
     response_type: 'code',
     override_default_response_type: 'true',
-    extras: JSON.stringify({ setup: {}, featureType: '', sessionInfoVersion: '3' }),
+    // Coexistence: o número continua na app WhatsApp Business do telemóvel
+    // (developers.facebook.com → embedded-signup/onboarding-business-app-users)
+    extras: JSON.stringify({
+      setup: {},
+      featureType: opts.coexistence ? 'whatsapp_business_app_onboarding' : '',
+      sessionInfoVersion: '3',
+    }),
   });
   return `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth?${params.toString()}`;
 }
@@ -88,6 +94,17 @@ export interface SignupResult {
   display_phone_number?: string;
   verified_name?: string;
   pin: string;
+  /** Número também em uso na app WhatsApp Business (Coexistence): não se regista, sincroniza-se */
+  is_on_biz_app?: boolean;
+}
+
+/** Dados do número; is_on_biz_app/platform_type só existem nas versões que suportam Coexistence */
+async function phoneInfo(phoneId: string, token: string): Promise<any> {
+  try {
+    return await graph('GET', `/${encodeURIComponent(phoneId)}?fields=display_phone_number,verified_name,is_on_biz_app,platform_type`, token);
+  } catch {
+    return graph('GET', `/${encodeURIComponent(phoneId)}?fields=display_phone_number,verified_name`, token);
+  }
 }
 
 /**
@@ -113,6 +130,7 @@ async function sharedWabaIds(token: string): Promise<string[]> {
  */
 export async function completeSignup(input: {
   code: string; waba_id?: string; phone_number_id?: string; redirect_uri?: string; linkedPhoneIds?: Set<string>;
+  coexistence?: boolean;
 }): Promise<SignupResult> {
   const token = await exchangeSignupCode(input.code, input.redirect_uri);
 
@@ -137,20 +155,29 @@ export async function completeSignup(input: {
   // Webhooks das mensagens desta WABA para a app da LeadsFlow
   await graph('POST', `/${encodeURIComponent(waba)}/subscribed_apps`, token);
 
-  // Registar o número na Cloud API (PIN da verificação em dois passos)
-  const pin = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
-  try {
-    await graph('POST', `/${encodeURIComponent(phoneId)}/register`, token, { messaging_product: 'whatsapp', pin });
-  } catch (err: any) {
-    // Número já registado com outro PIN de verificação em dois passos
-    if (err?.code === 133005 || /two.step|pin/i.test(err?.message || '')) {
-      throw new MetaError('Este número tem um PIN de verificação em dois passos. Desative-o no WhatsApp Manager (ou indique o PIN) e tente de novo.');
-    }
-    // Já registado (ex.: ligar de novo): segue
-    if (!(err?.code === 133015 || /already registered/i.test(err?.message || ''))) throw err;
+  const phone = await phoneInfo(phoneId, token);
+  const onBizApp = phone?.is_on_biz_app === true;
+  if (input.coexistence && !onBizApp) {
+    console.warn('[WhatsApp Signup] Pedido de Coexistence, mas o número não está na app WhatsApp Business:', phoneId);
   }
 
-  const phone = await graph('GET', `/${encodeURIComponent(phoneId)}?fields=display_phone_number,verified_name`, token);
+  // Registar o número na Cloud API (PIN da verificação em dois passos). Números da app WhatsApp
+  // Business (Coexistence) já estão registados: a Meta diz para saltar este passo.
+  let pin = '';
+  if (!onBizApp) {
+    pin = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+    try {
+      await graph('POST', `/${encodeURIComponent(phoneId)}/register`, token, { messaging_product: 'whatsapp', pin });
+    } catch (err: any) {
+      // Número já registado com outro PIN de verificação em dois passos
+      if (err?.code === 133005 || /two.step|pin/i.test(err?.message || '')) {
+        throw new MetaError('Este número tem um PIN de verificação em dois passos. Desative-o no WhatsApp Manager (ou indique o PIN) e tente de novo.');
+      }
+      // Já registado (ex.: ligar de novo): segue
+      if (!(err?.code === 133015 || /already registered/i.test(err?.message || ''))) throw err;
+    }
+  }
+
   return {
     phone_number_id: phoneId,
     waba_id: waba,
@@ -158,12 +185,13 @@ export async function completeSignup(input: {
     display_phone_number: phone?.display_phone_number,
     verified_name: phone?.verified_name,
     pin,
+    ...(onBizApp ? { is_on_biz_app: true } : {}),
   };
 }
 
 /** Página servida pela API que corre o SDK da Meta (funciona no browser e no app, via browser do sistema) */
-export function signupPageHtml(opts: { state: string; nonce: string; appId: string; configId: string; version: string }): string {
-  const cfg = JSON.stringify({ state: opts.state, appId: opts.appId, configId: opts.configId, version: opts.version });
+export function signupPageHtml(opts: { state: string; nonce: string; appId: string; configId: string; version: string; coexistence?: boolean }): string {
+  const cfg = JSON.stringify({ state: opts.state, appId: opts.appId, configId: opts.configId, version: opts.version, coexistence: !!opts.coexistence });
   return `<!doctype html>
 <html lang="pt">
 <head>
@@ -218,7 +246,7 @@ export function signupPageHtml(opts: { state: string; nonce: string; appId: stri
     try {
       var data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
       if (!data || data.type !== 'WA_EMBEDDED_SIGNUP') return;
-      if (data.event === 'FINISH' || data.event === 'FINISH_ONLY_WABA') { session = data.data || {}; finish(); }
+      if (data.event === 'FINISH' || data.event === 'FINISH_ONLY_WABA' || data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') { session = data.data || {}; finish(); }
       else if (data.event === 'CANCEL') { go.disabled = false; say('Ligação cancelada antes de terminar.', true); }
       else if (data.event === 'ERROR') { go.disabled = false; say((data.data && data.data.error_message) || 'A Meta devolveu um erro.', true); }
     } catch (e) { /* mensagens de outros scripts */ }
@@ -233,7 +261,7 @@ export function signupPageHtml(opts: { state: string; nonce: string; appId: stri
       if (response.authResponse && response.authResponse.code) { code = response.authResponse.code; finish(); if (!session) say('A aguardar a confirmação da Meta…'); }
       else { go.disabled = false; say('Ligação cancelada.', true); }
     }, { config_id: cfg.configId, response_type: 'code', override_default_response_type: true,
-         extras: { setup: {}, featureType: '', sessionInfoVersion: '3' } });
+         extras: { setup: {}, featureType: cfg.coexistence ? 'whatsapp_business_app_onboarding' : '', sessionInfoVersion: '3' } });
   });
 })();
 </script>

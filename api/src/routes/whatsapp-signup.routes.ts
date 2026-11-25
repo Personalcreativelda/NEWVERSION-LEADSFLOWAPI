@@ -9,6 +9,7 @@ import { ChannelsService } from '../services/channels.service';
 import { validateChannelCredentials } from '../services/channel-validation.service';
 import { apiBaseUrl, createState, GRAPH_VERSION, metaRedirectUri, readState, returnUrl, type OAuthPlatform } from '../services/meta-oauth.service';
 import { buildSignupDialogUrl, completeSignup, isWhatsAppSignupConfigured, signupPageHtml, waConfigId, type SignupResult } from '../services/whatsapp-signup.service';
+import { whatsappCoexistenceService } from '../services/whatsapp-coexistence.service';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -34,10 +35,18 @@ async function saveSignupChannel(userId: string, result: SignupResult): Promise<
 
   const name = result.verified_name || result.display_phone_number || 'WhatsApp Business';
   const existing = await channelsService.findByCredentialField('phone_number_id', result.phone_number_id, userId);
+  let channelId: string | undefined;
   if (existing && existing.type === 'whatsapp_cloud') {
     await channelsService.update(existing.id, { status: 'active', name, credentials: { ...existing.credentials, ...credentials } }, userId);
+    channelId = existing.id;
   } else {
-    await channelsService.create({ type: 'whatsapp_cloud', name, status: 'active', credentials, settings: {} }, userId);
+    channelId = (await channelsService.create({ type: 'whatsapp_cloud', name, status: 'active', credentials, settings: {} }, userId))?.id;
+  }
+
+  // Coexistence: contactos e conversas da app WhatsApp Business (a Meta só aceita até 24 h depois da ligação)
+  if (result.is_on_biz_app && channelId) {
+    void whatsappCoexistenceService.startSync(channelId)
+      .catch((err) => console.warn('[WhatsAppSignup] Sincronização da app WhatsApp Business:', err?.message));
   }
   return name;
 }
@@ -46,7 +55,7 @@ async function saveSignupChannel(userId: string, result: SignupResult): Promise<
  * Regresso do diálogo direto (chamado pelo /api/oauth/meta/callback quando o state é do
  * WhatsApp). Devolve o URL para onde o browser volta (app ou painel).
  */
-export async function finishWhatsAppSignup(state: { userId: string; platform: OAuthPlatform }, query: Record<string, any>): Promise<string> {
+export async function finishWhatsAppSignup(state: { userId: string; platform: OAuthPlatform; coexistence?: boolean }, query: Record<string, any>): Promise<string> {
   if (query.error || !query.code) {
     const reason = String(query.error_reason || query.error || 'cancelled');
     return returnUrl(state.platform, { meta_error: reason === 'user_denied' ? 'cancelled' : reason });
@@ -56,6 +65,7 @@ export async function finishWhatsAppSignup(state: { userId: string; platform: OA
       code: String(query.code),
       redirect_uri: metaRedirectUri(),
       linkedPhoneIds: await linkedPhoneIds(state.userId),
+      coexistence: !!state.coexistence,
     });
     const name = await saveSignupChannel(state.userId, result);
     return returnUrl(state.platform, { wa_connected: name });
@@ -70,11 +80,13 @@ router.post('/start', requireAuth, (req: AuthenticatedRequest, res) => {
     return res.status(503).json({ code: 'wa_not_configured', error: 'A ligação automática do WhatsApp oficial ainda não está configurada.' });
   }
   const platform: OAuthPlatform = req.body?.platform === 'app' ? 'app' : 'web';
+  // Coexistence: número que continua na app WhatsApp Business do telemóvel
+  const coexistence = req.body?.coexistence === true;
   if (useSignupPage()) {
-    const state = createState(req.user!.id, platform);
+    const state = createState(req.user!.id, platform, 'whatsapp', { coexistence });
     return res.json({ url: `${apiBaseUrl()}/api/oauth/whatsapp/connect?state=${encodeURIComponent(state)}` });
   }
-  res.json({ url: buildSignupDialogUrl(createState(req.user!.id, platform, 'whatsapp')) });
+  res.json({ url: buildSignupDialogUrl(createState(req.user!.id, platform, 'whatsapp', { coexistence }), { coexistence }) });
 });
 
 router.get('/connect', (req, res) => {
@@ -104,6 +116,7 @@ router.get('/connect', (req, res) => {
     appId: process.env.META_APP_ID || '',
     configId: waConfigId(),
     version: GRAPH_VERSION,
+    coexistence: valid.coexistence,
   }));
 });
 
@@ -114,7 +127,7 @@ router.post('/complete', async (req, res) => {
   if (!code || !wabaId) return res.status(400).json({ error: 'A Meta não devolveu a conta do WhatsApp. Tente de novo.' });
 
   try {
-    const result = await completeSignup({ code: String(code), waba_id: String(wabaId), phone_number_id: phoneId ? String(phoneId) : undefined });
+    const result = await completeSignup({ code: String(code), waba_id: String(wabaId), phone_number_id: phoneId ? String(phoneId) : undefined, coexistence: state.coexistence });
     const name = await saveSignupChannel(state.userId, result);
     res.json({ ok: true, redirect: returnUrl(state.platform, { wa_connected: name }) });
   } catch (err: any) {

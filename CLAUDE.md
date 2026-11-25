@@ -75,6 +75,13 @@ Há um emulador `Medium_Phone_API_37.0`.
 - Nada de mostrar endereços da API ao utilizador: Custom Tabs só para logins de terceiros
   (`openBrowser()` em `native.ts`, barra da cor do app); imagens das conversas em `ImageViewer`
   e anexos com `saveRemoteFile()` (Transferências), não numa aba do browser.
+- WhatsApp Coexistence (número que continua na app WhatsApp Business): opção "WhatsApp Business (app no
+  telemóvel)" → `/api/oauth/whatsapp/start { coexistence: true }` → diálogo com `featureType:
+  'whatsapp_business_app_onboarding'` (state com `c: 1`). Número com `is_on_biz_app` NÃO leva `/register`;
+  fica `credentials.is_on_biz_app = true` e `whatsapp-coexistence.service.ts` pede `smb_app_data` (contactos e
+  depois histórico, uma vez cada, até 24 h). Webhooks `history`/`smb_app_state_sync`/`smb_message_echoes`/
+  `account_update` (PARTNER_REMOVED) em fila por número; histórico não conta como não lido nem chama a IA.
+  Eco (resposta pela app) pausa a IA nessa conversa `HUMAN_ECHO_PAUSE_MIN` (60) min. Limite: 20 mensagens/s.
 - WhatsApp oficial (canais `whatsapp_cloud`): Definições → WhatsApp Business
   (`settings/WhatsAppBusinessSettings.tsx`) gere conta, números (verificar/ativar/usar no canal),
   perfil e modelos (criar/apagar/estado). API em `/api/whatsapp-business/*`
