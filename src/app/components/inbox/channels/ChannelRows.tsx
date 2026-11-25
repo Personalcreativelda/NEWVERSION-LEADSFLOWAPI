@@ -1,4 +1,4 @@
-// Canais em lista nativa: linha, detalhe (folha) e escolha de canal novo (folha).
+// Canais em mosaico: cartão de cada canal, detalhe (folha) e escolha de canal novo (grelha).
 import { useEffect, useState } from 'react';
 import { ChevronRight, Globe, Loader2, Mail, MessageCircle, RefreshCcw, Settings, Smartphone, Trash2, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -39,29 +39,33 @@ export function channelDisplayName(channel: Channel): string {
 
 const isConnected = (channel: Channel) => channel.status === 'active';
 
+/** Cartão de um canal ligado (mosaico) */
 export function ChannelRow({ channel, onOpen }: { channel: Channel; onOpen: (c: Channel) => void }) {
   const info = channelTypeInfo(channel.type);
   const Icon = info.Icon;
   const connected = isConnected(channel);
+  // Número também na app WhatsApp Business (Coexistence)
+  const subtitle = channel.type === 'whatsapp_cloud' && (channel.credentials as any)?.is_on_biz_app ? 'WhatsApp Coexistente' : info.subtitle;
   return (
-    <li>
+    <li className="min-w-0">
       <button
         type="button"
         onClick={() => onOpen(channel)}
-        className="flex w-full min-h-[64px] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+        className="flex h-full w-full flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-foreground/25 hover:bg-muted/30 active:bg-muted"
       >
-        <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted ${info.color}`}>
-          <Icon className="h-7 w-7" />
+        <span className="flex w-full items-start justify-between gap-2">
+          <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted ${info.color}`}>
+            <Icon className="h-7 w-7" />
+          </span>
+          <span className={`flex flex-shrink-0 items-center gap-1.5 text-xs font-medium ${connected ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+            <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+            {connected ? 'Ligado' : 'Desligado'}
+          </span>
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block break-words text-[15px] font-medium leading-snug text-foreground">{channelDisplayName(channel)}</span>
-          <span className="block text-[13px] text-muted-foreground">{info.subtitle}</span>
+        <span className="min-w-0 w-full">
+          <span className="block truncate text-[15px] font-medium leading-snug text-foreground">{channelDisplayName(channel)}</span>
+          <span className="block truncate text-[13px] text-muted-foreground">{subtitle}</span>
         </span>
-        <span className={`flex flex-shrink-0 items-center gap-1.5 text-xs font-medium ${connected ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-          <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
-          {connected ? 'Ligado' : 'Desligado'}
-        </span>
-        <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
       </button>
     </li>
   );
@@ -226,25 +230,24 @@ export function AddChannelSheet({ open, onClose, channels, onPick }: {
   onPick: (id: string) => void;
 }) {
   return (
-    <AppModal open={open} onOpenChange={(o) => !o && onClose()} size="md" title="Adicionar canal" description="Escolha o canal que quer ligar">
-      <ul className="-mx-1 divide-y divide-border">
+    <AppModal open={open} onOpenChange={(o) => !o && onClose()} size="lg" title="Adicionar canal" description="Escolha o canal que quer ligar">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {channels.filter((c) => c.available).map((c) => {
           const Icon = c.icon;
           return (
-            <li key={c.id}>
+            <li key={c.id} className="min-w-0">
               <button
                 type="button"
                 onClick={() => { onClose(); onPick(c.id); }}
-                className="flex w-full min-h-[60px] items-center gap-3 rounded-lg px-1 py-2.5 text-left hover:bg-muted/50 active:bg-muted"
+                className="flex h-full w-full flex-col items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-foreground/25 hover:bg-muted/30 active:bg-muted sm:p-4"
               >
                 <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-muted ${c.color}`}>
                   <Icon className="h-7 w-7" />
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-medium text-foreground">{c.name}</span>
-                  <span className="block text-[13px] text-muted-foreground">{c.description}</span>
+                <span className="min-w-0 w-full">
+                  <span className="block text-[15px] font-medium leading-snug text-foreground">{c.name}</span>
+                  <span className="mt-0.5 block line-clamp-2 text-[13px] leading-snug text-muted-foreground">{c.description}</span>
                 </span>
-                <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
               </button>
             </li>
           );

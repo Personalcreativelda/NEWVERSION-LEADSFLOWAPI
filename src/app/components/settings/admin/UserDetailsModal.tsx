@@ -8,6 +8,7 @@ import { AppModal } from '../../base/AppModal';
 import { LogoBox } from '../../base/LogoBox';
 import { brandForChannel } from '../../base/BrandIcon';
 import { Button } from '../../ui/button';
+import { Switch } from '../../ui/switch';
 import { Input } from '../../ui/input';
 import { cn } from '../../ui/utils';
 import { apiRequest } from '../../../utils/api';
@@ -22,7 +23,7 @@ interface Details {
   user: {
     id: string; email: string; name: string; avatar_url?: string | null; role?: string; is_active: boolean;
     email_verified: boolean; two_factor_enabled: boolean; plan: string; plan_expires_at?: string | null;
-    created_at: string; last_active_at?: string | null; allow_whatsapp_qr: boolean;
+    created_at: string; last_active_at?: string | null; allow_whatsapp_qr: boolean; channel_options?: string[];
   };
   usage: {
     leads: UsageItem; messages: UsageItem; mass_messages: UsageItem;
@@ -145,12 +146,18 @@ function Section({ title, children, aside }: { title: string; children: ReactNod
   );
 }
 
+/** Opções de canais extra que a administração liga por conta (o servidor aceita as mesmas chaves) */
+const CHANNEL_OPTION_LABELS: [string, string][] = [
+  ['whatsapp_cloud_token', 'WhatsApp Business com token'],
+];
+
 const listClass = 'divide-y divide-border rounded-xl border border-border';
 const rowClass = 'flex items-center gap-3 px-4 py-2.5';
 
 export function UserDetailsModal({ userId, onClose }: { userId: string; onClose: () => void }) {
   const [details, setDetails] = useState<Details | null>(null);
   const [loading, setLoading] = useState(true);
+  const [savingOption, setSavingOption] = useState(false);
   const [tab, setTab] = useState<Tab>('summary');
 
   // Mensagem
@@ -211,6 +218,22 @@ export function UserDetailsModal({ userId, onClose }: { userId: string; onClose:
   };
 
   const d = details;
+
+  const toggleChannelOption = async (key: string, on: boolean) => {
+    if (!d) return;
+    const current = new Set(d.user.channel_options || []);
+    if (on) current.add(key); else current.delete(key);
+    setSavingOption(true);
+    try {
+      const res = await apiRequest(`/admin/users/${userId}/channel-options`, 'PUT', { options: Array.from(current) });
+      setDetails({ ...d, user: { ...d.user, channel_options: res?.channel_options || Array.from(current) } });
+      toast.success('Guardado');
+    } catch {
+      toast.error('Não foi possível guardar');
+    } finally {
+      setSavingOption(false);
+    }
+  };
   const alerts = d?.security.alerts || [];
 
   return (
@@ -304,6 +327,22 @@ export function UserDetailsModal({ userId, onClose }: { userId: string; onClose:
                   {formatNumber(d.usage.conversations)} conversas · {formatNumber(d.usage.received_30d)} mensagens recebidas em 30 dias ·{' '}
                   {formatNumber(d.usage.campaigns.total)} campanhas ({formatNumber(d.usage.campaigns.active)} em curso)
                 </p>
+
+                <Section title="Opções de canais">
+                  <ul className={listClass}>
+                    {CHANNEL_OPTION_LABELS.map(([key, label]) => (
+                      <li key={key} className={rowClass}>
+                        <span className="min-w-0 flex-1 text-sm text-foreground">{label}</span>
+                        <Switch
+                          checked={(d.user.channel_options || []).includes(key)}
+                          disabled={savingOption}
+                          onCheckedChange={(on) => void toggleChannelOption(key, on)}
+                          aria-label={label}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
 
                 <Section title="Canais" aside={d.deleted_channels > 0 ? `${d.deleted_channels} apagados` : undefined}>
                   {d.channels.length === 0 ? (

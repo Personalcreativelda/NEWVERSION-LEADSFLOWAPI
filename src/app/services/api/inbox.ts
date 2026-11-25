@@ -73,8 +73,8 @@ api.interceptors.response.use(undefined, (error) => {
 
 export const channelsApi = {
     /** Canais que esta conta pode ligar (o WhatsApp por código QR só com autorização) */
-    async getOptions(): Promise<{ whatsapp_qr: boolean }> {
-        const { data } = await api.get<{ whatsapp_qr: boolean }>('/channels/options');
+    async getOptions(): Promise<{ whatsapp_qr: boolean; whatsapp_cloud_token?: boolean }> {
+        const { data } = await api.get<{ whatsapp_qr: boolean; whatsapp_cloud_token?: boolean }>('/channels/options');
         return data;
     },
 

@@ -4995,5 +4995,9 @@
  "Volte a ligar o WhatsApp Business: faltam dados da Meta": "Reconnectez WhatsApp Business : des données Meta manquent",
  "Volte a ligar o WhatsApp Business: o canal já não tem acesso à Meta": "Reconnectez WhatsApp Business : le canal n'a plus accès à Meta",
  "A Meta não devolveu o conjunto de dados": "Meta n'a pas renvoyé le jeu de données",
- "WhatsApp Coexistente": "WhatsApp Coexistence"
+ "WhatsApp Coexistente": "WhatsApp Coexistence",
+ "WhatsApp Business (token)": "WhatsApp Business (jeton)",
+ "Ligar com token de utilizador do sistema": "Connecter avec un jeton d'utilisateur système",
+ "Opções de canais": "Options de canaux",
+ "WhatsApp Business com token": "WhatsApp Business avec jeton"
 }

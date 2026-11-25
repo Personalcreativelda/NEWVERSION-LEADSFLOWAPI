@@ -8,6 +8,26 @@ import { validateChannelCredentials } from '../services/channel-validation.servi
 import { mergeCredentials } from '../utils/secret-box';
 import { channelHealthService } from '../services/channel-health.service';
 
+/**
+ * Canal WhatsApp Business ligado com token (formulário manual): liga a app da LeadsFlow à conta
+ * WhatsApp Business para receber mensagens, chamadas e ecos. O login da Meta já o faz; aqui faltava.
+ */
+async function subscribeAppToWaba(wabaId: unknown, token: string) {
+    const waba = String(wabaId || '').replace(/\D/g, '');
+    if (!waba || !token) return;
+    try {
+        const res = await fetch(`https://graph.facebook.com/${process.env.META_GRAPH_VERSION || 'v21.0'}/${waba}/subscribed_apps`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(15_000),
+        });
+        const data: any = await res.json().catch(() => ({}));
+        if (!res.ok || data?.error) console.warn('[Channels] subscribed_apps falhou:', waba, data?.error?.message || res.status);
+    } catch (err: any) {
+        console.warn('[Channels] subscribed_apps sem resposta:', waba, err?.message);
+    }
+}
+
 const router = Router();
 const channelsService = new ChannelsService();
 const whatsappService = new WhatsAppService();
@@ -90,10 +110,19 @@ router.get('/options', async (req, res, next) => {
     const { query } = require('../database/connection');
     const r = await query(
       `SELECT COALESCE((SELECT allow_whatsapp_qr FROM users WHERE id = $1), false)
-              OR EXISTS (SELECT 1 FROM channels WHERE user_id = $1 AND type = 'whatsapp') AS whatsapp_qr`,
+              OR EXISTS (SELECT 1 FROM channels WHERE user_id = $1 AND type = 'whatsapp') AS whatsapp_qr,
+              (SELECT role FROM users WHERE id = $1) AS role,
+              COALESCE((SELECT channel_options FROM users WHERE id = $1), '[]'::jsonb) AS channel_options`,
       [user.id]
     );
-    res.json({ whatsapp_qr: r.rows[0]?.whatsapp_qr === true });
+    const row = r.rows[0] || {};
+    const extra: string[] = Array.isArray(row.channel_options) ? row.channel_options : [];
+    res.json({
+      whatsapp_qr: row.whatsapp_qr === true,
+      // WhatsApp Business com token (números do próprio portfólio da app, que o Embedded Signup recusa):
+      // administradores e contas a quem a administração ligou a opção
+      whatsapp_cloud_token: row.role === 'admin' || extra.includes('whatsapp_cloud_token'),
+    });
   } catch (error) {
     next(error);
   }
@@ -166,6 +195,7 @@ router.post('/', async (req, res, next) => {
                     status: requestedStatus,
                     credentials
                 }, user.id);
+                void subscribeAppToWaba(credentials.waba_id, accessToken);
                 return res.status(200).json(updated);
             }
 
@@ -178,12 +208,14 @@ router.post('/', async (req, res, next) => {
                     phone_number_id: phoneNumberId,
                     waba_id: credentials.waba_id || null,
                     access_token: accessToken,
-                    verify_token: credentials.verify_token || 'leadflow_verify'
+                    verify_token: credentials.verify_token || 'leadflow_verify',
+                    connected_via: 'manual_token'
                 },
                 settings: settings || {}
             }, user.id);
 
             console.log(`[Channels] WhatsApp Cloud channel created: ${channel.id}`);
+            void subscribeAppToWaba(credentials.waba_id, accessToken);
             return res.status(201).json(channel);
         }
 

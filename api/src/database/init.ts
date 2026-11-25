@@ -559,6 +559,8 @@ const runPendingMigrations = async () => {
       -- WhatsApp por código QR: escondido nas contas novas (revisão da Meta); a administração
       -- pode permiti-lo conta a conta
       ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_whatsapp_qr BOOLEAN NOT NULL DEFAULT FALSE;
+      -- Opções de canais extra que a administração liga por conta (ex.: 'whatsapp_cloud_token')
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS channel_options JSONB NOT NULL DEFAULT '[]'::jsonb;
       -- Conversas fixadas no topo da inbox (como no WhatsApp)
       ALTER TABLE conversations ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMPTZ;
 

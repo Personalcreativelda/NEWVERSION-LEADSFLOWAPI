@@ -115,10 +115,28 @@ const AVAILABLE_CHANNELS = [
     }
 ];
 
+/** Números do próprio portfólio da app (o login da Meta recusa-os): ligar com token de utilizador do sistema */
+const TOKEN_CHANNEL = {
+    id: 'whatsapp_cloud_token',
+    name: 'WhatsApp Business (token)',
+    description: 'Ligar com token de utilizador do sistema',
+    icon: brandIcon('whatsapp'),
+    color: 'text-green-600',
+    available: true,
+    provider: 'cloud_api',
+};
+
 export function ChannelsList() {
     const [channels, setChannels] = useState<Channel[]>([]);
-    // Todos os canais, incluindo o WhatsApp por código QR, estão disponíveis para todas as contas
-    const pickableChannels = AVAILABLE_CHANNELS;
+    // Todos os canais, incluindo o WhatsApp por código QR, estão disponíveis para todas as contas.
+    // "WhatsApp Business com token" só para administradores e contas a quem a administração o ligou.
+    const [tokenOption, setTokenOption] = useState(false);
+    useEffect(() => {
+        channelsApi.getOptions().then((o) => setTokenOption(!!o.whatsapp_cloud_token)).catch(() => {});
+    }, []);
+    const pickableChannels = tokenOption
+        ? AVAILABLE_CHANNELS.flatMap((c) => (c.id === 'whatsapp_coexistence' ? [c, TOKEN_CHANNEL] : [c]))
+        : AVAILABLE_CHANNELS;
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [cloudModalOpen, setCloudModalOpen] = useState(false);
@@ -249,6 +267,8 @@ export function ChannelsList() {
             setModalOpen(true);
         } else if (channelId === 'whatsapp_cloud') {
             void startWhatsAppConnect().then((ok) => { if (!ok) setCloudModalOpen(true); });
+        } else if (channelId === 'whatsapp_cloud_token') {
+            setCloudModalOpen(true);
         } else if (channelId === 'whatsapp_coexistence') {
             // Número que fica também na app WhatsApp Business (só pelo login da Meta; sem formulário manual)
             void startWhatsAppConnect({ coexistence: true }).then((ok) => {
@@ -330,7 +350,7 @@ export function ChannelsList() {
                     }
                 />
             ) : (
-                <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+                <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {channels.map(channel => (
                         <ChannelRow key={channel.id} channel={channel} onOpen={setDetailChannel} />
                     ))}

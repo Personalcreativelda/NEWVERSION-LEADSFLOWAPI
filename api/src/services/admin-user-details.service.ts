@@ -38,6 +38,7 @@ export async function adminUserDetails(userId: string, adminId: string) {
     created_at: u.created_at,
     last_active_at: u.last_active_at || null,
     allow_whatsapp_qr: u.allow_whatsapp_qr === true,
+    channel_options: Array.isArray(u.channel_options) ? u.channel_options : [],
   };
 
   const [leadLimit, msgLimit, massLimit] = await Promise.all([

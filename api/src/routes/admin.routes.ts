@@ -637,6 +637,25 @@ router.post('/users/:userId/whatsapp-qr', requireAuth, requireAdmin, async (req:
 });
 
 // ==========================================
+// PUT /admin/users/:userId/channel-options - Opções de canais extra desta conta
+// ==========================================
+const CHANNEL_OPTIONS = ['whatsapp_cloud_token'];
+router.put('/users/:userId/channel-options', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const options = (Array.isArray(req.body?.options) ? req.body.options : [])
+      .map(String).filter((o: string) => CHANNEL_OPTIONS.includes(o));
+    const result = await query(
+      'UPDATE users SET channel_options = $2::jsonb WHERE id = $1 RETURNING id, channel_options',
+      [req.params.userId, JSON.stringify(Array.from(new Set(options)))]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Utilizador não encontrado' });
+    res.json({ success: true, channel_options: result.rows[0].channel_options });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==========================================
 // POST /admin/users/:userId/send-email - Enviar email para usuário
 // ==========================================
 router.post('/users/:userId/send-email', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
