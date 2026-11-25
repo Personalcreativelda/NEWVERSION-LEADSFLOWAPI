@@ -4994,5 +4994,6 @@
  "Ligue primeiro um número WhatsApp Business": "Connect a WhatsApp Business number first",
  "Volte a ligar o WhatsApp Business: faltam dados da Meta": "Reconnect WhatsApp Business: Meta data is missing",
  "Volte a ligar o WhatsApp Business: o canal já não tem acesso à Meta": "Reconnect WhatsApp Business: the channel no longer has Meta access",
- "A Meta não devolveu o conjunto de dados": "Meta did not return the dataset"
+ "A Meta não devolveu o conjunto de dados": "Meta did not return the dataset",
+ "WhatsApp Coexistente": "WhatsApp Coexistence"
 }

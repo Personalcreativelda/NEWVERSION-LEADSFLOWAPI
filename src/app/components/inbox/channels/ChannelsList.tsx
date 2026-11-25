@@ -50,7 +50,7 @@ const AVAILABLE_CHANNELS = [
     {
         // Coexistence da Meta: o número continua na app WhatsApp Business do telemóvel
         id: 'whatsapp_coexistence',
-        name: 'WhatsApp Business (app no telemóvel)',
+        name: 'WhatsApp Coexistente',
         description: 'Use o mesmo número aqui e na app',
         icon: brandIcon('whatsapp'),
         color: 'text-green-600',
