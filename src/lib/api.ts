@@ -204,7 +204,12 @@ class ApiClient {
     save: (data: Record<string, any>) =>
       this.request<any>('/api/meta-conversions/config', { method: 'PUT', body: JSON.stringify(data) }),
     test: () => this.request<any>('/api/meta-conversions/test', { method: 'POST' }),
-    events: () => this.request<any>('/api/meta-conversions/events'),
+    events: (status?: 'sent' | 'pending' | 'failed') =>
+      this.request<any>(`/api/meta-conversions/events${this.buildQuery({ status })}`),
+    /** Liga sem tokens: dataset da conta WhatsApp Business (Embedded Signup) */
+    auto: (channelId?: string) =>
+      this.request<any>('/api/meta-conversions/auto', { method: 'POST', body: JSON.stringify(channelId ? { channel_id: channelId } : {}) }),
+    diagnose: () => this.request<{ checks: { key: string; ok: boolean; detail?: string }[]; events: string[] }>('/api/meta-conversions/diagnose'),
     audience: (stages: string[]) =>
       this.request<{ csv: string; count: number }>(`/api/meta-conversions/audience${this.buildQuery({ stages: stages.join(',') })}`),
   };

@@ -596,6 +596,10 @@ const runPendingMigrations = async () => {
       );
       CREATE INDEX IF NOT EXISTS idx_meta_events_user ON meta_events(user_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_meta_events_retry ON meta_events(updated_at) WHERE status = 'failed';
+      -- Origem do envio (etapa do funil, assistente, automação, teste) e moeda do valor (ex.: MZN)
+      ALTER TABLE meta_events ADD COLUMN IF NOT EXISTS source VARCHAR(20);
+      ALTER TABLE meta_events ADD COLUMN IF NOT EXISTS currency VARCHAR(3);
+      CREATE INDEX IF NOT EXISTS idx_meta_events_pending ON meta_events(user_id, created_at) WHERE status IN ('pending', 'failed');
     `);
     console.log('[DB] ✅ campaign engine tables verified');
   } catch (error: any) {

@@ -8,6 +8,8 @@ import { query } from '../database/connection';
 import { decryptSecret, encryptSecret } from '../utils/secret-box';
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
+// Dataset da WABA e debug_token: versão da documentação da API de Conversões para mensagens
+const GRAPH_BM = `https://graph.facebook.com/${process.env.META_CAPI_GRAPH_VERSION || 'v23.0'}`;
 const SETTINGS_KEY = 'meta_conversions';
 const SWEEP_MS = 60_000;
 /** A Meta só aceita eventos dos últimos 7 dias */
@@ -15,8 +17,12 @@ const MAX_EVENT_AGE_DAYS = 6;
 const MAX_ATTEMPTS = 3;
 const BATCH = 200;
 
-export type MetaEventName = 'Lead' | 'QualifiedLead' | 'Purchase';
-export const META_EVENTS: MetaEventName[] = ['Lead', 'QualifiedLead', 'Purchase'];
+// Eventos oficiais da API de Conversões para mensagens (developers.facebook.com → conversions-api/business-messaging).
+// 'Lead' vai como LeadSubmitted nas conversas de anúncios.
+export type MetaEventName = 'Lead' | 'QualifiedLead' | 'Purchase' | 'AddToCart' | 'InitiateCheckout' | 'OrderCreated' | 'OrderDelivered';
+export const META_EVENTS: MetaEventName[] = ['Lead', 'QualifiedLead', 'AddToCart', 'InitiateCheckout', 'OrderCreated', 'Purchase', 'OrderDelivered'];
+/** Origem do pedido de envio: etapa do funil, assistente de IA, automação ou teste no painel */
+export type MetaEventSource = 'stage' | 'assistant' | 'automation' | 'manual';
 
 /** Etapa do funil → evento (as etapas sem evento não enviam nada) */
 export const DEFAULT_MAPPING: Record<string, MetaEventName> = {
@@ -30,6 +36,10 @@ const MESSAGING_NAMES: Record<MetaEventName, string> = {
   Lead: 'LeadSubmitted',
   QualifiedLead: 'QualifiedLead',
   Purchase: 'Purchase',
+  AddToCart: 'AddToCart',
+  InitiateCheckout: 'InitiateCheckout',
+  OrderCreated: 'OrderCreated',
+  OrderDelivered: 'OrderDelivered',
 };
 
 /** Indicativo do país (para números guardados sem ele) */
@@ -47,6 +57,12 @@ export interface MetaConfig {
   country: string;
   mapping: Record<string, MetaEventName>;
   enabled_at: string | null;
+  /** 'whatsapp': dataset da WABA e token do canal WhatsApp oficial (Embedded Signup); 'manual': token colado */
+  source: 'manual' | 'whatsapp';
+  channel_id: string;
+  waba_id: string;
+  /** Eventos que os assistentes de IA podem enviar (vazio = nenhum) */
+  assistant_events: MetaEventName[];
 }
 
 export class MetaConversionsError extends Error {
@@ -76,12 +92,35 @@ function normalizeConfig(raw: any): MetaConfig {
     country: (clean(v.country) || 'MZ').toUpperCase().slice(0, 2),
     mapping,
     enabled_at: v.enabled_at || null,
+    source: v.source === 'whatsapp' ? 'whatsapp' : 'manual',
+    channel_id: clean(v.channel_id),
+    waba_id: clean(v.waba_id).replace(/D/g, ''),
+    assistant_events: (Array.isArray(v.assistant_events) ? v.assistant_events : [])
+      .filter((e: any) => META_EVENTS.includes(e)) as MetaEventName[],
   };
+}
+
+/** Token do canal WhatsApp oficial (o do Embedded Signup, que a Meta recomenda reutilizar) */
+async function channelToken(userId: string, channelId: string): Promise<{ token: string; waba: string } | null> {
+  if (!channelId) return null;
+  const r = await query(
+    `SELECT credentials FROM channels WHERE id = $1 AND user_id = $2 AND type = 'whatsapp_cloud'`,
+    [channelId, userId],
+  );
+  const c = r.rows[0]?.credentials;
+  const cred = typeof c === 'string' ? (() => { try { return JSON.parse(c); } catch { return {}; } })() : c || {};
+  return cred.access_token ? { token: String(cred.access_token), waba: String(cred.waba_id || '') } : null;
 }
 
 export async function getMetaConfig(userId: string): Promise<MetaConfig> {
   const r = await query('SELECT value FROM settings WHERE user_id = $1 AND key = $2', [userId, SETTINGS_KEY]);
-  return normalizeConfig(r.rows[0]?.value);
+  const cfg = normalizeConfig(r.rows[0]?.value);
+  if (cfg.source === 'whatsapp') {
+    const ch = await channelToken(userId, cfg.channel_id);
+    cfg.access_token = ch?.token || '';
+    if (ch?.waba && !cfg.waba_id) cfg.waba_id = ch.waba;
+  }
+  return cfg;
 }
 
 /** Para o painel: nunca leva o token */
@@ -98,13 +137,20 @@ export async function saveMetaConfig(userId: string, input: any): Promise<MetaCo
     ...(input || {}),
     access_token: clean(input?.access_token) || current.access_token,
   });
+  // Ligação pelo WhatsApp: o token é o do canal (fica lá, cifrado; não se copia para as definições)
+  if (next.source === 'whatsapp') next.access_token = (await channelToken(userId, next.channel_id))?.token || '';
   if (next.enabled && (!next.dataset_id || !next.access_token)) {
-    throw new MetaConversionsError('Indique o ID do conjunto de dados e o token de acesso');
+    throw new MetaConversionsError(next.source === 'whatsapp'
+      ? 'Volte a ligar o WhatsApp Business: o canal já não tem acesso à Meta'
+      : 'Indique o ID do conjunto de dados e o token de acesso');
   }
   // Só os eventos a partir de agora: o histórico antigo não é enviado de repente
   if (next.enabled && (!current.enabled || !current.enabled_at)) next.enabled_at = new Date().toISOString();
   if (!next.enabled) next.enabled_at = null;
-  const stored = { ...next, access_token: next.access_token ? encryptSecret(next.access_token) : '' };
+  const stored = {
+    ...next,
+    access_token: next.source === 'whatsapp' ? '' : next.access_token ? encryptSecret(next.access_token) : '',
+  };
   await query(
     `INSERT INTO settings (user_id, key, value) VALUES ($1, $2, $3::jsonb)
      ON CONFLICT (user_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
@@ -151,26 +197,31 @@ interface LeadRow {
 }
 
 /** Monta o evento. Com o clique do anúncio do WhatsApp oficial vai como conversa de anúncio. */
-export function buildEvent(cfg: MetaConfig, lead: LeadRow, event: MetaEventName, now = Date.now()) {
+export function buildEvent(
+  cfg: MetaConfig, lead: LeadRow, event: MetaEventName, now = Date.now(),
+  opts: { value?: number | null; currency?: string | null } = {},
+) {
   const changed = lead.changed_at ? new Date(lead.changed_at).getTime() : now;
   const eventTime = Math.floor(Math.max(Math.min(changed, now), now - MAX_EVENT_AGE_DAYS * 86_400_000) / 1000);
-  const value = Number(lead.deal_value) || 0;
+  const value = opts.value != null && Number(opts.value) > 0 ? Number(opts.value) : Number(lead.deal_value) || 0;
+  const currency = (clean(opts.currency) || cfg.currency).toUpperCase().slice(0, 3);
   const custom: Record<string, any> = {};
   if (event === 'Purchase' || value > 0) {
     custom.value = value;
-    custom.currency = cfg.currency;
+    custom.currency = currency;
   }
   const eventId = `${lead.id}:${event}`;
 
   const ad = lead.ad_referral && typeof lead.ad_referral === 'object' ? lead.ad_referral : null;
-  if (ad?.ctwa_clid && ad?.waba_id) {
+  const adWaba = ad?.waba_id || (ad?.channel === 'whatsapp_cloud' ? cfg.waba_id : '');
+  if (ad?.ctwa_clid && adWaba) {
     return {
       event_name: MESSAGING_NAMES[event],
       event_time: eventTime,
       event_id: eventId,
       action_source: 'business_messaging',
       messaging_channel: 'whatsapp',
-      user_data: { whatsapp_business_account_id: String(ad.waba_id), ctwa_clid: String(ad.ctwa_clid) },
+      user_data: { whatsapp_business_account_id: String(adWaba), ctwa_clid: String(ad.ctwa_clid) },
       ...(Object.keys(custom).length ? { custom_data: custom } : {}),
     };
   }
@@ -283,17 +334,51 @@ async function dueEvents(userId: string, cfg: MetaConfig) {
   return res.rows.map((row: any) => ({ lead: row as LeadRow, event: row.event as MetaEventName }));
 }
 
-async function record(userId: string, items: Array<{ lead: LeadRow; event: MetaEventName }>, status: 'sent' | 'failed', error?: string) {
-  for (const { lead, event } of items) {
-    const viaAd = !!(lead.ad_referral?.ctwa_clid && lead.ad_referral?.waba_id);
+interface QueueItem {
+  lead: LeadRow;
+  event: MetaEventName;
+  source: MetaEventSource;
+  value?: number | null;
+  currency?: string | null;
+}
+
+/** Pedidos do assistente, das automações e do painel à espera de envio (ou a repetir depois de falhar) */
+async function queuedEvents(userId: string): Promise<QueueItem[]> {
+  const res = await query(
+    `SELECT l.id, l.name, l.phone, l.whatsapp, l.email, l.status, l.deal_value, l.ad_referral,
+            e.created_at AS changed_at, e.event_name, e.value AS q_value, e.currency AS q_currency, e.source
+       FROM meta_events e JOIN leads l ON l.id = e.lead_id AND l.user_id = e.user_id
+      WHERE e.user_id = $1
+        AND COALESCE(e.source, 'stage') <> 'stage'
+        AND e.status IN ('pending', 'failed') AND e.attempts < $2
+        AND (e.status = 'pending' OR e.updated_at < NOW() - INTERVAL '10 minutes')
+        AND e.created_at > NOW() - make_interval(days => $3)
+      ORDER BY e.created_at
+      LIMIT $4`,
+    [userId, MAX_ATTEMPTS, MAX_EVENT_AGE_DAYS, BATCH],
+  );
+  return res.rows.map((row: any) => ({
+    lead: row as LeadRow,
+    event: row.event_name as MetaEventName,
+    source: row.source as MetaEventSource,
+    value: row.q_value != null ? Number(row.q_value) : null,
+    currency: row.q_currency || null,
+  }));
+}
+
+async function record(userId: string, items: QueueItem[], status: 'sent' | 'failed', error?: string) {
+  for (const { lead, event, source, value, currency } of items) {
+    const viaAd = !!(lead.ad_referral?.ctwa_clid && (lead.ad_referral?.waba_id || lead.ad_referral?.channel === 'whatsapp_cloud'));
+    const amount = value != null && value > 0 ? value : Number(lead.deal_value) || 0;
     await query(
-      `INSERT INTO meta_events (user_id, lead_id, event_name, stage, value, via_ad, status, attempts, error, sent_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::text, 1, $8, CASE WHEN $7::text = 'sent' THEN NOW() END)
+      `INSERT INTO meta_events (user_id, lead_id, event_name, stage, value, currency, via_ad, status, attempts, error, sent_at, source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text, 1, $9, CASE WHEN $8::text = 'sent' THEN NOW() END, $10)
        ON CONFLICT (lead_id, event_name) DO UPDATE
          SET status = EXCLUDED.status, attempts = meta_events.attempts + 1, error = EXCLUDED.error,
              sent_at = COALESCE(EXCLUDED.sent_at, meta_events.sent_at), value = EXCLUDED.value,
-             via_ad = EXCLUDED.via_ad, updated_at = NOW()`,
-      [userId, lead.id, event, lead.status, Number(lead.deal_value) || 0, viaAd, status, error ? error.slice(0, 500) : null],
+             currency = EXCLUDED.currency, via_ad = EXCLUDED.via_ad,
+             source = COALESCE(meta_events.source, EXCLUDED.source), updated_at = NOW()`,
+      [userId, lead.id, event, lead.status, amount, currency || null, viaAd, status, error ? error.slice(0, 500) : null, source],
     );
   }
 }
@@ -302,11 +387,13 @@ async function record(userId: string, items: Array<{ lead: LeadRow; event: MetaE
 export async function flushUser(userId: string) {
   const cfg = await getMetaConfig(userId);
   if (!cfg.enabled || !cfg.dataset_id || !cfg.access_token) return { sent: 0, failed: 0 };
-  const items = await dueEvents(userId, cfg);
+  const stage = (await dueEvents(userId, cfg)).map((i) => ({ ...i, source: 'stage' as MetaEventSource }));
+  const items: QueueItem[] = [...stage, ...(await queuedEvents(userId))];
   if (items.length === 0) return { sent: 0, failed: 0 };
   const now = Date.now();
+  const build = (i: QueueItem) => buildEvent(cfg, i.lead, i.event, now, { value: i.value, currency: i.currency });
   try {
-    await sendEvents(cfg, items.map((i) => buildEvent(cfg, i.lead, i.event, now)));
+    await sendEvents(cfg, items.map(build));
     await record(userId, items, 'sent');
     return { sent: items.length, failed: 0 };
   } catch (batchErr: any) {
@@ -318,7 +405,7 @@ export async function flushUser(userId: string) {
     let sent = 0, failed = 0;
     for (const item of items) {
       try {
-        await sendEvents(cfg, [buildEvent(cfg, item.lead, item.event, now)]);
+        await sendEvents(cfg, [build(item)]);
         await record(userId, [item], 'sent');
         sent += 1;
       } catch (err: any) {
@@ -328,6 +415,123 @@ export async function flushUser(userId: string) {
     }
     return { sent, failed };
   }
+}
+
+/**
+ * Pede o envio de um evento (assistente, automação ou teste no painel). Vai para a fila e o envio
+ * periódico trata dele, com repetições. Um evento de cada tipo por lead: pedir de novo não duplica.
+ * Só com a integração ativa e só para leads da própria conta.
+ */
+export async function queueEvent(
+  userId: string, leadId: string, event: MetaEventName, source: Exclude<MetaEventSource, 'stage'>,
+  opts: { value?: number | null; currency?: string | null } = {},
+): Promise<{ queued: boolean; reason?: string }> {
+  if (!META_EVENTS.includes(event)) return { queued: false, reason: 'Evento desconhecido' };
+  const cfg = await getMetaConfig(userId);
+  if (!cfg.enabled) return { queued: false, reason: 'A API de Conversões não está ativa' };
+  if (source === 'assistant' && !cfg.assistant_events.includes(event)) return { queued: false, reason: 'Evento não autorizado para os assistentes' };
+  const lead = await query('SELECT id, status FROM leads WHERE id = $1 AND user_id = $2', [leadId, userId]);
+  if (!lead.rows[0]) return { queued: false, reason: 'Lead não encontrado' };
+  const value = opts.value != null && Number(opts.value) > 0 ? Math.round(Number(opts.value) * 100) / 100 : null;
+  if (event === 'Purchase' && !value) {
+    // Compra sem valor só se o negócio já tiver valor
+    const dv = await query('SELECT deal_value FROM leads WHERE id = $1', [leadId]);
+    if (!(Number(dv.rows[0]?.deal_value) > 0)) return { queued: false, reason: 'A compra precisa do valor' };
+  }
+  const currency = clean(opts.currency).toUpperCase().slice(0, 3) || null;
+  const ins = await query(
+    `INSERT INTO meta_events (user_id, lead_id, event_name, stage, value, currency, status, source)
+     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
+     ON CONFLICT (lead_id, event_name) DO NOTHING
+     RETURNING id`,
+    [userId, leadId, event, lead.rows[0].status, value, currency, source],
+  );
+  return ins.rowCount ? { queued: true } : { queued: false, reason: 'Este evento já foi registado para este lead' };
+}
+
+// ── Ligação automática pelo WhatsApp oficial ─────────────────────────────────
+
+/** Permissões que a Meta deu ao token (escopos granulares do debug_token) */
+async function tokenScopes(token: string): Promise<string[]> {
+  const appToken = `${process.env.META_APP_ID || ''}|${process.env.META_APP_SECRET || ''}`;
+  const url = `${GRAPH_BM}/debug_token?${new URLSearchParams({ input_token: token, access_token: appToken })}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(20_000) }).catch(() => null);
+  const data: any = res ? await res.json().catch(() => ({})) : {};
+  const granular = (data?.data?.granular_scopes || []).map((s: any) => String(s.scope));
+  const scopes = (data?.data?.scopes || []).map(String);
+  return Array.from(new Set([...granular, ...scopes]));
+}
+
+export const REQUIRED_PERMISSIONS = ['whatsapp_business_management', 'whatsapp_business_manage_events'];
+
+/**
+ * Liga a API de Conversões sem tokens nem píxeis: usa o token do canal WhatsApp oficial e o dataset
+ * da WABA (POST /{WABA_ID}/dataset cria-o ou devolve o que já existe).
+ */
+export async function connectWhatsAppDataset(userId: string, channelId?: string) {
+  const r = await query(
+    `SELECT id, name, credentials FROM channels
+      WHERE user_id = $1 AND type = 'whatsapp_cloud' AND status = 'active' ${channelId ? 'AND id = $2' : ''}
+      ORDER BY created_at DESC LIMIT 1`,
+    channelId ? [userId, channelId] : [userId],
+  );
+  const ch = r.rows[0];
+  if (!ch) throw new MetaConversionsError('Ligue primeiro um número WhatsApp Business');
+  const cred = typeof ch.credentials === 'string' ? JSON.parse(ch.credentials) : ch.credentials || {};
+  if (!cred.access_token || !cred.waba_id) throw new MetaConversionsError('Volte a ligar o WhatsApp Business: faltam dados da Meta');
+
+  const scopes = await tokenScopes(cred.access_token);
+  const missing = REQUIRED_PERMISSIONS.filter((p) => !scopes.includes(p));
+  if (scopes.length && missing.length) {
+    throw new MetaConversionsError(`A ligação do WhatsApp não tem a permissão ${missing.join(', ')}. Depois de a Meta a aprovar, volte a ligar o WhatsApp Business.`);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${GRAPH_BM}/${encodeURIComponent(cred.waba_id)}/dataset`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${cred.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dataset_name: `LeadsFlow · ${String(ch.name || 'WhatsApp').slice(0, 60)}` }),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    throw new MetaConversionsError('Não foi possível contactar a Meta. Tente de novo dentro de momentos.');
+  }
+  const data: any = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.id) {
+    throw new MetaConversionsError(data?.error?.error_user_msg || data?.error?.message || 'A Meta não devolveu o conjunto de dados');
+  }
+
+  const current = await getMetaConfig(userId);
+  return saveMetaConfig(userId, {
+    ...current,
+    source: 'whatsapp',
+    channel_id: ch.id,
+    waba_id: String(cred.waba_id),
+    dataset_id: String(data.id),
+    access_token: '',
+    enabled: true,
+  });
+}
+
+/** Diagnóstico para o painel: o que está bem e o que falta */
+export async function diagnose(userId: string) {
+  const cfg = await getMetaConfig(userId);
+  const checks: { key: string; ok: boolean; detail?: string }[] = [];
+  checks.push({ key: 'dataset', ok: !!cfg.dataset_id, detail: cfg.dataset_id || undefined });
+  checks.push({ key: 'token', ok: !!cfg.access_token });
+  if (cfg.access_token && cfg.source === 'whatsapp') {
+    const scopes = await tokenScopes(cfg.access_token);
+    for (const p of REQUIRED_PERMISSIONS) checks.push({ key: `perm:${p}`, ok: scopes.includes(p) });
+  }
+  checks.push({ key: 'enabled', ok: cfg.enabled });
+  checks.push({ key: 'mapping', ok: Object.keys(cfg.mapping).length > 0 });
+  const ads = await query(
+    `SELECT COUNT(*)::int AS n FROM leads WHERE user_id = $1 AND ad_referral->>'ctwa_clid' IS NOT NULL AND updated_at > NOW() - INTERVAL '30 days'`,
+    [userId],
+  );
+  checks.push({ key: 'ads', ok: Number(ads.rows[0]?.n) > 0, detail: String(ads.rows[0]?.n || 0) });
+  return { checks };
 }
 
 // ── Origem dos leads: anúncios ───────────────────────────────────────────────

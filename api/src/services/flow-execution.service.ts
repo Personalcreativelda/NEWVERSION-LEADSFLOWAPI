@@ -16,6 +16,7 @@ import {
   FlowSendError, generateVoice, isVoiceConfigured, isWindowOpen, resolveTarget, saveOutgoing, sendAudio, sendEmail, sendText,
   targetForConversation, type FlowLead, type FlowTarget, type WhatsAppTemplateRef,
 } from './flow-send.service';
+import { META_EVENTS, queueEvent } from './meta-conversions.service';
 import {
   classifyReply, contextualAcknowledgement, conversationContext, hasActiveAssistant, isAiAvailable, personalizeMessage,
   transcribeReply, type ReplyIntent,
@@ -700,6 +701,16 @@ export class FlowExecutionService {
           [Math.trunc(points), lead.id, lead.user_id],
         );
         return { kind: 'next', note: `Pontuação ${points > 0 ? '+' : ''}${Math.trunc(points)}` };
+      }
+
+      case 'meta_event': {
+        // Conversão para a Meta: vai para a fila da API de Conversões (uma por lead e por evento)
+        const event = META_EVENTS.find((e) => e === cfg.event);
+        if (!event) return { kind: 'next' };
+        const r = await queueEvent(lead.user_id, lead.id, event, 'automation', {
+          value: cfg.value ? Number(cfg.value) : null, currency: cfg.currency || null,
+        });
+        return { kind: 'next', note: r.queued ? `Conversão ${event} enviada para a Meta` : `Conversão ${event}: ${r.reason}` };
       }
 
       case 'condition': {

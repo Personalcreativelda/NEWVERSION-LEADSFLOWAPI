@@ -15,6 +15,7 @@ import { emailService } from './email.service';
 import { checkMessageLimit } from '../middleware/plan-enforcement.middleware';
 import { isValidPhoneNumber, isSamePhoneNumber, normalizePhoneNumber } from '../utils/phone.utils';
 import { metaMessagesUrl } from '../utils/meta-send';
+import { getMetaConfig, META_EVENTS, queueEvent } from './meta-conversions.service';
 
 const aiService = new AIService();
 const assistantsService = new AssistantsService();
@@ -126,6 +127,27 @@ export interface IncomingMessageContext {
 // A IA pede para enviar um ficheiro da lista [FICHEIROS PARA O CLIENTE]: [[ENVIAR:2]]
 const SEND_FILE_RE = /\[\[\s*ENVIAR\s*:\s*(\d+)\s*\]\]/i;
 const SEND_FILE_RE_GLOBAL = /\[\[\s*ENVIAR\s*:\s*\d+\s*\]\]/gi;
+// Conversão confirmada na conversa ([[CONVERSAO:Purchase:1500:MZN]]): vai para a API de Conversões da Meta
+const CONVERSION_RE_GLOBAL = /\[\[\s*CONVERSAO\s*:\s*([A-Za-z]+)\s*(?::\s*([\d.,]+)\s*)?(?::\s*([A-Za-z]{3})\s*)?\]\]/gi;
+const CONVERSION_LABELS: Record<string, string> = {
+    Lead: 'o cliente deixou os dados ou pediu claramente para ser contactado',
+    QualifiedLead: 'o cliente confirmou interesse real e cumpre o que a empresa procura (orçamento, necessidade, prazo)',
+    AddToCart: 'o cliente escolheu um produto ou serviço concreto para comprar',
+    InitiateCheckout: 'o cliente pediu os dados de pagamento ou começou a pagar',
+    OrderCreated: 'a encomenda/pedido ficou confirmada com o cliente',
+    Purchase: 'o pagamento foi confirmado (indique o valor e a moeda)',
+    OrderDelivered: 'o cliente confirmou que recebeu a encomenda',
+};
+
+/** "1.500,50" / "1500.5" / "1,500" → número */
+function parseAmount(raw: string | undefined): number | null {
+    if (!raw) return null;
+    let t = raw.trim();
+    if (/,\d{1,2}$/.test(t)) t = t.replace(/\./g, '').replace(',', '.');
+    else t = t.replace(/,/g, '');
+    const n = Number(t);
+    return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 export const isImageFile = (f: { mime_type?: string | null; file_name?: string | null }) =>
     /^image\//i.test(String(f.mime_type || '')) || /\.(jpe?g|png|webp|gif)$/i.test(String(f.file_name || ''));
@@ -548,6 +570,13 @@ export class AssistantProcessorService {
                 aiResponse.content = aiResponse.content.replace(SEND_FILE_RE_GLOBAL, '').trim();
             }
 
+            // 5b''. Conversões confirmadas pela IA ([[CONVERSAO:...]]): saem da resposta e vão para a fila da Meta
+            const conversions = Array.from(aiResponse.content.matchAll(CONVERSION_RE_GLOBAL));
+            if (conversions.length) {
+                aiResponse.content = aiResponse.content.replace(CONVERSION_RE_GLOBAL, '').trim();
+                void this.queueConversions(ctx, conversions.map((m) => ({ event: m[1], value: parseAmount(m[2]), currency: m[3] || null })));
+            }
+
             // 5c. Proteção: a resposta não pode revelar as instruções, blocos internos nem segredos
             let guardrailBlocked: string | undefined;
             if (config.guardrails_enabled !== false) {
@@ -855,6 +884,18 @@ export class AssistantProcessorService {
                 `Nunca diga que vai encaminhar ou transferir sem incluir ${ESCALATION_MARKER}.\n---`;
         }
 
+        // Conversões (API de Conversões da Meta): só os eventos que a empresa autorizou para os assistentes
+        try {
+            const capi = await getMetaConfig(ctx.userId);
+            if (capi.enabled && capi.assistant_events.length) {
+                systemPrompt += '\n\n---\n[CONVERSÕES]\n' +
+                    'Quando um destes factos ficar CONFIRMADO pelo cliente nesta conversa, acrescente no fim da resposta o marcador indicado ' +
+                    '(é removido automaticamente; o cliente não o vê). Nunca o use por suposição, intenção vaga ou só porque o cliente perguntou o preço.\n' +
+                    capi.assistant_events.map((e) => `- [[CONVERSAO:${e}${e === 'Purchase' ? ':VALOR:MOEDA' : ''}]] quando ${CONVERSION_LABELS[e] || e}`).join('\n') +
+                    `\nA moeda por omissão é ${capi.currency}. Cada evento conta uma vez por cliente.\n---`;
+            }
+        } catch { /* sem a integração, o assistente segue igual */ }
+
         // Injetar memória de longo prazo no system prompt
         if (memoryEnabled && ctx.contactPhone) {
             const memory = await aiService.getContactMemory(assistant.user_assistant_id, ctx.contactPhone);
@@ -1001,6 +1042,23 @@ export class AssistantProcessorService {
         messages.push({ role: 'user', content: ctx.guardrail ? fenceCustomerMessage(ctx.messageContent) : ctx.messageContent });
 
         return messages;
+    }
+
+    /** Eventos de conversão pedidos pela IA → fila da API de Conversões (só os autorizados; um por lead) */
+    private async queueConversions(ctx: IncomingMessageContext, items: { event: string; value: number | null; currency: string | null }[]) {
+        try {
+            const conv = await query('SELECT lead_id FROM conversations WHERE id = $1 AND user_id = $2', [ctx.conversationId, ctx.userId]);
+            const leadId = conv.rows[0]?.lead_id;
+            if (!leadId) return;
+            for (const item of items) {
+                const event = META_EVENTS.find((e) => e.toLowerCase() === item.event.toLowerCase());
+                if (!event) continue;
+                const r = await queueEvent(ctx.userId, leadId, event, 'assistant', { value: item.value, currency: item.currency });
+                console.log(`[AssistantProcessor] Conversão ${event} (lead ${leadId}): ${r.queued ? 'na fila' : r.reason}`);
+            }
+        } catch (err: any) {
+            console.warn('[AssistantProcessor] Conversão não registada:', err?.message);
+        }
     }
 
     // ─── Utilitários de humanização ───────────────────────────────────────────

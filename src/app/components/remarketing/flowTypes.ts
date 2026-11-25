@@ -4,7 +4,7 @@ export type TriggerType = 'funnel_stage' | 'tag' | 'inactivity' | 'purchase' | '
 export type ActionType =
   | 'message' | 'whatsapp' | 'facebook' | 'instagram' | 'telegram' | 'email' | 'dynamic_audio' | 'ab_test'
   | 'wait' | 'condition'
-  | 'move_stage' | 'tag' | 'remove_tag' | 'create_task' | 'add_note' | 'notify' | 'score';
+  | 'move_stage' | 'tag' | 'remove_tag' | 'create_task' | 'add_note' | 'notify' | 'score' | 'meta_event';
 
 export interface FlowStep {
   id: string;
@@ -99,6 +99,7 @@ export const STEP_GROUPS: { label: string; options: { value: ActionType; label: 
       { value: 'add_note', label: 'Adicionar nota' },
       { value: 'notify', label: 'Avisar a equipa' },
       { value: 'score', label: 'Alterar pontuação' },
+      { value: 'meta_event', label: 'Enviar conversão (Meta)' },
     ],
   },
 ];
@@ -121,7 +122,19 @@ export const STEP_NAMES: Record<ActionType, string> = {
   add_note: 'Adicionar nota',
   notify: 'Avisar a equipa',
   score: 'Pontuação',
+  meta_event: 'Conversão (Meta)',
 };
+
+/** Eventos da API de Conversões da Meta (o mesmo que o servidor aceita) */
+export const META_EVENT_OPTIONS: { value: string; label: string }[] = [
+  { value: 'Lead', label: 'Lead (LeadSubmitted)' },
+  { value: 'QualifiedLead', label: 'Lead qualificado' },
+  { value: 'AddToCart', label: 'Adicionou ao carrinho' },
+  { value: 'InitiateCheckout', label: 'Iniciou o pagamento' },
+  { value: 'OrderCreated', label: 'Encomenda criada' },
+  { value: 'Purchase', label: 'Compra' },
+  { value: 'OrderDelivered', label: 'Encomenda entregue' },
+];
 
 export const CONDITION_OPTIONS = [
   { value: 'replied', label: 'O lead respondeu' },
@@ -179,6 +192,11 @@ export function stepSummary(type: ActionType, config: Record<string, any> = {}, 
     case 'add_note': return config.text ? short(config.text) : 'Sem texto';
     case 'notify': return config.title ? short(config.title) : 'Sem aviso';
     case 'score': return config.points ? `${Number(config.points) > 0 ? '+' : ''}${config.points} pontos` : 'Sem pontos';
+    case 'meta_event': {
+      const ev = META_EVENT_OPTIONS.find((o) => o.value === config.event);
+      if (!ev) return 'Sem evento';
+      return config.event === 'Purchase' && Number(config.value) > 0 ? `${ev.label} · ${config.value} ${config.currency || ''}`.trim() : ev.label;
+    }
     default: return '';
   }
 }

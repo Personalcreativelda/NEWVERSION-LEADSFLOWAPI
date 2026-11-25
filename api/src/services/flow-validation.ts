@@ -38,6 +38,9 @@ function stepProblem(step: any, steps: any[]): string | null {
       return hasText(cfg.title) ? null : 'falta o texto do aviso';
     case 'score':
       return Number.isFinite(Number(cfg.points)) && Number(cfg.points) !== 0 ? null : 'faltam os pontos';
+    case 'meta_event':
+      return ['Lead', 'QualifiedLead', 'AddToCart', 'InitiateCheckout', 'OrderCreated', 'Purchase', 'OrderDelivered'].includes(cfg.event)
+        ? null : 'falta escolher o evento da Meta';
     case 'condition': {
       if (!hasText(cfg.check)) return 'falta escolher a condição';
       if (['stage', 'not_stage', 'tag', 'not_tag'].includes(cfg.check) && !hasText(cfg.value)) return 'falta o valor da condição';
@@ -53,7 +56,7 @@ export function flowProblems(flow: { steps?: any; trigger_type?: string; trigger
   const steps = Array.isArray(flow.steps) ? flow.steps : [];
   const problems: string[] = [];
   if (steps.length === 0) problems.push('O fluxo não tem passos');
-  if (!steps.some((s) => SEND_STEP_TYPES.has(s?.type)) && !steps.some((s) => ['tag', 'remove_tag', 'move_stage', 'create_task', 'add_note', 'notify', 'score'].includes(s?.type))) {
+  if (!steps.some((s) => SEND_STEP_TYPES.has(s?.type)) && !steps.some((s) => ['tag', 'remove_tag', 'move_stage', 'create_task', 'add_note', 'notify', 'score', 'meta_event'].includes(s?.type))) {
     if (steps.length > 0) problems.push('O fluxo não faz nenhuma ação');
   }
   steps.forEach((step, i) => {

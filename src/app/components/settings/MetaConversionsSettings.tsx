@@ -19,11 +19,32 @@ const DEFAULT_STAGES = [
   { id: 'perdido', label: 'Perdidos' },
 ];
 
+// Eventos oficiais da API de Conversões para mensagens (Lead vai como LeadSubmitted)
 const EVENT_LABELS: Record<string, string> = {
   Lead: 'Lead',
   QualifiedLead: 'Lead qualificado',
+  AddToCart: 'Adicionou ao carrinho',
+  InitiateCheckout: 'Iniciou o pagamento',
+  OrderCreated: 'Encomenda criada',
   Purchase: 'Compra',
+  OrderDelivered: 'Encomenda entregue',
 };
+
+const SOURCE_LABELS: Record<string, string> = {
+  stage: 'funil', assistant: 'assistente', automation: 'automação', manual: 'teste',
+};
+
+const CHECK_LABELS: Record<string, string> = {
+  dataset: 'Conjunto de dados',
+  token: 'Acesso à Meta',
+  'perm:whatsapp_business_management': 'Permissão whatsapp_business_management',
+  'perm:whatsapp_business_manage_events': 'Permissão whatsapp_business_manage_events',
+  enabled: 'Envio ativo',
+  mapping: 'Etapas com evento',
+  ads: 'Leads vindos de anúncios (30 dias)',
+};
+
+type StatusFilter = '' | 'sent' | 'pending' | 'failed';
 
 const CURRENCIES = ['MZN', 'EUR', 'USD', 'BRL', 'AOA', 'ZAR', 'CVE'];
 const COUNTRIES: Array<[string, string]> = [
@@ -47,6 +68,9 @@ interface Config {
   currency: string;
   country: string;
   mapping: Record<string, string>;
+  source?: 'manual' | 'whatsapp';
+  waba_id?: string;
+  assistant_events?: string[];
 }
 
 export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
@@ -58,11 +82,15 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
-  const [totals, setTotals] = useState<{ sent: number; via_ad: number; failed: number } | null>(null);
+  const [totals, setTotals] = useState<{ sent: number; via_ad: number; failed: number; pending: number } | null>(null);
+  const [filter, setFilter] = useState<StatusFilter>('');
+  const [connecting, setConnecting] = useState(false);
+  const [checks, setChecks] = useState<{ key: string; ok: boolean; detail?: string }[] | null>(null);
+  const [checking, setChecking] = useState(false);
   const stages = funnelStages();
 
-  const loadEvents = useCallback(() => {
-    api.metaConversions.events().then((r) => { setEvents(r.events || []); setTotals(r.totals || null); }).catch(() => {});
+  const loadEvents = useCallback((status: StatusFilter = '') => {
+    api.metaConversions.events(status || undefined).then((r) => { setEvents(r.events || []); setTotals(r.totals || null); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -89,6 +117,37 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
     set({ mapping });
   };
 
+  const connectWhatsApp = async () => {
+    setConnecting(true);
+    try {
+      const saved = await api.metaConversions.auto();
+      setConfig({ ...config, ...saved });
+      onConfigured?.(!!saved.enabled);
+      toast.success('Ligado pelo WhatsApp Business');
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível ligar');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const runDiagnose = async () => {
+    setChecking(true);
+    try {
+      setChecks((await api.metaConversions.diagnose()).checks);
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível verificar');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const toggleAssistantEvent = (event: string, on: boolean) => {
+    const list = new Set(config.assistant_events || []);
+    if (on) list.add(event); else list.delete(event);
+    set({ assistant_events: Array.from(list) });
+  };
+
   const save = async (enabled = config.enabled) => {
     setSaving(true);
     try {
@@ -100,6 +159,7 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
         currency: config.currency,
         country: config.country,
         mapping: config.mapping,
+        assistant_events: config.assistant_events || [],
       });
       setConfig({ ...config, ...saved });
       setToken('');
@@ -138,7 +198,24 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="rounded-xl border border-border px-4 py-3">
+        {config.source === 'whatsapp' ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Ligado pelo WhatsApp Business</p>
+              <p className="truncate text-xs text-muted-foreground" translate="no">Conjunto de dados {config.dataset_id}</p>
+            </div>
+            <Button variant="outline" onClick={connectWhatsApp} disabled={connecting}>{connecting ? 'A ligar…' : 'Ligar de novo'}</Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-foreground">Sem tokens nem píxeis: usa o número WhatsApp Business ligado.</p>
+            <Button onClick={connectWhatsApp} disabled={connecting}>{connecting ? 'A ligar…' : 'Ligar pelo WhatsApp Business'}</Button>
+          </div>
+        )}
+      </div>
+
+      <div className={cn('grid gap-4 sm:grid-cols-2', config.source === 'whatsapp' && 'hidden')}>
         <div className="space-y-1.5 min-w-0">
           <Label htmlFor="meta-dataset" className="text-sm text-foreground">ID do conjunto de dados (pixel)</Label>
           <Input
@@ -161,6 +238,9 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
             placeholder={config.has_token ? 'Guardado' : 'EAA…'}
           />
         </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5 min-w-0">
           <Label htmlFor="meta-currency" className="text-sm text-foreground">Moeda</Label>
           <select id="meta-currency" value={config.currency} onChange={(e) => set({ currency: e.target.value })} className="w-full">
@@ -195,7 +275,23 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
         </div>
       </div>
 
-      <details className="rounded-xl border border-border px-4 py-3">
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-foreground">Eventos que os assistentes podem enviar</p>
+        <div className="divide-y divide-border rounded-xl border border-border">
+          {Object.entries(EVENT_LABELS).map(([value, label]) => (
+            <label key={value} className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <span className="text-sm text-foreground">{label}</span>
+              <Switch
+                checked={(config.assistant_events || []).includes(value)}
+                onCheckedChange={(v) => toggleAssistantEvent(value, v)}
+                aria-label={label}
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <details className={cn('rounded-xl border border-border px-4 py-3', config.source === 'whatsapp' && 'hidden')}>
         <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Como obter o ID e o token</summary>
         <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground">
           <li>No Gestor de Eventos da Meta, abra o seu conjunto de dados (pixel) e copie o ID.</li>
@@ -216,13 +312,28 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
       </details>
 
       <div className="flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none sm:justify-end">
-        <Button variant="outline" onClick={test} disabled={testing || saving || !config.has_token}>
+        <Button variant="outline" onClick={runDiagnose} disabled={checking}>
+          {checking ? 'A verificar…' : 'Diagnóstico'}
+        </Button>
+        <Button variant="outline" onClick={test} disabled={testing || saving || !(config.has_token || config.source === 'whatsapp')}>
           {testing ? 'A testar…' : 'Testar ligação'}
         </Button>
         <Button onClick={() => save()} disabled={saving}>
           {saving ? 'A guardar…' : 'Guardar'}
         </Button>
       </div>
+
+      {checks && (
+        <ul className="divide-y divide-border rounded-xl border border-border">
+          {checks.map((c) => (
+            <li key={c.key} className="flex items-center gap-3 px-4 py-2.5">
+              <span className={cn('h-2 w-2 flex-shrink-0 rounded-full', c.ok ? 'bg-emerald-500' : 'bg-red-500')} />
+              <span className="min-w-0 flex-1 truncate text-sm text-foreground">{CHECK_LABELS[c.key] || c.key}</span>
+              <span className="flex-shrink-0 text-xs text-muted-foreground" translate="no">{c.detail || (c.ok ? 'OK' : 'Em falta')}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {(events.length > 0 || totals) && (
         <div className="space-y-2">
@@ -234,6 +345,22 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
               </p>
             )}
           </div>
+          {totals && (
+            <div className="flex flex-wrap gap-1.5">
+              {([['', 'Todos'], ['sent', 'Enviados ' + formatNumber(totals.sent)], ['pending', 'Pendentes ' + formatNumber(totals.pending || 0)], ['failed', 'Falhados ' + formatNumber(totals.failed)]] as [StatusFilter, string][]).map(([value, label]) => (
+                <button
+                  key={value || 'all'}
+                  type="button"
+                  onClick={() => { setFilter(value); loadEvents(value); }}
+                  className={cn('h-9 rounded-full border px-3 text-sm', filter === value
+                    ? 'border-foreground/25 bg-muted font-medium text-foreground'
+                    : 'border-border text-muted-foreground hover:bg-muted/50')}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           {events.length > 0 && (
             <ul className="divide-y divide-border rounded-xl border border-border">
               {events.map((e) => (
@@ -243,6 +370,8 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
                     <p className="truncate text-sm text-foreground">
                       <span translate="no">{e.lead_name}</span> · {EVENT_LABELS[e.event_name] || e.event_name}
                       {e.via_ad && <span className="text-muted-foreground"> · anúncio</span>}
+                      {e.source && SOURCE_LABELS[e.source] && <span className="text-muted-foreground"> · {SOURCE_LABELS[e.source]}</span>}
+                      {Number(e.value) > 0 && <span className="text-muted-foreground"> · {formatNumber(Number(e.value))} {e.currency || config.currency}</span>}
                     </p>
                     {e.status === 'failed' && e.error && <p className="truncate text-xs text-red-500" translate="no">{e.error}</p>}
                   </div>

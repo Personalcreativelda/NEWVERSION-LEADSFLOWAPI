@@ -8,7 +8,7 @@ import { Switch } from '../ui/switch';
 import { inboxApi } from '../../services/api/inbox';
 import { whatsappBusinessApi, type WaTemplate } from '../../services/api/whatsapp-business';
 import {
-  CHANNEL_OPTIONS, CONDITION_OPTIONS, DEFAULT_AUTO_REPLY, MESSAGE_VARIABLES, STEP_GROUPS, STEP_NAMES, TRIGGER_OPTIONS, stepSummary,
+  CHANNEL_OPTIONS, CONDITION_OPTIONS, DEFAULT_AUTO_REPLY, MESSAGE_VARIABLES, META_EVENT_OPTIONS, STEP_GROUPS, STEP_NAMES, TRIGGER_OPTIONS, stepSummary,
   type ActionType, type FlowSettings, type FlowStep, type RemarketingFlow, type TriggerType,
 } from './flowTypes';
 import { STEP_COLORS, STEP_ICONS } from './flowVisuals';
@@ -392,6 +392,22 @@ export function FlowEditor({ flow, isNew = false, onSave, onClose, funnelStages 
           <div className="flex items-center gap-2">
             <input type="number" value={cfg.points ?? ''} onChange={(e) => patchConfig(step.id, { points: e.target.value })} placeholder="10" className="w-24" />
             <span className="text-sm text-muted-foreground">pontos (negativo para tirar)</span>
+          </div>
+        );
+      case 'meta_event':
+        // Conversão para a API de Conversões da Meta (Integrações → Meta); uma por lead e por evento
+        return (
+          <div className="space-y-2">
+            <select value={cfg.event ?? ''} onChange={(e) => patchConfig(step.id, { event: e.target.value })} className="w-full">
+              <option value="">Escolher evento</option>
+              {META_EVENT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {cfg.event === 'Purchase' && (
+              <div className="flex items-center gap-2">
+                <input type="number" min="0" step="0.01" value={cfg.value ?? ''} onChange={(e) => patchConfig(step.id, { value: e.target.value })} placeholder="Valor (vazio = valor do negócio)" className="min-w-0 flex-1" />
+                <input value={cfg.currency ?? ''} onChange={(e) => patchConfig(step.id, { currency: e.target.value.toUpperCase().slice(0, 3) })} placeholder="MZN" className="w-20" maxLength={3} />
+              </div>
+            )}
           </div>
         );
       default:

@@ -1,7 +1,7 @@
 // Ícones e cores de cada tipo de passo (lista de fluxos, modelos e editor)
 import type { ElementType } from 'react';
 import {
-  Bell, Clock, Filter, GitBranch, ListChecks, Mail, MessageSquare, Mic, Split, StickyNote, Tag, TagsIcon, TrendingUp,
+  Bell, Clock, Filter, GitBranch, ListChecks, Mail, MessageSquare, Mic, Split, StickyNote, Tag, TagsIcon, Target, TrendingUp,
 } from 'lucide-react';
 import { brandIcon } from '../base/BrandIcon';
 import type { ActionType } from './flowTypes';
@@ -24,6 +24,7 @@ export const STEP_ICONS: Record<ActionType, ElementType> = {
   add_note: StickyNote,
   notify: Bell,
   score: TrendingUp,
+  meta_event: Target,
 };
 
 export const STEP_COLORS: Record<ActionType, string> = {
@@ -44,4 +45,5 @@ export const STEP_COLORS: Record<ActionType, string> = {
   add_note: 'text-slate-500 bg-slate-500/10',
   notify: 'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10',
   score: 'text-teal-500 bg-teal-500/10',
+  meta_event: 'text-blue-600 bg-blue-600/10',
 };

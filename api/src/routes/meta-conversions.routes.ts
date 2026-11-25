@@ -3,7 +3,8 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { query } from '../database/connection';
 import {
-  audienceCsv, getMetaConfig, MetaConversionsError, publicConfig, saveMetaConfig, testConnection,
+  audienceCsv, connectWhatsAppDataset, diagnose, getMetaConfig, META_EVENTS, MetaConversionsError, publicConfig,
+  saveMetaConfig, testConnection,
 } from '../services/meta-conversions.service';
 
 const router = Router();
@@ -22,9 +23,29 @@ router.get('/config', async (req, res, next) => {
 
 router.put('/config', async (req, res, next) => {
   try {
-    const { enabled, dataset_id, access_token, test_event_code, currency, country, mapping } = req.body || {};
-    const saved = await saveMetaConfig(req.user!.id, { enabled, dataset_id, access_token, test_event_code, currency, country, mapping });
+    const { enabled, dataset_id, access_token, test_event_code, currency, country, mapping, assistant_events, source } = req.body || {};
+    // Voltar ao modo manual só quando a pessoa cola um token; senão mantém a ligação pelo WhatsApp
+    const current = await getMetaConfig(req.user!.id);
+    const manual = source === 'manual' || (!!access_token && current.source !== 'whatsapp');
+    const saved = await saveMetaConfig(req.user!.id, {
+      enabled, dataset_id, access_token, test_event_code, currency, country, mapping, assistant_events,
+      ...(manual ? { source: 'manual', channel_id: '' } : {}),
+    });
     res.json(publicConfig(saved));
+  } catch (err) { fail(res, next, err); }
+});
+
+/** Liga sem tokens: dataset da conta WhatsApp Business (Embedded Signup) */
+router.post('/auto', async (req, res, next) => {
+  try {
+    const channelId = typeof req.body?.channel_id === 'string' && /^[0-9a-f-]{36}$/i.test(req.body.channel_id) ? req.body.channel_id : undefined;
+    res.json(publicConfig(await connectWhatsAppDataset(req.user!.id, channelId)));
+  } catch (err) { fail(res, next, err); }
+});
+
+router.get('/diagnose', async (req, res, next) => {
+  try {
+    res.json({ ...(await diagnose(req.user!.id)), events: META_EVENTS });
   } catch (err) { fail(res, next, err); }
 });
 
@@ -38,18 +59,19 @@ router.post('/test', async (req, res, next) => {
 router.get('/events', async (req, res, next) => {
   try {
     const rows = await query(
-      `SELECT e.id, e.event_name, e.stage, e.value, e.via_ad, e.status, e.error, e.sent_at, e.updated_at,
-              l.id AS lead_id, l.name AS lead_name
+      `SELECT e.id, e.event_name, e.stage, e.value, e.currency, e.via_ad, e.status, e.error, e.attempts, e.source,
+              e.sent_at, e.updated_at, l.id AS lead_id, l.name AS lead_name
          FROM meta_events e JOIN leads l ON l.id = e.lead_id
-        WHERE e.user_id = $1
+        WHERE e.user_id = $1 AND ($2::text = '' OR e.status = $2::text)
         ORDER BY e.updated_at DESC
-        LIMIT 30`,
-      [req.user!.id],
+        LIMIT 50`,
+      [req.user!.id, ['sent', 'pending', 'failed'].includes(String(req.query.status)) ? String(req.query.status) : ''],
     );
     const totals = await query(
       `SELECT COUNT(*) FILTER (WHERE status = 'sent')::int AS sent,
               COUNT(*) FILTER (WHERE status = 'sent' AND via_ad)::int AS via_ad,
-              COUNT(*) FILTER (WHERE status = 'failed')::int AS failed
+              COUNT(*) FILTER (WHERE status = 'failed')::int AS failed,
+              COUNT(*) FILTER (WHERE status = 'pending')::int AS pending
          FROM meta_events WHERE user_id = $1 AND created_at > NOW() - INTERVAL '30 days'`,
       [req.user!.id],
     );

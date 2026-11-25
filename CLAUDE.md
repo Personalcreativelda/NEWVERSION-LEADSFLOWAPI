@@ -259,6 +259,17 @@ Há um emulador `Medium_Phone_API_37.0`.
 - A voz é escolhida por assistente (`config.voice_id`); sem escolha usa `ELEVENLABS_DEFAULT_VOICE_ID`. Uma voz em inglês a falar português soa estrangeira.
 - Links, emails ou mais de 600 caracteres seguem também por escrito. Se o áudio falhar, segue sempre o texto (`ctx.audioFellBack`).
 
+## API de Conversões da Meta (`services/meta-conversions.service.ts`, Integrações → Meta)
+
+- Eventos: Lead (sai como LeadSubmitted nas conversas de anúncios), QualifiedLead, AddToCart, InitiateCheckout,
+  OrderCreated, Purchase (valor + moeda, ex.: MZN), OrderDelivered. Um de cada tipo por lead (`meta_events`
+  UNIQUE lead_id+event_name). `business_messaging` + `ctwa_clid` quando o lead veio de um anúncio; senão CRM com dados cifrados.
+- Ligação sem tokens: "Ligar pelo WhatsApp Business" → `POST /{WABA_ID}/dataset` (cria ou devolve) com o token do canal
+  (`source: 'whatsapp'`, o token fica no canal, não nas definições). Exige `whatsapp_business_manage_events` (verificado no debug_token).
+- Quem pede eventos: etapas do funil (mapeamento), assistentes (`[[CONVERSAO:Evento:valor:moeda]]`, só os autorizados em
+  `assistant_events`), automações (passo `meta_event`) → `queueEvent` → fila do `metaConversionsWorker` (repete 3 vezes).
+  Compra sem valor nem valor do negócio é recusada.
+
 ## Chamadas do WhatsApp atendidas por agentes de voz
 
 - Só números WhatsApp Business (Cloud API Calling); o WhatsApp por QR não atende chamadas.
