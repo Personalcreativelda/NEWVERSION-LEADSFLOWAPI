@@ -27,8 +27,21 @@ import { findOrCreateLead } from '../services/leads-dedup.service';
 import { recordAdReferral, referralFromCloud, referralFromEvolution, referralFromMessaging } from '../services/meta-conversions.service';
 import { describeWhatsAppMessage, unwrapWhatsAppMessage, whatsAppEvent, whatsAppMessageType, whatsAppQuoteInfo, whatsAppThumbnail, type WhatsAppEvent } from '../utils/whatsapp-message';
 import { applyWhatsAppEvent, quotedForIncoming } from '../services/whatsapp-events.service';
+import { isBridgeRequest, whatsappCallsService } from '../services/whatsapp-calls.service';
 
 const router = Router();
+
+// Ponte de voz: fim de uma chamada do WhatsApp atendida por um agente (transcrição, duração)
+router.post('/voice-bridge', async (req, res) => {
+  if (!isBridgeRequest(req.headers.authorization)) return res.sendStatus(401);
+  try {
+    await whatsappCallsService.onBridgeEnded(req.body);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[VoiceBridge] Aviso de fim:', err?.message);
+    res.status(500).json({ error: 'Falha ao guardar a chamada' });
+  }
+});
 const conversationsService = new ConversationsService();
 const whatsappService = new WhatsAppService();
 
@@ -3480,6 +3493,11 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
       const wabaId = entry.id;
 
       for (const change of entry.changes || []) {
+        // Chamadas de voz (atendidas por um agente de voz; desligado sem WHATSAPP_CALLS_ENABLED)
+        if (change.field === 'calls') {
+          void whatsappCallsService.handleCallsChange(change.value);
+          continue;
+        }
         if (change.field !== 'messages') continue;
 
         const value = change.value;

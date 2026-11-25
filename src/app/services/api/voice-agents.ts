@@ -219,4 +219,25 @@ export const voiceAgentsApi = {
     const response = await api.get(`/voice-agents/conversations/${conversationId}`);
     return response.data;
   },
+
+  /** Chamadas do WhatsApp Business atendidas por agentes de voz */
+  async getWhatsAppCalls(): Promise<WhatsAppCallsState> {
+    const response = await api.get('/whatsapp-calls');
+    return response.data;
+  },
+
+  async setWhatsAppCalls(channelId: string, data: { enabled: boolean; voice_agent_id: string | null }) {
+    const response = await api.put(`/whatsapp-calls/${channelId}`, data);
+    return response.data;
+  },
 };
+
+export interface WhatsAppCallsState {
+  available: boolean;
+  channels: { id: string; name: string; phone: string | null; enabled: boolean; voice_agent_id: string | null }[];
+  agents: { id: string; name: string; ready: boolean }[];
+  calls: {
+    id: string; phone_number: string; status: string; duration_seconds: number | null; transcript: string | null;
+    started_at: string | null; ended_at: string | null; caller_name: string | null; lead_id: string | null; agent_name: string | null;
+  }[];
+}

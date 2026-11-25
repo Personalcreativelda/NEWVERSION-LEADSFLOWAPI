@@ -245,6 +245,18 @@ Há um emulador `Medium_Phone_API_37.0`.
 - A voz é escolhida por assistente (`config.voice_id`); sem escolha usa `ELEVENLABS_DEFAULT_VOICE_ID`. Uma voz em inglês a falar português soa estrangeira.
 - Links, emails ou mais de 600 caracteres seguem também por escrito. Se o áudio falhar, segue sempre o texto (`ctx.audioFellBack`).
 
+## Chamadas do WhatsApp atendidas por agentes de voz
+
+- Só números WhatsApp Business (Cloud API Calling); o WhatsApp por QR não atende chamadas.
+- Webhook `calls` → `services/whatsapp-calls.service.ts` → ponte `voice-bridge/` (Node, werift + opusscript:
+  WebRTC/Opus da Meta ↔ WebSocket do agente ElevenLabs) → `pre_accept`/`accept` na Meta → `/start` na ponte.
+  A ponte avisa o fim em `POST /api/webhooks/voice-bridge` (Bearer `VOICE_BRIDGE_TOKEN` = `BRIDGE_TOKEN` da ponte).
+- A ponte é um recurso Coolify à parte (`voice-bridge/docker-compose.yml`), com UDP `RTC_PORT_MIN`–`RTC_PORT_MAX`
+  aberto e `PUBLIC_IP`. Teste fechado: `cd voice-bridge && npm test`.
+- `WHATSAPP_CALLS_ENABLED=false` por omissão: sem ela (e sem `VOICE_BRIDGE_URL`) o webhook ignora as chamadas e a
+  secção "Chamadas do WhatsApp" em Agentes de voz não aparece. Escolha por número em `channels.settings.whatsapp_calls`;
+  histórico em `voice_agent_calls` (`metadata.source = 'whatsapp_call'`). O aviso "assistente com IA" é dito pela ponte.
+
 ## Testar sem a conta do utilizador
 
 Nunca escrever credenciais reais. Sessão de demonstração local no browser (dev server):

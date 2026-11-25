@@ -1,0 +1,20 @@
+{
+  "name": "leadsflow-voice-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ponte de voz: chamadas do WhatsApp Business (WebRTC) ↔ agentes ElevenLabs (WebSocket)",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "opusscript": "^0.1.1",
+    "werift": "^0.28.0",
+    "ws": "^8.23.0"
+  }
+}

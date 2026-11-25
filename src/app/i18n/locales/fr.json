@@ -4882,5 +4882,20 @@
  "Windows": "Windows",
  "Workspace não encontrado": "Espace de travail introuvable",
  "X-Webhook-Secret": "X-Webhook-Secret",
- "Yahoo Mail": "Yahoo Mail"
+ "Yahoo Mail": "Yahoo Mail",
+ "Chamadas do WhatsApp": "Appels WhatsApp",
+ "Escolher agente": "Choisir un agent",
+ "Sem agentes prontos": "Aucun agent prêt",
+ "Atender": "Répondre",
+ "A tocar": "Sonnerie",
+ "Atendida": "Répondu",
+ "Não atendida": "Manqué",
+ "Chamadas ativadas": "Appels activés",
+ "Chamadas desativadas": "Appels désactivés",
+ "Escolha o agente": "Choisissez l'agent",
+ "Ainda não disponível": "Pas encore disponible",
+ "Este agente ainda não está pronto para chamadas": "Cet agent n'est pas encore prêt pour les appels",
+ "Volte a ligar este número": "Reconnectez ce numéro",
+ "Número não encontrado": "Numéro introuvable",
+ "Agente não encontrado": "Agent introuvable"
 }

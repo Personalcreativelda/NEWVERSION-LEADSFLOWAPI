@@ -59,6 +59,10 @@ services:
       - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY:-}
       - META_FACEBOOK_COMMENTS=${META_FACEBOOK_COMMENTS:-true}
       - META_COMMENTS_ENABLED=${META_COMMENTS_ENABLED:-false}
+      # Chamadas do WhatsApp atendidas por agentes de voz (ponte em voice-bridge/, recurso à parte)
+      - WHATSAPP_CALLS_ENABLED=${WHATSAPP_CALLS_ENABLED:-false}
+      - VOICE_BRIDGE_URL=${VOICE_BRIDGE_URL:-}
+      - VOICE_BRIDGE_TOKEN=${VOICE_BRIDGE_TOKEN:-}
     restart: unless-stopped
     # O processo 1 de um contentor ignora sinais enviados de dentro dele: com o init (tini)
     # o vigilante da API consegue terminá-la quando bloqueia (api/src/services/health.service.ts)

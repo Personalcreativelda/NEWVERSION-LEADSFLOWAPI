@@ -11,6 +11,7 @@ import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { PageHeader, PageAction } from '../base/PageHeader';
 import { EmptyState } from '../base/EmptyState';
+import { WhatsAppCallsPanel } from '../voice-agents/WhatsAppCallsPanel';
 import { toast } from 'sonner';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { voiceAgentsApi } from '../../services/api/voice-agents';
@@ -964,6 +965,8 @@ export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
           </div>
         )}
       </div>
+
+      {!loading && <WhatsAppCallsPanel refreshKey={voiceAgents.length} />}
 
       {/* Modal */}
       {modalOpen && (

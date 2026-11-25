@@ -4882,5 +4882,20 @@
  "Windows": "Windows",
  "Workspace não encontrado": "Workspace not found",
  "X-Webhook-Secret": "X-Webhook-Secret",
- "Yahoo Mail": "Yahoo Mail"
+ "Yahoo Mail": "Yahoo Mail",
+ "Chamadas do WhatsApp": "WhatsApp calls",
+ "Escolher agente": "Choose agent",
+ "Sem agentes prontos": "No agents ready",
+ "Atender": "Answer",
+ "A tocar": "Ringing",
+ "Atendida": "Answered",
+ "Não atendida": "Missed",
+ "Chamadas ativadas": "Calls turned on",
+ "Chamadas desativadas": "Calls turned off",
+ "Escolha o agente": "Choose the agent",
+ "Ainda não disponível": "Not available yet",
+ "Este agente ainda não está pronto para chamadas": "This agent is not ready for calls yet",
+ "Volte a ligar este número": "Reconnect this number",
+ "Número não encontrado": "Number not found",
+ "Agente não encontrado": "Agent not found"
 }

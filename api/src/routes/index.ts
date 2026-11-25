@@ -40,6 +40,7 @@ import conversationTagsRoutes from './conversation-tags.routes';
 // Groups: Importar rotas de gerenciamento de grupos WhatsApp
 import groupsRoutes from './groups.routes';
 import commentAutomationsRoutes from './comment-automations.routes';
+import whatsappCallsRoutes from './whatsapp-calls.routes';
 import leadFinderRoutes from './lead-finder.routes';
 import whatsappBusinessRoutes from './whatsapp-business.routes';
 import metaConversionsRoutes from './meta-conversions.routes';
@@ -95,6 +96,7 @@ router.use('/lead-notes', withPlan, leadNotesRoutes);
 router.use('/scheduled-conversations', withPlan, scheduledConversationsRoutes);
 router.use('/groups', withPlan, groupsRoutes);
 router.use('/comment-automations', withPlan, commentAutomationsRoutes); // comentário → mensagem privada
+router.use('/whatsapp-calls', withPlan, whatsappCallsRoutes); // chamadas do WhatsApp atendidas por agentes de voz
 router.use('/lead-finder', withPlan, leadFinderRoutes); // encontrar leads (Google Maps)
 router.use('/whatsapp-business', withPlan, whatsappBusinessRoutes); // WhatsApp Business oficial: conta, números, perfil, modelos
 router.use('/ai-remarketing', withPlan, aiRemarketingRoutes);
