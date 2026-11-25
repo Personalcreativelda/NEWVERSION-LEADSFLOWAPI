@@ -42,7 +42,6 @@ const emptyForm = { channel_id: '', name: '', keywords: '', dm_message: '', publ
 
 export default function CommentAutomationsPage() {
   const [loading, setLoading] = useState(true);
-  const [instagramEnabled, setInstagramEnabled] = useState(false);
   const [publicReplies, setPublicReplies] = useState(false);
   const [rules, setRules] = useState<Rule[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -59,7 +58,6 @@ export default function CommentAutomationsPage() {
         apiRequest('/comment-automations', 'GET'),
         apiRequest('/comment-automations/replies', 'GET').catch(() => ({ replies: [] })),
       ]);
-      setInstagramEnabled(r?.instagram_enabled === true);
       setPublicReplies(r?.public_replies === true);
       setRules(r?.automations || []);
       setChannels(r?.channels || []);
@@ -149,11 +147,6 @@ export default function CommentAutomationsPage() {
         create={channels.length ? { label: 'Nova regra', onClick: openNew, icon: Plus } : undefined}
       />
 
-      {!instagramEnabled && channels.some((c) => c.type === 'instagram') && (
-        <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          Instagram: começa a funcionar quando a Meta aprovar as permissões de comentários
-        </div>
-      )}
 
       {!loading && channels.length === 0 && (
         <EmptyState icon={MessageCircle} title="Ligue o Instagram ou o Facebook" description="Na caixa de entrada → Canais" />
