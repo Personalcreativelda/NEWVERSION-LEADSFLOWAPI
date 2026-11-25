@@ -45,9 +45,21 @@ async function graph(path: string, token: string, body: unknown) {
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   const data: any = await res.json().catch(() => ({}));
-  if (!res.ok || data?.error) throw new WhatsAppCallError(data?.error?.message || `Erro ${res.status} da Meta`, 422);
+  if (!res.ok || data?.error) {
+    const e = data?.error || {};
+    console.error(`[WhatsAppCalls] Meta ${path}: ${e.code} ${e.message}`, JSON.stringify(e.error_data || {}));
+    throw new WhatsAppCallError(META_ERRORS[e.code] || e.error_data?.details || e.message || `Erro ${res.status} da Meta`, 422);
+  }
   return data;
 }
+
+// Erros da API de chamadas com o que a pessoa tem de fazer (developers.facebook.com → calling/troubleshooting)
+const META_ERRORS: Record<number, string> = {
+  138015: 'A Meta só liga as chamadas em números com limite de 2000 conversas por dia ou mais. Veja o limite do número no Gestor do WhatsApp.',
+  138018: 'Falta subscrever as chamadas no webhook do WhatsApp Business.',
+  138014: 'A Meta desativou as chamadas neste número por agora, por causa da qualidade.',
+  131055: 'Este número está configurado para chamadas por SIP.',
+};
 
 const callAction = (phoneId: string, token: string, callId: string, action: string, sdp?: string) =>
   graph(`/${encodeURIComponent(phoneId)}/calls`, token, {
@@ -61,8 +73,8 @@ const callAction = (phoneId: string, token: string, callId: string, action: stri
 export async function setNumberCalling(phoneId: string, token: string, enabled: boolean) {
   return graph(`/${encodeURIComponent(phoneId)}/settings`, token, {
     calling: enabled
-      ? { status: 'ENABLED', call_icon_visibility: 'DEFAULT' }
-      : { status: 'DISABLED' },
+      ? { status: 'enabled', call_icon_visibility: 'DEFAULT' }
+      : { status: 'disabled' },
   });
 }
 

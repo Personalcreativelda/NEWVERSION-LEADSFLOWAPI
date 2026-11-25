@@ -4939,5 +4939,9 @@
  "Não foi possível concluir": "Impossible de terminer",
  "Ex.: Receção": "Ex. : Accueil",
  "Olá, em que posso ajudar?": "Bonjour, comment puis-je vous aider ?",
- "Quem é, o que vende, horários, preços e o que deve fazer em cada caso.": "Qui il est, ce qu'il vend, horaires, prix et quoi faire dans chaque cas."
+ "Quem é, o que vende, horários, preços e o que deve fazer em cada caso.": "Qui il est, ce qu'il vend, horaires, prix et quoi faire dans chaque cas.",
+ "A Meta só liga as chamadas em números com limite de 2000 conversas por dia ou mais. Veja o limite do número no Gestor do WhatsApp.": "Meta n'active les appels que sur les numéros avec une limite de 2 000 conversations par jour ou plus. Vérifiez la limite du numéro dans le Gestionnaire WhatsApp.",
+ "Falta subscrever as chamadas no webhook do WhatsApp Business.": "Les appels ne sont pas abonnés dans le webhook WhatsApp Business.",
+ "A Meta desativou as chamadas neste número por agora, por causa da qualidade.": "Meta a désactivé les appels sur ce numéro pour le moment à cause de la qualité.",
+ "Este número está configurado para chamadas por SIP.": "Ce numéro est configuré pour les appels SIP."
 }

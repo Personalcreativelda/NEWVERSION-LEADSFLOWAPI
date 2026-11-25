@@ -4939,5 +4939,9 @@
  "Não foi possível concluir": "Could not complete",
  "Ex.: Receção": "E.g. Reception",
  "Olá, em que posso ajudar?": "Hi, how can I help?",
- "Quem é, o que vende, horários, preços e o que deve fazer em cada caso.": "Who it is, what it sells, hours, prices and what to do in each case."
+ "Quem é, o que vende, horários, preços e o que deve fazer em cada caso.": "Who it is, what it sells, hours, prices and what to do in each case.",
+ "A Meta só liga as chamadas em números com limite de 2000 conversas por dia ou mais. Veja o limite do número no Gestor do WhatsApp.": "Meta only turns on calling for numbers with a limit of 2,000 conversations a day or more. Check the number's limit in WhatsApp Manager.",
+ "Falta subscrever as chamadas no webhook do WhatsApp Business.": "Calls are not subscribed in the WhatsApp Business webhook.",
+ "A Meta desativou as chamadas neste número por agora, por causa da qualidade.": "Meta has turned off calling on this number for now because of quality.",
+ "Este número está configurado para chamadas por SIP.": "This number is set up for SIP calling."
 }
