@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../../../lib/api';
+import { whatsappBusinessApi, type WaChannel } from '../../services/api/whatsapp-business';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -69,6 +70,7 @@ interface Config {
   country: string;
   mapping: Record<string, string>;
   source?: 'manual' | 'whatsapp';
+  channel_id?: string;
   waba_id?: string;
   assistant_events?: string[];
 }
@@ -87,6 +89,9 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
   const [connecting, setConnecting] = useState(false);
   const [checks, setChecks] = useState<{ key: string; ok: boolean; detail?: string }[] | null>(null);
   const [checking, setChecking] = useState(false);
+  // Números WhatsApp Business ligados: com mais de um, a pessoa escolhe qual dá o conjunto de dados
+  const [waChannels, setWaChannels] = useState<WaChannel[]>([]);
+  const [waChannelId, setWaChannelId] = useState('');
   const stages = funnelStages();
 
   const loadEvents = useCallback((status: StatusFilter = '') => {
@@ -104,6 +109,9 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
         currency: 'MZN', country: 'MZ', mapping: { novo: 'Lead', qualificado: 'QualifiedLead', convertido: 'Purchase' },
       }));
     loadEvents();
+    whatsappBusinessApi.channels()
+      .then((list) => setWaChannels(list.filter((c) => c.status === 'active' && c.has_account)))
+      .catch(() => setWaChannels([]));
   }, [initialDatasetId, loadEvents, onConfigured]);
 
   if (!config) {
@@ -120,7 +128,8 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
   const connectWhatsApp = async () => {
     setConnecting(true);
     try {
-      const saved = await api.metaConversions.auto();
+      const chosen = waChannelId || config.channel_id || waChannels[0]?.id;
+      const saved = await api.metaConversions.auto(waChannels.length > 1 ? chosen : undefined);
       setConfig({ ...config, ...saved });
       onConfigured?.(!!saved.enabled);
       toast.success('Ligado pelo WhatsApp Business');
@@ -198,14 +207,31 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
         />
       </div>
 
-      <div className="rounded-xl border border-border px-4 py-3">
+      <div className="space-y-3 rounded-xl border border-border px-4 py-3">
+        {waChannels.length > 1 && (
+          <div className="space-y-1.5">
+            <Label htmlFor="meta-wa-channel" className="text-sm text-foreground">Número WhatsApp Business</Label>
+            <select
+              id="meta-wa-channel"
+              value={waChannelId || config.channel_id || waChannels[0]?.id || ''}
+              onChange={(e) => setWaChannelId(e.target.value)}
+              className="w-full text-sm"
+            >
+              {waChannels.map((c) => (
+                <option key={c.id} value={c.id} translate="no">{c.name}{c.phone ? ' · ' + c.phone : ''}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {config.source === 'whatsapp' ? (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">Ligado pelo WhatsApp Business</p>
               <p className="truncate text-xs text-muted-foreground" translate="no">Conjunto de dados {config.dataset_id}</p>
             </div>
-            <Button variant="outline" onClick={connectWhatsApp} disabled={connecting}>{connecting ? 'A ligar…' : 'Ligar de novo'}</Button>
+            <Button variant="outline" onClick={connectWhatsApp} disabled={connecting}>
+              {connecting ? 'A ligar…' : waChannelId && waChannelId !== config.channel_id ? 'Ligar este número' : 'Ligar de novo'}
+            </Button>
           </div>
         ) : (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
