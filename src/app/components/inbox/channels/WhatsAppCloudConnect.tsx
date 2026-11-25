@@ -14,9 +14,14 @@ interface WhatsAppCloudConnectProps {
     onClose: () => void;
     onSuccess: () => void;
     editingChannel?: any;
+    /**
+     * Token de utilizador do sistema da própria app da LeadsFlow: os webhooks já chegam pelo callback
+     * da app (não se mostra o URL do canal, que não deve ir para o callback da app)
+     */
+    appToken?: boolean;
 }
 
-export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppCloudConnectProps) {
+export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess, appToken = false }: WhatsAppCloudConnectProps) {
     const [step, setStep] = useState<'info' | 'form' | 'webhook' | 'success'>('info');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -56,7 +61,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
     };
 
     const handleSubmit = async () => {
-        if (!formData.name.trim() || !formData.phoneNumberId.trim() || !formData.accessToken.trim()) {
+        if (!formData.name.trim() || !formData.phoneNumberId.trim() || !formData.accessToken.trim() || (appToken && !formData.wabaId.trim())) {
             setError('Preencha todos os campos obrigatórios.');
             return;
         }
@@ -77,7 +82,11 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess }: WhatsAppClo
                 }
             });
 
-            if (channel) {
+            if (channel && appToken) {
+                // Mesma app da LeadsFlow: nada a configurar no webhook
+                onSuccess();
+                onClose();
+            } else if (channel) {
                 // Generate webhook URL based on API URL
                 setWebhookUrl(`${API_URL}/api/webhooks/whatsapp-cloud/${channel.id}`);
                 setStep('webhook');

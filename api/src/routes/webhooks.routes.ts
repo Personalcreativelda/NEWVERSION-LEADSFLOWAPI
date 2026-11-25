@@ -3582,10 +3582,13 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
           // Encontrar canal pelo phone_number_id (sem filtro de status - Meta envia mesmo quando canal está em 'error')
           let channelResult;
           if (req.params.channelId) {
-            // Buscar por ID do canal (qualquer status)
+            // Buscar por ID do canal (qualquer status), mas só se for mesmo deste número: se alguém
+            // puser o URL de um canal no callback da app da LeadsFlow, as mensagens dos outros
+            // números (de outros clientes) não podem cair neste canal
             channelResult = await query(
-              `SELECT * FROM channels WHERE id = $1`,
-              [req.params.channelId]
+              `SELECT * FROM channels WHERE id = $1 AND type = 'whatsapp_cloud'
+                 AND credentials->>'phone_number_id' = $2`,
+              [req.params.channelId, String(phoneNumberId || '')]
             );
           }
 

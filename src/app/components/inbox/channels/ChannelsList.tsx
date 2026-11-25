@@ -140,6 +140,8 @@ export function ChannelsList() {
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [cloudModalOpen, setCloudModalOpen] = useState(false);
+    // Formulário aberto pela opção "WhatsApp Business (token)" (token da própria app)
+    const [cloudViaToken, setCloudViaToken] = useState(false);
     const [telegramModalOpen, setTelegramModalOpen] = useState(false);
     const [facebookModalOpen, setFacebookModalOpen] = useState(false);
     const [instagramModalOpen, setInstagramModalOpen] = useState(false);
@@ -268,6 +270,7 @@ export function ChannelsList() {
         } else if (channelId === 'whatsapp_cloud') {
             void startWhatsAppConnect().then((ok) => { if (!ok) setCloudModalOpen(true); });
         } else if (channelId === 'whatsapp_cloud_token') {
+            setCloudViaToken(true);
             setCloudModalOpen(true);
         } else if (channelId === 'whatsapp_coexistence') {
             // Número que fica também na app WhatsApp Business (só pelo login da Meta; sem formulário manual)
@@ -402,7 +405,8 @@ export function ChannelsList() {
 
             <WhatsAppCloudConnect
                 isOpen={cloudModalOpen}
-                onClose={() => closeModalAndResetEditing(setCloudModalOpen)}
+                appToken={cloudViaToken}
+                onClose={() => { setCloudViaToken(false); closeModalAndResetEditing(setCloudModalOpen); }}
                 onSuccess={() => {
                     closeModalAndResetEditing(setCloudModalOpen);
                     loadChannels();
