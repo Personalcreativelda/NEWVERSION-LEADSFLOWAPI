@@ -79,9 +79,93 @@ async function bridge(method: string, path: string, body?: unknown) {
 }
 
 // ── ElevenLabs ───────────────────────────────────────────────────────────────
-async function elevenKey(userId: string): Promise<string> {
+const platformKey = () => process.env.ELEVENLABS_API_KEY || '';
+
+/** Agentes criados na LeadsFlow (managed) vivem na conta ElevenLabs da plataforma; os antigos na do cliente */
+async function elevenKey(userId: string, managed = false): Promise<string> {
+  if (managed) return platformKey();
   const r = await query('SELECT elevenlabs_api_key FROM users WHERE id = $1', [userId]);
-  return r.rows[0]?.elevenlabs_api_key || process.env.ELEVENLABS_API_KEY || '';
+  return r.rows[0]?.elevenlabs_api_key || platformKey();
+}
+
+// ── Agentes geridos pela plataforma (o cliente não configura nada do ElevenLabs) ──
+export interface ManagedAgentInput {
+  name: string;
+  instructions: string;
+  greeting: string;
+  voice_id: string;
+  language: string;
+}
+
+export const LANGUAGES = ['pt', 'en', 'es', 'fr'] as const;
+
+async function eleven(method: string, path: string, body?: unknown) {
+  const key = platformKey();
+  if (!key) throw new WhatsAppCallError('Agentes de voz indisponíveis de momento', 503);
+  const res = await fetch(`${ELEVEN}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', 'xi-api-key': key },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  const data: any = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data?.detail;
+    const msg = typeof detail === 'string' ? detail : detail?.message || (Array.isArray(detail) ? detail.map((d: any) => d.msg).join('; ') : '');
+    console.error(`[WhatsAppCalls] ElevenLabs ${method} ${path}: ${res.status}`, msg);
+    throw new WhatsAppCallError('Não foi possível guardar o agente de voz', 422);
+  }
+  return data;
+}
+
+const CALL_STYLE = '\n\nEstás numa chamada de voz pelo WhatsApp: responde em frases curtas e naturais, uma ideia de cada vez, '
+  + 'sem listas nem formatação. Se não souberes algo, diz que a equipa vai entrar em contacto.';
+
+function agentBody(input: ManagedAgentInput) {
+  return {
+    name: input.name.slice(0, 100),
+    conversation_config: {
+      agent: {
+        prompt: { prompt: `${input.instructions.trim()}${CALL_STYLE}` },
+        first_message: input.greeting.trim(),
+        language: input.language,
+      },
+      // Modelos v2.5 aceitam todas as línguas nos agentes de conversa
+      tts: { voice_id: input.voice_id, model_id: input.language === 'en' ? 'eleven_flash_v2' : 'eleven_flash_v2_5' },
+    },
+  };
+}
+
+export async function createManagedAgent(input: ManagedAgentInput): Promise<string> {
+  const data = await eleven('POST', '/convai/agents/create', agentBody(input));
+  if (!data?.agent_id) throw new WhatsAppCallError('Não foi possível criar o agente de voz', 422);
+  return data.agent_id;
+}
+
+export async function updateManagedAgent(agentId: string, input: ManagedAgentInput) {
+  await eleven('PATCH', `/convai/agents/${encodeURIComponent(agentId)}`, agentBody(input));
+}
+
+export async function deleteManagedAgent(agentId: string) {
+  await eleven('DELETE', `/convai/agents/${encodeURIComponent(agentId)}`).catch(() => {});
+}
+
+/** Vozes prontas da biblioteca (nunca as vozes clonadas da conta da plataforma) */
+let voicesCache: { at: number; voices: any[] } | null = null;
+export async function listVoices() {
+  if (voicesCache && Date.now() - voicesCache.at < 3600_000) return voicesCache.voices;
+  const data = await eleven('GET', '/voices');
+  const voices = (data?.voices || [])
+    .filter((v: any) => v.category === 'premade' || v.category === 'professional')
+    .map((v: any) => ({
+      voice_id: v.voice_id,
+      name: v.name,
+      gender: v.labels?.gender || null,
+      accent: v.labels?.accent || null,
+      preview_url: v.preview_url || null,
+    }));
+  voicesCache = { at: Date.now(), voices };
+  return voices;
 }
 
 async function signedUrl(apiKey: string, agentId: string): Promise<string> {
@@ -195,7 +279,7 @@ export class WhatsAppCallsService {
       `INSERT INTO voice_agent_calls (voice_agent_id, user_id, phone_number, direction, status, lead_id, call_provider_id, metadata, started_at)
        VALUES ($1, $2, $3, 'inbound', 'ringing', $4, $5, $6, NOW()) RETURNING id`,
       [agent.id, channel.user_id, from || 'desconhecido', lead?.id || null, call.id,
-        JSON.stringify({ source: 'whatsapp_call', channel_id: channel.id, phone_number_id: phoneId, caller_name: contact?.profile?.name || null })],
+        JSON.stringify({ source: 'whatsapp_call', channel_id: channel.id, phone_number_id: phoneId, caller_name: contact?.profile?.name || null, managed: !!parse(agent.call_config).managed })],
     )).rows[0];
 
     const fail = async (message: string) => {
@@ -209,7 +293,7 @@ export class WhatsAppCallsService {
 
     try {
       if (!agentId) throw new WhatsAppCallError('O agente de voz não tem um agente ElevenLabs');
-      const apiKey = await elevenKey(channel.user_id);
+      const apiKey = await elevenKey(channel.user_id, !!parse(agent.call_config).managed);
       if (!apiKey) throw new WhatsAppCallError('Sem chave do ElevenLabs');
       const [url, disclosure] = await Promise.all([
         signedUrl(apiKey, agentId),
@@ -276,13 +360,13 @@ export class WhatsAppCallsService {
 
     // Transcrição final, duração e custo do ElevenLabs (prontos uns segundos depois)
     if (result.conversationId) {
-      setTimeout(() => { void this.syncConversation(row.id, row.user_id, result.conversationId); }, 20_000).unref?.();
+      setTimeout(() => { void this.syncConversation(row.id, row.user_id, result.conversationId, !!meta.managed); }, 20_000).unref?.();
     }
   }
 
-  private async syncConversation(rowId: string, userId: string, conversationId: string) {
+  private async syncConversation(rowId: string, userId: string, conversationId: string, managed = false) {
     try {
-      const apiKey = await elevenKey(userId);
+      const apiKey = await elevenKey(userId, managed);
       const conv: any = apiKey ? await fetchConversation(apiKey, conversationId) : null;
       if (!conv) return;
       const lines = (conv.transcript || [])

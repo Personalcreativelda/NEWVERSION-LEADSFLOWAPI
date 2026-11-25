@@ -1,1651 +1,310 @@
-import { matchesSearch } from '../../utils/search';
-import { OverlayModal } from '../base/OverlayModal';
-import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  Phone, Search, Plus, Power, PowerOff, Trash2, Edit3,
-  Loader2, X, Check, Eye, EyeOff, Mic, PhoneCall, Settings,
-  Bot, Link2, Unlink, RefreshCw, PhoneOutgoing, AlertCircle,
-} from 'lucide-react';
+// Agentes de voz: atendem as chamadas do WhatsApp Business.
+// O cliente só cria o agente (nome, instruções, primeira frase, voz) e escolhe que número ele atende;
+// chaves e contas do ElevenLabs ficam do lado da plataforma (api/src/routes/whatsapp-calls.routes.ts).
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pause, Pencil, PhoneCall, Play, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { PageHeader } from '../base/PageHeader';
+import { EmptyState } from '../base/EmptyState';
+import { AppModal } from '../base/AppModal';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
-import { PageHeader, PageAction } from '../base/PageHeader';
-import { EmptyState } from '../base/EmptyState';
-import { WhatsAppCallsPanel } from '../voice-agents/WhatsAppCallsPanel';
-import { toast } from 'sonner';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
 import { useConfirm } from '../ui/ConfirmDialog';
-import { voiceAgentsApi } from '../../services/api/voice-agents';
 import { SkeletonVoiceAgentGrid } from '../ui/skeletons';
-import { usePlanLimits } from '../../hooks/usePlanLimits';
-import type {
-  VoiceAgent,
-  CreateVoiceAgentInput,
-  ElevenLabsVoice,
-  ElevenLabsConvAIAgent,
-  ElevenLabsPhoneNumber,
-  ConvAIConversation,
-} from '../../types/voice-agents';
+import { CallHistory, WhatsAppNumbers } from '../voice-agents/WhatsAppCallsPanel';
+import {
+  voiceAgentsApi, type CallAgent, type CallAgentInput, type CallVoice, type WhatsAppCallsState,
+} from '../../services/api/voice-agents';
 
 interface VoiceAgentsPageProps {
-  isDark: boolean;
+  isDark?: boolean;
 }
 
-export default function VoiceAgentsPage({ isDark }: VoiceAgentsPageProps) {
+const LANGUAGES = [
+  { value: 'pt', label: 'Português' },
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Español' },
+  { value: 'fr', label: 'Français' },
+];
+
+const EMPTY: CallAgentInput = { name: '', instructions: '', greeting: '', voice_id: '', language: 'pt' };
+
+export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
   const confirm = useConfirm();
-  const planLimits = usePlanLimits();
-  console.log('[VoiceAgentsPage] Render - isDark:', isDark);
-  
-  // LocalStorage helper functions for API keys
-  const getStoredApiKey = (keyName: string): string | null => {
-    try {
-      return localStorage.getItem(`voice_agent_${keyName}`);
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const setStoredApiKey = (keyName: string, value: string | null): void => {
-    try {
-      if (value) {
-        localStorage.setItem(`voice_agent_${keyName}`, value);
-      } else {
-        localStorage.removeItem(`voice_agent_${keyName}`);
-      }
-    } catch (e) {
-      console.warn(`Failed to store ${keyName} in localStorage:`, e);
-    }
-  };
-  
-  const [voiceAgents, setVoiceAgents] = useState<VoiceAgent[]>([]);
-  const [elevenLabsVoices, setElevenLabsVoices] = useState<ElevenLabsVoice[]>([]);
-  const [convAIAgents, setConvAIAgents] = useState<ElevenLabsConvAIAgent[]>([]);
-  const [phoneNumbers, setPhoneNumbers] = useState<ElevenLabsPhoneNumber[]>([]);
+  const [state, setState] = useState<WhatsAppCallsState | null>(null);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<VoiceAgent | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [showSettingsApiKey, setShowSettingsApiKey] = useState<Record<string, boolean>>({
-    elevenlabs: false,
-    openai: false,
-    anthropic: false,
-    google: false,
-    sip_password: false,
-  });
-  const [elevenLabsConfigured, setElevenLabsConfigured] = useState(false);
-  const [savedApiKeys, setSavedApiKeys] = useState<{
-    elevenlabs: boolean;
-    openai: boolean;
-    anthropic: boolean;
-    google: boolean;
-  }>({
-    elevenlabs: false,
-    openai: false,
-    anthropic: false,
-    google: false,
-  });
+  const [voices, setVoices] = useState<CallVoice[]>([]);
+  const [editing, setEditing] = useState<CallAgent | null>(null);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<CallAgentInput>(EMPTY);
+  const [saving, setSaving] = useState(false);
+  const [playing, setPlaying] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Active AI call tracking
-  const [activeCall, setActiveCall] = useState<{
-    conversationId: string;
-    agentName: string;
-    phone: string;
-    status: ConvAIConversation['status'];
-    transcript: ConvAIConversation['transcript'];
-  } | null>(null);
-  const callPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // SIP registration form (inside Settings modal)
-  const [sipForm, setSipForm] = useState({
-    phone_number: '',
-    sip_host: 'sipv2.wavoip.com',
-    sip_username: '',
-    sip_password: '',
-    label: '',
-  });
-  const [sipLoading, setSipLoading] = useState(false);
-
-  // ConvAI agent creation form (inline, inside the agent modal)
-  const [createAgentFormOpen, setCreateAgentFormOpen] = useState(false);
-  const [createAgentLoading, setCreateAgentLoading] = useState(false);
-  const [createAgentForm, setCreateAgentForm] = useState({
-    name: '',
-    system_prompt: '',
-    first_message: '',
-    voice_id: '',
-    language: 'pt',
-    llm: 'claude-3-5-sonnet',
-  });
-
-  const [settingsForm, setSettingsForm] = useState({
-    elevenlabs_api_key: '',
-    openai_api_key: '',
-    anthropic_api_key: '',
-    google_api_key: '',
-    preferred_ai_model: 'elevenlabs',
-  });
-
-  const emptyForm: CreateVoiceAgentInput = {
-    name: '',
-    description: '',
-    voice_provider: 'elevenlabs',
-    voice_config: {
-      voice_id: '',
-      model: 'eleven_monolingual_v1',
-      stability: 0.5,
-      similarity_boost: 0.75,
-    },
-    call_provider: 'wavoip',
-    call_config: {
-      api_key: '',
-      from_number: '',
-      elevenlabs_agent_id: '',
-      phone_number_id: '',
-    },
-    greeting_message: '',
-    instructions: '',
-    language: 'pt-BR',
-  };
-
-  const [form, setForm] = useState<CreateVoiceAgentInput>(emptyForm);
-
-  const loadData = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      console.log('[VoiceAgentsPage] Starting to load data...');
-      setLoading(true);
-      
-      // Load settings first to know if ElevenLabs is configured
-      let settings: any = { elevenlabs_configured: false, elevenlabs_api_key_preview: null, voice_settings: {} };
-      try {
-        settings = await voiceAgentsApi.getSettings();
-        console.log('[VoiceAgentsPage] Settings loaded:', {
-          elevenlabs_configured: settings.elevenlabs_configured,
-          openai_configured: settings.openai_configured,
-          anthropic_configured: settings.anthropic_configured,
-          google_configured: settings.google_configured,
-          preferred_ai_model: settings.preferred_ai_model,
-        });
-      } catch (settingsError) {
-        console.error('[VoiceAgentsPage] Error loading settings:', settingsError);
-        // Continue even if settings fail to load
-      }
-
-      // Load agents, voices, ConvAI agents and phone numbers in parallel
-      const [agents, voicesResponse, convAIRes, phoneNumRes] = await Promise.all([
-        voiceAgentsApi.getAll().catch((err) => {
-          console.error('[VoiceAgentsPage] Error loading agents:', err);
-          return [];
-        }),
-        settings.elevenlabs_configured
-          ? voiceAgentsApi.getElevenLabsVoices().catch((err) => {
-              console.error('[VoiceAgentsPage] Error loading voices:', err);
-              return { voices: [], configured: false };
-            })
-          : Promise.resolve({ voices: [], configured: false }),
-        settings.elevenlabs_configured
-          ? voiceAgentsApi.listConvAIAgents().catch(() => [])
-          : Promise.resolve([]),
-        settings.elevenlabs_configured
-          ? voiceAgentsApi.listPhoneNumbers().catch(() => [])
-          : Promise.resolve([]),
-      ]);
-
-      setVoiceAgents(agents);
-
-      if (Array.isArray(voicesResponse)) {
-        setElevenLabsVoices(voicesResponse);
-      } else {
-        setElevenLabsVoices((voicesResponse as any).voices || []);
-      }
-
-      setConvAIAgents(convAIRes);
-      setPhoneNumbers(phoneNumRes);
-
-      const configuredStatus = settings.elevenlabs_configured ||
-        (!Array.isArray(voicesResponse) && (voicesResponse as any).configured);
-      setElevenLabsConfigured(configuredStatus);
-
-      setSavedApiKeys({
-        elevenlabs: settings.elevenlabs_configured || false,
-        openai: settings.openai_configured || false,
-        anthropic: settings.anthropic_configured || false,
-        google: settings.google_configured || false,
-      });
-
-      console.log('[VoiceAgentsPage] Loaded:', {
-        agents: agents.length,
-        convAIAgents: convAIRes.length,
-        phoneNumbers: phoneNumRes.length,
-      });
-    } catch (error) {
-      console.error('[VoiceAgentsPage] Error in loadData:', error);
-      toast.error('Erro ao carregar agentes de voz. Tente atualizar a página.');
+      setState(await voiceAgentsApi.getWhatsAppCalls());
+    } catch {
+      setState(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    console.log('[VoiceAgentsPage] Component mounted, isDark:', isDark);
-    loadData();
-  }, [loadData]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => () => { audioRef.current?.pause(); }, []);
 
-  // Loading state for ConvAI dropdowns
-  const [convAILoading, setConvAILoading] = useState(false);
-
-  // Refresh phone numbers and ConvAI agents every time the agent modal opens
-  useEffect(() => {
-    if (modalOpen) {
-      voiceAgentsApi.listPhoneNumbers().then(setPhoneNumbers).catch(() => {});
-      voiceAgentsApi.listConvAIAgents().then(setConvAIAgents).catch(() => {});
-    }
-  }, [modalOpen]);
-
-  const filteredAgents = voiceAgents.filter(agent => matchesSearch(searchTerm, agent.name, agent.description));
-
-  // Refresh ConvAI data (agents + phone numbers) — no elevenLabsConfigured guard
-  const refreshConvAIData = async () => {
-    setConvAILoading(true);
+  const loadVoices = async () => {
+    if (voices.length) return;
     try {
-      const [agents, numbers] = await Promise.all([
-        voiceAgentsApi.listConvAIAgents().catch((e) => {
-          console.error('[VoiceAgentsPage] listConvAIAgents error:', e);
-          return [] as ElevenLabsConvAIAgent[];
-        }),
-        voiceAgentsApi.listPhoneNumbers().catch((e) => {
-          console.error('[VoiceAgentsPage] listPhoneNumbers error:', e);
-          return [] as ElevenLabsPhoneNumber[];
-        }),
-      ]);
-      console.log('[VoiceAgentsPage] refreshConvAIData:', { agents: agents.length, numbers: numbers.length });
-      setConvAIAgents(agents);
-      setPhoneNumbers(numbers);
-    } finally {
-      setConvAILoading(false);
+      setVoices(await voiceAgentsApi.getCallVoices());
+    } catch {
+      toast.error('Não foi possível carregar as vozes');
     }
   };
 
-  const handleCreate = async () => {
-    if (!planLimits.canCreateVoiceAgent(voiceAgents.length)) {
-      planLimits.openUpgradeModal();
+  const limit = state?.limit ?? 0;
+  const atLimit = limit !== -1 && (state?.agents.length ?? 0) >= limit;
+
+  const openCreate = () => {
+    if (atLimit) {
+      toast.error(limit === 0 ? 'O seu plano não inclui agentes de voz' : 'Chegou ao limite de agentes do seu plano');
       return;
     }
-    setSelectedAgent(null);
-    setForm(emptyForm);
-    await refreshConvAIData();
-    setModalOpen(true);
+    setEditing(null);
+    setForm(EMPTY);
+    setOpen(true);
+    void loadVoices();
   };
 
-  const handleEdit = async (agent: VoiceAgent) => {
-    setSelectedAgent(agent);
-    setForm({
-      name: agent.name,
-      description: agent.description || '',
-      voice_provider: agent.voice_provider,
-      voice_config: agent.voice_config,
-      call_provider: agent.call_provider,
-      call_config: {
-        api_key: agent.call_config.api_key || '',
-        from_number: agent.call_config.from_number || '',
-        elevenlabs_agent_id: agent.call_config.elevenlabs_agent_id || '',
-        phone_number_id: agent.call_config.phone_number_id || '',
-      },
-      greeting_message: agent.greeting_message || '',
-      instructions: agent.instructions || '',
-      language: agent.language,
-    });
-    await refreshConvAIData();
-    setModalOpen(true);
+  const openEdit = (agent: CallAgent) => {
+    setEditing(agent);
+    setForm({ name: agent.name, instructions: agent.instructions, greeting: agent.greeting, voice_id: agent.voice_id, language: agent.language || 'pt' });
+    setOpen(true);
+    void loadVoices();
   };
 
-  const handleSubmit = async () => {
-    if (!form.name) {
-      toast.error('Nome do agente é obrigatório');
-      return;
-    }
+  const stopPreview = () => {
+    audioRef.current?.pause();
+    setPlaying(null);
+  };
 
+  const preview = (voice: CallVoice | undefined) => {
+    if (!voice?.preview_url) return;
+    if (playing === voice.voice_id) return stopPreview();
+    audioRef.current?.pause();
+    const audio = new Audio(voice.preview_url);
+    audio.onended = () => setPlaying(null);
+    audioRef.current = audio;
+    setPlaying(voice.voice_id);
+    audio.play().catch(() => setPlaying(null));
+  };
+
+  const save = async () => {
+    setSaving(true);
     try {
-      setActionLoading(true);
-      if (selectedAgent) {
-        await voiceAgentsApi.update(selectedAgent.id, form);
-        toast.success('Agente atualizado com sucesso');
-      } else {
-        await voiceAgentsApi.create(form);
-        toast.success('Agente criado com sucesso');
-      }
-      setModalOpen(false);
-      loadData();
-    } catch (error: any) {
-      console.error('[VoiceAgentsPage] Error saving agent:', error);
-      toast.error(error.response?.data?.error || 'Erro ao guardar agente');
+      await voiceAgentsApi.saveCallAgent(editing?.id || null, form);
+      toast.success(editing ? 'Agente guardado' : 'Agente criado');
+      stopPreview();
+      setOpen(false);
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Não foi possível guardar');
     } finally {
-      setActionLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    const confirmed = await confirm('Tem certeza que deseja eliminar este agente?', {
-      title: 'Eliminar agente',
-      confirmLabel: 'Eliminar',
+  const remove = async (agent: CallAgent) => {
+    const ok = await confirm(`O agente "${agent.name}" deixa de atender as chamadas.`, {
+      title: 'Apagar agente',
+      confirmLabel: 'Apagar',
       variant: 'danger',
     });
-    if (!confirmed) return;
-
+    if (!ok) return;
     try {
-      await voiceAgentsApi.delete(id);
-      toast.success('Agente eliminado com sucesso');
-      loadData();
-    } catch (error) {
-      console.error('[VoiceAgentsPage] Error deleting agent:', error);
-      toast.error('Erro ao eliminar agente');
-    }
-  };
-
-  const handleToggle = async (id: string, isActive: boolean) => {
-    try {
-      await voiceAgentsApi.toggle(id, !isActive);
-      toast.success(isActive ? 'Agente desativado' : 'Agente ativado');
-      loadData();
-    } catch (error) {
-      console.error('[VoiceAgentsPage] Error toggling agent:', error);
-      toast.error('Erro ao alterar status');
-    }
-  };
-
-  const stopCallPolling = () => {
-    if (callPollRef.current) {
-      clearInterval(callPollRef.current);
-      callPollRef.current = null;
-    }
-  };
-
-  const startCallPolling = (conversationId: string, agentName: string, phone: string) => {
-    stopCallPolling();
-    callPollRef.current = setInterval(async () => {
-      try {
-        const conv = await voiceAgentsApi.getConversation(conversationId);
-        setActiveCall((prev) =>
-          prev ? { ...prev, status: conv.status, transcript: conv.transcript } : prev,
-        );
-        if (conv.status === 'completed' || conv.status === 'failed') {
-          stopCallPolling();
-        }
-      } catch {
-        // ignore polling errors
-      }
-    }, 3000);
-  };
-
-  const handleTestCall = async (agentOrId: string | VoiceAgent) => {
-    const agent = typeof agentOrId === 'string'
-      ? voiceAgents.find((a) => a.id === agentOrId)
-      : agentOrId;
-    if (!agent) return;
-
-    const phone = prompt('Digite o número de telefone para teste (com código do país, ex: +5511999999999):');
-    if (!phone) return;
-
-    if (!/^\+[1-9]\d{6,14}$/.test(phone)) {
-      toast.error('Formato inválido. Use +5511999999999 (com código do país).', { duration: 6000 });
-      return;
-    }
-
-    const hasAIAgent = !!agent.call_config?.elevenlabs_agent_id;
-    const hasAIPhone = !!agent.call_config?.phone_number_id;
-    const hasWavoipToken = !!agent.call_config?.api_key;
-    const hasAIConfig = hasAIAgent && hasAIPhone;
-
-    // Pre-call validation: detect partial AI config and show targeted message
-    if (hasAIAgent && !hasAIPhone) {
-      toast.error(
-        'Agente ElevenLabs configurado, mas falta o Número SIP de saída. ' +
-        'Edite o agente, selecione um número SIP registrado e salve.',
-        { duration: 8000 },
-      );
-      return;
-    }
-    if (!hasAIAgent && hasAIPhone) {
-      toast.error(
-        'Número SIP configurado, mas falta o Agente ElevenLabs. ' +
-        'Edite o agente, selecione um agente ConvAI e salve.',
-        { duration: 8000 },
-      );
-      return;
-    }
-    if (!hasAIConfig && !hasWavoipToken) {
-      toast.error(
-        'Agente sem configuração de chamadas.\n' +
-        'Edite o agente e configure:\n' +
-        '• Modo AI: selecione Agente ElevenLabs + Número SIP\n' +
-        '• Modo simples: preencha o Token Wavoip',
-        { duration: 9000 },
-      );
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-
-      if (hasAIConfig) {
-        // ── AI call via ElevenLabs ConvAI + Wavoip SIP ──────────────────────
-        const result = await voiceAgentsApi.startAICall(agent.id, { phone_number: phone });
-
-        if (!result.conversation_id) {
-          toast.error('Chamada iniciada mas sem ID de conversa retornado pelo ElevenLabs.', { duration: 5000 });
-          return;
-        }
-
-        setActiveCall({
-          conversationId: result.conversation_id,
-          agentName: agent.name,
-          phone,
-          status: 'initiated',
-          transcript: [],
-        });
-        startCallPolling(result.conversation_id, agent.name, phone);
-        toast.success(`Chamada AI iniciada para ${phone}! O agente "${agent.name}" está ligando...`, { duration: 5000 });
-      } else {
-        // ── Fallback: Wavoip Click-to-Call (simple mode) ────────────────────
-        const result = await voiceAgentsApi.testCall(agent.id, { phone_number: phone });
-
-        if (!result.call_url) {
-          toast.error(
-            'Não foi possível gerar a URL de chamada.\n' +
-            'Configure o Agente ElevenLabs e o Número SIP para usar chamadas com AI, ' +
-            'ou preencha o Token Wavoip para o modo simples.',
-            { duration: 8000 },
-          );
-          return;
-        }
-
-        const popup = window.open(result.call_url, `wavoip_call_${agent.id}`, 'width=480,height=680,resizable=yes,scrollbars=no');
-        if (!popup) {
-          toast.error('Popup bloqueado. Permita popups para este site.', { duration: 8000 });
-        } else {
-          popup.focus();
-          toast.success('Webphone Wavoip aberto na nova janela.', { duration: 4000 });
-        }
-      }
+      await voiceAgentsApi.deleteCallAgent(agent.id);
+      toast.success('Agente apagado');
+      await load();
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || 'Erro ao iniciar chamada';
-      toast.error(msg, { duration: 6000 });
-    } finally {
-      setActionLoading(false);
+      toast.error(err?.response?.data?.error || 'Não foi possível apagar');
     }
   };
 
-  const handleRegisterSip = async () => {
-    if (!sipForm.phone_number || !sipForm.sip_host || !sipForm.sip_username || !sipForm.sip_password) {
-      toast.error('Preencha todos os campos SIP: número, host, utilizador e palavra-passe.');
-      return;
-    }
-    try {
-      setSipLoading(true);
-      await voiceAgentsApi.registerSipTrunk({
-        phone_number: sipForm.phone_number,
-        sip_host: sipForm.sip_host,
-        sip_username: sipForm.sip_username,
-        sip_password: sipForm.sip_password,
-        label: sipForm.label || `Wavoip ${sipForm.phone_number}`,
-      });
-      const registeredLabel = sipForm.label || `Wavoip ${sipForm.phone_number}`;
-      toast.success(`Número "${registeredLabel}" registrado com sucesso`);
-      // Keep form data visible so user can see what was registered; refresh list
-      const updated = await voiceAgentsApi.listPhoneNumbers();
-      setPhoneNumbers(updated);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || err?.message || 'Erro ao registrar SIP', { duration: 7000 });
-    } finally {
-      setSipLoading(false);
-    }
-  };
-
-  const handleCreateConvAIAgent = async () => {
-    if (!createAgentForm.name || !createAgentForm.system_prompt || !createAgentForm.first_message) {
-      toast.error('Preencha: nome, instruções e primeira mensagem.');
-      return;
-    }
-    try {
-      setCreateAgentLoading(true);
-      const result = await voiceAgentsApi.createConvAIAgent({
-        name: createAgentForm.name,
-        system_prompt: createAgentForm.system_prompt,
-        first_message: createAgentForm.first_message,
-        voice_id: createAgentForm.voice_id || undefined,
-        language: createAgentForm.language,
-        llm: createAgentForm.llm,
-      });
-      toast.success(`Agente "${result.agent.name}" criado com sucesso`);
-      // Reload agents list and auto-select the new agent
-      const updatedAgents = await voiceAgentsApi.listConvAIAgents();
-      setConvAIAgents(updatedAgents);
-      setForm((prev) => ({
-        ...prev,
-        call_config: { ...prev.call_config, elevenlabs_agent_id: result.agent.agent_id },
-      }));
-      setCreateAgentFormOpen(false);
-      setCreateAgentForm({ name: '', system_prompt: '', first_message: '', voice_id: '', language: 'pt', llm: 'claude-3-5-sonnet' });
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || err?.message || 'Erro ao criar agente', { duration: 7000 });
-    } finally {
-      setCreateAgentLoading(false);
-    }
-  };
-
-  const handleDeletePhoneNumber = async (phoneNumberId: string) => {
-    const confirmed = await confirm('Remover este número do ElevenLabs?', {
-      title: 'Remover número',
-      confirmLabel: 'Remover',
-      variant: 'danger',
-    });
-    if (!confirmed) return;
-    try {
-      await voiceAgentsApi.deletePhoneNumber(phoneNumberId);
-      toast.success('Número removido.');
-      setPhoneNumbers((prev) => prev.filter((p) => p.phone_number_id !== phoneNumberId));
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Erro ao remover número', { duration: 5000 });
-    }
-  };
-
-  const handleOpenSettings = async () => {
-    try {
-      console.log('[VoiceAgentsPage] 🔧 Opening settings modal...');
-      
-      // Load current settings from server
-      const currentSettings = await voiceAgentsApi.getSettings();
-      console.log('[VoiceAgentsPage] Current settings from server:', {
-        elevenlabs: currentSettings.elevenlabs_configured,
-        openai: currentSettings.openai_configured,
-        anthropic: currentSettings.anthropic_configured,
-        google: currentSettings.google_configured,
-      });
-      
-      // Update saved API keys status
-      setSavedApiKeys({
-        elevenlabs: currentSettings.elevenlabs_configured || false,
-        openai: currentSettings.openai_configured || false,
-        anthropic: currentSettings.anthropic_configured || false,
-        google: currentSettings.google_configured || false,
-      });
-      
-      // Try to load from localStorage first (full keys), fallback to preview from server
-      const storedElevenLabs = getStoredApiKey('elevenlabs_api_key');
-      const storedOpenAI = getStoredApiKey('openai_api_key');
-      const storedAnthropic = getStoredApiKey('anthropic_api_key');
-      const storedGoogle = getStoredApiKey('google_api_key');
-
-      // Pre-fill fields with stored values or previews
-      setSettingsForm({
-        elevenlabs_api_key: storedElevenLabs || currentSettings.elevenlabs_api_key_preview || '',
-        openai_api_key: storedOpenAI || currentSettings.openai_api_key_preview || '',
-        anthropic_api_key: storedAnthropic || currentSettings.anthropic_api_key_preview || '',
-        google_api_key: storedGoogle || currentSettings.google_api_key_preview || '',
-        preferred_ai_model: currentSettings.preferred_ai_model || 'elevenlabs',
-      });
-      
-      setShowSettingsApiKey({
-        elevenlabs: false,
-        openai: false,
-        anthropic: false,
-        google: false,
-      });
-      
-      // Also refresh ConvAI phone numbers list
-      if (currentSettings.elevenlabs_configured) {
-        voiceAgentsApi.listPhoneNumbers().then(setPhoneNumbers).catch(() => {});
-        voiceAgentsApi.listConvAIAgents().then(setConvAIAgents).catch(() => {});
-      }
-
-      setSettingsModalOpen(true);
-      console.log('[VoiceAgentsPage] Settings modal opened with saved status:', currentSettings);
-    } catch (error) {
-      console.error('[VoiceAgentsPage] Error loading settings for modal:', error);
-      // If error, start with empty form
-      setSettingsForm({ 
-        elevenlabs_api_key: '',
-        openai_api_key: '',
-        anthropic_api_key: '',
-        google_api_key: '',
-        preferred_ai_model: 'elevenlabs',
-      });
-      setShowSettingsApiKey({
-        elevenlabs: false,
-        openai: false,
-        anthropic: false,
-        google: false,
-      });
-      setSettingsModalOpen(true);
-      toast.error('Erro ao carregar definições atuais');
-    }
-  };
-
-  const handleSaveSettings = async () => {
-    // Helper function to determine if a value is a preview or actual key
-    const isPreview = (value: string | undefined): boolean => {
-      return !!value?.endsWith('...');
-    };
-
-    // Prepare data - only send keys that were actually modified (not previews)
-    const dataToSave = {
-      elevenlabs_api_key: (settingsForm.elevenlabs_api_key && !isPreview(settingsForm.elevenlabs_api_key)) 
-        ? settingsForm.elevenlabs_api_key 
-        : null,
-      openai_api_key: (settingsForm.openai_api_key && !isPreview(settingsForm.openai_api_key)) 
-        ? settingsForm.openai_api_key 
-        : null,
-      anthropic_api_key: (settingsForm.anthropic_api_key && !isPreview(settingsForm.anthropic_api_key)) 
-        ? settingsForm.anthropic_api_key 
-        : null,
-      google_api_key: (settingsForm.google_api_key && !isPreview(settingsForm.google_api_key)) 
-        ? settingsForm.google_api_key 
-        : null,
-      preferred_ai_model: settingsForm.preferred_ai_model,
-    };
-
-    // Validations: at least one key must be provided (either already saved or newly provided)
-    const hasAnySavedKey = 
-      savedApiKeys.elevenlabs || savedApiKeys.openai || savedApiKeys.anthropic || savedApiKeys.google;
-    const hasAnyNewKey = 
-      dataToSave.elevenlabs_api_key || 
-      dataToSave.openai_api_key || 
-      dataToSave.anthropic_api_key || 
-      dataToSave.google_api_key;
-
-    if (!hasAnySavedKey && !hasAnyNewKey) {
-      toast.error('Forneça pelo menos uma API key válida');
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      console.log('[VoiceAgentsPage] 🔄 Saving API keys...');
-      
-      console.log('[VoiceAgentsPage] Submitting:', {
-        hasElevenLabs: !!dataToSave.elevenlabs_api_key,
-        hasOpenAI: !!dataToSave.openai_api_key,
-        hasAnthropic: !!dataToSave.anthropic_api_key,
-        hasGoogle: !!dataToSave.google_api_key,
-        keepingExisting: `${[
-          savedApiKeys.elevenlabs && !dataToSave.elevenlabs_api_key ? 'ElevenLabs' : '',
-          savedApiKeys.openai && !dataToSave.openai_api_key ? 'OpenAI' : '',
-          savedApiKeys.anthropic && !dataToSave.anthropic_api_key ? 'Anthropic' : '',
-          savedApiKeys.google && !dataToSave.google_api_key ? 'Google' : '',
-        ].filter(Boolean).join(', ')}`,
-      });
-      
-      const response = await voiceAgentsApi.updateSettings(dataToSave);
-      
-      console.log('[VoiceAgentsPage] ✅ Settings saved:', response);
-      
-      // Store new/updated keys in localStorage for future reference
-      if (dataToSave.elevenlabs_api_key) {
-        setStoredApiKey('elevenlabs_api_key', dataToSave.elevenlabs_api_key);
-      }
-      if (dataToSave.openai_api_key) {
-        setStoredApiKey('openai_api_key', dataToSave.openai_api_key);
-      }
-      if (dataToSave.anthropic_api_key) {
-        setStoredApiKey('anthropic_api_key', dataToSave.anthropic_api_key);
-      }
-      if (dataToSave.google_api_key) {
-        setStoredApiKey('google_api_key', dataToSave.google_api_key);
-      }
-      
-      // Update saved API keys status immediately
-      setSavedApiKeys({
-        elevenlabs: savedApiKeys.elevenlabs || !!dataToSave.elevenlabs_api_key,
-        openai: savedApiKeys.openai || !!dataToSave.openai_api_key,
-        anthropic: savedApiKeys.anthropic || !!dataToSave.anthropic_api_key,
-        google: savedApiKeys.google || !!dataToSave.google_api_key,
-      });
-      
-      toast.success('Definições guardadas com sucesso. Recarregando...');
-      
-      // Keep modal open for a moment while showing loading state
-      // This prevents UI flicker
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Close modal
-      setSettingsModalOpen(false);
-      
-      // Wait a bit more for cleanup
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Reload ALL data including agents and voices
-      console.log('[VoiceAgentsPage] 🔄 Reloading all data after settings save...');
-      setLoading(true);
-      
-      // Load fresh data with explicit error handling
-      try {
-        const [agents, settings] = await Promise.all([
-          voiceAgentsApi.getAll(),
-          voiceAgentsApi.getSettings(),
-        ]);
-        
-        console.log('[VoiceAgentsPage] ✅ Fresh data loaded:', {
-          agentsCount: agents.length,
-          elevenLabsConfigured: settings.elevenlabs_configured,
-          openAIConfigured: settings.openai_configured,
-        });
-        
-        // Update state with fresh data
-        setVoiceAgents(agents);
-        setElevenLabsConfigured(settings.elevenlabs_configured);
-        
-        // Load voices if ElevenLabs is configured
-        if (settings.elevenlabs_configured) {
-          try {
-            const voicesData = await voiceAgentsApi.getElevenLabsVoices();
-            console.log('[VoiceAgentsPage] Voices loaded:', voicesData);
-            const voiceList = Array.isArray(voicesData) ? voicesData : (voicesData as any).voices || [];
-            setElevenLabsVoices(voiceList);
-          } catch (voiceError) {
-            console.warn('[VoiceAgentsPage] Could not load voices:', voiceError);
-          }
-        }
-        
-        console.log('[VoiceAgentsPage] ✅ All data refreshed successfully');
-      } catch (reloadError) {
-        console.error('[VoiceAgentsPage] Error reloading data:', reloadError);
-        toast.error('Definições guardadas, mas houve erro ao recarregar. Atualize a página.');
-      } finally {
-        setLoading(false);
-      }
-      
-    } catch (error: any) {
-      console.error('[VoiceAgentsPage] ❌ Error saving settings:', error);
-      
-      // Improved error handling with diagnostics
-      const status = error.response?.status;
-      const data = error.response?.data;
-      const errorMsg = data?.error || error.message || 'Erro ao salvar configurações';
-      
-      // Log detailed error information
-      console.error('[VoiceAgentsPage] Error details:', {
-        status,
-        statusText: error.response?.statusText,
-        errorMessage: errorMsg,
-        receivedFields: data?.receivedFields,
-        schemaError: data?.error?.includes('schema'),
-      });
-      
-      // If it's a 400 or 500 error related to schema/database
-      if ((status === 400 || status === 500) && errorMsg.includes('schema')) {
-        console.warn('[VoiceAgentsPage] ⚠️ Appears to be a database schema issue');
-        toast.error(
-          'Erro de schema do banco de dados\n\n' +
-          'Possível solução:\n' +
-          '1. Abra o console (F12) e procure por logs de erro\n' +
-          '2. Verifique se a migração 014 foi aplicada\n' +
-          '3. Contate o administrador do sistema'
-        );
-        
-        // Attempt to run diagnosis
-        try {
-          console.log('[VoiceAgentsPage] 🔍 Running diagnosis...');
-          const diagResponse = await voiceAgentsApi.diagnose();
-          console.log('[VoiceAgentsPage] Diagnosis result:', diagResponse);
-          if (diagResponse.diagnosis?.missingColumns?.length > 0) {
-            toast.error(
-              `Colunas faltando no banco:\n${diagResponse.diagnosis.missingColumns.join(', ')}\n\n` +
-              `Execute a migração 014_add_ai_models_support.sql`
-            );
-          }
-        } catch (diagError) {
-          console.error('[VoiceAgentsPage] Diagnosis failed:', diagError);
-        }
-      } else if (status === 400 && data?.receivedFields) {
-        // Debug info for empty fields
-        console.warn('[VoiceAgentsPage] Empty request body?', data.receivedFields);
-        toast.error(
-          'Nenhum campo de API foi enviado.\n\n' +
-          'Verifique:\n' +
-          '- Você preencheu alguma chave de API?\n' +
-          '- Clicou em "Guardar Definições"?'
-        );
-      } else {
-        toast.error(errorMsg);
-      }
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const voiceName = (id: string) => voices.find((v) => v.voice_id === id)?.name;
+  const usedOn = (agentId: string) => state?.channels.filter((c) => c.voice_agent_id === agentId && c.enabled) || [];
+  const selectedVoice = voices.find((v) => v.voice_id === form.voice_id);
+  const canSave = form.name.trim() && form.instructions.trim() && form.greeting.trim() && form.voice_id;
 
   return (
-    // Página de ecrã inteiro (dentro do InboxPage): mesmas margens do PageContainer do Dashboard
     <div className="w-full h-full overflow-y-auto">
       <div className="px-3 pt-4 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8">
         <PageHeader
-          title="Agentes de Voz"
-          description="Chamadas automáticas com vozes realistas"
+          title="Agentes de voz"
+          description="Atendem as chamadas do WhatsApp"
           icon={PhoneCall}
-          actions={<PageAction icon={Settings} label="Definições" onClick={handleOpenSettings} />}
-          create={{
-            label: planLimits.limits.voiceAgents === 0 ? 'Criar agente (Pro)' : 'Criar agente',
-            onClick: handleCreate,
-          }}
+          create={state?.available ? { label: 'Criar agente', onClick: openCreate } : undefined}
         />
-
-        {!elevenLabsConfigured && (
-          <p className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-            <Settings className="h-4 w-4 flex-shrink-0" aria-hidden />
-            Configure a API ElevenLabs em Definições para criar agentes.
-          </p>
-        )}
-
-        {/* Search */}
-        <div className="relative w-full sm:w-80">
-          <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground`} />
-          <Input
-            type="text"
-            placeholder="Pesquisar agentes de voz..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className={`pl-9 text-sm bg-muted border-border text-foreground`}
-          />
-        </div>
       </div>
 
-      {/* Content */}
-      <div className="px-3 py-6 sm:px-6 lg:px-10">
+      <div className="space-y-8 px-3 py-6 sm:px-6 lg:px-10">
         {loading ? (
-          <SkeletonVoiceAgentGrid count={6} />
-        ) : filteredAgents.length === 0 ? (
-          <EmptyState
-            icon={PhoneCall}
-            title={searchTerm ? 'Nenhum agente encontrado' : 'Ainda sem agentes de voz'}
-            description={searchTerm ? 'Tente outro termo de pesquisa.' : 'Crie o primeiro agente para fazer chamadas automáticas.'}
-            action={!searchTerm ? <PageAction variant="primary" icon={Plus} label="Criar agente" onClick={handleCreate} /> : undefined}
-          />
+          <SkeletonVoiceAgentGrid count={3} />
+        ) : !state?.available ? (
+          <EmptyState icon={PhoneCall} title="Disponível em breve" description="Os agentes de voz ainda não estão ativos." />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {filteredAgents.map((agent) => (
-              <div
-                key={agent.id}
-                className={`rounded-lg p-4 sm:p-5 hover:shadow-lg transition-shadow bg-card border border-border`}
-              >
-                {/* Card header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${agent.call_config?.elevenlabs_agent_id ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-muted'}`}>
-                      {agent.call_config?.elevenlabs_agent_id
-                        ? <Bot className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                        : <PhoneCall className="w-5 h-5 text-muted-foreground" />
-                      }
-                    </div>
-                    <div>
-                      <h3 className={`font-semibold text-foreground`}>{agent.name}</h3>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <Badge variant={agent.is_active ? 'default' : 'secondary'} className="text-xs">
-                          {agent.is_active ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                        {agent.call_config?.elevenlabs_agent_id && agent.call_config?.phone_number_id && (
-                          <Badge variant="outline" className="text-[10px] text-purple-500 border-purple-400">
-                            AI
-                          </Badge>
-                        )}
-                        {(agent.call_config?.elevenlabs_agent_id || agent.call_config?.phone_number_id) &&
-                          !(agent.call_config?.elevenlabs_agent_id && agent.call_config?.phone_number_id) && (
-                          <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-400">
-                            Config. incompleta
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {agent.description && (
-                  <p className={`text-sm mb-3 line-clamp-2 text-muted-foreground`}>
-                    {agent.description}
-                  </p>
-                )}
-
-                <div className={`flex items-center gap-2 text-xs mb-4 text-muted-foreground`}>
-                  {agent.call_config?.elevenlabs_agent_id ? (
-                    <>
-                      <Bot className="w-3 h-3 text-purple-500" />
-                      <span className="text-purple-500">ConvAI</span>
-                      <span>•</span>
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="w-3 h-3" />
-                      <span>{agent.voice_provider}</span>
-                      <span>•</span>
-                    </>
-                  )}
-                  <Phone className="w-3 h-3" />
-                  <span>{agent.call_provider}</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleEdit(agent)}
-                    className="flex-1"
-                  >
-                    <Edit3 className="w-3 h-3 mr-1" />
-                    Editar
-                  </Button>
-                  <Button aria-label={agent.is_active ? 'Desativar' : 'Ativar'}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleToggle(agent.id, agent.is_active)}
-                  >
-                    {agent.is_active ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={actionLoading}
-                    onClick={() => handleTestCall(agent)}
-                    title={agent.call_config?.elevenlabs_agent_id ? 'Iniciar chamada AI' : 'Ligar (Click-to-Call)'}
-                    className={agent.call_config?.elevenlabs_agent_id ? 'text-purple-600 border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20' : ''}
-                  >
-                    {agent.call_config?.elevenlabs_agent_id
-                      ? <PhoneOutgoing className="w-3 h-3" />
-                      : <Phone className="w-3 h-3" />
-                    }
-                  </Button>
-                  <Button aria-label="Apagar"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDelete(agent.id)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {!loading && <WhatsAppCallsPanel refreshKey={voiceAgents.length} />}
-
-      {/* Modal */}
-      {modalOpen && (
-        <OverlayModal onClose={() => setModalOpen(false)} className="overflow-hidden" stickyEdges={false}>
-            <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3 border-b bg-card border-border`}>
-              <h2 className={`text-base sm:text-lg md:text-xl font-bold flex-1 text-foreground`}>
-                {selectedAgent ? 'Editar Agente de Voz' : 'Criar Agente de Voz'}
-              </h2>
-              <button aria-label="Fechar" 
-                type="button"
-                onClick={() => setModalOpen(false)} 
-                className={`flex-shrink-0 p-1 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted`}
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 space-y-4">
-              {/* Nome */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 text-foreground`}>
-                  Nome do Agente *
-                </label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Ex: Agente de Vendas"
-                  className={`text-sm sm:text-base bg-muted border-border text-foreground`}
+          <>
+            <section>
+              <h2 className="mb-3 text-base font-semibold text-foreground">Agentes</h2>
+              {state.agents.length === 0 ? (
+                <EmptyState
+                  icon={PhoneCall}
+                  title="Ainda sem agentes"
+                  description={limit === 0 ? 'O seu plano não inclui agentes de voz.' : 'Crie um agente para atender as chamadas.'}
+                  action={limit === 0 ? undefined : <Button onClick={openCreate}>Criar agente</Button>}
                 />
-              </div>
-
-              {/* Descrição */}
-              <div>
-                <label className={`block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 text-foreground`}>
-                  Descrição
-                </label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Descreva a função deste agente..."
-                  className={`w-full px-3 py-2 border rounded-md min-h-[60px] sm:min-h-[80px] text-sm sm:text-base bg-muted border-border text-foreground`}
-                />
-              </div>
-
-              {/* ── Configuração ElevenLabs ConvAI + SIP ── */}
-              <div className="rounded-lg p-4 border bg-purple-50 dark:bg-muted/50 border-purple-200 dark:border-purple-800/40">
-                <div className="flex items-center gap-2 mb-1">
-                  <Bot className="w-4 h-4 text-purple-500" />
-                  <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
-                    Configuração ElevenLabs + SIP
-                  </span>
-                </div>
-                <p className={`text-[11px] mb-4 text-muted-foreground`}>
-                  Selecione o agente ConvAI e o número SIP registrado em <strong>Definições</strong>.
-                </p>
-
-                {/* ElevenLabs ConvAI Agent selector + inline create */}
-                <div className="mb-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className={`block text-xs font-medium text-foreground/80`}>
-                      Agente ElevenLabs (ConvAI)
-                    </label>
-                    <div className="flex items-center gap-1">
-                      <button type="button" title="Recarregar agentes e números"
-                        onClick={refreshConvAIData}
-                        disabled={convAILoading}
-                        className={`p-0.5 rounded hover:bg-muted text-muted-foreground ${convAILoading ? 'opacity-50' : ''}`}>
-                        <RefreshCw className="w-3 h-3" />
-                      </button>
-                      <button type="button"
-                        onClick={() => setCreateAgentFormOpen((v) => !v)}
-                        title="Criar novo agente"
-                        className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${createAgentFormOpen
-                          ? 'bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-200'
-                          : 'bg-muted text-muted-foreground hover:bg-purple-100 dark:hover:bg-purple-800 hover:text-purple-700 dark:hover:text-purple-200'}`}>
-                        <Plus className="w-2.5 h-2.5" />
-                        Criar agente
-                      </button>
-                    </div>
-                  </div>
-                  <select
-                    value={form.call_config.elevenlabs_agent_id || ''}
-                    onChange={(e) => setForm({ ...form, call_config: { ...form.call_config, elevenlabs_agent_id: e.target.value } })}
-                    disabled={convAILoading}
-                    className={`w-full px-3 py-2 border rounded-md text-sm bg-muted border-border text-foreground ${convAILoading ? 'opacity-60' : ''}`}
-                  >
-                    <option value="">
-                      {convAILoading ? 'A carregar...' : '— Selecione um agente ElevenLabs —'}
-                    </option>
-                    {convAIAgents.map((a) => (
-                      <option key={a.agent_id} value={a.agent_id}>{a.name}</option>
-                    ))}
-                  </select>
-
-                  {/* Inline Create Agent Form */}
-                  {createAgentFormOpen && (
-                    <div className="mt-2 p-3 rounded-lg border space-y-2 bg-card border-purple-200 dark:border-purple-700/50">
-                      <p className="text-[11px] font-semibold mb-1 text-purple-700 dark:text-purple-300">
-                        Criar novo agente ConvAI
-                      </p>
-                      <div>
-                        <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Nome *</label>
-                        <Input value={createAgentForm.name}
-                          onChange={(e) => setCreateAgentForm((p) => ({ ...p, name: e.target.value }))}
-                          placeholder="Ex: Atendente Sofia"
-                          className={`text-xs h-7 bg-card border-border text-foreground`} />
-                      </div>
-                      <div>
-                        <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Primeira mensagem *</label>
-                        <Input value={createAgentForm.first_message}
-                          onChange={(e) => setCreateAgentForm((p) => ({ ...p, first_message: e.target.value }))}
-                          placeholder="Olá! Como posso ajudar?"
-                          className={`text-xs h-7 bg-card border-border text-foreground`} />
-                      </div>
-                      <div>
-                        <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Instruções (system prompt) *</label>
-                        <textarea value={createAgentForm.system_prompt}
-                          onChange={(e) => setCreateAgentForm((p) => ({ ...p, system_prompt: e.target.value }))}
-                          placeholder="Você é um assistente de vendas da empresa X. Seja cordial e objetivo..."
-                          rows={3}
-                          className={`w-full px-2 py-1 border rounded text-xs resize-none bg-card border-border text-foreground`} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Voz</label>
-                          <select value={createAgentForm.voice_id}
-                            onChange={(e) => setCreateAgentForm((p) => ({ ...p, voice_id: e.target.value }))}
-                            className={`w-full px-2 py-1 border rounded text-xs bg-card border-border text-foreground`}>
-                            <option value="">Padrão</option>
-                            {elevenLabsVoices.map((v) => (
-                              <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Idioma</label>
-                          <select value={createAgentForm.language}
-                            onChange={(e) => setCreateAgentForm((p) => ({ ...p, language: e.target.value }))}
-                            className={`w-full px-2 py-1 border rounded text-xs bg-card border-border text-foreground`}>
-                            <option value="pt">Português</option>
-                            <option value="en">English</option>
-                            <option value="es">Español</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <label className={`block text-[10px] font-medium mb-0.5 text-muted-foreground`}>Modelo LLM</label>
-                        <select value={createAgentForm.llm}
-                          onChange={(e) => setCreateAgentForm((p) => ({ ...p, llm: e.target.value }))}
-                          className={`w-full px-2 py-1 border rounded text-xs bg-card border-border text-foreground`}>
-                          <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Recomendado)</option>
-                          <option value="gpt-4o-mini">GPT-4o Mini</option>
-                          <option value="gpt-4o">GPT-4o</option>
-                          <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                        </select>
-                      </div>
-                      <div className="flex gap-2 pt-1">
-                        <Button type="button" size="sm"
-                          onClick={handleCreateConvAIAgent}
-                          disabled={createAgentLoading}
-                          className="flex-1 text-xs h-7">
-                          {createAgentLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Check className="w-3 h-3 mr-1" />}
-                          Criar Agente
-                        </Button>
-                        <Button type="button" size="sm" variant="outline"
-                          onClick={() => setCreateAgentFormOpen(false)}
-                          className="text-xs h-7">
-                          Cancelar
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Phone Number / SIP Trunk */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className={`block text-xs font-medium text-foreground/80`}>
-                      Número de Saída (SIP Wavoip registrado)
-                    </label>
-                    <button
-                      type="button"
-                      title="Recarregar números"
-                      onClick={refreshConvAIData}
-                      disabled={convAILoading}
-                      className={`p-0.5 rounded hover:bg-muted text-muted-foreground ${convAILoading ? 'opacity-50' : ''}`}
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <select
-                    value={form.call_config.phone_number_id || ''}
-                    onChange={(e) => setForm({ ...form, call_config: { ...form.call_config, phone_number_id: e.target.value } })}
-                    disabled={convAILoading}
-                    className={`w-full px-3 py-2 border rounded-md text-sm bg-muted border-border text-foreground ${convAILoading ? 'opacity-60' : ''}`}
-                  >
-                    <option value="">
-                      {convAILoading ? 'A carregar...' : phoneNumbers.length === 0 ? '— Nenhum número SIP registrado —' : '— Selecione um número —'}
-                    </option>
-                    {phoneNumbers.map((p) => (
-                      <option key={p.phone_number_id} value={p.phone_number_id}>
-                        {p.label || p.phone_number} ({p.phone_number})
-                      </option>
-                    ))}
-                  </select>
-                  {!convAILoading && phoneNumbers.length === 0 && (
-                    <p className="mt-1 text-[10px] text-yellow-600 dark:text-yellow-400">
-                      Sem números SIP. Registe-os em Definições → SIP Wavoip.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t bg-card border-border`}>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setModalOpen(false)}
-                className="w-full sm:w-auto text-sm sm:text-base"
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={actionLoading}
-                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-sm sm:text-base"
-              >
-                {actionLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    A guardar...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 mr-2" />
-                    {selectedAgent ? 'Atualizar' : 'Criar Agente'}
-                  </>
-                )}
-              </Button>
-            </div>
-        </OverlayModal>
-      )}
-
-      {/* Settings Modal */}
-      {settingsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Overlay */}
-          <div 
-            className="fixed inset-0 bg-black/50 transition-opacity" 
-            onClick={() => setSettingsModalOpen(false)}
-          ></div>
-          
-          {/* Modal Content */}
-          <div className={`relative rounded-lg shadow-xl w-full max-w-lg z-10 bg-card`}>
-            
-            {/* Header */}
-              <div className={`px-4 py-3 sm:px-6 sm:py-4 border-b bg-card border-border`}>
-                <div className="flex items-center justify-between">
-                  <h3 className={`text-base sm:text-lg font-semibold text-foreground`}>
-                    Definições de API
-                  </h3>
-                  <button aria-label="Fechar"
-                    onClick={() => setSettingsModalOpen(false)}
-                    className={`p-1.5 rounded-md transition-colors w-6 h-6 flex items-center justify-center hover:bg-muted`}
-                  >
-                    <X className={`w-4 h-4 text-muted-foreground`} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Body */}
-              <div className="px-4 py-4 sm:px-6 sm:py-5 space-y-5 max-h-[70vh] overflow-y-auto">
-                
-                {/* Model Selector */}
-                <div>
-                  <label className={`block text-xs sm:text-sm font-medium mb-2 text-foreground`}>
-                    Modelo de IA Preferido
-                  </label>
-                  <select
-                    value={settingsForm.preferred_ai_model}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, preferred_ai_model: e.target.value })}
-                    className={`w-full px-3 py-2 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground`}
-                  >
-                    <option value="elevenlabs">ElevenLabs (Voz)</option>
-                    <option value="openai">OpenAI (GPT-4, GPT-3.5)</option>
-                    <option value="anthropic">Anthropic (Claude)</option>
-                    <option value="google">Google (Gemini)</option>
-                  </select>
-                </div>
-
-                {/* ElevenLabs API Key */}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <label className={`block text-xs sm:text-sm font-medium text-foreground`}>
-                      ElevenLabs API Key
-                    </label>
-                    {savedApiKeys.elevenlabs && (
-                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Guardado</span>
-                    )}
-                  </div>
-                  <div className="relative mt-1.5 sm:mt-2">
-                    <input
-                      type={showSettingsApiKey.elevenlabs ? 'text' : 'password'}
-                      value={settingsForm.elevenlabs_api_key}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, elevenlabs_api_key: e.target.value })}
-                      placeholder={savedApiKeys.elevenlabs ? "Digite uma nova chave para atualizar..." : "sk_..."}
-                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
-                    />
-                    <button aria-label={showSettingsApiKey.elevenlabs ? 'Esconder' : 'Mostrar'}
-                      type="button"
-                      onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, elevenlabs: !showSettingsApiKey.elevenlabs })}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
-                    >
-                      {showSettingsApiKey.elevenlabs ? (
-                        <EyeOff className={`w-4 h-4 text-muted-foreground`} />
-                      ) : (
-                        <Eye className={`w-4 h-4 text-muted-foreground`} />
-                      )}
-                    </button>
-                  </div>
-                  <p className={`mt-1.5 text-[10px] sm:text-xs text-muted-foreground`}>
-                    Obtenha sua chave em <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">elevenlabs.io</a>
-                  </p>
-                </div>
-
-                {/* OpenAI API Key */}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <label className={`block text-xs sm:text-sm font-medium text-foreground`}>
-                      OpenAI API Key
-                    </label>
-                    {savedApiKeys.openai && (
-                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Guardado</span>
-                    )}
-                  </div>
-                  <div className="relative mt-1.5 sm:mt-2">
-                    <input
-                      type={showSettingsApiKey.openai ? 'text' : 'password'}
-                      value={settingsForm.openai_api_key}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, openai_api_key: e.target.value })}
-                      placeholder={savedApiKeys.openai ? "Digite uma nova chave para atualizar..." : "sk-..."}
-                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
-                    />
-                    <button aria-label={showSettingsApiKey.openai ? 'Esconder' : 'Mostrar'}
-                      type="button"
-                      onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, openai: !showSettingsApiKey.openai })}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
-                    >
-                      {showSettingsApiKey.openai ? (
-                        <EyeOff className={`w-4 h-4 text-muted-foreground`} />
-                      ) : (
-                        <Eye className={`w-4 h-4 text-muted-foreground`} />
-                      )}
-                    </button>
-                  </div>
-                  <p className={`mt-1.5 text-[10px] sm:text-xs text-muted-foreground`}>
-                    Obtenha sua chave em <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-cyan-500 hover:underline">platform.openai.com</a>
-                  </p>
-                </div>
-
-                {/* Anthropic API Key */}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <label className={`block text-xs sm:text-sm font-medium text-foreground`}>
-                      Anthropic API Key (Claude)
-                    </label>
-                    {savedApiKeys.anthropic && (
-                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Guardado</span>
-                    )}
-                  </div>
-                  <div className="relative mt-1.5 sm:mt-2">
-                    <input
-                      type={showSettingsApiKey.anthropic ? 'text' : 'password'}
-                      value={settingsForm.anthropic_api_key}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, anthropic_api_key: e.target.value })}
-                      placeholder={savedApiKeys.anthropic ? "Digite uma nova chave para atualizar..." : "sk-ant-..."}
-                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
-                    />
-                    <button aria-label={showSettingsApiKey.anthropic ? 'Esconder' : 'Mostrar'}
-                      type="button"
-                      onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, anthropic: !showSettingsApiKey.anthropic })}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
-                    >
-                      {showSettingsApiKey.anthropic ? (
-                        <EyeOff className={`w-4 h-4 text-muted-foreground`} />
-                      ) : (
-                        <Eye className={`w-4 h-4 text-muted-foreground`} />
-                      )}
-                    </button>
-                  </div>
-                  <p className={`mt-1.5 text-[10px] sm:text-xs text-muted-foreground`}>
-                    Obtenha sua chave em <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">console.anthropic.com</a>
-                  </p>
-                </div>
-
-                {/* Google API Key */}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <label className={`block text-xs sm:text-sm font-medium text-foreground`}>
-                      Google API Key (Gemini)
-                    </label>
-                    {savedApiKeys.google && (
-                      <span className="px-2 py-1 text-[10px] bg-green-500/20 text-green-600 rounded-full font-semibold">✓ Guardado</span>
-                    )}
-                  </div>
-                  <div className="relative mt-1.5 sm:mt-2">
-                    <input
-                      type={showSettingsApiKey.google ? 'text' : 'password'}
-                      value={settingsForm.google_api_key}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, google_api_key: e.target.value })}
-                      placeholder={savedApiKeys.google ? "Digite uma nova chave para atualizar..." : "AIza..."}
-                      className={`w-full px-3 py-2 pr-10 border rounded-md text-sm sm:text-base bg-muted border-border text-foreground placeholder:text-muted-foreground`}
-                    />
-                    <button aria-label={showSettingsApiKey.google ? 'Esconder' : 'Mostrar'}
-                      type="button"
-                      onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, google: !showSettingsApiKey.google })}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors hover:bg-muted`}
-                    >
-                      {showSettingsApiKey.google ? (
-                        <EyeOff className={`w-4 h-4 text-muted-foreground`} />
-                      ) : (
-                        <Eye className={`w-4 h-4 text-muted-foreground`} />
-                      )}
-                    </button>
-                  </div>
-                  <p className={`mt-1.5 text-[10px] sm:text-xs text-muted-foreground`}>
-                    Obtenha sua chave em <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-red-500 hover:underline">aistudio.google.com</a>
-                  </p>
-                </div>
-
-                {/* ── Integração SIP Wavoip ── */}
-                <div className={`mt-2 pt-4 border-t border-border`}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Link2 className="w-4 h-4 text-purple-500" />
-                    <h4 className={`text-sm font-semibold text-foreground`}>
-                      Integração SIP Wavoip → ElevenLabs
-                    </h4>
-                  </div>
-                  <p className={`text-xs mb-3 text-muted-foreground`}>
-                    Registe as credenciais SIP do Wavoip no ElevenLabs para o agente ligar via WhatsApp.
-                    Encontre as credenciais em: <strong>Wavoip Painel → Dispositivos → SIP</strong>
-                  </p>
-
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>Número WhatsApp</label>
-                        <Input
-                          value={sipForm.phone_number}
-                          onChange={(e) => setSipForm({ ...sipForm, phone_number: e.target.value })}
-                          placeholder="+5511999999999"
-                          className={`text-xs bg-muted border-border text-foreground`}
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>Label (opcional)</label>
-                        <Input
-                          value={sipForm.label}
-                          onChange={(e) => setSipForm({ ...sipForm, label: e.target.value })}
-                          placeholder="Ex: Vendas"
-                          className={`text-xs bg-muted border-border text-foreground`}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className={`block text-xs font-medium mb-1 text-foreground/80`}>SIP Host</label>
-                      <Input
-                        value={sipForm.sip_host}
-                        onChange={(e) => setSipForm({ ...sipForm, sip_host: e.target.value })}
-                        placeholder="sipv2.wavoip.com"
-                        className={`text-xs bg-muted border-border text-foreground`}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>SIP Utilizador</label>
-                        <Input
-                          value={sipForm.sip_username}
-                          onChange={(e) => setSipForm({ ...sipForm, sip_username: e.target.value })}
-                          placeholder="UUID do Wavoip"
-                          className={`text-xs bg-muted border-border text-foreground`}
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-xs font-medium mb-1 text-foreground/80`}>SIP Palavra-passe</label>
-                        <div className="relative">
-                          <Input
-                            type={showSettingsApiKey.sip_password ? 'text' : 'password'}
-                            value={sipForm.sip_password}
-                            onChange={(e) => setSipForm({ ...sipForm, sip_password: e.target.value })}
-                            placeholder="Palavra-passe SIP"
-                            className={`text-xs pr-8 bg-muted border-border text-foreground`}
-                          />
-                          <button aria-label={showSettingsApiKey.sip_password ? 'Esconder' : 'Mostrar'} type="button"
-                            onClick={() => setShowSettingsApiKey({ ...showSettingsApiKey, sip_password: !showSettingsApiKey.sip_password })}
-                            className={`absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground`}>
-                            {showSettingsApiKey.sip_password ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {state.agents.map((agent) => {
+                    const numbers = usedOn(agent.id);
+                    return (
+                      <div key={agent.id} className="flex flex-col rounded-lg border border-border bg-card p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate font-semibold text-foreground">{agent.name}</h3>
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                              {numbers.length
+                                ? `Atende ${numbers.map((n) => n.phone || n.name).join(', ')}`
+                                : agent.ready ? 'Sem número' : 'Por concluir'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openEdit(agent)}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                            aria-label="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void remove(agent)}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-red-600"
+                            aria-label="Apagar"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
+                        {agent.greeting && (
+                          <p className="mt-3 line-clamp-2 text-sm text-muted-foreground" translate="no">“{agent.greeting}”</p>
+                        )}
                       </div>
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={handleRegisterSip}
-                      disabled={sipLoading}
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-xs"
-                      size="sm"
-                    >
-                      {sipLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Link2 className="w-3 h-3 mr-1" />}
-                      Registrar SIP no ElevenLabs
-                    </Button>
-                  </div>
-
-                  {/* Registered phone numbers */}
-                  {phoneNumbers.length > 0 && (
-                    <div className="mt-3">
-                      <p className={`text-xs font-medium mb-2 text-foreground/80`}>
-                        Números registrados ({phoneNumbers.length}):
-                      </p>
-                      <div className="space-y-1">
-                        {phoneNumbers.map((pn) => (
-                          <div key={pn.phone_number_id}
-                            className={`flex items-center justify-between px-2 py-1.5 rounded text-xs bg-muted text-foreground/80`}>
-                            <div>
-                              <span className="font-medium">{pn.label || pn.phone_number}</span>
-                              <span className={`ml-1 text-muted-foreground`}>({pn.phone_number})</span>
-                              {pn.assigned_agent && (
-                                <span className="ml-1 text-purple-500">→ {pn.assigned_agent.agent_name}</span>
-                              )}
-                            </div>
-                            <button aria-label="Desligar número"
-                              type="button"
-                              onClick={() => handleDeletePhoneNumber(pn.phone_number_id)}
-                              className="text-red-400 hover:text-red-600 ml-2"
-                            >
-                              <Unlink className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
+              )}
+            </section>
 
-              </div>
+            <section>
+              <h2 className="mb-3 text-base font-semibold text-foreground">Números</h2>
+              <WhatsAppNumbers state={state} onChanged={() => void load()} />
+            </section>
 
-              {/* Footer */}
-              <div className={`flex-shrink-0 px-4 py-3 sm:px-6 sm:py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t bg-card border-border`}>
-                <Button 
-                  type="button"
-                  variant="outline" 
-                  onClick={() => setSettingsModalOpen(false)} 
-                  className="w-full sm:w-auto text-sm sm:text-base"
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  type="submit"
-                  onClick={handleSaveSettings} 
-                  disabled={actionLoading} 
-                  className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-sm sm:text-base"
-                >
-                  {actionLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      A guardar...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      Guardar Definições
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
+            <section>
+              <h2 className="mb-3 text-base font-semibold text-foreground">Chamadas</h2>
+              <CallHistory calls={state.calls} />
+            </section>
+          </>
+        )}
+      </div>
+
+      <AppModal
+        open={open}
+        onOpenChange={(v) => { if (!saving) { if (!v) stopPreview(); setOpen(v); } }}
+        size="md"
+        title={editing ? 'Editar agente' : 'Novo agente'}
+        footer={(
+          <>
+            <Button variant="outline" onClick={() => { stopPreview(); setOpen(false); }} disabled={saving}>Cancelar</Button>
+            <Button onClick={save} disabled={saving || !canSave}>{saving ? 'A guardar…' : 'Guardar'}</Button>
+          </>
+        )}
+      >
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="va-name" className="mb-1.5 block">Nome</Label>
+            <Input id="va-name" value={form.name} maxLength={100} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Receção" />
           </div>
-      )}
 
-      {/* ── Active AI Call Status Modal ───────────────────────────────────── */}
-      {activeCall && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-xl shadow-2xl w-full max-w-md bg-card`}>
-            {/* Header */}
-            <div className={`px-5 py-4 border-b border-border`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${activeCall.status === 'completed' ? 'bg-green-100' : activeCall.status === 'failed' ? 'bg-red-100' : 'bg-purple-100 animate-pulse'}`}>
-                    {activeCall.status === 'completed'
-                      ? <Check className="w-4 h-4 text-green-600" />
-                      : activeCall.status === 'failed'
-                      ? <AlertCircle className="w-4 h-4 text-red-600" />
-                      : <PhoneOutgoing className="w-4 h-4 text-purple-600" />
-                    }
-                  </div>
-                  <div>
-                    <p className={`font-semibold text-sm text-foreground`}>
-                      Chamada AI — {activeCall.agentName}
-                    </p>
-                    <p className={`text-xs text-muted-foreground`}>{activeCall.phone}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    activeCall.status === 'completed' ? 'bg-green-100 text-green-700' :
-                    activeCall.status === 'failed' ? 'bg-red-100 text-red-700' :
-                    activeCall.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                    'bg-purple-100 text-purple-700'
-                  }`}>
-                    {activeCall.status === 'initiated' ? 'A iniciar...' :
-                     activeCall.status === 'ringing' ? 'Chamando...' :
-                     activeCall.status === 'in-progress' ? 'Em andamento' :
-                     activeCall.status === 'completed' ? 'Concluída' : 'Falha'}
-                  </span>
-                  <button aria-label="Fechar"
-                    onClick={() => { stopCallPolling(); setActiveCall(null); }}
-                    className={`p-1 rounded hover:bg-muted text-muted-foreground`}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+          <div>
+            <Label htmlFor="va-greeting" className="mb-1.5 block">Primeira frase</Label>
+            <Input
+              id="va-greeting"
+              value={form.greeting}
+              maxLength={500}
+              onChange={(e) => setForm({ ...form, greeting: e.target.value })}
+              placeholder="Olá, em que posso ajudar?"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="va-instructions" className="mb-1.5 block">Instruções</Label>
+            <Textarea
+              id="va-instructions"
+              value={form.instructions}
+              maxLength={8000}
+              rows={7}
+              onChange={(e) => setForm({ ...form, instructions: e.target.value })}
+              placeholder="Quem é, o que vende, horários, preços e o que deve fazer em cada caso."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="va-voice" className="mb-1.5 block">Voz</Label>
+              <div className="flex gap-2">
+                <select
+                  id="va-voice"
+                  value={form.voice_id}
+                  onChange={(e) => { stopPreview(); setForm({ ...form, voice_id: e.target.value }); }}
+                  className="min-w-0 flex-1 text-sm"
+                >
+                  <option value="">{voices.length ? 'Escolher voz' : 'A carregar…'}</option>
+                  {form.voice_id && !voiceName(form.voice_id) && voices.length > 0 && <option value={form.voice_id}>Voz atual</option>}
+                  {voices.map((v) => (
+                    <option key={v.voice_id} value={v.voice_id}>
+                      {v.name}{v.gender ? ` · ${v.gender === 'female' ? 'feminina' : v.gender === 'male' ? 'masculina' : v.gender}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => preview(selectedVoice)}
+                  disabled={!selectedVoice?.preview_url}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border text-foreground hover:bg-muted disabled:opacity-40"
+                  aria-label={playing ? 'Parar' : 'Ouvir'}
+                >
+                  {playing && playing === form.voice_id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                </button>
               </div>
             </div>
-
-            {/* Transcript */}
-            <div className={`px-5 py-4 max-h-64 overflow-y-auto space-y-2 bg-card`}>
-              {(!activeCall.transcript || activeCall.transcript.length === 0) ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  {activeCall.status !== 'completed' && activeCall.status !== 'failed' ? (
-                    <>
-                      <Loader2 className="w-6 h-6 animate-spin mb-2 text-purple-500 dark:text-purple-400" />
-                      <p className={`text-sm text-muted-foreground`}>
-                        A aguardar início da conversa...
-                      </p>
-                    </>
-                  ) : (
-                    <p className={`text-sm text-muted-foreground`}>
-                      Sem transcrição disponível
-                    </p>
-                  )}
-                </div>
-              ) : (
-                activeCall.transcript.map((item, i) => (
-                  <div key={i} className={`flex gap-2 ${item.role === 'agent' ? '' : 'flex-row-reverse'}`}>
-                    <div className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${item.role === 'agent' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
-                      {item.role === 'agent' ? 'AI' : 'U'}
-                    </div>
-                    <div className={`max-w-[80%] px-3 py-1.5 rounded-lg text-xs ${item.role === 'agent'
-                      ? 'bg-muted text-foreground'
-                      : 'bg-purple-50 dark:bg-purple-900/40 text-purple-900 dark:text-purple-200'
-                    }`}>
-                      {item.message}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className={`px-5 py-3 border-t flex justify-between items-center border-border`}>
-              {(activeCall.status !== 'completed' && activeCall.status !== 'failed') && (
-                <Button size="sm" variant="outline" onClick={() => {
-                  voiceAgentsApi.getConversation(activeCall.conversationId)
-                    .then((c) => setActiveCall((prev) => prev ? { ...prev, status: c.status, transcript: c.transcript } : prev))
-                    .catch(() => {});
-                }}>
-                  <RefreshCw className="w-3 h-3 mr-1" />
-                  Atualizar
-                </Button>
-              )}
-              <Button size="sm" variant="outline" onClick={() => { stopCallPolling(); setActiveCall(null); }} className="ml-auto">
-                Fechar
-              </Button>
+            <div>
+              <Label htmlFor="va-lang" className="mb-1.5 block">Idioma</Label>
+              <select
+                id="va-lang"
+                value={form.language}
+                onChange={(e) => setForm({ ...form, language: e.target.value })}
+                className="w-full text-sm"
+                translate="no"
+              >
+                {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+              </select>
             </div>
           </div>
         </div>
-      )}
+      </AppModal>
     </div>
   );
 }

@@ -230,12 +230,52 @@ export const voiceAgentsApi = {
     const response = await api.put(`/whatsapp-calls/${channelId}`, data);
     return response.data;
   },
+
+  async getCallVoices(): Promise<CallVoice[]> {
+    const response = await api.get('/whatsapp-calls/voices');
+    return response.data?.voices || [];
+  },
+
+  async saveCallAgent(id: string | null, data: CallAgentInput) {
+    const response = id
+      ? await api.put(`/whatsapp-calls/agents/${id}`, data)
+      : await api.post('/whatsapp-calls/agents', data);
+    return response.data;
+  },
+
+  async deleteCallAgent(id: string) {
+    const response = await api.delete(`/whatsapp-calls/agents/${id}`);
+    return response.data;
+  },
 };
+
+export interface CallAgentInput {
+  name: string;
+  instructions: string;
+  greeting: string;
+  voice_id: string;
+  language: string;
+}
+
+export interface CallAgent extends CallAgentInput {
+  id: string;
+  ready: boolean;
+  managed: boolean;
+}
+
+export interface CallVoice {
+  voice_id: string;
+  name: string;
+  gender: string | null;
+  accent: string | null;
+  preview_url: string | null;
+}
 
 export interface WhatsAppCallsState {
   available: boolean;
+  limit: number;
   channels: { id: string; name: string; phone: string | null; enabled: boolean; voice_agent_id: string | null }[];
-  agents: { id: string; name: string; ready: boolean }[];
+  agents: CallAgent[];
   calls: {
     id: string; phone_number: string; status: string; duration_seconds: number | null; transcript: string | null;
     started_at: string | null; ended_at: string | null; caller_name: string | null; lead_id: string | null; agent_name: string | null;
