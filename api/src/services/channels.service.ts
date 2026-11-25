@@ -111,6 +111,7 @@ export class ChannelsService {
             `SELECT * FROM channels
              WHERE user_id = $1
              AND type = $2
+             AND status != 'deleted'
              ORDER BY created_at DESC`,
             [userId, type]
         );
