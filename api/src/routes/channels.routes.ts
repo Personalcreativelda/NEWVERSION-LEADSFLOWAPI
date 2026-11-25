@@ -12,6 +12,35 @@ import { channelHealthService } from '../services/channel-health.service';
  * Canal WhatsApp Business ligado com token (formulário manual): liga a app da LeadsFlow à conta
  * WhatsApp Business para receber mensagens, chamadas e ecos. O login da Meta já o faz; aqui faltava.
  */
+/**
+ * Conta WhatsApp Business onde está o número: confirma a indicada e, se não for, procura nas contas a
+ * que o token dá acesso (escopos do debug_token). null = não foi possível confirmar (mantém a indicada).
+ */
+async function wabaOfNumber(phoneId: string, token: string, given: unknown): Promise<string | null> {
+    const GRAPH = `https://graph.facebook.com/${process.env.META_GRAPH_VERSION || 'v21.0'}`;
+    const hasNumber = async (waba: string) => {
+        try {
+            const r = await fetch(`${GRAPH}/${waba}/phone_numbers?fields=id&limit=100`, {
+                headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000),
+            });
+            const d: any = await r.json().catch(() => ({}));
+            return Array.isArray(d?.data) && d.data.some((n: any) => String(n.id) === phoneId);
+        } catch { return false; }
+    };
+    const first = String(given || '').replace(/\D/g, '');
+    if (first && await hasNumber(first)) return first;
+    try {
+        const app = `${process.env.META_APP_ID || ''}|${process.env.META_APP_SECRET || ''}`;
+        const r = await fetch(`${GRAPH}/debug_token?${new URLSearchParams({ input_token: token, access_token: app })}`, { signal: AbortSignal.timeout(15_000) });
+        const d: any = await r.json().catch(() => ({}));
+        const ids: string[] = Array.from(new Set((d?.data?.granular_scopes || [])
+            .filter((s: any) => /^whatsapp_business_(management|messaging)$/.test(s.scope))
+            .flatMap((s: any) => s.target_ids || []).map(String)));
+        for (const waba of ids) if (waba !== first && await hasNumber(waba)) return waba;
+    } catch { /* sem confirmação: fica a indicada */ }
+    return null;
+}
+
 async function subscribeAppToWaba(wabaId: unknown, token: string) {
     const waba = String(wabaId || '').replace(/\D/g, '');
     if (!waba || !token) return;
@@ -186,6 +215,11 @@ router.post('/', async (req, res, next) => {
             if (!phoneNumberId || !accessToken) {
                 return res.status(400).json({ error: 'phone_number_id and access_token are required for WhatsApp Cloud' });
             }
+
+            // A conta WhatsApp certa é a que tem este número: com o ID errado, a app era ligada a outra
+            // conta e as mensagens deste número não chegavam
+            const realWaba = await wabaOfNumber(String(phoneNumberId), accessToken, credentials.waba_id);
+            if (realWaba) credentials.waba_id = realWaba;
 
             // Verificar se já existe canal com esse phone_number_id
             const existingResult = await channelsService.findByCredentialField('phone_number_id', phoneNumberId, user.id);

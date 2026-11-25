@@ -229,7 +229,7 @@ export default function NavigationSidebar({
               isCollapsed
                 ? <li className="sidebar-collapsed-divider" />
                 : <li className={`px-3 ${isMobile ? 'pt-4' : 'pt-6'} pb-1.5 sidebar-section-label`}>
-                    <span className="text-xs font-medium text-[hsl(var(--sidebar-muted))] opacity-60">
+                    <span className="sidebar-section-text text-xs font-medium">
                       {item.sectionLabel}
                     </span>
                   </li>
@@ -257,7 +257,7 @@ export default function NavigationSidebar({
             isCollapsed
               ? <li className="sidebar-collapsed-divider" />
               : <li className={`px-3 ${isMobile ? 'pt-4' : 'pt-6'} pb-1.5 sidebar-section-label`}>
-                  <span className="text-xs font-medium text-[hsl(var(--sidebar-muted))] opacity-60">
+                  <span className="sidebar-section-text text-xs font-medium">
                     {item.sectionLabel}
                   </span>
                 </li>
@@ -295,7 +295,7 @@ export default function NavigationSidebar({
           isCollapsed
             ? <li className="sidebar-collapsed-divider" />
             : <li className={`px-3 ${isMobile ? 'pt-4' : 'pt-6'} pb-1.5 sidebar-section-label`}>
-                <span className="text-xs font-medium text-[hsl(var(--sidebar-muted))] opacity-60">
+                <span className="sidebar-section-text text-xs font-medium">
                   {item.sectionLabel}
                 </span>
               </li>

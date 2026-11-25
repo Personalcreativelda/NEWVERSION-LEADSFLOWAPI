@@ -275,10 +275,21 @@
 
 /* Nav item base */
 .sidebar-nav-item {
-  color: hsl(var(--sidebar-foreground) / 0.58);
+  /* Modo claro: 58% sobre o branco ficava cinzento demais para ler; no escuro mantém-se */
+  color: hsl(var(--sidebar-foreground) / 0.82);
   letter-spacing: -0.01em;
   position: relative;
   transition: color 0.15s ease, background-color 0.15s ease;
+}
+.dark .sidebar-nav-item {
+  color: hsl(var(--sidebar-foreground) / 0.58);
+}
+/* Títulos das secções do menu (Comunicação, Vendas…) */
+.sidebar-section-text {
+  color: hsl(var(--sidebar-muted));
+}
+.dark .sidebar-section-text {
+  opacity: 0.6;
 }
 
 /* Nav item hover — barely-there fill */
@@ -297,8 +308,11 @@
 }
 
 /* Subitem base */
-.sidebar-nav-subitem {
+.dark .sidebar-nav-subitem:not(.active) {
   color: hsl(var(--sidebar-foreground) / 0.42);
+}
+.sidebar-nav-subitem {
+  color: hsl(var(--sidebar-foreground) / 0.72);
   letter-spacing: -0.01em;
   transition: color 0.15s ease, background-color 0.15s ease;
 }
