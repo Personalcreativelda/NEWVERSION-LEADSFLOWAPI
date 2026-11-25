@@ -11,7 +11,8 @@
 import { timingSafeEqual } from 'crypto';
 import { query } from '../database/connection';
 
-const GRAPH = 'https://graph.facebook.com/v21.0';
+// A API de chamadas não existe em versões antigas da Graph API
+const GRAPH = 'https://graph.facebook.com/v23.0';
 const ELEVEN = 'https://api.elevenlabs.io/v1';
 const TIMEOUT_MS = 15_000;
 const DISCLOSURE_TEXT = process.env.WHATSAPP_CALLS_DISCLOSURE
