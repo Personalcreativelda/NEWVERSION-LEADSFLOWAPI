@@ -114,6 +114,13 @@ Há um emulador `Medium_Phone_API_37.0`.
 - WhatsApp por código QR (Evolution): disponível para todas as contas na escolha de canal (depois da
   aprovação da Meta deixou de ser escondido; o interruptor da Administração foi retirado). O oficial aparece
   como "WhatsApp Business". Sem "API não oficial" nos textos. `POST /api/whatsapp/send` usa o oficial (Cloud API) quando existe.
+- Estado real do WhatsApp por QR: `services/channel-health.service.ts` pergunta à Evolution a cada 5 min (e no
+  `connection.update`; o "close" é confirmado 30 s depois) → `active`/`inactive` + aviso no sino. Sem resposta da
+  Evolution não muda nada. `POST /channels/:id/sync` usa a mesma verificação (a lista de canais chama-a ao abrir).
+  "Ligar de novo" abre o `WhatsAppConnect` com `editingChannel`: mesma instância, só um QR novo.
+- Leituras (vistos): a Evolution v2 envia `messages.update` com `{ keyId, fromMe, status }` (a v1 `MESSAGES_UPDATE` com
+  `key.id`). O estado só sobe (sent < delivered < read) e `campaigns.stats.delivered/read` é recontado das mensagens
+  (`recountCampaignReads`). Quem viu cada campanha: `GET /campaigns/:id/recipients` → `CampaignRecipientsList`.
 - SQL com nomes de coluna vindos do pedido: só identificadores `^[a-z][a-z0-9_]*$` (entre aspas)
   ou lista fechada — houve injeção pelo nome da chave em leads/campanhas/contactos.
 

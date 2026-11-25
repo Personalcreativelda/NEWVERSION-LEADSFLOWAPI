@@ -634,9 +634,17 @@ router.get('/:id/recipients', async (req, res, next) => {
       return res.status(404).json({ error: 'Campanha não encontrada' });
     }
     const rows = await query(
-      `SELECT id, lead_id, phone, name, status, skip_reason, error, sent_at, replied_at, opted_out_at
-         FROM campaign_recipients WHERE campaign_id = $1 ORDER BY position LIMIT 5000`,
-      [req.params.id]
+      // Entregue/lida vêm da mensagem enviada (confirmações do WhatsApp), ligada pelo id externo
+      `SELECT r.id, r.lead_id, r.phone, r.name, r.status, r.skip_reason, r.error, r.sent_at, r.replied_at, r.opted_out_at,
+              m.status AS message_status, m.delivered_at, m.read_at
+         FROM campaign_recipients r
+         LEFT JOIN LATERAL (
+           SELECT status, delivered_at, read_at FROM messages
+            WHERE external_id = r.external_id AND user_id = $2 AND direction = 'out'
+            ORDER BY created_at DESC LIMIT 1
+         ) m ON r.external_id IS NOT NULL
+        WHERE r.campaign_id = $1 ORDER BY r.position LIMIT 5000`,
+      [req.params.id, user.id]
     );
     res.json({ recipients: rows.rows, counts: await campaignEngine.counts(req.params.id) });
   } catch (error) {

@@ -140,6 +140,16 @@ export function ChannelDetailSheet({ channel, onClose, onRename, onOpenSettings,
           {instance && <span className="ml-auto truncate font-mono text-xs font-normal text-muted-foreground">{instance}</span>}
         </div>
 
+        {!connected && channel.type === 'whatsapp' && (
+          <button
+            type="button"
+            onClick={() => onOpenSettings(channel)}
+            className="h-10 w-full rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Ligar de novo
+          </button>
+        )}
+
         <label className="block text-sm font-medium text-foreground">
           Nome do canal
           <div className="mt-1.5 flex gap-2">

@@ -19,7 +19,12 @@ interface WhatsAppConnectProps {
 
 type ConnectionStatus = 'idle' | 'creating' | 'waiting_qr' | 'connecting' | 'connected' | 'error';
 
-export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectProps) {
+export function WhatsAppConnect({ isOpen, onClose, onSuccess, editingChannel }: WhatsAppConnectProps) {
+    // Ligar de novo um canal existente: mesma instância (mesmo nome), só um código QR novo
+    const reconnectChannel = isOpen && editingChannel?.type === 'whatsapp' ? editingChannel : null;
+    const reconnectInstance: string | null = reconnectChannel
+        ? (reconnectChannel.credentials?.instance_id || reconnectChannel.credentials?.instance_name || null)
+        : null;
     const [step, setStep] = useState<'form' | 'qr' | 'success'>('form');
     const [instanceName, setInstanceName] = useState('');
     const [qrCode, setQrCode] = useState<string | null>(null);
@@ -117,7 +122,10 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
     // se a gravação falhar, o utilizador vê o erro (antes aparecia "ligado" na mesma).
     const finishConnection = useCallback(async (status: any, instId: string = fullInstanceName) => {
         try {
-            await channelsApi.create({
+            if (reconnectChannel) {
+                // O servidor confirma na Evolution e volta a pôr o canal como Ligado
+                await channelsApi.sync(reconnectChannel.id);
+            } else await channelsApi.create({
                 type: 'whatsapp',
                 name: instanceName,
                 provider: 'evolution_api',
@@ -155,7 +163,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
         window.dispatchEvent(new Event('whatsapp-connected'));
         setStep('success');
         toast.success('WhatsApp ligado com sucesso');
-    }, [instanceName, fullInstanceName, getAuthHeaders]);
+    }, [instanceName, fullInstanceName, getAuthHeaders, reconnectChannel]);
 
     // Verifica a ligação a cada 3 s enquanto o código está no ecrã. A Evolution responde
     // "connecting" desde que o QR aparece; só "open" quer dizer ligado. Antes a verificação
@@ -202,6 +210,59 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
 
         return stop;
     }, [step, connectionStatus, fullInstanceName, checkStatus, finishConnection]);
+
+    // Modo reconectar: pede logo o QR da mesma instância (se a Evolution já a apagou, cria-a de novo com o mesmo nome)
+    const reconnectStarted = useRef(false);
+    useEffect(() => {
+        if (!isOpen) { reconnectStarted.current = false; return; }
+        if (!reconnectChannel || reconnectStarted.current) return;
+        reconnectStarted.current = true;
+        const inst = reconnectInstance;
+        setInstanceName(reconnectChannel.name || '');
+        setStep('qr');
+        setQrCode(null);
+        if (!inst) {
+            setError('Este canal não tem ligação guardada. Desligue-o e ligue de novo.');
+            setConnectionStatus('error');
+            return;
+        }
+        setFullInstanceName(inst);
+        const fetchQr = async (): Promise<string | null> => {
+            const r = await fetch(`${API_URL}/api/whatsapp/qr/${inst}`, { headers: getAuthHeaders() });
+            if (r.status === 403) throw new Error('Sem permissão para esta ligação.');
+            if (!r.ok) return null;
+            const d = await r.json().catch(() => ({}));
+            return d.base64 || d.code || d.qrcode?.base64 || null;
+        };
+        (async () => {
+            setLoading(true);
+            setError(null);
+            setConnectionStatus('creating');
+            try {
+                const st = await checkStatus(inst);
+                if (st && (st.state === 'open' || st.connected === true)) {
+                    await finishConnection(st, inst);
+                    return;
+                }
+                let qr = await fetchQr();
+                if (!qr) {
+                    await fetch(`${API_URL}/api/whatsapp/instance`, {
+                        method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ instanceName: inst }),
+                    }).catch(() => null);
+                    await new Promise((r) => setTimeout(r, 1500));
+                    qr = await fetchQr();
+                }
+                if (!qr) throw new Error('Não foi possível gerar o código QR. Tente de novo.');
+                setQrCode(qr.startsWith('data:') ? qr : `data:image/png;base64,${qr}`);
+                setConnectionStatus('waiting_qr');
+            } catch (err: any) {
+                setError(err?.message || 'Não foi possível gerar o código QR. Tente de novo.');
+                setConnectionStatus('error');
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, [isOpen, reconnectChannel, reconnectInstance, checkStatus, finishConnection, getAuthHeaders]);
 
     // Auto-close modal when connection succeeds
     useEffect(() => {
@@ -498,7 +559,7 @@ export function WhatsAppConnect({ isOpen, onClose, onSuccess }: WhatsAppConnectP
                                 WhatsApp
                             </h3>
                             <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                                Ligação por código QR
+                                {reconnectChannel ? `Ligar de novo · ${reconnectChannel.name}` : 'Ligação por código QR'}
                             </p>
                         </div>
                     </div>

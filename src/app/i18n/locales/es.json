@@ -4943,5 +4943,19 @@
  "A Meta só liga as chamadas em números com limite de 2000 conversas por dia ou mais. Veja o limite do número no Gestor do WhatsApp.": "Meta solo activa las llamadas en números con un límite de 2000 conversaciones al día o más. Consulte el límite del número en el Administrador de WhatsApp.",
  "Falta subscrever as chamadas no webhook do WhatsApp Business.": "Falta suscribir las llamadas en el webhook de WhatsApp Business.",
  "A Meta desativou as chamadas neste número por agora, por causa da qualidade.": "Meta desactivó las llamadas en este número por ahora debido a la calidad.",
- "Este número está configurado para chamadas por SIP.": "Este número está configurado para llamadas por SIP."
+ "Este número está configurado para chamadas por SIP.": "Este número está configurado para llamadas por SIP.",
+ "Ligar de novo": "Volver a conectar",
+ "Este canal não tem ligação guardada. Desligue-o e ligue de novo.": "Este canal no tiene conexión guardada. Desconéctelo y conéctelo de nuevo.",
+ "Não foi possível gerar o código QR. Tente de novo.": "No se pudo generar el código QR. Inténtelo de nuevo.",
+ "O telemóvel terminou a sessão. Abra o canal e leia o código QR de novo.": "El teléfono cerró la sesión. Abra el canal y escanee el código QR de nuevo.",
+ "Viram": "Vieron",
+ "Não viram": "No vieron",
+ "Viu": "Visto",
+ "Fora do envio": "Fuera del envío",
+ "Por enviar": "Por enviar",
+ "Viu · Respondeu": "Visto · Respondió",
+ "Entregue · Respondeu": "Entregado · Respondió",
+ "Enviada · Respondeu": "Enviado · Respondió",
+ "Sem destinatários.": "Sin destinatarios.",
+ "Ninguém nesta lista.": "Nadie en esta lista."
 }

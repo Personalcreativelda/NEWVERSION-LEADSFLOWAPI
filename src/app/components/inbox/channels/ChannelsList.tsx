@@ -198,11 +198,34 @@ export function ChannelsList() {
         loadChannels();
     }, []);
 
+    // Estado real dos WhatsApp por QR (o telemóvel pode ter terminado a sessão): o servidor
+    // pergunta à Evolution e devolve 'active'/'inactive'; só se atualiza o que mudou.
+    const refreshWhatsAppStatus = async (list: Channel[]) => {
+        const qr = list.filter((c) => c.type === 'whatsapp');
+        if (!qr.length) return;
+        const results = await Promise.all(qr.map(async (c) => {
+            try {
+                const r: any = await channelsApi.sync(c.id);
+                return { id: c.id, status: r?.status as string | undefined };
+            } catch {
+                return { id: c.id, status: undefined };
+            }
+        }));
+        const changed = results.filter((r) => r.status && list.find((c) => c.id === r.id)?.status !== r.status);
+        if (changed.length) {
+            setChannels((prev) => prev.map((c) => {
+                const hit = changed.find((r) => r.id === c.id);
+                return hit ? { ...c, status: hit.status as Channel['status'] } : c;
+            }));
+        }
+    };
+
     const loadChannels = async () => {
         try {
             setLoading(true);
             const data = await channelsApi.getAll();
             setChannels(data);
+            void refreshWhatsAppStatus(data);
         } catch (error) {
             console.error('Error loading channels:', error);
         } finally {

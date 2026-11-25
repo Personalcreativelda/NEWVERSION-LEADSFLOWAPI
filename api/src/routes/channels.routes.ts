@@ -6,6 +6,7 @@ import { WhatsAppService } from '../services/whatsapp.service';
 import { isValidE164 } from '../utils/phone-validation';
 import { validateChannelCredentials } from '../services/channel-validation.service';
 import { mergeCredentials } from '../utils/secret-box';
+import { channelHealthService } from '../services/channel-health.service';
 
 const router = Router();
 const channelsService = new ChannelsService();
@@ -702,30 +703,14 @@ router.post('/:id/sync', async (req, res, next) => {
         }
 
         // Para WhatsApp, verificar status no Evolution API
+        // (mesma verificação do serviço que corre a cada 5 min; sem resposta da Evolution não muda o estado)
         if (channel.type === 'whatsapp' && whatsappService.isReady()) {
             try {
-                const instanceId = channel.credentials?.instance_id;
-                if (instanceId) {
-                    const status = await whatsappService.getStatus(instanceId) as any;
-                    const isConnected = status.state === 'open' || status.connectionStatus === 'open';
-
-                    await channelsService.updateStatus(
-                        channel.id,
-                        isConnected ? 'active' : 'inactive',
-                        user.id
-                    );
-
-                    await channelsService.updateLastSync(channel.id, user.id);
-
-                    return res.json({
-                        success: true,
-                        status: isConnected ? 'active' : 'inactive',
-                        synced_at: new Date().toISOString()
-                    });
-                }
+                const status = await channelHealthService.check(channel);
+                await channelsService.updateLastSync(channel.id, user.id);
+                return res.json({ success: true, status, synced_at: new Date().toISOString() });
             } catch (error) {
                 console.error('[Channels] Error syncing WhatsApp status:', error);
-                await channelsService.updateStatus(channel.id, 'error', user.id);
                 return res.status(500).json({ error: 'Failed to sync channel status' });
             }
         }

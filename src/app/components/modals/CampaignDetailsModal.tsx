@@ -5,6 +5,7 @@ import { AppButton } from '../base/AppButton';
 import { StatusBadge, type StatusTone } from '../base/StatusBadge';
 import { NUMBER_OPTS, getLocale } from '../../utils/format';
 import { saveFile } from '../../lib/saveFile';
+import { CampaignRecipientsList } from './CampaignRecipientsList';
 
 interface Campaign {
   id: string;
@@ -369,6 +370,17 @@ export default function CampaignDetailsModal({ isOpen, onClose, campaign }: Camp
               </div>
             </div>
           </section>
+
+          {/* Quem viu: estado de cada destinatário (só WhatsApp tem confirmações de leitura) */}
+          {campaign.type === 'whatsapp' && (
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1 h-4 bg-primary rounded-full" />
+                <h3 className="text-sm font-medium text-muted-foreground">Destinatários</h3>
+              </div>
+              <CampaignRecipientsList campaignId={campaign.id} />
+            </section>
+          )}
 
           {/* Lista de Falhas (Se houver) */}
           {failures.length > 0 && (

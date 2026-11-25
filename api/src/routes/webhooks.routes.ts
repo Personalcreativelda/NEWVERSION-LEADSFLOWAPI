@@ -28,8 +28,25 @@ import { recordAdReferral, referralFromCloud, referralFromEvolution, referralFro
 import { describeWhatsAppMessage, unwrapWhatsAppMessage, whatsAppEvent, whatsAppMessageType, whatsAppQuoteInfo, whatsAppThumbnail, type WhatsAppEvent } from '../utils/whatsapp-message';
 import { applyWhatsAppEvent, quotedForIncoming } from '../services/whatsapp-events.service';
 import { isBridgeRequest, whatsappCallsService } from '../services/whatsapp-calls.service';
+import { channelHealthService } from '../services/channel-health.service';
 
 const router = Router();
+
+/** Entregues/lidas de uma campanha contadas a partir das mensagens (sem somas repetidas quando o evento chega mais de uma vez) */
+async function recountCampaignReads(campaignId: string, userId: string) {
+  const upd = await query(
+    `UPDATE campaigns
+        SET stats = COALESCE(stats, '{}'::jsonb) || jsonb_build_object(
+              'delivered', (SELECT COUNT(*) FROM messages WHERE campaign_id = $1 AND direction = 'out' AND status IN ('delivered', 'read')),
+              'read', (SELECT COUNT(*) FROM messages WHERE campaign_id = $1 AND direction = 'out' AND status = 'read')),
+            updated_at = NOW()
+      WHERE id = $1
+    RETURNING stats`,
+    [campaignId]
+  ).catch(() => null);
+  const stats = upd?.rows?.[0]?.stats;
+  if (stats) getWebSocketService()?.emitToUser(userId, 'campaign:stats', { campaignId, stats });
+}
 
 // Ponte de voz: fim de uma chamada do WhatsApp atendida por um agente (transcrição, duração)
 router.post('/voice-bridge', async (req, res) => {
@@ -509,77 +526,44 @@ async function handleEvolutionMessage(req: any, res: any): Promise<void> {
     console.log('[Evolution Webhook] Data keys:', data ? Object.keys(data) : 'null');
 
     // ─── Processar MESSAGES_UPDATE (confirmações de entrega / leitura) ─────────
-    if (event === 'MESSAGES_UPDATE') {
+    // A Evolution v2 envia "messages.update" com { keyId, fromMe, status }; a v1 enviava "MESSAGES_UPDATE"
+    // com { key: { id, fromMe }, update: { status } }. Antes só se aceitava a v1 e as leituras não chegavam.
+    if (event === 'MESSAGES_UPDATE' || event === 'messages.update') {
       const updates = Array.isArray(data) ? data : (data ? [data] : []);
-      console.log(`[Evolution Webhook] MESSAGES_UPDATE: ${updates.length} atualizações`);
+      const statusMap: Record<string, string> = {
+        SERVER_ACK: 'sent', DELIVERY_ACK: 'delivered', READ: 'read', PLAYED: 'read',
+      };
+      const touchedCampaigns = new Map<string, string>(); // campaign_id → user_id
 
       for (const update of updates) {
-        const msgId = update?.key?.id || update?.id;
-        const newStatus: string = update?.update?.status || update?.status || '';
-        const fromMe: boolean = update?.key?.fromMe === true;
+        const msgId = update?.key?.id || update?.keyId || update?.id;
+        const rawStatus = String(update?.update?.status ?? update?.status ?? '').toUpperCase();
+        const fromMe = (update?.key?.fromMe ?? update?.fromMe) === true;
+        const internalStatus = statusMap[rawStatus];
+        if (!msgId || !fromMe || !internalStatus) continue;
 
-        if (!msgId || !newStatus || !fromMe) continue;
-
-        // Mapear status do Evolution API para status interno
-        const statusMap: Record<string, string> = {
-          'SERVER_ACK': 'sent',
-          'DELIVERY_ACK': 'delivered',
-          'READ': 'read',
-          'PLAYED': 'read',
-        };
-        const internalStatus = statusMap[newStatus];
-        if (!internalStatus) continue;
-
-        console.log(`[Evolution Webhook] Atualizando mensagem ${msgId} → ${internalStatus}`);
-
-        // Atualizar status da mensagem na tabela messages
+        // Só sobe de estado (uma confirmação atrasada de "entregue" não apaga um "lido")
         const msgUpdateResult = await query(
           `UPDATE messages
-           SET status = $1, updated_at = NOW()
-           WHERE external_id = $2
-           RETURNING id, campaign_id, user_id`,
+              SET status = $1,
+                  delivered_at = CASE WHEN $1::text IN ('delivered', 'read') THEN COALESCE(delivered_at, NOW()) ELSE delivered_at END,
+                  read_at = CASE WHEN $1::text = 'read' THEN COALESCE(read_at, NOW()) ELSE read_at END,
+                  updated_at = NOW()
+            WHERE external_id = $2
+              AND (CASE status WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 WHEN 'sent' THEN 1 ELSE 0 END)
+                < (CASE $1::text WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 WHEN 'sent' THEN 1 ELSE 0 END)
+          RETURNING id, conversation_id, campaign_id, user_id`,
           [internalStatus, msgId]
         ).catch(() => null);
 
-        if (!msgUpdateResult || msgUpdateResult.rowCount === 0) continue;
-
-        const msg = msgUpdateResult.rows[0];
-        if (!msg.campaign_id) continue;
-
-        // Incrementar contador na campanha de acordo com o status
-        if (internalStatus === 'delivered') {
-          await query(
-            `UPDATE campaigns
-             SET stats = jsonb_set(
-               COALESCE(stats, '{}'::jsonb),
-               '{delivered}',
-               (COALESCE((stats->>'delivered')::int, 0) + 1)::text::jsonb
-             ),
-             updated_at = NOW()
-             WHERE id = $1`,
-            [msg.campaign_id]
-          ).catch(() => null);
-        } else if (internalStatus === 'read') {
-          await query(
-            `UPDATE campaigns
-             SET stats = jsonb_set(
-               jsonb_set(
-                 COALESCE(stats, '{}'::jsonb),
-                 '{read}',
-                 (COALESCE((stats->>'read')::int, 0) + 1)::text::jsonb
-               ),
-               '{delivered}',
-               GREATEST(
-                 COALESCE((stats->>'delivered')::int, 0),
-                 (COALESCE((stats->>'delivered')::int, 0))
-               )::text::jsonb
-             ),
-             updated_at = NOW()
-             WHERE id = $1`,
-            [msg.campaign_id]
-          ).catch(() => null);
+        for (const row of msgUpdateResult?.rows || []) {
+          if (row.campaign_id) touchedCampaigns.set(row.campaign_id, row.user_id);
+          // Vistos na caixa de entrada (como no WhatsApp oficial)
+          getWebSocketService()?.emitMessageStatusUpdate(row.user_id, { messageId: row.id, conversationId: row.conversation_id, status: internalStatus as 'sent' | 'delivered' | 'read' });
         }
       }
+
+      for (const [campaignId, userId] of touchedCampaigns) await recountCampaignReads(campaignId, userId);
 
       return res.json({ success: true, message: `${updates.length} status(es) atualizados` });
     }
@@ -599,6 +583,8 @@ async function handleEvolutionMessage(req: any, res: any): Promise<void> {
           if (evtChannelResult.rows.length > 0) {
             const evtChannel = evtChannelResult.rows[0];
             if (connectionEvents.includes(event)) {
+              // Estado real do canal (Ligado/Desligado) e aviso quando o telemóvel termina a sessão
+              channelHealthService.onConnectionUpdate(instance, data?.state || data?.status || '');
               webhookDispatcher.dispatchWhatsAppEvent(evtChannel.user_id, 'whatsapp.connection.update', {
                 channelId: evtChannel.id,
                 instanceName: instance,
@@ -3911,12 +3897,17 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
           if (status.status === 'delivered' || status.status === 'read' || status.status === 'failed') {
             const metaError = status.status === 'failed' ? status.errors?.[0] : null;
             if (metaError) console.warn('[WhatsApp Cloud Webhook] Mensagem recusada pela Meta:', status.id, JSON.stringify(metaError).slice(0, 300));
+            // Só sobe de estado (a recusa passa sempre); guarda quando foi entregue/lida
             const updated = await query(
               `UPDATE messages
                SET status = $1, updated_at = NOW(),
+                   delivered_at = CASE WHEN $1::text IN ('delivered', 'read') THEN COALESCE(delivered_at, NOW()) ELSE delivered_at END,
+                   read_at = CASE WHEN $1::text = 'read' THEN COALESCE(read_at, NOW()) ELSE read_at END,
                    metadata = CASE WHEN $3::jsonb IS NULL THEN metadata ELSE COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('error', $3::jsonb) END
                WHERE external_id = $2 AND direction = 'out'
-               RETURNING id, conversation_id, user_id`,
+                 AND ($1::text = 'failed' OR (CASE status WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 WHEN 'sent' THEN 1 ELSE 0 END)
+                                     < (CASE $1::text WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 ELSE 0 END))
+               RETURNING id, conversation_id, user_id, campaign_id`,
               [status.status, status.id, metaError ? JSON.stringify({ code: metaError.code, message: metaError.error_data?.details || metaError.message || metaError.title }) : null]
             );
             const row = updated.rows[0];
@@ -3924,6 +3915,7 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
             if (row && ws) {
               ws.emitMessageStatusUpdate(row.user_id, { messageId: row.id, conversationId: row.conversation_id, status: status.status });
             }
+            if (row?.campaign_id) await recountCampaignReads(row.campaign_id, row.user_id);
           }
         }
       }
