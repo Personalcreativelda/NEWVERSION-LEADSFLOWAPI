@@ -149,7 +149,9 @@ const buildProfileResponse = (user: DbUserRow, usage?: UsageCounts) => {
       const hardcoded = getPlanLimits(plan);
       const fromPlansTable = (user.db_plan_limits && typeof user.db_plan_limits === 'object' && Object.keys(user.db_plan_limits).length > 0)
         ? user.db_plan_limits : null;
-      const fallback = fromPlansTable || hardcoded;
+      // Os limites da tabela plans podem não ter todas as chaves (ex.: só leads/messages/massMessages):
+      // as que faltam vêm do plano fixo, como no painel (usePlanLimits), e não ficam undefined
+      const fallback = { ...hardcoded, ...(fromPlansTable || {}) } as typeof hardcoded;
       const db = (user.plan_limits && typeof user.plan_limits === 'object' && Object.keys(user.plan_limits).length > 0)
         ? user.plan_limits : null;
       return {
