@@ -306,6 +306,28 @@ export async function testConnection(userId: string) {
       events_received: Number(result?.events_received ?? 0),
     };
   }
+  // Dataset da WABA: a Meta não deixa lê-lo (GET dá "Missing Permission"); o POST devolve o mesmo
+  // dataset sem criar outro e confirma o token e a permissão whatsapp_business_manage_events
+  if (cfg.source === 'whatsapp') {
+    if (!cfg.waba_id) throw new MetaConversionsError('Volte a ligar o WhatsApp Business: faltam dados da Meta');
+    let res: Response;
+    try {
+      res = await fetch(`${GRAPH_BM}/${encodeURIComponent(cfg.waba_id)}/dataset`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${cfg.access_token}`, 'Content-Type': 'application/json' },
+        body: '{}',
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch {
+      throw new MetaConversionsError('Não foi possível contactar a Meta. Tente de novo dentro de momentos.');
+    }
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.id) throw new MetaConversionsError(metaErrorMessage(data?.error, cfg.dataset_id));
+    if (String(data.id) !== cfg.dataset_id) {
+      throw new MetaConversionsError(`A conta WhatsApp Business usa outro conjunto de dados (${data.id}). Carregue em "Ligar de novo".`);
+    }
+    return { dataset: { id: cfg.dataset_id, name: '' }, test_event: false };
+  }
   const dataset = await graph(cfg, `${cfg.dataset_id}?fields=id,name`);
   return { dataset: { id: String(dataset.id || cfg.dataset_id), name: String(dataset.name || '') }, test_event: false };
 }

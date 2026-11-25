@@ -291,9 +291,11 @@ export function MetaConversionsSettings({ initialDatasetId, onConfigured }: {
         </div>
       </div>
 
-      <details className={cn('rounded-xl border border-border px-4 py-3', config.source === 'whatsapp' && 'hidden')}>
-        <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Como obter o ID e o token</summary>
-        <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground">
+      <details className="rounded-xl border border-border px-4 py-3">
+        <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
+          {config.source === 'whatsapp' ? 'Código de teste' : 'Como obter o ID e o token'}
+        </summary>
+        <ol className={cn('mt-3 list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground', config.source === 'whatsapp' && 'hidden')}>
           <li>No Gestor de Eventos da Meta, abra o seu conjunto de dados (pixel) e copie o ID.</li>
           <li>Em Definições → API de Conversões, carregue em "Gerar token de acesso" e copie-o.</li>
           <li>Para confirmar, copie o código de teste do separador "Testar eventos" para aqui e carregue em "Testar ligação".</li>
