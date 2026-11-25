@@ -60,7 +60,7 @@ services:
       - META_FACEBOOK_COMMENTS=${META_FACEBOOK_COMMENTS:-true}
       - META_COMMENTS_ENABLED=${META_COMMENTS_ENABLED:-false}
       # Chamadas do WhatsApp atendidas por agentes de voz (serviço voice-bridge abaixo, pela rede interna)
-      - WHATSAPP_CALLS_ENABLED=${WHATSAPP_CALLS_ENABLED:-false}
+      - WHATSAPP_CALLS_ENABLED=${WHATSAPP_CALLS_ENABLED:-true}
       - VOICE_BRIDGE_URL=http://voice-bridge:8090
       - VOICE_BRIDGE_TOKEN=${VOICE_BRIDGE_TOKEN:-}
     restart: unless-stopped
