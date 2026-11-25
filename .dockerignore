@@ -17,4 +17,5 @@ pnpm-debug.log*
 
 # Projeto Android (Capacitor) e fontes de ícones — não fazem parte do site
 android/
+voice-bridge/
 assets/

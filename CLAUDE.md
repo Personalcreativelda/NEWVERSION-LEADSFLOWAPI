@@ -251,8 +251,9 @@ Há um emulador `Medium_Phone_API_37.0`.
 - Webhook `calls` → `services/whatsapp-calls.service.ts` → ponte `voice-bridge/` (Node, werift + opusscript:
   WebRTC/Opus da Meta ↔ WebSocket do agente ElevenLabs) → `pre_accept`/`accept` na Meta → `/start` na ponte.
   A ponte avisa o fim em `POST /api/webhooks/voice-bridge` (Bearer `VOICE_BRIDGE_TOKEN` = `BRIDGE_TOKEN` da ponte).
-- A ponte é um recurso Coolify à parte (`voice-bridge/docker-compose.yml`), com UDP `RTC_PORT_MIN`–`RTC_PORT_MAX`
-  aberto e `PUBLIC_IP`. Teste fechado: `cd voice-bridge && npm test`.
+- A ponte é o serviço `voice-bridge` do docker-compose.yml principal (sem domínio; a API usa `http://voice-bridge:8090`
+  e a ponte avisa `http://api:4000`). Precisa de UDP 10000–10100 aberto na firewall e `PUBLIC_IP` (IP real do
+  servidor, não o do Cloudflare) no Coolify. Teste fechado: `cd voice-bridge && npm test`.
 - `WHATSAPP_CALLS_ENABLED=false` por omissão: sem ela (e sem `VOICE_BRIDGE_URL`) o webhook ignora as chamadas e a
   secção "Chamadas do WhatsApp" em Agentes de voz não aparece. Escolha por número em `channels.settings.whatsapp_calls`;
   histórico em `voice_agent_calls` (`metadata.source = 'whatsapp_call'`). O aviso "assistente com IA" é dito pela ponte.

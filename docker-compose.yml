@@ -59,9 +59,9 @@ services:
       - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY:-}
       - META_FACEBOOK_COMMENTS=${META_FACEBOOK_COMMENTS:-true}
       - META_COMMENTS_ENABLED=${META_COMMENTS_ENABLED:-false}
-      # Chamadas do WhatsApp atendidas por agentes de voz (ponte em voice-bridge/, recurso à parte)
+      # Chamadas do WhatsApp atendidas por agentes de voz (serviço voice-bridge abaixo, pela rede interna)
       - WHATSAPP_CALLS_ENABLED=${WHATSAPP_CALLS_ENABLED:-false}
-      - VOICE_BRIDGE_URL=${VOICE_BRIDGE_URL:-}
+      - VOICE_BRIDGE_URL=http://voice-bridge:8090
       - VOICE_BRIDGE_TOKEN=${VOICE_BRIDGE_TOKEN:-}
     restart: unless-stopped
     # O processo 1 de um contentor ignora sinais enviados de dentro dele: com o init (tini)
@@ -90,3 +90,24 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  # Ponte de voz: chamadas do WhatsApp Business ↔ agentes ElevenLabs (voice-bridge/).
+  # Sem domínio: só a API lhe fala, pela rede interna. O áudio entra direto pelas portas UDP
+  # (abrir 10000-10100/udp na firewall do servidor) e PUBLIC_IP tem de ser o IP real do servidor.
+  # Nenhum serviço depende dela: se falhar, a API e o painel continuam.
+  voice-bridge:
+    build: ./voice-bridge
+    environment:
+      - PORT=8090
+      - BRIDGE_TOKEN=${VOICE_BRIDGE_TOKEN:-}
+      - PUBLIC_IP=${PUBLIC_IP:-}
+      - RTC_PORT_MIN=10000
+      - RTC_PORT_MAX=10100
+      - API_CALLBACK_URL=http://api:4000/api/webhooks/voice-bridge
+      - MAX_CONCURRENT_CALLS=${MAX_CONCURRENT_CALLS:-20}
+    expose:
+      - "8090"
+    ports:
+      - "10000-10100:10000-10100/udp"
+    restart: unless-stopped
+    init: true

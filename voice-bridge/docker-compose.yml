@@ -1,9 +1,5 @@
-# Recurso SEPARADO no Coolify (não faz parte do docker-compose.yml principal):
-# se este serviço falhar, a API e o painel continuam como estão.
-#
-# No Coolify: novo recurso "Docker Compose" a partir deste repositório, com
-# "Base Directory" = /voice-bridge. Domínio para a porta 8090 (ex.: voice.leadsflowapi.com).
-# Firewall do servidor: abrir UDP RTC_PORT_MIN–RTC_PORT_MAX (o áudio não passa pelo proxy HTTP).
+# Opcional: correr a ponte sozinha (noutro servidor). Em produção ela já faz parte do
+# docker-compose.yml principal (serviço voice-bridge). Abrir UDP RTC_PORT_MIN–RTC_PORT_MAX na firewall.
 services:
   voice-bridge:
     build: .
