@@ -25,7 +25,6 @@ export const pathToPageId: Record<string, string> = {
   '/dashboard/campaigns': 'campaigns',
   '/dashboard/remarketing': 'remarketing',
   '/dashboard/lead-finder': 'lead-finder',
-  '/dashboard/comment-automations': 'comment-automations',
   '/dashboard/ai-insights': 'ai-insights',
   '/dashboard/plan': 'plan',
   '/dashboard/integrations': 'integrations',

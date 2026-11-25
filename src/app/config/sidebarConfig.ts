@@ -1,7 +1,7 @@
 import {
     Home, Users, MessageSquare, Workflow, BarChart3,
     CheckSquare, Megaphone, Crown, Settings, User,
-    Bot, PhoneCall, Globe, Target, Brain, MapPin, MessageCircle
+    Bot, PhoneCall, Globe, Target, Brain, MapPin
 } from 'lucide-react';
 
 export interface SidebarItemConfig {
@@ -37,7 +37,6 @@ export const sidebarConfig: SidebarItemConfig[] = [
     { id: 'tasks', labelKey: 'tasksFollowup', icon: CheckSquare, path: '/dashboard/tasks', keywords: 'tarefas follow-up lembretes agenda agendamentos' },
     // Automação
     { id: 'ai-assistants', labelKey: 'aiAssistants', icon: Bot, path: '/dashboard/ai-assistants', sectionLabel: 'Automação', keywords: 'ia bot chatbot agentes atendimento automatico gpt' },
-    { id: 'comment-automations', labelKey: 'commentReplies', icon: MessageCircle, path: '/dashboard/comment-automations', keywords: 'comentarios instagram facebook resposta privada dm mensagem automatica' },
     { id: 'voice-agents', labelKey: 'voiceAgents', icon: PhoneCall, path: '/dashboard/voice-agents', keywords: 'voz chamadas telefone ligacoes' },
     { id: 'webhook', labelKey: 'webhook', icon: Globe, path: '/dashboard/automations', keywords: 'webhooks automacoes eventos n8n api' },
     // Configurações

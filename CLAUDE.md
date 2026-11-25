@@ -91,7 +91,7 @@ Há um emulador `Medium_Phone_API_37.0`.
   uma resposta privada ao último comentário sem resposta (`replyFromInbox`, só texto); a pessoa responde no
   Messenger, noutra conversa (PSID ≠ id do comentário). Funciona com as permissões já aprovadas
   (`META_FACEBOOK_COMMENTS`, ligado por omissão); ao arrancar, as páginas já ligadas são subscritas com `feed`.
-- Respostas a comentários (`pages/CommentAutomationsPage.tsx`, `/api/comment-automations`,
+- Respostas automáticas a comentários (API `/api/comment-automations`; a página `pages/CommentAutomationsPage.tsx` saiu do menu a pedido — os comentários entram sozinhos na caixa de entrada),
   `services/comment-automation.service.ts`): webhooks `comments` (Instagram) e `feed` (Facebook) → resposta
   privada (`recipient.comment_id`, uma por comentário, até 7 dias) + resposta pública opcional + lead
   (`custom_fields.social_id`). Instagram e respostas públicas só com `META_COMMENTS_ENABLED=true`
