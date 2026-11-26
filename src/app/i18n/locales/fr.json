@@ -5001,5 +5001,6 @@
  "Opções de canais": "Options de canaux",
  "WhatsApp Business com token": "WhatsApp Business avec jeton",
  "Número WhatsApp Business": "Numéro WhatsApp Business",
- "Ligar este número": "Connecter ce numéro"
+ "Ligar este número": "Connecter ce numéro",
+ "O token não dá acesso a uma conta de mensagens com este número. Na Meta, ligue o número a uma conta de mensagens e atribua essa conta ao utilizador do sistema.": "Le jeton ne donne pas accès à un compte de messagerie avec ce numéro. Dans Meta, liez le numéro à un compte de messagerie et attribuez ce compte à l'utilisateur système."
 }

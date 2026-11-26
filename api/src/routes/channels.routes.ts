@@ -220,6 +220,12 @@ router.post('/', async (req, res, next) => {
             // conta e as mensagens deste número não chegavam
             const realWaba = await wabaOfNumber(String(phoneNumberId), accessToken, credentials.waba_id);
             if (realWaba) credentials.waba_id = realWaba;
+            else if (credentials.waba_id) {
+                // Nem a conta indicada nem as do token têm o número: o canal ficava a falhar ao abrir
+                return res.status(400).json({
+                    error: 'O token não dá acesso a uma conta de mensagens com este número. Na Meta, ligue o número a uma conta de mensagens e atribua essa conta ao utilizador do sistema.',
+                });
+            }
 
             // Verificar se já existe canal com esse phone_number_id
             const existingResult = await channelsService.findByCredentialField('phone_number_id', phoneNumberId, user.id);

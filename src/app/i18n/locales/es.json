@@ -5001,5 +5001,6 @@
  "Opções de canais": "Opciones de canales",
  "WhatsApp Business com token": "WhatsApp Business con token",
  "Número WhatsApp Business": "Número de WhatsApp Business",
- "Ligar este número": "Conectar este número"
+ "Ligar este número": "Conectar este número",
+ "O token não dá acesso a uma conta de mensagens com este número. Na Meta, ligue o número a uma conta de mensagens e atribua essa conta ao utilizador do sistema.": "El token no da acceso a una cuenta de mensajería con este número. En Meta, vincule el número a una cuenta de mensajería y asigne esa cuenta al usuario del sistema."
 }

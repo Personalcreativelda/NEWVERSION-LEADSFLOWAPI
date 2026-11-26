@@ -96,7 +96,7 @@ export function WhatsAppCloudConnect({ isOpen, onClose, onSuccess, appToken = fa
             if (err.response?.status === 401) {
                 setError('Sessão expirada. Recarregue a página e tente novamente.');
             } else if (err.response?.status === 400) {
-                setError('Dados inválidos. Verifique as credenciais.');
+                setError(err.response?.data?.error || 'Dados inválidos. Verifique as credenciais.');
             } else {
                 setError(err.message || 'Erro ao criar canal.');
             }
