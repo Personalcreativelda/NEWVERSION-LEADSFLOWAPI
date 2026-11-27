@@ -3,6 +3,7 @@ import multer from 'multer';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware';
 import { getUserProfile, updateUserAvatar, updateUserProfile } from '../services/users.service';
+import { isValidTimezone, setUserTimezone, userTimezone } from '../utils/user-timezone';
 
 const router = Router();
 const upload = multer({
@@ -155,6 +156,18 @@ router.post('/change-password', requireAuth, async (req: AuthenticatedRequest, r
 });
 
 // Get user settings (webhooks, integrations, etc)
+// Fuso horário da conta (marcações dos assistentes e dos agentes de voz)
+router.get('/timezone', requireAuth, async (req: AuthenticatedRequest, res) => {
+  res.json({ timezone: await userTimezone(req.user!.id) });
+});
+
+router.put('/timezone', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const tz = String(req.body?.timezone || '').trim();
+  if (!isValidTimezone(tz)) return res.status(400).json({ error: 'Fuso horário inválido' });
+  await setUserTimezone(req.user!.id, tz);
+  res.json({ timezone: tz });
+});
+
 router.get('/settings', requireAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!req.user) {

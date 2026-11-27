@@ -304,6 +304,18 @@ Há um emulador `Medium_Phone_API_37.0`.
   sem minutos as recebidas são recusadas na Meta e não se liga; cada chamada é cortada pela ponte no menor entre o máximo
   do plano e o que resta; o mesmo número só liga 3 vezes / 20 min em 24 h; 20 s de silêncio desligam; sino aos 80 % e 100 %.
   Apagar um agente já não apaga as chamadas (FK SET NULL), senão os minutos voltavam a zero.
+- Ferramentas dos agentes de voz (`services/voice-tools.service.ts`): client tools do ElevenLabs criadas uma vez na conta
+  da plataforma (`POST /v1/convai/tools`, ids em `voice_tools`, atualizadas quando a definição muda) e ligadas por
+  `tool_ids`. ElevenLabs `client_tool_call` → ponte → `POST /api/webhooks/voice-bridge/tool` → `runVoiceTool` → resultado.
+  ver_horarios/marcar/remarcar/desmarcar (mesma agenda dos assistentes), mover_etapa e etiquetar (disparam o remarketing),
+  guardar_contacto (nome, email, nota do lead), registar_conversao (só eventos autorizados), enviar_mensagem (janela de
+  24 h), passar_equipa (aviso no sino). Cada chamada fica ligada a um lead e à conversa do WhatsApp desse número
+  (`callContext`); no fim entra na conversa uma nota com a duração e a transcrição. Ferramenta nova → `TOOLS` + `runVoiceTool`.
+  Por agente (`call_config`): `tools` (grupos de `TOOL_GROUPS`; o agente só recebe essas tool_ids e as instruções delas),
+  `agenda` (dias, horário, duração — mesmas chaves do `agendaOptions`), `avatar_url` (`POST /api/whatsapp-calls/avatar`),
+  `template_id`. Agentes prontos com plano mínimo (`TEMPLATE_PLAN` na API + `plan` em `agentTemplates.ts`): todos os planos
+  os veem, os de cima com cadeado e upgrade. Fuso horário por conta (`utils/user-timezone.ts`, Definições → Perfil): usado nas
+  marcações dos assistentes e dos agentes (`agendaOptions(..., tz)`).
 
 ## Testar sem a conta do utilizador
 

@@ -2,6 +2,25 @@
 import { query } from '../database/connection';
 import { encryptCredentials, isSecretKey, secretFingerprint } from '../utils/secret-box';
 
+/**
+ * Canal WhatsApp Business (Cloud API) de um número, para os webhooks da Meta.
+ * Um número ligado várias vezes deixa canais apagados (soft delete, mesmas credenciais): esses
+ * nunca recebem nada. Havendo mais de um, ganha o ativo e, entre iguais, o mais recente —
+ * sem isto as mensagens podiam cair num canal apagado e não apareciam na caixa de entrada.
+ */
+export async function cloudChannelForNumber(phoneNumberId: string, opts: { channelId?: string; activeOnly?: boolean } = {}) {
+    if (!phoneNumberId) return null;
+    const r = await query(
+        `SELECT * FROM channels
+          WHERE type = 'whatsapp_cloud' AND credentials->>'phone_number_id' = $1 AND status <> 'deleted'
+            ${opts.activeOnly ? "AND status = 'active'" : ''}
+          ORDER BY (id::text = $2) DESC, (status = 'active') DESC, updated_at DESC NULLS LAST, created_at DESC
+          LIMIT 1`,
+        [String(phoneNumberId), opts.channelId || ''],
+    );
+    return r.rows[0] || null;
+}
+
 export interface Channel {
     id: string;
     user_id: string;

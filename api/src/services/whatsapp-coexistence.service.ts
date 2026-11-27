@@ -15,6 +15,7 @@
 // as automações nem os webhooks externos; uma resposta pelo telemóvel (eco) pausa o assistente nessa
 // conversa (ver assistant-processor: HUMAN_ECHO_PAUSE_MIN). Tudo isolado por user_id do canal.
 import { query } from '../database/connection';
+import { cloudChannelForNumber } from './channels.service';
 import { ConversationsService } from './conversations.service';
 import { normalizePhoneNumber } from '../utils/phone.utils';
 import { getStorageService } from './storage.service';
@@ -37,11 +38,8 @@ const toDate = (ts: any) => {
 // ── Canal ────────────────────────────────────────────────────────────────────
 async function channelFor(phoneNumberId?: string, wabaId?: string) {
   if (phoneNumberId) {
-    const r = await query(
-      `SELECT * FROM channels WHERE type = 'whatsapp_cloud' AND credentials->>'phone_number_id' = $1 LIMIT 1`,
-      [String(phoneNumberId)],
-    );
-    if (r.rows[0]) return r.rows[0];
+    const ch = await cloudChannelForNumber(String(phoneNumberId));
+    if (ch) return ch;
   }
   if (wabaId) {
     const r = await query(

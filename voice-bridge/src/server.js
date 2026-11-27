@@ -19,6 +19,8 @@ const PUBLIC_IP = process.env.PUBLIC_IP || '';
 const PORT_MIN = Number(process.env.RTC_PORT_MIN || 10000);
 const PORT_MAX = Number(process.env.RTC_PORT_MAX || 10100);
 const CALLBACK_URL = process.env.API_CALLBACK_URL || '';
+// Ferramentas dos agentes (marcar, mover o lead…): por omissão o mesmo endereço da API + /tool
+const TOOL_URL = process.env.API_TOOL_URL || (CALLBACK_URL ? `${CALLBACK_URL.replace(/\/$/, '')}/tool` : '');
 const MAX_CALLS = Number(process.env.MAX_CONCURRENT_CALLS || 20);
 const MAX_BODY = 256 * 1024;
 
@@ -51,6 +53,19 @@ async function notifyEnded(result) {
     }
     await new Promise((r) => setTimeout(r, attempt * 2000));
   }
+}
+
+/** O agente pediu uma ferramenta: a API executa (com o contexto da chamada) e devolve o resultado */
+async function runTool(callId, tool, parameters) {
+  if (!TOOL_URL) return { result: 'Ferramenta indisponível.', is_error: true };
+  const res = await fetch(TOOL_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` },
+    body: JSON.stringify({ callId, tool, parameters }),
+    signal: AbortSignal.timeout(18000),
+  });
+  if (!res.ok) return { result: 'Não foi possível concluir agora.', is_error: true };
+  return res.json();
 }
 
 function send(res, status, body) {
@@ -90,6 +105,7 @@ const server = http.createServer(async (req, res) => {
       conversationOverride: body.conversationOverride || null,
       maxSeconds: Number(body.maxSeconds) || undefined,
       peerConfig,
+      onToolCall: (tool, parameters) => runTool(callId, tool, parameters),
       onEnded: (result) => {
         calls.delete(callId);
         void notifyEnded(result);

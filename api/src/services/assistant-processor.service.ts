@@ -3,6 +3,7 @@
 import { flowNoteForAssistant } from './flow-context.service';
 import { canSetDealValue, formatDealValue, mentionsPrice, parseDealValue } from './deal-value.service';
 import { GUARDRAIL_RULES, INJECTION_NOTE, checkReply, detectInjection, fenceCustomerMessage, safeRefusal } from './guardrails.service';
+import { userTimezone } from '../utils/user-timezone';
 import { agendaBlock, agendaOptions, applyDecision, decisionPrompt, hasSchedulingIntent, parseDecision, pendingForConversation } from './appointments.service';
 import { query } from '../database/connection';
 import { MAX_HANDOFFS, getTeamState, logHandoff, parseHandoff, pickResponsible, saveTeamState, stripHandoff, teamBlock, teamForChannel, type TeamMember, type TeamState } from './assistant-team.service';
@@ -988,7 +989,7 @@ export class AssistantProcessorService {
         // ─────────────────────────────────────────────────────────────────────────
 
         // Agenda: horários ocupados (tarefas + Google Calendar) quando a conversa fala de marcações
-        const agenda = agendaOptions(config, defaultConfig);
+        const agenda = agendaOptions(config, defaultConfig, await userTimezone(ctx.userId));
         const recentText = [ctx.messageContent, ...history.slice(-3).map((m: any) => String(m.content || ''))].join(' ');
         if (agenda.enabled && config.scheduling_enabled !== false && hasSchedulingIntent(recentText)) {
             try {
@@ -2999,7 +3000,7 @@ Valor registado neste momento: ${current > 0 ? current : 'nenhum'}`,
             if (history[history.length - 1] !== last) history.push(last);
 
             const response = await aiService.generateResponseWithFallback([
-                { role: 'system', content: decisionPrompt(new Date(), existing) },
+                { role: 'system', content: decisionPrompt(new Date(), existing, await userTimezone(ctx.userId)) },
                 { role: 'user', content: history.join('\n') },
             ], providers, model);
             const decision = parseDecision(response.content);
@@ -3013,7 +3014,7 @@ Valor registado neste momento: ${current > 0 ? current : 'nenhum'}`,
                 contactPhone: ctx.contactPhone,
                 channelType: ctx.channelType,
                 assistantName: assistant.assistant_name || 'Assistente',
-            }, decision, agendaOptions(assistant.config || {}, assistant.default_config || {}));
+            }, decision, agendaOptions(assistant.config || {}, assistant.default_config || {}, await userTimezone(ctx.userId)));
             console.log(`[Scheduling] ${decision.action} → ${result.done}${result.reason ? ` (${result.reason})` : ''}`);
         } catch (err: any) {
             console.warn('[Scheduling] Erro ao tratar marcação (não crítico):', err.message);

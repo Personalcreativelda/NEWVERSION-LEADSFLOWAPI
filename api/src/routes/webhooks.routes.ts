@@ -28,6 +28,8 @@ import { recordAdReferral, referralFromCloud, referralFromEvolution, referralFro
 import { describeWhatsAppMessage, unwrapWhatsAppMessage, whatsAppEvent, whatsAppMessageType, whatsAppQuoteInfo, whatsAppThumbnail, type WhatsAppEvent } from '../utils/whatsapp-message';
 import { applyWhatsAppEvent, quotedForIncoming } from '../services/whatsapp-events.service';
 import { isBridgeRequest, whatsappCallsService } from '../services/whatsapp-calls.service';
+import { cloudChannelForNumber } from '../services/channels.service';
+import { runVoiceTool } from '../services/voice-tools.service';
 import { channelHealthService } from '../services/channel-health.service';
 import { whatsappCoexistenceService } from '../services/whatsapp-coexistence.service';
 import { applyCloudStatus } from '../services/cloud-status.service';
@@ -60,6 +62,14 @@ router.post('/voice-bridge', async (req, res) => {
     console.error('[VoiceBridge] Aviso de fim:', err?.message);
     res.status(500).json({ error: 'Falha ao guardar a chamada' });
   }
+});
+
+// Ponte de voz: o agente usou uma ferramenta a meio da chamada (marcar, mover o lead, etiquetar…)
+// { callId (chave da sessão na ponte), tool, parameters } → { result, is_error }
+router.post('/voice-bridge/tool', async (req, res) => {
+  if (!isBridgeRequest(req.headers.authorization)) return res.sendStatus(401);
+  const { callId, tool, parameters } = req.body || {};
+  res.json(await runVoiceTool(String(callId || ''), String(tool || ''), parameters || {}));
 });
 const conversationsService = new ConversationsService();
 const whatsappService = new WhatsAppService();
@@ -3587,36 +3597,14 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
               messageContent = `[${messageType}]`;
           }
 
-          // Encontrar canal pelo phone_number_id (sem filtro de status - Meta envia mesmo quando canal está em 'error')
-          let channelResult;
-          if (req.params.channelId) {
-            // Buscar por ID do canal (qualquer status), mas só se for mesmo deste número: se alguém
-            // puser o URL de um canal no callback da app da LeadsFlow, as mensagens dos outros
-            // números (de outros clientes) não podem cair neste canal
-            channelResult = await query(
-              `SELECT * FROM channels WHERE id = $1 AND type = 'whatsapp_cloud'
-                 AND credentials->>'phone_number_id' = $2`,
-              [req.params.channelId, String(phoneNumberId || '')]
-            );
-          }
-
-          if (!channelResult || channelResult.rows.length === 0) {
-            // Buscar por phone_number_id nas credenciais (sem filtro de status)
-            channelResult = await query(
-              `SELECT * FROM channels
-               WHERE type = 'whatsapp_cloud'
-               AND credentials->>'phone_number_id' = $1`,
-              [phoneNumberId]
-            );
-          }
-
-          // Sem "canal qualquer" de recurso: com vários clientes, a mensagem iria parar à conta errada
-          if (channelResult.rows.length === 0) {
+          // Canal deste número (qualquer estado menos apagado: a Meta envia mesmo com o canal em 'error').
+          // O canal do URL só ganha se for mesmo deste número (um URL de canal posto no callback da app
+          // não pode puxar as mensagens dos outros números). Sem "canal qualquer" de recurso.
+          const channel = await cloudChannelForNumber(String(phoneNumberId || ''), { channelId: req.params.channelId });
+          if (!channel) {
             console.warn('[WhatsApp Cloud Webhook] Nenhum canal com este phone_number_id:', phoneNumberId);
             continue;
           }
-
-          const channel = channelResult.rows[0];
           // Safe-parse credentials se vier como string
           if (channel.credentials && typeof channel.credentials === 'string') {
             try { channel.credentials = JSON.parse(channel.credentials); } catch (e) { /* ignore */ }

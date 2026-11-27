@@ -22,7 +22,7 @@ export function hasSchedulingIntent(text: string): boolean {
 }
 
 /** Opções de agenda do assistente (configuração própria, ou a do modelo do marketplace) */
-export function agendaOptions(config: any, defaults: any = {}) {
+export function agendaOptions(config: any, defaults: any = {}, tz?: string) {
   const pick = (k: string) => (config?.[k] !== undefined ? config[k] : defaults?.[k]);
   return {
     enabled: pick('calendar_check_enabled') !== false,
@@ -30,6 +30,8 @@ export function agendaOptions(config: any, defaults: any = {}) {
     endMin: hhmmToMinutes(pick('business_hours_end'), 18 * 60),
     durationMin: Math.min(Math.max(Number(pick('appointment_minutes')) || 60, 15), 240),
     workDays: Array.isArray(pick('business_days')) ? (pick('business_days') as number[]) : [1, 2, 3, 4, 5, 6],
+    /** Fuso da conta (Definições); sem ele o da plataforma */
+    tz: tz || appTimezone(),
   };
 }
 
@@ -74,7 +76,7 @@ const DAY_NAMES = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 
 
 /** Bloco [AGENDA] para as instruções: agora, horário, dias, ocupados e as marcações deste cliente */
 export async function agendaBlock(userId: string, conversationId: string, opts: ReturnType<typeof agendaOptions>): Promise<string> {
-  const tz = appTimezone();
+  const tz = opts.tz || appTimezone();
   const now = new Date();
   const to = new Date(now.getTime() + 14 * 86400_000);
   const { slots } = await busySlots(userId, now, to, opts.durationMin);
@@ -92,7 +94,7 @@ export async function agendaBlock(userId: string, conversationId: string, opts: 
 
 /** Um horário pedido está livre? (dentro do horário de funcionamento e sem sobreposição) */
 export async function isSlotFree(userId: string, start: Date, opts: ReturnType<typeof agendaOptions>, ignoreId?: string): Promise<boolean> {
-  const tz = appTimezone();
+  const tz = opts.tz || appTimezone();
   const end = new Date(start.getTime() + opts.durationMin * 60_000);
   const startMin = localMinutes(start, tz);
   const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(
@@ -148,8 +150,7 @@ export function parseDecision(raw: string | null | undefined): SchedulingDecisio
 }
 
 /** Prompt para decidir a ação de agenda a partir da última troca de mensagens */
-export function decisionPrompt(now: Date, existing: PendingAppointment[]): string {
-  const tz = appTimezone();
+export function decisionPrompt(now: Date, existing: PendingAppointment[], tz = appTimezone()): string {
   return `Analise a conversa e diga se o ASSISTENTE acabou de CONFIRMAR uma marcação, uma remarcação ou uma desmarcação.
 Agora: ${toLocalIso(now, tz)} (${formatLocal(now, tz)}), fuso ${tz}.
 Marcações atuais deste cliente: ${existing.length ? existing.map((e) => `[id ${e.id}] "${e.title}" em ${toLocalIso(e.scheduled_at, tz)}`).join('; ') : 'nenhuma'}.
@@ -171,7 +172,7 @@ export interface AppointmentContext {
 /** Aplica a decisão: tarefa + evento no calendário + nota na conversa. Devolve o que fez. */
 export async function applyDecision(ctx: AppointmentContext, d: SchedulingDecision, opts: ReturnType<typeof agendaOptions>):
   Promise<{ done: 'created' | 'rescheduled' | 'cancelled' | 'skipped'; id?: string; reason?: string }> {
-  const tz = appTimezone();
+  const tz = opts.tz || appTimezone();
   const existing = await pendingForConversation(ctx.userId, ctx.conversationId);
 
   if (d.action === 'cancel') {

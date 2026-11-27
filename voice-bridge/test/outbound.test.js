@@ -11,11 +11,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 test('chamada feita: oferta → resposta do WhatsApp → agente com primeira frase própria', { timeout: 30000 }, async () => {
   let initData = null;
+  let toolResult = null;
   const wss = new WebSocketServer({ port: 0 });
   await new Promise((r) => wss.once('listening', r));
   wss.on('connection', (ws) => {
     ws.on('message', (raw) => {
       const msg = JSON.parse(String(raw));
+      if (msg.type === 'client_tool_result') { toolResult = msg; return; }
       if (msg.type !== 'conversation_initiation_client_data') return;
       initData = msg;
       ws.send(JSON.stringify({
@@ -23,6 +25,7 @@ test('chamada feita: oferta → resposta do WhatsApp → agente com primeira fra
         conversation_initiation_metadata_event: { conversation_id: 'conv_out', user_input_audio_format: 'pcm_16000', agent_output_audio_format: 'pcm_16000' },
       }));
       const pcm = new Int16Array(8000).map((_, i) => Math.round(8000 * Math.sin((2 * Math.PI * 440 * i) / 16000)));
+      ws.send(JSON.stringify({ type: 'client_tool_call', client_tool_call: { tool_name: 'mover_etapa', tool_call_id: 't1', parameters: { etapa: 'qualificado' }, event_id: 9, expects_response: true } }));
       for (let i = 0; i < 4; i++) ws.send(JSON.stringify({ type: 'audio', audio_event: { audio_base_64: int16ToBuffer(pcm).toString('base64'), event_id: i } }));
     });
   });
@@ -34,6 +37,7 @@ test('chamada feita: oferta → resposta do WhatsApp → agente com primeira fra
     conversationOverride: { agent: { first_message: 'Olá Ana, fala a assistente virtual da Loja.' } },
     peerConfig: {},
     onEnded: () => {},
+    onToolCall: async (tool, params) => ({ result: `${tool}:${params.etapa}`, is_error: false }),
     log: () => {},
   });
   const offerSdp = await session.offer();
@@ -66,6 +70,8 @@ test('chamada feita: oferta → resposta do WhatsApp → agente com primeira fra
 
   assert.equal(initData.conversation_config_override.agent.first_message, 'Olá Ana, fala a assistente virtual da Loja.');
   assert.equal(initData.dynamic_variables.customer_name, 'Ana');
+  for (let i = 0; i < 20 && !toolResult; i++) await sleep(50);
+  assert.deepEqual(toolResult, { type: 'client_tool_result', tool_call_id: 't1', result: 'mover_etapa:qualificado', is_error: false }, 'ferramenta: pedido → API → resultado ao agente');
   assert.ok(heard >= 20, `o cliente ouviu o agente (${heard} pacotes)`);
 
   session.end('test');

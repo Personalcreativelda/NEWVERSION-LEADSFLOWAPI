@@ -634,6 +634,12 @@ const runPendingMigrations = async () => {
             FOREIGN KEY (voice_agent_id) REFERENCES voice_agents(id) ON DELETE SET NULL;
         END LOOP;
       END $$;
+      CREATE TABLE IF NOT EXISTS voice_tools (
+        name        VARCHAR(60) PRIMARY KEY,
+        tool_id     VARCHAR(120) NOT NULL,
+        fingerprint VARCHAR(32),
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
       CREATE INDEX IF NOT EXISTS idx_voice_agent_calls_usage
         ON voice_agent_calls(user_id, created_at) WHERE metadata->>'source' = 'whatsapp_call';
     `);

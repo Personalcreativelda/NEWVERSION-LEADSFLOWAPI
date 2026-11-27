@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { withOfflineCache } from '../../lib/axiosOffline';
+import type { AgentAgenda } from '../../components/voice-agents/agentTemplates';
 import type {
   VoiceAgent,
   CreateVoiceAgentInput,
@@ -266,6 +267,14 @@ export const voiceAgentsApi = {
     return response.data;
   },
 
+  /** Foto do agente → URL para guardar no agente */
+  async uploadAgentAvatar(file: File): Promise<string> {
+    const form = new FormData();
+    form.append('avatar', file);
+    const response = await api.post('/whatsapp-calls/avatar', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return response.data.url;
+  },
+
   /** Gravação da chamada (MP3) */
   async getCallRecording(callId: string): Promise<Blob> {
     const response = await api.get(`/whatsapp-calls/calls/${callId}/audio`, { responseType: 'blob', timeout: 90_000 });
@@ -279,6 +288,12 @@ export interface CallAgentInput {
   greeting: string;
   voice_id: string;
   language: string;
+  /** Ações ligadas (grupos: agenda, funil, etiquetas, contacto, mensagens, conversoes, equipa) */
+  tools?: string[];
+  agenda?: AgentAgenda;
+  avatar_url?: string | null;
+  /** Agente pronto de origem (o plano mínimo é verificado na API) */
+  template_id?: string | null;
 }
 
 export interface CallAgent extends CallAgentInput {
@@ -298,6 +313,9 @@ export interface CallVoice {
 export interface WhatsAppCallsState {
   available: boolean;
   limit: number;
+  plan: string;
+  /** Plano mínimo de cada agente pronto */
+  template_plans: Record<string, string>;
   channels: { id: string; name: string; phone: string | null; enabled: boolean; voice_agent_id: string | null }[];
   agents: CallAgent[];
   calls: {

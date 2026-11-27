@@ -13,6 +13,8 @@ import { query } from '../database/connection';
 import { callAllowance, callerBlocked, notifyUsageThresholds } from './voice-usage.service';
 import { contactWindow } from './whatsapp-window.service';
 import { notificationsService } from './notifications.service';
+import { cloudChannelForNumber } from './channels.service';
+import { callContext, noteCallInConversation, toolsPrompt, voiceToolIds } from './voice-tools.service';
 
 // A API de chamadas não existe em versões antigas da Graph API
 const GRAPH = 'https://graph.facebook.com/v23.0';
@@ -136,6 +138,8 @@ export interface ManagedAgentInput {
   greeting: string;
   voice_id: string;
   language: string;
+  /** Grupos de ações ligados (voice-tools.service TOOL_GROUPS); sem valor = todos */
+  tools?: string[];
 }
 
 export const LANGUAGES = ['pt', 'en', 'es', 'fr'] as const;
@@ -167,16 +171,18 @@ const CALL_STYLE = '\n\nEstás numa chamada de voz pelo WhatsApp: responde em fr
 const SILENCE_END_SECONDS = Number(process.env.VOICE_SILENCE_END_SECONDS) || 20;
 
 /** Instruções completas do agente (as mesmas que ficam no ElevenLabs) */
-function agentPrompt(instructions: string) {
-  return `${instructions.trim()}${CALL_STYLE}`;
+function agentPrompt(instructions: string, tools?: unknown) {
+  return `${instructions.trim()}${CALL_STYLE}${toolsPrompt(tools)}`;
 }
 
-function agentBody(input: ManagedAgentInput) {
+/** Corpo do agente no ElevenLabs; toolIds = ferramentas para agir no LeadsFlow (voice-tools.service) */
+function agentBody(input: ManagedAgentInput, toolIds: string[] = []) {
   return {
     name: input.name.slice(0, 100),
     conversation_config: {
       agent: {
-        prompt: { prompt: agentPrompt(input.instructions) },
+        // Sempre tool_ids (mesmo vazio): desligar todas as ações tem de as tirar do agente
+        prompt: { prompt: agentPrompt(input.instructions, input.tools), tool_ids: toolIds },
         first_message: input.greeting.trim(),
         language: input.language,
       },
@@ -197,17 +203,17 @@ function agentBody(input: ManagedAgentInput) {
 }
 
 export async function createManagedAgent(input: ManagedAgentInput): Promise<string> {
-  const data = await eleven('POST', '/convai/agents/create', agentBody(input));
+  const data = await eleven('POST', '/convai/agents/create', agentBody(input, await voiceToolIds(input.tools)));
   if (!data?.agent_id) throw new WhatsAppCallError('Não foi possível criar o agente de voz', 422);
   return data.agent_id;
 }
 
 export async function updateManagedAgent(agentId: string, input: ManagedAgentInput) {
-  await eleven('PATCH', `/convai/agents/${encodeURIComponent(agentId)}`, agentBody(input));
+  await eleven('PATCH', `/convai/agents/${encodeURIComponent(agentId)}`, agentBody(input, await voiceToolIds(input.tools)));
 }
 
 /** Sobe quando CALL_STYLE/agentBody mudam: os agentes com versão anterior são atualizados ao arrancar */
-export const AGENT_PROMPT_VERSION = 3;
+export const AGENT_PROMPT_VERSION = 5;
 
 export async function resyncManagedAgents(): Promise<void> {
   if (!platformKey()) return;
@@ -223,7 +229,7 @@ export async function resyncManagedAgents(): Promise<void> {
       if (!voiceId || !a.greeting_message) continue;
       await updateManagedAgent(parse(a.call_config).elevenlabs_agent_id, {
         name: a.name, instructions: a.instructions || '', greeting: a.greeting_message,
-        voice_id: voiceId, language: String(a.language || 'pt').slice(0, 2),
+        voice_id: voiceId, language: String(a.language || 'pt').slice(0, 2), tools: parse(a.call_config).tools,
       });
       await query(
         `UPDATE voice_agents SET call_config = call_config || $2::jsonb WHERE id = $1`,
@@ -301,14 +307,7 @@ async function fetchConversation(apiKey: string, conversationId: string) {
 const parse = (v: any) => (typeof v === 'string' ? (() => { try { return JSON.parse(v); } catch { return {}; } })() : v || {});
 const digits = (s: string) => String(s || '').replace(/\D/g, '');
 
-async function channelForNumber(phoneId: string) {
-  const r = await query(
-    `SELECT * FROM channels WHERE type = 'whatsapp_cloud' AND credentials->>'phone_number_id' = $1
-        AND status = 'active' LIMIT 1`,
-    [phoneId],
-  );
-  return r.rows[0] || null;
-}
+const channelForNumber = (phoneId: string) => cloudChannelForNumber(phoneId, { activeOnly: true });
 
 /** Pela id da Meta (wacid…) ou pela chave da ponte (chamadas feitas usam a id da linha) */
 async function callRow(callId: string) {
@@ -404,6 +403,7 @@ export class WhatsAppCallsService {
        VALUES ($1, $2, $3, 'inbound', 'ringing', $4, $5, $6, NOW()) RETURNING id`,
       [agent.id, channel.user_id, from || 'desconhecido', lead?.id || null, call.id, JSON.stringify(baseMeta)],
     )).rows[0];
+    void callContext(call.id).catch(() => {});
 
     const fail = async (message: string) => {
       await callAction(phoneId, token, call.id, 'reject').catch(() => {});
@@ -485,7 +485,11 @@ export class WhatsAppCallsService {
 
     // Transcrição final, duração e custo do ElevenLabs (prontos uns segundos depois)
     if (result.conversationId) {
-      setTimeout(() => { void this.syncConversation(row.id, row.user_id, result.conversationId, !!meta.managed); }, 20_000).unref?.();
+      setTimeout(() => {
+        void this.syncConversation(row.id, row.user_id, result.conversationId, !!meta.managed).then(() => noteCallInConversation(row.id));
+      }, 20_000).unref?.();
+    } else {
+      void noteCallInConversation(row.id);
     }
     void notifyUsageThresholds(row.user_id).catch(() => {});
   }
@@ -537,6 +541,7 @@ export class WhatsAppCallsService {
         JSON.stringify({ source: 'whatsapp_call', channel_id: channel.id, phone_number_id: phoneId, managed: !!call.managed, caller_name: lead?.name || null, purpose: purpose || null })],
     )).rows[0];
     await query(`UPDATE voice_agent_calls SET metadata = metadata || $2::jsonb WHERE id = $1`, [row.id, JSON.stringify({ bridge_key: row.id })]);
+    void callContext(row.id).catch(() => {});
 
     try {
       const apiKey = await elevenKey(userId, !!call.managed);
@@ -549,7 +554,7 @@ export class WhatsAppCallsService {
         callId: row.id,
         signedUrl: url,
         dynamicVariables: { caller_number: to, caller_name: lead?.name || '' },
-        conversationOverride: { agent: { first_message: greeting.slice(0, 500), prompt: { prompt: agentPrompt(agent.instructions || '') + outboundNote } } },
+        conversationOverride: { agent: { first_message: greeting.slice(0, 500), prompt: { prompt: agentPrompt(agent.instructions || '', call.tools) + outboundNote } } },
         maxSeconds: allowance.maxSeconds,
       });
       const res = await graph(`/${encodeURIComponent(phoneId)}/calls`, token, {

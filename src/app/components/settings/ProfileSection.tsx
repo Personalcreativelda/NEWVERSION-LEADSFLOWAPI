@@ -82,6 +82,41 @@ export function PhotoSourceSheet({ open, onClose, onPicked }: {
   );
 }
 
+// Todos os fusos que o browser conhece (os assistentes e os agentes de voz marcam nesta hora)
+const TIMEZONES: string[] = (() => {
+  try { return (Intl as any).supportedValuesOf('timeZone') as string[]; } catch { return ['Africa/Maputo', 'Africa/Johannesburg', 'Europe/Lisbon', 'America/Sao_Paulo', 'Africa/Luanda']; }
+})();
+
+/** Fuso horário da conta: guarda logo ao escolher */
+function TimezoneField() {
+  const [tz, setTz] = useState('');
+  const base = getApiBaseUrl();
+  const headers = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('leadflow_access_token')}` });
+  useEffect(() => {
+    fetch(`${base}/api/users/timezone`, { headers: headers() }).then((r) => r.ok ? r.json() : null)
+      // Sem resposta fica o da plataforma (o mesmo que a API usa sem escolha)
+      .then((d) => setTz(d?.timezone || 'Africa/Maputo')).catch(() => setTz('Africa/Maputo'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const change = async (value: string) => {
+    const prev = tz;
+    setTz(value);
+    const res = await fetch(`${base}/api/users/timezone`, { method: 'PUT', headers: headers(), body: JSON.stringify({ timezone: value }) }).catch(() => null);
+    if (res?.ok) toast.success('Fuso horário guardado');
+    else { setTz(prev); toast.error('Não foi possível guardar o fuso horário'); }
+  };
+  const options = tz && !TIMEZONES.includes(tz) ? [tz, ...TIMEZONES] : TIMEZONES;
+  return (
+    <div>
+      <Label htmlFor="profile-tz">Fuso horário</Label>
+      <select id="profile-tz" value={tz} onChange={(e) => void change(e.target.value)} className="mt-1.5 w-full" disabled={!tz} translate="no">
+        {!tz && <option value="">A carregar…</option>}
+        {options.map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}
+      </select>
+    </div>
+  );
+}
+
 /** Perfil: foto no topo, nome e email; Guardar só fica ativo quando há alterações */
 export function ProfileSection({ user, onUpdateUser }: { user: any; onUpdateUser: (u: any) => void }) {
   const [name, setName] = useState(user?.name || '');
@@ -169,6 +204,7 @@ export function ProfileSection({ user, onUpdateUser }: { user: any; onUpdateUser
           <Label htmlFor="profile-email">Email</Label>
           <Input id="profile-email" value={user?.email || ''} readOnly disabled className="mt-1.5 h-11" />
         </div>
+        <TimezoneField />
       </div>
 
       <Button onClick={save} disabled={!dirty || saving} className="w-full sm:w-auto">

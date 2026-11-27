@@ -2,10 +2,39 @@
 // escolhe a voz e liga-o ao número. A API recusa guardar com campos por preencher (o agente lia-os).
 // A primeira frase já diz que é um assistente virtual; as instruções não voltam a cumprimentar.
 
+export type AgentPlan = 'business' | 'enterprise';
+
+export interface AgentAgenda {
+  business_days: number[];
+  business_hours_start: string;
+  business_hours_end: string;
+  appointment_minutes: number;
+}
+
+export const DEFAULT_AGENDA: AgentAgenda = {
+  business_days: [1, 2, 3, 4, 5, 6], business_hours_start: '09:00', business_hours_end: '18:00', appointment_minutes: 60,
+};
+
+/** Ações que um agente pode fazer na chamada (grupos de ferramentas da API: voice-tools.service TOOL_GROUPS) */
+export const AGENT_ACTIONS: { value: string; label: string }[] = [
+  { value: 'agenda', label: 'Marcar, remarcar e desmarcar' },
+  { value: 'funil', label: 'Mover o lead no funil' },
+  { value: 'etiquetas', label: 'Pôr etiquetas' },
+  { value: 'contacto', label: 'Guardar nome, email e notas' },
+  { value: 'mensagens', label: 'Enviar mensagem no WhatsApp' },
+  { value: 'conversoes', label: 'Registar vendas na Meta' },
+  { value: 'equipa', label: 'Chamar a equipa' },
+];
+export const ALL_ACTIONS = AGENT_ACTIONS.map((a) => a.value);
+
 export interface AgentTemplate {
   id: string;
   name: string;
   summary: string;
+  /** Plano a partir do qual se pode usar (os outros veem-no com cadeado) */
+  plan: AgentPlan;
+  tools: string[];
+  agenda: AgentAgenda;
   greeting: string;
   instructions: string;
 }
@@ -20,6 +49,9 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
   {
     id: 'rececao',
     name: 'Receção',
+    plan: 'business',
+    tools: ['agenda', 'contacto', 'etiquetas', 'mensagens', 'equipa'],
+    agenda: DEFAULT_AGENDA,
     summary: 'Atende, responde a dúvidas e anota o contacto',
     greeting: 'Olá, fala a assistente virtual da [nome da empresa]. Em que posso ajudar?',
     instructions: `És a assistente virtual da receção da [nome da empresa]. Atendes as chamadas com simpatia e calma.
@@ -36,6 +68,9 @@ Nunca inventes preços, prazos ou informações que não estão aqui.`,
   {
     id: 'marcacoes',
     name: 'Marcações',
+    plan: 'business',
+    tools: ['agenda', 'contacto', 'mensagens', 'equipa'],
+    agenda: { ...DEFAULT_AGENDA, appointment_minutes: 30 },
     summary: 'Recolhe o pedido de marcação para a equipa confirmar',
     greeting: 'Olá, fala a assistente virtual da [nome da empresa]. Quer fazer uma marcação?',
     instructions: `És a assistente virtual da [nome da empresa] e ajudas as pessoas a pedir marcações.
@@ -56,6 +91,9 @@ Não garantas que a hora está livre: só a equipa confirma.`,
   {
     id: 'vendas',
     name: 'Vendas',
+    plan: 'enterprise',
+    tools: ALL_ACTIONS,
+    agenda: DEFAULT_AGENDA,
     summary: 'Percebe o que o cliente procura e apresenta os produtos',
     greeting: 'Olá, fala o assistente virtual da [nome da empresa]. Está à procura de algum produto?',
     instructions: `És o assistente de vendas da [nome da empresa]. Ajudas o cliente a escolher, sem pressão.
@@ -77,6 +115,9 @@ Não inventes descontos nem produtos que não estão na lista.`,
   {
     id: 'apoio',
     name: 'Apoio ao cliente',
+    plan: 'business',
+    tools: ['contacto', 'etiquetas', 'mensagens', 'equipa'],
+    agenda: DEFAULT_AGENDA,
     summary: 'Ouve o problema e passa à equipa com os detalhes',
     greeting: 'Olá, fala a assistente virtual da [nome da empresa]. Diga-me, como posso ajudar?',
     instructions: `És a assistente de apoio ao cliente da [nome da empresa]. Falas com calma e mostras que percebeste o problema.
@@ -96,6 +137,9 @@ Nunca prometas reembolsos, trocas ou prazos.`,
   {
     id: 'encomendas',
     name: 'Encomendas',
+    plan: 'enterprise',
+    tools: ['funil', 'contacto', 'etiquetas', 'mensagens', 'conversoes', 'equipa'],
+    agenda: DEFAULT_AGENDA,
     summary: 'Recebe encomendas por telefone (restaurante ou loja)',
     greeting: 'Olá, fala a assistente virtual da [nome da empresa]. Quer fazer uma encomenda?',
     instructions: `És a assistente virtual da [nome da empresa] e recebes encomendas por telefone.

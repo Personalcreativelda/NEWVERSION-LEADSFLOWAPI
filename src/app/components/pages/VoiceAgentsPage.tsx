@@ -15,7 +15,8 @@ import { useConfirm } from '../ui/ConfirmDialog';
 import { SkeletonVoiceAgentGrid } from '../ui/skeletons';
 import { CallHistory, VoiceUsageCard, WhatsAppNumbers } from '../voice-agents/WhatsAppCallsPanel';
 import { CallModal } from '../voice-agents/CallModal';
-import { AGENT_TEMPLATES, hasPlaceholders, type AgentTemplate } from '../voice-agents/agentTemplates';
+import { AGENT_TEMPLATES, ALL_ACTIONS, DEFAULT_AGENDA, hasPlaceholders, type AgentTemplate } from '../voice-agents/agentTemplates';
+import { ActionsField, AgendaFields, AgentAvatar, AvatarPicker, TemplateCard } from '../voice-agents/AgentSettings';
 import {
   voiceAgentsApi, type CallAgent, type CallAgentInput, type CallVoice, type WhatsAppCallsState,
 } from '../../services/api/voice-agents';
@@ -48,7 +49,12 @@ function CardGrid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{children}</div>;
 }
 
-const EMPTY: CallAgentInput = { name: '', instructions: '', greeting: '', voice_id: '', language: 'pt' };
+const EMPTY: CallAgentInput = {
+  name: '', instructions: '', greeting: '', voice_id: '', language: 'pt',
+  tools: ALL_ACTIONS, agenda: DEFAULT_AGENDA, avatar_url: null, template_id: null,
+};
+const PLAN_RANK: Record<string, number> = { free: 0, business: 1, enterprise: 2 };
+const showUpgrade = () => window.dispatchEvent(new CustomEvent('leadflow:show-upgrade'));
 
 export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
   const confirm = useConfirm();
@@ -98,14 +104,26 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
   const limit = state?.limit ?? 0;
   const atLimit = limit !== -1 && (state?.agents.length ?? 0) >= limit;
 
+  // Agente pronto de um plano acima do atual: aparece com cadeado e abre o upgrade
+  const locked = (t: AgentTemplate) =>
+    (PLAN_RANK[state?.plan || 'free'] ?? 0) < (PLAN_RANK[state?.template_plans?.[t.id] || t.plan] ?? 1);
+
   const openCreate = (template?: AgentTemplate) => {
+    if (limit === 0 || (template && locked(template))) {
+      showUpgrade();
+      return;
+    }
     if (atLimit) {
-      toast.error(limit === 0 ? 'O seu plano não inclui agentes de voz' : 'Chegou ao limite de agentes do seu plano');
+      toast.error('Chegou ao limite de agentes do seu plano');
+      showUpgrade();
       return;
     }
     setEditing(null);
     setForm(template
-      ? { ...EMPTY, name: template.name, greeting: template.greeting, instructions: template.instructions }
+      ? {
+        ...EMPTY, name: template.name, greeting: template.greeting, instructions: template.instructions,
+        tools: template.tools, agenda: template.agenda, template_id: template.id,
+      }
       : EMPTY);
     setOpen(true);
     void loadVoices();
@@ -113,7 +131,11 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
 
   const openEdit = (agent: CallAgent) => {
     setEditing(agent);
-    setForm({ name: agent.name, instructions: agent.instructions, greeting: agent.greeting, voice_id: agent.voice_id, language: agent.language || 'pt' });
+    setForm({
+      name: agent.name, instructions: agent.instructions, greeting: agent.greeting, voice_id: agent.voice_id,
+      language: agent.language || 'pt', tools: agent.tools || ALL_ACTIONS, agenda: agent.agenda || DEFAULT_AGENDA,
+      avatar_url: agent.avatar_url || null, template_id: agent.template_id || null,
+    });
     setOpen(true);
     void loadVoices();
   };
@@ -200,7 +222,7 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
                   title="Ainda sem agentes"
                   description={limit === 0 ? 'O seu plano não inclui agentes de voz.' : 'Crie um agente ou escolha um dos prontos.'}
                   action={limit === 0
-                    ? <Button onClick={() => window.dispatchEvent(new CustomEvent('leadflow:show-upgrade'))}>Melhorar plano</Button>
+                    ? <Button onClick={showUpgrade}>Melhorar plano</Button>
                     : <Button onClick={() => openCreate()}>Criar agente</Button>}
                 />
               ) : (
@@ -209,7 +231,8 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
                     const numbers = usedOn(agent.id);
                     return (
                       <div key={agent.id} className={CARD}>
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-start gap-3">
+                          <AgentAvatar name={agent.name} url={agent.avatar_url} />
                           <div className="min-w-0 flex-1">
                             <h3 className="truncate text-sm font-semibold text-foreground" translate="no">{agent.name}</h3>
                             <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -237,23 +260,13 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
               )}
             </Section>
 
-            {limit !== 0 && (
-              <Section title="Agentes prontos">
-                <CardGrid>
-                  {AGENT_TEMPLATES.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => openCreate(t)}
-                      className={`${CARD} text-left transition-colors hover:border-foreground/25 hover:bg-muted/40`}
-                    >
-                      <span className="truncate text-sm font-semibold text-foreground">{t.name}</span>
-                      <span className="mt-0.5 text-xs text-muted-foreground">{t.summary}</span>
-                    </button>
-                  ))}
-                </CardGrid>
-              </Section>
-            )}
+            <Section title="Agentes prontos">
+              <CardGrid>
+                {AGENT_TEMPLATES.map((t) => (
+                  <TemplateCard key={t.id} template={t} locked={locked(t)} onClick={() => openCreate(t)} className={CARD} />
+                ))}
+              </CardGrid>
+            </Section>
 
             <Section title="Números">
               <WhatsAppNumbers state={state} onChanged={() => void load()} />
@@ -285,6 +298,8 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
               Troque os campos entre [ ] pelos dados da sua empresa.
             </p>
           )}
+          <AvatarPicker name={form.name} url={form.avatar_url} onChange={(url) => setForm({ ...form, avatar_url: url })} />
+
           <div>
             <Label htmlFor="va-name" className="mb-1.5 block">Nome</Label>
             <Input id="va-name" value={form.name} maxLength={100} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Receção" />
@@ -355,6 +370,30 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
               </select>
             </div>
           </div>
+
+          <details className="group rounded-lg border border-border">
+            <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between px-3 text-sm font-medium text-foreground">
+              Ações na chamada
+              <span className="text-xs font-normal text-muted-foreground">{(form.tools || ALL_ACTIONS).length} de {ALL_ACTIONS.length}</span>
+            </summary>
+            <div className="border-t border-border p-3">
+              <ActionsField value={form.tools} onChange={(tools) => setForm({ ...form, tools })} />
+            </div>
+          </details>
+
+          {(form.tools || ALL_ACTIONS).includes('agenda') && (
+            <details className="group rounded-lg border border-border">
+              <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between px-3 text-sm font-medium text-foreground">
+                Agenda
+                <span className="text-xs font-normal text-muted-foreground" translate="no">
+                  {(form.agenda || DEFAULT_AGENDA).business_hours_start}–{(form.agenda || DEFAULT_AGENDA).business_hours_end}
+                </span>
+              </summary>
+              <div className="border-t border-border p-3">
+                <AgendaFields value={form.agenda} onChange={(agenda) => setForm({ ...form, agenda })} />
+              </div>
+            </details>
+          )}
         </div>
       </AppModal>
     </div>

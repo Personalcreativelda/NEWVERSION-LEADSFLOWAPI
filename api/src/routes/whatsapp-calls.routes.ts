@@ -1,6 +1,7 @@
 // /api/whatsapp-calls — agentes de voz que atendem as chamadas do WhatsApp Business
 //   GET    /              disponível?, números WhatsApp Business, agentes da conta, últimas chamadas, limite do plano
 //   GET    /voices        vozes que se podem escolher
+//   POST   /avatar        foto do agente (multipart "avatar") → { url }
 //   POST   /agents        criar agente { name, instructions, greeting, voice_id, language }
 //   PUT    /agents/:id    editar agente
 //   DELETE /agents/:id    apagar agente (desliga-o dos números que o usavam)
@@ -14,6 +15,7 @@
 // configura chaves e só vê os seus (voice_agents.user_id).
 import { Router } from 'express';
 import { Readable } from 'stream';
+import multer from 'multer';
 import { requireAuth } from '../middleware/auth.middleware';
 import { query } from '../database/connection';
 import { getUserProfile } from '../services/users.service';
@@ -23,8 +25,12 @@ import {
 } from '../services/whatsapp-calls.service';
 import { whatsappCallsService } from '../services/whatsapp-calls.service';
 import { voiceUsage } from '../services/voice-usage.service';
+import { TOOL_GROUPS } from '../services/voice-tools.service';
+import { getStorageService } from '../services/storage.service';
+import { publicFileUrl } from '../utils/storage-urls';
 
 const router = Router();
+const avatarUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 router.use(requireAuth);
 
 const parse = (v: any) => (typeof v === 'string' ? (() => { try { return JSON.parse(v); } catch { return {}; } })() : v || {});
@@ -53,7 +59,44 @@ function readAgent(body: any): { error: string } | ManagedAgentInput {
   if (instructions.length > 8000 || greeting.length > 500 || name.length > 100) return { error: 'Texto demasiado longo' };
   // Modelos prontos trazem campos como [nome da empresa]: o agente lê-los-ia em voz alta
   if (/\[[^\]]{2,60}\]/.test(`${greeting}\n${instructions}`)) return { error: 'Substitua os campos entre [ ] pelos dados da sua empresa' };
-  return { name, instructions, greeting, voice_id, language };
+  const tools = Array.isArray(body?.tools)
+    ? [...new Set(body.tools.map(String).filter((g: string) => g in TOOL_GROUPS))] as string[]
+    : undefined;
+  return { name, instructions, greeting, voice_id, language, tools };
+}
+
+/** Agenda do agente (mesmas chaves que agendaOptions lê nos assistentes) */
+function readAgenda(raw: any) {
+  const hhmm = (v: any, d: string) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(v || '')) ? String(v) : d);
+  const days = Array.isArray(raw?.business_days)
+    ? [...new Set(raw.business_days.map(Number).filter((d: number) => Number.isInteger(d) && d >= 0 && d <= 6))]
+    : [1, 2, 3, 4, 5, 6];
+  const start = hhmm(raw?.business_hours_start, '09:00');
+  const end = hhmm(raw?.business_hours_end, '18:00');
+  return {
+    business_days: days.length ? days : [1, 2, 3, 4, 5, 6],
+    business_hours_start: start,
+    business_hours_end: end > start ? end : '18:00',
+    appointment_minutes: Math.min(Math.max(Number(raw?.appointment_minutes) || 60, 15), 240),
+  };
+}
+
+// Agentes prontos pagos: o plano mínimo de cada um (o painel mostra-os com cadeado)
+const TEMPLATE_PLAN: Record<string, 'business' | 'enterprise'> = {
+  rececao: 'business', marcacoes: 'business', apoio: 'business', vendas: 'enterprise', encomendas: 'enterprise',
+};
+const PLAN_RANK: Record<string, number> = { free: 0, business: 1, enterprise: 2 };
+const planAllows = (plan: string | undefined, needed: string) => (PLAN_RANK[String(plan || 'free')] ?? 0) >= (PLAN_RANK[needed] ?? 1);
+
+/** Extras guardados em call_config: agenda, ações, foto e o modelo de origem */
+function agentExtras(body: any, input: ManagedAgentInput) {
+  const avatar = String(body?.avatar_url || '').trim();
+  return {
+    agenda: readAgenda(body?.agenda),
+    ...(input.tools ? { tools: input.tools } : {}),
+    avatar_url: avatar && avatar.length < 1000 && /^(https?:\/\/|\/api\/files\/)/.test(avatar) ? avatar : null,
+    ...(body?.template_id && TEMPLATE_PLAN[String(body.template_id)] ? { template_id: String(body.template_id) } : {}),
+  };
 }
 
 router.get('/', async (req: any, res) => {
@@ -86,6 +129,9 @@ router.get('/', async (req: any, res) => {
     res.json({
       available: callsEnabled() && bridgeConfigured() && !!process.env.ELEVENLABS_API_KEY,
       limit: profile?.limits?.voiceAgents ?? 0,
+      plan: String(profile?.plan || 'free'),
+      // Agentes prontos: plano mínimo de cada um (os outros aparecem com cadeado)
+      template_plans: TEMPLATE_PLAN,
       channels: channels.rows.map((c: any) => {
         const cfg = parse(c.settings).whatsapp_calls || {};
         return { id: c.id, name: c.name, phone: c.phone, enabled: !!cfg.enabled, voice_agent_id: cfg.voice_agent_id || null };
@@ -101,6 +147,10 @@ router.get('/', async (req: any, res) => {
           voice_id: parse(a.voice_config).voice_id || '',
           ready: !!call.elevenlabs_agent_id,
           managed: !!call.managed,
+          agenda: readAgenda(call.agenda),
+          tools: Array.isArray(call.tools) ? call.tools : Object.keys(TOOL_GROUPS),
+          avatar_url: call.avatar_url || null,
+          template_id: call.template_id || null,
         };
       }),
       calls: calls.rows,
@@ -157,6 +207,19 @@ router.get('/calls/:id/audio', async (req: any, res) => {
   }
 });
 
+// Foto do agente (imagem até 2 MB) → URL para guardar com o agente
+router.post('/avatar', avatarUpload.single('avatar'), async (req: any, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'Escolha uma imagem' });
+    if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.mimetype)) return res.status(400).json({ error: 'Use uma imagem PNG, JPG ou WebP' });
+    const url = await getStorageService().uploadFile(file, 'avatars', req.user.id);
+    res.json({ url: publicFileUrl(url) });
+  } catch (err: any) {
+    fail(res, err, 'foto');
+  }
+});
+
 router.get('/voices', async (_req, res) => {
   try {
     res.json({ voices: await listVoices() });
@@ -176,8 +239,13 @@ router.post('/agents', async (req: any, res) => {
     if (limit !== -1) {
       const count = Number((await query('SELECT COUNT(*) AS n FROM voice_agents WHERE user_id = $1', [userId])).rows[0]?.n || 0);
       if (count >= limit) {
-        return res.status(403).json({ error: limit === 0 ? 'O seu plano não inclui agentes de voz' : 'Chegou ao limite de agentes do seu plano' });
+        return res.status(403).json({ error: limit === 0 ? 'O seu plano não inclui agentes de voz' : 'Chegou ao limite de agentes do seu plano', code: 'PLAN' });
       }
+    }
+    const extras = agentExtras(req.body, input);
+    const needed = extras.template_id ? TEMPLATE_PLAN[extras.template_id] : null;
+    if (needed && !planAllows(profile?.plan, needed)) {
+      return res.status(403).json({ error: `Este agente pronto é do plano ${needed === 'enterprise' ? 'Enterprise' : 'Business'}`, code: 'PLAN' });
     }
 
     const agentId = await createManagedAgent(input);
@@ -187,7 +255,7 @@ router.post('/agents', async (req: any, res) => {
                                    greeting_message, instructions, language, is_active)
          VALUES ($1, $2, 'elevenlabs', $3, 'whatsapp', $4, $5, $6, $7, true) RETURNING id`,
         [userId, input.name, JSON.stringify({ voice_id: input.voice_id }),
-          JSON.stringify({ elevenlabs_agent_id: agentId, managed: true, prompt_v: AGENT_PROMPT_VERSION }), input.greeting, input.instructions, input.language],
+          JSON.stringify({ elevenlabs_agent_id: agentId, managed: true, prompt_v: AGENT_PROMPT_VERSION, ...extras }), input.greeting, input.instructions, input.language],
       )).rows[0];
       res.status(201).json({ id: row.id });
     } catch (err) {
@@ -208,6 +276,8 @@ router.put('/agents/:id', async (req: any, res) => {
     if (!agent) return res.status(404).json({ error: 'Agente não encontrado' });
 
     const call = parse(agent.call_config);
+    if (!input.tools && Array.isArray(call.tools)) input.tools = call.tools; // sem escolha mantém as ações
+    const extras = { ...agentExtras(req.body, input), template_id: call.template_id || null };
     let agentId = call.managed ? call.elevenlabs_agent_id : null;
     if (agentId) await updateManagedAgent(agentId, input);
     else agentId = await createManagedAgent(input); // agente antigo (da conta do cliente) passa a ser gerido aqui
@@ -218,7 +288,7 @@ router.put('/agents/:id', async (req: any, res) => {
               greeting_message = $6, instructions = $7, language = $8, updated_at = NOW()
         WHERE id = $1 AND user_id = $2`,
       [agent.id, userId, input.name, JSON.stringify({ voice_id: input.voice_id }),
-        JSON.stringify({ elevenlabs_agent_id: agentId, managed: true, prompt_v: AGENT_PROMPT_VERSION }), input.greeting, input.instructions, input.language],
+        JSON.stringify({ elevenlabs_agent_id: agentId, managed: true, prompt_v: AGENT_PROMPT_VERSION, ...extras }), input.greeting, input.instructions, input.language],
     );
     res.json({ ok: true });
   } catch (err: any) {

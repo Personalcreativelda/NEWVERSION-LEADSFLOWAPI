@@ -29,6 +29,8 @@ export class CallSession {
    * @param {object} [opts.peerConfig]     configuração do werift (portas UDP, IP público)
    * @param {number} [opts.maxSeconds]     duração máxima da chamada
    * @param {(result: object) => void} [opts.onEnded]
+   * @param {(tool: string, parameters: object) => Promise<{result: string, is_error: boolean}>} [opts.onToolCall]
+   *        o agente pediu uma ferramenta (marcar, mover o lead…): a API executa e devolve o resultado
    * @param {(...args: any[]) => void} [opts.log]
    */
   constructor(opts) {
@@ -40,6 +42,7 @@ export class CallSession {
     this.peerConfig = opts.peerConfig || {};
     this.maxSeconds = opts.maxSeconds || 1800;
     this.onEnded = opts.onEnded || (() => {});
+    this.onToolCall = opts.onToolCall || null;
     this.log = opts.log || ((...a) => console.log(`[call ${this.callId}]`, ...a));
 
     this.codec = new OpusCodec();
@@ -267,6 +270,9 @@ export class CallSession {
       case 'interruption':
         this.interrupt();
         break;
+      case 'client_tool_call':
+        void this.handleToolCall(msg.client_tool_call || {});
+        break;
       case 'ping':
         this.ws?.send(JSON.stringify({ type: 'pong', event_id: msg.ping_event?.event_id }));
         break;
@@ -289,6 +295,26 @@ export class CallSession {
       default:
         break;
     }
+  }
+
+  /** Ferramenta pedida pelo agente: executa na API e devolve o resultado (se o agente espera resposta) */
+  async handleToolCall(call) {
+    const { tool_name: tool, tool_call_id: id, parameters, expects_response: expects } = call;
+    if (!tool || !id) return;
+    this.stats.toolCalls = (this.stats.toolCalls || 0) + 1;
+    let out = { result: 'Ferramenta indisponível.', is_error: true };
+    if (this.onToolCall) {
+      try {
+        out = await this.onToolCall(tool, parameters || {});
+      } catch (err) {
+        this.log('Ferramenta falhou:', tool, err?.message);
+        out = { result: 'Não foi possível concluir agora.', is_error: true };
+      }
+    }
+    if (expects === false || this.ws?.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({
+      type: 'client_tool_result', tool_call_id: id, result: String(out.result ?? ''), is_error: !!out.is_error,
+    }));
   }
 
   elapsed() {
