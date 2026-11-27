@@ -12,6 +12,7 @@ import usersRoutes from './users.routes';
 import plansRoutes from './plans.routes';
 import adminPlansRoutes from './admin-plans.routes';
 import adminRoutes from './admin.routes';
+import adminBackupsRoutes from './admin-backups.routes';
 import notificationsRoutes from './notifications.routes';
 import securityRoutes from './security.routes';
 import webhooksRoutes from './webhooks.routes';
@@ -112,6 +113,7 @@ router.use('/smtp', smtpRoutes);
 router.use('/users', usersRoutes);
 router.use('/user', usersRoutes);         // Alias for compatibility
 router.use('/admin/plans', adminPlansRoutes);
+router.use('/admin/backups', adminBackupsRoutes);
 router.use('/admin', adminRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/security', securityRoutes);

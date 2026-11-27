@@ -239,6 +239,18 @@ Há um emulador `Medium_Phone_API_37.0`.
 - **Sessão**: access token JWT 24h, refresh 7 dias (renovação automática em `api.ts`); sem
   rede ao abrir o app usa o utilizador em cache em vez de terminar a sessão.
 
+## Cópias de segurança (Administração → Cópias de segurança)
+
+- `services/backup.service.ts` + `routes/admin-backups.routes.ts` (só admin): `pg_dump -Fc` → cifrado AES-256-GCM
+  (`.lfbak`, chave `BACKUP_ENCRYPTION_KEY` ou, sem ela, `CHANNEL_SECRETS_KEY`) → bucket privado `MINIO_BACKUP_BUCKET`
+  e, se configurado, S3 externo `BACKUP_S3_*` (R2/B2/AWS). A base de dados e o MinIO estão na mesma VPS: só o externo
+  (ou descarregar) protege contra perder a VPS. Mudar a chave depois torna as cópias antigas ilegíveis.
+- A lista vem do armazenamento (não de tabela). Criar/restaurar correm em segundo plano (Cloudflare corta aos 100 s);
+  o resultado fica em `/tmp/leadsflow-backup-last.json`. Restaurar: escrever RESTAURAR + palavra-passe, cópia "antes de
+  restaurar" automática, `pg_restore --clean --single-transaction`, depois a API reinicia (migrações correm de novo).
+- Diária à hora `BACKUP_HOUR_UTC` (1 = 03:00 Maputo), guarda `BACKUP_KEEP` automáticas. `postgresql-client` no Dockerfile.
+  Só a base de dados: ficheiros do MinIO (fotos, áudios, anexos) não entram. Importar pelo painel passa pelo Cloudflare (100 MB).
+
 ## Fluxos de remarketing
 
 - Motor em `api/src/services/flow-execution.service.ts`: o estado de cada lead fica em `flow_enrollments`

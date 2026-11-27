@@ -15,6 +15,7 @@ import { AdminActivityTab } from './admin/AdminActivityTab';
 import { AdminMarketingTab } from './admin/AdminMarketingTab';
 import { AdminDashboardTab } from './admin/AdminDashboardTab';
 import { AdminDiagnosticsTab } from './admin/AdminDiagnosticsTab';
+import { AdminBackupsTab } from './admin/AdminBackupsTab';
 import { AdminPaymentsTab } from './admin/AdminPaymentsTab';
 
 import { UserDetailsModal } from './admin/UserDetailsModal';
@@ -65,7 +66,7 @@ export default function AdminPage(_props: AdminPageProps = {}) {
   const [plansPricing, setPlansPricing] = useState<PlanPricing[]>([]);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [filterPlan, setFilterPlan] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'activity' | 'marketing' | 'payments' | 'settings' | 'feedback' | 'diagnostics'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'activity' | 'marketing' | 'payments' | 'settings' | 'feedback' | 'diagnostics' | 'backups'>('dashboard');
   const [feedbackList, setFeedbackList] = useState<any[]>([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [activities, setActivities] = useState<any[]>([]);
@@ -546,6 +547,8 @@ export default function AdminPage(_props: AdminPageProps = {}) {
       )}
 
       {activeTab === 'diagnostics' && <AdminDiagnosticsTab />}
+
+      {activeTab === 'backups' && <AdminBackupsTab />}
 
       {/* Modals — always rendered regardless of active tab */}
       {showAddUserModal && (

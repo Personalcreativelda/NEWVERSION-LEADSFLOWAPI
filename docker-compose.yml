@@ -5,29 +5,42 @@ services:
       - "${API_PORT:-4001}:4001"
     env_file: .env
     environment:
+      # ── Servidor ────────────────────────────────────────────────────────────
+      - PORT=4000
+      - APP_URL=${APP_URL:-https://app.leadsflowapi.com}
+      - FRONTEND_URL=${FRONTEND_URL:-}
+      # Endereço público da API (links de ficheiros, webhooks, logins da Meta e do Google)
+      - API_URL=${API_URL:-}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,https://app.leadsflowapi.com}
+      - APP_TIMEZONE=${APP_TIMEZONE:-Africa/Maputo}
+      # ── Segurança (gerar uma vez; nunca mudar a CHANNEL_SECRETS_KEY depois de definida) ──
+      - JWT_SECRET=${JWT_SECRET}
+      - CHANNEL_SECRETS_KEY=${CHANNEL_SECRETS_KEY:-}
+      - DIAGNOSTIC_SECRET=${DIAGNOSTIC_SECRET:-}
+      - ALERT_EMAIL=${ALERT_EMAIL:-}
+      # ── Base de dados ───────────────────────────────────────────────────────
       - PG_HOST=${PG_HOST}
       - PG_PORT=${PG_PORT:-5432}
       - PG_DATABASE=${PG_DATABASE:-leadflow}
       - PG_USER=${PG_USER}
       - PG_PASSWORD=${PG_PASSWORD}
       - PG_SSL=${PG_SSL:-false}
-      - PORT=4000
-      - JWT_SECRET=${JWT_SECRET}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,https://app.leadsflowapi.com}
-      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-}
-      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-}
+      # ── Contas iniciais ─────────────────────────────────────────────────────
+      - ALLOW_SETUP=${ALLOW_SETUP:-false}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - DEMO_EMAIL=${DEMO_EMAIL:-}
+      - DEMO_PASSWORD=${DEMO_PASSWORD:-}
+      - REQUIRE_EMAIL_CONFIRMATION=${REQUIRE_EMAIL_CONFIRMATION:-false}
+      # ── Email (SMTP) ────────────────────────────────────────────────────────
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-LeadsFlow API <noreply@leadsflowapi.com>}
-      - APP_URL=${APP_URL:-http://localhost:3000}
-      - REQUIRE_EMAIL_CONFIRMATION=${REQUIRE_EMAIL_CONFIRMATION:-false}
-      - ALLOW_SETUP=${ALLOW_SETUP:-false}
-      - DEMO_EMAIL=${DEMO_EMAIL:-}
-      - DEMO_PASSWORD=${DEMO_PASSWORD:-}
-      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-}
+      # ── Ficheiros (MinIO) ───────────────────────────────────────────────────
       - MINIO_ENDPOINT=${MINIO_ENDPOINT:-}
       - MINIO_PORT=${MINIO_PORT:-9000}
       - MINIO_USE_SSL=${MINIO_USE_SSL:-true}
@@ -38,13 +51,58 @@ services:
       - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-}
       - SERVICE_USER_MINIO=${SERVICE_USER_MINIO:-}
       - SERVICE_PASSWORD_MINIO=${SERVICE_PASSWORD_MINIO:-}
-      # Firebase Admin: manter apenas no ambiente da API/Coolify.
+      # ── Cópias de segurança (Administração → Cópias de segurança) ───────────
+      # Chave das cópias; vazia = usa a CHANNEL_SECRETS_KEY. Guardar fora da VPS: sem ela as cópias não abrem.
+      - BACKUP_ENCRYPTION_KEY=${BACKUP_ENCRYPTION_KEY:-}
+      - MINIO_BACKUP_BUCKET=${MINIO_BACKUP_BUCKET:-leadsflow-backups}
+      - BACKUP_KEEP=${BACKUP_KEEP:-14}
+      - BACKUP_HOUR_UTC=${BACKUP_HOUR_UTC:-1}
+      # Armazenamento fora da VPS (Cloudflare R2: endpoint https://<conta>.r2.cloudflarestorage.com)
+      - BACKUP_S3_ENDPOINT=${BACKUP_S3_ENDPOINT:-}
+      - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
+      - BACKUP_S3_ACCESS_KEY=${BACKUP_S3_ACCESS_KEY:-}
+      - BACKUP_S3_SECRET_KEY=${BACKUP_S3_SECRET_KEY:-}
+      - BACKUP_S3_REGION=${BACKUP_S3_REGION:-auto}
+      # ── Meta (Facebook, Instagram, WhatsApp Business, API de Conversões) ───
+      - META_APP_ID=${META_APP_ID:-}
+      - META_APP_SECRET=${META_APP_SECRET:-}
+      - META_LOGIN_CONFIG_ID=${META_LOGIN_CONFIG_ID:-}
+      - META_WA_CONFIG_ID=${META_WA_CONFIG_ID:-}
+      - META_INSTAGRAM_APP_ID=${META_INSTAGRAM_APP_ID:-}
+      - META_INSTAGRAM_APP_SECRET=${META_INSTAGRAM_APP_SECRET:-}
+      - META_VERIFY_TOKEN=${META_VERIFY_TOKEN:-}
+      - META_FACEBOOK_COMMENTS=${META_FACEBOOK_COMMENTS:-true}
+      - META_COMMENTS_ENABLED=${META_COMMENTS_ENABLED:-false}
+      # ── WhatsApp por código QR (Evolution) ─────────────────────────────────
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-}
+      # ── IA dos assistentes ──────────────────────────────────────────────────
+      - AI_PROVIDER=${AI_PROVIDER:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # ── Voz: ElevenLabs e chamadas do WhatsApp (serviço voice-bridge abaixo) ─
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - ELEVENLABS_DEFAULT_VOICE_ID=${ELEVENLABS_DEFAULT_VOICE_ID:-}
+      - WHATSAPP_CALLS_ENABLED=${WHATSAPP_CALLS_ENABLED:-true}
+      - VOICE_BRIDGE_URL=http://voice-bridge:8090
+      - VOICE_BRIDGE_TOKEN=${VOICE_BRIDGE_TOKEN:-}
+      # ── Google: login, Google Drive (base de conhecimento) e Encontrar leads ─
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_PICKER_API_KEY=${GOOGLE_PICKER_API_KEY:-}
+      - GOOGLE_PROJECT_NUMBER=${GOOGLE_PROJECT_NUMBER:-}
+      - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY:-}
+      # ── Pagamentos (Stripe) ─────────────────────────────────────────────────
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      # ── Notificações push (Firebase) ────────────────────────────────────────
       # FIREBASE_SERVICE_ACCOUNT_JSON pode ser o JSON da conta de serviço em base64.
       - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON:-}
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-}
       - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL:-}
       - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY:-}
-      # Google Play Billing: credenciais e notificações ficam apenas na API.
+      # ── Google Play (assinaturas no app da loja) ────────────────────────────
       - GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-}
       - GOOGLE_PLAY_PACKAGE_NAME=${GOOGLE_PLAY_PACKAGE_NAME:-com.leadsflowapi.app}
       - GOOGLE_PLAY_ACCOUNT_SECRET=${GOOGLE_PLAY_ACCOUNT_SECRET:-}
@@ -56,13 +114,8 @@ services:
       - GOOGLE_PLAY_ENTERPRISE_ANNUAL_BASE_PLAN_ID=${GOOGLE_PLAY_ENTERPRISE_ANNUAL_BASE_PLAN_ID:-annual}
       - GOOGLE_PLAY_PUBSUB_AUDIENCE=${GOOGLE_PLAY_PUBSUB_AUDIENCE:-}
       - GOOGLE_PLAY_PUBSUB_SERVICE_ACCOUNT_EMAIL=${GOOGLE_PLAY_PUBSUB_SERVICE_ACCOUNT_EMAIL:-}
-      - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY:-}
-      - META_FACEBOOK_COMMENTS=${META_FACEBOOK_COMMENTS:-true}
-      - META_COMMENTS_ENABLED=${META_COMMENTS_ENABLED:-false}
-      # Chamadas do WhatsApp atendidas por agentes de voz (serviço voice-bridge abaixo, pela rede interna)
-      - WHATSAPP_CALLS_ENABLED=${WHATSAPP_CALLS_ENABLED:-true}
-      - VOICE_BRIDGE_URL=http://voice-bridge:8090
-      - VOICE_BRIDGE_TOKEN=${VOICE_BRIDGE_TOKEN:-}
+      # ── Atualizações ao vivo do app (npm run release:mobile) ───────────────
+      - MOBILE_RELEASE_KEY=${MOBILE_RELEASE_KEY:-}
     restart: unless-stopped
     # O processo 1 de um contentor ignora sinais enviados de dentro dele: com o init (tini)
     # o vigilante da API consegue terminá-la quando bloqueia (api/src/services/health.service.ts)
