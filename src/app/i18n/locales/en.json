@@ -5074,5 +5074,10 @@
  "Pedido enviado. Vai receber um aviso quando o cliente responder.": "Request sent. You'll be notified when the customer replies.",
  "Não foi possível pedir autorização": "Could not ask for permission",
  "Objetivo: {0}": "Goal: {0}",
- "Podemos ligar-lhe pelo WhatsApp?": "May we call you on WhatsApp?"
+ "Podemos ligar-lhe pelo WhatsApp?": "May we call you on WhatsApp?",
+ "Atendem e fazem chamadas pelo WhatsApp": "Answer and make calls on WhatsApp",
+ "Crie um agente ou escolha um dos prontos.": "Create an agent or pick a ready-made one.",
+ "Recusada porque os minutos do plano acabaram.": "Declined because the plan's minutes ran out.",
+ "Recusada porque o plano não inclui chamadas.": "Declined because the plan doesn't include calls.",
+ "Recusada: este número já ligou muitas vezes nas últimas 24 horas.": "Declined: this number already called many times in the last 24 hours."
 }

@@ -1,5 +1,6 @@
 // Números WhatsApp Business (que agente atende) e histórico das chamadas atendidas.
 import { useEffect, useState } from 'react';
+import { PhoneIncoming, PhoneOutgoing } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
@@ -8,7 +9,25 @@ import { voiceAgentsApi, type VoiceUsage, type WhatsAppCallsState } from '../../
 
 const fmtDuration = (s: number | null) => {
   const n = Number(s) || 0;
+  if (!n) return '—';
   return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
+};
+
+/** 258849998877 → +258 84 999 8877 (igual aos números da empresa); outros países em grupos de 3 */
+export const fmtPhone = (raw: string) => {
+  const d = String(raw || '').replace(/\D/g, '');
+  if (!d) return raw;
+  if (d.startsWith('258') && d.length === 12) return `+258 ${d.slice(3, 5)} ${d.slice(5, 8)} ${d.slice(8)}`;
+  return `+${d.replace(/(\d{3})(?=\d)/g, '$1 ')}`;
+};
+
+const fmtWhen = (iso: string | null) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleString('pt-PT', {
+    day: '2-digit', month: '2-digit', ...(sameYear ? {} : { year: 'numeric' }), hour: '2-digit', minute: '2-digit',
+  });
 };
 
 const STATUS: Record<string, string> = {
@@ -23,9 +42,9 @@ const STATUS: Record<string, string> = {
 
 // Porque é que a chamada recebida foi recusada (voice-usage.service)
 const REJECT_REASON: Record<string, string> = {
-  NO_MINUTES: 'Sem minutos',
-  PLAN: 'Fora do plano',
-  CALLER_LIMIT: 'Demasiadas chamadas deste número',
+  NO_MINUTES: 'Recusada porque os minutos do plano acabaram.',
+  PLAN: 'Recusada porque o plano não inclui chamadas.',
+  CALLER_LIMIT: 'Recusada: este número já ligou muitas vezes nas últimas 24 horas.',
 };
 
 /** Minutos de chamadas usados neste período (recebidas + feitas) */
@@ -114,7 +133,8 @@ export function WhatsAppNumbers({ state, onChanged }: { state: WhatsAppCallsStat
             <label className="flex shrink-0 items-center gap-2 text-sm text-foreground">
               <Switch
                 checked={ch.enabled}
-                disabled={saving === ch.id || !ch.voice_agent_id}
+                // Sem agente fica visível (desativado ficava quase invisível): ao tocar pede o agente
+                disabled={saving === ch.id}
                 onCheckedChange={(v) => void save(ch.id, v, ch.voice_agent_id)}
               />
               Atender
@@ -185,24 +205,34 @@ export function CallHistory({ calls }: { calls: WhatsAppCallsState['calls'] }) {
           <button
             type="button"
             onClick={() => setOpen(open === c.id ? null : c.id)}
+            aria-expanded={open === c.id}
             className="flex w-full items-center gap-3 text-left"
           >
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+              title={c.direction === 'outbound' ? 'Feita' : 'Recebida'}
+            >
+              {c.direction === 'outbound' ? <PhoneOutgoing className="h-4 w-4" /> : <PhoneIncoming className="h-4 w-4" />}
+            </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground" translate="no">{c.caller_name || c.phone_number}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {c.direction === 'outbound' ? 'Feita' : 'Recebida'} · {c.started_at ? new Date(c.started_at).toLocaleString() : ''} · {c.agent_name || '—'}
+              <p className="truncate text-sm font-medium text-foreground" translate="no">{c.caller_name || fmtPhone(c.phone_number)}</p>
+              <p className="truncate text-xs text-muted-foreground" translate="no">
+                {c.caller_name ? `${fmtPhone(c.phone_number)} · ` : ''}{fmtWhen(c.started_at)}
               </p>
             </div>
-            <span className="shrink-0 text-right text-xs text-muted-foreground">
-              {STATUS[c.status] || c.status}
-              {c.status === 'rejected' && c.reject_reason && REJECT_REASON[c.reject_reason] && (
-                <span className="block">{REJECT_REASON[c.reject_reason]}</span>
-              )}
-            </span>
-            <span className="w-12 shrink-0 text-right text-sm tabular-nums text-foreground">{fmtDuration(c.duration_seconds)}</span>
+            <div className="shrink-0 text-right">
+              <p className="text-sm tabular-nums text-foreground">{fmtDuration(c.duration_seconds)}</p>
+              <p className="text-xs text-muted-foreground">{STATUS[c.status] || c.status}</p>
+            </div>
           </button>
           {open === c.id && (
-            <div className="mt-3 space-y-3">
+            <div className="mt-3 space-y-3 sm:pl-[52px]">
+              <p className="text-xs text-muted-foreground">
+                {c.direction === 'outbound' ? 'Feita' : 'Recebida'}{c.agent_name ? ` · ${c.agent_name}` : ''}
+              </p>
+              {c.status === 'rejected' && c.reject_reason && REJECT_REASON[c.reject_reason] && (
+                <p className="text-sm text-foreground">{REJECT_REASON[c.reject_reason]}</p>
+              )}
               {c.purpose && <p className="text-sm text-muted-foreground" translate="no">Objetivo: {c.purpose}</p>}
               <CallRecording call={c} />
               <p className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm text-foreground" translate="no">

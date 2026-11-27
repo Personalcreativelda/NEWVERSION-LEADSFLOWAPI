@@ -34,7 +34,8 @@
   --border: 220 13% 91%;
   --input: 220 13% 91%;
   --input-background: 0 0% 100%;
-  --switch-background: 220 14% 93%;
+  /* Interruptor desligado: tem de se ver em cima de um cartão branco (93% desaparecia) */
+  --switch-background: 220 12% 80%;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
   --ring: 221 83% 53%;

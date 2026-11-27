@@ -2,9 +2,9 @@
 // O cliente só cria o agente (nome, instruções, primeira frase, voz) e escolhe que número ele atende;
 // chaves e contas do ElevenLabs ficam do lado da plataforma (api/src/routes/whatsapp-calls.routes.ts).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pause, Pencil, PhoneCall, Play, Trash2 } from 'lucide-react';
+import { Pause, Pencil, PhoneCall, PhoneOutgoing, Play, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { PageHeader } from '../base/PageHeader';
+import { PageAction, PageHeader } from '../base/PageHeader';
 import { EmptyState } from '../base/EmptyState';
 import { AppModal } from '../base/AppModal';
 import { Button } from '../ui/button';
@@ -30,6 +30,23 @@ const LANGUAGES = [
   { value: 'es', label: 'Español' },
   { value: 'fr', label: 'Français' },
 ];
+
+// Cartões e secções iguais em toda a página
+const CARD = 'flex h-full min-w-0 flex-col rounded-lg border border-border bg-card p-4';
+const ICON_BUTTON = 'flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground';
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="mb-3 text-base font-semibold text-foreground">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function CardGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{children}</div>;
+}
 
 const EMPTY: CallAgentInput = { name: '', instructions: '', greeting: '', voice_id: '', language: 'pt' };
 
@@ -155,17 +172,19 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
   const canSave = form.name.trim() && form.instructions.trim() && form.greeting.trim() && form.voice_id && !unfilled;
 
   return (
-    <div className="w-full h-full overflow-y-auto">
-      <div className="px-3 pt-4 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8">
-        <PageHeader
-          title="Agentes de voz"
-          description="Atendem as chamadas do WhatsApp"
-          icon={PhoneCall}
-          create={state?.available ? { label: 'Criar agente', onClick: () => openCreate() } : undefined}
-        />
-      </div>
+    // Página normal: as margens e o deslizar vêm do PageContainer do Dashboard (como Campanhas, Funil…)
+    <div className="w-full min-w-0">
+      <PageHeader
+        title="Agentes de voz"
+        description="Atendem e fazem chamadas pelo WhatsApp"
+        icon={PhoneCall}
+        actions={state?.available && canCall
+          ? <PageAction icon={PhoneOutgoing} label="Ligar" onClick={() => setCalling(true)} />
+          : undefined}
+        create={state?.available ? { label: 'Criar agente', onClick: () => openCreate() } : undefined}
+      />
 
-      <div className="space-y-8 px-3 py-6 sm:px-6 lg:px-10">
+      <div className="space-y-8">
         {loading ? (
           <SkeletonVoiceAgentGrid count={3} />
         ) : !state?.available ? (
@@ -174,46 +193,39 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
           <>
             {state.usage && limit !== 0 && <VoiceUsageCard usage={state.usage} />}
 
-            <section>
-              <h2 className="mb-3 text-base font-semibold text-foreground">Agentes</h2>
+            <Section title="Agentes">
               {state.agents.length === 0 ? (
                 <EmptyState
                   icon={PhoneCall}
                   title="Ainda sem agentes"
-                  description={limit === 0 ? 'O seu plano não inclui agentes de voz.' : 'Crie um agente para atender as chamadas.'}
-                  action={limit === 0 ? undefined : <Button onClick={() => openCreate()}>Criar agente</Button>}
+                  description={limit === 0 ? 'O seu plano não inclui agentes de voz.' : 'Crie um agente ou escolha um dos prontos.'}
+                  action={limit === 0
+                    ? <Button onClick={() => window.dispatchEvent(new CustomEvent('leadflow:show-upgrade'))}>Melhorar plano</Button>
+                    : <Button onClick={() => openCreate()}>Criar agente</Button>}
                 />
               ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <CardGrid>
                   {state.agents.map((agent) => {
                     const numbers = usedOn(agent.id);
                     return (
-                      <div key={agent.id} className="flex flex-col rounded-lg border border-border bg-card p-4">
-                        <div className="flex items-start gap-3">
+                      <div key={agent.id} className={CARD}>
+                        <div className="flex items-start gap-2">
                           <div className="min-w-0 flex-1">
-                            <h3 className="truncate font-semibold text-foreground">{agent.name}</h3>
+                            <h3 className="truncate text-sm font-semibold text-foreground" translate="no">{agent.name}</h3>
                             <p className="mt-0.5 truncate text-xs text-muted-foreground">
                               {numbers.length
                                 ? `Atende ${numbers.map((n) => n.phone || n.name).join(', ')}`
                                 : agent.ready ? 'Sem número' : 'Por concluir'}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(agent)}
-                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                            aria-label="Editar"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void remove(agent)}
-                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-red-600"
-                            aria-label="Apagar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <div className="-mr-2 -mt-2 flex shrink-0">
+                            <button type="button" onClick={() => openEdit(agent)} className={ICON_BUTTON} aria-label="Editar">
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button type="button" onClick={() => void remove(agent)} className={`${ICON_BUTTON} hover:text-red-600`} aria-label="Apagar">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                         {agent.greeting && (
                           <p className="mt-3 line-clamp-2 text-sm text-muted-foreground" translate="no">“{agent.greeting}”</p>
@@ -221,41 +233,35 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
                       </div>
                     );
                   })}
-                </div>
+                </CardGrid>
               )}
-            </section>
+            </Section>
 
             {limit !== 0 && (
-              <section>
-                <h2 className="mb-3 text-base font-semibold text-foreground">Agentes prontos</h2>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Section title="Agentes prontos">
+                <CardGrid>
                   {AGENT_TEMPLATES.map((t) => (
                     <button
                       key={t.id}
                       type="button"
                       onClick={() => openCreate(t)}
-                      className="flex flex-col rounded-lg border border-border bg-card p-4 text-left hover:border-foreground/25 hover:bg-muted/40"
+                      className={`${CARD} text-left transition-colors hover:border-foreground/25 hover:bg-muted/40`}
                     >
-                      <span className="font-semibold text-foreground">{t.name}</span>
-                      <span className="mt-0.5 text-sm text-muted-foreground">{t.summary}</span>
+                      <span className="truncate text-sm font-semibold text-foreground">{t.name}</span>
+                      <span className="mt-0.5 text-xs text-muted-foreground">{t.summary}</span>
                     </button>
                   ))}
-                </div>
-              </section>
+                </CardGrid>
+              </Section>
             )}
 
-            <section>
-              <h2 className="mb-3 text-base font-semibold text-foreground">Números</h2>
+            <Section title="Números">
               <WhatsAppNumbers state={state} onChanged={() => void load()} />
-            </section>
+            </Section>
 
-            <section>
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-base font-semibold text-foreground">Chamadas</h2>
-                {canCall && <Button variant="outline" onClick={() => setCalling(true)}>Ligar</Button>}
-              </div>
+            <Section title="Chamadas">
               <CallHistory calls={state.calls} />
-            </section>
+            </Section>
             <CallModal open={calling} onOpenChange={setCalling} state={state} onStarted={() => void load()} />
           </>
         )}
@@ -315,7 +321,7 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
                   id="va-voice"
                   value={form.voice_id}
                   onChange={(e) => { stopPreview(); setForm({ ...form, voice_id: e.target.value }); }}
-                  className="min-w-0 flex-1 text-sm"
+                  className="min-w-0 flex-1"
                 >
                   <option value="">{voices.length ? 'Escolher voz' : 'A carregar…'}</option>
                   {form.voice_id && !voiceName(form.voice_id) && voices.length > 0 && <option value={form.voice_id}>Voz atual</option>}
@@ -342,7 +348,7 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
                 id="va-lang"
                 value={form.language}
                 onChange={(e) => setForm({ ...form, language: e.target.value })}
-                className="w-full text-sm"
+                className="w-full"
                 translate="no"
               >
                 {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}

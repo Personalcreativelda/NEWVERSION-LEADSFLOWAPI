@@ -137,14 +137,14 @@ export function CallModal({ open, onOpenChange, state, onStarted }: Props) {
             {numbers.length > 1 && (
               <div>
                 <Label htmlFor="call-channel" className="mb-1.5 block">Ligar de</Label>
-                <select id="call-channel" value={channelId} onChange={(e) => setChannelId(e.target.value)} className="w-full text-sm">
+                <select id="call-channel" value={channelId} onChange={(e) => setChannelId(e.target.value)} className="w-full">
                   {numbers.map((c) => <option key={c.id} value={c.id}>{c.phone || c.name}</option>)}
                 </select>
               </div>
             )}
             <div className={numbers.length > 1 ? '' : 'sm:col-span-2'}>
               <Label htmlFor="call-agent" className="mb-1.5 block">Agente</Label>
-              <select id="call-agent" value={agentId} onChange={(e) => pickAgent(e.target.value)} className="w-full text-sm">
+              <select id="call-agent" value={agentId} onChange={(e) => pickAgent(e.target.value)} className="w-full">
                 {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
             </div>

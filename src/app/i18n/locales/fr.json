@@ -5074,5 +5074,10 @@
  "Pedido enviado. Vai receber um aviso quando o cliente responder.": "Demande envoyée. Vous serez prévenu quand le client répondra.",
  "Não foi possível pedir autorização": "Impossible de demander l'autorisation",
  "Objetivo: {0}": "Objectif : {0}",
- "Podemos ligar-lhe pelo WhatsApp?": "Pouvons-nous vous appeler sur WhatsApp ?"
+ "Podemos ligar-lhe pelo WhatsApp?": "Pouvons-nous vous appeler sur WhatsApp ?",
+ "Atendem e fazem chamadas pelo WhatsApp": "Répondent et passent des appels sur WhatsApp",
+ "Crie um agente ou escolha um dos prontos.": "Créez un agent ou choisissez-en un prêt à l'emploi.",
+ "Recusada porque os minutos do plano acabaram.": "Refusé car les minutes du forfait sont épuisées.",
+ "Recusada porque o plano não inclui chamadas.": "Refusé car le forfait n'inclut pas les appels.",
+ "Recusada: este número já ligou muitas vezes nas últimas 24 horas.": "Refusé : ce numéro a déjà appelé de nombreuses fois ces dernières 24 heures."
 }

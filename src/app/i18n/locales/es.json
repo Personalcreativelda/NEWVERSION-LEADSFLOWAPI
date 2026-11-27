@@ -5074,5 +5074,10 @@
  "Pedido enviado. Vai receber um aviso quando o cliente responder.": "Solicitud enviada. Recibirá un aviso cuando el cliente responda.",
  "Não foi possível pedir autorização": "No se pudo pedir autorización",
  "Objetivo: {0}": "Objetivo: {0}",
- "Podemos ligar-lhe pelo WhatsApp?": "¿Podemos llamarle por WhatsApp?"
+ "Podemos ligar-lhe pelo WhatsApp?": "¿Podemos llamarle por WhatsApp?",
+ "Atendem e fazem chamadas pelo WhatsApp": "Atienden y hacen llamadas por WhatsApp",
+ "Crie um agente ou escolha um dos prontos.": "Cree un agente o elija uno listo.",
+ "Recusada porque os minutos do plano acabaram.": "Rechazada porque se acabaron los minutos del plan.",
+ "Recusada porque o plano não inclui chamadas.": "Rechazada porque el plan no incluye llamadas.",
+ "Recusada: este número já ligou muitas vezes nas últimas 24 horas.": "Rechazada: este número ya llamó muchas veces en las últimas 24 horas."
 }
