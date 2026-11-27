@@ -444,6 +444,7 @@ function TemplatesTab({ channelId }: { channelId: string }) {
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
   const [viewing, setViewing] = useState<WaTemplate | null>(null);
+  const [editingTpl, setEditingTpl] = useState<WaTemplate | null>(null);
 
   const load = useCallback(() => {
     setError('');
@@ -530,7 +531,22 @@ function TemplatesTab({ channelId }: { channelId: string }) {
           onCreated={(t) => { setCreating(false); setTemplates((list) => [t, ...(list || [])]); setFilter('all'); }}
         />
       )}
-      {viewing && <TemplateModal template={viewing} onClose={() => setViewing(null)} onDelete={() => void remove(viewing)} />}
+      {editingTpl && (
+        <NewTemplateModal
+          channelId={channelId}
+          editing={editingTpl}
+          onClose={() => setEditingTpl(null)}
+          onCreated={(t) => { setEditingTpl(null); setTemplates((list) => (list || []).map((x) => (x.id === t.id ? t : x))); }}
+        />
+      )}
+      {viewing && (
+        <TemplateModal
+          template={viewing}
+          onClose={() => setViewing(null)}
+          onDelete={() => void remove(viewing)}
+          onEdit={() => { setEditingTpl(viewing); setViewing(null); }}
+        />
+      )}
     </div>
   );
 }
@@ -555,7 +571,7 @@ function TemplatePreview({ header, body, footer, buttons }: { header?: string; b
   );
 }
 
-function TemplateModal({ template, onClose, onDelete }: { template: WaTemplate; onClose: () => void; onDelete: () => void }) {
+function TemplateModal({ template, onClose, onDelete, onEdit }: { template: WaTemplate; onClose: () => void; onDelete: () => void; onEdit: () => void }) {
   const header = template.components.find((c) => c.type === 'HEADER');
   const footer = template.components.find((c) => c.type === 'FOOTER');
   const buttons = template.components.find((c) => c.type === 'BUTTONS')?.buttons || [];
@@ -572,6 +588,7 @@ function TemplateModal({ template, onClose, onDelete }: { template: WaTemplate; 
         <>
           <Button variant="outline" onClick={onClose}>Fechar</Button>
           <Button variant="destructive" onClick={onDelete}>Apagar</Button>
+          <Button onClick={onEdit}>Editar</Button>
         </>
       }
     >
@@ -592,8 +609,25 @@ function TemplateModal({ template, onClose, onDelete }: { template: WaTemplate; 
   );
 }
 
-function NewTemplateModal({ channelId, onClose, onCreated }: { channelId: string; onClose: () => void; onCreated: (t: WaTemplate) => void }) {
-  const [form, setForm] = useState<NewTemplate>({ name: '', category: 'UTILITY', language: 'pt_PT', header: '', body: '', footer: '', examples: [], buttons: [] });
+/** Criar (ou editar) um modelo. Ao editar, o nome e o idioma ficam como estão (regra da Meta). */
+function NewTemplateModal({ channelId, onClose, onCreated, editing }: {
+  channelId: string; onClose: () => void; onCreated: (t: WaTemplate) => void; editing?: WaTemplate;
+}) {
+  const [form, setForm] = useState<NewTemplate>(() => {
+    if (!editing) return { name: '', category: 'UTILITY', language: 'pt_PT', header: '', body: '', footer: '', examples: [], buttons: [] };
+    const c = (type: string) => editing.components.find((x) => x.type === type) as any;
+    const header = c('HEADER');
+    return {
+      name: editing.name,
+      category: editing.category as NewTemplate['category'],
+      language: editing.language,
+      header: header?.format === 'TEXT' || !header?.format ? header?.text || '' : '',
+      body: c('BODY')?.text || '',
+      footer: c('FOOTER')?.text || '',
+      examples: c('BODY')?.example?.body_text?.[0] || [],
+      buttons: (c('BUTTONS')?.buttons || []).map((b: any) => ({ type: b.type, text: b.text, url: b.url, phone: b.phone_number })),
+    };
+  });
   const [saving, setSaving] = useState(false);
   const set = (patch: Partial<NewTemplate>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -607,8 +641,10 @@ function NewTemplateModal({ channelId, onClose, onCreated }: { channelId: string
   const submit = async () => {
     setSaving(true);
     try {
-      const created = await waApi.createTemplate(channelId, form);
-      toast.success('Modelo enviado para aprovação da Meta');
+      const created = editing
+        ? { ...editing, ...(await waApi.editTemplate(channelId, editing.id, form)), status: 'PENDING' }
+        : await waApi.createTemplate(channelId, form);
+      toast.success(editing ? 'Alterações enviadas para aprovação da Meta' : 'Modelo enviado para aprovação da Meta');
       onCreated({
         ...created,
         components: [
@@ -629,7 +665,7 @@ function NewTemplateModal({ channelId, onClose, onCreated }: { channelId: string
       onOpenChange={(open) => { if (!open && !saving) onClose(); }}
       size="lg"
       logo={<LogoBox brand="whatsapp" />}
-      title="Novo modelo"
+      title={editing ? 'Editar modelo' : 'Novo modelo'}
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
@@ -643,6 +679,7 @@ function NewTemplateModal({ channelId, onClose, onCreated }: { channelId: string
         <Field label="Nome" hint="minúsculas, números e _">
           <Input
             value={form.name}
+            disabled={!!editing}
             onChange={(e) => set({ name: e.target.value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '') })}
             placeholder="confirmacao_pedido"
             className="font-mono"
@@ -663,7 +700,7 @@ function NewTemplateModal({ channelId, onClose, onCreated }: { channelId: string
         </div>
 
         <Field label="Idioma">
-          <select value={form.language} onChange={(e) => set({ language: e.target.value })} className="w-full px-3 text-sm">
+          <select value={form.language} onChange={(e) => set({ language: e.target.value })} className="w-full px-3 text-sm" disabled={!!editing}>
             {LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
           </select>
         </Field>

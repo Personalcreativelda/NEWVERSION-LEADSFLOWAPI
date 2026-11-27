@@ -443,6 +443,29 @@ export interface UploadResponse {
     size: number;
 }
 
+/** WhatsApp oficial numa conversa: janela de 24 horas e modelos aprovados */
+export interface ServiceWindow { applies: boolean; open: boolean; last_inbound_at: string | null; expires_at: string | null }
+export interface ConversationTemplate {
+    name: string; language: string; category: string;
+    header: string | null; header_format: string | null; body: string; footer: string | null;
+    buttons: { type: string; text: string; url: string | null }[];
+    header_vars: number; body_vars: number; sendable: boolean;
+}
+export const whatsappCloudInboxApi = {
+    async window(conversationId: string): Promise<ServiceWindow> {
+        const { data } = await api.get<ServiceWindow>(`/inbox/conversations/${conversationId}/whatsapp-window`);
+        return data;
+    },
+    async templates(conversationId: string): Promise<ConversationTemplate[]> {
+        const { data } = await api.get<ConversationTemplate[]>(`/inbox/conversations/${conversationId}/templates`);
+        return data;
+    },
+    async sendTemplate(conversationId: string, body: { name: string; language: string; body_params: string[]; header_params: string[] }) {
+        const { data } = await api.post(`/inbox/conversations/${conversationId}/send-template`, body);
+        return data;
+    },
+};
+
 export const inboxApi = {
     /**
      * Verifica status do Evolution API

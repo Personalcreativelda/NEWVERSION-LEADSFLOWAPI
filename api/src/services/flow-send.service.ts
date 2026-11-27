@@ -1,6 +1,7 @@
 // Envio dos fluxos de remarketing por cada canal: encontra a conversa do lead, respeita a janela
 // de 24 horas da Meta, envia texto ou áudio e grava a mensagem na conversa (aparece na inbox).
 import { query as dbQuery } from '../database/connection';
+import { drainBufferedStatuses } from './cloud-status.service';
 import { WhatsAppService } from './whatsapp.service';
 import { MessagesService } from './messages.service';
 import { getStorageService } from './storage.service';
@@ -427,8 +428,9 @@ export async function saveOutgoing(
     direction: 'out',
     channel: target.channelType,
     content: data.content,
-    status: 'sent',
-    sent_at: new Date().toISOString(),
+    // WhatsApp oficial: o estado real (enviada/entregue/lida/falhou) chega pelo webhook da Meta
+    status: target.channelType === 'whatsapp_cloud' ? 'pending' : 'sent',
+    sent_at: target.channelType === 'whatsapp_cloud' ? undefined : new Date().toISOString(),
     external_id: data.externalId || null,
     media_url: data.mediaUrl || null,
     media_type: data.mediaType || null,
@@ -436,6 +438,7 @@ export async function saveOutgoing(
   }, lead.user_id);
 
   await dbQuery('UPDATE leads SET last_contact_at = NOW() WHERE id = $1', [lead.id]);
+  if (target.channelType === 'whatsapp_cloud' && data.externalId) void drainBufferedStatuses(data.externalId).catch(() => {});
 
   if (conversationId) {
     try { getWebSocketService()?.emitNewMessage(lead.user_id, { conversationId, message }); } catch { /* só atualiza o ecrã */ }

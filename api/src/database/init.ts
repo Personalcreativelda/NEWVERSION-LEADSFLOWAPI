@@ -598,6 +598,14 @@ const runPendingMigrations = async () => {
       );
       CREATE INDEX IF NOT EXISTS idx_meta_events_user ON meta_events(user_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_meta_events_retry ON meta_events(updated_at) WHERE status = 'failed';
+      -- Estados do WhatsApp oficial que chegam antes de a mensagem estar gravada (cloud-status.service)
+      CREATE TABLE IF NOT EXISTS wa_status_buffer (
+        external_id VARCHAR(255) NOT NULL,
+        status      VARCHAR(20) NOT NULL,
+        payload     JSONB NOT NULL,
+        received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (external_id, status)
+      );
       -- Origem do envio (etapa do funil, assistente, automação, teste) e moeda do valor (ex.: MZN)
       ALTER TABLE meta_events ADD COLUMN IF NOT EXISTS source VARCHAR(20);
       ALTER TABLE meta_events ADD COLUMN IF NOT EXISTS currency VARCHAR(3);

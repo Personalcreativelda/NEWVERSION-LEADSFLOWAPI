@@ -12,6 +12,9 @@ import { checkMessageLimit, planBalance, recordMassSend } from '../middleware/pl
 import { flowSettings, msUntilSendWindow, NOT_INTERESTED_TAG, OPT_OUT_RE, OPT_OUT_TAG } from './flow-execution.service';
 import { AIService, type AIMessage } from './ai.service';
 import { providersFor } from './sales-engine.service';
+import { contactWindow } from './whatsapp-window.service';
+import { cloudErrorText } from './whatsapp-cloud.service';
+import { drainBufferedStatuses } from './cloud-status.service';
 
 const whatsappService = new WhatsAppService();
 const conversationsService = new ConversationsService();
@@ -660,6 +663,16 @@ export class CampaignEngine {
     }
 
     const isGroup = String(recipient.phone).endsWith('@g.us');
+    // WhatsApp oficial sem modelo: texto livre só dentro da janela de 24 horas do contacto
+    // (fora dela a Meta aceita e não entrega — 131047). Fica de fora; não conta como falha.
+    if (official && !isGroup && !(settings.useTemplate && settings.templateName)) {
+      const win = await contactWindow(campaign.user_id, channel.id, recipient.phone);
+      if (!win.open) {
+        await query(`UPDATE campaign_recipients SET status = 'skipped', skip_reason = 'window_closed' WHERE id = $1`, [recipient.id]);
+        await this.syncStats(campaign.id);
+        return this.defer(campaign, 1_000);
+      }
+    }
     let number = recipient.phone;
     if (!official && !isGroup) {
       // Mensagens para números sem WhatsApp são um dos sinais de envio em massa
@@ -809,7 +822,10 @@ export class CampaignEngine {
           body: JSON.stringify({ messaging_product: 'whatsapp', to: number, ...payload }),
         });
         const body: any = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body?.error?.message || `Erro ${res.status} do WhatsApp Business`);
+        if (!res.ok) {
+          const e = body?.error || {};
+          throw new Error(cloudErrorText(Number(e.code) || undefined, e.error_data?.details || e.message || `Erro ${res.status} do WhatsApp Business`));
+        }
         return body?.messages?.[0]?.id || null;
       };
       if (settings.useTemplate && settings.templateName) {
@@ -872,12 +888,15 @@ export class CampaignEngine {
        VALUES ($1, $2, $3, $4, 'out', $5, $6, $7, $8, $9, $10, $11, NOW())
        RETURNING *`,
       [campaign.user_id, conversation.id, recipient.lead_id, campaign.id, msgChannel, text,
-        firstMedia || null, firstMedia ? mediaTypeOf(firstMedia) : null, error ? 'failed' : 'sent', externalId,
+        firstMedia || null, firstMedia ? mediaTypeOf(firstMedia) : null,
+        // WhatsApp oficial: aceite pela Meta não é enviado; o estado real chega pelo webhook
+        error ? 'failed' : (msgChannel === 'whatsapp_cloud' ? 'pending' : 'sent'), externalId,
         JSON.stringify({
           campaign_id: campaign.id, campaign_name: campaign.name, instance_id: instanceId, channel_type: msgChannel,
           phone: recipient.phone, lead_name: contactName, source: 'dashboard_campaign', engine: true, ...(error ? { error } : {}),
         })],
     );
+    if (msgChannel === 'whatsapp_cloud' && externalId) void drainBufferedStatuses(externalId).catch(() => {});
     await query(`UPDATE conversations SET last_message_at = NOW(), status = 'open', updated_at = NOW() WHERE id = $1`, [conversation.id]);
 
     const ws = getWebSocketService();

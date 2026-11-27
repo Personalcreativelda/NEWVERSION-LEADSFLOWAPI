@@ -18,6 +18,7 @@ import webhooksRoutes from './webhooks.routes';
 import leadNotesRoutes from './lead-notes.routes';
 import scheduledConversationsRoutes from './scheduled-conversations.routes';
 import inboxRoutes from './inbox.routes';
+import inboxWhatsAppRoutes from './inbox-whatsapp.routes';
 import emailCampaignsRoutes from './email-campaigns';
 import smsCampaignsRoutes from './sms-campaigns';
 // INBOX: Importar rotas de canais e assistentes
@@ -84,6 +85,7 @@ router.use('/messages', withPlan, messagesRoutes);
 router.use('/analytics', withPlan, analyticsRoutes);
 router.use('/whatsapp', withPlan, whatsappRoutes);
 router.use('/integrations', withPlan, integrationsRoutes);
+router.use('/inbox', withPlan, inboxWhatsAppRoutes); // WhatsApp oficial: janela de 24 h e modelos
 router.use('/inbox', withPlan, inboxRoutes);
 router.use('/email-campaigns', withPlan, emailCampaignsRoutes);
 router.use('/sms-campaigns', withPlan, smsCampaignsRoutes);

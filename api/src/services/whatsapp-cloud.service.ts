@@ -24,15 +24,32 @@ export class CloudSendError extends Error {
   constructor(message: string, public metaCode?: number, public metaMessage?: string) { super(message); }
 }
 
-/** Erros da Meta em texto para quem usa o painel */
+/**
+ * Erros da Meta em português, com o que fazer. Usado no envio (resposta da API) e nos estados "failed"
+ * que chegam pelo webhook. Códigos: developers.facebook.com → whatsapp/cloud-api/support/error-codes
+ */
+export function cloudErrorText(code: number | undefined, message = ''): string {
+  return friendlyError(code, message);
+}
+
+/** Erros de política da Meta: não se repetem sozinhos (só depois de a causa ser resolvida) */
+export const POLICY_ERROR_CODES = new Set([131047, 131026, 131042, 131049, 132001, 131030, 131031, 131051, 130472]);
+
 function friendlyError(code: number | undefined, message: string): string {
   // Números virtuais do WhatsApp: só enviam depois de a Meta aprovar o nome de exibição
   if (/display name approval/i.test(message)) {
     return 'Este número só pode enviar mensagens depois de a Meta aprovar o nome de exibição. Veja o estado em Definições → WhatsApp Business.';
   }
   switch (code) {
-    case 131047: return 'Passaram mais de 24 horas desde a última mensagem deste contacto. Só é possível enviar um modelo aprovado.';
-    case 131026: return 'Este número não pode receber mensagens no WhatsApp.';
+    case 131047: return 'Passaram mais de 24 horas desde a última mensagem deste contacto. Envie um modelo de mensagem aprovado; a conversa volta a abrir quando o cliente responder.';
+    case 131026: return 'Mensagem não entregue: o número pode não ter WhatsApp, ter uma versão antiga ou não ter aceitado os novos termos. Confirme o número com o cliente.';
+    case 131042: return 'Problema de pagamento na conta WhatsApp Business. Adicione ou corrija a forma de pagamento no Gestor do WhatsApp.';
+    case 131049: return 'A Meta limitou as mensagens de marketing para este contacto (recebeu muitas). Tente mais tarde ou use um modelo de utilidade.';
+    case 132001: return 'O modelo não existe nesse idioma. Confirme o nome e o idioma do modelo em Definições → WhatsApp Business → Modelos.';
+    case 132000: return 'O número de variáveis não corresponde ao modelo. Preencha todas as variáveis.';
+    case 132015: case 132016: return 'Este modelo foi pausado ou desativado pela Meta por baixa qualidade. Escolha outro modelo.';
+    case 130472: return 'A Meta não entregou esta mensagem de marketing a este contacto (experiência de marketing da Meta).';
+    case 131051: return 'Tipo de mensagem não suportado pelo WhatsApp.';
     case 131030: return 'Este número não está na lista de destinatários de teste da conta WhatsApp Business.';
     case 133010: return 'O número do WhatsApp Business ainda não está ativo. Ative-o em Definições → WhatsApp Business.';
     case 131031: return 'A conta WhatsApp Business está bloqueada pela Meta.';
@@ -114,7 +131,7 @@ export async function sendCloudReaction(creds: CloudCredentials | null | undefin
 export async function sendCloudTemplate(
   creds: CloudCredentials | null | undefined,
   to: string,
-  template: { name: string; language: string; params?: string[] },
+  template: { name: string; language: string; params?: string[]; headerParams?: string[] },
 ): Promise<any> {
   const { phoneId, token } = requireCreds(creds);
   if (!to) throw new CloudSendError('Este contacto não tem número de WhatsApp.');
@@ -127,7 +144,12 @@ export async function sendCloudTemplate(
       template: {
         name: template.name,
         language: { code: template.language },
-        ...(params.length > 0 ? { components: [{ type: 'body', parameters: params.map((text) => ({ type: 'text', text })) }] } : {}),
+        ...(params.length > 0 || template.headerParams?.length ? {
+          components: [
+            ...(template.headerParams?.length ? [{ type: 'header', parameters: template.headerParams.map((text) => ({ type: 'text', text })) }] : []),
+            ...(params.length > 0 ? [{ type: 'body', parameters: params.map((text) => ({ type: 'text', text })) }] : []),
+          ],
+        } : {}),
       },
     },
   });

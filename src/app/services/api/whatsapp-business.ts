@@ -94,6 +94,9 @@ export const whatsappBusinessApi = {
   templates: (channelId: string) => api.get<WaTemplate[]>(`/whatsapp-business/${channelId}/templates`).then((r) => r.data),
   createTemplate: (channelId: string, template: NewTemplate) =>
     api.post<WaTemplate>(`/whatsapp-business/${channelId}/templates`, template).then((r) => r.data),
+  /** Editar (volta à análise da Meta; nome e idioma não mudam) */
+  editTemplate: (channelId: string, templateId: string, template: NewTemplate) =>
+    api.put(`/whatsapp-business/${channelId}/templates/${templateId}`, template).then((r) => r.data),
   deleteTemplate: (channelId: string, name: string, id?: string) =>
     api.delete(`/whatsapp-business/${channelId}/templates/${encodeURIComponent(name)}`, { params: id ? { id } : undefined }),
 };

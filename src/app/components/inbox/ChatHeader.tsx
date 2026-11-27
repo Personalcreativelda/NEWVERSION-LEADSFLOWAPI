@@ -1,5 +1,6 @@
 // INBOX: Chat header - ManyChat-style with channel badge & resolve
 import React, { useState, useRef, useEffect } from 'react';
+import { WindowBadge } from './WhatsAppWindow';
 import type { ConversationWithDetails } from '../../types/inbox';
 import { usableImageUrl } from '../../utils/media-url';
 import {
@@ -40,6 +41,8 @@ interface ChatHeaderProps {
     onOpenContact?: () => void;
     /** Fixar/desafixar a conversa no topo da lista */
     onTogglePin?: () => void;
+    /** WhatsApp oficial: janela de 24 horas (só nestas conversas) */
+    serviceWindow?: { open: boolean; expiresAt: Date | null };
 }
 
 // Channel display config
@@ -56,7 +59,7 @@ const CHANNEL_CONFIG: Record<string, { label: string; color: string; icon: React
     twilio: { label: 'SMS', color: '#0d9488', icon: Smartphone },
 };
 
-export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat, onResolve, onStatusChange, layoutControls, onOpenContact, onTogglePin }: ChatHeaderProps) {
+export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversation, onSearchInChat, onResolve, onStatusChange, layoutControls, onOpenContact, onTogglePin, serviceWindow }: ChatHeaderProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [showStatusMenu, setShowStatusMenu] = useState(false);
@@ -177,6 +180,7 @@ export function ChatHeader({ conversation, onBack, onEditLead, onDeleteConversat
                         {(conversation.metadata?.is_comment || String((conversation as any).remote_jid || '').startsWith('comment:')) && (
                             <p className="text-xs text-muted-foreground truncate">Comentário · a resposta vai em privado</p>
                         )}
+                        {serviceWindow && <p className="truncate"><WindowBadge open={serviceWindow.open} expiresAt={serviceWindow.expiresAt} /></p>}
                     </div>
                 </button>
 

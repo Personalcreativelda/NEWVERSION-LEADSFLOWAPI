@@ -14,6 +14,7 @@ import { inactivityScheduler } from './services/inactivity-scheduler.service';
 import { flowExecutionService } from './services/flow-execution.service';
 import { campaignEngine } from './services/campaign-engine.service';
 import { channelHealthService } from './services/channel-health.service';
+import { cloudStatusWorker } from './services/cloud-status.service';
 import { commentAutomationService } from './services/comment-automation.service';
 import { metaConversionsWorker } from './services/meta-conversions.service';
 // INBOX: Importar WebSocket service e Email Polling
@@ -601,6 +602,8 @@ initDatabase().then(() => {
   campaignEngine.start();
   // Estado real dos WhatsApp por QR (deteta sessões terminadas no telemóvel)
   channelHealthService.start();
+  // Estados do WhatsApp oficial que chegaram antes da mensagem
+  cloudStatusWorker.start();
   metaConversionsWorker.start();
   // Páginas do Facebook já ligadas passam a receber também os comentários (uma vez por página)
   setTimeout(() => {

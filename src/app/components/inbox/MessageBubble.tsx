@@ -749,6 +749,17 @@ function MessageBubbleView({
                     {isOut && <StatusIcon status={message.status} />}
                 </div>
 
+                {/* Não entregue: o motivo que a Meta deu e o que fazer (texto em português do servidor) */}
+                {isOut && message.status === 'failed' && (() => {
+                    const err: any = (message.metadata as any)?.error;
+                    const text = typeof err === 'string' ? err : err?.message || err?.details;
+                    return (
+                        <p className="mt-1 text-[12px] leading-snug text-red-600 dark:text-red-400">
+                            {text || 'Mensagem não entregue.'}
+                        </p>
+                    );
+                })()}
+
                 {/* Reações (como no WhatsApp: em baixo, a sair do balão) */}
                 {reactions.length > 0 && !isDeleted && (
                     <div className={`absolute -bottom-3.5 ${isOut ? 'right-2' : 'left-2'} flex items-center gap-0.5 rounded-full border border-black/5 bg-white px-1.5 py-0.5 text-[13px] leading-none shadow-sm dark:border-white/10 dark:bg-[#233138]`}>

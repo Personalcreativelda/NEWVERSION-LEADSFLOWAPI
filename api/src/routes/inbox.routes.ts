@@ -53,6 +53,8 @@ import { CloudSendError, cloudMediaKind, cloudRecipient, sendCloudMedia, sendClo
 import { applyWhatsAppEvent } from '../services/whatsapp-events.service';
 import { quotedFromRow } from '../utils/whatsapp-message';
 import { appTimezone, formatLocal, localToUtc, toLocalIso } from '../utils/timezone';
+import { conversationWindow, WINDOW_CLOSED_MESSAGE } from '../services/whatsapp-window.service';
+import { drainBufferedStatuses } from '../services/cloud-status.service';
 
 const router = Router();
 
@@ -1627,6 +1629,11 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
 
     } else if (messageChannel === 'whatsapp_cloud' && (phone || remoteJid)) {
       // ===== WHATSAPP CLOUD (Graph API) SENDING =====
+      // Janela de 24 horas: fora dela a Meta aceita o pedido mas não entrega (131047). Só modelos.
+      const serviceWindow = conversationId ? await conversationWindow(conversationId) : null;
+      if (!serviceWindow || (serviceWindow.applies && !serviceWindow.open)) {
+        return res.status(422).json({ error: WINDOW_CLOSED_MESSAGE, code: 'WINDOW_CLOSED' });
+      }
       // O wa_id da conversa primeiro: o telefone do lead pode estar sem indicativo
       const recipientPhone = cloudRecipient(remoteJid, phone);
       try {
@@ -2092,8 +2099,9 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         direction: 'out',
         channel: messageChannel,
         content: messageContent || (media_type ? `[${media_type}]` : ''),
-        status: 'sent',
-        sent_at: new Date().toISOString(),
+        // WhatsApp oficial: o 200 da Meta só quer dizer "aceite"; enviada/entregue/lida/falhou vêm do webhook
+        status: messageChannel === 'whatsapp_cloud' ? 'pending' : 'sent',
+        sent_at: messageChannel === 'whatsapp_cloud' ? undefined : new Date().toISOString(),
         external_id: externalResult?.key?.id || externalResult?.messages?.[0]?.id || externalResult?.message_id || externalResult?.message_id?.toString() || null,
         media_url: media_url || null,
         media_type: media_type || null,
@@ -2108,6 +2116,8 @@ router.post('/conversations/:conversationIdOrJid/send', async (req, res, next) =
         },
       }, channelOwnerId);
       console.log('[Inbox] Message saved to database:', message.id, 'conversation:', conversationId);
+      // Estados da Meta que chegaram antes de a mensagem estar gravada
+      if (messageChannel === 'whatsapp_cloud' && message?.external_id) void drainBufferedStatuses(message.external_id).catch(() => {});
 
       // Update lead's last_contact_at if we have a lead
       if (leadId) {
@@ -2413,6 +2423,11 @@ router.post('/conversations/:conversationIdOrJid/send-audio', upload.single('aud
 
     } else if (channelType === 'whatsapp_cloud') {
       // ===== WhatsApp Cloud audio (Graph API) =====
+      // Fora da janela de 24 horas só modelos
+      const audioWindow = conversationId ? await conversationWindow(conversationId) : null;
+      if (!audioWindow || (audioWindow.applies && !audioWindow.open)) {
+        return res.status(422).json({ error: WINDOW_CLOSED_MESSAGE, code: 'WINDOW_CLOSED' });
+      }
       // Sobe para a Meta já em OGG Opus (chega como mensagem de voz); ver whatsapp-cloud.service
       try {
         const sent = await sendCloudMedia(channelCredentials, cloudRecipient(remoteJid, phone), {
@@ -2601,6 +2616,11 @@ router.post('/conversations/:conversationIdOrJid/send-sticker', async (req, res,
     console.log('[Inbox Sticker] Sending:', { conversation: conv?.id, channelType });
 
     if (channelType === 'whatsapp_cloud') {
+      // Fora da janela de 24 horas só modelos
+      const stickerWindow = conv?.id ? await conversationWindow(conv.id) : null;
+      if (!stickerWindow || (stickerWindow.applies && !stickerWindow.open)) {
+        return res.status(422).json({ error: WINDOW_CLOSED_MESSAGE, code: 'WINDOW_CLOSED' });
+      }
       try {
         const sent = await sendCloudMedia(creds, cloudRecipient(remoteJid, phone), { kind: 'sticker', url: stickerUrl });
         result = sent.result;

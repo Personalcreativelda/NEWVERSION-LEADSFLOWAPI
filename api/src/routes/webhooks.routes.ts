@@ -30,6 +30,7 @@ import { applyWhatsAppEvent, quotedForIncoming } from '../services/whatsapp-even
 import { isBridgeRequest, whatsappCallsService } from '../services/whatsapp-calls.service';
 import { channelHealthService } from '../services/channel-health.service';
 import { whatsappCoexistenceService } from '../services/whatsapp-coexistence.service';
+import { applyCloudStatus } from '../services/cloud-status.service';
 
 const router = Router();
 
@@ -3898,32 +3899,16 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
           }
         }
 
-        // Processar status de mensagem (delivered, read)
+        // Estados da Meta (sent / delivered / read / failed): só sobem, repetidos não mudam nada, e os que
+        // chegam antes de a mensagem estar gravada ficam guardados (cloud-status.service)
         for (const status of value.statuses || []) {
-          console.log('[WhatsApp Cloud Webhook] Status update:', status.status, 'for message:', status.id);
-          // Entregue, lida ou recusada depois de aceite (ex.: fora das 24 horas): a bolha no
-          // painel acompanha, e a recusa guarda o motivo da Meta
-          if (status.status === 'delivered' || status.status === 'read' || status.status === 'failed') {
-            const metaError = status.status === 'failed' ? status.errors?.[0] : null;
-            if (metaError) console.warn('[WhatsApp Cloud Webhook] Mensagem recusada pela Meta:', status.id, JSON.stringify(metaError).slice(0, 300));
-            // Só sobe de estado (a recusa passa sempre); guarda quando foi entregue/lida
-            const updated = await query(
-              `UPDATE messages
-               SET status = $1, updated_at = NOW(),
-                   delivered_at = CASE WHEN $1::text IN ('delivered', 'read') THEN COALESCE(delivered_at, NOW()) ELSE delivered_at END,
-                   read_at = CASE WHEN $1::text = 'read' THEN COALESCE(read_at, NOW()) ELSE read_at END,
-                   metadata = CASE WHEN $3::jsonb IS NULL THEN metadata ELSE COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('error', $3::jsonb) END
-               WHERE external_id = $2 AND direction = 'out'
-                 AND ($1::text = 'failed' OR (CASE status WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 WHEN 'sent' THEN 1 ELSE 0 END)
-                                     < (CASE $1::text WHEN 'read' THEN 3 WHEN 'delivered' THEN 2 ELSE 0 END))
-               RETURNING id, conversation_id, user_id, campaign_id`,
-              [status.status, status.id, metaError ? JSON.stringify({ code: metaError.code, message: metaError.error_data?.details || metaError.message || metaError.title }) : null]
-            );
-            const row = updated.rows[0];
-            const ws = getWebSocketService();
-            if (row && ws) {
-              ws.emitMessageStatusUpdate(row.user_id, { messageId: row.id, conversationId: row.conversation_id, status: status.status });
-            }
+          if (status.status === 'failed') console.warn('[WhatsApp Cloud Webhook] Mensagem recusada pela Meta:', status.id, JSON.stringify(status.errors?.[0] || {}).slice(0, 300));
+          const found = await applyCloudStatus(status);
+          if (found && (status.status === 'delivered' || status.status === 'read')) {
+            const row = (await query(
+              `SELECT campaign_id, user_id FROM messages WHERE external_id = $1 AND direction = 'out' LIMIT 1`,
+              [status.id],
+            )).rows[0];
             if (row?.campaign_id) await recountCampaignReads(row.campaign_id, row.user_id);
           }
         }

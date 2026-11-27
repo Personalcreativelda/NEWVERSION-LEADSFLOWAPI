@@ -14,6 +14,7 @@ import { MessageInput } from './MessageInput';
 import { useConversationUploadQueue } from '../../context/UploadQueueContext';
 import { filesFrom, hasFiles } from './droppedFiles';
 import { ForwardMessageModal } from './ForwardMessageModal';
+import { ClosedWindowComposer, TemplateSendModal, useWhatsAppWindow } from './WhatsAppWindow';
 import type { ConversationWithDetails, MessageWithSender } from '../../types/inbox';
 import { SkeletonMessageBubble } from '../ui/skeletons';
 import { getLocale } from '../../utils/format';
@@ -256,13 +257,21 @@ export function ChatPanel({
         setTimeout(() => inputAreaRef.current?.querySelector('textarea')?.focus(), 30);
     }, []);
 
+    // WhatsApp oficial: janela de 24 horas (fora dela só modelos aprovados)
+    const serviceWindow = useWhatsAppWindow(conversation, externalMessages || []);
+    const [templateOpen, setTemplateOpen] = useState(false);
     const handleSend = useCallback(
         async (content: string, mediaUrl?: string, mediaType?: string, replaceTempId?: string) => {
             const reply = replyTo;
             setReplyTo(null);
-            await onSendMessage?.(content, mediaUrl, mediaType, replaceTempId, reply);
+            try {
+                await onSendMessage?.(content, mediaUrl, mediaType, replaceTempId, reply);
+            } finally {
+                // O servidor pode ter recusado por a janela ter fechado entretanto
+                if (serviceWindow.applies) serviceWindow.refresh();
+            }
         },
-        [replyTo, onSendMessage],
+        [replyTo, onSendMessage, serviceWindow],
     );
 
     // Toque na citação: vai até à mensagem original e destaca-a
@@ -324,6 +333,7 @@ export function ChatPanel({
             <div className="flex-shrink-0">
                 <ChatHeader
                     conversation={conversation}
+                    serviceWindow={serviceWindow.applies ? { open: serviceWindow.open, expiresAt: serviceWindow.expiresAt } : undefined}
                     onBack={onBack}
                     onEditLead={onEditLead}
                     onDeleteConversation={onDeleteConversation}
@@ -440,16 +450,28 @@ export function ChatPanel({
                         </button>
                     </div>
                 )}
-                <MessageInput
-                    onSendMessage={handleSend}
-                    onSendAudio={onSendAudio}
-                    onTyping={handleTyping}
-                    isSending={sending}
-                    conversationId={conversation.id}
-                    onAddLocalMessage={onAddLocalMessage}
-                    onUpdateLocalMessageProgress={onUpdateLocalMessageProgress}
-                    onFailLocalMessage={onFailLocalMessage}
-                />
+                {serviceWindow.applies && !serviceWindow.open ? (
+                    <ClosedWindowComposer onSendTemplate={() => setTemplateOpen(true)} />
+                ) : (
+                    <MessageInput
+                        onSendMessage={handleSend}
+                        onSendAudio={onSendAudio}
+                        onTyping={handleTyping}
+                        isSending={sending}
+                        conversationId={conversation.id}
+                        onAddLocalMessage={onAddLocalMessage}
+                        onUpdateLocalMessageProgress={onUpdateLocalMessageProgress}
+                        onFailLocalMessage={onFailLocalMessage}
+                    />
+                )}
+                {serviceWindow.applies && (
+                    <TemplateSendModal
+                        conversationId={conversation.id}
+                        contactName={contactName}
+                        open={templateOpen}
+                        onClose={() => setTemplateOpen(false)}
+                    />
+                )}
             </div>
 
             {/* Editar mensagem enviada */}

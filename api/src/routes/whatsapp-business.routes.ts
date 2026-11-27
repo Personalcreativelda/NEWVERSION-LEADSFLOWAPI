@@ -17,6 +17,7 @@ import {
   cloudCredentials,
   createTemplate,
   deleteTemplate,
+  editTemplate,
   getOverview,
   getProfile,
   listTemplates,
@@ -126,6 +127,14 @@ router.post('/:channelId/templates', async (req: AuthenticatedRequest, res) => {
   try {
     const { cred } = await credentialsFor(req);
     res.status(201).json(await createTemplate(cred, req.body || {}));
+  } catch (error) { fail(res, error); }
+});
+
+// Editar um modelo (volta à análise da Meta; nome e idioma não mudam)
+router.put('/:channelId/templates/:templateId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { cred } = await credentialsFor(req);
+    res.json(await editTemplate(cred, String(req.params.templateId), req.body || {}));
   } catch (error) { fail(res, error); }
 });
 

@@ -82,6 +82,13 @@ Há um emulador `Medium_Phone_API_37.0`.
   depois histórico, uma vez cada, até 24 h). Webhooks `history`/`smb_app_state_sync`/`smb_message_echoes`/
   `account_update` (PARTNER_REMOVED) em fila por número; histórico não conta como não lido nem chama a IA.
   Eco (resposta pela app) pausa a IA nessa conversa `HUMAN_ECHO_PAUSE_MIN` (60) min. Limite: 20 mensagens/s.
+- WhatsApp oficial — janela de 24 horas e estados (`whatsapp-window.service.ts`, `cloud-status.service.ts`):
+  a janela abre/reabre com cada mensagem do cliente (`direction = 'in'` da conversa = contacto + número) e NÃO com
+  modelos. Fora dela a inbox (texto, áudio, autocolantes) devolve 422 `WINDOW_CLOSED` e o painel mostra
+  "Enviar modelo de mensagem" (`inbox-whatsapp.routes.ts`: janela, modelos aprovados, `send-template`). Campanhas
+  sem modelo saltam o contacto (`skip_reason = 'window_closed'`). O 200 da Meta não é envio: a mensagem fica
+  `pending` até o webhook `statuses` (sent < delivered < read; failed guarda `metadata.error` com código e texto
+  em PT); estados que chegam antes da mensagem ficam em `wa_status_buffer` e são aplicados depois.
 - WhatsApp oficial (canais `whatsapp_cloud`): Definições → WhatsApp Business
   (`settings/WhatsAppBusinessSettings.tsx`) gere conta, números (verificar/ativar/usar no canal),
   perfil e modelos (criar/apagar/estado). API em `/api/whatsapp-business/*`

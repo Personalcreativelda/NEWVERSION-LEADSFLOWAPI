@@ -181,15 +181,8 @@ function variablesIn(text: string): number[] {
   return [...new Set([...text.matchAll(/\{\{(\d+)\}\}/g)].map((m) => Number(m[1])))].sort((a, b) => a - b);
 }
 
-export async function createTemplate(cred: CloudCredentials, input: any) {
-  // A Meta só aceita a-z, 0-9 e _: tira acentos e troca espaços/hífens por _
-  const name = String(input.name || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .trim().toLowerCase().replace(/[\s-]+/g, '_');
-  if (!/^[a-z0-9_]{1,512}$/.test(name)) throw new WhatsAppBusinessError('Nome: só letras minúsculas, números e _ (sem espaços nem acentos).');
-  const category = String(input.category || '').toUpperCase();
-  if (!CATEGORIES.has(category)) throw new WhatsAppBusinessError('Escolha a categoria do modelo.');
-  const language = String(input.language || 'pt_PT');
-
+/** Partes do modelo (título, texto com exemplos das variáveis, rodapé e botões), validadas */
+function buildTemplateComponents(input: any): any[] {
   const body = String(input.body || '').trim();
   if (!body) throw new WhatsAppBusinessError('Escreva o texto da mensagem.');
   if (body.length > 1024) throw new WhatsAppBusinessError('O texto tem no máximo 1024 caracteres.');
@@ -234,9 +227,35 @@ export async function createTemplate(cred: CloudCredentials, input: any) {
       return { type: 'QUICK_REPLY', text };
     });
   if (buttons.length) components.push({ type: 'BUTTONS', buttons });
+  return components;
+}
+
+export async function createTemplate(cred: CloudCredentials, input: any) {
+  // A Meta só aceita a-z, 0-9 e _: tira acentos e troca espaços/hífens por _
+  const name = String(input.name || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!/^[a-z0-9_]{1,512}$/.test(name)) throw new WhatsAppBusinessError('Nome: só letras minúsculas, números e _ (sem espaços nem acentos).');
+  const category = String(input.category || '').toUpperCase();
+  if (!CATEGORIES.has(category)) throw new WhatsAppBusinessError('Escolha a categoria do modelo.');
+  const language = String(input.language || 'pt_PT');
+
+  const components = buildTemplateComponents(input);
 
   const created = await graph('POST', `/${cred.waba_id}/message_templates`, cred.access_token, { name, language, category, components });
   return { id: created.id, name, status: created.status, category: created.category || category, language };
+}
+
+/**
+ * Editar um modelo (POST /{TEMPLATE_ID}): texto, título, rodapé, botões e categoria. Nome e idioma não mudam.
+ * Volta à análise da Meta; modelos aprovados só se editam algumas vezes (limites da Meta).
+ */
+export async function editTemplate(cred: CloudCredentials, templateId: string, input: any) {
+  if (!/^\d+$/.test(String(templateId))) throw new WhatsAppBusinessError('Modelo inválido.');
+  const components = buildTemplateComponents(input);
+  const category = input.category ? String(input.category).toUpperCase() : undefined;
+  if (category && !CATEGORIES.has(category)) throw new WhatsAppBusinessError('Escolha a categoria do modelo.');
+  await graph('POST', `/${templateId}`, cred.access_token, { components, ...(category ? { category } : {}) });
+  return { id: templateId, status: 'PENDING' };
 }
 
 export async function deleteTemplate(cred: CloudCredentials, name: string, id?: string) {
