@@ -33,6 +33,8 @@ export interface BackupInfo {
   trigger: BackupTrigger;
   local: boolean;
   offsite: boolean;
+  /** Envio para fora falhou nesta cópia (só na resposta de criar) */
+  offsite_error?: string;
 }
 
 export class BackupError extends Error {
@@ -82,7 +84,12 @@ function offsite(): Store | null {
   const secretKey = process.env.BACKUP_S3_SECRET_KEY || '';
   const bucket = process.env.BACKUP_S3_BUCKET || '';
   if (!raw || !accessKey || !secretKey || !bucket) return (offsiteStore = null);
-  const url = new URL(/^https?:\/\//.test(raw) ? raw : `https://${raw}`);
+  let url: URL;
+  try {
+    url = new URL(/^https?:\/\//.test(raw) ? raw : `https://${raw}`);
+  } catch {
+    return (offsiteStore = null);
+  }
   offsiteStore = {
     client: minioClient({
       endPoint: url.hostname, port: url.port ? Number(url.port) : undefined, useSSL: url.protocol === 'https:',
@@ -92,6 +99,55 @@ function offsite(): Store | null {
     label: 'offsite',
   };
   return offsiteStore;
+}
+
+/**
+ * Deteta erros conhecidos antes de contactar o armazenamento. O R2 mostra também a localização
+ * física do bucket (por exemplo, "Western Europe"), mas a região da API S3 é sempre `auto`.
+ */
+function offsiteConfigurationProblem(): string | null {
+  const raw = (process.env.BACKUP_S3_ENDPOINT || '').trim();
+  const accessKey = process.env.BACKUP_S3_ACCESS_KEY || '';
+  const secretKey = process.env.BACKUP_S3_SECRET_KEY || '';
+  const bucket = process.env.BACKUP_S3_BUCKET || '';
+  const configured = [raw, accessKey, secretKey, bucket].filter(Boolean).length;
+  if (configured === 0) return null;
+  if (configured < 4) {
+    return 'Complete BACKUP_S3_ENDPOINT, BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY e BACKUP_S3_SECRET_KEY';
+  }
+
+  let url: URL;
+  try {
+    url = new URL(/^https?:\/\//.test(raw) ? raw : `https://${raw}`);
+  } catch {
+    return 'BACKUP_S3_ENDPOINT não é um endereço válido';
+  }
+
+  const problems: string[] = [];
+  if (url.pathname !== '/' || url.search || url.hash) {
+    problems.push('BACKUP_S3_ENDPOINT deve conter só o endereço do serviço, sem o nome do bucket nem outro caminho');
+  }
+
+  if (url.hostname.endsWith('.r2.cloudflarestorage.com')) {
+    const accountId = url.hostname.slice(0, -'.r2.cloudflarestorage.com'.length);
+    const region = (process.env.BACKUP_S3_REGION || 'auto').trim();
+    if (!/^[0-9a-f]{32}$/i.test(accountId)) {
+      problems.push('BACKUP_S3_ENDPOINT deve usar o ID da conta Cloudflare antes de .r2.cloudflarestorage.com');
+    }
+    if (!/^[0-9a-f]{32}$/i.test(accessKey)) {
+      problems.push('BACKUP_S3_ACCESS_KEY deve ser a Access Key ID criada em R2 → API Tokens');
+    }
+    if (accessKey === secretKey) {
+      problems.push('BACKUP_S3_SECRET_KEY repete a Access Key ID; use a Secret Access Key mostrada ao criar o token R2');
+    } else if (!/^[0-9a-f]{64}$/i.test(secretKey)) {
+      problems.push('BACKUP_S3_SECRET_KEY deve ser a Secret Access Key criada em R2 → API Tokens');
+    }
+    if (region !== 'auto' && region !== 'us-east-1') {
+      problems.push('BACKUP_S3_REGION deve ser auto no Cloudflare R2, não a localização física do bucket');
+    }
+  }
+
+  return problems.length ? problems.join('. ') : null;
 }
 
 export const backupStatus = () => ({
@@ -131,11 +187,26 @@ function parseName(name: string): { created_at: string; trigger: BackupTrigger }
   return { created_at: `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}.${m[7]}Z`, trigger: m[8] as BackupTrigger };
 }
 
+/** Último erro ao listar o armazenamento de fora (o painel mostra-o) */
+let offsiteListError: string | null = null;
+export const offsiteProblem = () => offsiteConfigurationProblem() || offsiteListError;
+
 export async function listBackups(): Promise<BackupInfo[]> {
   const byName = new Map<string, BackupInfo>();
   for (const s of [local(), offsite()].filter(Boolean) as Store[]) {
-    const items = await listStore(s).catch((err) => {
-      console.warn(`[Backup] Não foi possível listar ${s.label}:`, err?.message);
+    if (s.label === 'offsite') {
+      const problem = offsiteConfigurationProblem();
+      if (problem) {
+        offsiteListError = problem;
+        continue;
+      }
+    }
+    const items = await listStore(s).then((r) => {
+      if (s.label === 'offsite') offsiteListError = null;
+      return r;
+    }).catch((err) => {
+      console.warn(`[Backup] Não foi possível listar ${s.label}:`, err?.code, err?.message);
+      if (s.label === 'offsite') offsiteListError = storageErrorText(err);
       return [];
     });
     for (const o of items) {
@@ -231,8 +302,11 @@ const tmp = (suffix: string) => join(tmpdir(), `lf-${Date.now()}-${randomBytes(4
 
 // ── Criar ──
 async function createUnlocked(trigger: BackupTrigger): Promise<BackupInfo> {
-  const stores = [local(), offsite()].filter(Boolean) as Store[];
-  if (!stores.length) throw new BackupError('Sem armazenamento para as cópias (MinIO ou BACKUP_S3_*)', 503);
+  const configProblem = offsiteConfigurationProblem();
+  const stores = [local(), configProblem ? null : offsite()].filter(Boolean) as Store[];
+  if (!stores.length) {
+    throw new BackupError(configProblem || 'Sem armazenamento para as cópias (MinIO ou BACKUP_S3_*)', 503);
+  }
   key(); // falha já se não houver chave
   const dump = tmp('.dump');
   const enc = tmp('.lfbak');
@@ -242,14 +316,18 @@ async function createUnlocked(trigger: BackupTrigger): Promise<BackupInfo> {
     await run('pg_dump', ['--format=custom', '--compress=6', '--no-owner', '--no-acl', `--file=${dump}`]);
     await encryptFile(dump, enc);
     const { size } = await fs.stat(enc);
-    const info: BackupInfo = { name, size, ...parseName(name), local: false, offsite: false };
+    const info: BackupInfo = {
+      name, size, ...parseName(name), local: false, offsite: false,
+      ...(configProblem ? { offsite_error: configProblem } : {}),
+    };
     for (const s of stores) {
       try {
         await ensureBucket(s);
         await s.client.fPutObject(s.bucket, PREFIX + name, enc, { 'Content-Type': 'application/octet-stream' });
         info[s.label] = true;
       } catch (err: any) {
-        console.error(`[Backup] Envio para ${s.label} falhou:`, err?.message);
+        console.error(`[Backup] Envio para ${s.label} falhou:`, err?.code, err?.message);
+        if (s.label === 'offsite') info.offsite_error = storageErrorText(err);
       }
     }
     if (!info.local && !info.offsite) throw new BackupError('Não foi possível guardar a cópia no armazenamento', 502);
@@ -276,6 +354,60 @@ async function prune() {
     }
   }
 }
+
+/** Erro do S3 (R2/B2/AWS) com o que fazer, em português */
+export function storageErrorText(err: any): string {
+  const code = String(err?.code || err?.cause?.code || '');
+  const msg = String(err?.message || '').slice(0, 200);
+  const hints: Record<string, string> = {
+    InvalidAccessKeyId: 'A chave de acesso (BACKUP_S3_ACCESS_KEY) não existe neste serviço',
+    SignatureDoesNotMatch: 'A chave secreta (BACKUP_S3_SECRET_KEY) está errada (confirme que não tem espaços)',
+    AccessDenied: 'O token não tem permissão para escrever neste bucket (dê "Object Read & Write")',
+    NoSuchBucket: 'O bucket não existe: confirme BACKUP_S3_BUCKET',
+    ENOTFOUND: 'Endereço não encontrado: confirme BACKUP_S3_ENDPOINT (https://<ID da conta>.r2.cloudflarestorage.com)',
+    ECONNREFUSED: 'O endereço recusou a ligação: confirme BACKUP_S3_ENDPOINT',
+    InvalidEndpointError: 'Endereço inválido: confirme BACKUP_S3_ENDPOINT',
+  };
+  const hint = hints[code] || (/getaddrinfo/.test(msg) ? hints.ENOTFOUND : '');
+  return hint ? `${hint} (${code || 'erro'})` : `${code ? `${code}: ` : ''}${msg || 'erro desconhecido'}`;
+}
+
+/** Experimenta o armazenamento de fora: escreve, lê e apaga um ficheiro pequeno */
+export async function testOffsite(): Promise<{ ok: boolean; message: string }> {
+  const problem = offsiteConfigurationProblem();
+  if (problem) return { ok: false, message: problem };
+  const s = offsite();
+  if (!s) return { ok: false, message: 'Defina BACKUP_S3_ENDPOINT, BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY e BACKUP_S3_SECRET_KEY' };
+  const key = `${PREFIX}.teste-leadsflow`;
+  try {
+    await s.client.putObject(s.bucket, key, Buffer.from(`teste ${new Date().toISOString()}`));
+    await s.client.statObject(s.bucket, key);
+    await s.client.removeObject(s.bucket, key);
+    return { ok: true, message: 'Ligação ao armazenamento de fora a funcionar' };
+  } catch (err: any) {
+    console.error('[Backup] Teste do armazenamento de fora:', err?.code, err?.message);
+    return { ok: false, message: storageErrorText(err) };
+  }
+}
+
+/** Envia para fora uma cópia que só está no servidor (sem descarregar para o disco) */
+export const sendToOffsite = (name: string) => exclusive('envio para fora do servidor', async () => {
+  if (!safeName(name)) throw new BackupError('Cópia inválida', 404);
+  const problem = offsiteConfigurationProblem();
+  if (problem) throw new BackupError(problem, 503);
+  const l = local();
+  const o = offsite();
+  if (!l || !o) throw new BackupError('Falta o armazenamento de fora (BACKUP_S3_*)', 503);
+  const stat = await l.client.statObject(l.bucket, PREFIX + name).catch(() => null);
+  if (!stat) throw new BackupError('Cópia não encontrada no servidor', 404);
+  try {
+    const stream = await l.client.getObject(l.bucket, PREFIX + name);
+    await o.client.putObject(o.bucket, PREFIX + name, stream, stat.size, { 'Content-Type': 'application/octet-stream' });
+  } catch (err: any) {
+    throw new BackupError(storageErrorText(err), 502);
+  }
+  return { name, message: 'Cópia enviada para fora do servidor' };
+});
 
 /** Endereço temporário (10 min) para descarregar uma cópia */
 export async function downloadUrl(name: string): Promise<string> {
@@ -328,7 +460,7 @@ export const restoreBackup = (source: { name?: string; uploadedPath?: string }) 
 // ── Em segundo plano (o Cloudflare corta pedidos com mais de 100 s) ──
 // O resultado fica num ficheiro: sobrevive ao reinício da API depois de restaurar.
 const LAST_FILE = join(tmpdir(), 'leadsflow-backup-last.json');
-export interface LastResult { op: 'backup' | 'restore'; ok: boolean; at: string; message: string; name?: string }
+export interface LastResult { op: 'backup' | 'restore' | 'offsite'; ok: boolean; at: string; message: string; name?: string; warn?: boolean }
 
 export async function lastResult(): Promise<LastResult | null> {
   try { return JSON.parse(await fs.readFile(LAST_FILE, 'utf8')); } catch { return null; }
@@ -336,7 +468,7 @@ export async function lastResult(): Promise<LastResult | null> {
 const saveLast = (r: LastResult) => fs.writeFile(LAST_FILE, JSON.stringify(r)).catch(() => {});
 
 /** Arranca a operação e devolve logo; erro imediato se já houver outra a decorrer */
-export function startInBackground(op: 'backup' | 'restore', fn: () => Promise<{ name?: string; message: string }>, after?: () => void) {
+export function startInBackground(op: LastResult['op'], fn: () => Promise<{ name?: string; message: string; warn?: boolean }>, after?: () => void) {
   if (busy) throw new BackupError(`Já está a decorrer: ${busy}`, 409);
   void fn()
     .then(async (r) => { await saveLast({ op, ok: true, at: new Date().toISOString(), ...r }); after?.(); })
@@ -373,4 +505,4 @@ export const backupScheduler = {
   },
 };
 
-export const _test = { encryptFile, decryptFile, parseName, safeName, fileName };
+export const _test = { encryptFile, decryptFile, parseName, safeName, fileName, offsiteConfigurationProblem };

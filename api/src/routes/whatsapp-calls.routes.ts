@@ -42,6 +42,8 @@ const fail = (res: any, err: any, where: string) => {
     error: status === 500 ? 'Não foi possível concluir' : err.message,
     ...(err?.code ? { code: err.code } : {}),
     ...(err?.can_request !== undefined ? { can_request: !!err.can_request } : {}),
+    ...(err?.channel_id ? { channel_id: String(err.channel_id) } : {}),
+    ...(err?.to ? { to: String(err.to) } : {}),
   });
 };
 
@@ -350,7 +352,7 @@ router.put('/:channelId', async (req: any, res) => {
     if (enabled && !voiceAgentId) return res.status(400).json({ error: 'Escolha o agente' });
 
     const wasEnabled = !!parse(ch.settings).whatsapp_calls?.enabled;
-    if (enabled !== wasEnabled) {
+    if (enabled || enabled !== wasEnabled) {
       const phoneId = ch.credentials?.phone_number_id;
       const token = ch.credentials?.access_token;
       if (!phoneId || !token) return res.status(400).json({ error: 'Volte a ligar este número' });

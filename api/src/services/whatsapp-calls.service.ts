@@ -11,9 +11,10 @@
 import { timingSafeEqual } from 'crypto';
 import { query } from '../database/connection';
 import { callAllowance, callerBlocked, notifyUsageThresholds } from './voice-usage.service';
-import { contactWindow } from './whatsapp-window.service';
 import { notificationsService } from './notifications.service';
 import { cloudChannelForNumber } from './channels.service';
+import { cloudRecipient } from './whatsapp-cloud.service';
+import { SERVICE_WINDOW_MS } from './whatsapp-window.service';
 import { callContext, noteCallInConversation, toolsPrompt, voiceToolIds } from './voice-tools.service';
 
 // A API de chamadas não existe em versões antigas da Graph API
@@ -61,6 +62,7 @@ async function graph(path: string, token: string, body: unknown) {
 
 // Erros da API de chamadas com o que a pessoa tem de fazer (developers.facebook.com → calling/troubleshooting)
 const META_ERRORS: Record<number, string> = {
+  131047: 'O cliente não escreveu nas últimas 24 horas. Peça-lhe que mande uma mensagem e depois peça autorização.',
   138015: 'A Meta só liga as chamadas em números com limite de 2000 conversas por dia ou mais. Veja o limite do número no Gestor do WhatsApp.',
   138018: 'Falta subscrever as chamadas no webhook do WhatsApp Business.',
   138014: 'A Meta desativou as chamadas neste número por agora, por causa da qualidade.',
@@ -103,7 +105,7 @@ const callAction = (phoneId: string, token: string, callId: string, action: stri
 export async function setNumberCalling(phoneId: string, token: string, enabled: boolean) {
   return graph(`/${encodeURIComponent(phoneId)}/settings`, token, {
     calling: enabled
-      ? { status: 'enabled', call_icon_visibility: 'DEFAULT' }
+      ? { status: 'enabled', call_icon_visibility: 'DEFAULT', callback_permission_status: 'ENABLED' }
       : { status: 'disabled' },
   });
 }
@@ -334,6 +336,72 @@ async function findLeadByPhone(userId: string, phone: string) {
   )).rows[0] || null;
 }
 
+/**
+ * Conversas possíveis para um número escrito à mão.
+ *
+ * O wa_id recebido da Meta é a referência principal. O telefone do lead pode estar sem indicativo
+ * ou ter uma formatação diferente, por isso só usamos os últimos dígitos como último recurso.
+ * Também procuramos noutros números empresariais com chamadas ativas: a janela e a autorização
+ * pertencem ao par contacto + número empresarial.
+ */
+async function matchingCallConversations(userId: string, preferredChannelId: string, phone: string) {
+  const exactJid = `${phone}@s.whatsapp.net`;
+  const r = await query(
+    `WITH candidates AS (
+       SELECT c.id, c.channel_id, c.remote_jid, c.lead_id, c.metadata,
+              ch.credentials, ch.settings,
+              l.phone AS lead_phone, l.whatsapp AS lead_whatsapp,
+              (SELECT MAX(m.created_at)
+                 FROM messages m
+                WHERE m.conversation_id = c.id AND m.direction = 'in') AS last_in,
+              CASE
+                WHEN c.remote_jid = $4 THEN 3
+                WHEN regexp_replace(split_part(c.remote_jid, '@', 1), '\\D', '', 'g') = $3
+                  OR regexp_replace(COALESCE(c.metadata->>'phone', ''), '\\D', '', 'g') = $3
+                  OR regexp_replace(COALESCE(l.phone, ''), '\\D', '', 'g') = $3
+                  OR regexp_replace(COALESCE(l.whatsapp, ''), '\\D', '', 'g') = $3 THEN 2
+                ELSE 1
+              END AS match_rank
+         FROM conversations c
+         JOIN channels ch ON ch.id = c.channel_id AND ch.user_id = $1
+         LEFT JOIN leads l ON l.id = c.lead_id AND l.user_id = $1
+        WHERE c.user_id = $1
+          AND ch.type = 'whatsapp_cloud' AND ch.status = 'active'
+          AND (c.channel_id = $2 OR ch.settings->'whatsapp_calls'->>'enabled' = 'true')
+          AND c.remote_jid LIKE '%@s.whatsapp.net'
+          AND $3 <> ''
+          AND (
+            c.remote_jid = $4
+            OR regexp_replace(split_part(c.remote_jid, '@', 1), '\\D', '', 'g') = $3
+            OR regexp_replace(COALESCE(c.metadata->>'phone', ''), '\\D', '', 'g') = $3
+            OR regexp_replace(COALESCE(l.phone, ''), '\\D', '', 'g') = $3
+            OR regexp_replace(COALESCE(l.whatsapp, ''), '\\D', '', 'g') = $3
+            OR (LENGTH($3) >= 8 AND (
+              RIGHT(regexp_replace(split_part(c.remote_jid, '@', 1), '\\D', '', 'g'), LEAST(9, LENGTH($3))) = RIGHT($3, LEAST(9, LENGTH($3)))
+              OR RIGHT(regexp_replace(COALESCE(c.metadata->>'phone', ''), '\\D', '', 'g'), LEAST(9, LENGTH($3))) = RIGHT($3, LEAST(9, LENGTH($3)))
+              OR RIGHT(regexp_replace(COALESCE(l.phone, ''), '\\D', '', 'g'), LEAST(9, LENGTH($3))) = RIGHT($3, LEAST(9, LENGTH($3)))
+              OR RIGHT(regexp_replace(COALESCE(l.whatsapp, ''), '\\D', '', 'g'), LEAST(9, LENGTH($3))) = RIGHT($3, LEAST(9, LENGTH($3)))
+            ))
+          )
+     )
+     SELECT * FROM candidates
+      ORDER BY match_rank DESC, (last_in > NOW() - INTERVAL '24 hours') DESC,
+               (channel_id = $2) DESC, last_in DESC NULLS LAST
+      LIMIT 10`,
+    [userId, preferredChannelId, phone, exactJid],
+  );
+  return r.rows;
+}
+
+interface ResolvedCallTarget {
+  channel: any;
+  phoneId: string;
+  token: string;
+  to: string;
+  conversation: any | null;
+  windowOpen: boolean;
+}
+
 // ── Eventos ──────────────────────────────────────────────────────────────────
 export class WhatsAppCallsService {
   /** Webhook "calls" do WhatsApp Business. Nunca lança: os erros ficam no registo. */
@@ -458,6 +526,51 @@ export class WhatsAppCallsService {
     );
   }
 
+  /** Resolve o wa_id e o número empresarial a partir da conversa real, quando ela existe. */
+  private async resolveCallTargets(userId: string, channelId: string, toRaw: string) {
+    const typed = digits(toRaw);
+    if (typed.length < 8) throw new WhatsAppCallError('Número inválido. Use o indicativo do país (ex.: 258…).');
+
+    const selectedChannel = await this.callChannel(userId, channelId);
+    const rows = await matchingCallConversations(userId, channelId, typed);
+
+    // Um número sem indicativo pode coincidir pelos últimos dígitos. Só aceitamos esse fallback
+    // quando todas as coincidências apontam para o mesmo wa_id, para nunca enviar ao contacto errado.
+    const exactRows = rows.filter((row: any) => Number(row.match_rank) >= 2);
+    const suffixRows = rows.filter((row: any) => Number(row.match_rank) === 1);
+    const suffixRecipients = new Set(suffixRows.map((row: any) => cloudRecipient(row.remote_jid)));
+    const usableRows = exactRows.length ? exactRows : suffixRecipients.size === 1 ? suffixRows : [];
+
+    const fromRow = (row: any): ResolvedCallTarget | null => {
+      const credentials = parse(row.credentials);
+      const phoneId = String(credentials.phone_number_id || '');
+      const token = String(credentials.access_token || '');
+      if (!phoneId || !token) return null;
+      const metadata = parse(row.metadata);
+      const to = cloudRecipient(row.remote_jid, metadata.phone || row.lead_phone || row.lead_whatsapp || typed);
+      const lastIn = row.last_in ? new Date(row.last_in).getTime() : 0;
+      return {
+        channel: { id: row.channel_id, credentials, settings: parse(row.settings) },
+        phoneId,
+        token,
+        to: to || typed,
+        conversation: row,
+        windowOpen: lastIn > Date.now() - SERVICE_WINDOW_MS,
+      };
+    };
+
+    const selectedRow = usableRows.find((row: any) => String(row.channel_id) === channelId);
+    const selectedFromConversation = selectedRow ? fromRow(selectedRow) : null;
+    const selected: ResolvedCallTarget = selectedFromConversation || {
+      ...selectedChannel,
+      to: typed,
+      conversation: null,
+      windowOpen: false,
+    };
+    const open = usableRows.map(fromRow).find((target): target is ResolvedCallTarget => !!target?.windowOpen) || null;
+    return { selected, open };
+  }
+
   /** A ponte terminou a sessão: guarda a transcrição; se foi o agente a desligar, termina a chamada na Meta */
   async onBridgeEnded(result: any): Promise<void> {
     const row = await callRow(String(result?.callId || ''));
@@ -502,21 +615,13 @@ export class WhatsAppCallsService {
    */
   async startOutbound(userId: string, input: { channel_id: string; voice_agent_id: string; to: string; greeting: string; purpose?: string }) {
     if (!callsEnabled() || !bridgeConfigured()) throw new WhatsAppCallError('Ainda não disponível', 403);
-    const to = digits(input.to);
-    if (to.length < 8) throw new WhatsAppCallError('Número inválido. Use o indicativo do país (ex.: 258…).');
     const greeting = String(input.greeting || '').trim();
     if (!greeting) throw new WhatsAppCallError('Escreva a primeira frase');
     const purpose = String(input.purpose || '').trim().slice(0, 1500);
 
-    const channel = (await query(
-      `SELECT * FROM channels WHERE id = $1 AND user_id = $2 AND type = 'whatsapp_cloud' AND status = 'active'`,
-      [input.channel_id, userId],
-    )).rows[0];
-    if (!channel) throw new WhatsAppCallError('Número WhatsApp Business não encontrado', 404);
-    const phoneId = channel.credentials?.phone_number_id;
-    const token = channel.credentials?.access_token;
-    if (!phoneId || !token) throw new WhatsAppCallError('Ligue de novo o número WhatsApp Business');
-    if (!parse(channel.settings).whatsapp_calls?.enabled) {
+    const targets = await this.resolveCallTargets(userId, input.channel_id, input.to);
+    let target = targets.selected;
+    if (!parse(target.channel.settings).whatsapp_calls?.enabled) {
       throw new WhatsAppCallError('Ative as chamadas neste número primeiro (secção Números)');
     }
     const agent = (await query('SELECT * FROM voice_agents WHERE id = $1 AND user_id = $2', [input.voice_agent_id, userId])).rows[0];
@@ -526,19 +631,30 @@ export class WhatsAppCallsService {
     const allowance = await callAllowance(userId);
     if (!allowance.ok) throw Object.assign(new WhatsAppCallError(allowance.reason, 403), { code: allowance.code });
 
-    const permission = await this.permissionStatus(phoneId, token, to);
+    let permission = await this.permissionStatus(target.phoneId, target.token, target.to);
+    if (!permission.can_call && targets.open
+      && (targets.open.channel.id !== target.channel.id || targets.open.to !== target.to)) {
+      target = targets.open;
+      permission = await this.permissionStatus(target.phoneId, target.token, target.to);
+    }
     if (!permission.can_call) {
       throw Object.assign(new WhatsAppCallError('Este cliente ainda não autorizou chamadas', 409), {
         code: 'NEEDS_PERMISSION', can_request: permission.can_request,
+        channel_id: target.channel.id, to: target.to,
       });
     }
 
+    const { channel, phoneId, token, to } = target;
     const lead = await findLeadByPhone(userId, to);
     const row = (await query(
       `INSERT INTO voice_agent_calls (voice_agent_id, user_id, phone_number, direction, status, lead_id, metadata)
        VALUES ($1, $2, $3, 'outbound', 'initiated', $4, $5) RETURNING id`,
       [agent.id, userId, to, lead?.id || null,
-        JSON.stringify({ source: 'whatsapp_call', channel_id: channel.id, phone_number_id: phoneId, managed: !!call.managed, caller_name: lead?.name || null, purpose: purpose || null })],
+        JSON.stringify({
+          source: 'whatsapp_call', channel_id: channel.id, phone_number_id: phoneId,
+          conversation_id: target.conversation?.id || null, managed: !!call.managed,
+          caller_name: lead?.name || null, purpose: purpose || null,
+        })],
     )).rows[0];
     await query(`UPDATE voice_agent_calls SET metadata = metadata || $2::jsonb WHERE id = $1`, [row.id, JSON.stringify({ bridge_key: row.id })]);
     void callContext(row.id).catch(() => {});
@@ -631,8 +747,15 @@ export class WhatsAppCallsService {
   }
 
   async permissionForUser(userId: string, channelId: string, to: string) {
-    const ch = await this.callChannel(userId, channelId);
-    return this.permissionStatus(ch.phoneId, ch.token, digits(to));
+    const targets = await this.resolveCallTargets(userId, channelId, to);
+    let target = targets.selected;
+    let permission = await this.permissionStatus(target.phoneId, target.token, target.to);
+    if (!permission.can_call && targets.open
+      && (targets.open.channel.id !== target.channel.id || targets.open.to !== target.to)) {
+      target = targets.open;
+      permission = await this.permissionStatus(target.phoneId, target.token, target.to);
+    }
+    return { ...permission, channel_id: target.channel.id, to: target.to };
   }
 
   private async callChannel(userId: string, channelId: string) {
@@ -651,12 +774,11 @@ export class WhatsAppCallsService {
    * 24 horas aberta (o cliente escreveu nas últimas 24 h); a Meta deixa 1 pedido por dia e 2 por semana.
    */
   async requestPermission(userId: string, channelId: string, toRaw: string, text?: string) {
-    const { channel, phoneId, token } = await this.callChannel(userId, channelId);
-    const to = digits(toRaw);
-    const win = await contactWindow(userId, channel.id, to);
-    if (!win.open) {
+    const target = (await this.resolveCallTargets(userId, channelId, toRaw)).open;
+    if (!target) {
       throw new WhatsAppCallError('O cliente não escreveu nas últimas 24 horas. Peça-lhe que mande uma mensagem e depois peça autorização.', 422);
     }
+    const { channel, phoneId, token, to, conversation } = target;
     const body = String(text || '').trim().slice(0, 1024) || 'Podemos ligar-lhe pelo WhatsApp?';
     const res = await graph(`/${encodeURIComponent(phoneId)}/messages`, token, {
       messaging_product: 'whatsapp',
@@ -666,18 +788,14 @@ export class WhatsAppCallsService {
       interactive: { type: 'call_permission_request', action: { name: 'call_permission_request' }, body: { text: body } },
     });
     // Fica também na conversa da caixa de entrada
-    const conv = (await query(
-      `SELECT id, lead_id FROM conversations WHERE user_id = $1 AND channel_id = $2 AND remote_jid = $3 LIMIT 1`,
-      [userId, channel.id, `${to}@s.whatsapp.net`],
-    )).rows[0];
-    if (conv) {
+    if (conversation) {
       await query(
         `INSERT INTO messages (user_id, conversation_id, lead_id, direction, channel, content, status, external_id, metadata)
          VALUES ($1, $2, $3, 'out', 'whatsapp_cloud', $4, 'pending', $5, $6)`,
-        [userId, conv.id, conv.lead_id, `📞 ${body}`, res?.messages?.[0]?.id || null, JSON.stringify({ source: 'call_permission_request' })],
+        [userId, conversation.id, conversation.lead_id, `📞 ${body}`, res?.messages?.[0]?.id || null, JSON.stringify({ source: 'call_permission_request' })],
       ).catch((err: any) => console.warn('[WhatsAppCalls] Pedido não guardado na conversa:', err?.message));
     }
-    return { ok: true };
+    return { ok: true, channel_id: channel.id, to };
   }
 
   /** Resposta do cliente ao pedido de autorização (webhook messages → interactive call_permission_reply) */

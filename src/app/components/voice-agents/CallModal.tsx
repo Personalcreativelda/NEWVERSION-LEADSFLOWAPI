@@ -53,6 +53,14 @@ export function CallModal({ open, onOpenChange, state, onStarted }: Props) {
     if (agent) setGreeting(agent.greeting);
   };
 
+  const pickChannel = (id: string) => {
+    setChannelId(id);
+    const channel = state.channels.find((item) => item.id === id);
+    const agent = agents.find((item) => item.id === channel?.voice_agent_id) || agents[0];
+    setAgentId(agent?.id || '');
+    setGreeting(agent?.greeting || '');
+  };
+
   const call = async () => {
     setBusy(true);
     try {
@@ -63,6 +71,8 @@ export function CallModal({ open, onOpenChange, state, onStarted }: Props) {
     } catch (err: any) {
       const data = err?.response?.data;
       if (data?.code === 'NEEDS_PERMISSION') {
+        if (data.channel_id && numbers.some((number) => number.id === data.channel_id)) pickChannel(data.channel_id);
+        if (data.to) setTo(String(data.to));
         setNeedsPermission({ canRequest: !!data.can_request });
       } else if (data?.code === 'NO_MINUTES' || data?.code === 'PLAN') {
         toast.error(data.error);
@@ -89,7 +99,14 @@ export function CallModal({ open, onOpenChange, state, onStarted }: Props) {
   };
 
   const digits = to.replace(/\D/g, '');
-  const canCall = channelId && agentId && digits.length >= 8 && greeting.trim();
+  const selectedNumber = state.channels.find((channel) => channel.id === channelId);
+  const canCall = selectedNumber?.enabled && selectedNumber.voice_agent_id && agentId && digits.length >= 8 && greeting.trim();
+
+  const numberOptions = state.channels.map((channel) => (
+    <option key={channel.id} value={channel.id} disabled={!channel.enabled || !channel.voice_agent_id}>
+      {channel.phone || channel.name}{!channel.enabled || !channel.voice_agent_id ? ' — Ative em Números' : ''}
+    </option>
+  ));
 
   return (
     <AppModal
@@ -120,6 +137,14 @@ export function CallModal({ open, onOpenChange, state, onStarted }: Props) {
               ? 'Este cliente ainda não autorizou chamadas. Envie-lhe o pedido pelo WhatsApp; quando aceitar, pode ligar durante 7 dias.'
               : 'Este cliente ainda não autorizou chamadas e já recebeu um pedido recentemente. Tente amanhã.'}
           </p>
+          {state.channels.length > 1 && (
+            <div>
+              <Label htmlFor="call-perm-channel" className="mb-1.5 block">Enviar de</Label>
+              <select id="call-perm-channel" value={channelId} onChange={(e) => pickChannel(e.target.value)} className="w-full" translate="no">
+                {numberOptions}
+              </select>
+            </div>
+          )}
           {needsPermission.canRequest && (
             <div>
               <Label htmlFor="call-perm" className="mb-1.5 block">Mensagem</Label>
@@ -134,15 +159,15 @@ export function CallModal({ open, onOpenChange, state, onStarted }: Props) {
             <Input id="call-to" inputMode="tel" value={to} onChange={(e) => setTo(e.target.value)} placeholder="258 84 123 4567" />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {numbers.length > 1 && (
+            {state.channels.length > 1 && (
               <div>
                 <Label htmlFor="call-channel" className="mb-1.5 block">Ligar de</Label>
-                <select id="call-channel" value={channelId} onChange={(e) => setChannelId(e.target.value)} className="w-full">
-                  {numbers.map((c) => <option key={c.id} value={c.id}>{c.phone || c.name}</option>)}
+                <select id="call-channel" value={channelId} onChange={(e) => pickChannel(e.target.value)} className="w-full" translate="no">
+                  {numberOptions}
                 </select>
               </div>
             )}
-            <div className={numbers.length > 1 ? '' : 'sm:col-span-2'}>
+            <div className={state.channels.length > 1 ? '' : 'sm:col-span-2'}>
               <Label htmlFor="call-agent" className="mb-1.5 block">Agente</Label>
               <select id="call-agent" value={agentId} onChange={(e) => pickAgent(e.target.value)} className="w-full">
                 {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}

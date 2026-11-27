@@ -1,7 +1,7 @@
 // Administração → Cópias de segurança da base de dados (api/src/routes/admin-backups.routes.ts).
 // Criar e restaurar correm em segundo plano na API: este ecrã acompanha pelo GET (busy / last).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DatabaseBackup, Download, Loader2, RotateCcw, Trash2, Upload } from 'lucide-react';
+import { CloudUpload, DatabaseBackup, Download, Loader2, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageAction, PageHeader } from '../../base/PageHeader';
 import { AppModal } from '../../base/AppModal';
@@ -22,9 +22,9 @@ interface Backup {
   offsite: boolean;
 }
 interface State {
-  status: { local: boolean; offsite: boolean; encryption: boolean; keep: number; hour: number };
+  status: { local: boolean; offsite: boolean; encryption: boolean; keep: number; hour: number; offsite_error?: string | null };
   busy: string | null;
-  last: { op: 'backup' | 'restore'; ok: boolean; at: string; message: string; name?: string } | null;
+  last: { op: 'backup' | 'restore' | 'offsite'; ok: boolean; at: string; message: string; name?: string; warn?: boolean } | null;
   backups: Backup[];
 }
 
@@ -55,7 +55,9 @@ export function AdminBackupsTab() {
   const [phrase, setPhrase] = useState('');
   const [password, setPassword] = useState('');
   const [sending, setSending] = useState(false);
-  const [waiting, setWaiting] = useState<'backup' | 'restore' | null>(null);
+  const [waiting, setWaiting] = useState<'backup' | 'restore' | 'offsite' | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const seenLast = useRef<string | null>(null);
 
@@ -67,7 +69,9 @@ export function AdminBackupsTab() {
       // Terminou uma operação que estávamos a acompanhar
       if (s.last && s.last.at !== seenLast.current) {
         if (seenLast.current !== null && !s.busy) {
-          if (s.last.ok) toast.success(s.last.message); else toast.error(s.last.message);
+          if (!s.last.ok) toast.error(s.last.message);
+          else if (s.last.warn) toast.warning(s.last.message, { duration: 12000 });
+          else toast.success(s.last.message);
           setWaiting(null);
         }
         seenLast.current = s.last.at;
@@ -98,6 +102,29 @@ export function AdminBackupsTab() {
       setState((s) => (s ? { ...s, busy: 'cópia de segurança' } : s));
     } catch (err: any) {
       toast.error(err?.message || 'Não foi possível criar a cópia');
+    }
+  };
+
+  const testOffsite = async () => {
+    setTesting(true);
+    try {
+      const r = await apiRequest('/api/admin/backups/offsite/test', 'POST');
+      setTestResult(r);
+      if (r.ok) toast.success(r.message); else toast.error(r.message, { duration: 12000 });
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível testar');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const sendOffsite = async (b: Backup) => {
+    try {
+      await apiRequest(`/api/admin/backups/${encodeURIComponent(b.name)}/offsite`, 'POST');
+      setWaiting('offsite');
+      setState((s) => (s ? { ...s, busy: 'envio para fora do servidor' } : s));
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível enviar');
     }
   };
 
@@ -151,7 +178,10 @@ export function AdminBackupsTab() {
     }
   };
 
-  const busyLabel = state?.busy || (waiting === 'restore' ? 'restauro' : waiting === 'backup' ? 'cópia de segurança' : null);
+  const busyLabel = state?.busy || (waiting === 'restore' ? 'restauro' : waiting === 'backup' ? 'cópia de segurança' : waiting === 'offsite' ? 'envio para fora do servidor' : null);
+  const offsiteError = testResult
+    ? (testResult.ok ? null : testResult.message)
+    : state?.status.offsite_error;
 
   return (
     <div>
@@ -182,7 +212,7 @@ export function AdminBackupsTab() {
           {busyLabel && (
             <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm text-foreground">
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-              {busyLabel === 'restauro' ? 'A restaurar a base de dados…' : 'A criar a cópia…'}
+              {busyLabel === 'restauro' ? 'A restaurar a base de dados…' : busyLabel === 'envio para fora do servidor' ? 'A enviar para fora do servidor…' : 'A criar a cópia…'}
             </div>
           )}
 
@@ -194,10 +224,18 @@ export function AdminBackupsTab() {
               <Row label="No servidor" value={state.status.local ? 'Ativo' : 'Desligado'} />
               <Row
                 label="Fora do servidor"
-                value={state.status.offsite
-                  ? <span className="text-emerald-600 dark:text-emerald-400">Ativo</span>
-                  : <span className="text-amber-600 dark:text-amber-400">Não configurado</span>}
+                value={state.status.offsite || offsiteError ? (
+                  <span className="flex items-center justify-end gap-3">
+                    {offsiteError
+                      ? <span className="text-red-600 dark:text-red-400">Com erro</span>
+                      : <span className="text-emerald-600 dark:text-emerald-400">Configurado</span>}
+                    <Button variant="outline" onClick={() => void testOffsite()} disabled={testing}>{testing ? 'A testar…' : 'Testar'}</Button>
+                  </span>
+                ) : <span className="text-amber-600 dark:text-amber-400">Não configurado</span>}
               />
+              {offsiteError && (
+                <p className="px-4 py-3 text-sm text-red-600 dark:text-red-400">{offsiteError}</p>
+              )}
               <Row label="Cifra" value={state.status.encryption ? 'Ativa' : <span className="text-red-600">Sem chave</span>} />
             </div>
             {!state.status.offsite && (
@@ -231,6 +269,11 @@ export function AdminBackupsTab() {
                       <button type="button" onClick={() => void download(b)} className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Descarregar" title="Descarregar">
                         <Download className="h-4 w-4" />
                       </button>
+                      {state.status.offsite && b.local && !b.offsite && (
+                        <button type="button" onClick={() => void sendOffsite(b)} disabled={!!busyLabel} className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40" aria-label="Enviar para fora do servidor" title="Enviar para fora do servidor">
+                          <CloudUpload className="h-4 w-4" />
+                        </button>
+                      )}
                       <button type="button" onClick={() => openRestore({ name: b.name })} disabled={!!busyLabel} className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40" aria-label="Restaurar" title="Restaurar">
                         <RotateCcw className="h-4 w-4" />
                       </button>

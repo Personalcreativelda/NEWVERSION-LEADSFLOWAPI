@@ -3,6 +3,8 @@
 //   POST   /                  criar uma cópia agora (em segundo plano: 202; o GET mostra busy/last)
 //   GET    /:name/download    { url } temporário (10 min) para descarregar
 //   DELETE /:name             apagar uma cópia
+//   POST   /offsite/test      experimenta o armazenamento de fora (BACKUP_S3_*) → { ok, message }
+//   POST   /:name/offsite     envia para fora uma cópia que só está no servidor
 //   POST   /restore           restaurar { name } ou ficheiro enviado (multipart "file"); { confirm: "RESTAURAR", password }
 import { Router } from 'express';
 import multer from 'multer';
@@ -13,7 +15,7 @@ import { requireAdmin, requireAuth, type AuthenticatedRequest } from '../middlew
 import { query } from '../database/connection';
 import {
   BackupError, backupBusy, backupStatus, createBackup, deleteBackup, downloadUrl, lastResult, listBackups, restoreBackup,
-  startInBackground,
+  offsiteProblem, sendToOffsite, startInBackground, testOffsite,
 } from '../services/backup.service';
 import { activityService } from '../services/activity.service';
 
@@ -39,7 +41,8 @@ const log = (req: AuthenticatedRequest, type: string, metadata: Record<string, u
 
 router.get('/', async (_req, res) => {
   try {
-    res.json({ status: backupStatus(), busy: backupBusy(), last: await lastResult(), backups: await listBackups() });
+    const backups = await listBackups();
+    res.json({ status: { ...backupStatus(), offsite_error: offsiteProblem() }, busy: backupBusy(), last: await lastResult(), backups });
   } catch (err: any) {
     fail(res, err, 'listar');
   }
@@ -51,11 +54,34 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
     startInBackground('backup', async () => {
       const info = await createBackup('manual');
       log(req, 'backup_created', { name: info.name });
+      if (info.offsite_error) {
+        return { name: info.name, warn: true, message: `Cópia criada no servidor, mas não foi enviada para fora: ${info.offsite_error}` };
+      }
       return { name: info.name, message: info.offsite ? 'Cópia criada e guardada fora do servidor' : 'Cópia criada' };
     });
     res.status(202).json({ started: true });
   } catch (err: any) {
     fail(res, err, 'criar');
+  }
+});
+
+// Experimenta o armazenamento de fora (escreve, lê e apaga um ficheiro pequeno) e diz o erro exato
+router.post('/offsite/test', async (_req, res) => {
+  try {
+    res.json(await testOffsite());
+  } catch (err: any) {
+    fail(res, err, 'testar');
+  }
+});
+
+// Envia para fora uma cópia que só está no servidor (em segundo plano)
+router.post('/:name/offsite', async (req: AuthenticatedRequest, res) => {
+  try {
+    const name = String(req.params.name);
+    startInBackground('offsite', () => sendToOffsite(name));
+    res.status(202).json({ started: true });
+  } catch (err: any) {
+    fail(res, err, 'enviar para fora');
   }
 });
 
