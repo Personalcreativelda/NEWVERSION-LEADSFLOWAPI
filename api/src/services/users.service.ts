@@ -17,6 +17,8 @@ const getPlanLimits = (plan: string) => {
   const limitsMap: Record<string, {
     leads: number; messages: number; massMessages: number;
     channels: number; customAssistants: number; voiceAgents: number; activeCampaigns: number;
+    // Chamadas dos agentes de voz (recebidas + feitas): minutos por período e máximo por chamada
+    voiceMinutes: number; voiceCallMinutes: number;
   }> = {
     free: {
       leads: 100,
@@ -26,6 +28,8 @@ const getPlanLimits = (plan: string) => {
       customAssistants: 0,
       voiceAgents: 0,
       activeCampaigns: 1,
+      voiceMinutes: 0,
+      voiceCallMinutes: 0,
     },
     business: {
       leads: 2000,
@@ -35,6 +39,8 @@ const getPlanLimits = (plan: string) => {
       customAssistants: 3,
       voiceAgents: 1,
       activeCampaigns: 10,
+      voiceMinutes: 60,
+      voiceCallMinutes: 10,
     },
     enterprise: {
       leads: -1,
@@ -44,6 +50,8 @@ const getPlanLimits = (plan: string) => {
       customAssistants: -1,
       voiceAgents: -1,
       activeCampaigns: -1,
+      voiceMinutes: 600,
+      voiceCallMinutes: 20,
     },
   };
 
@@ -162,6 +170,8 @@ const buildProfileResponse = (user: DbUserRow, usage?: UsageCounts) => {
         customAssistants: db?.customAssistants ?? fallback.customAssistants,
         voiceAgents: db?.voiceAgents ?? fallback.voiceAgents,
         activeCampaigns: db?.activeCampaigns ?? fallback.activeCampaigns,
+        voiceMinutes: db?.voiceMinutes ?? fallback.voiceMinutes,
+        voiceCallMinutes: db?.voiceCallMinutes ?? fallback.voiceCallMinutes,
         exportLeads: db?.exportLeads ?? db?.leads ?? fallback.leads,
         importBatch: db?.importBatch ?? db?.leads ?? fallback.leads,
       };

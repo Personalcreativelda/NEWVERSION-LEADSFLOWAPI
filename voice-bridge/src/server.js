@@ -3,6 +3,8 @@
 //
 //   POST   /calls             { callId, sdp, signedUrl, disclosure?, dynamicVariables?, maxSeconds? } → { sdp }
 //   POST   /calls/:id/start   depois de o accept da Meta responder 200
+//   POST   /calls/outbound    { callId, signedUrl, dynamicVariables?, conversationOverride?, maxSeconds? } → { sdp } (oferta)
+//   POST   /calls/:id/answer  { sdp } resposta do WhatsApp (o cliente atendeu) → liga o agente
 //   DELETE /calls/:id         a chamada terminou (ou a API quer desligar)
 //   GET    /calls/:id         estado e estatísticas
 //   GET    /health
@@ -79,7 +81,41 @@ const server = http.createServer(async (req, res) => {
   }
   if (!TOKEN || req.headers.authorization !== `Bearer ${TOKEN}`) return send(res, 401, { error: 'unauthorized' });
 
+  const newSession = (callId, body) => {
+    const session = new CallSession({
+      callId,
+      signedUrl: body.signedUrl,
+      disclosure: body.disclosure || null,
+      dynamicVariables: body.dynamicVariables || {},
+      conversationOverride: body.conversationOverride || null,
+      maxSeconds: Number(body.maxSeconds) || undefined,
+      peerConfig,
+      onEnded: (result) => {
+        calls.delete(callId);
+        void notifyEnded(result);
+      },
+    });
+    calls.set(callId, session);
+    return session;
+  };
+
   try {
+    if (req.method === 'POST' && url.pathname === '/calls/outbound') {
+      const body = await readJson(req);
+      const { callId, signedUrl } = body;
+      if (!callId || !signedUrl) return send(res, 400, { error: 'callId e signedUrl são obrigatórios' });
+      if (calls.has(callId)) return send(res, 409, { error: 'Chamada já existe' });
+      if (calls.size >= MAX_CALLS) return send(res, 503, { error: 'Demasiadas chamadas em simultâneo' });
+      const session = newSession(callId, body);
+      try {
+        return send(res, 200, { sdp: await session.offer() });
+      } catch (err) {
+        session.end('offer_failed');
+        calls.delete(callId);
+        return send(res, 422, { error: err?.message || 'Não foi possível criar a oferta' });
+      }
+    }
+
     if (req.method === 'POST' && url.pathname === '/calls') {
       const body = await readJson(req);
       const { callId, sdp, signedUrl } = body;
@@ -87,19 +123,7 @@ const server = http.createServer(async (req, res) => {
       if (calls.has(callId)) return send(res, 409, { error: 'Chamada já existe' });
       if (calls.size >= MAX_CALLS) return send(res, 503, { error: 'Demasiadas chamadas em simultâneo' });
 
-      const session = new CallSession({
-        callId,
-        signedUrl,
-        disclosure: body.disclosure || null,
-        dynamicVariables: body.dynamicVariables || {},
-        maxSeconds: Number(body.maxSeconds) || undefined,
-        peerConfig,
-        onEnded: (result) => {
-          calls.delete(callId);
-          void notifyEnded(result);
-        },
-      });
-      calls.set(callId, session);
+      const session = newSession(callId, body);
       try {
         const answer = await session.answer(sdp);
         return send(res, 200, { sdp: answer });
@@ -110,12 +134,24 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    const m = /^\/calls\/([^/]+)(\/start)?$/.exec(url.pathname);
+    const m = /^\/calls\/([^/]+)(\/start|\/answer)?$/.exec(url.pathname);
     if (m) {
       const session = calls.get(decodeURIComponent(m[1]));
       if (!session) return send(res, 404, { error: 'Chamada não encontrada' });
-      if (req.method === 'POST' && m[2]) {
-        session.start();
+      if (req.method === 'POST' && m[2] === '/start') {
+        await session.start();
+        return send(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && m[2] === '/answer') {
+        const { sdp } = await readJson(req);
+        if (!sdp) return send(res, 400, { error: 'sdp é obrigatório' });
+        try {
+          await session.applyAnswer(sdp);
+        } catch (err) {
+          session.end('answer_failed');
+          return send(res, 422, { error: err?.message || 'Resposta inválida' });
+        }
+        void session.start().catch((err) => { console.warn('[bridge] start:', err?.message); session.end('start_failed'); });
         return send(res, 200, { ok: true });
       }
       if (req.method === 'DELETE' && !m[2]) {

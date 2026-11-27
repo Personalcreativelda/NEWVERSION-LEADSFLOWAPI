@@ -13,7 +13,9 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { SkeletonVoiceAgentGrid } from '../ui/skeletons';
-import { CallHistory, WhatsAppNumbers } from '../voice-agents/WhatsAppCallsPanel';
+import { CallHistory, VoiceUsageCard, WhatsAppNumbers } from '../voice-agents/WhatsAppCallsPanel';
+import { CallModal } from '../voice-agents/CallModal';
+import { AGENT_TEMPLATES, hasPlaceholders, type AgentTemplate } from '../voice-agents/agentTemplates';
 import {
   voiceAgentsApi, type CallAgent, type CallAgentInput, type CallVoice, type WhatsAppCallsState,
 } from '../../services/api/voice-agents';
@@ -54,6 +56,17 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Chamada a tocar ou em curso: atualiza o estado e os minutos a cada 5 s
+  const live = !!state?.calls.some((c) => ['initiated', 'ringing', 'answered'].includes(c.status));
+  useEffect(() => {
+    if (!live) return;
+    const t = setInterval(() => { void load(); }, 5000);
+    return () => clearInterval(t);
+  }, [live, load]);
+
+  const [calling, setCalling] = useState(false);
+  const canCall = !!state?.channels.some((c) => c.enabled && c.voice_agent_id);
   useEffect(() => () => { audioRef.current?.pause(); }, []);
 
   const loadVoices = async () => {
@@ -68,13 +81,15 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
   const limit = state?.limit ?? 0;
   const atLimit = limit !== -1 && (state?.agents.length ?? 0) >= limit;
 
-  const openCreate = () => {
+  const openCreate = (template?: AgentTemplate) => {
     if (atLimit) {
       toast.error(limit === 0 ? 'O seu plano não inclui agentes de voz' : 'Chegou ao limite de agentes do seu plano');
       return;
     }
     setEditing(null);
-    setForm(EMPTY);
+    setForm(template
+      ? { ...EMPTY, name: template.name, greeting: template.greeting, instructions: template.instructions }
+      : EMPTY);
     setOpen(true);
     void loadVoices();
   };
@@ -136,7 +151,8 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
   const voiceName = (id: string) => voices.find((v) => v.voice_id === id)?.name;
   const usedOn = (agentId: string) => state?.channels.filter((c) => c.voice_agent_id === agentId && c.enabled) || [];
   const selectedVoice = voices.find((v) => v.voice_id === form.voice_id);
-  const canSave = form.name.trim() && form.instructions.trim() && form.greeting.trim() && form.voice_id;
+  const unfilled = hasPlaceholders(`${form.greeting}\n${form.instructions}`);
+  const canSave = form.name.trim() && form.instructions.trim() && form.greeting.trim() && form.voice_id && !unfilled;
 
   return (
     <div className="w-full h-full overflow-y-auto">
@@ -145,7 +161,7 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
           title="Agentes de voz"
           description="Atendem as chamadas do WhatsApp"
           icon={PhoneCall}
-          create={state?.available ? { label: 'Criar agente', onClick: openCreate } : undefined}
+          create={state?.available ? { label: 'Criar agente', onClick: () => openCreate() } : undefined}
         />
       </div>
 
@@ -156,6 +172,8 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
           <EmptyState icon={PhoneCall} title="Disponível em breve" description="Os agentes de voz ainda não estão ativos." />
         ) : (
           <>
+            {state.usage && limit !== 0 && <VoiceUsageCard usage={state.usage} />}
+
             <section>
               <h2 className="mb-3 text-base font-semibold text-foreground">Agentes</h2>
               {state.agents.length === 0 ? (
@@ -163,7 +181,7 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
                   icon={PhoneCall}
                   title="Ainda sem agentes"
                   description={limit === 0 ? 'O seu plano não inclui agentes de voz.' : 'Crie um agente para atender as chamadas.'}
-                  action={limit === 0 ? undefined : <Button onClick={openCreate}>Criar agente</Button>}
+                  action={limit === 0 ? undefined : <Button onClick={() => openCreate()}>Criar agente</Button>}
                 />
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -207,15 +225,38 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
               )}
             </section>
 
+            {limit !== 0 && (
+              <section>
+                <h2 className="mb-3 text-base font-semibold text-foreground">Agentes prontos</h2>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {AGENT_TEMPLATES.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => openCreate(t)}
+                      className="flex flex-col rounded-lg border border-border bg-card p-4 text-left hover:border-foreground/25 hover:bg-muted/40"
+                    >
+                      <span className="font-semibold text-foreground">{t.name}</span>
+                      <span className="mt-0.5 text-sm text-muted-foreground">{t.summary}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <section>
               <h2 className="mb-3 text-base font-semibold text-foreground">Números</h2>
               <WhatsAppNumbers state={state} onChanged={() => void load()} />
             </section>
 
             <section>
-              <h2 className="mb-3 text-base font-semibold text-foreground">Chamadas</h2>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold text-foreground">Chamadas</h2>
+                {canCall && <Button variant="outline" onClick={() => setCalling(true)}>Ligar</Button>}
+              </div>
               <CallHistory calls={state.calls} />
             </section>
+            <CallModal open={calling} onOpenChange={setCalling} state={state} onStarted={() => void load()} />
           </>
         )}
       </div>
@@ -233,6 +274,11 @@ export default function VoiceAgentsPage(_props: VoiceAgentsPageProps) {
         )}
       >
         <div className="space-y-4">
+          {unfilled && (
+            <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground">
+              Troque os campos entre [ ] pelos dados da sua empresa.
+            </p>
+          )}
           <div>
             <Label htmlFor="va-name" className="mb-1.5 block">Nome</Label>
             <Input id="va-name" value={form.name} maxLength={100} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Receção" />

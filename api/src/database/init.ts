@@ -616,6 +616,31 @@ const runPendingMigrations = async () => {
     console.warn('[DB] campaign engine migration warning:', error.message);
   }
 
+  // Chamadas dos agentes de voz contam para os minutos do plano: apagar o agente não pode apagar
+  // o histórico (apagar e criar de novo repunha os minutos). ON DELETE CASCADE → SET NULL.
+  try {
+    await pool.query(`
+      DO $
+      DECLARE c record;
+      BEGIN
+        IF to_regclass('public.voice_agent_calls') IS NULL THEN RETURN; END IF;
+        ALTER TABLE voice_agent_calls ALTER COLUMN voice_agent_id DROP NOT NULL;
+        FOR c IN SELECT conname FROM pg_constraint
+                  WHERE conrelid = 'voice_agent_calls'::regclass AND confrelid = 'voice_agents'::regclass
+                    AND contype = 'f' AND confdeltype = 'c'
+        LOOP
+          EXECUTE format('ALTER TABLE voice_agent_calls DROP CONSTRAINT %I', c.conname);
+          ALTER TABLE voice_agent_calls ADD CONSTRAINT voice_agent_calls_voice_agent_id_fkey
+            FOREIGN KEY (voice_agent_id) REFERENCES voice_agents(id) ON DELETE SET NULL;
+        END LOOP;
+      END $$;
+      CREATE INDEX IF NOT EXISTS idx_voice_agent_calls_usage
+        ON voice_agent_calls(user_id, created_at) WHERE metadata->>'source' = 'whatsapp_call';
+    `);
+  } catch (error: any) {
+    console.warn('[DB] voice_agent_calls migration warning:', error.message);
+  }
+
   // ── Migration 021: Team Inbox ─────────────────────────────────────────────
   try {
     // Colunas de atribuição em conversations

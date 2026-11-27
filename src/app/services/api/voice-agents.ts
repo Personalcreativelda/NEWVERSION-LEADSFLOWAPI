@@ -247,6 +247,30 @@ export const voiceAgentsApi = {
     const response = await api.delete(`/whatsapp-calls/agents/${id}`);
     return response.data;
   },
+
+  /** O agente liga a um cliente */
+  async startCall(data: { channel_id: string; voice_agent_id: string; to: string; greeting: string; purpose?: string }) {
+    const response = await api.post('/whatsapp-calls/outbound', data);
+    return response.data as { id: string };
+  },
+
+  /** O cliente autorizou chamadas deste número? */
+  async getCallPermission(channelId: string, to: string): Promise<CallPermission> {
+    const response = await api.get('/whatsapp-calls/permission', { params: { channel_id: channelId, to } });
+    return response.data;
+  },
+
+  /** Pede autorização ao cliente por mensagem do WhatsApp */
+  async requestCallPermission(channelId: string, to: string, text?: string) {
+    const response = await api.post('/whatsapp-calls/permission', { channel_id: channelId, to, text });
+    return response.data;
+  },
+
+  /** Gravação da chamada (MP3) */
+  async getCallRecording(callId: string): Promise<Blob> {
+    const response = await api.get(`/whatsapp-calls/calls/${callId}/audio`, { responseType: 'blob', timeout: 90_000 });
+    return response.data;
+  },
 };
 
 export interface CallAgentInput {
@@ -279,5 +303,26 @@ export interface WhatsAppCallsState {
   calls: {
     id: string; phone_number: string; status: string; duration_seconds: number | null; transcript: string | null;
     started_at: string | null; ended_at: string | null; caller_name: string | null; lead_id: string | null; agent_name: string | null;
+    has_audio: boolean;
+    direction: 'inbound' | 'outbound';
+    reject_reason: string | null;
+    purpose: string | null;
   }[];
+  usage: VoiceUsage | null;
+}
+
+export interface VoiceUsage {
+  agents_limit: number;
+  minutes_limit: number;      // -1 = sem limite
+  call_max_minutes: number;
+  used_seconds: number;
+  remaining_seconds: number;  // -1 = sem limite
+  period_start: string;
+}
+
+export interface CallPermission {
+  status: 'no_permission' | 'temporary' | 'permanent' | string;
+  expires_at: string | null;
+  can_call: boolean;
+  can_request: boolean;
 }

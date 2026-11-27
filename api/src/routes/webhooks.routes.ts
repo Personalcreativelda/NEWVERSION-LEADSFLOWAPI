@@ -3558,6 +3558,13 @@ router.post('/whatsapp-cloud/:channelId?', async (req, res) => {
               break;
             }
             case 'interactive':
+              if (message.interactive?.type === 'call_permission_reply') {
+                // Resposta ao pedido "Podemos ligar-lhe?" (chamadas feitas pelos agentes de voz)
+                const reply = message.interactive.call_permission_reply || {};
+                messageContent = reply.response === 'accept' ? '📞 Autorizou chamadas' : '📞 Recusou chamadas';
+                void whatsappCallsService.onPermissionReply(String(phoneNumberId || ''), String(senderId || ''), reply);
+                break;
+              }
               messageContent = message.interactive?.button_reply?.title || message.interactive?.list_reply?.title
                 || message.interactive?.nfm_reply?.body || '';
               break;

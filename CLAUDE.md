@@ -288,7 +288,22 @@ Há um emulador `Medium_Phone_API_37.0`.
   servidor, não o do Cloudflare) no Coolify. Teste fechado: `cd voice-bridge && npm test`.
 - `WHATSAPP_CALLS_ENABLED=false` por omissão: sem ela (e sem `VOICE_BRIDGE_URL`) o webhook ignora as chamadas e a
   secção "Chamadas do WhatsApp" em Agentes de voz não aparece. Escolha por número em `channels.settings.whatsapp_calls`;
-  histórico em `voice_agent_calls` (`metadata.source = 'whatsapp_call'`). O aviso "assistente com IA" é dito pela ponte.
+  histórico em `voice_agent_calls` (`metadata.source = 'whatsapp_call'`). Quem fala primeiro é o agente, com a primeira frase
+  do cliente (os modelos já dizem "assistente virtual"); aviso fixo da ponte só com `WHATSAPP_CALLS_DISCLOSURE` (repetia o "Olá").
+  Mudar `CALL_STYLE`/`agentBody` → subir `AGENT_PROMPT_VERSION` (os agentes antigos são atualizados ao arrancar).
+  Gravação: `GET /api/whatsapp-calls/calls/:id/audio` (MP3 do ElevenLabs, `record_voice`), "Ouvir chamada" no histórico.
+  Agentes prontos em `voice-agents/agentTemplates.ts`; a API recusa guardar com campos `[ … ]` por preencher.
+- Chamadas feitas pelo agente ("Ligar", `POST /api/whatsapp-calls/outbound`): a Meta exige autorização do cliente
+  (`call_permission_request` por mensagem, só com a janela de 24 h aberta; 1 pedido/dia, 2/semana; dura 7 dias;
+  resposta em `messages` → `interactive.call_permission_reply` → aviso no sino). Ponte: `POST /calls/outbound` (oferta) →
+  Meta `connect` com `biz_opaque_callback_data` = id da linha → webhook `connect` BUSINESS_INITIATED com a resposta →
+  `POST /calls/:id/answer`. A chave da sessão na ponte é a id da linha (`metadata.bridge_key`); nas recebidas é a wacid.
+  A primeira frase e o objetivo vão como `conversation_config_override` (overrides ligados no agente).
+- Limites (`services/voice-usage.service.ts`, chaves do plano `voiceAgents`/`voiceMinutes`/`voiceCallMinutes`; Business
+  1 agente/60 min/10 min por chamada, Enterprise ilimitados/600/20): minutos de recebidas + feitas por período de faturação;
+  sem minutos as recebidas são recusadas na Meta e não se liga; cada chamada é cortada pela ponte no menor entre o máximo
+  do plano e o que resta; o mesmo número só liga 3 vezes / 20 min em 24 h; 20 s de silêncio desligam; sino aos 80 % e 100 %.
+  Apagar um agente já não apaga as chamadas (FK SET NULL), senão os minutos voltavam a zero.
 
 ## Testar sem a conta do utilizador
 

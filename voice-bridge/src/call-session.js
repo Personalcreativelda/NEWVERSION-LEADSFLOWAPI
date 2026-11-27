@@ -3,8 +3,10 @@
 //  WhatsApp ──WebRTC (Opus 48 kHz, DTLS-SRTP)──► ponte ──WebSocket (PCM/μ-law, base64)──► ElevenLabs
 //           ◄───────────────────────────────────        ◄──────────────────────────────────
 //
-// Ordem: answer(oferta) devolve o SDP de resposta (a API faz pre_accept/accept na Meta);
-// start() só depois do accept: diz o aviso de IA e liga o agente. end() fecha tudo uma vez.
+// Chamada recebida: answer(oferta) devolve o SDP de resposta (a API faz pre_accept/accept na Meta);
+// start() só depois do accept: liga o agente. Chamada feita pela empresa: offer() devolve a oferta
+// (a API envia-a à Meta em "connect") e applyAnswer() recebe a resposta do WhatsApp quando o
+// cliente atende; depois start(). end() fecha tudo uma vez.
 import { MediaStreamTrack, RTCPeerConnection, RtpHeader, RtpPacket, useOPUS } from 'werift';
 import WebSocket from 'ws';
 import {
@@ -23,6 +25,7 @@ export class CallSession {
    * @param {string} opts.signedUrl        URL assinado do agente (a API obtém-no com a chave do cliente)
    * @param {{audioBase64: string, format: string}|null} [opts.disclosure] aviso "está a falar com uma IA"
    * @param {object} [opts.dynamicVariables] variáveis para o agente (ex.: número de quem liga)
+   * @param {object} [opts.conversationOverride] conversation_config_override (ex.: primeira frase de uma chamada feita)
    * @param {object} [opts.peerConfig]     configuração do werift (portas UDP, IP público)
    * @param {number} [opts.maxSeconds]     duração máxima da chamada
    * @param {(result: object) => void} [opts.onEnded]
@@ -33,6 +36,7 @@ export class CallSession {
     this.signedUrl = opts.signedUrl;
     this.disclosure = opts.disclosure || null;
     this.dynamicVariables = opts.dynamicVariables || {};
+    this.conversationOverride = opts.conversationOverride || null;
     this.peerConfig = opts.peerConfig || {};
     this.maxSeconds = opts.maxSeconds || 1800;
     this.onEnded = opts.onEnded || (() => {});
@@ -55,11 +59,9 @@ export class CallSession {
   }
 
   /** Oferta SDP do WhatsApp → resposta SDP (com os candidatos ICE já incluídos) */
-  async answer(offerSdp) {
-    if (this.state !== 'new') throw new Error('A chamada já foi atendida');
+  createPeer() {
     this.pc = new RTCPeerConnection({ codecs: { audio: [useOPUS()] }, ...this.peerConfig });
     this.localTrack = new MediaStreamTrack({ kind: 'audio' });
-
     this.pc.onTrack.subscribe((track) => {
       track.onReceiveRtp.subscribe((rtp) => this.onRemoteRtp(rtp));
     });
@@ -67,6 +69,29 @@ export class CallSession {
       this.log('WebRTC:', s);
       if (s === 'failed' || s === 'closed') this.end(s === 'failed' ? 'media_failed' : 'media_closed');
     });
+  }
+
+  /** Chamada feita pela empresa: oferta SDP (com os candidatos ICE) para o "connect" da Meta */
+  async offer() {
+    if (this.state !== 'new') throw new Error('A chamada já começou');
+    this.createPeer();
+    this.transceiver = this.pc.addTransceiver(this.localTrack, { direction: 'sendrecv' });
+    await this.pc.setLocalDescription(await this.pc.createOffer());
+    await this.waitForIceGathering();
+    this.state = 'offered';
+    return this.pc.localDescription.sdp;
+  }
+
+  /** Resposta SDP do WhatsApp (o cliente atendeu) */
+  async applyAnswer(answerSdp) {
+    if (this.state !== 'offered') throw new Error('Não há oferta à espera de resposta');
+    await this.pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+    this.state = 'answered';
+  }
+
+  async answer(offerSdp) {
+    if (this.state !== 'new') throw new Error('A chamada já foi atendida');
+    this.createPeer();
 
     await this.pc.setRemoteDescription({ type: 'offer', sdp: offerSdp });
     const audio = this.pc.getTransceivers().find((t) => t.kind === 'audio');
@@ -91,9 +116,23 @@ export class CallSession {
     });
   }
 
-  /** Depois do accept na Meta: aviso de IA, agente e envio de áudio a cada 20 ms */
-  start() {
+  /** Espera que o áudio WebRTC esteja ligado (no máximo `ms`), para a primeira frase não se perder */
+  waitConnected(ms = 2500) {
+    if (!this.pc || this.pc.connectionState === 'connected') return Promise.resolve();
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, ms);
+      this.pc.connectionStateChange.subscribe((s) => {
+        if (s === 'connected') { clearTimeout(timer); resolve(); }
+      });
+    });
+  }
+
+  /** Depois do accept na Meta (ou da resposta do cliente): agente e envio de áudio a cada 20 ms */
+  async start() {
     if (this.state !== 'answered') throw new Error('A chamada ainda não foi atendida');
+    this.state = 'starting';
+    await this.waitConnected();
+    if (this.state !== 'starting') return; // terminou enquanto esperava
     this.state = 'live';
     this.startedAt = new Date();
     if (this.disclosure?.audioBase64) {
@@ -189,7 +228,11 @@ export class CallSession {
     const ws = new WebSocket(this.signedUrl);
     this.ws = ws;
     ws.on('open', () => {
-      ws.send(JSON.stringify({ type: 'conversation_initiation_client_data', dynamic_variables: this.dynamicVariables }));
+      ws.send(JSON.stringify({
+        type: 'conversation_initiation_client_data',
+        dynamic_variables: this.dynamicVariables,
+        ...(this.conversationOverride ? { conversation_config_override: this.conversationOverride } : {}),
+      }));
     });
     ws.on('message', (data) => this.onAgentMessage(data));
     ws.on('error', (err) => this.log('Agente: erro', err?.message));

@@ -24,7 +24,9 @@ export function withOfflineCache(api: AxiosInstance): AxiosInstance {
   api.interceptors.response.use(
     (response) => {
       reportServerUp();
-      if (isGet(response.config.method)) void saveCachedResponse(api.getUri(response.config), response.data);
+      // Ficheiros (áudio, documentos) não vão para a cópia offline: só os dados JSON
+      const binary = response.config.responseType === 'blob' || response.config.responseType === 'arraybuffer';
+      if (isGet(response.config.method) && !binary) void saveCachedResponse(api.getUri(response.config), response.data);
       return response;
     },
     async (error: AxiosError) => {

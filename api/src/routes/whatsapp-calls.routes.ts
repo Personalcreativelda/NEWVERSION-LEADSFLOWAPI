@@ -4,18 +4,25 @@
 //   POST   /agents        criar agente { name, instructions, greeting, voice_id, language }
 //   PUT    /agents/:id    editar agente
 //   DELETE /agents/:id    apagar agente (desliga-o dos números que o usavam)
+//   POST   /outbound      o agente liga a um cliente { channel_id, voice_agent_id, to, greeting, purpose? }
+//   GET    /permission    ?channel_id=&to= — o cliente autorizou chamadas?
+//   POST   /permission    { channel_id, to, text? } — pede autorização por mensagem
+//   GET    /calls/:id/audio  gravação da chamada (MP3, as duas vozes)
 //   PUT    /:channelId    { enabled, voice_agent_id } — liga/desliga as chamadas no número (Meta) e guarda a escolha
 //
 // Os agentes criados aqui vivem na conta ElevenLabs da plataforma (call_config.managed): o cliente não
 // configura chaves e só vê os seus (voice_agents.user_id).
 import { Router } from 'express';
+import { Readable } from 'stream';
 import { requireAuth } from '../middleware/auth.middleware';
 import { query } from '../database/connection';
 import { getUserProfile } from '../services/users.service';
 import {
-  LANGUAGES, ManagedAgentInput, WhatsAppCallError, bridgeConfigured, callsEnabled, createManagedAgent,
+  AGENT_PROMPT_VERSION, LANGUAGES, ManagedAgentInput, WhatsAppCallError, bridgeConfigured, callRecording, callsEnabled, createManagedAgent,
   deleteManagedAgent, listVoices, setNumberCalling, updateManagedAgent,
 } from '../services/whatsapp-calls.service';
+import { whatsappCallsService } from '../services/whatsapp-calls.service';
+import { voiceUsage } from '../services/voice-usage.service';
 
 const router = Router();
 router.use(requireAuth);
@@ -25,7 +32,11 @@ const parse = (v: any) => (typeof v === 'string' ? (() => { try { return JSON.pa
 const fail = (res: any, err: any, where: string) => {
   const status = err instanceof WhatsAppCallError ? err.status : 500;
   console.error(`[WhatsAppCalls] ${where}:`, err?.message);
-  res.status(status).json({ error: status === 500 ? 'Não foi possível concluir' : err.message });
+  res.status(status).json({
+    error: status === 500 ? 'Não foi possível concluir' : err.message,
+    ...(err?.code ? { code: err.code } : {}),
+    ...(err?.can_request !== undefined ? { can_request: !!err.can_request } : {}),
+  });
 };
 
 function readAgent(body: any): { error: string } | ManagedAgentInput {
@@ -40,13 +51,15 @@ function readAgent(body: any): { error: string } | ManagedAgentInput {
   if (!voice_id) return { error: 'Escolha a voz' };
   if (!(LANGUAGES as readonly string[]).includes(language)) return { error: 'Idioma inválido' };
   if (instructions.length > 8000 || greeting.length > 500 || name.length > 100) return { error: 'Texto demasiado longo' };
+  // Modelos prontos trazem campos como [nome da empresa]: o agente lê-los-ia em voz alta
+  if (/\[[^\]]{2,60}\]/.test(`${greeting}\n${instructions}`)) return { error: 'Substitua os campos entre [ ] pelos dados da sua empresa' };
   return { name, instructions, greeting, voice_id, language };
 }
 
 router.get('/', async (req: any, res) => {
   try {
     const userId = req.user.id;
-    const [channels, agents, calls, profile] = await Promise.all([
+    const [channels, agents, calls, profile, usage] = await Promise.all([
       query(
         `SELECT id, name, settings, credentials->>'display_phone_number' AS phone
            FROM channels WHERE user_id = $1 AND type = 'whatsapp_cloud' AND status = 'active' ORDER BY created_at`,
@@ -59,13 +72,16 @@ router.get('/', async (req: any, res) => {
       ),
       query(
         `SELECT c.id, c.phone_number, c.status, c.duration_seconds, c.transcript, c.started_at, c.ended_at,
-                c.metadata->>'caller_name' AS caller_name, c.lead_id, a.name AS agent_name
+                c.metadata->>'caller_name' AS caller_name, c.lead_id, a.name AS agent_name, c.direction,
+                c.metadata->>'reject_reason' AS reject_reason, c.metadata->>'purpose' AS purpose,
+                (c.voice_provider_id IS NOT NULL AND COALESCE(c.metadata->>'has_audio', 'true') <> 'false') AS has_audio
            FROM voice_agent_calls c LEFT JOIN voice_agents a ON a.id = c.voice_agent_id
           WHERE c.user_id = $1 AND c.metadata->>'source' = 'whatsapp_call'
           ORDER BY c.created_at DESC LIMIT 50`,
         [userId],
       ),
       getUserProfile(userId).catch(() => null),
+      voiceUsage(userId).catch(() => null),
     ]);
     res.json({
       available: callsEnabled() && bridgeConfigured() && !!process.env.ELEVENLABS_API_KEY,
@@ -88,9 +104,56 @@ router.get('/', async (req: any, res) => {
         };
       }),
       calls: calls.rows,
+      usage,
     });
   } catch (err: any) {
     fail(res, err, 'GET');
+  }
+});
+
+// O agente liga a um cliente { channel_id, voice_agent_id, to, greeting, purpose? }
+router.post('/outbound', async (req: any, res) => {
+  try {
+    const b = req.body || {};
+    res.status(201).json(await whatsappCallsService.startOutbound(req.user.id, {
+      channel_id: String(b.channel_id || ''), voice_agent_id: String(b.voice_agent_id || ''),
+      to: String(b.to || ''), greeting: String(b.greeting || ''), purpose: b.purpose ? String(b.purpose) : undefined,
+    }));
+  } catch (err: any) {
+    fail(res, err, 'ligar');
+  }
+});
+
+// Autorização do cliente para receber chamadas (?channel_id=&to=)
+router.get('/permission', async (req: any, res) => {
+  try {
+    res.json(await whatsappCallsService.permissionForUser(req.user.id, String(req.query.channel_id || ''), String(req.query.to || '')));
+  } catch (err: any) {
+    fail(res, err, 'autorização');
+  }
+});
+
+// Pedir autorização { channel_id, to, text? } (mensagem do WhatsApp; janela de 24 horas aberta)
+router.post('/permission', async (req: any, res) => {
+  try {
+    const b = req.body || {};
+    res.json(await whatsappCallsService.requestPermission(req.user.id, String(b.channel_id || ''), String(b.to || ''), b.text ? String(b.text) : undefined));
+  } catch (err: any) {
+    fail(res, err, 'pedir autorização');
+  }
+});
+
+router.get('/calls/:id/audio', async (req: any, res) => {
+  try {
+    const audio = await callRecording(req.user.id, String(req.params.id));
+    if (!audio) return res.status(404).json({ error: 'Esta chamada não tem gravação' });
+    res.setHeader('Content-Type', audio.headers.get('content-type') || 'audio/mpeg');
+    const len = audio.headers.get('content-length');
+    if (len) res.setHeader('Content-Length', len);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    Readable.fromWeb(audio.body as any).pipe(res);
+  } catch (err: any) {
+    fail(res, err, 'GET audio');
   }
 });
 
@@ -124,7 +187,7 @@ router.post('/agents', async (req: any, res) => {
                                    greeting_message, instructions, language, is_active)
          VALUES ($1, $2, 'elevenlabs', $3, 'whatsapp', $4, $5, $6, $7, true) RETURNING id`,
         [userId, input.name, JSON.stringify({ voice_id: input.voice_id }),
-          JSON.stringify({ elevenlabs_agent_id: agentId, managed: true }), input.greeting, input.instructions, input.language],
+          JSON.stringify({ elevenlabs_agent_id: agentId, managed: true, prompt_v: AGENT_PROMPT_VERSION }), input.greeting, input.instructions, input.language],
       )).rows[0];
       res.status(201).json({ id: row.id });
     } catch (err) {
@@ -155,7 +218,7 @@ router.put('/agents/:id', async (req: any, res) => {
               greeting_message = $6, instructions = $7, language = $8, updated_at = NOW()
         WHERE id = $1 AND user_id = $2`,
       [agent.id, userId, input.name, JSON.stringify({ voice_id: input.voice_id }),
-        JSON.stringify({ elevenlabs_agent_id: agentId, managed: true }), input.greeting, input.instructions, input.language],
+        JSON.stringify({ elevenlabs_agent_id: agentId, managed: true, prompt_v: AGENT_PROMPT_VERSION }), input.greeting, input.instructions, input.language],
     );
     res.json({ ok: true });
   } catch (err: any) {

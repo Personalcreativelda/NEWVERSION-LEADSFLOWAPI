@@ -15,6 +15,7 @@ import { flowExecutionService } from './services/flow-execution.service';
 import { campaignEngine } from './services/campaign-engine.service';
 import { channelHealthService } from './services/channel-health.service';
 import { cloudStatusWorker } from './services/cloud-status.service';
+import { resyncManagedAgents } from './services/whatsapp-calls.service';
 import { commentAutomationService } from './services/comment-automation.service';
 import { metaConversionsWorker } from './services/meta-conversions.service';
 // INBOX: Importar WebSocket service e Email Polling
@@ -606,6 +607,10 @@ initDatabase().then(() => {
   cloudStatusWorker.start();
   metaConversionsWorker.start();
   // Páginas do Facebook já ligadas passam a receber também os comentários (uma vez por página)
+  // Agentes de voz criados com instruções antigas (ex.: cumprimentavam outra vez depois da primeira frase)
+  setTimeout(() => {
+    resyncManagedAgents().catch((err) => console.warn('[WhatsAppCalls] Atualizar agentes:', err?.message));
+  }, 20_000).unref?.();
   setTimeout(() => {
     commentAutomationService.subscribeExistingPages().catch((err) => console.warn('[CommentAutomation] Subscrição das páginas:', err?.message));
   }, 30_000).unref?.();
